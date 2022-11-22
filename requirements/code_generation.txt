@@ -1,3 +1,4 @@
 sa-metameta
 jinja2
+jinja2-cli
 docopt

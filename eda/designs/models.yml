@@ -1,11 +1,13 @@
 models:
-- fields:
+- api: true
+  fields:
   - len: 32
     name: version_num
     pk: true
     type: AutoField
   name: AlembicVersion
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -18,7 +20,8 @@ models:
     ref_field: id
     type: IntegerField
   name: ActivationInstanceJobInstance
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -47,7 +50,8 @@ models:
     ref_field: id
     type: IntegerField
   name: ActivationInstance
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -60,7 +64,8 @@ models:
     ref_field: id
     type: IntegerField
   name: ExtraVar
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -79,7 +84,8 @@ models:
   - name: large_data_id
     type: OID
   name: Project
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -92,7 +98,8 @@ models:
     ref_field: id
     type: IntegerField
   name: Inventory
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -111,14 +118,16 @@ models:
   - name: modified_at
     type: DateTimeField
   name: Rulebook
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
   - name: uuid
     type: UUIDField
   name: JobInstance
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -131,7 +140,8 @@ models:
   - name: log
     type: CharField
   name: ActivationInstanceLog
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -144,7 +154,8 @@ models:
   - name: action
     type: JSONField
   name: Rule
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -159,14 +170,16 @@ models:
   - name: modified_at
     type: DateTimeField
   name: Ruleset
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
   - name: uuid
     type: UUIDField
   name: Job
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -179,7 +192,8 @@ models:
     ref_field: id
     type: IntegerField
   name: Playbook
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -212,7 +226,8 @@ models:
     ref_field: id
     type: IntegerField
   name: AuditRule
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -227,7 +242,8 @@ models:
   - name: created_at
     type: DateTimeField
   name: JobInstanceEvent
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -244,7 +260,8 @@ models:
   - name: status
     type: CharField
   name: JobInstanceHost
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -285,7 +302,8 @@ models:
     name: restart_policy
     type: CharField
   name: Activation
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -294,7 +312,8 @@ models:
   - name: description
     type: CharField
   name: Role
-- fields:
+- api: true
+  fields:
   - name: id
     pk: true
     type: AutoField
@@ -309,7 +328,8 @@ models:
     name: action
     type: CharField
   name: RolePermission
-- fields:
+- api: true
+  fields:
   - name: user_id
     pk: true
     ref: User
@@ -321,7 +341,8 @@ models:
     ref_field: id
     type: AutoField
   name: UserRole
-- fields:
+- api: true
+  fields:
   - len: 320
     name: email
     type: CharField

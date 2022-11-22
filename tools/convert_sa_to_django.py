@@ -87,6 +87,7 @@ def main(args=None):
                 clean_field(field)
 
             model['name'] = camelcase(model['name'])
+            model['api'] = True
 
 
 
