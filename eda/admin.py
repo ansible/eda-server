@@ -311,7 +311,10 @@ admin.site.register(RolePermission, RolePermissionAdmin)
 
 
 class UserRoleAdmin(admin.ModelAdmin):
-    fields = ()
+    fields = (
+        "user_id",
+        "role_id",
+    )
     raw_id_fields = (
         "user_id",
         "role_id",

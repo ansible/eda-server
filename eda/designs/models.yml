@@ -320,7 +320,7 @@ models:
   - name: role_id
     ref: Role
     ref_field: id
-    type: UUIDField
+    type: ForeignKey
   - len: 13
     name: resource_type
     type: CharField
@@ -331,14 +331,15 @@ models:
 - api: true
   fields:
   - name: user_id
-    pk: true
     ref: User
     ref_field: id
-    type: AutoField
+    type: ForeignKey
   - name: role_id
-    pk: true
     ref: Role
     ref_field: id
+    type: ForeignKey
+  - name: id
+    pk: true
     type: AutoField
   name: UserRole
 - api: true

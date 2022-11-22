@@ -45,8 +45,12 @@ def convert_field_type(field):
     elif "VARCHAR" in field['type']:
         field['len'] = int(field['type'].split('(')[1].split(')')[0])
         field['type'] = field_map['VARCHAR']
-    if field.get('pk'):
+    if field.get('pk') and not field.get('ref'):
         field['type'] = 'AutoField'
+    if field.get('pk') and field.get('ref'):
+        del field['pk']
+    if field.get('ref') and field.get('type') == 'UUIDField':
+        field['type'] = 'ForeignKey'
 
 
 
@@ -64,6 +68,14 @@ def clean_field(field):
             del field['pk']
 
 
+
+def add_pk_field(table):
+    if not any(f.get('pk') for f in table['fields']):
+        table['fields'].append({
+            'name': 'id',
+            'type': 'AutoField',
+            'pk': True,
+        })
 
 
 def main(args=None):
@@ -88,6 +100,7 @@ def main(args=None):
 
             model['name'] = camelcase(model['name'])
             model['api'] = True
+            add_pk_field(model)
 
 
 

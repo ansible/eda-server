@@ -39,7 +39,7 @@ class ActivationInstance(models.Model):
     )
     execution_environment = models.CharField(blank=True)
     working_directory = models.CharField(blank=True)
-    large_data_id = models.OID()
+    #large_data_id = models.OID()
     project_id = models.IntegerField(
         "Project",
     )
@@ -68,7 +68,7 @@ class Project(models.Model):
     description = models.CharField(blank=True)
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
-    large_data_id = models.OID()
+    #large_data_id = models.OID()
 
 
 class Inventory(models.Model):
@@ -254,7 +254,7 @@ class RolePermission(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    role_id = models.UUIDField(
+    role_id = models.ForeignKey(
         "Role",
     )
     resource_type = models.CharField(max_length=13, blank=True)
@@ -263,12 +263,13 @@ class RolePermission(models.Model):
 
 class UserRole(models.Model):
 
-    user_id = models.AutoField(
+    user_id = models.ForeignKey(
         "User",
-        primary_key=True,
     )
-    role_id = models.AutoField(
+    role_id = models.ForeignKey(
         "Role",
+    )
+    id = models.AutoField(
         primary_key=True,
     )
 

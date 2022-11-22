@@ -195,7 +195,7 @@ class RolePermissionSerializer(BaseSerializer):
 class UserRoleSerializer(BaseSerializer):
     class Meta:
         model = UserRole
-        fields = ("user_id", "role_id")
+        fields = ("user_id", "role_id", "id")
 
 
 class UserSerializer(BaseSerializer):

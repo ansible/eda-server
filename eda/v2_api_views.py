@@ -1062,13 +1062,13 @@ class UserRoleList(ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         response = super(UserRoleList, self).create(request, *args, **kwargs)
-        pk = response.data["user_idrole_id"]
+        pk = response.data["id"]
         message = dict()
 
         message.update(response.data)
 
         message["msg_type"] = "UserRoleCreate"
-        message["user_idrole_id"] = pk
+        message["id"] = pk
         message["sender"] = 0
 
         for topology_id in Topology.objects.all().values_list("topology_id", flat=True):
@@ -1088,7 +1088,7 @@ class UserRoleDetail(RetrieveUpdateDestroyAPIView):
         message = dict()
         message.update(json.loads(request.body))
         message["msg_type"] = "UserRoleUpdate"
-        message["user_idrole_id"] = pk
+        message["id"] = pk
         message["sender"] = 0
 
         for topology_id in Topology.objects.all().values_list("topology_id", flat=True):
