@@ -32,12 +32,12 @@ urls += [
     url(
         r"^activationinstancejobinstance/$",
         ActivationInstanceJobInstanceList.as_view(),
-        name="canvas_activationinstancejobinstance_list",
+        name="eda_activationinstancejobinstance_list",
     ),
     url(
         r"^activationinstancejobinstance/(?P<pk>[0-9]+)/$",
         ActivationInstanceJobInstanceDetail.as_view(),
-        name="canvas_activationinstancejobinstance_detail",
+        name="eda_activationinstancejobinstance_detail",
     ),
 ]
 
@@ -45,57 +45,55 @@ urls += [
     url(
         r"^activationinstance/$",
         ActivationInstanceList.as_view(),
-        name="canvas_activationinstance_list",
+        name="eda_activationinstance_list",
     ),
     url(
         r"^activationinstance/(?P<pk>[0-9]+)/$",
         ActivationInstanceDetail.as_view(),
-        name="canvas_activationinstance_detail",
+        name="eda_activationinstance_detail",
     ),
 ]
 
 urls += [
-    url(r"^extravar/$", ExtraVarList.as_view(), name="canvas_extravar_list"),
+    url(r"^extravar/$", ExtraVarList.as_view(), name="eda_extravar_list"),
     url(
         r"^extravar/(?P<pk>[0-9]+)/$",
         ExtraVarDetail.as_view(),
-        name="canvas_extravar_detail",
+        name="eda_extravar_detail",
     ),
 ]
 
 urls += [
-    url(r"^project/$", ProjectList.as_view(), name="canvas_project_list"),
+    url(r"^project/$", ProjectList.as_view(), name="eda_project_list"),
     url(
-        r"^project/(?P<pk>[0-9]+)/$",
-        ProjectDetail.as_view(),
-        name="canvas_project_detail",
+        r"^project/(?P<pk>[0-9]+)/$", ProjectDetail.as_view(), name="eda_project_detail"
     ),
 ]
 
 urls += [
-    url(r"^inventory/$", InventoryList.as_view(), name="canvas_inventory_list"),
+    url(r"^inventory/$", InventoryList.as_view(), name="eda_inventory_list"),
     url(
         r"^inventory/(?P<pk>[0-9]+)/$",
         InventoryDetail.as_view(),
-        name="canvas_inventory_detail",
+        name="eda_inventory_detail",
     ),
 ]
 
 urls += [
-    url(r"^rulebook/$", RulebookList.as_view(), name="canvas_rulebook_list"),
+    url(r"^rulebook/$", RulebookList.as_view(), name="eda_rulebook_list"),
     url(
         r"^rulebook/(?P<pk>[0-9]+)/$",
         RulebookDetail.as_view(),
-        name="canvas_rulebook_detail",
+        name="eda_rulebook_detail",
     ),
 ]
 
 urls += [
-    url(r"^jobinstance/$", JobInstanceList.as_view(), name="canvas_jobinstance_list"),
+    url(r"^jobinstance/$", JobInstanceList.as_view(), name="eda_jobinstance_list"),
     url(
         r"^jobinstance/(?P<pk>[0-9]+)/$",
         JobInstanceDetail.as_view(),
-        name="canvas_jobinstance_detail",
+        name="eda_jobinstance_detail",
     ),
 ]
 
@@ -103,49 +101,47 @@ urls += [
     url(
         r"^activationinstancelog/$",
         ActivationInstanceLogList.as_view(),
-        name="canvas_activationinstancelog_list",
+        name="eda_activationinstancelog_list",
     ),
     url(
         r"^activationinstancelog/(?P<pk>[0-9]+)/$",
         ActivationInstanceLogDetail.as_view(),
-        name="canvas_activationinstancelog_detail",
+        name="eda_activationinstancelog_detail",
     ),
 ]
 
 urls += [
-    url(r"^rule/$", RuleList.as_view(), name="canvas_rule_list"),
-    url(r"^rule/(?P<pk>[0-9]+)/$", RuleDetail.as_view(), name="canvas_rule_detail"),
+    url(r"^rule/$", RuleList.as_view(), name="eda_rule_list"),
+    url(r"^rule/(?P<pk>[0-9]+)/$", RuleDetail.as_view(), name="eda_rule_detail"),
 ]
 
 urls += [
-    url(r"^ruleset/$", RulesetList.as_view(), name="canvas_ruleset_list"),
+    url(r"^ruleset/$", RulesetList.as_view(), name="eda_ruleset_list"),
     url(
-        r"^ruleset/(?P<pk>[0-9]+)/$",
-        RulesetDetail.as_view(),
-        name="canvas_ruleset_detail",
+        r"^ruleset/(?P<pk>[0-9]+)/$", RulesetDetail.as_view(), name="eda_ruleset_detail"
     ),
 ]
 
 urls += [
-    url(r"^job/$", JobList.as_view(), name="canvas_job_list"),
-    url(r"^job/(?P<pk>[0-9]+)/$", JobDetail.as_view(), name="canvas_job_detail"),
+    url(r"^job/$", JobList.as_view(), name="eda_job_list"),
+    url(r"^job/(?P<pk>[0-9]+)/$", JobDetail.as_view(), name="eda_job_detail"),
 ]
 
 urls += [
-    url(r"^playbook/$", PlaybookList.as_view(), name="canvas_playbook_list"),
+    url(r"^playbook/$", PlaybookList.as_view(), name="eda_playbook_list"),
     url(
         r"^playbook/(?P<pk>[0-9]+)/$",
         PlaybookDetail.as_view(),
-        name="canvas_playbook_detail",
+        name="eda_playbook_detail",
     ),
 ]
 
 urls += [
-    url(r"^auditrule/$", AuditRuleList.as_view(), name="canvas_auditrule_list"),
+    url(r"^auditrule/$", AuditRuleList.as_view(), name="eda_auditrule_list"),
     url(
         r"^auditrule/(?P<pk>[0-9]+)/$",
         AuditRuleDetail.as_view(),
-        name="canvas_auditrule_detail",
+        name="eda_auditrule_detail",
     ),
 ]
 
@@ -153,12 +149,12 @@ urls += [
     url(
         r"^jobinstanceevent/$",
         JobInstanceEventList.as_view(),
-        name="canvas_jobinstanceevent_list",
+        name="eda_jobinstanceevent_list",
     ),
     url(
         r"^jobinstanceevent/(?P<pk>[0-9]+)/$",
         JobInstanceEventDetail.as_view(),
-        name="canvas_jobinstanceevent_detail",
+        name="eda_jobinstanceevent_detail",
     ),
 ]
 
@@ -166,54 +162,54 @@ urls += [
     url(
         r"^jobinstancehost/$",
         JobInstanceHostList.as_view(),
-        name="canvas_jobinstancehost_list",
+        name="eda_jobinstancehost_list",
     ),
     url(
         r"^jobinstancehost/(?P<pk>[0-9]+)/$",
         JobInstanceHostDetail.as_view(),
-        name="canvas_jobinstancehost_detail",
+        name="eda_jobinstancehost_detail",
     ),
 ]
 
 urls += [
-    url(r"^activation/$", ActivationList.as_view(), name="canvas_activation_list"),
+    url(r"^activation/$", ActivationList.as_view(), name="eda_activation_list"),
     url(
         r"^activation/(?P<pk>[0-9]+)/$",
         ActivationDetail.as_view(),
-        name="canvas_activation_detail",
+        name="eda_activation_detail",
     ),
 ]
 
 urls += [
-    url(r"^role/$", RoleList.as_view(), name="canvas_role_list"),
-    url(r"^role/(?P<pk>[0-9]+)/$", RoleDetail.as_view(), name="canvas_role_detail"),
+    url(r"^role/$", RoleList.as_view(), name="eda_role_list"),
+    url(r"^role/(?P<pk>[0-9]+)/$", RoleDetail.as_view(), name="eda_role_detail"),
 ]
 
 urls += [
     url(
         r"^rolepermission/$",
         RolePermissionList.as_view(),
-        name="canvas_rolepermission_list",
+        name="eda_rolepermission_list",
     ),
     url(
         r"^rolepermission/(?P<pk>[0-9]+)/$",
         RolePermissionDetail.as_view(),
-        name="canvas_rolepermission_detail",
+        name="eda_rolepermission_detail",
     ),
 ]
 
 urls += [
-    url(r"^userrole/$", UserRoleList.as_view(), name="canvas_userrole_list"),
+    url(r"^userrole/$", UserRoleList.as_view(), name="eda_userrole_list"),
     url(
         r"^userrole/(?P<pk>[0-9]+)/$",
         UserRoleDetail.as_view(),
-        name="canvas_userrole_detail",
+        name="eda_userrole_detail",
     ),
 ]
 
 urls += [
-    url(r"^user/$", UserList.as_view(), name="canvas_user_list"),
-    url(r"^user/(?P<pk>[0-9]+)/$", UserDetail.as_view(), name="canvas_user_detail"),
+    url(r"^user/$", UserList.as_view(), name="eda_user_list"),
+    url(r"^user/(?P<pk>[0-9]+)/$", UserDetail.as_view(), name="eda_user_detail"),
 ]
 
 __all__ = ["urls"]

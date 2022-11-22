@@ -1,25 +1,25 @@
 from awx.main.access import BaseAccess, access_registry
 
-from .models import ActivationInstanceJobInstance
-from .models import ActivationInstance
-from .models import ExtraVar
-from .models import Project
-from .models import Inventory
-from .models import Rulebook
-from .models import JobInstance
-from .models import ActivationInstanceLog
-from .models import Rule
-from .models import Ruleset
-from .models import Job
-from .models import Playbook
-from .models import AuditRule
-from .models import JobInstanceEvent
-from .models import JobInstanceHost
-from .models import Activation
-from .models import Role
-from .models import RolePermission
-from .models import UserRole
-from .models import User
+from eda.models import ActivationInstanceJobInstance
+from eda.models import ActivationInstance
+from eda.models import ExtraVar
+from eda.models import Project
+from eda.models import Inventory
+from eda.models import Rulebook
+from eda.models import JobInstance
+from eda.models import ActivationInstanceLog
+from eda.models import Rule
+from eda.models import Ruleset
+from eda.models import Job
+from eda.models import Playbook
+from eda.models import AuditRule
+from eda.models import JobInstanceEvent
+from eda.models import JobInstanceHost
+from eda.models import Activation
+from eda.models import Role
+from eda.models import RolePermission
+from eda.models import UserRole
+from eda.models import User
 
 
 class ActivationInstanceJobInstanceAccess(BaseAccess):

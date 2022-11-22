@@ -4,7 +4,7 @@ from utils import transform_dict
 
 from awx.api.generics import ListCreateAPIView
 from awx.api.generics import RetrieveUpdateDestroyAPIView
-from .models import (
+from eda.models import (
     ActivationInstanceJobInstance,
     ActivationInstance,
     ExtraVar,
@@ -26,7 +26,7 @@ from .models import (
     UserRole,
     User,
 )
-from .v2_api_serializers import (
+from eda.v2_api_serializers import (
     ActivationInstanceJobInstanceSerializer,
     ActivationInstanceSerializer,
     ExtraVarSerializer,

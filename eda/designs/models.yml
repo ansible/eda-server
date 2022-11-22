@@ -1,3 +1,4 @@
+app: eda
 models:
 - api: true
   fields:
@@ -36,8 +37,6 @@ models:
     type: TextField
   - name: working_directory
     type: TextField
-  - name: large_data_id
-    type: OID
   - name: project_id
     ref: Project
     ref_field: id
@@ -74,8 +73,6 @@ models:
     type: DateTimeField
   - name: modified_at
     type: DateTimeField
-  - name: large_data_id
-    type: OID
   name: Project
 - api: true
   fields:

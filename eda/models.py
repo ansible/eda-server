@@ -23,7 +23,6 @@ class ActivationInstance(models.Model):
     extra_var_id = models.ForeignKey("ExtraVar", on_delete=models.CASCADE)
     execution_environment = models.TextField()
     working_directory = models.TextField()
-    #large_data_id = models.OID()
     project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
 
 
@@ -48,7 +47,6 @@ class Project(models.Model):
     description = models.TextField()
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
-    #large_data_id = models.OID()
 
 
 class Inventory(models.Model):

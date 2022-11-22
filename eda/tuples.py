@@ -20,7 +20,6 @@ ActivationInstance = namedtuple(
         "extra_var_id",
         "execution_environment",
         "working_directory",
-        "large_data_id",
         "project_id",
     ],
 )
@@ -45,7 +44,6 @@ Project = namedtuple(
         "description",
         "created_at",
         "modified_at",
-        "large_data_id",
     ],
 )
 
