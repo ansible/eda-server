@@ -1,14 +1,6 @@
 from django.db import models
 
 
-class AlembicVersion(models.Model):
-
-    version_num = models.AutoField(
-        primary_key=True,
-        max_length=32,
-    )
-
-
 class ActivationInstanceJobInstance(models.Model):
 
     id = models.AutoField(

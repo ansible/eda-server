@@ -5,7 +5,6 @@ from utils import transform_dict
 from awx.api.generics import ListCreateAPIView
 from awx.api.generics import RetrieveUpdateDestroyAPIView
 from .models import (
-    AlembicVersion,
     ActivationInstanceJobInstance,
     ActivationInstance,
     ExtraVar,
@@ -28,7 +27,6 @@ from .models import (
     User,
 )
 from .v2_api_serializers import (
-    AlembicVersionSerializer,
     ActivationInstanceJobInstanceSerializer,
     ActivationInstanceSerializer,
     ExtraVarSerializer,
@@ -50,59 +48,6 @@ from .v2_api_serializers import (
     UserRoleSerializer,
     UserSerializer,
 )
-
-
-class AlembicVersionList(ListCreateAPIView):
-
-    model = AlembicVersion
-    serializer_class = AlembicVersionSerializer
-
-    def create(self, request, *args, **kwargs):
-        response = super(AlembicVersionList, self).create(request, *args, **kwargs)
-        pk = response.data["version_num"]
-        message = dict()
-
-        message.update(response.data)
-
-        message["msg_type"] = "AlembicVersionCreate"
-        message["version_num"] = pk
-        message["sender"] = 0
-
-        for topology_id in Topology.objects.all().values_list("topology_id", flat=True):
-
-            channels.Group("topology-%s" % topology_id).send(
-                {"text": json.dumps([message["msg_type"], message])}
-            )
-        return response
-
-
-class AlembicVersionDetail(RetrieveUpdateDestroyAPIView):
-
-    model = AlembicVersion
-    serializer_class = AlembicVersionSerializer
-
-    def update(self, request, pk=None, *args, **kwargs):
-        message = dict()
-        message.update(json.loads(request.body))
-        message["msg_type"] = "AlembicVersionUpdate"
-        message["version_num"] = pk
-        message["sender"] = 0
-
-        for topology_id in Topology.objects.all().values_list("topology_id", flat=True):
-
-            channels.Group("topology-%s" % topology_id).send(
-                {"text": json.dumps([message["msg_type"], message])}
-            )
-
-        return super(AlembicVersionDetail, self).update(request, pk, *args, **kwargs)
-
-    def partial_update(self, request, pk=None, *args, **kwargs):
-        return super(AlembicVersionDetail, self).partial_update(
-            request, pk, *args, **kwargs
-        )
-
-    def destroy(self, request, pk=None, *args, **kwargs):
-        return super(AlembicVersionDetail, self).destroy(request, pk, *args, **kwargs)
 
 
 class ActivationInstanceJobInstanceList(ListCreateAPIView):

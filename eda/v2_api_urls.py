@@ -1,6 +1,5 @@
 from django.conf.urls import url
 
-from eda.v2_api_views import AlembicVersionList, AlembicVersionDetail
 from eda.v2_api_views import (
     ActivationInstanceJobInstanceList,
     ActivationInstanceJobInstanceDetail,
@@ -28,19 +27,6 @@ from eda.v2_api_views import UserList, UserDetail
 
 urls = []
 
-
-urls += [
-    url(
-        r"^alembicversion/$",
-        AlembicVersionList.as_view(),
-        name="canvas_alembicversion_list",
-    ),
-    url(
-        r"^alembicversion/(?P<pk>[0-9]+)/$",
-        AlembicVersionDetail.as_view(),
-        name="canvas_alembicversion_detail",
-    ),
-]
 
 urls += [
     url(

@@ -1,13 +1,6 @@
 models:
 - api: true
   fields:
-  - len: 32
-    name: version_num
-    pk: true
-    type: AutoField
-  name: AlembicVersion
-- api: true
-  fields:
   - name: id
     pk: true
     type: AutoField

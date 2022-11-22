@@ -1,7 +1,5 @@
 from django.contrib import admin
 
-from .models import AlembicVersion
-
 from .models import ActivationInstanceJobInstance
 
 from .models import ActivationInstance
@@ -41,14 +39,6 @@ from .models import RolePermission
 from .models import UserRole
 
 from .models import User
-
-
-class AlembicVersionAdmin(admin.ModelAdmin):
-    fields = ()
-    raw_id_fields = ()
-
-
-admin.site.register(AlembicVersion, AlembicVersionAdmin)
 
 
 class ActivationInstanceJobInstanceAdmin(admin.ModelAdmin):

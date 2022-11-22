@@ -1,6 +1,5 @@
 from restframework.serializers import ModelSerializer
 
-from .models import AlembicVersion
 from .models import ActivationInstanceJobInstance
 from .models import ActivationInstance
 from .models import ExtraVar
@@ -21,12 +20,6 @@ from .models import Role
 from .models import RolePermission
 from .models import UserRole
 from .models import User
-
-
-class AlembicVersionSerializer(ModelSerializer):
-    class Meta:
-        model = AlembicVersion
-        fields = "version_num"
 
 
 class ActivationInstanceJobInstanceSerializer(ModelSerializer):

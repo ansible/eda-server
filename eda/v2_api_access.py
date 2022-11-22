@@ -1,6 +1,5 @@
 from awx.main.access import BaseAccess, access_registry
 
-from .models import AlembicVersion
 from .models import ActivationInstanceJobInstance
 from .models import ActivationInstance
 from .models import ExtraVar
@@ -21,14 +20,6 @@ from .models import Role
 from .models import RolePermission
 from .models import UserRole
 from .models import User
-
-
-class AlembicVersionAccess(BaseAccess):
-
-    model = AlembicVersion
-
-
-access_registry[AlembicVersion] = AlembicVersionAccess
 
 
 class ActivationInstanceJobInstanceAccess(BaseAccess):

@@ -1,13 +1,6 @@
 from collections import namedtuple
 
 
-AlembicVersion = namedtuple(
-    "AlembicVersion",
-    [
-        "version_num",
-    ],
-)
-
 ActivationInstanceJobInstance = namedtuple(
     "ActivationInstanceJobInstance",
     [
