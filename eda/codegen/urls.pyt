@@ -1,18 +1,18 @@
-from django.conf.urls import url
+from django.urls import include, path
 {%for model in models-%}{%if model.api%}
-from eda.v2_api_views import ({{model.name}}List, {{model.name}}Detail)
+from eda.views import ({{model.name}}List, {{model.name}}Detail)
 {%-endif%}
 {%-endfor%}
 
 
-urls = [];
+urlpatterns = [];
 {%for model in models%}{%if model.api%}
 
-urls += [
-    url(r'^{{model.name.lower()}}/$', {{model.name}}List.as_view(), name='eda_{{model.name.lower()}}_list'),
-    url(r'^{{model.name.lower()}}/(?P<pk>[0-9]+)/$', {{model.name}}Detail.as_view(), name='eda_{{model.name.lower()}}_detail'),
+urlpatterns += [
+    path('{{model.name.lower()}}/', {{model.name}}List.as_view(), name='eda_{{model.name.lower()}}_list'),
+    path('{{model.name.lower()}}/<int:pk>/', {{model.name}}Detail.as_view(), name='eda_{{model.name.lower()}}_detail'),
 ];
 {%-endif%}
 {%-endfor%}
 
-__all__ = ['urls']
+__all__ = ['urlpatterns']

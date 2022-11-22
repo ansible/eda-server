@@ -1,6 +1,4 @@
 import json
-import channels
-from utils import transform_dict
 
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
@@ -26,7 +24,7 @@ from eda.models import (
     UserRole,
     User,
 )
-from eda.v2_api_serializers import (
+from eda.serializers import (
     ActivationInstanceJobInstanceSerializer,
     ActivationInstanceSerializer,
     ExtraVarSerializer,
@@ -52,239 +50,239 @@ from eda.v2_api_serializers import (
 
 class ActivationInstanceJobInstanceList(ListCreateAPIView):
 
-    model = ActivationInstanceJobInstance
+    queryset = ActivationInstanceJobInstance.objects.all()
     serializer_class = ActivationInstanceJobInstanceSerializer
 
 
 class ActivationInstanceJobInstanceDetail(RetrieveUpdateDestroyAPIView):
 
-    model = ActivationInstanceJobInstance
+    queryset = ActivationInstanceJobInstance.objects.all()
     serializer_class = ActivationInstanceJobInstanceSerializer
 
 
 class ActivationInstanceList(ListCreateAPIView):
 
-    model = ActivationInstance
+    queryset = ActivationInstance.objects.all()
     serializer_class = ActivationInstanceSerializer
 
 
 class ActivationInstanceDetail(RetrieveUpdateDestroyAPIView):
 
-    model = ActivationInstance
+    queryset = ActivationInstance.objects.all()
     serializer_class = ActivationInstanceSerializer
 
 
 class ExtraVarList(ListCreateAPIView):
 
-    model = ExtraVar
+    queryset = ExtraVar.objects.all()
     serializer_class = ExtraVarSerializer
 
 
 class ExtraVarDetail(RetrieveUpdateDestroyAPIView):
 
-    model = ExtraVar
+    queryset = ExtraVar.objects.all()
     serializer_class = ExtraVarSerializer
 
 
 class ProjectList(ListCreateAPIView):
 
-    model = Project
+    queryset = Project.objects.all()
     serializer_class = ProjectSerializer
 
 
 class ProjectDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Project
+    queryset = Project.objects.all()
     serializer_class = ProjectSerializer
 
 
 class InventoryList(ListCreateAPIView):
 
-    model = Inventory
+    queryset = Inventory.objects.all()
     serializer_class = InventorySerializer
 
 
 class InventoryDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Inventory
+    queryset = Inventory.objects.all()
     serializer_class = InventorySerializer
 
 
 class RulebookList(ListCreateAPIView):
 
-    model = Rulebook
+    queryset = Rulebook.objects.all()
     serializer_class = RulebookSerializer
 
 
 class RulebookDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Rulebook
+    queryset = Rulebook.objects.all()
     serializer_class = RulebookSerializer
 
 
 class JobInstanceList(ListCreateAPIView):
 
-    model = JobInstance
+    queryset = JobInstance.objects.all()
     serializer_class = JobInstanceSerializer
 
 
 class JobInstanceDetail(RetrieveUpdateDestroyAPIView):
 
-    model = JobInstance
+    queryset = JobInstance.objects.all()
     serializer_class = JobInstanceSerializer
 
 
 class ActivationInstanceLogList(ListCreateAPIView):
 
-    model = ActivationInstanceLog
+    queryset = ActivationInstanceLog.objects.all()
     serializer_class = ActivationInstanceLogSerializer
 
 
 class ActivationInstanceLogDetail(RetrieveUpdateDestroyAPIView):
 
-    model = ActivationInstanceLog
+    queryset = ActivationInstanceLog.objects.all()
     serializer_class = ActivationInstanceLogSerializer
 
 
 class RuleList(ListCreateAPIView):
 
-    model = Rule
+    queryset = Rule.objects.all()
     serializer_class = RuleSerializer
 
 
 class RuleDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Rule
+    queryset = Rule.objects.all()
     serializer_class = RuleSerializer
 
 
 class RulesetList(ListCreateAPIView):
 
-    model = Ruleset
+    queryset = Ruleset.objects.all()
     serializer_class = RulesetSerializer
 
 
 class RulesetDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Ruleset
+    queryset = Ruleset.objects.all()
     serializer_class = RulesetSerializer
 
 
 class JobList(ListCreateAPIView):
 
-    model = Job
+    queryset = Job.objects.all()
     serializer_class = JobSerializer
 
 
 class JobDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Job
+    queryset = Job.objects.all()
     serializer_class = JobSerializer
 
 
 class PlaybookList(ListCreateAPIView):
 
-    model = Playbook
+    queryset = Playbook.objects.all()
     serializer_class = PlaybookSerializer
 
 
 class PlaybookDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Playbook
+    queryset = Playbook.objects.all()
     serializer_class = PlaybookSerializer
 
 
 class AuditRuleList(ListCreateAPIView):
 
-    model = AuditRule
+    queryset = AuditRule.objects.all()
     serializer_class = AuditRuleSerializer
 
 
 class AuditRuleDetail(RetrieveUpdateDestroyAPIView):
 
-    model = AuditRule
+    queryset = AuditRule.objects.all()
     serializer_class = AuditRuleSerializer
 
 
 class JobInstanceEventList(ListCreateAPIView):
 
-    model = JobInstanceEvent
+    queryset = JobInstanceEvent.objects.all()
     serializer_class = JobInstanceEventSerializer
 
 
 class JobInstanceEventDetail(RetrieveUpdateDestroyAPIView):
 
-    model = JobInstanceEvent
+    queryset = JobInstanceEvent.objects.all()
     serializer_class = JobInstanceEventSerializer
 
 
 class JobInstanceHostList(ListCreateAPIView):
 
-    model = JobInstanceHost
+    queryset = JobInstanceHost.objects.all()
     serializer_class = JobInstanceHostSerializer
 
 
 class JobInstanceHostDetail(RetrieveUpdateDestroyAPIView):
 
-    model = JobInstanceHost
+    queryset = JobInstanceHost.objects.all()
     serializer_class = JobInstanceHostSerializer
 
 
 class ActivationList(ListCreateAPIView):
 
-    model = Activation
+    queryset = Activation.objects.all()
     serializer_class = ActivationSerializer
 
 
 class ActivationDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Activation
+    queryset = Activation.objects.all()
     serializer_class = ActivationSerializer
 
 
 class RoleList(ListCreateAPIView):
 
-    model = Role
+    queryset = Role.objects.all()
     serializer_class = RoleSerializer
 
 
 class RoleDetail(RetrieveUpdateDestroyAPIView):
 
-    model = Role
+    queryset = Role.objects.all()
     serializer_class = RoleSerializer
 
 
 class RolePermissionList(ListCreateAPIView):
 
-    model = RolePermission
+    queryset = RolePermission.objects.all()
     serializer_class = RolePermissionSerializer
 
 
 class RolePermissionDetail(RetrieveUpdateDestroyAPIView):
 
-    model = RolePermission
+    queryset = RolePermission.objects.all()
     serializer_class = RolePermissionSerializer
 
 
 class UserRoleList(ListCreateAPIView):
 
-    model = UserRole
+    queryset = UserRole.objects.all()
     serializer_class = UserRoleSerializer
 
 
 class UserRoleDetail(RetrieveUpdateDestroyAPIView):
 
-    model = UserRole
+    queryset = UserRole.objects.all()
     serializer_class = UserRoleSerializer
 
 
 class UserList(ListCreateAPIView):
 
-    model = User
+    queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
 class UserDetail(RetrieveUpdateDestroyAPIView):
 
-    model = User
+    queryset = User.objects.all()
     serializer_class = UserSerializer

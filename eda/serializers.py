@@ -1,4 +1,4 @@
-from restframework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer
 
 from eda.models import ActivationInstanceJobInstance
 from eda.models import ActivationInstance

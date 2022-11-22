@@ -1,215 +1,183 @@
-from django.conf.urls import url
+from django.urls import include, path
 
-from eda.v2_api_views import (
+from eda.views import (
     ActivationInstanceJobInstanceList,
     ActivationInstanceJobInstanceDetail,
 )
-from eda.v2_api_views import ActivationInstanceList, ActivationInstanceDetail
-from eda.v2_api_views import ExtraVarList, ExtraVarDetail
-from eda.v2_api_views import ProjectList, ProjectDetail
-from eda.v2_api_views import InventoryList, InventoryDetail
-from eda.v2_api_views import RulebookList, RulebookDetail
-from eda.v2_api_views import JobInstanceList, JobInstanceDetail
-from eda.v2_api_views import ActivationInstanceLogList, ActivationInstanceLogDetail
-from eda.v2_api_views import RuleList, RuleDetail
-from eda.v2_api_views import RulesetList, RulesetDetail
-from eda.v2_api_views import JobList, JobDetail
-from eda.v2_api_views import PlaybookList, PlaybookDetail
-from eda.v2_api_views import AuditRuleList, AuditRuleDetail
-from eda.v2_api_views import JobInstanceEventList, JobInstanceEventDetail
-from eda.v2_api_views import JobInstanceHostList, JobInstanceHostDetail
-from eda.v2_api_views import ActivationList, ActivationDetail
-from eda.v2_api_views import RoleList, RoleDetail
-from eda.v2_api_views import RolePermissionList, RolePermissionDetail
-from eda.v2_api_views import UserRoleList, UserRoleDetail
-from eda.v2_api_views import UserList, UserDetail
+from eda.views import ActivationInstanceList, ActivationInstanceDetail
+from eda.views import ExtraVarList, ExtraVarDetail
+from eda.views import ProjectList, ProjectDetail
+from eda.views import InventoryList, InventoryDetail
+from eda.views import RulebookList, RulebookDetail
+from eda.views import JobInstanceList, JobInstanceDetail
+from eda.views import ActivationInstanceLogList, ActivationInstanceLogDetail
+from eda.views import RuleList, RuleDetail
+from eda.views import RulesetList, RulesetDetail
+from eda.views import JobList, JobDetail
+from eda.views import PlaybookList, PlaybookDetail
+from eda.views import AuditRuleList, AuditRuleDetail
+from eda.views import JobInstanceEventList, JobInstanceEventDetail
+from eda.views import JobInstanceHostList, JobInstanceHostDetail
+from eda.views import ActivationList, ActivationDetail
+from eda.views import RoleList, RoleDetail
+from eda.views import RolePermissionList, RolePermissionDetail
+from eda.views import UserRoleList, UserRoleDetail
+from eda.views import UserList, UserDetail
 
 
-urls = []
+urlpatterns = []
 
 
-urls += [
-    url(
-        r"^activationinstancejobinstance/$",
+urlpatterns += [
+    path(
+        "activationinstancejobinstance/",
         ActivationInstanceJobInstanceList.as_view(),
         name="eda_activationinstancejobinstance_list",
     ),
-    url(
-        r"^activationinstancejobinstance/(?P<pk>[0-9]+)/$",
+    path(
+        "activationinstancejobinstance/<int:pk>/",
         ActivationInstanceJobInstanceDetail.as_view(),
         name="eda_activationinstancejobinstance_detail",
     ),
 ]
 
-urls += [
-    url(
-        r"^activationinstance/$",
+urlpatterns += [
+    path(
+        "activationinstance/",
         ActivationInstanceList.as_view(),
         name="eda_activationinstance_list",
     ),
-    url(
-        r"^activationinstance/(?P<pk>[0-9]+)/$",
+    path(
+        "activationinstance/<int:pk>/",
         ActivationInstanceDetail.as_view(),
         name="eda_activationinstance_detail",
     ),
 ]
 
-urls += [
-    url(r"^extravar/$", ExtraVarList.as_view(), name="eda_extravar_list"),
-    url(
-        r"^extravar/(?P<pk>[0-9]+)/$",
-        ExtraVarDetail.as_view(),
-        name="eda_extravar_detail",
-    ),
+urlpatterns += [
+    path("extravar/", ExtraVarList.as_view(), name="eda_extravar_list"),
+    path("extravar/<int:pk>/", ExtraVarDetail.as_view(), name="eda_extravar_detail"),
 ]
 
-urls += [
-    url(r"^project/$", ProjectList.as_view(), name="eda_project_list"),
-    url(
-        r"^project/(?P<pk>[0-9]+)/$", ProjectDetail.as_view(), name="eda_project_detail"
-    ),
+urlpatterns += [
+    path("project/", ProjectList.as_view(), name="eda_project_list"),
+    path("project/<int:pk>/", ProjectDetail.as_view(), name="eda_project_detail"),
 ]
 
-urls += [
-    url(r"^inventory/$", InventoryList.as_view(), name="eda_inventory_list"),
-    url(
-        r"^inventory/(?P<pk>[0-9]+)/$",
-        InventoryDetail.as_view(),
-        name="eda_inventory_detail",
-    ),
+urlpatterns += [
+    path("inventory/", InventoryList.as_view(), name="eda_inventory_list"),
+    path("inventory/<int:pk>/", InventoryDetail.as_view(), name="eda_inventory_detail"),
 ]
 
-urls += [
-    url(r"^rulebook/$", RulebookList.as_view(), name="eda_rulebook_list"),
-    url(
-        r"^rulebook/(?P<pk>[0-9]+)/$",
-        RulebookDetail.as_view(),
-        name="eda_rulebook_detail",
-    ),
+urlpatterns += [
+    path("rulebook/", RulebookList.as_view(), name="eda_rulebook_list"),
+    path("rulebook/<int:pk>/", RulebookDetail.as_view(), name="eda_rulebook_detail"),
 ]
 
-urls += [
-    url(r"^jobinstance/$", JobInstanceList.as_view(), name="eda_jobinstance_list"),
-    url(
-        r"^jobinstance/(?P<pk>[0-9]+)/$",
+urlpatterns += [
+    path("jobinstance/", JobInstanceList.as_view(), name="eda_jobinstance_list"),
+    path(
+        "jobinstance/<int:pk>/",
         JobInstanceDetail.as_view(),
         name="eda_jobinstance_detail",
     ),
 ]
 
-urls += [
-    url(
-        r"^activationinstancelog/$",
+urlpatterns += [
+    path(
+        "activationinstancelog/",
         ActivationInstanceLogList.as_view(),
         name="eda_activationinstancelog_list",
     ),
-    url(
-        r"^activationinstancelog/(?P<pk>[0-9]+)/$",
+    path(
+        "activationinstancelog/<int:pk>/",
         ActivationInstanceLogDetail.as_view(),
         name="eda_activationinstancelog_detail",
     ),
 ]
 
-urls += [
-    url(r"^rule/$", RuleList.as_view(), name="eda_rule_list"),
-    url(r"^rule/(?P<pk>[0-9]+)/$", RuleDetail.as_view(), name="eda_rule_detail"),
+urlpatterns += [
+    path("rule/", RuleList.as_view(), name="eda_rule_list"),
+    path("rule/<int:pk>/", RuleDetail.as_view(), name="eda_rule_detail"),
 ]
 
-urls += [
-    url(r"^ruleset/$", RulesetList.as_view(), name="eda_ruleset_list"),
-    url(
-        r"^ruleset/(?P<pk>[0-9]+)/$", RulesetDetail.as_view(), name="eda_ruleset_detail"
-    ),
+urlpatterns += [
+    path("ruleset/", RulesetList.as_view(), name="eda_ruleset_list"),
+    path("ruleset/<int:pk>/", RulesetDetail.as_view(), name="eda_ruleset_detail"),
 ]
 
-urls += [
-    url(r"^job/$", JobList.as_view(), name="eda_job_list"),
-    url(r"^job/(?P<pk>[0-9]+)/$", JobDetail.as_view(), name="eda_job_detail"),
+urlpatterns += [
+    path("job/", JobList.as_view(), name="eda_job_list"),
+    path("job/<int:pk>/", JobDetail.as_view(), name="eda_job_detail"),
 ]
 
-urls += [
-    url(r"^playbook/$", PlaybookList.as_view(), name="eda_playbook_list"),
-    url(
-        r"^playbook/(?P<pk>[0-9]+)/$",
-        PlaybookDetail.as_view(),
-        name="eda_playbook_detail",
-    ),
+urlpatterns += [
+    path("playbook/", PlaybookList.as_view(), name="eda_playbook_list"),
+    path("playbook/<int:pk>/", PlaybookDetail.as_view(), name="eda_playbook_detail"),
 ]
 
-urls += [
-    url(r"^auditrule/$", AuditRuleList.as_view(), name="eda_auditrule_list"),
-    url(
-        r"^auditrule/(?P<pk>[0-9]+)/$",
-        AuditRuleDetail.as_view(),
-        name="eda_auditrule_detail",
-    ),
+urlpatterns += [
+    path("auditrule/", AuditRuleList.as_view(), name="eda_auditrule_list"),
+    path("auditrule/<int:pk>/", AuditRuleDetail.as_view(), name="eda_auditrule_detail"),
 ]
 
-urls += [
-    url(
-        r"^jobinstanceevent/$",
+urlpatterns += [
+    path(
+        "jobinstanceevent/",
         JobInstanceEventList.as_view(),
         name="eda_jobinstanceevent_list",
     ),
-    url(
-        r"^jobinstanceevent/(?P<pk>[0-9]+)/$",
+    path(
+        "jobinstanceevent/<int:pk>/",
         JobInstanceEventDetail.as_view(),
         name="eda_jobinstanceevent_detail",
     ),
 ]
 
-urls += [
-    url(
-        r"^jobinstancehost/$",
+urlpatterns += [
+    path(
+        "jobinstancehost/",
         JobInstanceHostList.as_view(),
         name="eda_jobinstancehost_list",
     ),
-    url(
-        r"^jobinstancehost/(?P<pk>[0-9]+)/$",
+    path(
+        "jobinstancehost/<int:pk>/",
         JobInstanceHostDetail.as_view(),
         name="eda_jobinstancehost_detail",
     ),
 ]
 
-urls += [
-    url(r"^activation/$", ActivationList.as_view(), name="eda_activation_list"),
-    url(
-        r"^activation/(?P<pk>[0-9]+)/$",
-        ActivationDetail.as_view(),
-        name="eda_activation_detail",
+urlpatterns += [
+    path("activation/", ActivationList.as_view(), name="eda_activation_list"),
+    path(
+        "activation/<int:pk>/", ActivationDetail.as_view(), name="eda_activation_detail"
     ),
 ]
 
-urls += [
-    url(r"^role/$", RoleList.as_view(), name="eda_role_list"),
-    url(r"^role/(?P<pk>[0-9]+)/$", RoleDetail.as_view(), name="eda_role_detail"),
+urlpatterns += [
+    path("role/", RoleList.as_view(), name="eda_role_list"),
+    path("role/<int:pk>/", RoleDetail.as_view(), name="eda_role_detail"),
 ]
 
-urls += [
-    url(
-        r"^rolepermission/$",
-        RolePermissionList.as_view(),
-        name="eda_rolepermission_list",
+urlpatterns += [
+    path(
+        "rolepermission/", RolePermissionList.as_view(), name="eda_rolepermission_list"
     ),
-    url(
-        r"^rolepermission/(?P<pk>[0-9]+)/$",
+    path(
+        "rolepermission/<int:pk>/",
         RolePermissionDetail.as_view(),
         name="eda_rolepermission_detail",
     ),
 ]
 
-urls += [
-    url(r"^userrole/$", UserRoleList.as_view(), name="eda_userrole_list"),
-    url(
-        r"^userrole/(?P<pk>[0-9]+)/$",
-        UserRoleDetail.as_view(),
-        name="eda_userrole_detail",
-    ),
+urlpatterns += [
+    path("userrole/", UserRoleList.as_view(), name="eda_userrole_list"),
+    path("userrole/<int:pk>/", UserRoleDetail.as_view(), name="eda_userrole_detail"),
 ]
 
-urls += [
-    url(r"^user/$", UserList.as_view(), name="eda_user_list"),
-    url(r"^user/(?P<pk>[0-9]+)/$", UserDetail.as_view(), name="eda_user_detail"),
+urlpatterns += [
+    path("user/", UserList.as_view(), name="eda_user_list"),
+    path("user/<int:pk>/", UserDetail.as_view(), name="eda_user_detail"),
 ]
 
-__all__ = ["urls"]
+__all__ = ["urlpatterns"]

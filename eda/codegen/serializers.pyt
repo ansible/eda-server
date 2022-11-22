@@ -1,4 +1,4 @@
-from restframework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer
 {%for model in models%}{%if model.api%}
 from {{app}}.models import {{model.name}}{%endif%}{%endfor%}
 

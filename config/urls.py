@@ -36,6 +36,7 @@ urlpatterns += [
         SpectacularSwaggerView.as_view(url_name="api-schema"),
         name="api-docs",
     ),
+    path('eda/', include('eda.urls'), name="eda"),
 ]
 
 if settings.DEBUG:
