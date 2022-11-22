@@ -1,6 +1,6 @@
 from django.conf.urls import url
 {%for model in models-%}{%if model.api%}
-from awx.network_ui.v2_api_views import ({{model.name}}List, {{model.name}}Detail)
+from eda.v2_api_views import ({{model.name}}List, {{model.name}}Detail)
 {%-endif%}
 {%-endfor%}
 

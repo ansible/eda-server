@@ -14,11 +14,11 @@ models:
   - name: activation_instance_id
     ref: ActivationInstance
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: job_instance_id
     ref: JobInstance
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   name: ActivationInstanceJobInstance
 - api: true
   fields:
@@ -26,29 +26,29 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: rulebook_id
     ref: Rulebook
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: inventory_id
     ref: Inventory
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: extra_var_id
     ref: ExtraVar
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: execution_environment
-    type: CharField
+    type: TextField
   - name: working_directory
-    type: CharField
+    type: TextField
   - name: large_data_id
     type: OID
   - name: project_id
     ref: Project
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   name: ActivationInstance
 - api: true
   fields:
@@ -56,13 +56,13 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: extra_var
-    type: CharField
+    type: TextField
   - name: project_id
     ref: Project
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   name: ExtraVar
 - api: true
   fields:
@@ -70,13 +70,13 @@ models:
     pk: true
     type: AutoField
   - name: git_hash
-    type: CharField
+    type: TextField
   - name: url
-    type: CharField
+    type: TextField
   - name: name
-    type: CharField
+    type: TextField
   - name: description
-    type: CharField
+    type: TextField
   - name: created_at
     type: DateTimeField
   - name: modified_at
@@ -90,13 +90,13 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: inventory
-    type: CharField
+    type: TextField
   - name: project_id
     ref: Project
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   name: Inventory
 - api: true
   fields:
@@ -104,15 +104,15 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: rulesets
-    type: CharField
+    type: TextField
   - name: project_id
     ref: Project
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: description
-    type: CharField
+    type: TextField
   - name: created_at
     type: DateTimeField
   - name: modified_at
@@ -134,11 +134,11 @@ models:
   - name: activation_instance_id
     ref: ActivationInstance
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: line_number
     type: IntegerField
   - name: log
-    type: CharField
+    type: TextField
   name: ActivationInstanceLog
 - api: true
   fields:
@@ -148,9 +148,9 @@ models:
   - name: ruleset_id
     ref: Ruleset
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: name
-    type: CharField
+    type: TextField
   - name: action
     type: JSONField
   name: Rule
@@ -162,9 +162,9 @@ models:
   - name: rulebook_id
     ref: Rulebook
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: name
-    type: CharField
+    type: TextField
   - name: created_at
     type: DateTimeField
   - name: modified_at
@@ -184,13 +184,13 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: playbook
-    type: CharField
+    type: TextField
   - name: project_id
     ref: Project
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   name: Playbook
 - api: true
   fields:
@@ -198,11 +198,11 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: description
-    type: CharField
+    type: TextField
   - name: status
-    type: CharField
+    type: TextField
   - name: fired_date
     type: DateTimeField
   - name: created_at
@@ -212,19 +212,19 @@ models:
   - name: rule_id
     ref: Rule
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: ruleset_id
     ref: Ruleset
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: activation_instance_id
     ref: ActivationInstance
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: job_instance_id
     ref: JobInstance
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   name: AuditRule
 - api: true
   fields:
@@ -236,9 +236,9 @@ models:
   - name: counter
     type: IntegerField
   - name: stdout
-    type: CharField
+    type: TextField
   - name: type
-    type: CharField
+    type: TextField
   - name: created_at
     type: DateTimeField
   name: JobInstanceEvent
@@ -248,17 +248,17 @@ models:
     pk: true
     type: AutoField
   - name: host
-    type: CharField
+    type: TextField
   - name: job_uuid
     type: UUIDField
   - name: playbook
-    type: CharField
+    type: TextField
   - name: play
-    type: CharField
+    type: TextField
   - name: task
-    type: CharField
+    type: TextField
   - name: status
-    type: CharField
+    type: TextField
   name: JobInstanceHost
 - api: true
   fields:
@@ -266,23 +266,23 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: rulebook_id
     ref: Rulebook
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: inventory_id
     ref: Inventory
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: extra_var_id
     ref: ExtraVar
     ref_field: id
-    type: IntegerField
+    type: ForeignKey
   - name: description
-    type: CharField
+    type: TextField
   - name: status
-    type: CharField
+    type: TextField
   - name: is_enabled
     type: BooleanField
   - name: restarted_at
@@ -294,13 +294,13 @@ models:
   - name: modified_at
     type: DateTimeField
   - name: working_directory
-    type: CharField
+    type: TextField
   - len: 6
     name: execution_environment
-    type: CharField
+    type: TextField
   - len: 10
     name: restart_policy
-    type: CharField
+    type: TextField
   name: Activation
 - api: true
   fields:
@@ -308,9 +308,9 @@ models:
     pk: true
     type: AutoField
   - name: name
-    type: CharField
+    type: TextField
   - name: description
-    type: CharField
+    type: TextField
   name: Role
 - api: true
   fields:
@@ -323,10 +323,10 @@ models:
     type: ForeignKey
   - len: 13
     name: resource_type
-    type: CharField
+    type: TextField
   - len: 6
     name: action
-    type: CharField
+    type: TextField
   name: RolePermission
 - api: true
   fields:
@@ -346,10 +346,10 @@ models:
   fields:
   - len: 320
     name: email
-    type: CharField
+    type: TextField
   - len: 1024
     name: hashed_password
-    type: CharField
+    type: TextField
   - name: is_active
     type: BooleanField
   - name: is_superuser

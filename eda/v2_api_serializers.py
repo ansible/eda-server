@@ -1,4 +1,4 @@
-from awx.api.serializers import BaseSerializer
+from restframework.serializers import ModelSerializer
 
 from .models import AlembicVersion
 from .models import ActivationInstanceJobInstance
@@ -23,19 +23,19 @@ from .models import UserRole
 from .models import User
 
 
-class AlembicVersionSerializer(BaseSerializer):
+class AlembicVersionSerializer(ModelSerializer):
     class Meta:
         model = AlembicVersion
         fields = "version_num"
 
 
-class ActivationInstanceJobInstanceSerializer(BaseSerializer):
+class ActivationInstanceJobInstanceSerializer(ModelSerializer):
     class Meta:
         model = ActivationInstanceJobInstance
         fields = ("id", "activation_instance_id", "job_instance_id")
 
 
-class ActivationInstanceSerializer(BaseSerializer):
+class ActivationInstanceSerializer(ModelSerializer):
     class Meta:
         model = ActivationInstance
         fields = (
@@ -51,13 +51,13 @@ class ActivationInstanceSerializer(BaseSerializer):
         )
 
 
-class ExtraVarSerializer(BaseSerializer):
+class ExtraVarSerializer(ModelSerializer):
     class Meta:
         model = ExtraVar
         fields = ("id", "name", "extra_var", "project_id")
 
 
-class ProjectSerializer(BaseSerializer):
+class ProjectSerializer(ModelSerializer):
     class Meta:
         model = Project
         fields = (
@@ -72,13 +72,13 @@ class ProjectSerializer(BaseSerializer):
         )
 
 
-class InventorySerializer(BaseSerializer):
+class InventorySerializer(ModelSerializer):
     class Meta:
         model = Inventory
         fields = ("id", "name", "inventory", "project_id")
 
 
-class RulebookSerializer(BaseSerializer):
+class RulebookSerializer(ModelSerializer):
     class Meta:
         model = Rulebook
         fields = (
@@ -92,43 +92,43 @@ class RulebookSerializer(BaseSerializer):
         )
 
 
-class JobInstanceSerializer(BaseSerializer):
+class JobInstanceSerializer(ModelSerializer):
     class Meta:
         model = JobInstance
         fields = ("id", "uuid")
 
 
-class ActivationInstanceLogSerializer(BaseSerializer):
+class ActivationInstanceLogSerializer(ModelSerializer):
     class Meta:
         model = ActivationInstanceLog
         fields = ("id", "activation_instance_id", "line_number", "log")
 
 
-class RuleSerializer(BaseSerializer):
+class RuleSerializer(ModelSerializer):
     class Meta:
         model = Rule
         fields = ("id", "ruleset_id", "name", "action")
 
 
-class RulesetSerializer(BaseSerializer):
+class RulesetSerializer(ModelSerializer):
     class Meta:
         model = Ruleset
         fields = ("id", "rulebook_id", "name", "created_at", "modified_at")
 
 
-class JobSerializer(BaseSerializer):
+class JobSerializer(ModelSerializer):
     class Meta:
         model = Job
         fields = ("id", "uuid")
 
 
-class PlaybookSerializer(BaseSerializer):
+class PlaybookSerializer(ModelSerializer):
     class Meta:
         model = Playbook
         fields = ("id", "name", "playbook", "project_id")
 
 
-class AuditRuleSerializer(BaseSerializer):
+class AuditRuleSerializer(ModelSerializer):
     class Meta:
         model = AuditRule
         fields = (
@@ -146,19 +146,19 @@ class AuditRuleSerializer(BaseSerializer):
         )
 
 
-class JobInstanceEventSerializer(BaseSerializer):
+class JobInstanceEventSerializer(ModelSerializer):
     class Meta:
         model = JobInstanceEvent
         fields = ("id", "job_uuid", "counter", "stdout", "type", "created_at")
 
 
-class JobInstanceHostSerializer(BaseSerializer):
+class JobInstanceHostSerializer(ModelSerializer):
     class Meta:
         model = JobInstanceHost
         fields = ("id", "host", "job_uuid", "playbook", "play", "task", "status")
 
 
-class ActivationSerializer(BaseSerializer):
+class ActivationSerializer(ModelSerializer):
     class Meta:
         model = Activation
         fields = (
@@ -180,25 +180,25 @@ class ActivationSerializer(BaseSerializer):
         )
 
 
-class RoleSerializer(BaseSerializer):
+class RoleSerializer(ModelSerializer):
     class Meta:
         model = Role
         fields = ("id", "name", "description")
 
 
-class RolePermissionSerializer(BaseSerializer):
+class RolePermissionSerializer(ModelSerializer):
     class Meta:
         model = RolePermission
         fields = ("id", "role_id", "resource_type", "action")
 
 
-class UserRoleSerializer(BaseSerializer):
+class UserRoleSerializer(ModelSerializer):
     class Meta:
         model = UserRole
         fields = ("user_id", "role_id", "id")
 
 
-class UserSerializer(BaseSerializer):
+class UserSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = (

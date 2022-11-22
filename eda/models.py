@@ -14,12 +14,10 @@ class ActivationInstanceJobInstance(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    activation_instance_id = models.IntegerField(
-        "ActivationInstance",
+    activation_instance_id = models.ForeignKey(
+        "ActivationInstance", on_delete=models.CASCADE
     )
-    job_instance_id = models.IntegerField(
-        "JobInstance",
-    )
+    job_instance_id = models.ForeignKey("JobInstance", on_delete=models.CASCADE)
 
 
 class ActivationInstance(models.Model):
@@ -27,22 +25,14 @@ class ActivationInstance(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    rulebook_id = models.IntegerField(
-        "Rulebook",
-    )
-    inventory_id = models.IntegerField(
-        "Inventory",
-    )
-    extra_var_id = models.IntegerField(
-        "ExtraVar",
-    )
-    execution_environment = models.CharField(blank=True)
-    working_directory = models.CharField(blank=True)
+    name = models.TextField()
+    rulebook_id = models.ForeignKey("Rulebook", on_delete=models.CASCADE)
+    inventory_id = models.ForeignKey("Inventory", on_delete=models.CASCADE)
+    extra_var_id = models.ForeignKey("ExtraVar", on_delete=models.CASCADE)
+    execution_environment = models.TextField()
+    working_directory = models.TextField()
     #large_data_id = models.OID()
-    project_id = models.IntegerField(
-        "Project",
-    )
+    project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
 
 
 class ExtraVar(models.Model):
@@ -50,11 +40,9 @@ class ExtraVar(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    extra_var = models.CharField(blank=True)
-    project_id = models.IntegerField(
-        "Project",
-    )
+    name = models.TextField()
+    extra_var = models.TextField()
+    project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
 
 
 class Project(models.Model):
@@ -62,10 +50,10 @@ class Project(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    git_hash = models.CharField(blank=True)
-    url = models.CharField(blank=True)
-    name = models.CharField(blank=True)
-    description = models.CharField(blank=True)
+    git_hash = models.TextField()
+    url = models.TextField()
+    name = models.TextField()
+    description = models.TextField()
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
     #large_data_id = models.OID()
@@ -76,11 +64,9 @@ class Inventory(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    inventory = models.CharField(blank=True)
-    project_id = models.IntegerField(
-        "Project",
-    )
+    name = models.TextField()
+    inventory = models.TextField()
+    project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
 
 
 class Rulebook(models.Model):
@@ -88,12 +74,10 @@ class Rulebook(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    rulesets = models.CharField(blank=True)
-    project_id = models.IntegerField(
-        "Project",
-    )
-    description = models.CharField(blank=True)
+    name = models.TextField()
+    rulesets = models.TextField()
+    project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
+    description = models.TextField()
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
 
@@ -111,11 +95,11 @@ class ActivationInstanceLog(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    activation_instance_id = models.IntegerField(
-        "ActivationInstance",
+    activation_instance_id = models.ForeignKey(
+        "ActivationInstance", on_delete=models.CASCADE
     )
     line_number = models.IntegerField()
-    log = models.CharField(blank=True)
+    log = models.TextField()
 
 
 class Rule(models.Model):
@@ -123,10 +107,8 @@ class Rule(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    ruleset_id = models.IntegerField(
-        "Ruleset",
-    )
-    name = models.CharField(blank=True)
+    ruleset_id = models.ForeignKey("Ruleset", on_delete=models.CASCADE)
+    name = models.TextField()
     action = models.JSONField()
 
 
@@ -135,10 +117,8 @@ class Ruleset(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    rulebook_id = models.IntegerField(
-        "Rulebook",
-    )
-    name = models.CharField(blank=True)
+    rulebook_id = models.ForeignKey("Rulebook", on_delete=models.CASCADE)
+    name = models.TextField()
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
 
@@ -156,11 +136,9 @@ class Playbook(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    playbook = models.CharField(blank=True)
-    project_id = models.IntegerField(
-        "Project",
-    )
+    name = models.TextField()
+    playbook = models.TextField()
+    project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
 
 
 class AuditRule(models.Model):
@@ -168,24 +146,18 @@ class AuditRule(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    description = models.CharField(blank=True)
-    status = models.CharField(blank=True)
+    name = models.TextField()
+    description = models.TextField()
+    status = models.TextField()
     fired_date = models.DateTimeField()
     created_at = models.DateTimeField()
     definition = models.JSONField()
-    rule_id = models.IntegerField(
-        "Rule",
+    rule_id = models.ForeignKey("Rule", on_delete=models.CASCADE)
+    ruleset_id = models.ForeignKey("Ruleset", on_delete=models.CASCADE)
+    activation_instance_id = models.ForeignKey(
+        "ActivationInstance", on_delete=models.CASCADE
     )
-    ruleset_id = models.IntegerField(
-        "Ruleset",
-    )
-    activation_instance_id = models.IntegerField(
-        "ActivationInstance",
-    )
-    job_instance_id = models.IntegerField(
-        "JobInstance",
-    )
+    job_instance_id = models.ForeignKey("JobInstance", on_delete=models.CASCADE)
 
 
 class JobInstanceEvent(models.Model):
@@ -195,8 +167,8 @@ class JobInstanceEvent(models.Model):
     )
     job_uuid = models.UUIDField()
     counter = models.IntegerField()
-    stdout = models.CharField(blank=True)
-    type = models.CharField(blank=True)
+    stdout = models.TextField()
+    type = models.TextField()
     created_at = models.DateTimeField()
 
 
@@ -205,12 +177,12 @@ class JobInstanceHost(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    host = models.CharField(blank=True)
+    host = models.TextField()
     job_uuid = models.UUIDField()
-    playbook = models.CharField(blank=True)
-    play = models.CharField(blank=True)
-    task = models.CharField(blank=True)
-    status = models.CharField(blank=True)
+    playbook = models.TextField()
+    play = models.TextField()
+    task = models.TextField()
+    status = models.TextField()
 
 
 class Activation(models.Model):
@@ -218,26 +190,24 @@ class Activation(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    rulebook_id = models.IntegerField(
-        "Rulebook",
-    )
-    inventory_id = models.IntegerField(
-        "Inventory",
-    )
-    extra_var_id = models.IntegerField(
-        "ExtraVar",
-    )
-    description = models.CharField(blank=True)
-    status = models.CharField(blank=True)
+    name = models.TextField()
+    rulebook_id = models.ForeignKey("Rulebook", on_delete=models.CASCADE)
+    inventory_id = models.ForeignKey("Inventory", on_delete=models.CASCADE)
+    extra_var_id = models.ForeignKey("ExtraVar", on_delete=models.CASCADE)
+    description = models.TextField()
+    status = models.TextField()
     is_enabled = models.BooleanField()
     restarted_at = models.DateTimeField()
     restart_count = models.IntegerField()
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField()
-    working_directory = models.CharField(blank=True)
-    execution_environment = models.CharField(max_length=6, blank=True)
-    restart_policy = models.CharField(max_length=10, blank=True)
+    working_directory = models.TextField()
+    execution_environment = models.TextField(
+        max_length=6,
+    )
+    restart_policy = models.TextField(
+        max_length=10,
+    )
 
 
 class Role(models.Model):
@@ -245,8 +215,8 @@ class Role(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    name = models.CharField(blank=True)
-    description = models.CharField(blank=True)
+    name = models.TextField()
+    description = models.TextField()
 
 
 class RolePermission(models.Model):
@@ -254,21 +224,19 @@ class RolePermission(models.Model):
     id = models.AutoField(
         primary_key=True,
     )
-    role_id = models.ForeignKey(
-        "Role",
+    role_id = models.ForeignKey("Role", on_delete=models.CASCADE)
+    resource_type = models.TextField(
+        max_length=13,
     )
-    resource_type = models.CharField(max_length=13, blank=True)
-    action = models.CharField(max_length=6, blank=True)
+    action = models.TextField(
+        max_length=6,
+    )
 
 
 class UserRole(models.Model):
 
-    user_id = models.ForeignKey(
-        "User",
-    )
-    role_id = models.ForeignKey(
-        "Role",
-    )
+    user_id = models.ForeignKey("User", on_delete=models.CASCADE)
+    role_id = models.ForeignKey("Role", on_delete=models.CASCADE)
     id = models.AutoField(
         primary_key=True,
     )
@@ -276,8 +244,12 @@ class UserRole(models.Model):
 
 class User(models.Model):
 
-    email = models.CharField(max_length=320, blank=True)
-    hashed_password = models.CharField(max_length=1024, blank=True)
+    email = models.TextField(
+        max_length=320,
+    )
+    hashed_password = models.TextField(
+        max_length=1024,
+    )
     is_active = models.BooleanField()
     is_superuser = models.BooleanField()
     is_verified = models.BooleanField()

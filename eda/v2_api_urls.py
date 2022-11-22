@@ -1,32 +1,29 @@
 from django.conf.urls import url
 
-from awx.network_ui.v2_api_views import AlembicVersionList, AlembicVersionDetail
-from awx.network_ui.v2_api_views import (
+from eda.v2_api_views import AlembicVersionList, AlembicVersionDetail
+from eda.v2_api_views import (
     ActivationInstanceJobInstanceList,
     ActivationInstanceJobInstanceDetail,
 )
-from awx.network_ui.v2_api_views import ActivationInstanceList, ActivationInstanceDetail
-from awx.network_ui.v2_api_views import ExtraVarList, ExtraVarDetail
-from awx.network_ui.v2_api_views import ProjectList, ProjectDetail
-from awx.network_ui.v2_api_views import InventoryList, InventoryDetail
-from awx.network_ui.v2_api_views import RulebookList, RulebookDetail
-from awx.network_ui.v2_api_views import JobInstanceList, JobInstanceDetail
-from awx.network_ui.v2_api_views import (
-    ActivationInstanceLogList,
-    ActivationInstanceLogDetail,
-)
-from awx.network_ui.v2_api_views import RuleList, RuleDetail
-from awx.network_ui.v2_api_views import RulesetList, RulesetDetail
-from awx.network_ui.v2_api_views import JobList, JobDetail
-from awx.network_ui.v2_api_views import PlaybookList, PlaybookDetail
-from awx.network_ui.v2_api_views import AuditRuleList, AuditRuleDetail
-from awx.network_ui.v2_api_views import JobInstanceEventList, JobInstanceEventDetail
-from awx.network_ui.v2_api_views import JobInstanceHostList, JobInstanceHostDetail
-from awx.network_ui.v2_api_views import ActivationList, ActivationDetail
-from awx.network_ui.v2_api_views import RoleList, RoleDetail
-from awx.network_ui.v2_api_views import RolePermissionList, RolePermissionDetail
-from awx.network_ui.v2_api_views import UserRoleList, UserRoleDetail
-from awx.network_ui.v2_api_views import UserList, UserDetail
+from eda.v2_api_views import ActivationInstanceList, ActivationInstanceDetail
+from eda.v2_api_views import ExtraVarList, ExtraVarDetail
+from eda.v2_api_views import ProjectList, ProjectDetail
+from eda.v2_api_views import InventoryList, InventoryDetail
+from eda.v2_api_views import RulebookList, RulebookDetail
+from eda.v2_api_views import JobInstanceList, JobInstanceDetail
+from eda.v2_api_views import ActivationInstanceLogList, ActivationInstanceLogDetail
+from eda.v2_api_views import RuleList, RuleDetail
+from eda.v2_api_views import RulesetList, RulesetDetail
+from eda.v2_api_views import JobList, JobDetail
+from eda.v2_api_views import PlaybookList, PlaybookDetail
+from eda.v2_api_views import AuditRuleList, AuditRuleDetail
+from eda.v2_api_views import JobInstanceEventList, JobInstanceEventDetail
+from eda.v2_api_views import JobInstanceHostList, JobInstanceHostDetail
+from eda.v2_api_views import ActivationList, ActivationDetail
+from eda.v2_api_views import RoleList, RoleDetail
+from eda.v2_api_views import RolePermissionList, RolePermissionDetail
+from eda.v2_api_views import UserRoleList, UserRoleDetail
+from eda.v2_api_views import UserList, UserDetail
 
 
 urls = []

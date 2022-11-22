@@ -1,4 +1,4 @@
-from awx.api.serializers import BaseSerializer
+from restframework.serializers import ModelSerializer
 {%for model in models%}{%if model.api%}
 from {{app}}.models import {{model.name}}{%endif%}{%endfor%}
 
@@ -7,7 +7,7 @@ from {{app}}.models import {{model.name}}{%endif%}{%endfor%}
 
 
 
-class {{model.name}}Serializer(BaseSerializer):
+class {{model.name}}Serializer(ModelSerializer):
     class Meta:
         model = {{model.name}}
         fields = ({%for field in model.fields%}'{{field.name}}'{%if not loop.last%},

@@ -29,7 +29,7 @@ field_map = {
     "SMALLINT": "SmallIntegerField",
     "TEXT": "TextField",
     "TIME": "TimeField",
-    "VARCHAR": "CharField",
+    "VARCHAR": "TextField",
     "TIMESTAMP": "DateTimeField",
     "UUID": "UUIDField",
     "JSON": "JSONField",
@@ -50,6 +50,8 @@ def convert_field_type(field):
     if field.get('pk') and field.get('ref'):
         del field['pk']
     if field.get('ref') and field.get('type') == 'UUIDField':
+        field['type'] = 'ForeignKey'
+    if field.get('ref') and field.get('type') == 'IntegerField':
         field['type'] = 'ForeignKey'
 
 
