@@ -2,7 +2,8 @@
 
 Werkzeug[watchdog]==2.2.2 # https://github.com/pallets/werkzeug
 ipdb==0.13.9  # https://github.com/gotcha/ipdb
-psycopg2==2.9.5  # https://github.com/psycopg/psycopg2
+#psycopg2==2.9.5  # https://github.com/psycopg/psycopg2
+psycopg2-binary
 watchfiles==0.18.1  # https://github.com/samuelcolvin/watchfiles
 
 # Testing
