@@ -1,8 +1,8 @@
 
 
-.PHONY: all models admin serializers views v2_api_urls v2_api_access
+.PHONY: all models admin serializers views urls v2_api_access
 
-all: tuples models admin serializers views v2_api_urls v2_api_access
+all: tuples models admin serializers views urls v2_api_access
 
 tuples:
 	jinja2 codegen/tuples.pyt designs/models.yml > tuples.py
@@ -16,9 +16,9 @@ admin:
 	jinja2 codegen/admin.pyt designs/models.yml > admin.py
 	black admin.py
 
-v2_api_urls:
-	jinja2 codegen/v2_api_urls.pyt designs/models.yml > v2_api_urls.py
-	black v2_api_urls.py
+urls:
+	jinja2 codegen/urls.pyt designs/models.yml > urls.py
+	black urls.py
 
 v2_api_access:
 	jinja2 codegen/v2_api_access.pyt designs/models.yml > v2_api_access.py
