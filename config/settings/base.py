@@ -55,6 +55,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # APPS
 # ------------------------------------------------------------------------------
 DJANGO_APPS = [
+    "daphne",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -323,9 +324,11 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
     "SERVERS": [
-        {"url": "http://127.0.0.1:8000", "description": "Local Development server"},
+        {"url": "http://127.0.0.1:8002", "description": "Local Development server"},
         {"url": "https://example.com", "description": "Production server"},
     ],
 }
 # Your stuff...
 # ------------------------------------------------------------------------------
+
+ASGI_APPLICATION = 'config.asgi.application'

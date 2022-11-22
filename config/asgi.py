@@ -11,6 +11,7 @@ import os
 import sys
 from pathlib import Path
 
+from channels.routing import ProtocolTypeRouter
 from django.core.asgi import get_asgi_application
 
 # This allows easy placement of apps within the interior
@@ -21,20 +22,11 @@ sys.path.append(str(ROOT_DIR / "aap_eda"))
 # If DJANGO_SETTINGS_MODULE is unset, default to the local settings
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 
-# This application object is used by any ASGI server configured to use this file.
-django_application = get_asgi_application()
-# Apply ASGI middleware here.
-# from helloworld.asgi import HelloWorldApplication
-# application = HelloWorldApplication(application)
+# Initialize Django ASGI application early to ensure the AppRegistry
+# is populated before importing code that may import ORM models.
+django_asgi_app = get_asgi_application()
 
-# Import websocket application here, so apps from django_application are loaded first
-from config.websocket import websocket_application  # noqa isort:skip
-
-
-async def application(scope, receive, send):
-    if scope["type"] == "http":
-        await django_application(scope, receive, send)
-    elif scope["type"] == "websocket":
-        await websocket_application(scope, receive, send)
-    else:
-        raise NotImplementedError(f"Unknown scope type {scope['type']}")
+application = ProtocolTypeRouter({
+    "http": django_asgi_app,
+    # Just HTTP for now. (We can add other protocols later.)
+})
