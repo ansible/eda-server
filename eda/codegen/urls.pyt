@@ -1,6 +1,6 @@
 from django.urls import include, path
 {%for model in models-%}{%if model.api%}
-from eda.views import ({{model.name}}List, {{model.name}}Detail)
+from eda.api_views import ({{model.name}}List, {{model.name}}Detail)
 {%-endif%}
 {%-endfor%}
 

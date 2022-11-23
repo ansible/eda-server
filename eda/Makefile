@@ -17,8 +17,8 @@ admin:
 	black admin.py
 
 urls:
-	jinja2 codegen/urls.pyt designs/models.yml > urls.py
-	black urls.py
+	jinja2 codegen/urls.pyt designs/models.yml > api_urls.py
+	black api_urls.py
 
 v2_api_access:
 	jinja2 codegen/v2_api_access.pyt designs/models.yml > v2_api_access.py
@@ -29,5 +29,5 @@ serializers:
 	black serializers.py
 
 views:
-	jinja2 codegen/views.pyt designs/models.yml > views.py
-	black views.py
+	jinja2 codegen/views.pyt designs/models.yml > api_views.py
+	black api_views.py
