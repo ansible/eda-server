@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 from channels.auth import AuthMiddlewareStack
-from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.routing import ProtocolTypeRouter, URLRouter, ChannelNameRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 
@@ -29,11 +29,16 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 django_asgi_app = get_asgi_application()
 
 import eda.routing  # noqa isort:skip
+import eda.consumers
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     # Just HTTP for now. (We can add other protocols later.)
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(URLRouter(eda.routing.websocket_urlpatterns))
-    )
+    ),
+    "channel": ChannelNameRouter({
+        "eda_api": eda.consumers.EdaApiConsumer.as_asgi(),
+    })
+    
 })

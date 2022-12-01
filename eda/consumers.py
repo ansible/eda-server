@@ -3,6 +3,7 @@ import json
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
+from channels.consumer import SyncConsumer
 
 
 class ChatConsumer(WebsocketConsumer):
@@ -39,3 +40,9 @@ class ChatConsumer(WebsocketConsumer):
 
         # Send message to WebSocket
         self.send(text_data=json.dumps({"message": message}))
+
+
+class EdaApiConsumer(SyncConsumer):
+
+    def test_print(self, message):
+        print("Test:", message)
