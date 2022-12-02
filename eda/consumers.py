@@ -44,5 +44,6 @@ class ChatConsumer(WebsocketConsumer):
 
 class EdaApiConsumer(SyncConsumer):
 
-    def test_print(self, message):
-        print("Test:", message)
+
+    def create_Project(self, message):
+        print("create_Project:", message)
