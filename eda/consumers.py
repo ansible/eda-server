@@ -1,9 +1,13 @@
 # chat/consumers.py
 import json
 
+from asyncio import run
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 from channels.consumer import SyncConsumer
+
+from . import tuples
+from .project import import_project
 
 
 class ChatConsumer(WebsocketConsumer):
@@ -42,8 +46,24 @@ class ChatConsumer(WebsocketConsumer):
         self.send(text_data=json.dumps({"message": message}))
 
 
-class EdaApiConsumer(SyncConsumer):
+class AnsibleRulebookConsumer(WebsocketConsumer):
 
+    def connect(self):
+        print('connect')
+        self.accept()
+
+    def disconnect(self, close_code):
+        print('disconnect')
+
+    # Receive message from WebSocket
+    def receive(self, text_data):
+        print('receive', text_data)
+
+
+class EdaApiConsumer(SyncConsumer):
 
     def create_Project(self, message):
         print("create_Project:", message)
+        project = tuples.Project(**message["object"])
+        print(project)
+        async_to_sync(import_project)(project)
