@@ -40,6 +40,7 @@ class ActivationInstanceSerializer(ModelSerializer):
             "execution_environment",
             "working_directory",
             "project_id",
+            "activation",
         )
 
 

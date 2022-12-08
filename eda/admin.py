@@ -64,12 +64,14 @@ class ActivationInstanceAdmin(admin.ModelAdmin):
         "execution_environment",
         "working_directory",
         "project_id",
+        "activation",
     )
     raw_id_fields = (
         "rulebook_id",
         "inventory_id",
         "extra_var_id",
         "project_id",
+        "activation",
     )
 
 

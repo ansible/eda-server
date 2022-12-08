@@ -24,6 +24,7 @@ class ActivationInstance(models.Model):
     execution_environment = models.TextField()
     working_directory = models.TextField()
     project_id = models.ForeignKey("Project", on_delete=models.CASCADE)
+    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
 
 
 class ExtraVar(models.Model):

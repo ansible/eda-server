@@ -41,6 +41,10 @@ models:
     ref: Project
     ref_field: id
     type: ForeignKey
+  - name: activation
+    ref: Activation
+    ref_field: id
+    type: ForeignKey
   name: ActivationInstance
 - api: true
   fields:
