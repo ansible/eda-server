@@ -1,0 +1,19 @@
+---
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        language: system
+        types: [python]
+        entry: poetry run black --check .
+      - id: isort
+        name: isort
+        language: system
+        types: [python]
+        entry: poetry run isort --check .
+      - id: flake8
+        name: flake8
+        language: system
+        types: [python]
+        entry: poetry run flake8 .

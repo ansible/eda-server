@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """
-WSGI config for aap_eda project.
+WSGI config.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -24,6 +24,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'aap_eda.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings")
 
 application = get_wsgi_application()
