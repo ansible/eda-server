@@ -1,0 +1,5 @@
+## Python
+# Bytecode cache
+__pycache__/
+# Packaging / distribution
+/dist/

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "aap-eda"
+version = "0.1.0"
+description = ""
+authors = ["Red Hat, Inc. <info@ansible.com>"]
+readme = "README.md"
+packages = [
+    {include = "aap_eda", from = "src"}
+]
+
+[tool.poetry.dependencies]
+python = ">=3.9"
