@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  default:
+    desc: "Show this message and exit"
+    cmds:
+      - task -l
+    silent: true
+
+  lint:
+    desc: "Run all linters."
+    cmds:
+      - task: lint:black
+      - task: lint:isort
+      - task: lint:flake8
+
+  lint:black:
+    desc: "Check code with `black`."
+    cmds:
+      - poetry run black --check .
+
+  lint:isort:
+    desc: "Check code with `isort`."
+    cmds:
+      - poetry run isort --check .
+
+  lint:flake8:
+    desc: "Check code with `flake8`."
+    cmds:
+      - poetry run flake8
