@@ -36,6 +36,11 @@ pep8-naming = "*"
 pre-commit = "^2.20.0"
 
 
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+pytest-django = "*"
+
 [tool.black]
 line-length = 79
 target-version = ["py39", "py310"]
