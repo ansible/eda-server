@@ -7,3 +7,4 @@ repos:
         language: system
         types: [python]
         entry: task lint
+        pass_filenames: false
