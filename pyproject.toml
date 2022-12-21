@@ -16,6 +16,7 @@ packages = [
 python = ">=3.9"
 django = "*"
 psycopg2 = "*"
+djangorestframework = "*"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"
@@ -31,9 +32,9 @@ flake8-print = "*"
 flake8-string-format = "*"
 pep8-naming = "*"
 
-
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.20.0"
+
 
 [tool.black]
 line-length = 79
