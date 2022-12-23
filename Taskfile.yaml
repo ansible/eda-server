@@ -28,3 +28,19 @@ tasks:
     desc: "Check code with `flake8`."
     cmds:
       - poetry run flake8
+
+  format:
+    desc: "Run code formatters"
+    cmds:
+      - task: format:isort
+      - task: format:black
+
+  format:isort:
+    desc: "Format code with `isort`."
+    cmds:
+      - poetry run black .
+
+  format:black:
+    desc: "Format code with `black`."
+    cmds:
+      - poetry run isort .
