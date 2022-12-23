@@ -9,12 +9,15 @@ services:
       EDA_SECRET_KEY: 'insecure'
       EDA_DB_HOST: 'postgres'
       EDA_DB_PASSWORD: 'secret'
-    command: [
-      "/bin/bash", "-c",
-      "django-admin migrate && django-admin runserver 0.0.0.0:8000"
-    ]
+    command:
+      - /bin/bash
+      - -c
+      - django-admin migrate
+        && django-admin runserver 0.0.0.0:8000
     ports:
       - '8000:8000'
+    volumes:
+      - '../../:/app/src'
     depends_on:
       postgres:
         condition: service_healthy
