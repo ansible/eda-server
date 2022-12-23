@@ -47,6 +47,18 @@ def test_create_playbook(client: APIClient):
     assert models.Playbook.objects.filter(pk=id_).exists()
 
 
+@pytest.mark.xfail(reason="DRF ignores read only fields")
+@pytest.mark.django_db
+def test_create_playbook_with_id_fail(client: APIClient):
+    data_in = {
+        "id": 42,
+        "name": "test-playbook.yml",
+        "playbook": TEST_PLAYBOOK,
+    }
+    response = client.post("/eda/api/v1/playbooks", data=data_in)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 @pytest.mark.django_db
 def test_retrieve_playbook(client: APIClient):
     obj = models.Playbook.objects.create(
@@ -60,6 +72,12 @@ def test_retrieve_playbook(client: APIClient):
         "name": "test-playbook.yml",
         "playbook": TEST_PLAYBOOK,
     }
+
+
+@pytest.mark.django_db
+def test_retrieve_playbook_not_exist(client: APIClient):
+    response = client.get("/eda/api/v1/playbooks/42")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
