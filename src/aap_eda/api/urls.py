@@ -13,10 +13,6 @@ router = routers.SimpleRouter(trailing_slash=False)
 router.register("extra_vars", views.ExtraVarViewSet)
 router.register("playbooks", views.PlaybookViewSet)
 
-v1_urls = [
-    *router.urls,
-]
-
 openapi_urls = [
     path(
         "openapi.json",
@@ -40,7 +36,11 @@ openapi_urls = [
     ),
 ]
 
+v1_urls = [
+    *router.urls,
+    path("", include(openapi_urls)),
+]
+
 urlpatterns = [
     path("v1/", include(v1_urls)),
-    path("", include(openapi_urls)),
 ]

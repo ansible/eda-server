@@ -169,6 +169,8 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/api/v[0-9]",
+    "SCHEMA_PATH_PREFIX_TRIM": True,
+    "SERVERS": [{"url": f"/{API_PREFIX}/api/v1"}],
     "PREPROCESSING_HOOKS": [
         "aap_eda.api.openapi.preprocess_filter_api_routes"
     ],
