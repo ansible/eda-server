@@ -24,6 +24,6 @@ import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
 
 application = get_asgi_application()
