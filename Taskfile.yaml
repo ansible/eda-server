@@ -26,17 +26,17 @@ tasks:
   lint:black:
     desc: "Check code with `black`."
     cmds:
-      - poetry run black --check .
+      - poetry run black --check -- {{.CLI_ARGS | default "."}}
 
   lint:isort:
     desc: "Check code with `isort`."
     cmds:
-      - poetry run isort --check .
+      - poetry run isort --check -- {{.CLI_ARGS | default "."}}
 
   lint:flake8:
     desc: "Check code with `flake8`."
     cmds:
-      - poetry run flake8
+      - poetry run flake8 -- {{.CLI_ARGS | default "."}}
 
   format:
     desc: "Run code formatters"
