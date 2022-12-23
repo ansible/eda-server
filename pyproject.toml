@@ -18,6 +18,7 @@ django = "*"
 psycopg2 = "*"
 djangorestframework = "*"
 dynaconf = ">=3"
+drf-spectacular = "*"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"

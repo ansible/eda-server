@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party apps
     "rest_framework",
+    "drf_spectacular",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -153,11 +154,26 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "core.User"
 
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
 # ---------------------------------------------------------
 # APPLICATION SETTINGS
 # ---------------------------------------------------------
 
-API_PREFIX = settings.get("API_PREFIX", "eda")
+API_PREFIX = settings.get("API_PREFIX", "eda").strip("/")
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Event Driven Ansible API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/api/v[0-9]",
+    "PREPROCESSING_HOOKS": [
+        "aap_eda.api.openapi.preprocess_filter_api_routes"
+    ],
+}
+
 
 # ---------------------------------------------------------
 # LOGGING SETTINGS

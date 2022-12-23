@@ -32,9 +32,7 @@ from django.urls import include, path
 from aap_eda.api import urls as api_urls
 from aap_eda.core import urls as core_urls
 
-api_prefix = settings.API_PREFIX.rstrip("/")
-
 urlpatterns = [
     path("", include(core_urls)),
-    path(f"{api_prefix}/api/v1/", include(api_urls)),
+    path(f"{settings.API_PREFIX}/api/", include(api_urls)),
 ]
