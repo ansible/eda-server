@@ -45,7 +45,7 @@ settings = dynaconf.Dynaconf(envvar_prefix="EDA")
 # DJANGO SETTINGS
 # ---------------------------------------------------------
 
-SECRET_KEY = settings["SECRET_KEY"]
+SECRET_KEY = settings.get("SECRET_KEY")
 
 DEBUG = settings.get("DEBUG", False)
 
@@ -156,6 +156,8 @@ AUTH_USER_MODEL = "core.User"
 # ---------------------------------------------------------
 # APPLICATION SETTINGS
 # ---------------------------------------------------------
+
+API_PREFIX = settings.get("API_PREFIX", "eda")
 
 # ---------------------------------------------------------
 # LOGGING SETTINGS

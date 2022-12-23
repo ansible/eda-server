@@ -5,10 +5,7 @@ services:
       context: ../../
       dockerfile: tools/docker/Dockerfile
     environment:
-      EDA_DEBUG: true
-      EDA_SECRET_KEY: 'insecure'
       EDA_DB_HOST: 'postgres'
-      EDA_DB_PASSWORD: 'secret'
     command:
       - /bin/bash
       - -c
@@ -23,7 +20,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: curl -q http://localhost:8000/_healthz
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 10
 
