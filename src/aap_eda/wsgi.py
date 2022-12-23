@@ -24,6 +24,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
 
 application = get_wsgi_application()
