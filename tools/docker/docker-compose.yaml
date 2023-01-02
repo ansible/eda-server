@@ -29,9 +29,16 @@ services:
     environment:
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: eda
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c log_statement=${PG_LOG_STATEMENT:-none}
     ports:
       - '5432:5432'
     volumes:
+      - "./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:z"
+      - "./postgres/initdb.d:/docker-entrypoint-initdb.d:z"
+      - "./postgres/conf.d:/etc/postgresql/conf.d:z"
       - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
       test: [ 'CMD-SHELL', 'pg_isready -U postgres' ]
