@@ -12,6 +12,9 @@ packages = [
     {include = "aap_eda", from = "src"}
 ]
 
+[tool.poetry.scripts]
+aap-eda-manage = 'aap_eda.manage:main'
+
 [tool.poetry.dependencies]
 python = ">=3.9"
 django = "*"

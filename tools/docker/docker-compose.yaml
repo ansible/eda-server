@@ -9,8 +9,8 @@ services:
     command:
       - /bin/bash
       - -c
-      - django-admin migrate
-        && django-admin runserver 0.0.0.0:8000
+      - aap-eda-manage migrate
+        && aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - '8000:8000'
     volumes:
@@ -19,7 +19,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: curl -q http://localhost:8000/_healthz
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
       interval: 30s
       timeout: 5s
       retries: 10
@@ -41,7 +41,7 @@ services:
       - "./postgres/conf.d:/etc/postgresql/conf.d:z"
       - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
-      test: [ 'CMD-SHELL', 'pg_isready -U postgres' ]
+      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
       timeout: 5s
       retries: 3

@@ -28,4 +28,4 @@ RUN poetry install --no-interaction --no-ansi --no-root
 COPY . /app/src
 RUN poetry install --only-root
 
-CMD ["django-admin", "runserver", "0.0.0.0:8000"]
+CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
