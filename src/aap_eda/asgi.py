@@ -22,8 +22,13 @@ https://docs.djangoproject.com/en/4.1/howto/deployment/asgi/
 
 import os
 
+from channels.routing import ProtocolTypeRouter
 from django.core.asgi import get_asgi_application
+
+from .wsapi.routes import router
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
 
-application = get_asgi_application()
+django_app = get_asgi_application()
+
+application = ProtocolTypeRouter({"http": django_app, "websocket": router})

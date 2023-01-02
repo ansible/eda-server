@@ -54,6 +54,7 @@ ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 
 # Application definition
 INSTALLED_APPS = [
+    "daphne",
     # Django apps
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -94,6 +95,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "aap_eda.wsgi.application"
+
+ASGI_APPLICATION = "aap_eda.asgi.application"
 
 
 # Database
