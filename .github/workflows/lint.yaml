@@ -28,4 +28,4 @@ jobs:
       - name: Lint with ruff
         run: poetry run ruff --show-source -- .
       - name: Lint with flake8
-        run: flake8 . --count --show-source --statistics
+        run: poetry run flake8 . --count --show-source --statistics
