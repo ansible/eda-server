@@ -33,8 +33,7 @@ djangorestframework = "*"
 dynaconf = ">=3"
 drf-spectacular = "*"
 channels = { version = "*", extras = ["daphne"] }
-psycopg2 = { version = "*", optional = true }
-psycopg2-binary = { version = "*", optional = true }
+psycopg2-binary = "^2.9.5"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
