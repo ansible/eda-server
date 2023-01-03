@@ -940,21 +940,21 @@ files = [
 
 [[package]]
 name = "pydocstyle"
-version = "6.1.1"
+version = "6.2.1"
 description = "Python docstring style checker"
 category = "dev"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "pydocstyle-6.1.1-py3-none-any.whl", hash = "sha256:6987826d6775056839940041beef5c08cc7e3d71d63149b48e36727f70144dc4"},
-    {file = "pydocstyle-6.1.1.tar.gz", hash = "sha256:1d41b7c459ba0ee6c345f2eb9ae827cab14a7533a88c5c6f7e94923f72df92dc"},
+    {file = "pydocstyle-6.2.1-py3-none-any.whl", hash = "sha256:e034023706489a5786778d21bd25e951052616b260d83e163f09d559dcd647b9"},
+    {file = "pydocstyle-6.2.1.tar.gz", hash = "sha256:5ddccabe3c9555d4afaabdba909ca2de4fa24ac31e2eede4ab3d528a4bcadd52"},
 ]
 
 [package.dependencies]
-snowballstemmer = "*"
+snowballstemmer = ">=2.2.0"
 
 [package.extras]
-toml = ["toml"]
+toml = ["tomli (>=1.2.3)"]
 
 [[package]]
 name = "pyflakes"
@@ -1127,6 +1127,32 @@ files = [
     {file = "PyYAML-6.0-cp39-cp39-win32.whl", hash = "sha256:b5b9eccad747aabaaffbc6064800670f0c297e52c12754eb1d976c57e4f74dcb"},
     {file = "PyYAML-6.0-cp39-cp39-win_amd64.whl", hash = "sha256:b3d267842bf12586ba6c734f89d1f5b871df0273157918b0ccefa29deb05c21c"},
     {file = "PyYAML-6.0.tar.gz", hash = "sha256:68fb519c14306fec9720a2a5b45bc9f0c8d1b9c72adf45c37baedfcd949c35a2"},
+]
+
+[[package]]
+name = "ruff"
+version = "0.0.209"
+description = "An extremely fast Python linter, written in Rust."
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "ruff-0.0.209-py3-none-macosx_10_7_x86_64.whl", hash = "sha256:da3d55155504d268f02419499d06f38dcce55e0ea9ef675a1940862922cdb695"},
+    {file = "ruff-0.0.209-py3-none-macosx_10_9_x86_64.macosx_11_0_arm64.macosx_10_9_universal2.whl", hash = "sha256:3107b2b5079004e231a296c2c57f30f5e31854d67d8f542319af655d7b40df87"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:61b93156b49d83dba998cf8d7b8355fc902e253c7a0538fdfce20261b08c3ee7"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f29d38bdf4727404e35688e5d321696e9b807bae4ba22b520a131ed6b50f9143"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a1895cb9731ac114911ec2a0fb4a376883f8fcb0c6fe4c13d87a9b8c450b06a9"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_ppc64.manylinux2014_ppc64.whl", hash = "sha256:7314533610931e1618fe85759e5c5f765912c1596a2e2810e3894e15a3fde604"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:01b0d92b1712643f736b6ef88bf14646af61d4f7dd69fdfc0d333b0a82893ccf"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:c6d88849f5b10d5bdf7cda688179f7009d9099f1030e8c36cd05e1e1616e1564"},
+    {file = "ruff-0.0.209-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a45f3c4fb0cbb3322bb4e039ef797cb4917bf07d4d0c48401ba6ec50aaaeeb76"},
+    {file = "ruff-0.0.209-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:6602cf6a2e556f0d21b8940f78a360d3991df91f9dcaeec06d15fe969c362620"},
+    {file = "ruff-0.0.209-py3-none-musllinux_1_2_armv7l.whl", hash = "sha256:6acf6e987def3c41d6ab986c6da3c82e1997cea99b785909293b3128c2763791"},
+    {file = "ruff-0.0.209-py3-none-musllinux_1_2_i686.whl", hash = "sha256:659a35a1ade05daa1d300a9a6704f22c6af6d4f7f457b71d0cc6b943df7825e9"},
+    {file = "ruff-0.0.209-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:e99a2b6bba1c1b50d0f7407124a082944e2c675997715509bea9f6be3cb9c303"},
+    {file = "ruff-0.0.209-py3-none-win32.whl", hash = "sha256:cea72bb923a2cff0e988e72def8155d4bf00e6a5b508164a535d0a22564cb792"},
+    {file = "ruff-0.0.209-py3-none-win_amd64.whl", hash = "sha256:f95431f0a4ab15bf5ba3c6422ec31e52ac3430f2d23893df312690f16d87510e"},
+    {file = "ruff-0.0.209.tar.gz", hash = "sha256:b3b3eaa862d4ba4ecb8fb0bc811e405a4a75c86eca760f0acbbb2f86dc48a331"},
 ]
 
 [[package]]
@@ -1414,4 +1440,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9"
-content-hash = "ad5ef37d123389bd43af28e3be7f19317651223174e0f4543e28b593ace51f80"
+content-hash = "797d37cc18b4bdbd96b3661d0b958bbc42ddb58f1339657939a297c347442de4"

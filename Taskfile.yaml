@@ -21,6 +21,7 @@ tasks:
     cmds:
       - task: lint:black
       - task: lint:isort
+      - task: lint:ruff
       - task: lint:flake8
 
   lint:black:
@@ -32,6 +33,11 @@ tasks:
     desc: "Check code with `isort`."
     cmds:
       - poetry run isort --check -- {{.CLI_ARGS | default "."}}
+
+  lint:ruff:
+    desc: "Check code with `flake8`."
+    cmds:
+      - poetry run ruff -- {{.CLI_ARGS | default "."}}
 
   lint:flake8:
     desc: "Check code with `flake8`."

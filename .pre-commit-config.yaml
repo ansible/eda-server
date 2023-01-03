@@ -12,6 +12,11 @@ repos:
         language: system
         types: [python]
         entry: task lint:isort --
+      - id: ruff
+        name: ruff
+        language: system
+        types: [python]
+        entry: task lint:ruff --
       - id: flake8
         name: flake8
         language: system
