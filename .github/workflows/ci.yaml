@@ -74,4 +74,4 @@ jobs:
         run: poetry install --only main,test
 
       - name: Run tests
-        run: poetry run -m pytest
+        run: poetry run python -m pytest
