@@ -5,8 +5,7 @@ env:
 
 on:
   push:
-    # TODO: Remove 'initial-project-structure' once it replaces 'main' branch.
-    branches: [ 'main', 'initial-project-structure' ]
+    branches: [ 'main' ]
   pull_request:
     branches: [ 'main' ]
 
