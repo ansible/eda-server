@@ -27,7 +27,7 @@ RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
 WORKDIR /app/src
 
 COPY pyproject.toml poetry.lock /app/src/
-RUN poetry install --no-root
+RUN poetry install -E all --no-root
 COPY . /app/src
 RUN poetry install --only-root
 
