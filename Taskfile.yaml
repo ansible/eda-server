@@ -1,9 +1,11 @@
 version: '3'
 
+env:
+  DJANGO_SETTINGS_MODULE: "aap_eda.settings.development"
+
 vars:
   DOCKER_COMPOSE: "docker-compose"
   DOCKER_COMPOSE_ARGS: "-p eda -f tools/docker/docker-compose.yaml"
-  DJANGO_SETTINGS_MODULE: "aap_eda.settings.development"
 
 tasks:
   default:
@@ -23,7 +25,7 @@ tasks:
     cmds:
         # This is a workaround for poetry incorrectly passing argv[0] to spawned subprocess
         #   See https://github.com/python-poetry/poetry/issues/965
-      - cmd: poetry run /usr/bin/env bash -c "aap-eda-manage" {{.CLI_ARGS}}
+      - cmd: poetry run /usr/bin/env bash -c "aap-eda-manage {{.CLI_ARGS}}"
 
   test:
     desc: "Run project tests."
