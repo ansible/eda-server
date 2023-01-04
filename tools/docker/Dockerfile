@@ -15,6 +15,7 @@ ENV POETRY_VERSION='1.3.1' \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    POETRY_NO_INTERACTION=1 \
     VIRTUAL_ENV=/app/venv \
     PATH="/app/venv/bin:/app/.local/bin:$PATH" \
     DJANGO_SETTINGS_MODULE="aap_eda.settings.development"
@@ -26,7 +27,7 @@ RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
 WORKDIR /app/src
 
 COPY pyproject.toml poetry.lock /app/src/
-RUN poetry install --no-interaction --no-ansi --no-root
+RUN poetry install --no-root
 COPY . /app/src
 RUN poetry install --only-root
 
