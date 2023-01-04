@@ -29,6 +29,6 @@ WORKDIR /app/src
 COPY pyproject.toml poetry.lock /app/src/
 RUN poetry install -E all --no-root
 COPY . /app/src
-RUN poetry install --only-root
+RUN poetry install -E all --only-root
 
 CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
