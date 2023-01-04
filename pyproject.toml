@@ -2,6 +2,10 @@
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+# -------------------------------------
+# Poetry: Metadata
+# -------------------------------------
+
 [tool.poetry]
 name = "aap-eda"
 version = "0.1.0"
@@ -14,6 +18,10 @@ packages = [
 
 [tool.poetry.scripts]
 aap-eda-manage = 'aap_eda.manage:main'
+
+# -------------------------------------
+# Poetry: Dependencies
+# -------------------------------------
 
 [tool.poetry.dependencies]
 python = ">=3.9"
@@ -46,8 +54,15 @@ flake8-docstrings = "*"
 flake8-eradicate = { version="*", python="<4.0" }
 flake8-print = "*"
 
+[tool.poetry.group.dev]
+optional = true
+
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.20.0"
+
+# -------------------------------------
+# Tools
+# -------------------------------------
 
 [tool.black]
 line-length = 79
