@@ -25,7 +25,7 @@ tasks:
     cmds:
         # This is a workaround for poetry incorrectly passing argv[0] to spawned subprocess
         #   See https://github.com/python-poetry/poetry/issues/965
-      - cmd: poetry run /usr/bin/env bash -c "aap-eda-manage {{.CLI_ARGS}}"
+      - cmd: poetry run /usr/bin/env aap-eda-manage {{.CLI_ARGS}}
 
   test:
     desc: "Run project tests."
