@@ -22,15 +22,19 @@ aap-eda-manage = 'aap_eda.manage:main'
 # -------------------------------------
 # Poetry: Dependencies
 # -------------------------------------
+[tool.poetry.extras]
+all = ["psycopg2"]
+dev = ["psycopg2-binary"]
 
 [tool.poetry.dependencies]
 python = ">=3.9"
 django = "*"
-psycopg2 = "*"
 djangorestframework = "*"
 dynaconf = ">=3"
 drf-spectacular = "*"
-channels = {version = "*", extras = ["daphne"]}
+channels = { version = "*", extras = ["daphne"] }
+psycopg2 = { version = "*", optional = true }
+psycopg2-binary = { version = "*", optional = true }
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

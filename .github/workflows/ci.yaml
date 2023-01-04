@@ -74,7 +74,7 @@ jobs:
           cache: 'poetry'
 
       - name: Install package
-        run: poetry install --only main,test
+        run: poetry install -E all --only main,test
 
       - name: Run tests
         run: poetry run python -m pytest

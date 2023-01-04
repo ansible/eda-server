@@ -17,7 +17,7 @@ tasks:
   dev:init:
     desc: "Initialize local development environment"
     cmds:
-      - cmd: poetry install --with=dev
+      - cmd: poetry install -E dev --with=dev
       - cmd: poetry run pre-commit install
 
   manage:
