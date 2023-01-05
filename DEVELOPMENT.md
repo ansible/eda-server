@@ -4,14 +4,20 @@
 
 ### Prerequisites
 
+* [Git](https://git-scm.com/)
 * [Docker](https://www.docker.com/) or [Podman](https://podman.io/)
-* docker-compose
+* [Docker Compose plugin](https://docs.docker.com/compose/) or `docker-compose` python package.
 * [Poetry](https://python-poetry.org/)
 * [Taskfile](https://taskfile.dev/)
-* [Git](https://git-scm.com/)
+* [pre-commit](https://pre-commit.com/)
 
 For running services locally:
 * Python >= 3.9
+
+For standalone development tools written Python, like `pre-commit`,
+we recommend using your system package manager,
+[pipx](https://pypa.github.io/pipx/) tool or pip user install mode (`pip install --user`),
+in order of preference from high to low.
 
 #### Docker
 
@@ -102,6 +108,29 @@ Follow the [Installation](https://taskfile.dev/installation/) instruction to ins
 **Note:** For Macs with the M1 or M2 chip make sure you 
 [download](https://github.com/go-task/task/releases) Task for the `arm64` architecture.
 
+#### Pre-commit (optional)
+
+Install [pre-commit](https://pre-commit.com/) tool.
+
+On macOS install it with homebrew:
+
+```shell
+brew install pre-commit
+```
+
+On Linux use `pipx` or `pip install --user`:
+
+```shell
+pipx install pre-commit
+# OR
+pip install --user pre-commit
+```
+
+On Arch Linux:
+```shell
+pacman -S python-pre-commit
+```
+
 ### Backend Development
 
 #### Clone the repository
@@ -122,7 +151,7 @@ Or if you want to customize installation options, you may run commands, executed
 target manually:
 
 ```shell
-poetry install -E dev --with dev
+poetry install -E dev
 poetry run pre-commit install
 ```
 

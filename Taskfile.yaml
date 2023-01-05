@@ -17,8 +17,8 @@ tasks:
   dev:init:
     desc: "Initialize local development environment"
     cmds:
-      - cmd: poetry install -E dev --with=dev
-      - cmd: poetry run pre-commit install
+      - cmd: poetry install -E dev
+      - cmd: pre-commit install
 
   manage:
     desc: "Run django management command"
