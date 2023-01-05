@@ -17,8 +17,8 @@ tasks:
   dev:init:
     desc: "Initialize local development environment"
     cmds:
-      - cmd: poetry install -E dev --with=dev
-      - cmd: poetry run pre-commit install
+      - cmd: poetry install -E dev
+      - cmd: pre-commit install
 
   manage:
     desc: "Run django management command"
@@ -127,3 +127,10 @@ tasks:
       - task: docker
         vars:
           CLI_ARGS: exec postgres psql -U postgres eda
+
+  docker:migrate:
+    desc: "Apply database migrations."
+    cmds:
+      - task: docker
+        vars:
+          CLI_ARGS: run --rm api aap-eda-manage migrate
