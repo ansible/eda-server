@@ -12,7 +12,6 @@
 
 For running services locally:
 * Python >= 3.9
-* C\C++ Compiler (gcc or clang)
 
 #### Docker
 
@@ -39,9 +38,13 @@ See [Installing on macOS](https://podman.io/getting-started/installation#macos)
 
 A new Docker Compose plugin written in Go that is installed with Docker Desktop or
 from the official Docker's repositories is not compatible with podman. 
-Install older version of docker-compose written in python:
+Install older version of docker-compose written in python.
+
+We suggest installing into a user directory with `pip install --user` or `pipx` tool:
 
 ```shell
+pip install --user docker-compose
+# OR
 pipx install docker-compose
 ```
 
@@ -72,9 +75,11 @@ On Linux and macOS Poetry can be installed with the official installer:
 curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-Alternatively you can install it with `pipx`:
+Alternatively you can install it with manually with `pip` or `pipx`:
 
 ```shell
+pip install --user poetry
+# OR
 pipx install poetry
 ```
 
