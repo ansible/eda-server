@@ -152,7 +152,7 @@ target manually:
 
 ```shell
 poetry install -E dev
-poetry run pre-commit install
+pre-commit install
 ```
 
 #### Building container images
@@ -174,11 +174,28 @@ localhost/aap-eda                             latest      28fd94c8cf89   5 hours
 
 #### Running services
 
-AAP EDA requires some services like database to be running. You'll need to start them:
+AAP EDA requires some services like database to be running. We recommend running such services
+in containerized environment (e.g. docker \ podman \ minikube \ etc.).
+
+If you use docker or podman, you can start them with:
 
 ```shell
 task docker:up:postgres
 ```
+
+This will start PostgreSQL service and create a database.
+
+If you need to run local or standalone external instance of PostgreSQL service, you will need
+to create a database for EDA. By default, the database is named `eda`.
+
+You can customize database name, it's location and access credentials with the following
+environment variables:
+
+* `EDA_DB_HOST` – Database hostname (default: `127.0.0.1`)
+* `EDA_DB_PORT` – Database port (default: `5432`)
+* `EDA_DB_USER` – Database username (default: `postgres`)
+* `EDA_DB_PASSWORD` – Database user password (default: `secret`, only in development mode)
+* `EDA_DB_NAME` – Database name (default: `eda`)
 
 #### Executing migrations
 
@@ -191,7 +208,7 @@ task manage -- migrate
 With docker compose:
 
 ```shell
-task docker -- run --rm api aap-eda-manage migrate
+task docker:migrate
 ```
 
 #### Starting API server
@@ -248,3 +265,18 @@ task lint:ruff
 ```
 
 #### Code formatting
+
+To automatically format your source code run:
+
+```shell
+task format
+```
+
+This will execute `isort` and `black` tools.
+
+You can run individual formatting tools if needed:
+
+```shell
+task format:isort
+task format:black
+```

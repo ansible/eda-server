@@ -127,3 +127,10 @@ tasks:
       - task: docker
         vars:
           CLI_ARGS: exec postgres psql -U postgres eda
+
+  docker:migrate:
+    desc: "Apply database migrations."
+    cmds:
+      - task: docker
+        vars:
+          CLI_ARGS: run --rm api aap-eda-manage migrate
