@@ -35,6 +35,8 @@ drf-spectacular = "*"
 channels = { version = "*", extras = ["daphne"] }
 psycopg2 = { version = "*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
+django-rq = "*"
+rq = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
