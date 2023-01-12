@@ -38,7 +38,7 @@ class Role(models.Model):
 class UserRole(models.Model):
     class Meta:
         db_table = "core_user_role"
-        unique_together = ["user_id", "role_id"]
+        unique_together = ["user", "role"]
 
     user = models.ForeignKey("User", on_delete=models.CASCADE)
     role = models.ForeignKey("Role", on_delete=models.CASCADE)
@@ -47,7 +47,7 @@ class UserRole(models.Model):
 class RolePermission(models.Model):
     class Meta:
         db_table = "core_role_permission"
-        unique_together = ["role_id", "resource_type", "action"]
+        unique_together = ["role", "resource_type", "action"]
         constraints = [
             models.CheckConstraint(
                 check=models.Q(resource_type__in=ResourceType.values()),

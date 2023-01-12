@@ -28,17 +28,7 @@ __all__ = (
 class Activation(models.Model):
     class Meta:
         db_table = "core_activation"
-        indexes = [
-            models.Index(
-                fields=["rulebook_id"], name="ix_activation_rulebook_id"
-            ),
-            models.Index(
-                fields=["inventory_id"], name="ix_activation_inventory_id"
-            ),
-            models.Index(
-                fields=["extra_var_id"], name="ix_activation_extra_var_id"
-            ),
-        ]
+        indexes = [models.Index(fields=["name"], name="ix_activation_name")]
 
     name = models.TextField(null=False)
     description = models.TextField()
@@ -72,16 +62,7 @@ class ActivationInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance"
         indexes = [
-            models.Index(fields=["project_id"], name="ix_act_inst_project_id"),
-            models.Index(
-                fields=["rulebook_id"], name="ix_act_inst_rulebook_id"
-            ),
-            models.Index(
-                fields=["inventory_id"], name="ix_act_inst_inventory_id"
-            ),
-            models.Index(
-                fields=["extra_var_id"], name="ix_act_inst_extra_var_id"
-            ),
+            models.Index(fields=["name"], name="ix_act_inst_name"),
         ]
 
     name = models.TextField()

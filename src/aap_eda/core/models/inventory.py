@@ -38,9 +38,6 @@ class Inventory(models.Model):
         ]
         indexes = [
             models.Index(
-                fields=["project_id"], name="ix_inventory_project_id"
-            ),
-            models.Index(
                 fields=["inventory_source"], name="ix_inventory_inv_src"
             ),
         ]

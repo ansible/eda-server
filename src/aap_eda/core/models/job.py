@@ -50,16 +50,7 @@ class JobInstance(models.Model):
 class ActivationInstanceJobInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance_job_instance"
-        indexes = [
-            models.Index(
-                fields=["activation_instance_id"],
-                name="ix_ainst_jinst_act_inst_id",
-            ),
-            models.Index(
-                fields=["job_instance_id"],
-                name="ix_ainst_jinst_job_inst_id",
-            ),
-        ]
+        unique_together = ["activation_instance", "job_instance"]
 
     activation_instance = models.ForeignKey(
         "ActivationInstance", on_delete=models.CASCADE

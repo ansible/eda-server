@@ -33,9 +33,6 @@ class Rulebook(models.Model):
                 violation_error_message="Rulebook name must not be empty.",
             ),
         ]
-        indexes = [
-            models.Index(fields=["project_id"], name="ix_rulebook_project_id"),
-        ]
 
     name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
@@ -49,11 +46,6 @@ class Ruleset(models.Model):
     class Meta:
         db_table = "core_ruleset"
         unique_together = ["rulebook_id", "name"]
-        indexes = [
-            models.Index(
-                fields=["rulebook_id"], name="ix_ruleset_rulebook_id"
-            ),
-        ]
 
     name = models.TextField(null=False)
     sources = models.JSONField(default=dict)
@@ -67,10 +59,7 @@ class Ruleset(models.Model):
 class Rule(models.Model):
     class Meta:
         db_table = "core_rule"
-        unique_together = ["ruleset_id", "name"]
-        indexes = [
-            models.Index(fields=["ruleset_id"], name="ix_rule_ruleset_id"),
-        ]
+        unique_together = ["ruleset", "name"]
 
     ruleset = models.ForeignKey("Ruleset", on_delete=models.CASCADE, null=True)
     name = models.TextField(null=False)
@@ -82,18 +71,7 @@ class AuditRule(models.Model):
         db_table = "core_audit_rule"
         indexes = [
             models.Index(fields=["name"], name="ix_audit_rule_name"),
-            models.Index(fields=["rule_id"], name="ix_audit_rule_rule_id"),
-            models.Index(
-                fields=["ruleset_id"], name="ix_audit_rule_ruleset_id"
-            ),
-            models.Index(
-                fields=["activation_instance_id"],
-                name="ix_audit_rule_act_inst_id",
-            ),
-            models.Index(
-                fields=["job_instance_id"],
-                name="ix_audit_rule_job_instance_id",
-            ),
+            models.Index(fields=["fired_date"], name="ix_audit_rule_fired_date"),
         ]
 
     name = models.TextField(null=False)

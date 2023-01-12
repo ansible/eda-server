@@ -40,9 +40,6 @@ class Project(models.Model):
 class Playbook(models.Model):
     class Meta:
         db_table = "core_playbook"
-        indexes = [
-            models.Index(fields=["project_id"], name="ix_playbook_project_id"),
-        ]
 
     name = models.TextField(unique=True)
     playbook = models.TextField()
@@ -52,11 +49,6 @@ class Playbook(models.Model):
 class ExtraVar(models.Model):
     class Meta:
         db_table = "core_extra_var"
-        indexes = [
-            models.Index(
-                fields=["project_id"], name="ix_extra_var_project_id"
-            ),
-        ]
 
     name = models.TextField(unique=True)
     extra_var = models.TextField()
