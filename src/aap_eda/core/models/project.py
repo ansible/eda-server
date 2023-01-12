@@ -14,10 +14,10 @@
 
 from django.db import models
 
-from .base import OIDField
+from .base import CopyfyMixin, OIDField
 
 
-class Project(models.Model):
+class Project(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_project"
         constraints = [
@@ -37,7 +37,7 @@ class Project(models.Model):
     large_data_id = OIDField(null=True)
 
 
-class Playbook(models.Model):
+class Playbook(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_playbook"
 
@@ -46,7 +46,7 @@ class Playbook(models.Model):
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
 
 
-class ExtraVar(models.Model):
+class ExtraVar(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_extra_var"
 

@@ -16,10 +16,12 @@ from django.db import models
 
 from aap_eda.core.enums import InventorySource
 
+from .base import CopyfyMixin
+
 __all__ = "Inventory"
 
 
-class Inventory(models.Model):
+class Inventory(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_inventory"
         constraints = [

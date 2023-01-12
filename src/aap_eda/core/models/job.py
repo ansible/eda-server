@@ -14,6 +14,8 @@
 
 from django.db import models
 
+from .base import CopyfyMixin
+
 __all__ = (
     "ActivationInstanceJobInstance",
     "JobInstanceEvent",
@@ -23,7 +25,7 @@ __all__ = (
 )
 
 
-class Job(models.Model):
+class Job(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_job"
         indexes = [models.Index(fields=["uuid"], name="ix_job_uuid")]
@@ -31,7 +33,7 @@ class Job(models.Model):
     uuid = models.UUIDField()
 
 
-class JobInstance(models.Model):
+class JobInstance(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_job_instance"
         indexes = [
@@ -47,7 +49,7 @@ class JobInstance(models.Model):
     hosts = models.TextField()
 
 
-class ActivationInstanceJobInstance(models.Model):
+class ActivationInstanceJobInstance(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_activation_instance_job_instance"
         unique_together = ["activation_instance", "job_instance"]
@@ -58,7 +60,7 @@ class ActivationInstanceJobInstance(models.Model):
     job_instance = models.ForeignKey("JobInstance", on_delete=models.CASCADE)
 
 
-class JobInstanceEvent(models.Model):
+class JobInstanceEvent(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_job_instance_event"
         indexes = [
@@ -74,7 +76,7 @@ class JobInstanceEvent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False)
 
 
-class JobInstanceHost(models.Model):
+class JobInstanceHost(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_job_instance_host"
         indexes = [

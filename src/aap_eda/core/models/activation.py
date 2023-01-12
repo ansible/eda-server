@@ -16,7 +16,7 @@ from django.db import models
 
 from aap_eda.core.enums import RestartPolicy
 
-from .base import OIDField
+from .base import CopyfyMixin, OIDField
 
 __all__ = (
     "Activation",
@@ -25,7 +25,7 @@ __all__ = (
 )
 
 
-class Activation(models.Model):
+class Activation(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
@@ -58,7 +58,7 @@ class Activation(models.Model):
 # set the large_data_id if it is null.
 # This table will have a post-delete trigger that will
 # cascade delete action to the large object table.
-class ActivationInstance(models.Model):
+class ActivationInstance(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_activation_instance"
         indexes = [
@@ -76,7 +76,7 @@ class ActivationInstance(models.Model):
     large_data_id = OIDField(null=True)
 
 
-class ActivationInstanceLog(models.Model):
+class ActivationInstanceLog(models.Model, CopyfyMixin):
     class Meta:
         db_table = "core_activation_instance_log"
 
