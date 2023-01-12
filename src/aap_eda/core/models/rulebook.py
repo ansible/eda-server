@@ -71,7 +71,9 @@ class AuditRule(models.Model):
         db_table = "core_audit_rule"
         indexes = [
             models.Index(fields=["name"], name="ix_audit_rule_name"),
-            models.Index(fields=["fired_date"], name="ix_audit_rule_fired_date"),
+            models.Index(
+                fields=["fired_date"], name="ix_audit_rule_fired_date"
+            ),
         ]
 
     name = models.TextField(null=False)
