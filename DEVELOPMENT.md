@@ -14,16 +14,16 @@
 For running services locally:
 * Python >= 3.9
 
-For standalone development tools written Python, like `pre-commit`,
+For standalone development tools written in Python, such as `pre-commit`,
 we recommend using your system package manager,
 [pipx](https://pypa.github.io/pipx/) tool or pip user install mode (`pip install --user`),
-in order of preference from high to low.
+in decreasing order of preference.
 
 #### Docker
 
 You'll need to install Docker or Podman.
 
-On Linux docker is generally available in your Linux distribution repositories or in 
+On Linux, docker is generally available in your Linux distribution repositories or in 
 the repositories, provided by Docker. Follow the installation instructions:
 [Docker Engine installation overview](https://docs.docker.com/engine/install/).
 
@@ -36,15 +36,15 @@ and [Docker for Windows](https://www.docker.com/docker-windows) respectively.
 
 #### Podman
 
-On Linux podman can be installed by your Linux distribution package manager.
+On Linux, podman can be installed using your Linux distribution package manager.
 See [Installing on Linux](https://podman.io/getting-started/installation#installing-on-linux).
 
-On macOS podman is available via Homebrew. 
+On macOS, podman is available via Homebrew. 
 See [Installing on macOS](https://podman.io/getting-started/installation#macos)
 
-A new Docker Compose plugin written in Go that is installed with Docker Desktop or
-from the official Docker's repositories is not compatible with podman. 
-Install older version of docker-compose written in python.
+A new Docker Compose plugin written in Go, which is installed with Docker Desktop or
+from the official Docker's repositories, is not compatible with podman. 
+Instead you should use the older version of docker-compose which is written in python.
 
 We suggest installing into a user directory with `pip install --user` or `pipx` tool:
 
@@ -75,13 +75,13 @@ systemctl --user enable --now podman.socket
 
 #### Poetry
 
-On Linux and macOS Poetry can be installed with the official installer:
+On Linux and macOS, Poetry can be installed with the official installer:
 
 ```shell
 curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-Alternatively you can install it with manually with `pip` or `pipx`:
+Alternatively, you can install it with manually with `pip` or `pipx`:
 
 ```shell
 pip install --user poetry
@@ -89,13 +89,13 @@ pip install --user poetry
 pipx install poetry
 ```
 
-In ArchLinux Poetry is available in official distribution repositories:
+In ArchLinux, Poetry is available in the official distribution repositories:
 
 ```shell
 sudo pacman -S python-poetry 
 ```
 
-In macOS Poetry can be installed with Homebrew:
+In macOS, Poetry can be installed with Homebrew:
 
 ```shell
 brew install poetry
@@ -103,7 +103,7 @@ brew install poetry
 
 #### Taskfile
 
-Follow the [Installation](https://taskfile.dev/installation/) instruction to install Taskfile.
+Follow the [Installation](https://taskfile.dev/installation/) instructions to install Taskfile.
 
 **Note:** For Macs with the M1 or M2 chip make sure you 
 [download](https://github.com/go-task/task/releases) Task for the `arm64` architecture.
@@ -112,13 +112,13 @@ Follow the [Installation](https://taskfile.dev/installation/) instruction to ins
 
 Install [pre-commit](https://pre-commit.com/) tool.
 
-On macOS install it with homebrew:
+On macOS, install it with homebrew:
 
 ```shell
 brew install pre-commit
 ```
 
-On Linux use `pipx` or `pip install --user`:
+On Linux, use `pipx` or `pip install --user`:
 
 ```shell
 pipx install pre-commit
@@ -130,6 +130,10 @@ On Arch Linux:
 ```shell
 pacman -S python-pre-commit
 ```
+
+**Note:** The `poetry-lock` hook will check to ensure consistency across the poetry.lock and
+pyproject.toml files. In case of conflict, a developer must manually execute either `poetry update`,
+`poetry lock` or `poetry lock --no-update` to resolve it.
 
 ### Backend Development
 
@@ -174,8 +178,14 @@ localhost/aap-eda                             latest      28fd94c8cf89   5 hours
 
 #### Running services
 
-AAP EDA requires some services like database to be running. We recommend running such services
-in containerized environment (e.g. docker \ podman \ minikube \ etc.).
+AAP EDA requires some services, such as database, to be running. We recommend running such services
+in a containerized environment (e.g. docker / podman / minikube etc.).
+
+Follow the steps below to start each container service manually. Alternately, you can start all
+required containers by running:
+```shell
+task docker:up
+```
 
 If you use docker or podman, you can start them with:
 
@@ -183,12 +193,12 @@ If you use docker or podman, you can start them with:
 task docker:up:postgres
 ```
 
-This will start PostgreSQL service and create a database.
+This will initialize a PostgreSQL container and create the database.
 
-If you need to run local or standalone external instance of PostgreSQL service, you will need
+If you need to run a local or standalone external instance of PostgreSQL service, you will need
 to create a database for EDA. By default, the database is named `eda`.
 
-You can customize database name, it's location and access credentials with the following
+You can customize the database name, it's location and access credentials with the following
 environment variables:
 
 * `EDA_DB_HOST` – Database hostname (default: `127.0.0.1`)
@@ -225,11 +235,7 @@ With docker compose:
 task docker -- up -d api
 ```
 
-Or you can start all services with docker compose at once:
 
-```shell
-task docker:up
-```
 
 #### Running tests
 
@@ -247,16 +253,16 @@ task docker -- run api --rm python -m pytest
 
 #### Running linters
 
-The project uses `flake8` with set of plugins, `black`, `isort` and `ruff` (experimental)
-for automated code quality checks. Generally you should have `pre-commit` hook already installed,
-so that linters will be executed on every commit automatically.
+The project uses `flake8` with a set of plugins, `black`, `isort` and `ruff` (experimental),
+for automated code quality checks. Generally you should have the `pre-commit` hook already installed,
+so that linters will be executed automatically on every commit.
 If needed you can run linters manually (all at once):
 
 ```shell
 task lint
 ```
 
-Or individual linter:
+Or an individual linter:
 ```shell
 task lint:flake8
 task lint:black
