@@ -20,6 +20,20 @@ tasks:
       - cmd: poetry install -E dev
       - cmd: pre-commit install
 
+  run:api:
+    desc: "Run API server locally"
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: runserver
+
+  run:worker:
+    desc: "Run tasking worker locally"
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.Worker'
+
   manage:
     desc: "Run django management command"
     cmds:
