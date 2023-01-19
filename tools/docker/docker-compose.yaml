@@ -50,6 +50,20 @@ services:
       retries: 3
       start_period: 5s
 
+  worker:
+    image: 'localhost/aap-eda'
+    environment:
+      EDA_DB_HOST: 'postgres'
+      EDA_MQ_HOST: 'redis'
+    command: ['aap-eda-manage', 'rqworker', '--worker-class', 'aap_eda.tasking.Worker']
+    volumes:
+      - '../../:/app/src'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   redis:
     image: 'docker.io/library/redis:7'
     ports:
