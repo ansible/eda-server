@@ -29,7 +29,13 @@ the repositories, provided by Docker. Follow the installation instructions:
 
 If you're installing Docker from the official Docker's repositories, follow
 [Install using the repository](https://docs.docker.com/compose/install/linux/#install-using-the-repository)
-to install the Docker Compose plugin from the same repository as well.
+to install the Docker Compose plugin from the same repository as well. Please note that when installing
+Docker Compose via the official Docker repo, an alias or symlink for `docker-compose` is not automatically
+created and you must create one manually. For example, on Fedora:
+
+```shell
+sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+```
 
 For macOS and Windows, we recommend [Docker for Mac](https://www.docker.com/docker-mac)
 and [Docker for Windows](https://www.docker.com/docker-windows) respectively.
@@ -104,6 +110,9 @@ brew install poetry
 #### Taskfile
 
 Follow the [Installation](https://taskfile.dev/installation/) instructions to install Taskfile.
+
+Depending on your OS or distribution, Taskfile will be packaged with the binary named `task`, whilst others name it `go-task`.
+The instructions below assume your Taskfile binary is named `task`, but please keep in mind that the binary on your system may have a different name.
 
 **Note:** For Macs with the M1 or M2 chip make sure you 
 [download](https://github.com/go-task/task/releases) Task for the `arm64` architecture.
