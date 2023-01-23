@@ -69,12 +69,12 @@ tasks:
   format:isort:
     desc: "Format code with `isort`."
     cmds:
-      - poetry run black .
+      - poetry run isort .
 
   format:black:
     desc: "Format code with `black`."
     cmds:
-      - poetry run isort .
+      - poetry run black .
 
   docker:
     desc: "Run docker-compose with specified CLI arguments."
