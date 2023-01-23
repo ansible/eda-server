@@ -1,61 +1,17 @@
 import datetime
 import json
+import os
 from io import StringIO
 
+import django
 import pytest
 from django.contrib.postgres.fields import ArrayField
-from django.db import models
-from psycopg2 import DatabaseError, DataError, connect as pg_connect
+from django.db import connection, models, transaction
+from psycopg2 import errors as pg_errors
 
-from aap_eda.core.models import Project, base
+from aap_eda.core.models import base
 
-
-def get_wrapped_connection():
-    """Get a separate connection to tests exceptions."""
-    from django.db import connection
-
-    class PGCurWrapper:
-        def __init__(self, cur):
-            self.cursor = cur
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args, **kwargs):
-            self.cursor.close()
-
-        def execute(self, sql, params=None):
-            self.cursor.execute(sql, params)
-
-    class PGConnWrapper:
-        def __init__(self, dsn):
-            self.connection = pg_connect(dsn)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args, **kwargs):
-            self.connection.close()
-
-        def cursor(self):
-            return PGCurWrapper(self.connection.cursor())
-
-        def commit(self):
-            self.connection.commit()
-
-        def rollback(self):
-            self.connection.rollback()
-
-    db_url = (
-        "postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}"
-        "?sslmode=prefer&application_name=eda_test_exc"
-    ).format(**connection.settings_dict)
-
-    return PGConnWrapper(db_url)
-
-
-def get_create_test_table_sql():
-    return """
+CREATE_TEST_TABLE = """
 create table eek (
     id         serial primary key,
     label      text not null,
@@ -64,11 +20,71 @@ create table eek (
     created_ts timestamptz
 )
 ;
-    """
+"""
+
+DROP_TEST_TABLE = """
+drop table if exists eek
+;
+"""
 
 
-def get_drop_test_table_sql():
-    return "drop table if exists eek;"
+@pytest.fixture
+def eek_temp_table():
+    with connection.cursor() as cur:
+        cur.execute(CREATE_TEST_TABLE)
+    yield
+    with connection.cursor() as cur:
+        cur.execute(DROP_TEST_TABLE)
+
+
+@pytest.fixture
+def eek_model(eek_temp_table):
+    if "eek" not in django.apps.apps.all_models["core"]:
+
+        class Eek(models.Model):
+            class Meta:
+                app_label = "core"
+                db_table = "eek"
+
+            label = models.TextField(null=False)
+            data = models.JSONField()
+            lista = ArrayField(models.IntegerField())
+            created_ts = models.DateTimeField()
+
+    return django.apps.apps.all_models["core"]["eek"]
+
+
+@pytest.fixture
+def test_data():
+    return {
+        "cols": ["label", "data", "lista", "created_ts"],
+        "data": [
+            {
+                "label": "label-1",
+                "data": {"type": "rulebook", "data": {"ruleset": "ruleset-1"}},
+                "lista": None,
+                "created_ts": datetime.datetime.now(tz=datetime.timezone.utc),
+            },
+            {
+                "label": "label-2",
+                "data": None,
+                "lista": [1, 2, 3, 4],
+                "created_ts": datetime.datetime.now(tz=datetime.timezone.utc),
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def test_record():
+    return {
+        "id": 1,
+        "name": "eek",
+        "lista": None,
+        "data": {"feels": "meh"},
+        "created_ts": datetime.datetime.now(tz=datetime.timezone.utc),
+        "links": [1, 2, 3, 4],
+    }
 
 
 def test_oid_field_int():
@@ -95,276 +111,145 @@ def test_copyfylisttuple():
     assert str(base.CopyfyListTuple([[1, 2], [3, 4]])) == "{{1,2},{3,4}}"
 
 
-def test_adapt_copy_types():
-    vals = [
-        1,
-        "eek",
-        None,
-        {"feels": "meh"},
-        datetime.datetime.now(tz=datetime.timezone.utc),
-        [1, 2, 3, 4],
+def test_adapt_copy_types_dict(test_record):
+    rec = test_record
+    writer = base.DictCopyWriter(StringIO(), list(rec))
+    mvals = {
+        col: writer._adapt_copy_type(rec[col]) for col in writer.fieldnames
+    }
+    assert type(mvals) == dict
+    assert len(mvals) == len(rec)
+    assert type(mvals["id"]) == base.Copyfy
+    assert type(mvals["name"]) == base.Copyfy
+    assert type(mvals["lista"]) == base.Copyfy
+    assert type(mvals["data"]) == base.CopyfyDict
+    assert type(mvals["created_ts"]) == base.Copyfy
+    assert type(mvals["links"]) == base.CopyfyListTuple
+
+
+@pytest.mark.django_db
+def test_adapt_copy_types_model(eek_model):
+    eek = eek_model(
+        label="test_model_adapt",
+        data={"quatloos": 300},
+        lista=[1, 2, 3],
+    )
+    writer = base.ModelCopyWriter(StringIO(), eek_model)
+    rec = writer._model_to_dict(eek)
+    assert type(rec["id"]) == base.Copyfy
+    assert type(rec["label"]) == base.Copyfy
+    assert type(rec["data"]) == base.CopyfyDict
+    assert type(rec["lista"]) == base.CopyfyListTuple
+    assert type(rec["created_ts"]) == base.Copyfy
+
+
+def test_adapted_values(test_record):
+    cols = list(test_record)
+    rec = test_record
+    writer = base.DictCopyWriter(StringIO(), list(rec))
+    mvals = dict(zip(cols, writer._dict_to_list(rec)))
+    assert len(mvals) == len(rec)
+    assert mvals["id"] == str(rec["id"])
+    assert mvals["name"] == rec["name"]
+    assert mvals["lista"] == base.DEFAULT_NULL
+    assert mvals["data"] == json.dumps(rec["data"])
+    assert mvals["created_ts"] == str(rec["created_ts"])
+    assert mvals["links"] == "{1,2,3,4}"
+
+
+def verify_copied_data(expected, db_data):
+    assert len(db_data) == len(expected)
+    for i, dat in enumerate(db_data):
+        exp = expected[i]
+        for k in dat:
+            if k == "id":
+                assert isinstance(dat[k], int)
+            else:
+                assert exp[k] == dat[k]
+
+
+def write_to_copy_file(cols, data):
+    copy_file = StringIO()
+    writer = base.DictCopyWriter(copy_file, cols)
+    writer.writerows(data)
+    copy_file.seek(0)
+
+    return copy_file
+
+
+@pytest.mark.django_db
+def test_copy_to_table(eek_model, test_data):
+    cols = test_data["cols"]
+    expected = test_data["data"]
+
+    copy_file = write_to_copy_file(cols, expected)
+    base.copy_to_table(connection, "eek", cols, copy_file)
+
+    db_result = list(eek_model.objects.values())
+    verify_copied_data(expected, db_result)
+
+
+@pytest.mark.django_db
+def test_copy_to_table_with_sep(eek_model, test_data):
+    new_sep = "|"
+    cols = test_data["cols"]
+    expected = test_data["data"]
+
+    copy_file = StringIO()
+    # Checking calls to writerow
+    writer = base.DictCopyWriter(copy_file, cols, delimiter=new_sep)
+    for exp in expected:
+        writer.writerow(exp)
+
+    # Verify file data
+    copy_file.seek(0)
+    file_recs = [
+        line for line in copy_file.read().split(os.linesep) if len(line) > 0
     ]
-    mvals = base.adapt_copy_types(vals)
-    assert type(mvals) == list
-    assert len(mvals) == len(vals)
-    assert type(mvals[0]) == base.Copyfy
-    assert type(mvals[1]) == base.Copyfy
-    assert type(mvals[2]) == base.Copyfy
-    assert type(mvals[2]) == base.Copyfy
-    assert type(mvals[3]) == base.CopyfyDict
-    assert type(mvals[4]) == base.Copyfy
-    assert type(mvals[5]) == base.CopyfyListTuple
+    assert len(file_recs) == len(expected)
+    assert file_recs[0].count(new_sep) == len(expected[0]) - 1
+    assert file_recs[1].count(new_sep) == len(expected[1]) - 1
 
-    mvals = base.adapt_copy_types(tuple(vals))
-    assert type(mvals) == tuple
+    copy_file.seek(0)
+    base.copy_to_table(connection, "eek", cols, copy_file, sep=new_sep)
 
-
-def test_copyfy_values(db):
-    vals = [
-        1,
-        "eek",
-        None,
-        {"feels": "meh"},
-        datetime.datetime.now(tz=datetime.timezone.utc),
-        [1, 2, 3, 4],
-    ]
-    mvals = base.copyfy_values(vals)
-    assert isinstance(mvals, str)
-    assert base.DEFAULT_SEP in mvals
-    mvals_list = mvals.split(base.DEFAULT_SEP)
-    assert len(mvals_list) == len(vals)
-    assert mvals_list[0] == str(vals[0])
-    assert mvals_list[1] == str(vals[1])
-    assert mvals_list[2] == base.DEFAULT_NULL
-    assert mvals_list[3] == json.dumps(vals[3])
-    assert mvals_list[4] == str(vals[4])
-    assert mvals_list[5] == str(base.CopyfyListTuple(vals[5]))
+    db_data = list(eek_model.objects.values())
+    verify_copied_data(expected, db_data)
 
 
 @pytest.mark.django_db
-def test_copy_to_table():
-    from django.db import connection as db
+def test_copy_to_table_file_error(eek_temp_table, test_data):
+    cols = test_data["cols"]
+    data = test_data["data"]
 
-    with db.cursor() as cur:
-        cur.execute(get_create_test_table_sql())
+    copy_file = write_to_copy_file(cols, data)
 
-    class Eek(models.Model):
-        class Meta:
-            app_label = "core"
-            db_table = "eek"
+    cols = cols[:3]
 
-        label = models.TextField(null=False)
-        data = models.JSONField()
-        lista = ArrayField(models.IntegerField())
-        created_ts = models.DateTimeField()
-
-    try:
-        cols = ["label", "data", "lista", "created_ts"]
-        vals = [
-            [
-                "label-1",
-                {"type": "rulebook", "data": {"ruleset": "ruleset-1"}},
-                None,
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-            [
-                "label-2",
-                None,
-                [1, 2, 3, 4],
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-        ]
-
-        copy_file = StringIO()
-        for val in vals:
-            print(base.copyfy_values(val), file=copy_file)  # noqa:T201
-        copy_file.seek(0)
-
-        base.copy_to_table(db, "eek", cols, copy_file)
-
-        res = list(Eek.objects.values_list())
-        assert len(res) == 2
-        for i, rec in enumerate(res):
-            val = vals[i]
-            for j in range(len(rec)):
-                if j == 0:
-                    assert isinstance(rec[j], int)
-                else:
-                    assert val[j - 1] == rec[j]
-
-    finally:
-        with db.cursor() as cur:
-            cur.execute(get_drop_test_table_sql())
-
-
-@pytest.mark.django_db
-def test_copy_to_table_with_sep():
-    from django.db import connection as db
-
-    with db.cursor() as cur:
-        cur.execute(get_create_test_table_sql())
-
-    class EekWithSep(models.Model):
-        class Meta:
-            app_label = "core"
-            db_table = "eek"
-
-        label = models.TextField(null=False)
-        data = models.JSONField()
-        lista = ArrayField(models.IntegerField())
-        created_ts = models.DateTimeField()
-
-    try:
-        cols = ["label", "data", "lista", "created_ts"]
-        vals = [
-            [
-                "label-1",
-                {"type": "rulebook", "data": {"ruleset": "ruleset-1"}},
-                None,
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-            [
-                "label-2",
-                None,
-                [1, 2, 3, 4],
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-        ]
-
-        copy_file = StringIO()
-        for val in vals:
-            copy_rec = base.copyfy_values(val, sep="|")
-            print(copy_rec, file=copy_file)  # noqa:T201
-        copy_file.seek(0)
-
-        base.copy_to_table(db, "eek", cols, copy_file, sep="|")
-
-        res = list(EekWithSep.objects.values_list())
-        assert len(res) == 2
-        for i, rec in enumerate(res):
-            val = vals[i]
-            for j in range(len(rec)):
-                if j == 0:
-                    assert isinstance(rec[j], int)
-                else:
-                    assert val[j - 1] == rec[j]
-
-    finally:
-        with db.cursor() as cur:
-            cur.execute(get_drop_test_table_sql())
-
-
-@pytest.mark.django_db
-def test_copy_to_table_file_error():
-    with get_wrapped_connection() as db:
-        with db.cursor() as cur:
-            cur.execute(get_create_test_table_sql())
-
-        cols = ["label", "data", "created_ts"]
-        vals = [
-            [
-                "label-1",
-                {"type": "rulebook", "data": {"ruleset": "ruleset-1"}},
-                None,
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-            [
-                "label-2",
-                None,
-                [1, 2, 3, 4],
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-        ]
-
-        copy_file = StringIO()
-        for val in vals:
-            print(base.copyfy_values(val), file=copy_file)  # noqa:T201
-        copy_file.seek(0)
-
-        with pytest.raises(DataError):
+    with pytest.raises(pg_errors.BadCopyFileFormat):
+        with transaction.atomic():
             base.copy_to_table(
-                db,
+                connection,
                 "eek",
                 cols,
                 copy_file,
             )
 
-        db.rollback()
-
-        with db.cursor() as cur:
-            cur.execute(get_drop_test_table_sql())
-
 
 @pytest.mark.django_db
-def test_copy_to_table_integrity_error():
-    with get_wrapped_connection() as db:
-        with db.cursor() as cur:
-            cur.execute(get_create_test_table_sql())
+def test_copy_to_table_integrity_error(eek_temp_table, test_data):
+    cols = test_data["cols"]
+    data = test_data["data"]
 
-        cols = ["label", "data", "lista", "created_ts"]
-        vals = [
-            [
-                None,
-                {"type": "rulebook", "data": {"ruleset": "ruleset-1"}},
-                None,
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-            [
-                "label-2",
-                None,
-                [1, 2, 3, 4],
-                datetime.datetime.now(tz=datetime.timezone.utc),
-            ],
-        ]
+    data[0]["label"] = None
 
-        copy_file = StringIO()
-        for val in vals:
-            print(base.copyfy_values(val), file=copy_file)  # noqa:T201
-        copy_file.seek(0)
+    copy_file = write_to_copy_file(cols, data)
 
-        with pytest.raises(DatabaseError):
+    with pytest.raises(pg_errors.NotNullViolation):
+        with transaction.atomic():
             base.copy_to_table(
-                db,
+                connection,
                 "eek",
                 cols,
                 copy_file,
             )
-
-        db.rollback()
-
-        with db.cursor() as cur:
-            cur.execute(get_drop_test_table_sql())
-
-
-def test_copyfy_model():
-    kwargs = {
-        "name": "proj-1",
-        "description": "test project",
-    }
-    p = Project(**kwargs)
-    p_mog = p.copyfy()
-    p_mog_values = p_mog.split(base.DEFAULT_SEP)
-    assert len(p_mog_values) == len(p._meta.concrete_fields)
-
-
-def test_copyfy_model_with_sep():
-    kwargs = {
-        "name": "proj-1",
-        "description": "test project",
-    }
-    p = Project(**kwargs)
-    p_mog = p.copyfy(sep="|")
-    p_mog_values = p_mog.split("|")
-    assert len(p_mog_values) == len(p._meta.concrete_fields)
-
-
-def test_copyfy_model_with_fields():
-    kwargs = {
-        "name": "proj-1",
-        "description": "test project",
-    }
-    p = Project(**kwargs)
-    mog_fields = ["name", "description"]
-    p_mog = p.copyfy(fields=mog_fields)
-    p_mog_values = p_mog.split(base.DEFAULT_SEP)
-    assert len(p_mog_values) == len(mog_fields)

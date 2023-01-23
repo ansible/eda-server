@@ -18,8 +18,6 @@ from django.db import models
 
 from aap_eda.core.enums import Action, ResourceType
 
-from .base import CopyfyMixin
-
 __all__ = (
     "Role",
     "UserRole",
@@ -27,7 +25,7 @@ __all__ = (
 )
 
 
-class Role(models.Model, CopyfyMixin):
+class Role(models.Model):
     class Meta:
         db_table = "core_role"
 
@@ -37,7 +35,7 @@ class Role(models.Model, CopyfyMixin):
     is_default = models.BooleanField(null=True, default=False)
 
 
-class UserRole(models.Model, CopyfyMixin):
+class UserRole(models.Model):
     class Meta:
         db_table = "core_user_role"
         unique_together = ["user", "role"]
@@ -46,7 +44,7 @@ class UserRole(models.Model, CopyfyMixin):
     role = models.ForeignKey("Role", on_delete=models.CASCADE)
 
 
-class RolePermission(models.Model, CopyfyMixin):
+class RolePermission(models.Model):
     class Meta:
         db_table = "core_role_permission"
         unique_together = ["role", "resource_type", "action"]
