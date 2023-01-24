@@ -1,8 +1,7 @@
-from typing import List
+from typing import List, Optional
 
 from django.db import models
 from django.utils.connection import ConnectionProxy
-
 
 __all__ = (
     "create_large_object_trigger_func_sql",
@@ -64,7 +63,7 @@ drop function if exists trfn_cascade_delete_lobject cascade
 
 
 def get_applied_large_object_trigger_table_info(
-    conn: ConnectionProxy
+    conn: ConnectionProxy,
 ) -> List[dict]:
     sql = """
 select c.relname as "table_name",
@@ -88,18 +87,15 @@ select c.relname as "table_name",
     on true
  where a.attname = 'large_data_id'
 ;
-    """
+    """  # noqa: P103
     with conn.cursor() as cur:
         cur.execute(sql)
         cols = [c[0] for c in cur.description]
-        return [
-            dict(zip(cols, rec))
-            for rec in cur.fetchall()
-        ]
+        return [dict(zip(cols, rec)) for rec in cur.fetchall()]
 
 
 def apply_large_object_triggers(
-    conn: ConnectionProxy, models: List[models.Model] = []
+    conn: ConnectionProxy, *, models: Optional[List[models.Model]] = None
 ):
     create_trigger_tmpl = """
 create trigger tr_{db_table}_lob
@@ -119,7 +115,8 @@ create trigger tr_{db_table}_cascade_delete_lob
     """
 
     table_info = get_applied_large_object_trigger_table_info(conn)
-    models = [m._meta.db_table for m in models]
+    if models:
+        models = [m._meta.db_table for m in models]
     for tab_rec in table_info:
         tab_name = tab_rec["table_name"]
         trig_funcs = tab_rec["trigger_funcs"]
@@ -128,18 +125,14 @@ create trigger tr_{db_table}_cascade_delete_lob
             delete_func = "trfn_cascade_delete_lobject"
             if create_func not in trig_funcs:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        create_trigger_tmpl.format(db_table=tab_name)
-                    )
+                    cur.execute(create_trigger_tmpl.format(db_table=tab_name))
             if delete_func not in trig_funcs:
                 with conn.cursor() as cur:
-                    cur.execute(
-                        delete_trigger_tmpl.format(db_table=tab_name)
-                    )
+                    cur.execute(delete_trigger_tmpl.format(db_table=tab_name))
 
 
 def unapply_large_object_triggers(
-    conn: ConnectionProxy, models: List[models.Model] = []
+    conn: ConnectionProxy, models: Optional[List[models.Model]] = None
 ):
     delete_trigger_tmpl = [
         """
@@ -151,12 +144,11 @@ drop trigger if exists tr_{db_table}_cascade_delete_lob on {db_table} ;
     ]
 
     table_info = get_applied_large_object_trigger_table_info(conn)
-    models = [m._meta.db_table for m in models]
+    if models:
+        models = [m._meta.db_table for m in models]
     for tab_rec in table_info:
         tab_name = tab_rec["table_name"]
         if not models or tab_name in models:
             with conn.cursor() as cur:
                 for drop_stmt in delete_trigger_tmpl:
-                    cur.execute(
-                        drop_stmt.format(db_table=tab_name)
-                    )
+                    cur.execute(drop_stmt.format(db_table=tab_name))

@@ -3,11 +3,11 @@
 from django.db import migrations
 
 from aap_eda.core.db_utils.large_object_triggers import (
-    create_large_object_trigger_func_sql,
-    drop_create_large_object_func_sql,
-    delete_large_object_trigger_func_sql,
-    drop_delete_large_object_func_sql,
     apply_large_object_triggers,
+    create_large_object_trigger_func_sql,
+    delete_large_object_trigger_func_sql,
+    drop_create_large_object_func_sql,
+    drop_delete_large_object_func_sql,
     unapply_large_object_triggers,
 )
 
@@ -33,7 +33,5 @@ class Migration(migrations.Migration):
             delete_large_object_trigger_func_sql(),
             reverse_sql=drop_delete_large_object_func_sql(),
         ),
-        migrations.RunPython(
-            create_triggers, reverse_code=drop_triggers
-        ),
+        migrations.RunPython(create_triggers, reverse_code=drop_triggers),
     ]
