@@ -128,13 +128,21 @@ def test_adapt_copy_types_dict(test_record):
 
 
 @pytest.mark.django_db
+def test_model_writer_pk_switch(eek_model):
+    writer = base.ModelCopyWriter(StringIO(), eek_model)
+    assert eek_model._meta.pk.name not in writer.fieldnames
+    writer = base.ModelCopyWriter(StringIO(), eek_model, pk_in_data=True)
+    assert eek_model._meta.pk.name in writer.fieldnames
+
+
+@pytest.mark.django_db
 def test_adapt_copy_types_model(eek_model):
     eek = eek_model(
         label="test_model_adapt",
         data={"quatloos": 300},
         lista=[1, 2, 3],
     )
-    writer = base.ModelCopyWriter(StringIO(), eek_model)
+    writer = base.ModelCopyWriter(StringIO(), eek_model, pk_in_data=True)
     rec = writer._model_to_dict(eek)
     assert type(rec["id"]) == base.Copyfy
     assert type(rec["label"]) == base.Copyfy

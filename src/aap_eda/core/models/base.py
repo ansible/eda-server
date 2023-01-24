@@ -158,8 +158,11 @@ class ModelCopyWriter(DictCopyWriter):
         self,
         copyfile: TextIO,
         model: models.Model,
+        *,
+        pk_in_data=False,
     ):
         self.model = model
+        self.pk_in_data = pk_in_data
         # Sets fieldnames, fieldtypes
         self._resolve_fields()
         super().__init__(copyfile, self.fieldnames)
@@ -169,6 +172,8 @@ class ModelCopyWriter(DictCopyWriter):
         self.fieldtypes = {}
 
         for field in self.model._meta.concrete_fields:
+            if field.primary_key and not self.pk_in_data:
+                continue
             self.fieldnames.append(field.name)
             self.fieldtypes[field.name] = type(field)
 
