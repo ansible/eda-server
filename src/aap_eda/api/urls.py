@@ -12,6 +12,7 @@ from . import views
 router = routers.SimpleRouter(trailing_slash=False)
 router.register("extra_vars", views.ExtraVarViewSet)
 router.register("playbooks", views.PlaybookViewSet)
+router.register("tasks", views.TaskViewSet, basename="task")
 
 openapi_urls = [
     path(
