@@ -75,10 +75,16 @@ line_length = 79
 
 [tool.ruff]
 line-length = 79
+extend-select = [
+    "TID",      # flake8-tidy-imports
+]
 extend-ignore = [
-    "D1",     #  Missing docstrings errors
+    "D1",       #  Missing docstrings errors
 ]
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 "src/aap_eda/core/migrations/*" = ["E501"]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "parents"
