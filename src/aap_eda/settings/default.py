@@ -36,6 +36,12 @@ Database settings:
 * DB_USER - Database username (default: "postgres")
 * DB_PASSWORD - Database user password (default: None)
 * DB_NAME - Database name (default: "eda")
+
+Redis queue settings:
+
+* MQ_HOST - Redis queue hostname (default: "127.0.0.1")
+* MQ_PORT - Redis queue port (default: 6379)
+* MQ_DB - Redis queue database (default: 0)
 """
 import dynaconf
 
@@ -63,6 +69,7 @@ INSTALLED_APPS = [
     # Third party apps
     "rest_framework",
     "drf_spectacular",
+    "django_rq",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -162,6 +169,23 @@ REST_FRAMEWORK = {
 }
 
 # ---------------------------------------------------------
+# TASKING SETTINGS
+# ---------------------------------------------------------
+
+RQ = {
+    "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
+    "JOB_CLASS": "aap_eda.core.tasking.Job",
+}
+
+RQ_QUEUES = {
+    "default": {
+        "HOST": settings.get("MQ_HOST", "localhost"),
+        "PORT": settings.get("MQ_PORT", 6379),
+        "DB": settings.get("MQ_DB", 0),
+    }
+}
+
+# ---------------------------------------------------------
 # APPLICATION SETTINGS
 # ---------------------------------------------------------
 
@@ -178,7 +202,6 @@ SPECTACULAR_SETTINGS = {
         "aap_eda.api.openapi.preprocess_filter_api_routes"
     ],
 }
-
 
 # ---------------------------------------------------------
 # LOGGING SETTINGS
