@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
-from django_rq import enqueue, job
+from django_rq import enqueue, get_queue, job
 from rq import Connection, Queue as _Queue, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
@@ -13,7 +13,7 @@ from rq.defaults import (
 from rq.job import Job as _Job
 from rq.serializers import JSONSerializer
 
-__all__ = ["Job", "Queue", "Worker", "enqueue", "job"]
+__all__ = ["Job", "Queue", "Worker", "enqueue", "job", "get_queue"]
 
 ErrorHandlerType = Callable[[_Job], None]
 
