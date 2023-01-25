@@ -40,7 +40,6 @@ from aap_eda.core import models
 )
 class ExtraVarViewSet(
     mixins.CreateModelMixin,
-    mixins.DestroyModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.ExtraVar.objects.all()
@@ -67,30 +66,10 @@ class ExtraVarViewSet(
             ),
         },
     ),
-    create=extend_schema(
-        description="Create a playbook",
-        responses={
-            201: OpenApiResponse(
-                serializers.PlaybookSerializer,
-                description=("Return the created playbook."),
-            ),
-        },
-    ),
-    destroy=extend_schema(
-        description="Delete an existing playbook",
-        responses={
-            204: OpenApiResponse(
-                None,
-                description=("The playbook is deleted."),
-            ),
-        },
-    ),
 )
 class PlaybookViewSet(
-    mixins.CreateModelMixin,
-    mixins.DestroyModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.Playbook.objects.all()
     serializer_class = serializers.PlaybookSerializer
-    http_method_names = ["get", "post", "delete"]
+    http_method_names = ["get"]
