@@ -15,15 +15,15 @@ collections:
 @pytest.mark.django_db
 def test_list_extra_var(client: APIClient):
     obj = models.ExtraVar.objects.create(
-        name="test-extra_var.yml", extra_var=TEST_EXTRA_VAR
+        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
-    response = client.get("/eda/api/v1/extra_vars")
+    response = client.get("/eda/api/v1/extra-vars")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == [
         {
             "id": obj.id,
             "project": None,
-            "name": "test-extra_var.yml",
+            "name": "test-extra-var.yml",
             "extra_var": TEST_EXTRA_VAR,
         }
     ]
@@ -32,16 +32,16 @@ def test_list_extra_var(client: APIClient):
 @pytest.mark.django_db
 def test_create_extra_var(client: APIClient):
     data_in = {
-        "name": "test-extra_var.yml",
+        "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
-    response = client.post("/eda/api/v1/extra_vars", data=data_in)
+    response = client.post("/eda/api/v1/extra-vars", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     id_ = response.data["id"]
     assert response.data == {
         "id": id_,
         "project": None,
-        "name": "test-extra_var.yml",
+        "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
     assert models.ExtraVar.objects.filter(pk=id_).exists()
@@ -50,19 +50,19 @@ def test_create_extra_var(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_extra_var(client: APIClient):
     obj = models.ExtraVar.objects.create(
-        name="test-extra_var.yml", extra_var=TEST_EXTRA_VAR
+        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
-    response = client.get(f"/eda/api/v1/extra_vars/{obj.id}")
+    response = client.get(f"/eda/api/v1/extra-vars/{obj.id}")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
         "id": obj.id,
         "project": None,
-        "name": "test-extra_var.yml",
+        "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
 
 
 @pytest.mark.django_db
 def test_retrieve_extra_var_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/extra_vars/42")
+    response = client.get("/eda/api/v1/extra-vars/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
