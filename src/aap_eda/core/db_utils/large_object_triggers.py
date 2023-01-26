@@ -132,7 +132,7 @@ create trigger tr_{db_table}_cascade_delete_lob
 
 
 def unapply_large_object_triggers(
-    conn: ConnectionProxy, models: Optional[List[models.Model]] = None
+    conn: ConnectionProxy, *, models: Optional[List[models.Model]] = None
 ):
     delete_trigger_tmpl = [
         """
