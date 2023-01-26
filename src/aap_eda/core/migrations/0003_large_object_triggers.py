@@ -10,20 +10,25 @@ from aap_eda.core.db_utils.large_object_triggers import (
     drop_delete_large_object_func_sql,
     unapply_large_object_triggers,
 )
-from aap_eda.core.models import ActivationInstance, Project
 
 
 def create_triggers(apps, schema_editor):
+    proj = apps.get_model("core", "Project")
+    act_inst = apps.get_model("core", "ActivationInstance")
+
     apply_large_object_triggers(
         schema_editor.connection,
-        models=[Project, ActivationInstance],
+        models=[proj, act_inst],
     )
 
 
 def drop_triggers(apps, schema_editor):
+    proj = apps.get_model("core", "Project")
+    act_inst = apps.get_model("core", "ActivationInstance")
+
     unapply_large_object_triggers(
         schema_editor.connection,
-        models=[Project, ActivationInstance],
+        models=[proj, act_inst],
     )
 
 
