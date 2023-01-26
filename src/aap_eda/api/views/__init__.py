@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
-from .rulebook import RulebookViewSet
+from .rulebook import RulebookViewSet, RulesetViewSet, RuleViewSet
 from .tasks import TaskViewSet
 
 __all__ = (
@@ -22,6 +22,8 @@ __all__ = (
     "PlaybookViewSet",
     "ProjectViewSet",
     "RulebookViewSet",
+    "RulesetViewSet",
+    "RuleViewSet",
     # tasks
     "TaskViewSet",
 )

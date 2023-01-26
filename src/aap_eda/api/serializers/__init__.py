@@ -20,6 +20,8 @@ from .project import (
 )
 from .rulebook import (
     RulebookSerializer,
+    RuleOutSerializer,
+    RuleSerializer,
     RulesetOutSerializer,
     RulesetSerializer,
 )
@@ -34,6 +36,8 @@ __all__ = (
     "RulebookSerializer",
     "RulesetOutSerializer",
     "RulesetSerializer",
+    "RuleOutSerializer",
+    "RuleSerializer",
     # tasks
     "TaskRefSerializer",
     "TaskSerializer",

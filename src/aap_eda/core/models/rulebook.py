@@ -36,7 +36,7 @@ class Rulebook(models.Model):
 
     name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
-    rulesets = models.TextField(null=True)
+    rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)

@@ -1,3 +1,18 @@
+#  Copyright 2023 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+from aap_eda.api import serializers
 from aap_eda.core import models
 
 
@@ -40,6 +55,28 @@ def expand_ruleset_sources(rulebook_data: dict) -> dict:
                 xp_sources.append(xp_src)
 
     return expanded_ruleset_sources
+
+
+def ruleset_out_data(ruleset: models.Ruleset) -> dict:
+    data = serializers.RulesetSerializer(ruleset).data
+
+    data["source_types"] = [src["type"] for src in (data["sources"] or [])]
+    data["rule_count"] = models.Rule.objects.filter(
+        ruleset_id=ruleset.id
+    ).count()
+    data["fired_stats"] = build_fired_stats(data)
+
+    for key in ["rulebook", "sources"]:
+        data.pop(key)
+
+    return data
+
+
+def rule_out_data(rule: models.Rule) -> dict:
+    data = serializers.RuleSerializer(rule).data
+    data["fired_stats"] = build_fired_stats(data)
+
+    return data
 
 
 # TODO: define when audit rules/rulesets are available

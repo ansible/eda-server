@@ -28,6 +28,8 @@ router.register("extra-vars", views.ExtraVarViewSet)
 router.register("playbooks", views.PlaybookViewSet)
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
+router.register("rulesets", views.RulesetViewSet)
+router.register("rules", views.RuleViewSet)
 router.register("tasks", views.TaskViewSet, basename="task")
 
 openapi_urls = [
