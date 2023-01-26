@@ -34,7 +34,7 @@ $$ language plpgsql
 
 def drop_create_large_object_func_sql() -> str:
     return """
-drop function if exists trfn_create_lobject cascade
+drop function if exists trfn_create_lobject() cascade
 ;
     """
 
@@ -57,7 +57,7 @@ $$ language plpgsql
 
 def drop_delete_large_object_func_sql() -> str:
     return """
-drop function if exists trfn_cascade_delete_lobject cascade
+drop function if exists trfn_cascade_delete_lobject() cascade
 ;
     """
 
