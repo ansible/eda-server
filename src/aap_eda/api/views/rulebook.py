@@ -1,5 +1,4 @@
 import yaml
-from django.forms.models import model_to_dict
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
@@ -12,7 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import serializers
-from aap_eda.api.services import RulebookService
+from aap_eda.api.services.rulebook import build_fired_stats
 from aap_eda.core import models
 
 
@@ -51,7 +50,6 @@ class RulebookViewSet(
 ):
     queryset = models.Rulebook.objects.all()
     serializer_class = serializers.RulebookSerializer
-    http_method_names = ["get", "post"]
 
     @extend_schema(
         description=("Ruleset list of a rulebook by its id"),
@@ -65,7 +63,7 @@ class RulebookViewSet(
 
         result = []
         for ruleset in rulesets:
-            data = model_to_dict(ruleset)
+            data = serializers.RulesetSerializer(ruleset).data
 
             data["source_types"] = [
                 src["type"] for src in (data["sources"] or [])
@@ -73,9 +71,7 @@ class RulebookViewSet(
             data["rule_count"] = models.Rule.objects.filter(
                 ruleset_id=ruleset.id
             ).count()
-            data["fired_stats"] = RulebookService(rulebook).build_fired_stat(
-                data
-            )
+            data["fired_stats"] = build_fired_stats(data)
 
             for key in ["rulebook", "sources"]:
                 data.pop(key)
@@ -87,12 +83,12 @@ class RulebookViewSet(
     @extend_schema(
         description=("Get the JSON format of a rulebook by its id"),
         request=None,
-        responses={200: serializers.RulebookSerializer(many=False)},
+        responses={200: serializers.RulebookSerializer},
     )
     @action(detail=True)
     def json(self, request, pk):
         rulebook = get_object_or_404(models.Rulebook, pk=pk)
-        data = model_to_dict(rulebook)
+        data = serializers.RulebookSerializer(rulebook).data
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
         return JsonResponse(data)

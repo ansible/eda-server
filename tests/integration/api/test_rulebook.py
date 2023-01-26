@@ -6,12 +6,14 @@ from aap_eda.core import models
 
 TEST_RULESETS_SAMPLE = """
 ---
-- name: Test simple 001
+- name: Test sample 001
   hosts: all
   sources:
-    - name: range
-      range:
+    - ansible.eda.range:
         limit: 5
+        delay: 1
+      filters:
+        - noop:
   rules:
     - name: r1
       condition: event.i == 1
@@ -22,12 +24,12 @@ TEST_RULESETS_SAMPLE = """
       action:
         debug:
 
-- name: Test simple 002
+- name: Test sample 002
   hosts: all
   sources:
-    - name: range
-      range:
+    - ansible.eda.range:
         limit: 5
+        delay: 1
   rules:
     - name: r3
       condition: event.i == 2
@@ -68,8 +70,8 @@ def test_create_rulebook(client: APIClient):
     assert models.Rulebook.objects.filter(pk=id_).exists()
 
     assert len(models.Ruleset.objects.all()) == 2
-    assert models.Ruleset.objects.first().name == "Test simple 001"
-    assert models.Ruleset.objects.last().name == "Test simple 002"
+    assert models.Ruleset.objects.first().name == "Test sample 001"
+    assert models.Ruleset.objects.last().name == "Test sample 002"
 
 
 @pytest.mark.django_db
@@ -104,8 +106,8 @@ def test_retrieve_json_rulebook(client: APIClient):
     assert data["id"] == obj.id
     assert data["name"] == "test-rulebook.yml"
     assert len(data["rulesets"]) == 2
-    assert data["rulesets"][0]["name"] == "Test simple 001"
-    assert data["rulesets"][1]["name"] == "Test simple 002"
+    assert data["rulesets"][0]["name"] == "Test sample 001"
+    assert data["rulesets"][1]["name"] == "Test sample 002"
 
 
 @pytest.mark.django_db
@@ -129,11 +131,13 @@ def test_list_rulesets_from_rulebook(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
 
     assert len(response.data) == 2
-    assert response.data[0]["name"] == "Test simple 001"
-    assert response.data[1]["name"] == "Test simple 002"
+    assert response.data[0]["name"] == "Test sample 001"
+    assert response.data[1]["name"] == "Test sample 002"
     assert list(response.data[0]) == [
         "id",
         "name",
+        "created_at",
+        "modified_at",
         "source_types",
         "rule_count",
         "fired_stats",

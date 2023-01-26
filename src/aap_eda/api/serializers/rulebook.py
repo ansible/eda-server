@@ -1,7 +1,7 @@
 import yaml
 from rest_framework import serializers
 
-from aap_eda.api.services import RulebookService
+from aap_eda.api.services.rulebook import insert_rulebook_related_data
 from aap_eda.core import models
 
 
@@ -18,9 +18,8 @@ class RulebookSerializer(serializers.ModelSerializer):
     )
 
     rulesets = serializers.CharField(
-        default="",
+        required=True,
         help_text="The contained rulesets in the rulebook",
-        allow_null=True,
     )
 
     project = serializers.IntegerField(
@@ -38,9 +37,7 @@ class RulebookSerializer(serializers.ModelSerializer):
         rulebook_data = validated_data["rulesets"]
         rulebook = models.Rulebook.objects.create(**validated_data)
 
-        RulebookService(rulebook).insert_rulebook_related_data(
-            yaml.safe_load(rulebook_data)
-        )
+        insert_rulebook_related_data(rulebook, yaml.safe_load(rulebook_data))
 
         return rulebook
 
@@ -52,13 +49,8 @@ class RulesetSerializer(serializers.ModelSerializer):
     )
 
     sources = serializers.JSONField(
-        default=dict,
+        required=True,
         help_text="The contained sources in the ruleset",
-        allow_null=True,
-    )
-
-    rulebook = serializers.IntegerField(
-        required=True, help_text="ID of the rulebook"
     )
 
     class Meta:
