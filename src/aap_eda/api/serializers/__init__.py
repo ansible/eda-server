@@ -18,6 +18,13 @@ from .project import (
     ProjectCreateSerializer,
     ProjectSerializer,
 )
+from .rulebook import (
+    RulebookSerializer,
+    RuleOutSerializer,
+    RuleSerializer,
+    RulesetOutSerializer,
+    RulesetSerializer,
+)
 from .tasks import TaskRefSerializer, TaskSerializer
 
 __all__ = (
@@ -26,6 +33,11 @@ __all__ = (
     "PlaybookSerializer",
     "ProjectSerializer",
     "ProjectCreateSerializer",
+    "RulebookSerializer",
+    "RulesetOutSerializer",
+    "RulesetSerializer",
+    "RuleOutSerializer",
+    "RuleSerializer",
     # tasks
     "TaskRefSerializer",
     "TaskSerializer",
