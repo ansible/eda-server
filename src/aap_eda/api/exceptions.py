@@ -11,10 +11,17 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-from .project import import_project, sync_project
+from django.utils.translation import gettext_lazy as _
+from rest_framework import status
+from rest_framework.exceptions import APIException, NotFound
 
 __all__ = (
-    "import_project",
-    "sync_project",
+    "NotFound",
+    "Conflict",
 )
+
+
+class Conflict(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = _("Conflict.")
+    default_code = "conflict"
