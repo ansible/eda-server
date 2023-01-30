@@ -13,18 +13,30 @@
 #  limitations under the License.
 
 import logging
-from typing import Optional
 
 from aap_eda.core.tasking import job
+from aap_eda.services import project as project_svc
 
 logger = logging.getLogger(__name__)
 
 
 @job
-def import_project(name: str, url: str, description: Optional[str] = None):
-    logger.info(f"[Task]: Import project ( {name=} {url=} {description=} )")
+def import_project(name: str, url: str, description: str = ""):
+    logger.info(
+        "[Task]: Import project ( name=%s url=%s description=%s )",
+        name,
+        url,
+        description,
+    )
+    project = project_svc.import_project(
+        name=name, url=url, description=description
+    )
+    logger.info("[Task]: Project imported ( id=%s )", project.id)
+    return {"project_id": project.id}
 
 
 @job
 def sync_project(project_id: int):
-    logger.info(f"[Task]: Sync project ( {project_id=} )")
+    logger.info("[Task]: Project sync started (id=%s)", project_id)
+    project_svc.sync_project(project_id=project_id)
+    logger.info("[Task]: Project sync complete (id=%s)", project_id)

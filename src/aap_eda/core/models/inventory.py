@@ -42,7 +42,7 @@ class Inventory(models.Model):
             ),
         ]
 
-    name = models.TextField(null=False, unique=True)
+    name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
     inventory = models.TextField(null=True)
     inventory_source = models.TextField(
@@ -51,3 +51,7 @@ class Inventory(models.Model):
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    @property
+    def content(self):
+        return self.inventory

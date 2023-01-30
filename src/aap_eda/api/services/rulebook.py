@@ -12,8 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# TODO(cutwater): Refactoring needed
+#       1. Move into `aap_eda.services` package
+#       2. Decouple from API. Services MUST expect parsed data, not raw data.
+#       3. Services MUST NOT use serializes for data de-serialization.
+#       4. Define public interface.
+#       5. Remove duplicated code (`import_rulebook_releated_data` and
+#           `import_rulebook` functions).
+
 from aap_eda.api import serializers
 from aap_eda.core import models
+from aap_eda.services.project.importing import expand_ruleset_sources
 
 
 def insert_rulebook_related_data(
@@ -33,28 +42,6 @@ def insert_rulebook_related_data(
                 action=rule["action"],
                 ruleset_id=ruleset.id,
             )
-
-
-def expand_ruleset_sources(rulebook_data: dict) -> dict:
-    expanded_ruleset_sources = {}
-    if rulebook_data is not None:
-        for ruleset_data in rulebook_data:
-            xp_sources = []
-            expanded_ruleset_sources[ruleset_data["name"]] = xp_sources
-            for source in ruleset_data.get("sources") or []:
-                xp_src = {"name": "<unnamed>"}
-                for src_key, src_val in source.items():
-                    if src_key == "name":
-                        xp_src["name"] = src_val
-                    elif src_key == "filters":
-                        xp_src["filters"] = src_val
-                    else:
-                        xp_src["type"] = src_key.split(".")[-1]
-                        xp_src["source"] = src_key
-                        xp_src["config"] = src_val
-                xp_sources.append(xp_src)
-
-    return expanded_ruleset_sources
 
 
 def ruleset_out_data(ruleset: models.Ruleset) -> dict:

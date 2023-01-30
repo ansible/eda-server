@@ -30,27 +30,27 @@ from aap_eda.core import models
     retrieve=extend_schema(
         description="Get the extra_var by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.ExtraVarSerializer,
-                description=("Return the extra_var by its id."),
+                description="Return the extra_var by its id.",
             ),
         },
     ),
     list=extend_schema(
         description="List all extra_vars",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.ExtraVarSerializer,
-                description=("Return a list of extra_vars."),
+                description="Return a list of extra_vars.",
             ),
         },
     ),
     create=extend_schema(
         description="Create an extra_var",
         responses={
-            201: OpenApiResponse(
+            status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.ExtraVarSerializer,
-                description=("Return the created extra_var."),
+                description="Return the created extra_var.",
             ),
         },
     ),
@@ -68,18 +68,18 @@ class ExtraVarViewSet(
     retrieve=extend_schema(
         description="Get the playbook by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.PlaybookSerializer,
-                description=("Return the playbook by its id."),
+                description="Return the playbook by its id.",
             ),
         },
     ),
     list=extend_schema(
         description="List all playbooks",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.PlaybookSerializer,
-                description=("Return a list of playbooks."),
+                description="Return a list of playbooks.",
             ),
         },
     ),

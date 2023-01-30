@@ -53,18 +53,26 @@ class Playbook(models.Model):
     class Meta:
         db_table = "core_playbook"
 
-    name = models.TextField(unique=True)
+    name = models.TextField()
     playbook = models.TextField()
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
+
+    @property
+    def content(self):
+        return self.playbook
 
 
 class ExtraVar(models.Model):
     class Meta:
         db_table = "core_extra_var"
 
-    name = models.TextField(unique=True)
+    name = models.TextField()
     extra_var = models.TextField()
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
+
+    @property
+    def content(self):
+        return self.extra_var
 
 
 __all__ = [
