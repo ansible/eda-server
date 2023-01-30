@@ -53,6 +53,7 @@ tasks:
       - task: lint:isort
       - task: lint:ruff
       - task: lint:flake8
+      - task: lint:migrations
 
   lint:black:
     desc: "Check code with `black`."
@@ -73,6 +74,13 @@ tasks:
     desc: "Check code with `flake8`."
     cmds:
       - poetry run flake8 -- {{.CLI_ARGS | default "."}}
+
+  lint:migrations:
+    desc: "Check that all migrations are up to date."
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: makemigrations --dry-run --check
 
   format:
     desc: "Run code formatters"
