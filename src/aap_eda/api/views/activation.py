@@ -86,9 +86,6 @@ class ActivationViewSet(viewsets.ModelViewSet):
         activation.data["rulebook"] = models.Rulebook.objects.get(
             pk=activation.data["rulebook"]
         )
-        activation.data["inventory"] = models.Inventory.objects.get(
-            pk=activation.data["inventory"]
-        )
         activation.data["extra_var"] = (
             models.ExtraVar.objects.get(pk=activation.data["extra_var"])
             if activation.data["extra_var"]

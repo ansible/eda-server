@@ -20,7 +20,6 @@ from .activation import (
     ActivationSerializer,
     ActivationUpdateSerializer,
 )
-from .inventory import InventoryRefSerializer, InventorySerializer
 from .project import (
     ExtraVarRefSerializer,
     ExtraVarSerializer,
@@ -63,7 +62,4 @@ __all__ = (
     "ActivationReadSerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
-    # inventory
-    "InventorySerializer",
-    "InventoryRefSerializer",
 )

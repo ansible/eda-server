@@ -18,7 +18,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from aap_eda.core.enums import InventorySource, RestartPolicy
+from aap_eda.core.enums import RestartPolicy
 
 TEST_ACTIVATION = {
     "name": "test-activation",
@@ -28,7 +28,6 @@ TEST_ACTIVATION = {
     "execution_environment": "quay.io/aizquier/ansible-rulebook",
     "project_id": 1,
     "rulebook_id": 1,
-    "inventory_id": 1,
     "extra_var_id": 1,
     "restart_policy": RestartPolicy.ON_FAILURE.value,
     "restart_count": 0,
@@ -44,11 +43,6 @@ def create_activation_related_data():
     rulebook_id = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets="..."
     ).pk
-    inventory_id = models.Inventory.objects.create(
-        name="test-inventory.yml",
-        inventory="...",
-        inventory_source=InventorySource.USER_DEFINED.value,
-    ).pk
     extra_var_id = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var="..."
     ).pk
@@ -56,7 +50,6 @@ def create_activation_related_data():
     return {
         "project_id": project_id,
         "rulebook_id": rulebook_id,
-        "inventory_id": inventory_id,
         "extra_var_id": extra_var_id,
     }
 
@@ -65,7 +58,6 @@ def create_activation(fks: dict):
     activation_data = TEST_ACTIVATION.copy()
     activation_data["project_id"] = fks["project_id"]
     activation_data["rulebook_id"] = fks["rulebook_id"]
-    activation_data["inventory_id"] = fks["inventory_id"]
     activation_data["extra_var_id"] = fks["extra_var_id"]
     activation = models.Activation(**activation_data)
     activation.save()
@@ -126,14 +118,11 @@ def assert_activation_data(
     if mode == "list":
         project_id = data_dict["project"]
         rulebook_id = data_dict["rulebook"]
-        inventory_id = data_dict["inventory"]
         extra_var_id = data_dict["extra_var"]
     elif mode == "retrieve":
         project_id = data_dict["project"]["id"]
         rulebook_id = data_dict["rulebook"]["id"]
-        inventory_id = data_dict["inventory"]["id"]
         extra_var_id = data_dict["extra_var"]["id"]
     assert project_id == activation.project.id
     assert rulebook_id == activation.rulebook.id
-    assert inventory_id == activation.inventory.id
     assert extra_var_id == activation.extra_var.id

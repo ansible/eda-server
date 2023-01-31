@@ -14,7 +14,6 @@
 
 from rest_framework import serializers
 
-from aap_eda.api.serializers.inventory import InventoryRefSerializer
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
     ProjectRefSerializer,
@@ -37,7 +36,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
     project_id = serializers.IntegerField(required=False)
     rulebook_id = serializers.IntegerField()
-    inventory_id = serializers.IntegerField()
     extra_var_id = serializers.IntegerField(required=False)
 
     class Meta:
@@ -50,7 +48,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "execution_environment",
             "project_id",
             "rulebook_id",
-            "inventory_id",
             "extra_var_id",
             "restart_policy",
         ]
@@ -91,7 +88,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
 
     project = ProjectRefSerializer(required=False)
     rulebook = RulebookRefSerializer()
-    inventory = InventoryRefSerializer()
     extra_var = ExtraVarRefSerializer(required=False)
     instances = ActivationInstanceSerializer(many=True)
 
@@ -106,7 +102,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "execution_environment",
             "project",
             "rulebook",
-            "inventory",
             "extra_var",
             "instances",
             "restart_policy",
@@ -136,7 +131,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "execution_environment": activation["execution_environment"],
             "project": project,
             "rulebook": RulebookRefSerializer(activation["rulebook"]).data,
-            "inventory": InventoryRefSerializer(activation["inventory"]).data,
             "extra_var": extra_var,
             "instances": ActivationInstanceSerializer(
                 activation["instances"], many=True

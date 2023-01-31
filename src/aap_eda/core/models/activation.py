@@ -41,9 +41,6 @@ class Activation(models.Model):
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.CASCADE, null=False
     )
-    inventory = models.ForeignKey(
-        "Inventory", on_delete=models.CASCADE, null=False
-    )
     extra_var = models.ForeignKey(
         "ExtraVar", on_delete=models.CASCADE, null=True
     )
