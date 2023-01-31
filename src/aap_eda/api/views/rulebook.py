@@ -20,7 +20,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -33,27 +33,27 @@ from aap_eda.core import models
     retrieve=extend_schema(
         description="Get the rulebook by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.RulebookSerializer,
-                description=("Return the rulebook by its id."),
+                description="Return the rulebook by its id.",
             ),
         },
     ),
     list=extend_schema(
         description="List all rulebooks",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.RulebookSerializer,
-                description=("Return a list of rulebooks."),
+                description="Return a list of rulebooks.",
             ),
         },
     ),
     create=extend_schema(
         description="Create a rulebook",
         responses={
-            201: OpenApiResponse(
+            status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.RulebookSerializer,
-                description=("Return the created rulebook."),
+                description="Return the created rulebook.",
             ),
         },
     ),
@@ -66,9 +66,11 @@ class RulebookViewSet(
     serializer_class = serializers.RulebookSerializer
 
     @extend_schema(
-        description=("Ruleset list of a rulebook by its id"),
+        description="Ruleset list of a rulebook by its id",
         request=None,
-        responses={200: serializers.RulesetOutSerializer(many=True)},
+        responses={
+            status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)
+        },
     )
     @action(detail=True)
     def rulesets(self, request, pk):
@@ -83,9 +85,9 @@ class RulebookViewSet(
         return Response(result)
 
     @extend_schema(
-        description=("Get the JSON format of a rulebook by its id"),
+        description="Get the JSON format of a rulebook by its id",
         request=None,
-        responses={200: serializers.RulebookSerializer},
+        responses={status.HTTP_200_OK: serializers.RulebookSerializer},
     )
     @action(detail=True)
     def json(self, request, pk):
@@ -105,9 +107,9 @@ class RulesetViewSet(
     @extend_schema(
         description="Get the ruleset by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.RulesetOutSerializer,
-                description=("Return the ruleset by its id."),
+                description="Return the ruleset by its id.",
             ),
         },
     )
@@ -120,9 +122,9 @@ class RulesetViewSet(
     @extend_schema(
         description="List all rulesets",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.RulesetOutSerializer(many=True),
-                description=("Return a list of rulesets."),
+                description="Return a list of rulesets.",
             ),
         },
     )
@@ -137,9 +139,9 @@ class RulesetViewSet(
         return Response(result)
 
     @extend_schema(
-        description=("Rule list of a ruleset by its id"),
+        description="Rule list of a ruleset by its id",
         request=None,
-        responses={200: serializers.RuleSerializer(many=True)},
+        responses={status.HTTP_200_OK: serializers.RuleSerializer(many=True)},
     )
     @action(detail=True)
     def rules(self, _request, pk):
@@ -159,9 +161,9 @@ class RuleViewSet(
     @extend_schema(
         description="Get the rule by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.RuleOutSerializer(many=False),
-                description=("Return the rule by its id."),
+                description="Return the rule by its id.",
             ),
         },
     )
@@ -174,9 +176,9 @@ class RuleViewSet(
     @extend_schema(
         description="List all rules",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.RuleOutSerializer(many=True),
-                description=("Return a list of rules."),
+                description="Return a list of rules.",
             ),
         },
     )
