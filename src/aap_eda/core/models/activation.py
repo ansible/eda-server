@@ -14,7 +14,7 @@
 
 from django.db import models
 
-from aap_eda.core.enums import RestartPolicy
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
 from .base import OIDField
 
@@ -30,26 +30,28 @@ class Activation(models.Model):
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
 
-    name = models.TextField(null=False)
-    description = models.TextField()
-    working_directory = models.TextField()
-    execution_environment = models.TextField()
-    rulebook_id = models.ForeignKey(
+    name = models.TextField(null=False, unique=True)
+    description = models.TextField(default="")
+    is_enabled = models.BooleanField(default=True)
+    working_directory = models.TextField(default="")
+    execution_environment = models.TextField(
+        default="quay.io/aizquier/ansible-rulebook"
+    )
+    project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
+    rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.CASCADE, null=False
     )
-    inventory_id = models.ForeignKey(
+    inventory = models.ForeignKey(
         "Inventory", on_delete=models.CASCADE, null=False
     )
-    extra_var_id = models.ForeignKey("ExtraVar", on_delete=models.CASCADE)
+    extra_var = models.ForeignKey(
+        "ExtraVar", on_delete=models.CASCADE, null=True
+    )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
-        default=RestartPolicy.ON_FAILURE,
-        null=False,
+        default=RestartPolicy.ON_FAILURE.value,
     )
-    status = models.TextField()
-    is_enabled = models.BooleanField(null=False, default=True)
-    restarted_at = models.DateTimeField()
-    restart_count = models.IntegerField(null=False, default=0)
+    restart_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
@@ -61,18 +63,16 @@ class Activation(models.Model):
 class ActivationInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance"
-        indexes = [
-            models.Index(fields=["name"], name="ix_act_inst_name"),
-        ]
 
-    name = models.TextField()
-    project = models.ForeignKey("Project", on_delete=models.CASCADE)
-    rulebook = models.ForeignKey("Rulebook", on_delete=models.CASCADE)
-    inventory = models.ForeignKey("Inventory", on_delete=models.CASCADE)
-    extra_var = models.ForeignKey("ExtraVar", on_delete=models.CASCADE)
-    working_directory = models.TextField()
-    execution_environment = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True, null=False)
+    status = models.TextField(
+        choices=ActivationStatus.choices(),
+        default=ActivationStatus.PENDING.value,
+    )
+    activation = models.ForeignKey(
+        "Activation", on_delete=models.CASCADE, null=True
+    )
+    started_at = models.DateTimeField(auto_now_add=True, null=False)
+    ended_at = models.DateTimeField(null=True)
     large_data_id = OIDField(null=True)
 
 

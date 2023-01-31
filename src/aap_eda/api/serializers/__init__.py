@@ -12,13 +12,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from .activation import (
+    ActivationCreateSerializer,
+    ActivationInstanceLogSerializer,
+    ActivationInstanceSerializer,
+    ActivationReadSerializer,
+    ActivationSerializer,
+    ActivationUpdateSerializer,
+)
+from .inventory import InventoryRefSerializer, InventorySerializer
 from .project import (
+    ExtraVarRefSerializer,
     ExtraVarSerializer,
     PlaybookSerializer,
     ProjectCreateSerializer,
+    ProjectRefSerializer,
     ProjectSerializer,
 )
 from .rulebook import (
+    RulebookRefSerializer,
     RulebookSerializer,
     RuleOutSerializer,
     RuleSerializer,
@@ -30,10 +42,13 @@ from .tasks import TaskRefSerializer, TaskSerializer
 __all__ = (
     # project
     "ExtraVarSerializer",
+    "ExtraVarRefSerializer",
     "PlaybookSerializer",
     "ProjectSerializer",
     "ProjectCreateSerializer",
+    "ProjectRefSerializer",
     "RulebookSerializer",
+    "RulebookRefSerializer",
     "RulesetOutSerializer",
     "RulesetSerializer",
     "RuleOutSerializer",
@@ -41,4 +56,14 @@ __all__ = (
     # tasks
     "TaskRefSerializer",
     "TaskSerializer",
+    # activations
+    "ActivationSerializer",
+    "ActivationCreateSerializer",
+    "ActivationUpdateSerializer",
+    "ActivationReadSerializer",
+    "ActivationInstanceSerializer",
+    "ActivationInstanceLogSerializer",
+    # inventory
+    "InventorySerializer",
+    "InventoryRefSerializer",
 )

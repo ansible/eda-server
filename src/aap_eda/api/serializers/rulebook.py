@@ -56,6 +56,15 @@ class RulebookSerializer(serializers.ModelSerializer):
         return rulebook
 
 
+class RulebookRefSerializer(serializers.ModelSerializer):
+    """Serializer for Rulebook reference."""
+
+    class Meta:
+        model = models.Rulebook
+        fields = ["id", "name", "description"]
+        read_only_fields = ["id"]
+
+
 class RulesetSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         required=True,

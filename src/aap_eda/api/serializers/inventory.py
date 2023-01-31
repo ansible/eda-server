@@ -12,22 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation import ActivationInstanceViewSet, ActivationViewSet
-from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
-from .rulebook import RulebookViewSet, RulesetViewSet, RuleViewSet
-from .tasks import TaskViewSet
+from rest_framework import serializers
 
-__all__ = (
-    # project
-    "ExtraVarViewSet",
-    "PlaybookViewSet",
-    "ProjectViewSet",
-    "RulebookViewSet",
-    "RulesetViewSet",
-    "RuleViewSet",
-    # tasks
-    "TaskViewSet",
-    # activations
-    "ActivationViewSet",
-    "ActivationInstanceViewSet",
-)
+from aap_eda.core import models
+
+
+class InventorySerializer(serializers.ModelSerializer):
+    """Serializer for Inventory model."""
+
+    class Meta:
+        model = models.Inventory
+        fields = "__all__"
+        read_only_fields = ["id"]
+
+
+class InventoryRefSerializer(serializers.ModelSerializer):
+    """Serializer for Inventory reference."""
+
+    class Meta:
+        model = models.Inventory
+        fields = ["id", "name", "description"]
+        read_only_fields = ["id"]

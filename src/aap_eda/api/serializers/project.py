@@ -37,6 +37,13 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         fields = ["url", "name", "description"]
 
 
+class ProjectRefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Project
+        fields = ["id", "url", "name", "description"]
+        read_only_fields = ["id"]
+
+
 class ExtraVarSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         required=True,
@@ -51,6 +58,15 @@ class ExtraVarSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ExtraVar
         fields = "__all__"
+        read_only_fields = ["id"]
+
+
+class ExtraVarRefSerializer(serializers.ModelSerializer):
+    """Serializer for Extra Var reference."""
+
+    class Meta:
+        model = models.ExtraVar
+        fields = ["id", "name"]
         read_only_fields = ["id"]
 
 

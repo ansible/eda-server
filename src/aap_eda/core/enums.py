@@ -65,3 +65,11 @@ class InventorySource(DjangoEnum):
     COLLECTION = "collection"
     USER_DEFINED = "user_defined"
     EXECUTION_ENV = "execution_env"
+
+
+class ActivationStatus(DjangoEnum):
+    RUNNING = "running"
+    PENDING = "pending"
+    FAILED = "failed"
+    STOPPED = "stopped"
+    COMPLETED = "completed"
