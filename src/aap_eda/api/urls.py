@@ -31,6 +31,8 @@ router.register("rulebooks", views.RulebookViewSet)
 router.register("rulesets", views.RulesetViewSet)
 router.register("rules", views.RuleViewSet)
 router.register("tasks", views.TaskViewSet, basename="task")
+router.register("activations", views.ActivationViewSet)
+router.register("activation-instances", views.ActivationInstanceViewSet)
 
 openapi_urls = [
     path(

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
 from .rulebook import RulebookViewSet, RulesetViewSet, RuleViewSet
 from .tasks import TaskViewSet
@@ -26,4 +27,7 @@ __all__ = (
     "RuleViewSet",
     # tasks
     "TaskViewSet",
+    # activations
+    "ActivationViewSet",
+    "ActivationInstanceViewSet",
 )
