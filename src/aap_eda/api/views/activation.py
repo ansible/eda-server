@@ -17,7 +17,9 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from aap_eda.api import serializers
@@ -99,6 +101,29 @@ class ActivationViewSet(viewsets.ModelViewSet):
             serializers.ActivationReadSerializer(activation.data).data
         )
 
+    @extend_schema(
+        description="List all instances for the Activation",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.ActivationInstanceSerializer
+        },
+    )
+    @action(detail=True)
+    def instances(self, request, pk):
+        activation_exists = models.Activation.objects.filter(pk=pk).exists()
+        if not activation_exists:
+            raise APIException(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Activation with id {pk} does not exist.",
+            )
+        activation_instances = models.ActivationInstance.objects.filter(
+            activation_id=pk
+        )
+        serializer = serializers.ActivationInstanceSerializer(
+            activation_instances, many=True
+        )
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+
 
 @extend_schema_view(
     retrieve=extend_schema(
@@ -117,7 +142,42 @@ class ActivationViewSet(viewsets.ModelViewSet):
             ),
         },
     ),
+    destroy=extend_schema(
+        description="Delete an existing Activation Instance",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None,
+                description="The Activation Instance has been deleted.",
+            ),
+        },
+    ),
 )
-class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
+class ActivationInstanceViewSet(
+    viewsets.ReadOnlyModelViewSet,
+    mixins.DestroyModelMixin,
+):
     queryset = models.ActivationInstance.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
+
+    @extend_schema(
+        description="List all logs for the Activation Instance",
+        responses={
+            status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer
+        },
+    )
+    @action(detail=True)
+    def logs(self, request, pk):
+        instance_exists = models.Activation.objects.filter(pk=pk).exists()
+        if not instance_exists:
+            raise APIException(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Activation Instance with id {pk} does not exist.",
+            )
+
+        activation_instance_logs = models.ActivationInstanceLog.objects.filter(
+            activation_instance_id=pk
+        )
+        serializer = serializers.ActivationInstanceLogSerializer(
+            activation_instance_logs, many=True
+        )
+        return Response(status=status.HTTP_200_OK, data=serializer.data)

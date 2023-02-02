@@ -46,7 +46,7 @@ class Activation(models.Model):
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
-        default=RestartPolicy.ON_FAILURE.value,
+        default=RestartPolicy.ON_FAILURE,
     )
     restart_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
@@ -63,7 +63,7 @@ class ActivationInstance(models.Model):
 
     status = models.TextField(
         choices=ActivationStatus.choices(),
-        default=ActivationStatus.PENDING.value,
+        default=ActivationStatus.PENDING,
     )
     activation = models.ForeignKey(
         "Activation", on_delete=models.CASCADE, null=True
