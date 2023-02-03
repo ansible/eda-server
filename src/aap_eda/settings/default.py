@@ -166,6 +166,8 @@ AUTH_USER_MODEL = "core.User"
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "aap_eda.api.common.pagination.StandardPagination",  # noqa
+    "PAGE_SIZE": 10,
 }
 
 # ---------------------------------------------------------
