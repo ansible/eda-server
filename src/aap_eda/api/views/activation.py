@@ -26,16 +26,6 @@ from aap_eda.core import models
 
 
 @extend_schema_view(
-    partial_update=extend_schema(
-        request=serializers.ActivationUpdateSerializer,
-        description="Partially update the activation by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ActivationSerializer,
-                description="The activation has been updated.",
-            ),
-        },
-    ),
     list=extend_schema(
         description="List all activations",
         responses={
@@ -55,10 +45,15 @@ from aap_eda.core import models
         },
     ),
 )
-class ActivationViewSet(viewsets.ModelViewSet):
+class ActivationViewSet(
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
-    http_method_names = ["get", "post", "patch", "delete"]
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -67,12 +62,13 @@ class ActivationViewSet(viewsets.ModelViewSet):
     def create(self, request):
         serializer = serializers.ActivationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        response = models.Activation.objects.create(**data)
-        serializer_class = serializers.ActivationSerializer(response)
+        response = serializer.create(serializer.validated_data)
+        response_serializer = serializers.ActivationSerializer(response)
         # TODO(doston): need to implement backend process and instance creation
 
-        return Response(serializer_class.data, status=status.HTTP_201_CREATED)
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED
+        )
 
     @extend_schema(
         responses={status.HTTP_200_OK: serializers.ActivationReadSerializer},
@@ -99,6 +95,26 @@ class ActivationViewSet(viewsets.ModelViewSet):
         return Response(
             serializers.ActivationReadSerializer(activation.data).data
         )
+
+    @extend_schema(
+        request=serializers.ActivationUpdateSerializer,
+        responses={status.HTTP_200_OK: serializers.ActivationSerializer},
+    )
+    def partial_update(self, request, *args, **kwargs):
+        partial = True
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
 
     @extend_schema(
         description="List all instances for the Activation",

@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import json
 from typing import Any, Dict
 
 import pytest
@@ -32,6 +33,12 @@ TEST_ACTIVATION = {
     "restart_policy": RestartPolicy.ON_FAILURE.value,
     "restart_count": 0,
 }
+
+
+class ApiMode:
+    CREATE = "create"
+    RETRIEVE = "retrieve"
+    LIST = "list"
 
 
 def create_activation_related_data():
@@ -66,6 +73,60 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
+def test_create_activation(client: APIClient):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+
+    response = client.post("/eda/api/v1/activations", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    assert_activation_data(
+        data,
+        models.Activation(id=data["id"], **test_activation),
+        mode=ApiMode.CREATE,
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_bad_entity(client: APIClient):
+    test_activation = {
+        "name": "test-activation",
+        "description": "test activation",
+        "is_enabled": True,
+    }
+    response = client.post(
+        "/eda/api/v1/activations",
+        data=test_activation,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_update_activation(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    new_activation = {
+        "name": "new demo",
+        "description": "demo activation",
+        "is_enabled": False,
+    }
+
+    response = client.patch(
+        f"/eda/api/v1/activations/{activation.id}",
+        data=json.dumps(new_activation),
+        content_type="application/json",
+    )
+    assert response.status_code == status.HTTP_200_OK
+    activation = response.data
+    assert activation["name"] == new_activation["name"]
+    assert activation["description"] == new_activation["description"]
+    assert activation["is_enabled"] == new_activation["is_enabled"]
+
+
+@pytest.mark.django_db
 def test_list_activations(client: APIClient):
     fks = create_activation_related_data()
     activations = [create_activation(fks)]
@@ -73,7 +134,7 @@ def test_list_activations(client: APIClient):
     response = client.get("/eda/api/v1/activations")
     assert response.status_code == status.HTTP_200_OK
     for data, activation in zip(response.data, activations):
-        assert_activation_data(data, activation, mode="list")
+        assert_activation_data(data, activation, mode=ApiMode.LIST)
 
 
 @pytest.mark.django_db
@@ -83,13 +144,22 @@ def test_retrieve_activation(client: APIClient):
 
     response = client.get(f"/eda/api/v1/activations/{activation.id}")
     assert response.status_code == status.HTTP_200_OK
-    assert_activation_data(response.data, activation, mode="retrieve")
+    assert_activation_data(response.data, activation, mode=ApiMode.RETRIEVE)
 
 
 @pytest.mark.django_db
 def test_retrieve_activation_not_exist(client: APIClient):
     response = client.get("/eda/api/v1/activations/77")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_delete_activation(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    response = client.delete(f"/eda/api/v1/activations/{activation.id}")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -109,17 +179,18 @@ def assert_activation_data(
     )
     assert data_dict["restart_policy"] == activation.restart_policy
     assert data_dict["restart_count"] == activation.restart_count
-    assert data_dict["created_at"] == activation.created_at.strftime(
-        DATETIME_FORMAT
-    )
-    assert data_dict["modified_at"] == activation.modified_at.strftime(
-        DATETIME_FORMAT
-    )
-    if mode == "list":
+    if mode != ApiMode.CREATE:
+        assert data_dict["created_at"] == activation.created_at.strftime(
+            DATETIME_FORMAT
+        )
+        assert data_dict["modified_at"] == activation.modified_at.strftime(
+            DATETIME_FORMAT
+        )
+    if mode in [ApiMode.LIST, ApiMode.CREATE]:
         project_id = data_dict["project"]
         rulebook_id = data_dict["rulebook"]
         extra_var_id = data_dict["extra_var"]
-    elif mode == "retrieve":
+    elif mode == ApiMode.RETRIEVE:
         project_id = data_dict["project"]["id"]
         rulebook_id = data_dict["rulebook"]["id"]
         extra_var_id = data_dict["extra_var"]["id"]
