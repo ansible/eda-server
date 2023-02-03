@@ -19,10 +19,9 @@ from drf_spectacular.utils import (
 )
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
-from aap_eda.api import serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 
 
@@ -112,7 +111,7 @@ class ActivationViewSet(viewsets.ModelViewSet):
     def instances(self, request, pk):
         activation_exists = models.Activation.objects.filter(pk=pk).exists()
         if not activation_exists:
-            raise APIException(
+            raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
                 detail=f"Activation with id {pk} does not exist.",
             )
@@ -169,7 +168,7 @@ class ActivationInstanceViewSet(
     def logs(self, request, pk):
         instance_exists = models.Activation.objects.filter(pk=pk).exists()
         if not instance_exists:
-            raise APIException(
+            raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
                 detail=f"Activation Instance with id {pk} does not exist.",
             )
