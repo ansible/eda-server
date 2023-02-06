@@ -6,6 +6,7 @@ env:
 vars:
   DOCKER_COMPOSE: '{{ default "docker-compose" .DOCKER_COMPOSE }}'
   DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose.yaml" .DOCKER_COMPOSE_ARGS }}'
+  PYTEST_CMD: "poetry run python -m pytest"
 
 tasks:
   default:
@@ -43,8 +44,16 @@ tasks:
 
   test:
     desc: "Run project tests."
+    summary: |
+      Run poetry run python -m pytest with specified CLI arguments.
+      
+      Example(s):
+        Run a single test module
+          $ task test -- tests/integration/api/test_activation.py
+        Run a single test from a module
+          $ task test -- tests/integration/api/test_activation.py -k test_retrieve_activation
     cmds:
-      - poetry run python -m pytest
+      - '{{.PYTEST_CMD}} {{.CLI_ARGS}}'
 
   lint:
     desc: "Run all linters."
