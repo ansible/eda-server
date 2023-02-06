@@ -4,3 +4,6 @@ __pycache__/
 # Packaging / distribution
 /dist/
 .venv/
+
+# IDE projects
+.idea/
