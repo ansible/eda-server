@@ -103,6 +103,7 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = serializers.ProjectCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        # TODO: Remove creation when tasks are implemented.
         serializer.create(data)
         job = tasks.import_project.delay(**data)
         serializer = serializers.TaskRefSerializer(
