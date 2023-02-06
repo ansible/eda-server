@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0004_alter_project_description"),
+        ("core", "0005_remove_activationinstance_ix_act_inst_name_and_more"),
     ]
 
     operations = [
