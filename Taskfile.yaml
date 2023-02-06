@@ -51,6 +51,8 @@ tasks:
         Run a single test module
           $ task test -- tests/integration/api/test_activation.py
         Run a single test from a module
+          $ task test -- tests/integration/api/test_activation.py::test_retrieve_activation
+       Exclude a single test 
           $ task test -- tests/integration/api/test_activation.py -k test_retrieve_activation
     cmds:
       - '{{.PYTEST_CMD}} {{.CLI_ARGS}}'
