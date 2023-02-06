@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import RestartPolicy
+from tests.integration.api.conftest import api_url_v1
 
 TEST_ACTIVATION = {
     "name": "test-activation",
@@ -156,7 +157,7 @@ def test_list_activations(client: APIClient):
     fks = create_activation_related_data()
     activations = [create_activation(fks)]
 
-    response = client.get("/eda/api/v1/activations")
+    response = client.get(f"{api_url_v1}/activations")
     assert response.status_code == status.HTTP_200_OK
     for data, activation in zip(response.data, activations):
         assert_activation_base_data(data, activation)
@@ -168,7 +169,7 @@ def test_retrieve_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.get(f"/eda/api/v1/activations/{activation.id}")
+    response = client.get(f"{api_url_v1}/activations/{activation.id}")
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, activation)
@@ -182,7 +183,7 @@ def test_retrieve_activation(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_activation_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/activations/77")
+    response = client.get(f"{api_url_v1}/activations/77")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

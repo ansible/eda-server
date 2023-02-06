@@ -17,6 +17,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from tests.integration.api.conftest import api_url_v1
 
 TEST_RULESETS_SAMPLE = """
 ---
@@ -57,7 +58,7 @@ def test_list_rulebooks(client: APIClient):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
-    response = client.get("/eda/api/v1/rulebooks")
+    response = client.get(f"{api_url_v1}/rulebooks")
     assert response.status_code == status.HTTP_200_OK
     rulebook = response.data[0]
 
@@ -74,7 +75,7 @@ def test_create_rulebook(client: APIClient):
         "rulesets": TEST_RULESETS_SAMPLE,
     }
 
-    response = client.post("/eda/api/v1/rulebooks", data=data_in)
+    response = client.post(f"{api_url_v1}/rulebooks", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
 
     id_ = response.data["id"]
@@ -93,7 +94,7 @@ def test_retrieve_rulebook(client: APIClient):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
-    response = client.get(f"/eda/api/v1/rulebooks/{obj.id}")
+    response = client.get(f"{api_url_v1}/rulebooks/{obj.id}")
     assert response.status_code == status.HTTP_200_OK
 
     assert response.data["id"] == obj.id
@@ -104,7 +105,7 @@ def test_retrieve_rulebook(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_rulebook_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/rulebooks/42")
+    response = client.get(f"{api_url_v1}/rulebooks/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -113,7 +114,7 @@ def test_retrieve_json_rulebook(client: APIClient):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
-    response = client.get(f"/eda/api/v1/rulebooks/{obj.id}/json")
+    response = client.get(f"{api_url_v1}/rulebooks/{obj.id}/json")
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
@@ -126,7 +127,7 @@ def test_retrieve_json_rulebook(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_json_rulebook_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/rulebooks/42/json")
+    response = client.get(f"{api_url_v1}/rulebooks/42/json")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -134,10 +135,10 @@ def test_retrieve_json_rulebook_not_exist(client: APIClient):
 def test_list_rulesets_from_rulebook(client: APIClient):
     _prepare_rulesets_and_rules(client)
 
-    response = client.get("/eda/api/v1/rulebooks")
+    response = client.get(f"{api_url_v1}/rulebooks")
     rulebook_id = response.data[0]["id"]
 
-    response = client.get(f"/eda/api/v1/rulebooks/{rulebook_id}/rulesets")
+    response = client.get(f"{api_url_v1}/rulebooks/{rulebook_id}/rulesets")
     assert response.status_code == status.HTTP_200_OK
 
     assert len(response.data) == 2
@@ -158,7 +159,7 @@ def test_list_rulesets_from_rulebook(client: APIClient):
 def test_list_rulesets(client: APIClient):
     _prepare_rulesets_and_rules(client)
 
-    response = client.get("/eda/api/v1/rulesets")
+    response = client.get(f"{api_url_v1}/rulesets")
     assert response.status_code == status.HTTP_200_OK
     rulesets = response.data
 
@@ -181,10 +182,10 @@ def test_list_rulesets(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_ruleset(client: APIClient):
     _prepare_rulesets_and_rules(client)
-    response = client.get("/eda/api/v1/rulesets")
+    response = client.get(f"{api_url_v1}/rulesets")
     rulesets = response.data
 
-    response = client.get(f"/eda/api/v1/rulesets/{rulesets[0]['id']}")
+    response = client.get(f"{api_url_v1}/rulesets/{rulesets[0]['id']}")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "Test sample 001"
@@ -193,10 +194,10 @@ def test_retrieve_ruleset(client: APIClient):
 @pytest.mark.django_db
 def test_list_rules_from_ruleset(client: APIClient):
     _prepare_rulesets_and_rules(client)
-    response = client.get("/eda/api/v1/rulesets")
+    response = client.get(f"{api_url_v1}/rulesets")
     rulesets = response.data
 
-    response = client.get(f"/eda/api/v1/rulesets/{rulesets[0]['id']}/rules")
+    response = client.get(f"{api_url_v1}/rulesets/{rulesets[0]['id']}/rules")
     assert response.status_code == status.HTTP_200_OK
 
     rules = response.data
@@ -213,7 +214,7 @@ def test_list_rules_from_ruleset(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_ruleset_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/rulesets/42")
+    response = client.get(f"{api_url_v1}/rulesets/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -221,7 +222,7 @@ def test_retrieve_ruleset_not_exist(client: APIClient):
 def test_list_rules(client: APIClient):
     _prepare_rulesets_and_rules(client)
 
-    response = client.get("/eda/api/v1/rules")
+    response = client.get(f"{api_url_v1}/rules")
     assert response.status_code == status.HTTP_200_OK
     rules = response.data
 
@@ -241,10 +242,10 @@ def test_list_rules(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_rule(client: APIClient):
     _prepare_rulesets_and_rules(client)
-    response = client.get("/eda/api/v1/rules")
+    response = client.get(f"{api_url_v1}/rules")
     rules = response.data
 
-    response = client.get(f"/eda/api/v1/rules/{rules[0]['id']}")
+    response = client.get(f"{api_url_v1}/rules/{rules[0]['id']}")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "r1"
@@ -252,7 +253,7 @@ def test_retrieve_rule(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_rule_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/rules/42")
+    response = client.get(f"{api_url_v1}/rules/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -262,4 +263,4 @@ def _prepare_rulesets_and_rules(client: APIClient):
         "name": "test-rulebook.yml",
         "rulesets": TEST_RULESETS_SAMPLE,
     }
-    client.post("/eda/api/v1/rulebooks", data=data_in)
+    client.post(f"{api_url_v1}/rulebooks", data=data_in)
