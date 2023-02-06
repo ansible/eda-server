@@ -63,8 +63,6 @@ def scan_file(path: Path) -> Optional[ScanResult]:
         return None
 
     kind = guess_entry_kind(content)
-    if kind is None:
-        return None
     return ScanResult(
         kind=kind,
         filename=path.name,
