@@ -35,12 +35,6 @@ TEST_ACTIVATION = {
 }
 
 
-class ApiMode:
-    CREATE = "create"
-    RETRIEVE = "retrieve"
-    LIST = "list"
-
-
 def create_activation_related_data():
     project_id = models.Project.objects.create(
         name="test-project-01",
@@ -83,10 +77,9 @@ def test_create_activation(client: APIClient):
     response = client.post("/eda/api/v1/activations", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
-    assert_activation_data(
+    assert_activation_base_data(
         data,
         models.Activation(id=data["id"], **test_activation),
-        mode=ApiMode.CREATE,
     )
 
 
@@ -134,7 +127,8 @@ def test_list_activations(client: APIClient):
     response = client.get("/eda/api/v1/activations")
     assert response.status_code == status.HTTP_200_OK
     for data, activation in zip(response.data, activations):
-        assert_activation_data(data, activation, mode=ApiMode.LIST)
+        assert_activation_base_data(data, activation)
+        assert_activation_time_fields(data, activation)
 
 
 @pytest.mark.django_db
@@ -144,7 +138,8 @@ def test_retrieve_activation(client: APIClient):
 
     response = client.get(f"/eda/api/v1/activations/{activation.id}")
     assert response.status_code == status.HTTP_200_OK
-    assert_activation_data(response.data, activation, mode=ApiMode.RETRIEVE)
+    assert_activation_base_data(response.data, activation)
+    assert_activation_time_fields(response.data, activation)
 
 
 @pytest.mark.django_db
@@ -165,8 +160,20 @@ def test_delete_activation(client: APIClient):
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
-def assert_activation_data(
-    data: Dict[str, Any], activation: models.Activation, mode: str
+def assert_activation_time_fields(
+    data: Dict[str, Any], activation: models.Activation
+):
+    data_dict = dict(data)
+    assert data_dict["created_at"] == activation.created_at.strftime(
+        DATETIME_FORMAT
+    )
+    assert data_dict["modified_at"] == activation.modified_at.strftime(
+        DATETIME_FORMAT
+    )
+
+
+def assert_activation_base_data(
+    data: Dict[str, Any], activation: models.Activation
 ):
     data_dict = dict(data)
     assert data_dict["id"] == activation.id
@@ -179,21 +186,11 @@ def assert_activation_data(
     )
     assert data_dict["restart_policy"] == activation.restart_policy
     assert data_dict["restart_count"] == activation.restart_count
-    if mode != ApiMode.CREATE:
-        assert data_dict["created_at"] == activation.created_at.strftime(
-            DATETIME_FORMAT
-        )
-        assert data_dict["modified_at"] == activation.modified_at.strftime(
-            DATETIME_FORMAT
-        )
-    if mode in [ApiMode.LIST, ApiMode.CREATE]:
-        project_id = data_dict["project"]
-        rulebook_id = data_dict["rulebook"]
-        extra_var_id = data_dict["extra_var"]
-    elif mode == ApiMode.RETRIEVE:
-        project_id = data_dict["project"]["id"]
-        rulebook_id = data_dict["rulebook"]["id"]
-        extra_var_id = data_dict["extra_var"]["id"]
-    assert project_id == activation.project.id
-    assert rulebook_id == activation.rulebook.id
-    assert extra_var_id == activation.extra_var.id
+    if type(data_dict["rulebook"]) == int:
+        assert data_dict["project"] == activation.project.id
+        assert data_dict["rulebook"] == activation.rulebook.id
+        assert data_dict["extra_var"] == activation.extra_var.id
+    else:
+        assert data_dict["project"]["id"] == activation.project.id
+        assert data_dict["rulebook"]["id"] == activation.rulebook.id
+        assert data_dict["extra_var"]["id"] == activation.extra_var.id
