@@ -18,7 +18,7 @@ from enum import Enum
 class DjangoEnum(Enum):
     @classmethod
     def choices(cls):
-        return tuple(((e.name, e.value) for e in cls))
+        return tuple((e.value, e.value) for e in cls)
 
     @classmethod
     def values(cls):

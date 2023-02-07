@@ -25,10 +25,45 @@ from aap_eda.core import models
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
+    project_id = serializers.SerializerMethodField()
+    rulebook_id = serializers.SerializerMethodField()
+    extra_var_id = serializers.SerializerMethodField()
+
     class Meta:
         model = models.Activation
-        fields = "__all__"
-        read_only_fields = ["id"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "is_enabled",
+            "working_directory",
+            "execution_environment",
+            "project_id",
+            "rulebook_id",
+            "extra_var_id",
+            "restart_policy",
+            "restart_count",
+            "created_at",
+            "modified_at",
+        ]
+        read_only_fields = ["id", "created_at", "modified_at"]
+
+    def get_project_id(self, activation):
+        return (
+            ProjectRefSerializer(activation.project).data["id"]
+            if activation.project
+            else None
+        )
+
+    def get_rulebook_id(self, activation):
+        return RulebookRefSerializer(activation.rulebook).data["id"]
+
+    def get_extra_var_id(self, activation):
+        return (
+            ExtraVarRefSerializer(activation.extra_var).data["id"]
+            if activation.extra_var
+            else None
+        )
 
 
 class ActivationCreateSerializer(serializers.ModelSerializer):
