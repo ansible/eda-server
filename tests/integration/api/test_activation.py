@@ -98,7 +98,7 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
-def test_create_activation(client: APIClient, api_url_v1):
+def test_create_activation(client: APIClient):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["project_id"] = fks["project_id"]
@@ -124,7 +124,7 @@ def test_create_activation_bad_entity(client: APIClient):
         "is_enabled": True,
     }
     response = client.post(
-        "/eda/api/v1/activations",
+        f"{api_url_v1}/activations",
         data=test_activation,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -141,7 +141,7 @@ def test_update_activation(client: APIClient):
     }
 
     response = client.patch(
-        f"/eda/api/v1/activations/{activation.id}",
+        f"{api_url_v1}/activations/{activation.id}",
         data=json.dumps(new_activation),
         content_type="application/json",
     )
