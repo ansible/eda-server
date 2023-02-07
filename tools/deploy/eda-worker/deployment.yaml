@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda
+      comp: worker
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: eda
+        comp: worker
+    spec:
+      containers:
+        - args:
+            - /bin/bash
+            - -c
+            - aap-eda-manage rqworker --worker-class aap_eda.tasking.Worker
+          env:
+            - name: EDA_DATABASE_URL
+              value: postgresql+asyncpg://postgres:secret@postgres/eda
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_MQ_HOST
+              value: eda-redis
+          image: aap-eda
+          imagePullPolicy: Never
+          name: eda-worker
+          ports:
+            - containerPort: 8000
+          resources: {}
+#          volumeMounts:
+#            - mountPath: /app/src
+#              name: app-src
+      restartPolicy: Always
+#      volumes:
+#        - name: app-src
+#          persistentVolumeClaim:
+#            claimName: app-src
+status: {}

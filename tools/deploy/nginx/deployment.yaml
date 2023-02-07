@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-nginx
+spec:
+  selector:
+    matchLabels:
+      app: eda
+      comp: nginx
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: eda
+        comp: nginx
+    spec:
+      containers:
+      - name: eda-nginx
+        imagePullPolicy: Never
+        image: eda-nginx
+        ports:
+        - containerPort: 8000
+status: {}

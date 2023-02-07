@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda
+      comp: api
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: eda
+        comp: api
+    spec:
+      containers:
+        - args:
+            - /bin/bash
+            - -c
+            - aap-eda-manage migrate && aap-eda-manage runserver
+          env:
+            - name: EDA_DATABASE_URL
+              value: postgresql+asyncpg://postgres:secret@postgres/eda
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_MQ_HOST
+              value: eda-redis
+          image: aap-eda
+          imagePullPolicy: Never
+          name: eda-api
+          ports:
+            - containerPort: 8000
+          resources: {}
+      restartPolicy: Always
+status: {}
