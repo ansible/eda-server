@@ -25,6 +25,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import serializers
+from aap_eda.api.common.pagination import ListPagination
 from aap_eda.api.services.rulebook import rule_out_data, ruleset_out_data
 from aap_eda.core import models
 
@@ -82,7 +83,10 @@ class RulebookViewSet(
             data = ruleset_out_data(ruleset)
             result.append(data)
 
-        return Response(result)
+        paginator = ListPagination(result, request)
+        result = paginator.paginate_data
+
+        return paginator.get_paginated_response(result)
 
     @extend_schema(
         description="Get the JSON format of a rulebook by its id",
@@ -136,7 +140,10 @@ class RulesetViewSet(
             data = ruleset_out_data(ruleset)
             result.append(data)
 
-        return Response(result)
+        paginator = ListPagination(result, _request)
+        result = paginator.paginate_data
+
+        return paginator.get_paginated_response(result)
 
     @extend_schema(
         description="Rule list of a ruleset by its id",
@@ -190,4 +197,7 @@ class RuleViewSet(
             data = rule_out_data(rule)
             result.append(data)
 
-        return Response(result)
+        paginator = ListPagination(result, _request)
+        result = paginator.paginate_data
+
+        return paginator.get_paginated_response(result)

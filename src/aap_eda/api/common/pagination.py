@@ -98,18 +98,18 @@ class StandardPagination(pagination.LimitOffsetPagination):
 
 
 class ListPagination(StandardPagination):
-    @property
-    def set_request(self, request):
+    def __init__(self, data, request):
+        self.data = data
+        self.count = len(self.data)
         self.request = request
-
-    def paginate_data(self, data, request):
-        self.count = len(data)
         self.offset = self.get_offset(request)
         self.limit = self.get_limit(request)
 
+    @property
+    def paginate_data(self):
         max_index = min(self.limit, self.count)
         try:
-            data = data[self.offset : self.offset + max_index]
+            paginated_data = self.data[self.offset : self.offset + max_index]
         except IndexError:
-            data = []
-        return data
+            paginated_data = []
+        return paginated_data
