@@ -37,7 +37,12 @@ TEST_ACTIVATION = {
 TEST_PROJECT = {
     "name": "test-project-01",
     "url": "https://git.example.com/acme/project-01",
-    "git_hash": "4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+    "description": "test project",
+}
+
+TEST_RULEBOOK = {
+    "name": "test-rulebook.yml",
+    "description": "test rulebok",
 }
 
 TEST_RULESETS = """
@@ -62,10 +67,12 @@ def create_activation_related_data():
     project_id = models.Project.objects.create(
         name=TEST_PROJECT["name"],
         url=TEST_PROJECT["url"],
-        git_hash=TEST_PROJECT["git_hash"],
+        description=TEST_PROJECT["description"],
     ).pk
     rulebook_id = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets=TEST_RULESETS
+        name=TEST_RULEBOOK["name"],
+        rulesets=TEST_RULESETS,
+        description=TEST_RULEBOOK["description"],
     ).pk
     extra_var_id = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
@@ -165,15 +172,12 @@ def test_retrieve_activation(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, activation)
-    assert data["project"]["id"] == activation.project.id
-    assert data["project"]["name"] == activation.project.name
-    assert data["project"]["url"] == activation.project.url
-
-    assert data["rulebook"]["id"] == activation.rulebook.id
-    assert data["rulebook"]["name"] == "test-rulebook.yml"
-
-    assert data["extra_var"]["id"] == activation.extra_var.id
-    assert data["extra_var"]["name"] == "test-extra-var.yml"
+    assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
+    assert data["rulebook"] == {"id": activation.rulebook.id, **TEST_RULEBOOK}
+    assert data["extra_var"] == {
+        "id": activation.extra_var.id,
+        "name": "test-extra-var.yml",
+    }
 
 
 @pytest.mark.django_db
