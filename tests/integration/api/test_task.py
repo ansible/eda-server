@@ -19,11 +19,9 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rq.job import JobStatus
 
-from tests.integration.api.conftest import api_url_v1
-
 
 @mock.patch("aap_eda.api.views.tasks.list_jobs")
-def test_list_tasks(list_jobs: mock.Mock, client: APIClient):
+def test_list_tasks(list_jobs: mock.Mock, client: APIClient, api_url_v1):
     list_jobs.return_value = [
         _create_job(
             "6636aad2-7998-4376-bb4d-ef19796fd1b3",
@@ -63,7 +61,7 @@ def test_list_tasks(list_jobs: mock.Mock, client: APIClient):
 
 
 @mock.patch("aap_eda.api.views.tasks.get_job")
-def test_retrieve_task(get_job: mock.Mock, client: APIClient):
+def test_retrieve_task(get_job: mock.Mock, client: APIClient, api_url_v1):
     get_job.return_value = _create_job(
         "6636aad2-7998-4376-bb4d-ef19796fd1b3",
         JobStatus.QUEUED,
@@ -85,7 +83,9 @@ def test_retrieve_task(get_job: mock.Mock, client: APIClient):
 
 
 @mock.patch("aap_eda.api.views.tasks.get_job")
-def test_retrieve_task_not_exists(get_job: mock.Mock, client: APIClient):
+def test_retrieve_task_not_exists(
+    get_job: mock.Mock, client: APIClient, api_url_v1
+):
     get_job.return_value = None
     response = client.get(
         f"{api_url_v1}/tasks/a13f539c-aaa1-46b6-80c3-7dbfad941292"

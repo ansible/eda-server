@@ -3,7 +3,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from tests.integration.api.conftest import api_url_v1
 
 TEST_EXTRA_VAR = """
 ---
@@ -14,7 +13,7 @@ collections:
 
 
 @pytest.mark.django_db
-def test_list_extra_var(client: APIClient):
+def test_list_extra_var(client: APIClient, api_url_v1):
     obj = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
@@ -31,7 +30,7 @@ def test_list_extra_var(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_create_extra_var(client: APIClient):
+def test_create_extra_var(client: APIClient, api_url_v1):
     data_in = {
         "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
@@ -49,7 +48,7 @@ def test_create_extra_var(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_extra_var(client: APIClient):
+def test_retrieve_extra_var(client: APIClient, api_url_v1):
     obj = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
@@ -64,6 +63,6 @@ def test_retrieve_extra_var(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_extra_var_not_exist(client: APIClient):
+def test_retrieve_extra_var_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/extra-vars/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND

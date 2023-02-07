@@ -20,7 +20,6 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import RestartPolicy
-from tests.integration.api.conftest import api_url_v1
 
 TEST_ACTIVATION = {
     "name": "test-activation",
@@ -98,14 +97,14 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
-def test_create_activation(client: APIClient):
+def test_create_activation(client: APIClient, api_url_v1):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
-    response = client.post("/eda/api/v1/activations", data=test_activation)
+    response = client.post(f"{api_url_v1}/activations", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
@@ -153,7 +152,7 @@ def test_update_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_activations(client: APIClient):
+def test_list_activations(client: APIClient, api_url_v1):
     fks = create_activation_related_data()
     activations = [create_activation(fks)]
 
@@ -165,7 +164,7 @@ def test_list_activations(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_activation(client: APIClient):
+def test_retrieve_activation(client: APIClient, api_url_v1):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
@@ -182,13 +181,13 @@ def test_retrieve_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_activation_not_exist(client: APIClient):
+def test_retrieve_activation_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/activations/77")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_delete_activation(client: APIClient):
+def test_delete_activation(client: APIClient, api_url_v1):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 

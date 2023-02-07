@@ -19,11 +19,10 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from tests.integration.api.conftest import api_url_v1
 
 
 @pytest.mark.django_db
-def test_list_projects(client: APIClient):
+def test_list_projects(client: APIClient, api_url_v1):
     projects = models.Project.objects.bulk_create(
         [
             models.Project(
@@ -46,7 +45,7 @@ def test_list_projects(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_project(client: APIClient):
+def test_retrieve_project(client: APIClient, api_url_v1):
     project = models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
@@ -58,14 +57,16 @@ def test_retrieve_project(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_project_not_exist(client: APIClient):
+def test_retrieve_project_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/projects/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.import_project")
-def test_import_project(import_project_task: mock.Mock, client: APIClient):
+def test_import_project(
+    import_project_task: mock.Mock, client: APIClient, api_url_v1
+):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
@@ -90,7 +91,7 @@ def test_import_project(import_project_task: mock.Mock, client: APIClient):
 
 
 @pytest.mark.django_db
-def test_import_project_name_conflict(client: APIClient):
+def test_import_project_name_conflict(client: APIClient, api_url_v1):
     models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
@@ -113,7 +114,9 @@ def test_import_project_name_conflict(client: APIClient):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.sync_project")
-def test_sync_project(sync_project_task: mock.Mock, client: APIClient):
+def test_sync_project(
+    sync_project_task: mock.Mock, client: APIClient, api_url_v1
+):
     project = models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
@@ -137,7 +140,7 @@ def test_sync_project(sync_project_task: mock.Mock, client: APIClient):
 
 
 @pytest.mark.django_db
-def test_sync_project_not_exist(client: APIClient):
+def test_sync_project_not_exist(client: APIClient, api_url_v1):
     response = client.post(f"{api_url_v1}/projects/42/sync")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 

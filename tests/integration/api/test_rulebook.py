@@ -17,7 +17,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from tests.integration.api.conftest import api_url_v1
 
 TEST_RULESETS_SAMPLE = """
 ---
@@ -54,7 +53,7 @@ TEST_RULESETS_SAMPLE = """
 
 
 @pytest.mark.django_db
-def test_list_rulebooks(client: APIClient):
+def test_list_rulebooks(client: APIClient, api_url_v1):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
@@ -69,7 +68,7 @@ def test_list_rulebooks(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_create_rulebook(client: APIClient):
+def test_create_rulebook(client: APIClient, api_url_v1):
     data_in = {
         "name": "test-rulebook.yml",
         "rulesets": TEST_RULESETS_SAMPLE,
@@ -90,7 +89,7 @@ def test_create_rulebook(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_rulebook(client: APIClient):
+def test_retrieve_rulebook(client: APIClient, api_url_v1):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
@@ -104,13 +103,13 @@ def test_retrieve_rulebook(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_rulebook_not_exist(client: APIClient):
+def test_retrieve_rulebook_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/rulebooks/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_retrieve_json_rulebook(client: APIClient):
+def test_retrieve_json_rulebook(client: APIClient, api_url_v1):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
@@ -126,14 +125,14 @@ def test_retrieve_json_rulebook(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_json_rulebook_not_exist(client: APIClient):
+def test_retrieve_json_rulebook_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/rulebooks/42/json")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_list_rulesets_from_rulebook(client: APIClient):
-    _prepare_rulesets_and_rules(client)
+def test_list_rulesets_from_rulebook(client: APIClient, api_url_v1):
+    _prepare_rulesets_and_rules(client, api_url_v1)
 
     response = client.get(f"{api_url_v1}/rulebooks")
     rulebook_id = response.data[0]["id"]
@@ -156,8 +155,8 @@ def test_list_rulesets_from_rulebook(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_rulesets(client: APIClient):
-    _prepare_rulesets_and_rules(client)
+def test_list_rulesets(client: APIClient, api_url_v1):
+    _prepare_rulesets_and_rules(client, api_url_v1)
 
     response = client.get(f"{api_url_v1}/rulesets")
     assert response.status_code == status.HTTP_200_OK
@@ -180,8 +179,8 @@ def test_list_rulesets(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_ruleset(client: APIClient):
-    _prepare_rulesets_and_rules(client)
+def test_retrieve_ruleset(client: APIClient, api_url_v1):
+    _prepare_rulesets_and_rules(client, api_url_v1)
     response = client.get(f"{api_url_v1}/rulesets")
     rulesets = response.data
 
@@ -192,8 +191,8 @@ def test_retrieve_ruleset(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_rules_from_ruleset(client: APIClient):
-    _prepare_rulesets_and_rules(client)
+def test_list_rules_from_ruleset(client: APIClient, api_url_v1):
+    _prepare_rulesets_and_rules(client, api_url_v1)
     response = client.get(f"{api_url_v1}/rulesets")
     rulesets = response.data
 
@@ -213,14 +212,14 @@ def test_list_rules_from_ruleset(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_ruleset_not_exist(client: APIClient):
+def test_retrieve_ruleset_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/rulesets/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_list_rules(client: APIClient):
-    _prepare_rulesets_and_rules(client)
+def test_list_rules(client: APIClient, api_url_v1):
+    _prepare_rulesets_and_rules(client, api_url_v1)
 
     response = client.get(f"{api_url_v1}/rules")
     assert response.status_code == status.HTTP_200_OK
@@ -240,8 +239,8 @@ def test_list_rules(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_rule(client: APIClient):
-    _prepare_rulesets_and_rules(client)
+def test_retrieve_rule(client: APIClient, api_url_v1):
+    _prepare_rulesets_and_rules(client, api_url_v1)
     response = client.get(f"{api_url_v1}/rules")
     rules = response.data
 
@@ -252,13 +251,13 @@ def test_retrieve_rule(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_rule_not_exist(client: APIClient):
+def test_retrieve_rule_not_exist(client: APIClient, api_url_v1):
     response = client.get(f"{api_url_v1}/rules/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def _prepare_rulesets_and_rules(client: APIClient):
+def _prepare_rulesets_and_rules(client: APIClient, api_url_v1):
     data_in = {
         "name": "test-rulebook.yml",
         "rulesets": TEST_RULESETS_SAMPLE,
