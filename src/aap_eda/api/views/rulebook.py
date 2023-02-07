@@ -25,7 +25,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import serializers
-from aap_eda.api.common.pagination import ListPagination
+from aap_eda.api.common.pagination import ListPagination, StandardPagination
 from aap_eda.api.services.rulebook import rule_out_data, ruleset_out_data
 from aap_eda.core import models
 
@@ -107,6 +107,7 @@ class RulesetViewSet(
 ):
     queryset = models.Ruleset.objects.all()
     serializer_class = serializers.RulesetSerializer
+    pagination_class = StandardPagination()
 
     @extend_schema(
         description="Get the ruleset by its id",
@@ -154,9 +155,13 @@ class RulesetViewSet(
     def rules(self, _request, pk):
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
         rules = models.Rule.objects.filter(ruleset=ruleset)
-        serializer = serializers.RuleSerializer(rules, many=True)
 
-        return Response(serializer.data)
+        serializer = serializers.RuleSerializer(rules, many=True)
+        results = self.pagination_class.paginate_queryset(
+            serializer.data, _request
+        )
+
+        return self.pagination_class.get_paginated_response(results)
 
 
 class RuleViewSet(

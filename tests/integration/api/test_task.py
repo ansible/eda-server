@@ -44,7 +44,7 @@ def test_list_tasks(list_jobs: mock.Mock, client: APIClient):
             },
         ),
     ]
-    response = client.get(f"{api_url_v1}/tasks")
+    response = client.get(f"{api_url_v1}/tasks/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == [
         {
@@ -77,7 +77,7 @@ def test_retrieve_task(get_job: mock.Mock, client: APIClient):
         enqueued_at="2023-01-25T15:24:47.123923",
     )
     response = client.get(
-        f"{api_url_v1}/tasks/6636aad2-7998-4376-bb4d-ef19796fd1b3"
+        f"{api_url_v1}/tasks/6636aad2-7998-4376-bb4d-ef19796fd1b3/"
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
@@ -95,7 +95,7 @@ def test_retrieve_task(get_job: mock.Mock, client: APIClient):
 def test_retrieve_task_not_exists(get_job: mock.Mock, client: APIClient):
     get_job.return_value = None
     response = client.get(
-        "{api_url_v1}/tasks/a13f539c-aaa1-46b6-80c3-7dbfad941292"
+        f"{api_url_v1}/tasks/a13f539c-aaa1-46b6-80c3-7dbfad941292/"
     )
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
