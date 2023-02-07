@@ -76,16 +76,16 @@ class ActivationViewSet(
     def retrieve(self, request, pk):
         activation = super().retrieve(request, pk)
         activation.data["project"] = (
-            models.Project.objects.get(pk=activation.data["project"])
-            if activation.data["project"]
+            models.Project.objects.get(pk=activation.data["project_id"])
+            if activation.data["project_id"]
             else None
         )
         activation.data["rulebook"] = models.Rulebook.objects.get(
-            pk=activation.data["rulebook"]
+            pk=activation.data["rulebook_id"]
         )
         activation.data["extra_var"] = (
-            models.ExtraVar.objects.get(pk=activation.data["extra_var"])
-            if activation.data["extra_var"]
+            models.ExtraVar.objects.get(pk=activation.data["extra_var_id"])
+            if activation.data["extra_var_id"]
             else None
         )
         activation.data[

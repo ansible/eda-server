@@ -34,18 +34,41 @@ TEST_ACTIVATION = {
     "restart_count": 0,
 }
 
+TEST_PROJECT = {
+    "name": "test-project-01",
+    "url": "https://git.example.com/acme/project-01",
+    "git_hash": "4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+}
+
+TEST_RULESETS = """
+---
+- name: hello
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - debug:
+        msg: hello
+"""
+
+TEST_EXTRA_VAR = """
+---
+collections:
+  - community.general
+  - benthomasson.eda
+"""
+
 
 def create_activation_related_data():
     project_id = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+        name=TEST_PROJECT["name"],
+        url=TEST_PROJECT["url"],
+        git_hash=TEST_PROJECT["git_hash"],
     ).pk
     rulebook_id = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets="..."
+        name="test-rulebook.yml", rulesets=TEST_RULESETS
     ).pk
     extra_var_id = models.ExtraVar.objects.create(
-        name="test-extra-var.yml", extra_var="..."
+        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     ).pk
 
     return {
@@ -77,10 +100,12 @@ def test_create_activation(client: APIClient):
     response = client.post("/eda/api/v1/activations", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
     assert_activation_base_data(
         data,
-        models.Activation(id=data["id"], **test_activation),
+        activation,
     )
+    assert_activation_related_object_fks(data, activation)
 
 
 @pytest.mark.django_db
@@ -128,7 +153,7 @@ def test_list_activations(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
     for data, activation in zip(response.data, activations):
         assert_activation_base_data(data, activation)
-        assert_activation_time_fields(data, activation)
+        assert_activation_related_object_fks(data, activation)
 
 
 @pytest.mark.django_db
@@ -138,8 +163,17 @@ def test_retrieve_activation(client: APIClient):
 
     response = client.get(f"/eda/api/v1/activations/{activation.id}")
     assert response.status_code == status.HTTP_200_OK
-    assert_activation_base_data(response.data, activation)
-    assert_activation_time_fields(response.data, activation)
+    data = response.data
+    assert_activation_base_data(data, activation)
+    assert data["project"]["id"] == activation.project.id
+    assert data["project"]["name"] == activation.project.name
+    assert data["project"]["url"] == activation.project.url
+
+    assert data["rulebook"]["id"] == activation.rulebook.id
+    assert data["rulebook"]["name"] == "test-rulebook.yml"
+
+    assert data["extra_var"]["id"] == activation.extra_var.id
+    assert data["extra_var"]["name"] == "test-extra-var.yml"
 
 
 @pytest.mark.django_db
@@ -160,37 +194,28 @@ def test_delete_activation(client: APIClient):
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
-def assert_activation_time_fields(
-    data: Dict[str, Any], activation: models.Activation
-):
-    data_dict = dict(data)
-    assert data_dict["created_at"] == activation.created_at.strftime(
-        DATETIME_FORMAT
-    )
-    assert data_dict["modified_at"] == activation.modified_at.strftime(
-        DATETIME_FORMAT
-    )
-
-
 def assert_activation_base_data(
     data: Dict[str, Any], activation: models.Activation
 ):
-    data_dict = dict(data)
-    assert data_dict["id"] == activation.id
-    assert data_dict["name"] == activation.name
-    assert data_dict["description"] == activation.description
-    assert data_dict["is_enabled"] == activation.is_enabled
-    assert data_dict["working_directory"] == activation.working_directory
-    assert (
-        data_dict["execution_environment"] == activation.execution_environment
+    assert data["id"] == activation.id
+    assert data["name"] == activation.name
+    assert data["description"] == activation.description
+    assert data["is_enabled"] == activation.is_enabled
+    assert data["working_directory"] == activation.working_directory
+    assert data["execution_environment"] == activation.execution_environment
+    assert data["restart_policy"] == activation.restart_policy
+    assert data["restart_count"] == activation.restart_count
+    assert data["created_at"] == activation.created_at.strftime(
+        DATETIME_FORMAT
     )
-    assert data_dict["restart_policy"] == activation.restart_policy
-    assert data_dict["restart_count"] == activation.restart_count
-    if type(data_dict["rulebook"]) == int:
-        assert data_dict["project"] == activation.project.id
-        assert data_dict["rulebook"] == activation.rulebook.id
-        assert data_dict["extra_var"] == activation.extra_var.id
-    else:
-        assert data_dict["project"]["id"] == activation.project.id
-        assert data_dict["rulebook"]["id"] == activation.rulebook.id
-        assert data_dict["extra_var"]["id"] == activation.extra_var.id
+    assert data["modified_at"] == activation.modified_at.strftime(
+        DATETIME_FORMAT
+    )
+
+
+def assert_activation_related_object_fks(
+    data: Dict[str, Any], activation: models.Activation
+):
+    assert data["project_id"] == activation.project.id
+    assert data["rulebook_id"] == activation.rulebook.id
+    assert data["extra_var_id"] == activation.extra_var.id
