@@ -105,7 +105,7 @@ def test_create_activation(client: APIClient):
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
-    response = client.post(f"{api_url_v1}/activations", data=test_activation)
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
@@ -124,7 +124,7 @@ def test_create_activation_bad_entity(client: APIClient):
         "is_enabled": True,
     }
     response = client.post(
-        f"{api_url_v1}/activations",
+        f"{api_url_v1}/activations/",
         data=test_activation,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -141,7 +141,7 @@ def test_update_activation(client: APIClient):
     }
 
     response = client.patch(
-        f"{api_url_v1}/activations/{activation.id}",
+        f"{api_url_v1}/activations/{activation.id}/",
         data=json.dumps(new_activation),
         content_type="application/json",
     )
@@ -157,9 +157,9 @@ def test_list_activations(client: APIClient):
     fks = create_activation_related_data()
     activations = [create_activation(fks)]
 
-    response = client.get(f"{api_url_v1}/activations")
+    response = client.get(f"{api_url_v1}/activations/")
     assert response.status_code == status.HTTP_200_OK
-    for data, activation in zip(response.data, activations):
+    for data, activation in zip(response.data["results"], activations):
         assert_activation_base_data(data, activation)
         assert_activation_related_object_fks(data, activation)
 
@@ -169,7 +169,7 @@ def test_retrieve_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.get(f"{api_url_v1}/activations/{activation.id}")
+    response = client.get(f"{api_url_v1}/activations/{activation.id}/")
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, activation)
@@ -183,7 +183,7 @@ def test_retrieve_activation(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_activation_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/activations/77")
+    response = client.get(f"{api_url_v1}/activations/77/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -192,7 +192,7 @@ def test_delete_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.delete(f"{api_url_v1}/activations/{activation.id}")
+    response = client.delete(f"{api_url_v1}/activations/{activation.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
