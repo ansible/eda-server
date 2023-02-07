@@ -34,5 +34,5 @@ from aap_eda.core import urls as core_urls
 
 urlpatterns = [
     path("", include(core_urls)),
-    path(f"{settings.API_PREFIX}/api/", include(api_urls)),
+    path(f"{settings.API_PREFIX}/", include(api_urls)),
 ]

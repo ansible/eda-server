@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from tests.integration.constants import api_url_v1
 
 TEST_PLAYBOOK = """
 ---
@@ -17,7 +18,7 @@ def test_list_playbooks(client: APIClient):
     obj = models.Playbook.objects.create(
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
-    response = client.get("/eda/api/v1/playbooks")
+    response = client.get(f"{api_url_v1}/playbooks")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == [
         {
@@ -34,7 +35,7 @@ def test_retrieve_playbook(client: APIClient):
     obj = models.Playbook.objects.create(
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
-    response = client.get(f"/eda/api/v1/playbooks/{obj.id}")
+    response = client.get(f"{api_url_v1}/playbooks/{obj.id}")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
         "id": obj.id,
@@ -46,7 +47,7 @@ def test_retrieve_playbook(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_playbook_not_exist(client: APIClient):
-    response = client.get("/eda/api/v1/playbooks/42")
+    response = client.get(f"{api_url_v1}/playbooks/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -56,7 +57,7 @@ def test_create_playbook_not_allowed(client: APIClient):
         "name": "test-playbook.yml",
         "playbook": TEST_PLAYBOOK,
     }
-    response = client.post("/eda/api/v1/playbooks", data=data_in)
+    response = client.post(f"{api_url_v1}/playbooks", data=data_in)
     assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
@@ -65,5 +66,5 @@ def test_destroy_playbook_not_allowed(client: APIClient):
     obj = models.Playbook.objects.create(
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
-    response = client.delete(f"/eda/api/v1/playbooks/{obj.id}")
+    response = client.delete(f"{api_url_v1}/playbooks/{obj.id}")
     assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
