@@ -244,14 +244,21 @@ With docker compose:
 task docker -- up -d api
 ```
 
-
-
 #### Running tests
 
-Locally:
-
+Run all tests:
 ```
 task test
+```
+
+Run a single module:
+```
+task test -- tests/integration/api/test_activation.py
+```
+
+Run a single test:
+```
+task test -- tests/integration/api/test_activation.py::test_retrieve_activation
 ```
 
 With docker compose:
