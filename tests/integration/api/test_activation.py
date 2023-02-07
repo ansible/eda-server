@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import RestartPolicy
+from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
     "name": "test-activation",
@@ -152,7 +153,7 @@ def test_update_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_activations(client: APIClient, api_url_v1):
+def test_list_activations(client: APIClient):
     fks = create_activation_related_data()
     activations = [create_activation(fks)]
 
@@ -164,7 +165,7 @@ def test_list_activations(client: APIClient, api_url_v1):
 
 
 @pytest.mark.django_db
-def test_retrieve_activation(client: APIClient, api_url_v1):
+def test_retrieve_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
@@ -181,17 +182,17 @@ def test_retrieve_activation(client: APIClient, api_url_v1):
 
 
 @pytest.mark.django_db
-def test_retrieve_activation_not_exist(client: APIClient, api_url_v1):
+def test_retrieve_activation_not_exist(client: APIClient):
     response = client.get(f"{api_url_v1}/activations/77")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_delete_activation(client: APIClient, api_url_v1):
+def test_delete_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.delete(f"/eda/api/v1/activations/{activation.id}")
+    response = client.delete(f"{api_url_v1}/activations/{activation.id}")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 

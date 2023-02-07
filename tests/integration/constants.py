@@ -1,5 +1,3 @@
-import pytest
-
 #  Copyright 2023 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +12,4 @@ import pytest
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-
-@pytest.fixture(scope="session")
-def api_url_v1():
-    return "/api/eda/v1"
+api_url_v1 = "/api/eda/v1"

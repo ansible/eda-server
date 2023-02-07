@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from tests.integration.constants import api_url_v1
 
 TEST_PLAYBOOK = """
 ---
@@ -13,7 +14,7 @@ TEST_PLAYBOOK = """
 
 
 @pytest.mark.django_db
-def test_list_playbooks(client: APIClient, api_url_v1):
+def test_list_playbooks(client: APIClient):
     obj = models.Playbook.objects.create(
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
@@ -30,7 +31,7 @@ def test_list_playbooks(client: APIClient, api_url_v1):
 
 
 @pytest.mark.django_db
-def test_retrieve_playbook(client: APIClient, api_url_v1):
+def test_retrieve_playbook(client: APIClient):
     obj = models.Playbook.objects.create(
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
@@ -45,13 +46,13 @@ def test_retrieve_playbook(client: APIClient, api_url_v1):
 
 
 @pytest.mark.django_db
-def test_retrieve_playbook_not_exist(client: APIClient, api_url_v1):
+def test_retrieve_playbook_not_exist(client: APIClient):
     response = client.get(f"{api_url_v1}/playbooks/42")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_create_playbook_not_allowed(client: APIClient, api_url_v1):
+def test_create_playbook_not_allowed(client: APIClient):
     data_in = {
         "name": "test-playbook.yml",
         "playbook": TEST_PLAYBOOK,
@@ -61,7 +62,7 @@ def test_create_playbook_not_allowed(client: APIClient, api_url_v1):
 
 
 @pytest.mark.django_db
-def test_destroy_playbook_not_allowed(client: APIClient, api_url_v1):
+def test_destroy_playbook_not_allowed(client: APIClient):
     obj = models.Playbook.objects.create(
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
