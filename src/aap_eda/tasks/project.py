@@ -13,18 +13,28 @@
 #  limitations under the License.
 
 import logging
-from typing import Optional
 
 from aap_eda.core.tasking import job
+from aap_eda.services.project import ProjectImportService
 
 logger = logging.getLogger(__name__)
 
 
 @job
-def import_project(name: str, url: str, description: Optional[str] = None):
-    logger.info(f"[Task]: Import project ( {name=} {url=} {description=} )")
+def import_project(name: str, url: str, description: str = ""):
+    logger.info(
+        f"Task started: Import project ( {name=} {url=} {description=} )"
+    )
+    project = ProjectImportService().run(
+        name=name,
+        url=url,
+        description=description,
+    )
+    logger.info(f"Task complete: Import project ( project_id={project.id} )")
+    return {"project_id": project.id}
 
 
 @job
 def sync_project(project_id: int):
-    logger.info(f"[Task]: Sync project ( {project_id=} )")
+    logger.info(f"Task started: Sync project ( {project_id=} )")
+    raise NotImplementedError
