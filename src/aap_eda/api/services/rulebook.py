@@ -60,7 +60,7 @@ def expand_ruleset_sources(rulebook_data: dict) -> dict:
 def ruleset_out_data(ruleset: models.Ruleset) -> dict:
     data = serializers.RulesetSerializer(ruleset).data
 
-    data["source_types"] = [src["type"] for src in (data["sources"] or [])]
+    data["source_types"] = [src.get("type") for src in (data["sources"] or [])]
     data["rule_count"] = models.Rule.objects.filter(
         ruleset_id=ruleset.id
     ).count()

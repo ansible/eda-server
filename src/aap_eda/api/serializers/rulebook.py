@@ -36,12 +36,6 @@ class RulebookSerializer(serializers.ModelSerializer):
         help_text="The contained rulesets in the rulebook",
     )
 
-    project = serializers.IntegerField(
-        required=False,
-        allow_null=True,
-        help_text="ID of the project",
-    )
-
     class Meta:
         model = models.Rulebook
         fields = "__all__"
