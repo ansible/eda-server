@@ -1,6 +1,6 @@
 resources:
 - ./eda-api
 - ./eda-worker
-- ./eda-standalone-ui
+- ./nginx
 - ./postgres
 - ./redis

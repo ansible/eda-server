@@ -4,11 +4,9 @@ metadata:
   name: eda-api
 spec:
   ports:
-    - name: "8000"
+    - protocol: TCP
       port: 8000
       targetPort: 8000
   selector:
     app: eda
     comp: api
-status:
-  loadBalancer: {}

@@ -49,15 +49,14 @@ help() {
 build-deployment() {
   local _api_image="aap-eda:${1}"
   local _ngx_image="eda-nginx:${1}"
+  local _temp_dir="${DEPLOY_DIR}"/temp
 
   log-info "Using Deployment Directory: ${DEPLOY_DIR}/temp"
 
-  if [ -d "${DEPLOY_DIR}"/temp ]; then
-    rm -rf "${DEPLOY_DIR}"/temp
-    mkdir "${DEPLOY_DIR}"/temp
-  else
-    mkdir "${DEPLOY_DIR}"/temp
+  if [ -d "${_temp_dir}" ]; then
+    rm -rf "${_temp_dir}"
   fi
+  mkdir "${_temp_dir}"
 
   cd "${DEPLOY_DIR}"/eda-api
   log-debug "kustomize edit set image aap-eda=${_api_image}"
@@ -75,20 +74,33 @@ build-deployment() {
 build-eda-image() {
   local _image="aap-eda:${1}"
 
-  log-info "minikube image build . -t ${_image} -f tools/docker/Dockerfile"
+  log-info "Building aap-eda image"
+  log-debug "minikube image build . -t ${_image} -f tools/docker/Dockerfile"
   minikube image build . -t "${_image}" -f tools/docker/Dockerfile
 }
 
 build-nginx-image() {
   local _image="eda-nginx:${1}"
+  local _temp_dir=./tmp
 
-  log-info "minikube image build . -t ${_image} -f tools/docker/nginx/Dockerfile"
+  if [ -d "${_temp_dir}" ]; then
+    rm -rf "${_temp_dir}"
+  fi
+  mkdir "${_temp_dir}"
+
+  log-info "Clone ansible-ui"
+  log-debug "git clone git@github.com:ansible/ansible-ui.git ${_temp_dir}/ansible-ui"
+  git clone git@github.com:ansible/ansible-ui.git "${_temp_dir}"/ansible-ui
+
+  log-info "Build eda-nginx image"
+  log-debug "minikube image build . -t ${_image} -f tools/docker/nginx/Dockerfile"
   minikube image build . -t "${_image}" -f tools/docker/nginx/Dockerfile
+  rm -rf "${_temp_dir}"
 }
 
 build-all() {
   build-eda-image "${1}"
-#  build-nginx-image "${1}"
+  build-nginx-image "${1}"
   build-deployment "${1}"
 }
 
@@ -143,6 +155,10 @@ clean-deployment() {
   else
     log-debug "${NAMESPACE} does not exist"
   fi
+
+  for image in  redis:7 postgres:13 aap-eda:latest eda-nginx:latest; do
+    remove-image "${image}"
+  done
 
   remove-deployment-tempdir
 }

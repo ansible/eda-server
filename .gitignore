@@ -5,8 +5,9 @@ __pycache__/
 /dist/
 .venv/
 
-# deployment temp dir
+# temp dirs
 /tools/deploy/temp/
+/tmp/
 
 # IDE
-/.idea/
+/.idea
