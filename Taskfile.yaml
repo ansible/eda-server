@@ -219,13 +219,6 @@ tasks:
         vars:
           CLI_ARGS: port-forward-api {{.CLI_ARGS}}
 
-  minikube:fp:ngx:
-    desc: "Forward local port to api instance port in minikube"
-    cmds:
-      - task: minikube
-        vars:
-          CLI_ARGS: port-forward-ngx {{.CLI_ARGS}}
-
   minikube:logs:api:
     desc: "Get eda-api server pod logs"
     cmds:

@@ -206,8 +206,6 @@ case ${CMD} in
   "deploy") deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api 8000 ;;
   "port-forward-ui") port-forward-ui 8080 ;;
-  "add-dev-user") add-dev-user ;;
-  "load-rbac-data") load-rbac-data ;;
   "eda-api-logs") get-eda-api-logs ;;
   "help") usage ;;
    *) usage ;;
