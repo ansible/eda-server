@@ -5,5 +5,9 @@ __pycache__/
 /dist/
 .venv/
 
-# IDE projects
-.idea/
+# temp dirs
+/tools/deploy/temp/
+/tmp/
+
+# IDE
+/.idea

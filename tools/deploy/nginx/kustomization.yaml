@@ -1,0 +1,12 @@
+commonLabels:
+  app: eda
+  comp: ui
+resources:
+- deployment.yaml
+- service.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: ngx-server
+  newName: eda-nginx
+  newTag: latest

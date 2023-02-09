@@ -1,0 +1,6 @@
+resources:
+- ./eda-api
+- ./eda-worker
+- ./nginx
+- ./postgres
+- ./redis

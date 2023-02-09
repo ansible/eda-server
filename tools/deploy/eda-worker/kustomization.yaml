@@ -1,0 +1,11 @@
+commonLabels:
+  app: eda
+  comp: worker
+resources:
+- deployment.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: aap-eda
+  newName: aap-eda
+  newTag: latest

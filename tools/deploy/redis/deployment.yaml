@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda
+      comp: redis
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: eda
+        comp: redis
+    spec:
+      containers:
+        - env: []
+          image: docker.io/library/redis:7
+          name: redis
+          ports:
+            - containerPort: 6379
+          resources: {}
+      restartPolicy: Always
+status: {}

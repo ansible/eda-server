@@ -7,6 +7,7 @@ vars:
   DOCKER_COMPOSE: '{{ default "docker-compose" .DOCKER_COMPOSE }}'
   DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose.yaml" .DOCKER_COMPOSE_ARGS }}'
   PYTEST_CMD: "poetry run python -m pytest"
+  MINIKUBE_CMD: "scripts/eda_kube.sh"
 
 tasks:
   default:
@@ -145,6 +146,13 @@ tasks:
         vars:
           CLI_ARGS: up --detach postgres
 
+  docker:migrate:
+    desc: "Apply database migrations."
+    cmds:
+      - task: docker
+        vars:
+          CLI_ARGS: run --rm api aap-eda-manage migrate
+
   docker:down:
     desc: "Stop all services."
     cmds:
@@ -166,9 +174,68 @@ tasks:
         vars:
           CLI_ARGS: exec postgres psql -U postgres eda
 
-  docker:migrate:
-    desc: "Apply database migrations."
+  minikube:
+    desc: "Run eda_kube.sh with specified CLI arguments."
+    summary: |
+      Run eda.sh with specified CLI arguments.
+
+      Example:
+        $ task minikube -- build
     cmds:
-      - task: docker
+      - '{{.MINIKUBE_CMD}} {{.CLI_ARGS}}'
+
+  minikube:build:
+    desc: "Build docker image and push to minikube"
+    cmds:
+      - task: minikube
         vars:
-          CLI_ARGS: run --rm api aap-eda-manage migrate
+          CLI_ARGS: build {{.CLI_ARGS}}
+
+  minikube:deploy:
+    desc: "Build deployment and deploy to minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: deploy {{.CLI_ARGS}}
+
+  minikube:clean:
+    desc: "Clean deployment directory and clean minikube resources"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: clean {{.CLI_ARGS}}
+
+  minikube:fp:ui:
+    desc: "Forward local port to ui instance port in minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: port-forward-ui {{.CLI_ARGS}}
+
+  minikube:fp:api:
+    desc: "Forward local port to api instance port in minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: port-forward-api {{.CLI_ARGS}}
+
+  minikube:fp:ngx:
+    desc: "Forward local port to api instance port in minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: port-forward-ngx {{.CLI_ARGS}}
+
+  minikube:logs:api:
+    desc: "Get eda-api server pod logs"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: eda-api-logs {{.CLI_ARGS}}
+
+  minikube:all:
+    desc: "clean, build, deploy"
+    cmds:
+      - task: minikube:clean
+      - task: minikube:build
+      - task: minikube:deploy
