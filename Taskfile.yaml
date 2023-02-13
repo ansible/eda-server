@@ -219,12 +219,12 @@ tasks:
         vars:
           CLI_ARGS: port-forward-api {{.CLI_ARGS}}
 
-  minikube:logs:api:
-    desc: "Get eda-api server pod logs"
+  minikube:logs:eda:
+    desc: "Stream logs for EDA application"
     cmds:
       - task: minikube
         vars:
-          CLI_ARGS: eda-api-logs {{.CLI_ARGS}}
+          CLI_ARGS: eda-logs {{.CLI_ARGS}}
 
   minikube:all:
     desc: "clean, build, deploy"
