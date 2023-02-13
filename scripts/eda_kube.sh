@@ -38,7 +38,7 @@ usage() {
     log-info "\t clean                        remove deployment directory and all EDA resource from minikube"
     log-info "\t port-forward-api             forward local port to EDA API (default: 8000)"
     log-info "\t port-forward-ui              forward local port to EDA UI (default: 8080)"
-    log-info "\t eda-api-logs                 get eda-api pod logs"
+    log-info "\t eda-logs                     stream logs for all container in eda application"
     log-info "\t help                         show usage"
 }
 
@@ -190,11 +190,9 @@ port-forward-api() {
   port-forward "${_svc_name}" "${_local_port}" "${_svc_port}"
 }
 
-get-eda-api-logs() {
-  local _pod_name=$(kubectl get pod -l comp=api -o jsonpath="{.items[0].metadata.name}")
-
-  log-debug "kubectl logs ${_pod_name} -f"
-  kubectl logs "${_pod_name}" -f
+get-eda-logs() {
+  log-debug "kubectl logs -n ${NAMESPACE} -l app=eda -f"
+  kubectl logs -n "${NAMESPACE}" -l app=eda -f
 }
 
 #
@@ -206,7 +204,7 @@ case ${CMD} in
   "deploy") deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api 8000 ;;
   "port-forward-ui") port-forward-ui 8080 ;;
-  "eda-api-logs") get-eda-api-logs ;;
+  "eda-logs") get-eda-logs ;;
   "help") usage ;;
    *) usage ;;
 esac
