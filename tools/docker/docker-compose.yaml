@@ -55,7 +55,7 @@ services:
     environment:
       EDA_DB_HOST: 'postgres'
       EDA_MQ_HOST: 'redis'
-    command: ['aap-eda-manage', 'rqworker', '--worker-class', 'aap_eda.tasking.Worker']
+    command: ['aap-eda-manage', 'rqworker', '--worker-class', 'aap_eda.core.tasking.Worker']
     volumes:
       - '../../:/app/src'
     depends_on:
