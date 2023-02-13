@@ -18,15 +18,14 @@ from rest_framework import pagination
 from rest_framework.response import Response
 from rest_framework.utils.urls import remove_query_param, replace_query_param
 
+from aap_eda.settings.default import REST_FRAMEWORK
+
 logger = logging.getLogger()
 
 
 class StandardPagination(pagination.PageNumberPagination):
-    def get_count(self, queryset):
-        try:
-            return queryset.count()
-        except (AttributeError, TypeError):
-            return len(queryset)
+    page_size_query_param = "page_size"
+    max_page_size = REST_FRAMEWORK["MAX_PAGE_SIZE"]
 
     def get_next_link(self):
         if not self.page.has_next():
@@ -35,8 +34,9 @@ class StandardPagination(pagination.PageNumberPagination):
         url = self.request and self.request.get_full_path() or ""
         url = url.encode("utf-8")
 
-        page = self.page.number + self.page_size
-        return replace_query_param(url, self.page_query_param, page)
+        return replace_query_param(
+            url, self.page_query_param, self.page.next_page_number()
+        )
 
     def get_previous_link(self):
         if not self.page.has_previous():
@@ -45,19 +45,19 @@ class StandardPagination(pagination.PageNumberPagination):
         url = self.request and self.request.get_full_path() or ""
         url = url.encode("utf-8")
 
-        page = self.page.number - self.page_size
-        if page <= 0:
+        previous_page = self.page.previous_page_number()
+        if previous_page <= 0:
             return remove_query_param(url, self.page_query_param)
-        return replace_query_param(url, self.page_query_param, page)
+        return replace_query_param(url, self.page_query_param, previous_page)
 
     def get_paginated_response(self, data):
         return Response(
             {
-                "count": self.get_count(data),
+                "count": self.page.paginator.count,
                 "next": self.get_next_link(),
                 "previous": self.get_previous_link(),
-                "page_size": self.page_size,
-                "page_number": self.page.number,
+                "page_size": self.get_page_size(self.request),
+                "page": self.page.number,
                 "results": data,
             }
         )
@@ -74,29 +74,29 @@ class StandardPagination(pagination.PageNumberPagination):
                     "type": "string",
                     "nullable": True,
                     "format": "uri",
-                    "example": "/eda/api/v1/example/?{offset_param}=50&{limit_param}=100".format(  # noqa
-                        offset_param=self.page_query_param,
-                        limit_param=self.page_size_query_param,
+                    "example": "/eda/api/v1/example/?{page_param}=50&{page_size_param}=100".format(  # noqa
+                        page_size_param=self.page_size_query_param,
+                        page_param=self.page_query_param,
                     ),
                 },
                 "previous": {
                     "type": "string",
                     "nullable": True,
                     "format": "uri",
-                    "example": "/eda/api/v1/example/?{offset_param}=50&{limit_param}=100".format(  # noqa
-                        offset_param=self.page_query_param,
-                        limit_param=self.page_size_query_param,
+                    "example": "/eda/api/v1/example/?{page_param}=50&{page_size_param}=100".format(  # noqa
+                        page_size_param=self.page_size_query_param,
+                        page_param=self.page_query_param,
                     ),
                 },
                 "page_size": {
                     "type": "integer",
                     "nullable": True,
-                    "example": self.page_size_query_param,
+                    "example": 100,
                 },
-                "page_number": {
+                "page": {
                     "type": "integer",
                     "nullable": True,
-                    "example": self.page_query_param,
+                    "example": 50,
                 },
                 "results": schema,
             },
