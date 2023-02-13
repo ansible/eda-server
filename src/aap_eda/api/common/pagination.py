@@ -21,37 +21,43 @@ from rest_framework.utils.urls import remove_query_param, replace_query_param
 logger = logging.getLogger()
 
 
-class StandardPagination(pagination.LimitOffsetPagination):
+class StandardPagination(pagination.PageNumberPagination):
+    def get_count(self, queryset):
+        try:
+            return queryset.count()
+        except (AttributeError, TypeError):
+            return len(queryset)
+
     def get_next_link(self):
-        if self.offset + self.limit >= self.count:
+        if not self.page.has_next():
             return None
 
         url = self.request and self.request.get_full_path() or ""
         url = url.encode("utf-8")
 
-        offset = self.offset + self.limit
-        return replace_query_param(url, self.offset_query_param, offset)
+        page = self.page.number + self.page_size
+        return replace_query_param(url, self.page_query_param, page)
 
     def get_previous_link(self):
-        if self.offset <= 0:
+        if not self.page.has_previous():
             return None
 
         url = self.request and self.request.get_full_path() or ""
         url = url.encode("utf-8")
 
-        offset = self.offset - self.limit
-        if offset <= 0:
-            return remove_query_param(url, self.offset_query_param)
-        return replace_query_param(url, self.offset_query_param, offset)
+        page = self.page.number - self.page_size
+        if page <= 0:
+            return remove_query_param(url, self.page_query_param)
+        return replace_query_param(url, self.page_query_param, page)
 
     def get_paginated_response(self, data):
         return Response(
             {
-                "count": self.count,
+                "count": self.get_count(data),
                 "next": self.get_next_link(),
                 "previous": self.get_previous_link(),
-                "limit": self.limit,
-                "offset": self.offset,
+                "page_size": self.page_size,
+                "page_number": self.page.number,
                 "results": data,
             }
         )
@@ -69,8 +75,8 @@ class StandardPagination(pagination.LimitOffsetPagination):
                     "nullable": True,
                     "format": "uri",
                     "example": "/eda/api/v1/example/?{offset_param}=50&{limit_param}=100".format(  # noqa
-                        offset_param=self.offset_query_param,
-                        limit_param=self.limit_query_param,
+                        offset_param=self.page_query_param,
+                        limit_param=self.page_size_query_param,
                     ),
                 },
                 "previous": {
@@ -78,38 +84,20 @@ class StandardPagination(pagination.LimitOffsetPagination):
                     "nullable": True,
                     "format": "uri",
                     "example": "/eda/api/v1/example/?{offset_param}=50&{limit_param}=100".format(  # noqa
-                        offset_param=self.offset_query_param,
-                        limit_param=self.limit_query_param,
+                        offset_param=self.page_query_param,
+                        limit_param=self.page_size_query_param,
                     ),
                 },
-                "limit": {
+                "page_size": {
                     "type": "integer",
                     "nullable": True,
-                    "example": self.limit_query_param,
+                    "example": self.page_size_query_param,
                 },
-                "offset": {
+                "page_number": {
                     "type": "integer",
                     "nullable": True,
-                    "example": self.offset_query_param,
+                    "example": self.page_query_param,
                 },
                 "results": schema,
             },
         }
-
-
-class ListPagination(StandardPagination):
-    def __init__(self, data, request):
-        self.data = data
-        self.count = len(self.data)
-        self.request = request
-        self.offset = self.get_offset(request)
-        self.limit = self.get_limit(request)
-
-    @property
-    def paginate_data(self):
-        max_index = min(self.limit, self.count)
-        try:
-            paginated_data = self.data[self.offset : self.offset + max_index]
-        except IndexError:
-            paginated_data = []
-        return paginated_data

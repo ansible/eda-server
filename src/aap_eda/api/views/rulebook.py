@@ -24,8 +24,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import serializers
-from aap_eda.api.common.pagination import ListPagination, StandardPagination
+from aap_eda.api import common, serializers
 from aap_eda.api.services.rulebook import rule_out_data, ruleset_out_data
 from aap_eda.core import models
 
@@ -65,6 +64,7 @@ class RulebookViewSet(
 ):
     queryset = models.Rulebook.objects.all()
     serializer_class = serializers.RulebookSerializer
+    pagination_class = common.StandardPagination
 
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
@@ -83,10 +83,9 @@ class RulebookViewSet(
             data = ruleset_out_data(ruleset)
             result.append(data)
 
-        paginator = ListPagination(result, request)
-        result = paginator.paginate_data
+        result = self.paginate_queryset(result)
 
-        return paginator.get_paginated_response(result)
+        return self.get_paginated_response(result)
 
     @extend_schema(
         description="Get the JSON format of a rulebook by its id",
@@ -107,7 +106,7 @@ class RulesetViewSet(
 ):
     queryset = models.Ruleset.objects.all()
     serializer_class = serializers.RulesetSerializer
-    pagination_class = StandardPagination()
+    pagination_class = common.StandardPagination
 
     @extend_schema(
         description="Get the ruleset by its id",
@@ -141,10 +140,9 @@ class RulesetViewSet(
             data = ruleset_out_data(ruleset)
             result.append(data)
 
-        paginator = ListPagination(result, _request)
-        result = paginator.paginate_data
+        result = self.paginate_queryset(result)
 
-        return paginator.get_paginated_response(result)
+        return self.get_paginated_response(result)
 
     @extend_schema(
         description="Rule list of a ruleset by its id",
@@ -156,12 +154,10 @@ class RulesetViewSet(
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
         rules = models.Rule.objects.filter(ruleset=ruleset)
 
-        serializer = serializers.RuleSerializer(rules, many=True)
-        results = self.pagination_class.paginate_queryset(
-            serializer.data, _request
-        )
+        results = self.paginate_queryset(rules)
+        serializer = serializers.RuleSerializer(results, many=True)
 
-        return self.pagination_class.get_paginated_response(results)
+        return self.get_paginated_response(serializer.data)
 
 
 class RuleViewSet(
@@ -202,7 +198,6 @@ class RuleViewSet(
             data = rule_out_data(rule)
             result.append(data)
 
-        paginator = ListPagination(result, _request)
-        result = paginator.paginate_data
+        result = self.paginate_queryset(result)
 
-        return paginator.get_paginated_response(result)
+        return self.get_paginated_response(result)

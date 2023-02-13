@@ -21,7 +21,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, serializers
+from aap_eda.api import common, exceptions as api_exc, serializers
 from aap_eda.core import models
 
 
@@ -54,6 +54,7 @@ class ActivationViewSet(
 ):
     queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
+    pagination_class = common.StandardPagination
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -133,10 +134,12 @@ class ActivationViewSet(
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
         )
+
+        activation_instances = self.paginate_queryset(activation_instances)
         serializer = serializers.ActivationInstanceSerializer(
             activation_instances, many=True
         )
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+        return self.get_paginated_response(serializer.data)
 
 
 @extend_schema_view(
@@ -172,6 +175,7 @@ class ActivationInstanceViewSet(
 ):
     queryset = models.ActivationInstance.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
+    pagination_class = common.StandardPagination
 
     @extend_schema(
         description="List all logs for the Activation Instance",
@@ -191,7 +195,12 @@ class ActivationInstanceViewSet(
         activation_instance_logs = models.ActivationInstanceLog.objects.filter(
             activation_instance_id=pk
         )
+
+        activation_instance_logs = self.paginate_queryset(
+            activation_instance_logs
+        )
+
         serializer = serializers.ActivationInstanceLogSerializer(
             activation_instance_logs, many=True
         )
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+        return self.get_paginated_response(serializer.data)
