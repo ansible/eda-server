@@ -48,6 +48,9 @@ class Project(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
     large_data_id = OIDField(null=True)
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name})"
+
 
 class Playbook(models.Model):
     class Meta:

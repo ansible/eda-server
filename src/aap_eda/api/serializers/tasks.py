@@ -16,6 +16,8 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 from rq.job import JobStatus
 
+from aap_eda.core.tasking import Job
+
 
 class TaskRefSerializer(serializers.Serializer):
     id = serializers.UUIDField()
@@ -30,19 +32,15 @@ class TaskRefSerializer(serializers.Serializer):
 
 class TaskSerializer(serializers.Serializer):
     id = serializers.UUIDField()
-    status = serializers.ChoiceField(choices=[x.value for x in JobStatus])
+    status = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(allow_null=True)
     enqueued_at = serializers.DateTimeField(allow_null=True)
     started_at = serializers.DateTimeField(allow_null=True)
-    finished_at = serializers.DateTimeField(allow_null=True)
+    finished_at = serializers.DateTimeField(allow_null=True, source="ended_at")
+    result = serializers.JSONField()
 
-    def to_representation(self, instance):
-        data = instance.to_dict()
-        return {
-            "id": instance.id,
-            "status": data["status"],
-            "created_at": data["created_at"] or None,
-            "enqueued_at": data["enqueued_at"] or None,
-            "started_at": data["started_at"] or None,
-            "finished_at": data["ended_at"] or None,
-        }
+    @extend_schema_field(
+        serializers.ChoiceField(choices=[x.value for x in JobStatus])
+    )
+    def get_status(self, instance: Job) -> str:
+        return instance.get_status()
