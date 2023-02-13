@@ -12,26 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-
 from rest_framework import pagination
 from rest_framework.response import Response
 from rest_framework.utils.urls import remove_query_param, replace_query_param
 
-from aap_eda.settings.default import REST_FRAMEWORK
-
-logger = logging.getLogger()
-
 
 class StandardPagination(pagination.PageNumberPagination):
     page_size_query_param = "page_size"
-    max_page_size = REST_FRAMEWORK["MAX_PAGE_SIZE"]
 
     def get_next_link(self):
         if not self.page.has_next():
             return None
 
-        url = self.request and self.request.get_full_path() or ""
+        url = ""
+        if self.request:
+            url = self.request.get_full_path()
         url = url.encode("utf-8")
 
         return replace_query_param(
@@ -42,7 +37,9 @@ class StandardPagination(pagination.PageNumberPagination):
         if not self.page.has_previous():
             return None
 
-        url = self.request and self.request.get_full_path() or ""
+        url = ""
+        if self.request:
+            url = self.request.get_full_path()
         url = url.encode("utf-8")
 
         previous_page = self.page.previous_page_number()
@@ -63,6 +60,14 @@ class StandardPagination(pagination.PageNumberPagination):
         )
 
     def get_paginated_response_schema(self, schema):
+        next_page_url = (
+            f"/eda/api/v1/example/"
+            f"?{self.page_query_param}=51&{self.page_size_query_param}=100"
+        )
+        prev_page_url = (
+            f"/eda/api/v1/example/"
+            f"?{self.page_query_param}=49&{self.page_size_query_param}=100"
+        )
         return {
             "type": "object",
             "properties": {
@@ -74,19 +79,13 @@ class StandardPagination(pagination.PageNumberPagination):
                     "type": "string",
                     "nullable": True,
                     "format": "uri",
-                    "example": "/eda/api/v1/example/?{page_param}=50&{page_size_param}=100".format(  # noqa
-                        page_size_param=self.page_size_query_param,
-                        page_param=self.page_query_param,
-                    ),
+                    "example": next_page_url,
                 },
                 "previous": {
                     "type": "string",
                     "nullable": True,
                     "format": "uri",
-                    "example": "/eda/api/v1/example/?{page_param}=50&{page_size_param}=100".format(  # noqa
-                        page_size_param=self.page_size_query_param,
-                        page_param=self.page_query_param,
-                    ),
+                    "example": prev_page_url,
                 },
                 "page_size": {
                     "type": "integer",

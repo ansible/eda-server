@@ -183,12 +183,12 @@ def test_list_rulesets(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_ruleset(client: APIClient):
     _prepare_rulesets_and_rules(client)
+    # TODO: Refactor to not call list when testing retrieve
     response = client.get(f"{api_url_v1}/rulesets/")
     rulesets = response.data
 
-    response = client.get(
-        f"{api_url_v1}/rulesets/{rulesets['results'][0]['id']}/"
-    )
+    ruleset_id = rulesets["results"][0]["id"]
+    response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "Test sample 001"
@@ -197,12 +197,12 @@ def test_retrieve_ruleset(client: APIClient):
 @pytest.mark.django_db
 def test_list_rules_from_ruleset(client: APIClient):
     _prepare_rulesets_and_rules(client)
+    # TODO: Refactor to not call list when testing retrieve
     response = client.get(f"{api_url_v1}/rulesets/")
     rulesets = response.data
 
-    response = client.get(
-        f"{api_url_v1}/rulesets/{rulesets['results'][0]['id']}/rules/"
-    )
+    ruleset_id = rulesets["results"][0]["id"]
+    response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/rules/")
     assert response.status_code == status.HTTP_200_OK
 
     rules = response.data["results"]
@@ -247,10 +247,12 @@ def test_list_rules(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_rule(client: APIClient):
     _prepare_rulesets_and_rules(client)
+    # TODO: Refactor to not call list when testing retrieve
     response = client.get(f"{api_url_v1}/rules/")
     rules = response.data
 
-    response = client.get(f"{api_url_v1}/rules/{rules['results'][0]['id']}/")
+    rule_id = rules["results"][0]["id"]
+    response = client.get(f"{api_url_v1}/rules/{rule_id}/")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "r1"
@@ -264,6 +266,7 @@ def test_retrieve_rule_not_exist(client: APIClient):
 
 @pytest.mark.django_db
 def _prepare_rulesets_and_rules(client: APIClient):
+    # TODO: Refactor to not use API to populate database with initial data
     data_in = {
         "name": "test-rulebook.yml",
         "rulesets": TEST_RULESETS_SAMPLE,

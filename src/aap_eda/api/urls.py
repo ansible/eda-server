@@ -23,7 +23,7 @@ from rest_framework import routers
 
 from . import views
 
-router = routers.SimpleRouter(trailing_slash=True)
+router = routers.SimpleRouter()
 router.register("extra-vars", views.ExtraVarViewSet)
 router.register("playbooks", views.PlaybookViewSet)
 router.register("projects", views.ProjectViewSet)
