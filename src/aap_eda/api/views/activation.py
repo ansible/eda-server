@@ -21,7 +21,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import common, exceptions as api_exc, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 
 
@@ -54,7 +54,6 @@ class ActivationViewSet(
 ):
     queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
-    pagination_class = common.StandardPagination
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -175,7 +174,6 @@ class ActivationInstanceViewSet(
 ):
     queryset = models.ActivationInstance.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
-    pagination_class = common.StandardPagination
 
     @extend_schema(
         description="List all logs for the Activation Instance",

@@ -24,7 +24,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import common, serializers
+from aap_eda.api import serializers
 from aap_eda.api.services.rulebook import rule_out_data, ruleset_out_data
 from aap_eda.core import models
 
@@ -64,7 +64,6 @@ class RulebookViewSet(
 ):
     queryset = models.Rulebook.objects.all()
     serializer_class = serializers.RulebookSerializer
-    pagination_class = common.StandardPagination
 
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
@@ -106,7 +105,6 @@ class RulesetViewSet(
 ):
     queryset = models.Ruleset.objects.all()
     serializer_class = serializers.RulesetSerializer
-    pagination_class = common.StandardPagination
 
     @extend_schema(
         description="Get the ruleset by its id",
