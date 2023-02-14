@@ -20,15 +20,14 @@ from aap_eda.core import models
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
-        fields = [
+        read_only_fields = [
             "id",
             "url",
-            "name",
-            "description",
             "git_hash",
             "created_at",
             "modified_at",
         ]
+        fields = ["name", "description", *read_only_fields]
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):

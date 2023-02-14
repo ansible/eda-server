@@ -30,27 +30,27 @@ from aap_eda.core import models
     retrieve=extend_schema(
         description="Get the extra_var by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.ExtraVarSerializer,
-                description=("Return the extra_var by its id."),
+                description="Return the extra_var by its id.",
             ),
         },
     ),
     list=extend_schema(
         description="List all extra_vars",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.ExtraVarSerializer,
-                description=("Return a list of extra_vars."),
+                description="Return a list of extra_vars.",
             ),
         },
     ),
     create=extend_schema(
         description="Create an extra_var",
         responses={
-            201: OpenApiResponse(
+            status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.ExtraVarSerializer,
-                description=("Return the created extra_var."),
+                description="Return the created extra_var.",
             ),
         },
     ),
@@ -68,18 +68,18 @@ class ExtraVarViewSet(
     retrieve=extend_schema(
         description="Get the playbook by its id",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.PlaybookSerializer,
-                description=("Return the playbook by its id."),
+                description="Return the playbook by its id.",
             ),
         },
     ),
     list=extend_schema(
         description="List all playbooks",
         responses={
-            200: OpenApiResponse(
+            status.HTTP_200_OK: OpenApiResponse(
                 serializers.PlaybookSerializer,
-                description=("Return a list of playbooks."),
+                description="Return a list of playbooks.",
             ),
         },
     ),
@@ -91,13 +91,65 @@ class PlaybookViewSet(
     serializer_class = serializers.PlaybookSerializer
 
 
-class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
+@extend_schema_view(
+    list=extend_schema(
+        description="List all projects",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ProjectSerializer,
+                description="Return a list of projects.",
+            ),
+        },
+    ),
+    retrieve=extend_schema(
+        description="Get project by id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ProjectSerializer,
+                description="Return a project by id.",
+            ),
+        },
+    ),
+    update=extend_schema(
+        description="Update a project",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ProjectSerializer,
+                description="Update successful. Return an updated project.",
+            )
+        },
+    ),
+    partial_update=extend_schema(
+        description="Partial update of a project",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ProjectSerializer,
+                description="Update successful. Return an updated project.",
+            )
+        },
+    ),
+    destroy=extend_schema(
+        description="Delete a project by id",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                serializers.ProjectSerializer, description="Delete successful."
+            )
+        },
+    ),
+)
+class ProjectViewSet(viewsets.ModelViewSet):
     queryset = models.Project.objects.all()
     serializer_class = serializers.ProjectSerializer
 
     @extend_schema(
+        description="Import a project.",
         request=serializers.ProjectCreateSerializer,
-        responses={status.HTTP_202_ACCEPTED: serializers.TaskRefSerializer},
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                serializers.TaskRefSerializer,
+                description="Return a reference to a project import task.",
+            ),
+        },
     )
     def create(self, request):
         serializer = serializers.ProjectCreateSerializer(data=request.data)
@@ -124,3 +176,6 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
             {"id": job.id}, context={"request": request}
         )
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
