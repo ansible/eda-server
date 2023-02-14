@@ -27,7 +27,6 @@ class StandardPagination(pagination.PageNumberPagination):
         url = ""
         if self.request:
             url = self.request.get_full_path()
-        url = url.encode("utf-8")
 
         return replace_query_param(
             url, self.page_query_param, self.page.next_page_number()
@@ -40,7 +39,6 @@ class StandardPagination(pagination.PageNumberPagination):
         url = ""
         if self.request:
             url = self.request.get_full_path()
-        url = url.encode("utf-8")
 
         previous_page = self.page.previous_page_number()
         if previous_page <= 0:
