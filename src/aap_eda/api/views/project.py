@@ -59,7 +59,7 @@ class ExtraVarViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.ExtraVar.objects.all()
+    queryset = models.ExtraVar.objects.all().order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
 
@@ -87,7 +87,7 @@ class ExtraVarViewSet(
 class PlaybookViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Playbook.objects.all()
+    queryset = models.Playbook.objects.all().order_by("id")
     serializer_class = serializers.PlaybookSerializer
 
 

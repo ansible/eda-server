@@ -52,7 +52,7 @@ class ActivationViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.all()
+    queryset = models.Activation.objects.all().order_by("id")
     serializer_class = serializers.ActivationSerializer
 
     @extend_schema(

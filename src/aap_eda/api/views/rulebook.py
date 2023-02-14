@@ -62,7 +62,7 @@ class RulebookViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Rulebook.objects.all()
+    queryset = models.Rulebook.objects.all().order_by("id")
     serializer_class = serializers.RulebookSerializer
 
     @extend_schema(
@@ -103,7 +103,7 @@ class RulebookViewSet(
 class RulesetViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Ruleset.objects.all()
+    queryset = models.Ruleset.objects.all().order_by("id")
     serializer_class = serializers.RulesetSerializer
 
     @extend_schema(
@@ -150,7 +150,7 @@ class RulesetViewSet(
     @action(detail=True)
     def rules(self, _request, pk):
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
-        rules = models.Rule.objects.filter(ruleset=ruleset)
+        rules = models.Rule.objects.filter(ruleset=ruleset).order_by("id")
 
         results = self.paginate_queryset(rules)
         serializer = serializers.RuleSerializer(results, many=True)
@@ -161,7 +161,7 @@ class RulesetViewSet(
 class RuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Rule.objects.all()
+    queryset = models.Rule.objects.all().order_by("id")
     serializer_class = serializers.RuleSerializer
 
     @extend_schema(
@@ -189,7 +189,7 @@ class RuleViewSet(
         },
     )
     def list(self, _request):
-        rules = models.Rule.objects.all()
+        rules = models.Rule.objects.all().order_by("id")
 
         result = []
         for rule in rules:
