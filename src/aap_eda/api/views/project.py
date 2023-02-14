@@ -138,7 +138,7 @@ class PlaybookViewSet(
     ),
 )
 class ProjectViewSet(viewsets.ModelViewSet):
-    queryset = models.Project.objects.all()
+    queryset = models.Project.objects.all().order_by("id")
     serializer_class = serializers.ProjectSerializer
 
     @extend_schema(
