@@ -4,7 +4,7 @@ ARG USER_ID=${USER_ID:-1001}
 RUN useradd --system --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda
 
 RUN DNF=dnf \
-    INSTALL_PACKAGES="python3 python3-devel python3-pip libpq-devel gcc" \
+    INSTALL_PACKAGES="python3 python3-devel python3-pip libpq-devel gcc git" \
     && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf
