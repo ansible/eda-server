@@ -62,7 +62,7 @@ class RulebookViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Rulebook.objects.all()
+    queryset = models.Rulebook.objects.order_by("id")
     serializer_class = serializers.RulebookSerializer
 
     @extend_schema(
@@ -82,7 +82,9 @@ class RulebookViewSet(
             data = ruleset_out_data(ruleset)
             result.append(data)
 
-        return Response(result)
+        result = self.paginate_queryset(result)
+
+        return self.get_paginated_response(result)
 
     @extend_schema(
         description="Get the JSON format of a rulebook by its id",
@@ -101,7 +103,7 @@ class RulebookViewSet(
 class RulesetViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Ruleset.objects.all()
+    queryset = models.Ruleset.objects.order_by("id")
     serializer_class = serializers.RulesetSerializer
 
     @extend_schema(
@@ -136,7 +138,9 @@ class RulesetViewSet(
             data = ruleset_out_data(ruleset)
             result.append(data)
 
-        return Response(result)
+        result = self.paginate_queryset(result)
+
+        return self.get_paginated_response(result)
 
     @extend_schema(
         description="Rule list of a ruleset by its id",
@@ -146,16 +150,18 @@ class RulesetViewSet(
     @action(detail=True)
     def rules(self, _request, pk):
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
-        rules = models.Rule.objects.filter(ruleset=ruleset)
-        serializer = serializers.RuleSerializer(rules, many=True)
+        rules = models.Rule.objects.filter(ruleset=ruleset).order_by("id")
 
-        return Response(serializer.data)
+        results = self.paginate_queryset(rules)
+        serializer = serializers.RuleSerializer(results, many=True)
+
+        return self.get_paginated_response(serializer.data)
 
 
 class RuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Rule.objects.all()
+    queryset = models.Rule.objects.order_by("id")
     serializer_class = serializers.RuleSerializer
 
     @extend_schema(
@@ -183,11 +189,13 @@ class RuleViewSet(
         },
     )
     def list(self, _request):
-        rules = models.Rule.objects.all()
+        rules = models.Rule.objects.order_by("id")
 
         result = []
         for rule in rules:
             data = rule_out_data(rule)
             result.append(data)
 
-        return Response(result)
+        result = self.paginate_queryset(result)
+
+        return self.get_paginated_response(result)

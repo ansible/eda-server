@@ -18,9 +18,9 @@ def test_list_extra_var(client: APIClient):
     obj = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
-    response = client.get(f"{api_url_v1}/extra-vars")
+    response = client.get(f"{api_url_v1}/extra-vars/")
     assert response.status_code == status.HTTP_200_OK
-    assert response.data == [
+    assert response.data["results"] == [
         {
             "id": obj.id,
             "project": None,
@@ -36,7 +36,7 @@ def test_create_extra_var(client: APIClient):
         "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
-    response = client.post(f"{api_url_v1}/extra-vars", data=data_in)
+    response = client.post(f"{api_url_v1}/extra-vars/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     id_ = response.data["id"]
     assert response.data == {
@@ -53,7 +53,7 @@ def test_retrieve_extra_var(client: APIClient):
     obj = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
-    response = client.get(f"{api_url_v1}/extra-vars/{obj.id}")
+    response = client.get(f"{api_url_v1}/extra-vars/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
         "id": obj.id,
@@ -65,5 +65,5 @@ def test_retrieve_extra_var(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_extra_var_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/extra-vars/42")
+    response = client.get(f"{api_url_v1}/extra-vars/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND

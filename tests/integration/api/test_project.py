@@ -41,9 +41,9 @@ def test_list_projects(client: APIClient):
             ),
         ]
     )
-    response = client.get(f"{api_url_v1}/projects")
+    response = client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_200_OK
-    for data, project in zip(response.json(), projects):
+    for data, project in zip(response.data["results"], projects):
         assert_project_data(data, project)
 
 
@@ -54,14 +54,14 @@ def test_retrieve_project(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.get(f"{api_url_v1}/projects/{project.id}")
+    response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_project_data(response.json(), project)
 
 
 @pytest.mark.django_db
-def test_retrieve_project_not_found(client: APIClient):
-    response = client.get(f"{api_url_v1}/projects/42")
+def test_retrieve_project_not_exist(client: APIClient):
+    response = client.get(f"{api_url_v1}/projects/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -75,7 +75,7 @@ def test_create_project(import_project_task: mock.Mock, client: APIClient):
     import_project_task.delay.return_value = job
 
     response = client.post(
-        f"{api_url_v1}/projects",
+        f"{api_url_v1}/projects/",
         data={
             "name": "test-project-01",
             "url": "https://git.example.com/acme/project-01",
@@ -84,7 +84,7 @@ def test_create_project(import_project_task: mock.Mock, client: APIClient):
     assert response.status_code == status.HTTP_202_ACCEPTED
     assert response.json() == {
         "id": job_id,
-        "href": f"http://testserver{api_url_v1}/tasks/{job_id}",
+        "href": f"http://testserver{api_url_v1}/tasks/{job_id}/",
     }
 
     import_project_task.delay.assert_called_once_with(
@@ -101,7 +101,7 @@ def test_create_project_name_conflict(client: APIClient):
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
     response = client.post(
-        f"{api_url_v1}/projects",
+        f"{api_url_v1}/projects/",
         data={
             "name": "test-project-01",
             "url": "https://git.example.com/acme/project-01",
@@ -130,11 +130,11 @@ def test_sync_project(sync_project_task: mock.Mock, client: APIClient):
     job = mock.Mock(id=job_id)
     sync_project_task.delay.return_value = job
 
-    response = client.post(f"{api_url_v1}/projects/{project.id}/sync")
+    response = client.post(f"{api_url_v1}/projects/{project.id}/sync/")
     assert response.status_code == status.HTTP_202_ACCEPTED
     assert response.json() == {
         "id": job_id,
-        "href": f"http://testserver{api_url_v1}/tasks/{job_id}",
+        "href": f"http://testserver{api_url_v1}/tasks/{job_id}/",
     }
 
     sync_project_task.delay.assert_called_once_with(
@@ -143,8 +143,8 @@ def test_sync_project(sync_project_task: mock.Mock, client: APIClient):
 
 
 @pytest.mark.django_db
-def test_sync_project_not_found(client: APIClient):
-    response = client.post(f"{api_url_v1}/projects/42/sync")
+def test_sync_project_not_exist(client: APIClient):
+    response = client.post(f"{api_url_v1}/projects/42/sync/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -157,7 +157,7 @@ def test_update_project(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.get(f"{api_url_v1}/projects/{project.id}")
+    response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
 
     update_data = {
@@ -167,7 +167,7 @@ def test_update_project(client: APIClient):
     }
 
     response = client.put(
-        f"{api_url_v1}/projects/{project.id}", data=update_data
+        f"{api_url_v1}/projects/{project.id}/", data=update_data
     )
     assert response.status_code == status.HTTP_200_OK
 
@@ -185,10 +185,10 @@ def test_update_project_not_found(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.get(f"{api_url_v1}/projects/{project.id}")
+    response = client.get(f"{api_url_v1}/projects/{project.id}/")
     data = response.json()
 
-    response = client.get(f"{api_url_v1}/projects/42", data=data)
+    response = client.get(f"{api_url_v1}/projects/42/", data=data)
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -204,12 +204,12 @@ def test_update_project_conflict(client: APIClient):
         url="https://git.example.com/acme/project-02",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.get(f"{api_url_v1}/projects/{first.id}")
+    response = client.get(f"{api_url_v1}/projects/{first.id}/")
     data = {
         **response.json(),
         "name": second.name,
     }
-    response = client.put(f"{api_url_v1}/projects/{first.id}", data=data)
+    response = client.put(f"{api_url_v1}/projects/{first.id}/", data=data)
     # NOTE(cutwater): Should be 409 Conflict
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {
@@ -224,12 +224,12 @@ def test_update_project_empty_name(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.get(f"{api_url_v1}/projects/{project.id}")
+    response = client.get(f"{api_url_v1}/projects/{project.id}/")
     data = {
         **response.json(),
         "name": "",
     }
-    response = client.put(f"{api_url_v1}/projects/{project.id}", data=data)
+    response = client.put(f"{api_url_v1}/projects/{project.id}/", data=data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {"name": ["This field may not be blank."]}
 
@@ -246,7 +246,7 @@ def test_partial_update_project(client: APIClient):
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
     response = client.put(
-        f"{api_url_v1}/projects/{project.id}",
+        f"{api_url_v1}/projects/{project.id}/",
         data={"name": "test-project-01-updated"},
     )
     assert response.status_code == status.HTTP_200_OK
@@ -268,7 +268,7 @@ def test_delete_project_not_implemented(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.delete(f"{api_url_v1}/projects/{project.id}")
+    response = client.delete(f"{api_url_v1}/projects/{project.id}/")
 
     assert response.status_code == status.HTTP_501_NOT_IMPLEMENTED
 

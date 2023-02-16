@@ -52,7 +52,7 @@ class ActivationViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.all()
+    queryset = models.Activation.objects.order_by("id")
     serializer_class = serializers.ActivationSerializer
 
     @extend_schema(
@@ -133,10 +133,12 @@ class ActivationViewSet(
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
         )
+
+        activation_instances = self.paginate_queryset(activation_instances)
         serializer = serializers.ActivationInstanceSerializer(
             activation_instances, many=True
         )
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+        return self.get_paginated_response(serializer.data)
 
 
 @extend_schema_view(
@@ -191,7 +193,12 @@ class ActivationInstanceViewSet(
         activation_instance_logs = models.ActivationInstanceLog.objects.filter(
             activation_instance_id=pk
         )
+
+        activation_instance_logs = self.paginate_queryset(
+            activation_instance_logs
+        )
+
         serializer = serializers.ActivationInstanceLogSerializer(
             activation_instance_logs, many=True
         )
-        return Response(status=status.HTTP_200_OK, data=serializer.data)
+        return self.get_paginated_response(serializer.data)
