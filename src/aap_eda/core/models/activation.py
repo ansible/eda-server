@@ -16,8 +16,6 @@ from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
-from .base import OIDField
-
 __all__ = (
     "Activation",
     "ActivationInstance",
@@ -53,10 +51,6 @@ class Activation(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
-# This table will have an pre-insert trigger that will
-# set the large_data_id if it is null.
-# This table will have a post-delete trigger that will
-# cascade delete action to the large object table.
 class ActivationInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance"
@@ -70,7 +64,6 @@ class ActivationInstance(models.Model):
     )
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     ended_at = models.DateTimeField(null=True)
-    large_data_id = OIDField(null=True)
 
 
 class ActivationInstanceLog(models.Model):
