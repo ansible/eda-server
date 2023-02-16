@@ -13,18 +13,16 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import io
 import logging
 import os
 import shutil
 import subprocess
-from typing import Final, Iterable, Literal, Optional
+from typing import IO, Final, Iterable, Optional
 
 from aap_eda.core.types import StrPath
 
 logger = logging.getLogger(__name__)
-
-
-ArchiveFormat = Literal["zip", "tar", "tar.gz", "tgz"]
 
 
 class GitError(Exception):
@@ -62,10 +60,24 @@ class GitRepository:
         return result.stdout.strip()
 
     def archive(
-        self, output: StrPath, *, format: ArchiveFormat = "tar.gz"
+        self,
+        treeish: str,
+        /,
+        output: [StrPath, io.BytesIO],
+        *,
+        format: Optional[str] = None,
     ) -> None:
         """Create an archive of files from a repository."""
-        raise NotImplementedError
+        cmd = ["archive"]
+        kwargs = {"cwd": self.root}
+        if isinstance(output, (str, os.PathLike)):
+            cmd.extend(("--output", os.fspath(output)))
+        else:
+            kwargs["stdout"] = output
+        if format is not None:
+            cmd.extend(("--format", format))
+        cmd.append(treeish)
+        self._executor(cmd, **kwargs)
 
     @classmethod
     def clone(
@@ -120,7 +132,12 @@ class GitExecutor:
         args: Iterable[str],
         timeout: Optional[float] = None,
         cwd: Optional[StrPath] = None,
+        stdout: Optional[IO] = None,
     ):
+        if stdout is None:
+            stdout = subprocess.PIPE
+        stderr = subprocess.PIPE
+
         if timeout is None:
             timeout = self.DEFAULT_TIMEOUT
         try:
@@ -129,7 +146,8 @@ class GitExecutor:
                 check=True,
                 encoding="utf-8",
                 env=self.DEFAULT_ENVIRON,
-                capture_output=True,
+                stdout=stdout,
+                stderr=stderr,
                 timeout=timeout,
                 cwd=cwd,
             )

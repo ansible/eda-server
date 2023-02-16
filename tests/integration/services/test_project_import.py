@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
+import os
+import shutil
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -19,32 +21,51 @@ from unittest import mock
 import pytest
 
 from aap_eda.core import models
-from aap_eda.services.project import (
-    ProjectImportService as _ProjectImportService,
-)
+from aap_eda.services.project import ProjectImportService
 from aap_eda.services.project.git import GitRepository
 
 DATA_DIR = Path(__file__).parent / "data"
 
 
-class ProjectImportService(_ProjectImportService):
-    def _temporary_directory(self) -> tempfile.TemporaryDirectory:
+@pytest.fixture
+def service_tempdir_mock():
+    with (
+        tempfile.TemporaryDirectory(prefix="test") as tempdir,
+        mock.patch.object(
+            ProjectImportService, "_temporary_directory"
+        ) as method_mock,
+    ):
         tmp_mock = mock.Mock()
-        tmp_mock.name = DATA_DIR / "project-01"
+        tmp_mock.name = tempdir
         tmp_mock.__enter__ = mock.Mock(return_value=tmp_mock.name)
         tmp_mock.__exit__ = mock.Mock(return_value=None)
-        return tmp_mock
+        method_mock.return_value = tmp_mock
+        yield tmp_mock
 
 
 @pytest.mark.django_db
-def test_project_import():
+@mock.patch("django.core.files.storage.FileSystemStorage.save")
+def test_project_import(storage_save_mock, service_tempdir_mock):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-01"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    def archive_project(_treeish, output, *_args, **_kwargs):
+        with open(output, "w") as fp:
+            fp.write("REPOSITORY ARCHIVE")
+
+    storage_save_mock.return_value = "project.tar.gz"
+
     repo_mock = mock.Mock(name="GitRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
 
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
-    git_mock.clone.return_value = repo_mock
+    git_mock.clone.side_effect = clone_project
+
+    repo_mock.archive.side_effect = archive_project
 
     service = ProjectImportService(git_cls=git_mock)
     project = service.run(
@@ -52,7 +73,9 @@ def test_project_import():
     )
 
     git_mock.clone.assert_called_once_with(
-        "https://git.example.com/repo.git", DATA_DIR / "project-01", depth=1
+        "https://git.example.com/repo.git",
+        os.path.join(service_tempdir_mock.name, "src"),
+        depth=1,
     )
 
     assert project is not None
@@ -60,6 +83,7 @@ def test_project_import():
     assert project.name == "test-project-01"
     assert project.url == "https://git.example.com/repo.git"
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.archive_file.name == "project.tar.gz"
 
     rulebooks = list(project.rulebook_set.order_by("name"))
     assert len(rulebooks) == 2
@@ -69,6 +93,8 @@ def test_project_import():
 
     for rulebook, expected in zip(rulebooks, expected_rulebooks):
         assert_rulebook_is_valid(rulebook, expected)
+
+    storage_save_mock.assert_called_once()
 
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):

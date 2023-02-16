@@ -27,8 +27,7 @@ from aap_eda.services.rulebook import expand_ruleset_sources
 
 logger = logging.getLogger(__name__)
 
-
-TMP_PREFIX: Final = "eda-project"
+TMP_PREFIX: Final = "eda-project-"
 YAML_EXTENSIONS = (".yml", ".yaml")
 
 
@@ -51,16 +50,15 @@ class ProjectImportService:
 
     @transaction.atomic
     def run(self, *, name: str, url: str, description: str = ""):
-        with self._temporary_directory() as repo_dir:
+        with self._temporary_directory() as tempdir:
+            repo_dir = os.path.join(tempdir, "src")
             repo = self._git_cls.clone(url, repo_dir, depth=1)
             commit_id = repo.rev_parse("HEAD")
             project = models.Project.objects.create(
                 url=url, git_hash=commit_id, name=name, description=description
             )
             self._import_rulebooks(project, repo_dir)
-
-            # TODO: Archive project
-            # TODO: Save project archive into storage
+            self._save_project_archive(project, repo, tempdir)
             return project
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
@@ -156,3 +154,17 @@ class ProjectImportService:
         if not isinstance(data, list):
             return False
         return all("rules" in entry for entry in data)
+
+    def _save_project_archive(
+        self,
+        project: models.Project,
+        repo: GitRepository,
+        tempdir: StrPath,
+    ):
+        archive_file = os.path.join(tempdir, "archive.tar.gz")
+        repo.archive("HEAD", archive_file, format="tar.gz")
+
+        filename = f"{project.id:010}.archive.tar.gz"
+        with open(archive_file, "rb") as fp:
+            project.archive_file.save(filename, fp)
+        return project
