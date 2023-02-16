@@ -17,16 +17,14 @@ from rest_framework.response import Response
 from rest_framework.utils.urls import remove_query_param, replace_query_param
 
 
-class StandardPagination(pagination.PageNumberPagination):
+class DefaultPagination(pagination.PageNumberPagination):
     page_size_query_param = "page_size"
 
     def get_next_link(self):
         if not self.page.has_next():
             return None
 
-        url = ""
-        if self.request:
-            url = self.request.get_full_path()
+        url = self.request.get_full_path()
 
         return replace_query_param(
             url, self.page_query_param, self.page.next_page_number()
@@ -36,9 +34,7 @@ class StandardPagination(pagination.PageNumberPagination):
         if not self.page.has_previous():
             return None
 
-        url = ""
-        if self.request:
-            url = self.request.get_full_path()
+        url = self.request.get_full_path()
 
         previous_page = self.page.previous_page_number()
         if previous_page <= 0:
