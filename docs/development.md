@@ -1,8 +1,6 @@
-# Contributing
+# Development environment setup
 
-## Development environment setup
-
-### Prerequisites
+## Prerequisites
 
 * [Git](https://git-scm.com/)
 * [Docker](https://www.docker.com/) or [Podman](https://podman.io/)
@@ -12,6 +10,7 @@
 * [pre-commit](https://pre-commit.com/)
 
 For running services locally:
+
 * Python >= 3.9
 
 For standalone development tools written in Python, such as `pre-commit`,
@@ -19,11 +18,11 @@ we recommend using your system package manager,
 [pipx](https://pypa.github.io/pipx/) tool or pip user install mode (`pip install --user`),
 in decreasing order of preference.
 
-#### Docker
+### Docker
 
 You'll need to install Docker or Podman.
 
-On Linux, docker is generally available in your Linux distribution repositories or in 
+On Linux, docker is generally available in your Linux distribution repositories or in
 the repositories, provided by Docker. Follow the installation instructions:
 [Docker Engine installation overview](https://docs.docker.com/engine/install/).
 
@@ -40,16 +39,18 @@ sudo ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-
 For macOS and Windows, we recommend [Docker for Mac](https://www.docker.com/docker-mac)
 and [Docker for Windows](https://www.docker.com/docker-windows) respectively.
 
-#### Podman
+### Podman
 
 On Linux, podman can be installed using your Linux distribution package manager.
 See [Installing on Linux](https://podman.io/getting-started/installation#installing-on-linux).
 
-On macOS, podman is available via Homebrew. 
+On macOS, podman is available via Homebrew.
 See [Installing on macOS](https://podman.io/getting-started/installation#macos)
 
+#### Notes for linux users
+
 A new Docker Compose plugin written in Go, which is installed with Docker Desktop or
-from the official Docker's repositories, is not compatible with podman. 
+from the official Docker's repositories, is not compatible with podman.
 Instead you should use the older version of docker-compose which is written in python.
 
 We suggest installing into a user directory with `pip install --user` or `pipx` tool:
@@ -60,26 +61,27 @@ pip install --user docker-compose
 pipx install docker-compose
 ```
 
-By default, all dev scripts use `docker` binary. 
+By default, all dev scripts use `docker` binary.
 Podman users must install `podman-docker` package or run the following command:
 
 ```shell
 sudo ln -s $(which podman) $(dirname $(which podman))/docker
 ```
-      
-The `DOCKER_HOST` environment variable must be defined pointing 
+
+The `DOCKER_HOST` environment variable must be defined pointing
 to the podman socket to be able to use `docker-compose`. Example:
 
 ```shell
-export DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
 ```
 
 Ensure the `podman.socket` service is enabled and running:
+
 ```shell
 systemctl --user enable --now podman.socket
 ```
 
-#### Poetry
+### Poetry
 
 On Linux and macOS, Poetry can be installed with the official installer:
 
@@ -107,17 +109,17 @@ In macOS, Poetry can be installed with Homebrew:
 brew install poetry
 ```
 
-#### Taskfile
+### Taskfile
 
 Follow the [Installation](https://taskfile.dev/installation/) instructions to install Taskfile.
 
 Depending on your OS or distribution, Taskfile will be packaged with the binary named `task`, whilst others name it `go-task`.
 The instructions below assume your Taskfile binary is named `task`, but please keep in mind that the binary on your system may have a different name.
 
-**Note:** For Macs with the M1 or M2 chip make sure you 
+**Note:** For Macs with the M1 or M2 chip make sure you
 [download](https://github.com/go-task/task/releases) Task for the `arm64` architecture.
 
-#### Pre-commit (optional)
+### Pre-commit (optional)
 
 Install [pre-commit](https://pre-commit.com/) tool.
 
@@ -136,6 +138,7 @@ pip install --user pre-commit
 ```
 
 On Arch Linux:
+
 ```shell
 pacman -S python-pre-commit
 ```
@@ -144,15 +147,15 @@ pacman -S python-pre-commit
 pyproject.toml files. In case of conflict, a developer must manually execute either `poetry update`,
 `poetry lock` or `poetry lock --no-update` to resolve it.
 
-### Backend Development
+## Development environment steps
 
-#### Clone the repository
+### Clone the repository
 
 ```shell
 git clone git@github.com:ansible/aap-eda.git
 ```
 
-#### Install dependencies
+### Install dependencies
 
 Go you project directory and install dependencies for local development:
 
@@ -180,29 +183,34 @@ This will build `localhost/aap-eda:latest` development image:
 
 ```shell
 $ docker images
-
 REPOSITORY                                    TAG         IMAGE ID       CREATED        SIZE
 localhost/aap-eda                             latest      28fd94c8cf89   5 hours ago    611MB
 ```
 
-#### Running services
+### Running services
 
-AAP EDA requires some services, such as database, to be running. We recommend running such services
+AAP EDA requires some services, such as database and redis to be running. We recommend running such services
 in a containerized environment (e.g. docker / podman / minikube etc.).
 
-Follow the steps below to start each container service manually. Alternately, you can start all
-required containers by running:
+You can start all minimal required containers by running:
+
+```shell
+task docker:up:minimal
+```
+
+Alternately, you can start all containers, including the applications, by running:
+
 ```shell
 task docker:up
 ```
 
-If you use docker or podman, you can start them with:
+If you use docker or podman, you can start just the postgres instance with:
 
 ```shell
 task docker:up:postgres
 ```
 
-This will initialize a PostgreSQL container and create the database.
+### Customizing database settings
 
 If you need to run a local or standalone external instance of PostgreSQL service, you will need
 to create a database for EDA. By default, the database is named `eda`.
@@ -216,7 +224,7 @@ environment variables:
 * `EDA_DB_PASSWORD` – Database user password (default: `secret`, only in development mode)
 * `EDA_DB_NAME` – Database name (default: `eda`)
 
-#### Executing migrations
+### Executing migrations
 
 Locally:
 
@@ -227,10 +235,10 @@ task manage -- migrate
 With docker compose:
 
 ```shell
-task docker:migrate
+task docker:migrate 
 ```
 
-#### Starting API server
+### Starting API server
 
 Locally:
 
@@ -241,33 +249,36 @@ task manage -- runserver
 With docker compose:
 
 ```shell
-task docker -- up -d api
+task docker -- up -d api 
 ```
 
-#### Running tests
+### Running tests
 
 Run all tests:
+
 ```
 task test
 ```
 
 Run a single module:
+
 ```
 task test -- tests/integration/api/test_activation.py
 ```
 
 Run a single test:
+
 ```
 task test -- tests/integration/api/test_activation.py::test_retrieve_activation
 ```
 
 With docker compose:
 
-```shell
-task docker -- run api --rm python -m pytest 
+```shell 
+task docker -- run api --rm python -m pytest  
 ```
 
-#### Running linters
+### Running linters
 
 The project uses `flake8` with a set of plugins, `black`, `isort` and `ruff` (experimental),
 for automated code quality checks. Generally you should have the `pre-commit` hook already installed,
@@ -279,6 +290,7 @@ task lint
 ```
 
 Or an individual linter:
+
 ```shell
 task lint:flake8
 task lint:black
@@ -286,7 +298,7 @@ task lint:isort
 task lint:ruff
 ```
 
-#### Code formatting
+### Code formatting
 
 To automatically format your source code run:
 

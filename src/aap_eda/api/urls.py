@@ -43,7 +43,7 @@ openapi_urls = [
     path(
         "openapi.yaml",
         SpectacularYAMLAPIView.as_view(),
-        name="openapi-jaml",
+        name="openapi-yaml",
     ),
     path(
         "docs",
