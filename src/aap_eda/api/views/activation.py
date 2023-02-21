@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+from django.db import IntegrityError
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -23,6 +23,24 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
+
+
+def dependent_object_exists_or_exception(activation):
+    activation_dependent_objects = [
+        (models.Project, "project", activation.get("project_id")),
+        (models.Rulebook, "rulebook", activation.get("rulebook_id")),
+        (models.ExtraVar, "extra_var", activation.get("extra_var_id")),
+    ]
+    for object_model, object_name, object_id in activation_dependent_objects:
+        if object_id is None:
+            continue
+        object_exists = object_model.objects.filter(pk=object_id).exists()
+        if not object_exists:
+            raise api_exc.NotFound(
+                code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{object_name.capitalize()} with ID={object_id}"
+                " does not exist.",
+            )
 
 
 @extend_schema_view(
@@ -62,7 +80,10 @@ class ActivationViewSet(
     def create(self, request):
         serializer = serializers.ActivationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        response = serializer.create(serializer.validated_data)
+        try:
+            response = serializer.create(serializer.validated_data)
+        except IntegrityError:
+            dependent_object_exists_or_exception(serializer.validated_data)
         response_serializer = serializers.ActivationSerializer(response)
         # TODO(doston): need to implement backend process and instance creation
 
