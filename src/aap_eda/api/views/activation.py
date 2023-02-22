@@ -36,7 +36,7 @@ def dependent_object_exists_or_exception(activation):
             continue
         object_exists = object_model.objects.filter(pk=object_id).exists()
         if not object_exists:
-            raise api_exc.NotFound(
+            raise api_exc.Unprocessable(
                 code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"{object_name.capitalize()} with ID={object_id}"
                 " does not exist.",
