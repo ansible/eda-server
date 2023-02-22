@@ -508,7 +508,6 @@ class Migration(migrations.Migration):
             constraint=models.CheckConstraint(
                 check=models.Q(("name", ""), _negated=True),
                 name="ck_empty_project_name",
-                violation_error_message="Project name cannot be empty.",
             ),
         ),
         migrations.AddField(
@@ -686,7 +685,6 @@ class Migration(migrations.Migration):
             constraint=models.CheckConstraint(
                 check=models.Q(("name", ""), _negated=True),
                 name="ck_rulebook_name_not_empty",
-                violation_error_message="Rulebook name must not be empty.",
             ),
         ),
         migrations.AlterUniqueTogether(
@@ -728,7 +726,6 @@ class Migration(migrations.Migration):
                     )
                 ),
                 name="ck_resource_type_values",
-                violation_error_message="Value not defined in Resource Type Enum.",
             ),
         ),
         migrations.AddConstraint(
@@ -738,7 +735,6 @@ class Migration(migrations.Migration):
                     ("action__in", ("create", "read", "update", "delete"))
                 ),
                 name="ck_action_values",
-                violation_error_message="Value not defined in Action Enum.",
             ),
         ),
         migrations.AlterUniqueTogether(
@@ -766,7 +762,6 @@ class Migration(migrations.Migration):
                     )
                 ),
                 name="ck_inventory_source_values",
-                violation_error_message="Value not defined in Inventory Source enum.",
             ),
         ),
         migrations.AddConstraint(
@@ -774,7 +769,6 @@ class Migration(migrations.Migration):
             constraint=models.CheckConstraint(
                 check=models.Q(("name", ""), _negated=True),
                 name="ck_empty_inventory_name",
-                violation_error_message="Inventory name cannot be empty.",
             ),
         ),
         migrations.AddIndex(

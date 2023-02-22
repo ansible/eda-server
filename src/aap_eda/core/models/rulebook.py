@@ -30,7 +30,6 @@ class Rulebook(models.Model):
             models.CheckConstraint(
                 check=~models.Q(name=""),
                 name="ck_rulebook_name_not_empty",
-                violation_error_message="Rulebook name must not be empty.",
             ),
         ]
 

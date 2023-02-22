@@ -36,7 +36,6 @@ class Project(models.Model):
             models.CheckConstraint(
                 check=~models.Q(name=""),
                 name="ck_empty_project_name",
-                violation_error_message="Project name cannot be empty.",
             )
         ]
 

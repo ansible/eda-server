@@ -52,14 +52,10 @@ class RolePermission(models.Model):
             models.CheckConstraint(
                 check=models.Q(resource_type__in=ResourceType.values()),
                 name="ck_resource_type_values",
-                violation_error_message=(
-                    "Value not defined in Resource Type Enum."
-                ),
             ),
             models.CheckConstraint(
                 check=models.Q(action__in=Action.values()),
                 name="ck_action_values",
-                violation_error_message="Value not defined in Action Enum.",
             ),
         ]
         indexes = [

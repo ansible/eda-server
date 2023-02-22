@@ -26,14 +26,10 @@ class Inventory(models.Model):
             models.CheckConstraint(
                 check=models.Q(inventory_source__in=InventorySource.values()),
                 name="ck_inventory_source_values",
-                violation_error_message=(
-                    "Value not defined in Inventory Source enum."
-                ),
             ),
             models.CheckConstraint(
                 check=~models.Q(name=""),
                 name="ck_empty_inventory_name",
-                violation_error_message="Inventory name cannot be empty.",
             ),
         ]
         indexes = [
