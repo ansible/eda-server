@@ -9,6 +9,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 from aap_eda.core import models
 
+from .messages import ExtraVars, Inventory, Rulebook, SSHPrivateKey
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,43 +72,24 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             data.get("activation_id")
         )
 
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "Rulebook",
-                    "data": base64.b64encode(
-                        rulebook.rulesets.encode()
-                    ).decode(),
-                }
-            )
+        rulebook_message = Rulebook(
+            data=base64.b64encode(rulebook.rulesets.encode()).decode()
         )
-
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "Inventory",
-                    "data": base64.b64encode(
-                        inventory.inventory.encode()
-                    ).decode(),
-                }
-            )
+        inventory_message = Inventory(
+            data=base64.b64encode(inventory.inventory.encode()).decode()
         )
-
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "ExtraVars",
-                    "data": base64.b64encode(
-                        extra_var.extra_var.encode()
-                    ).decode(),
-                }
-            )
+        extra_var_message = ExtraVars(
+            data=base64.b64encode(extra_var.extra_var.encode()).decode()
         )
-
         # TODO: add secret manager later
-        await self.send(
-            text_data=json.dumps({"type": "SSHPrivateKey", "data": ""})
+        ssh_key_message = SSHPrivateKey(
+            data=base64.b64encode("".encode()).decode()
         )
+
+        await self.send(text_data=rulebook_message.to_json())
+        await self.send(text_data=inventory_message.to_json())
+        await self.send(text_data=extra_var_message.to_json())
+        await self.send(text_data=ssh_key_message.to_json())
 
         # TODO: add broadcasting later by channel groups
 
