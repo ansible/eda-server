@@ -19,6 +19,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, serializers
@@ -83,6 +84,8 @@ class ActivationViewSet(
             response = serializer.create(serializer.validated_data)
         except IntegrityError:
             dependent_object_exists_or_exception(serializer.validated_data)
+            # in case IntegrityError is not handled by above logic
+            raise APIException()
         response_serializer = serializers.ActivationSerializer(response)
         # TODO(doston): need to implement backend process and instance creation
 
