@@ -1,11 +1,11 @@
-version: '3'
+version: "3"
 
 env:
   DJANGO_SETTINGS_MODULE: "aap_eda.settings.development"
 
 vars:
   DOCKER_COMPOSE: '{{ default "docker-compose" .DOCKER_COMPOSE }}'
-  DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose.yaml" .DOCKER_COMPOSE_ARGS }}'
+  DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose-dev.yaml" .DOCKER_COMPOSE_ARGS }}'
   PYTEST_CMD: "poetry run python -m pytest"
   MINIKUBE_CMD: "scripts/eda_kube.sh"
 
@@ -39,22 +39,22 @@ tasks:
   manage:
     desc: "Run django management command"
     cmds:
-        # This is a workaround for poetry incorrectly passing argv[0] to spawned subprocess
-        #   See https://github.com/python-poetry/poetry/issues/965
+      # This is a workaround for poetry incorrectly passing argv[0] to spawned subprocess
+      #   See https://github.com/python-poetry/poetry/issues/965
       - cmd: poetry run /usr/bin/env aap-eda-manage {{.CLI_ARGS}}
 
   test:
     desc: "Run project tests."
     summary: |
       Run poetry run python -m pytest with specified CLI arguments.
-      
+
       Example(s):
         Run a single test module
           $ task test -- tests/integration/api/test_activation.py
         Run a single test from a module
           $ task test -- tests/integration/api/test_activation.py::test_retrieve_activation
     cmds:
-      - '{{.PYTEST_CMD}} {{.CLI_ARGS}}'
+      - "{{.PYTEST_CMD}} {{.CLI_ARGS}}"
 
   lint:
     desc: "Run all linters."
@@ -116,7 +116,7 @@ tasks:
       Example:
         $ task docker -- ls
     cmds:
-      - '{{.DOCKER_COMPOSE}} {{.DOCKER_COMPOSE_ARGS}} {{.CLI_ARGS}}'
+      - "{{.DOCKER_COMPOSE}} {{.DOCKER_COMPOSE_ARGS}} {{.CLI_ARGS}}"
 
   docker:build:
     desc: "Build container images."
@@ -182,7 +182,7 @@ tasks:
       Example:
         $ task minikube -- build
     cmds:
-      - '{{.MINIKUBE_CMD}} {{.CLI_ARGS}}'
+      - "{{.MINIKUBE_CMD}} {{.CLI_ARGS}}"
 
   minikube:build:
     desc: "Build docker image and push to minikube"
