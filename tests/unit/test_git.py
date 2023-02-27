@@ -91,7 +91,8 @@ def test_git_executor_call(run_mock: mock.Mock):
         env={
             "GIT_TERMINAL_PROMPT": "0",
         },
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         timeout=30,
         cwd=None,
     )
