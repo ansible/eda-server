@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from channels.db import database_sync_to_async
@@ -9,9 +9,26 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 from aap_eda.core import models
 
-from .messages import ExtraVars, Inventory, Rulebook, SSHPrivateKey
+from .messages import (
+    ActionMessage,
+    AnsibleEventMessage,
+    ExtraVars,
+    Inventory,
+    JobMessage,
+    Rulebook,
+    SSHPrivateKey,
+    WorkerMessage,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class MessageType(Enum):
+    ACTION = "Action"
+    ANSIBLE_EVENT = "AnsibleEvent"
+    JOB = "Job"
+    WORKER = "Worker"
+    SHUTDOWN = "Shutdown"
 
 
 # Determine host status based on event type
@@ -54,22 +71,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
 
-        data_type = data.get("type")
+        msg_type = MessageType(data.get("type"))
 
-        if data_type == "Worker":
-            await self.handle_workers(data)
-        elif data_type == "Job":
-            await self.handle_jobs(data)
-        elif data_type == "AnsibleEvent":
-            await self.handle_events(data)
-        elif data_type == "Action":
-            await self.handle_actions(data)
+        if msg_type == MessageType.WORKER:
+            await self.handle_workers(WorkerMessage.parse_obj(data))
+        elif msg_type == MessageType.JOB:
+            await self.handle_jobs(JobMessage.parse_obj(data))
+        elif msg_type == MessageType.ANSIBLE_EVENT:
+            await self.handle_events(AnsibleEventMessage.parse_obj(data))
+        elif msg_type == MessageType.ACTION:
+            await self.handle_actions(ActionMessage.parse_obj(data))
+        elif msg_type == MessageType.SHUTDOWN:
+            logger.info("Websocket connection is closed.")
         else:
-            logger.warning(f"Unsupported data type received: {data_type}")
+            logger.warning(f"Unsupported message type received: {msg_type}")
 
-    async def handle_workers(self, data: dict):
+    async def handle_workers(self, message: WorkerMessage):
+        logger.info(f"Start to handle workers: {message}")
         rulebook, inventory, extra_var = await self.get_resources(
-            data.get("activation_id")
+            message.activation_id
         )
 
         rulebook_message = Rulebook(
@@ -86,28 +106,28 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             data=base64.b64encode("".encode()).decode()
         )
 
-        await self.send(text_data=rulebook_message.to_json())
-        await self.send(text_data=inventory_message.to_json())
-        await self.send(text_data=extra_var_message.to_json())
-        await self.send(text_data=ssh_key_message.to_json())
+        await self.send(text_data=rulebook_message.json())
+        await self.send(text_data=inventory_message.json())
+        await self.send(text_data=extra_var_message.json())
+        await self.send(text_data=ssh_key_message.json())
 
         # TODO: add broadcasting later by channel groups
 
-    async def handle_jobs(self, data: dict):
-        logger.info(f"Start to handle jobs: {data}")
-        await self.insert_job_related_data(data)
+    async def handle_jobs(self, message: JobMessage):
+        logger.info(f"Start to handle jobs: {message}")
+        await self.insert_job_related_data(message)
 
-    async def handle_events(self, data: dict):
-        logger.info(f"Start to handle events: {data}")
-        await self.insert_event_related_data(data)
+    async def handle_events(self, message: AnsibleEventMessage):
+        logger.info(f"Start to handle events: {message}")
+        await self.insert_event_related_data(message)
 
-    async def handle_actions(self, data: dict):
-        logger.info(f"Start to handle actions: {data}")
-        await self.insert_audit_rule_data(data)
+    async def handle_actions(self, message: ActionMessage):
+        logger.info(f"Start to handle actions: {message}")
+        await self.insert_audit_rule_data(message)
 
     @database_sync_to_async
-    def insert_event_related_data(self, data: dict) -> None:
-        event_data = data.get("event", {})
+    def insert_event_related_data(self, message: AnsibleEventMessage) -> None:
+        event_data = message.event or {}
         if event_data.get("stdout"):
             job_instance = models.JobInstance.objects.get(
                 uuid=event_data.get("job_id")
@@ -153,17 +173,17 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
     @database_sync_to_async
-    def insert_audit_rule_data(self, data: dict) -> None:
-        activation_instance_id = int(data.get("activation_id"))
+    def insert_audit_rule_data(self, message: ActionMessage) -> None:
+        activation_instance_id = message.activation_id
 
         if activation_instance_id:
-            action_name = data.get("action")
-            playbook_name = data.get("playbook_name")
-            job_id = data.get("job_id")
+            action_name = message.action
+            playbook_name = message.playbook_name
+            job_id = message.job_id
             fired_date = datetime.strptime(
-                data.get("run_at"), "%Y-%m-%d %H:%M:%S.%f"
-            )
-            status = data.get("status")
+                message.run_at, "%Y-%m-%d %H:%M:%S.%f"
+            ).replace(tzinfo=timezone.utc)
+            status = message.status
 
             if job_id:
                 job_instance = models.JobInstance.objects.get(uuid=job_id)
@@ -183,57 +203,44 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
             audit_rules = []
-            if job_instance:
-                for rule in rules:
-                    if (
-                        rule.action.get(action_name, {}).get("name")
-                        == playbook_name
-                    ):
-                        audit_rule = models.AuditRule(
-                            activation_instance_id=activation_instance_id,
-                            ruleset_id=rule.ruleset_id,
-                            rule_id=rule.id,
-                            name=rule.name,
-                            definition=rule.action,
-                            job_instance_id=job_instance.id,
-                            fired_date=fired_date,
-                            status=status,
-                        )
-                        audit_rules.append(audit_rule)
-            else:
-                for rule in rules:
-                    if (
-                        rule.action.get(action_name, {}).get("name")
-                        == playbook_name
-                    ):
-                        audit_rule = models.AuditRule(
-                            activation_instance_id=activation_instance_id,
-                            ruleset_id=rule.ruleset_id,
-                            rule_id=rule.id,
-                            name=rule.name,
-                            definition=rule.action,
-                            fired_date=fired_date,
-                            status=status,
-                        )
-                        audit_rules.append(audit_rule)
+            job_instance_id = job_instance.id if job_instance else None
+
+            for rule in rules:
+                if (
+                    rule.action.get(action_name, {}).get("name")
+                    == playbook_name
+                ):
+                    audit_rule = models.AuditRule(
+                        activation_instance_id=activation_instance_id,
+                        ruleset_id=rule.ruleset_id,
+                        rule_id=rule.id,
+                        name=rule.name,
+                        definition=rule.action,
+                        job_instance_id=job_instance_id,
+                        fired_date=fired_date,
+                        status=status,
+                    )
+                    audit_rules.append(audit_rule)
 
             if len(audit_rules) > 0:
                 models.AuditRule.objects.bulk_create(audit_rules)
                 logger.info(f"{len(audit_rules)} audit rules are created.")
 
     @database_sync_to_async
-    def insert_job_related_data(self, data: dict) -> models.JobInstance:
+    def insert_job_related_data(
+        self, message: JobMessage
+    ) -> models.JobInstance:
         job_instance = models.JobInstance.objects.create(
-            uuid=data.get("job_id"),
-            name=data.get("name"),
-            action=data.get("action"),
-            ruleset=data.get("ruleset"),
-            hosts=data.get("hosts"),
-            rule=data.get("rule"),
+            uuid=message.job_id,
+            name=message.name,
+            action=message.action,
+            ruleset=message.ruleset,
+            hosts=message.hosts,
+            rule=message.rule,
         )
         logger.info(f"Job instance {job_instance.id} is created.")
 
-        activation_instance_id = int(data.get("ansible_rulebook_id"))
+        activation_instance_id = message.ansible_rulebook_id
         instance = models.ActivationInstanceJobInstance.objects.create(
             job_instance_id=job_instance.id,
             activation_instance_id=activation_instance_id,

@@ -12,41 +12,65 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
-from dataclasses import asdict, dataclass
+from pydantic import BaseModel
 
 
-@dataclass(frozen=True)
-class Rulebook:
+class Message(BaseModel):
+    type: str
+
+
+class ActionMessage(Message):
+    action: str
+    activation_id: int
+    playbook_name: str
+    job_id: str
+    ruleset: str
+    rule: str
+    rc: int
+    status: str
+    run_at: str = None
+    matching_events: dict = {}
+
+
+class AnsibleEventMessage(Message):
+    event: dict = {}
+    run_at: str = None
+
+
+class JobMessage(Message):
+    job_id: str
+    ansible_rulebook_id: int
+    name: str
+    ruleset: str
+    rule: str
+    hosts: str
+    action: str
+
+
+class WorkerMessage(Message):
+    activation_id: int
+
+
+class Rulebook(BaseModel):
     data: str
     type: str = "Rulebook"
 
-    def to_json(self):
-        return json.dumps(asdict(self))
 
-
-@dataclass(frozen=True)
-class Inventory:
+class Inventory(BaseModel):
     data: str
     type: str = "Inventory"
 
-    def to_json(self):
-        return json.dumps(asdict(self))
 
-
-@dataclass(frozen=True)
-class ExtraVars:
+class ExtraVars(BaseModel):
     data: str
     type: str = "ExtraVars"
 
-    def to_json(self):
-        return json.dumps(asdict(self))
 
-
-@dataclass(frozen=True)
-class SSHPrivateKey:
+class SSHPrivateKey(BaseModel):
     data: str
     type: str = "SSHPrivateKey"
 
-    def to_json(self):
-        return json.dumps(asdict(self))
+
+class Hello(BaseModel):
+    data: str = {}
+    type: str = "Hello"
