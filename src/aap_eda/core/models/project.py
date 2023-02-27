@@ -26,10 +26,10 @@
 
 from django.db import models
 
+PROJECT_ARCHIVE_DIR = "projects/"
+
 
 class Project(models.Model):
-    ARCHIVE_FILE_PREFIX = "projects/"
-
     class Meta:
         db_table = "core_project"
         constraints = [
@@ -45,7 +45,7 @@ class Project(models.Model):
     description = models.TextField(default="")
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
-    archive_file = models.FileField(upload_to=ARCHIVE_FILE_PREFIX)
+    archive_file = models.FileField(upload_to=PROJECT_ARCHIVE_DIR)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.id}, name={self.name})"
