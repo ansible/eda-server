@@ -186,6 +186,18 @@ $ docker images
 REPOSITORY                                    TAG         IMAGE ID       CREATED        SIZE
 localhost/aap-eda                             latest      28fd94c8cf89   5 hours ago    611MB
 ```
+To override image name:(using short git hash for version here)
+
+```shell
+export EDA_IMAGE="ansible/eda-server:$(git rev-parse --short HEAD)"; task docker:build
+```
+
+```shell
+$ docker images
+
+REPOSITORY                      TAG         IMAGE ID       CREATED          SIZE
+ansible/eda-server              12146d8     51fb0c850b94   10 minutes ago   682MB
+```
 
 ### Running services
 
