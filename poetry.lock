@@ -369,6 +369,21 @@ argon2 = ["argon2-cffi (>=19.1.0)"]
 bcrypt = ["bcrypt"]
 
 [[package]]
+name = "django-filter"
+version = "22.1"
+description = "Django-filter is a reusable Django application for allowing users to filter querysets dynamically."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "django-filter-22.1.tar.gz", hash = "sha256:ed473b76e84f7e83b2511bb2050c3efb36d135207d0128dfe3ae4b36e3594ba5"},
+    {file = "django_filter-22.1-py3-none-any.whl", hash = "sha256:ed429e34760127e3520a67f415bec4c905d4649fbe45d0d6da37e6ff5e0287eb"},
+]
+
+[package.dependencies]
+Django = ">=3.2"
+
+[[package]]
 name = "django-rq"
 version = "2.7.0"
 description = "An app that provides django integration for RQ (Redis Queue)"
@@ -1488,4 +1503,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9"
-content-hash = "5fa58ea43e1e0d1286b2fb4979de323b486fe255859a56f9cfa9f75432623577"
+content-hash = "9e2dfb3f390de017db80c251a87a4925f28ebb73ccb9fd7a0baf38e7a3080d95"

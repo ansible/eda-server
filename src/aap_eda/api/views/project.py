@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -22,7 +23,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda import tasks
-from aap_eda.api import exceptions as api_exc, serializers
+from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 
 
@@ -140,6 +141,8 @@ class PlaybookViewSet(
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filterset_class = filters.ProjectFilter
 
     @extend_schema(
         description="Import a project.",

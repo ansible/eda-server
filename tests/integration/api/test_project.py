@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from datetime import datetime, timedelta
 from typing import Any, Dict
 from unittest import mock
 
@@ -45,6 +46,107 @@ def test_list_projects(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
     for data, project in zip(response.data["results"], projects):
         assert_project_data(data, project)
+
+
+@pytest.mark.django_db
+def test_projects_filter_name(client: APIClient):
+    projects = models.Project.objects.bulk_create(
+        [
+            models.Project(
+                name="test-project-01",
+                url="https://git.example.com/acme/project-01",
+                git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+            ),
+            models.Project(
+                name="test-project-02",
+                url="https://git.example.com/acme/project-02",
+                description="Project description.",
+                git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+            ),
+        ]
+    )
+    test_name = "test-project-01"
+    response = client.get(f"{api_url_v1}/projects/?name={test_name}")
+    data = response.json()["results"][0]
+    project = projects[0]
+    assert response.status_code == status.HTTP_200_OK
+    assert_project_data(data, project)
+
+
+@pytest.mark.django_db
+def test_projects_filter_name_none_exist(client: APIClient):
+    models.Project.objects.bulk_create(
+        [
+            models.Project(
+                name="test-project-01",
+                url="https://git.example.com/acme/project-01",
+                git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+            ),
+            models.Project(
+                name="test-project-02",
+                url="https://git.example.com/acme/project-02",
+                description="Project description.",
+                git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+            ),
+        ]
+    )
+    test_name = "test-doesnt-exist"
+    response = client.get(f"{api_url_v1}/projects/?name={test_name}")
+    data = response.json()["results"]
+    assert response.status_code == status.HTTP_200_OK
+    assert data == []
+
+
+@pytest.mark.django_db
+def test_projects_filter_created_date(client: APIClient):
+    projects = models.Project.objects.bulk_create(
+        [
+            models.Project(
+                name="test-project-01",
+                url="https://git.example.com/acme/project-01",
+                git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+            ),
+            models.Project(
+                name="test-project-02",
+                url="https://git.example.com/acme/project-02",
+                description="Project description.",
+                git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+            ),
+        ]
+    )
+
+    yesterday = datetime.today() - timedelta(1)
+
+    response = client.get(f"{api_url_v1}/projects/?created_at={yesterday}")
+    assert response.status_code == status.HTTP_200_OK
+    for data, project in zip(response.data["results"], projects):
+        assert_project_data(data, project)
+
+
+@pytest.mark.django_db
+def test_projects_filter_date_none(client: APIClient):
+    models.Project.objects.bulk_create(
+        [
+            models.Project(
+                name="test-project-01",
+                url="https://git.example.com/acme/project-01",
+                git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+            ),
+            models.Project(
+                name="test-project-02",
+                url="https://git.example.com/acme/project-02",
+                description="Project description.",
+                git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+            ),
+        ]
+    )
+
+    tomorrow = datetime.today() + timedelta(1)
+
+    response = client.get(f"{api_url_v1}/projects/?created_at={tomorrow}")
+    data = response.json()["results"]
+    assert response.status_code == status.HTTP_200_OK
+    assert data == []
 
 
 @pytest.mark.django_db
