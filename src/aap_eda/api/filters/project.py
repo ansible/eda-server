@@ -24,7 +24,9 @@ class ProjectFilter(django_filters.FilterSet):
     )
     url = django_filters.CharFilter(field_name="url", lookup_expr="icontains")
     created_at = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
+        field_name="created_at",
+        lookup_expr="gte",
+        widget=DateInput(attrs={"type": "date"}),
     )
     modified_at = django_filters.DateTimeFilter(
         field_name="modified_at",
