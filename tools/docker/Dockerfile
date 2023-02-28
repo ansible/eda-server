@@ -30,4 +30,22 @@ RUN poetry install -E all --no-root
 COPY . ${WORKDIR}
 RUN poetry install -E all --only-root
 
+
+# Pre-create things we need to access
+USER 0
+RUN for dir in \
+      /app \
+      /app/venv \
+      /app/venv/bin ; \
+    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done && \
+    for file in \
+      /etc/subuid \
+      /etc/subgid \
+      /etc/group \
+      /etc/passwd ; \
+    do touch $file ; chmod g+rw $file ; chgrp root $file ; done
+
+USER "$USER_ID"
+
+
 CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
