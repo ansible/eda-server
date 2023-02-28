@@ -29,6 +29,7 @@ class MessageType(Enum):
     JOB = "Job"
     WORKER = "Worker"
     SHUTDOWN = "Shutdown"
+    PROCESSED_EVENT = "ProcessedEvent"
 
 
 # Determine host status based on event type
@@ -84,7 +85,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         elif msg_type == MessageType.SHUTDOWN:
             logger.info("Websocket connection is closed.")
         else:
-            logger.warning(f"Unsupported message type received: {msg_type}")
+            logger.warning(f"Unsupported message received: {data}")
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
