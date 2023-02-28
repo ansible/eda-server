@@ -37,7 +37,7 @@ psycopg2 = { version = "*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
 django-rq = "*"
 rq = "*"
-django-filter = "^22.1"
+django-filter = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
