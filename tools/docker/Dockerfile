@@ -25,9 +25,9 @@ RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
 
 WORKDIR /app/src
 
-COPY pyproject.toml poetry.lock ${WORKDIR}
+COPY pyproject.toml poetry.lock ${WORKDIR}/
 RUN poetry install -E all --no-root
-COPY . ${WORKDIR}
+COPY . ${WORKDIR}/
 RUN poetry install -E all --only-root
 
 CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
