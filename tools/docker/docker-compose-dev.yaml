@@ -6,7 +6,7 @@ x-environment:
 
 services:
   api:
-    image: 'localhost/aap-eda'
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
     build:
       context: ../../
       dockerfile: tools/docker/Dockerfile
