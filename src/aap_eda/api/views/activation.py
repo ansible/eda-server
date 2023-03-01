@@ -19,14 +19,13 @@ from drf_spectacular.utils import (
 )
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 
 
-def dependent_object_exists_or_exception(activation):
+def handle_activation_create_conflict(activation):
     activation_dependent_objects = [
         (models.Project, "project", activation.get("project_id")),
         (models.Rulebook, "rulebook", activation.get("rulebook_id")),
@@ -41,6 +40,7 @@ def dependent_object_exists_or_exception(activation):
                 detail=f"{object_name.capitalize()} with ID={object_id}"
                 " does not exist.",
             )
+    raise api_exc.Unprocessable(detail="Integrity error.")
 
 
 @extend_schema_view(
@@ -83,9 +83,8 @@ class ActivationViewSet(
         try:
             response = serializer.create(serializer.validated_data)
         except IntegrityError:
-            dependent_object_exists_or_exception(serializer.validated_data)
-            # in case IntegrityError is not handled by above logic
-            raise APIException()
+            handle_activation_create_conflict(serializer.validated_data)
+
         response_serializer = serializers.ActivationSerializer(response)
         # TODO(doston): need to implement backend process and instance creation
 
