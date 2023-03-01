@@ -12,6 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from .activate_rulesets import ActivateRulesets
 from .ansible_rulebook import AnsibleRulebookService
 
-__all__ = ("AnsibleRulebookService",)
+__all__ = (
+    "ActivateRulesets",
+    "AnsibleRulebookService",
+)

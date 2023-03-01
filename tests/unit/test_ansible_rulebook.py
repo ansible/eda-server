@@ -26,7 +26,7 @@ from aap_eda.services.ruleset.ansible_rulebook import (
 
 @mock.patch("subprocess.run")
 def test_run_worker_mode(run_mock: mock.Mock):
-    AnsibleRulebookService.run_worker_mode(
+    AnsibleRulebookService().run_worker_mode(
         "ws://localhost:8000/api/eda/ws/ansible-rulebook", "1"
     )
 
@@ -58,7 +58,7 @@ def test_raise_error(run_mock: mock.Mock):
     run_mock.side_effect = raise_error
 
     with pytest.raises(AnsibleRulebookServiceFailed):
-        executor = AnsibleRulebookService.run_worker_mode(
+        executor = AnsibleRulebookService().run_worker_mode(
             "ws://localhost:8000/api/eda/ws/ansible-rulebook", "1"
         )
 

@@ -100,6 +100,18 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         ]
 
 
+class ActivationInstanceCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating the Activation Instance."""
+
+    activation_id = serializers.IntegerField()
+
+    class Meta:
+        model = models.ActivationInstance
+        fields = [
+            "activation_id",
+        ]
+
+
 class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
 

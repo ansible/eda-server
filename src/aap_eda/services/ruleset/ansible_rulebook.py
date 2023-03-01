@@ -27,21 +27,17 @@ class AnsibleRulebookServiceFailed(Exception):
     pass
 
 
-if ANSIBLE_RULEBOOK_BIN is None:
-    raise AnsibleRulebookServiceFailed("ansible-rulebook: command not found")
-
-if SSH_AGENT_BIN is None:
-    raise AnsibleRulebookServiceFailed("ssh-agent: command not found")
-
-
 class AnsibleRulebookService:
-    @classmethod
+    def __init__(
+        self, timeout: Optional[float] = None, cwd: Optional[str] = None
+    ):
+        self.timeout = timeout
+        self.cwd = cwd
+
     def run_worker_mode(
-        cls,
+        self,
         url: str,
         activation_id: str,
-        timeout: Optional[float] = None,
-        cwd: Optional[str] = None,
     ) -> subprocess.CompletedProcess:
         """Run ansible-rulebook in worker mode."""
         args = [
@@ -58,8 +54,8 @@ class AnsibleRulebookService:
                 check=True,
                 encoding="utf-8",
                 capture_output=True,
-                timeout=timeout,
-                cwd=cwd,
+                timeout=self.timeout,
+                cwd=self.cwd,
             )
         except subprocess.TimeoutExpired as exc:
             logging.warning("%s", str(exc))

@@ -14,36 +14,33 @@
 
 import logging
 
-from aap_eda.core import models
 from aap_eda.core.tasking import job
-from aap_eda.services.ruleset.ansible_rulebook import AnsibleRulebookService
+from aap_eda.core.types import StrPath
+from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 
 logger = logging.getLogger(__name__)
 
 
 @job
-def activate_rulesets(url: str, activation_id: str):
-    logger.info(f"Task started: Activate ruleset ( {url=} {activation_id=} )")
+def activate_rulesets(
+    activation_instance_id: int,
+    execution_environment: str,
+    working_directory: StrPath,
+    deployment_type: str,
+    host: str,
+    port: int,
+) -> None:
+    logger.info(f"Task started: Activate ruleset ({activation_instance_id=})")
 
-    proc = AnsibleRulebookService().run(
-        url=url,
-        activation_id=activation_id,
+    ActivateRulesets().activate(
+        activation_instance_id,
+        execution_environment,
+        working_directory,
+        deployment_type,
+        host,
+        port,
     )
 
-    line_number = 0
-
-    activation_instance_logs = []
-    for line in proc.stdout.splitlines():
-        activation_instance_log = models.ActivationInstanceLog(
-            line_number=line_number,
-            log=line,
-            activation_id=activation_id,
-        )
-        activation_instance_logs.append(activation_instance_log)
-
-        line_number += 1
-
-    models.ActivationInstanceLog.objects.bulk_create(activation_instance_logs)
-    logger.info(f"{line_number} of activation instance log are created.")
-
-    logger.info(f"Task finished: Ruleset for ({activation_id}) is activated.")
+    logger.info(
+        f"Task finished: Ruleset ({activation_instance_id}) is activated."
+    )
