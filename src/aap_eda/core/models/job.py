@@ -16,9 +16,9 @@ from django.db import models
 
 __all__ = (
     "ActivationInstanceJobInstance",
-    "JobInstanceEvent",
     "JobInstanceHost",
     "JobInstance",
+    "JobInstanceEvent",
     "Job",
 )
 

@@ -73,3 +73,10 @@ class ActivationStatus(DjangoEnum):
     FAILED = "failed"
     STOPPED = "stopped"
     COMPLETED = "completed"
+
+
+class EDADeployment(DjangoEnum):
+    LOCAL = "local"
+    DOCKER = "docker"
+    PODMAN = "podman"
+    # TODO: Add K8S support

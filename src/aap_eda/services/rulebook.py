@@ -42,29 +42,42 @@ def expand_ruleset_sources(rulebook_data: dict) -> dict:
 def insert_rulebook_related_data(
     rulebook: models.Rulebook, data: dict
 ) -> None:
-    expanded_sources = expand_ruleset_sources(data)
+    # Raising exceptions here as a message with better detail can be
+    # constructed here rather than the IntegrityError message from the DB
 
-    rule_sets = [
-        models.Ruleset(
-            rulebook=rulebook,
-            name=data["name"],
-            sources=expanded_sources.get(data["name"]),
+    expanded_sources = expand_ruleset_sources(data)
+    seen_names = set()
+    rule_sets = []
+    for datum in data or {}:
+        name = datum["name"]
+        if name in seen_names:
+            raise ValueError(f"Duplicate ruleset name '{name}' in rulesets.")
+
+        seen_names.add(name)
+        rule_sets.append(
+            models.Ruleset(
+                rulebook=rulebook,
+                name=name,
+                sources=expanded_sources.get(name),
+            )
         )
-        for data in (data or [])
-    ]
     rule_sets = models.Ruleset.objects.bulk_create(rule_sets)
 
-    # Changed to support rules with multiple actions. Will be skipped
-    # when removing rulebook introspection.
-    rules = [
-        models.Rule(
-            name=rule.get("name"),
-            action=rule.get("action") or rule.get("actions", {}),
-            ruleset=rule_set,
-        )
+    seen_names.clear()
+    rules = []
+    for rul, rul_set in (
+        (rule, rule_set)
         for rule_set, rule_set_data in zip(rule_sets, data)
         for rule in rule_set_data["rules"]
-    ]
+    ):
+        name = rul["name"]
+        if name in seen_names:
+            raise ValueError(f"Duplicate rule name '{name}' in rulesets.")
+
+        seen_names.add(name)
+        rules.append(
+            models.Rule(name=name, action=rul["action"], ruleset=rul_set)
+        )
     models.Rule.objects.bulk_create(rules)
 
 

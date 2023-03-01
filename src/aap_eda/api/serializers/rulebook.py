@@ -50,6 +50,10 @@ class RulebookSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["id", "created_at", "modified_at"]
 
+    def create(self, validated_data):
+        rulebook = models.Rulebook.objects.create(**validated_data)
+        return rulebook
+
 
 class RulebookRefSerializer(serializers.ModelSerializer):
     """Serializer for Rulebook reference."""

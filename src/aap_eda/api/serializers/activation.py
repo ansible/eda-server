@@ -109,13 +109,30 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "started_at", "ended_at"]
 
 
-class ActivationInstanceLogSerializer(serializers.ModelSerializer):
-    """Serializer for the Activation Instance Log model."""
-
+class ActivationInstanceEventSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.ActivationInstanceLog
-        fields = "__all__"
-        read_only_fields = ["id"]
+        model = models.ActivationInstanceEvent
+        fields = ["__all__"]
+
+    def to_representation(self, inst):
+        from aap_eda.services.eda_consumer import NLREGEX
+
+        start_line = inst.event_chunk_start_line
+
+        rep = {
+            "activation_id": inst.activation_id,
+            "activation_instance_id": inst.activation_instance_id,
+            "log_chunk_created_at": inst.created_at,
+            "log_data": [
+                {
+                    "line_number": lnum + start_line,
+                    "log_text": txt,
+                }
+                for lnum, txt in enumerate(NLREGEX.split(inst.event_chunk))
+            ],
+        }
+
+        return rep
 
 
 class ActivationReadSerializer(serializers.ModelSerializer):

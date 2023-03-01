@@ -53,6 +53,8 @@ Redis queue settings:
 """
 import dynaconf
 
+from aap_eda.core.enums import EDADeployment
+
 settings = dynaconf.Dynaconf(envvar_prefix="EDA")
 
 # ---------------------------------------------------------
@@ -297,3 +299,42 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
 WEBSOCKET_SERVER_NAME = settings.get("WEBSOCKET_SERVER_NAME", "localhost")
 WEBSOCKET_SERVER_PORT = settings.get("WEBSOCKET_SERVER_PORT", "8000")
+
+# ---------------------------------------------------------
+# DEPLOYMENT SETTINGS
+# ---------------------------------------------------------
+
+
+class _EDADeploymentSettings:
+    LOCAL_RUNNER_DEPLOY_HOST = "127.0.0.1"
+    LOCAL_RUNNER_DEPLOY_PORT = 8080
+    DEFAULT_CONTAINER_DEPLOYMENT = EDADeployment.PODMAN.value
+
+    def __init__(self, settings):
+        # Set EDA_DEPLOYMENT_TYPE enviroment variable to one of:
+        # "local", "podman", "docker"
+        self.deployment_type = EDADeployment(
+            settings.get("DEPLOYMENT_TYPE", EDADeployment.LOCAL.value)
+        )
+        self.deployment_host = settings.get(
+            "WEBSOCKET_SERVER_PORT", self.LOCAL_RUNNER_DEPLOY_HOST
+        )
+        self.deployment_port = settings.get(
+            "RUNNER_DEPLOYMENT_HOST", self.LOCAL_RUNNER_DEPLOY_PORT
+        )
+
+        # The default container engine is podman.
+        # Set EDA_CONTAINER_ENGINE enviroment variable to one of:
+        # "podman", "docker"
+        self.deployment_container_engine = EDADeployment(
+            settings.get("CONTAINER_ENGINE", self.DEFAULT_CONTAINER_DEPLOYMENT)
+        )
+        if self.deployment_container_engine == EDADeployment.LOCAL:
+            raise ValueError(
+                "Environment variable EDA_RUNNER_CONTAINER_ENGINE value "
+                + f"must be one of {EDADeployment.PODMAN.value} "
+                + f"or {EDADeployment.DOCKER.value}"
+            )
+
+
+EDA_DEPLOY_SETTINGS = _EDADeploymentSettings(settings)

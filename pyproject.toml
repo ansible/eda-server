@@ -40,12 +40,15 @@ rq = "*"
 django-filter = "*"
 pydantic = "*"
 cryptography = "*"
+docker = "^6.0.1"
+podman = "^4.4.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
 requests = { version="*", python="<4.0" }
+ansible-rulebook = "*"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"

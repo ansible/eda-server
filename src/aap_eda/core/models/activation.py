@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
+
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
@@ -48,6 +50,36 @@ class Activation(models.Model):
     restart_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+
+class ActivationInstanceEvent(models.Model):
+    """Stores chunked logs."""
+
+    class Meta:
+        db_table = "core_activation_instance_event"
+        indexes = [
+            models.Index(
+                fields=["activation_instance", "event_number"],
+                name="ix_act_activation_event",
+            ),
+            models.Index(
+                fields=["event_chunk_start_line", "event_chunk_end_line"],
+                name="ix_act_event_start_end_line",
+            ),
+        ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    created_at = models.DateTimeField(auto_now_add=True, null=False)
+    activation = models.ForeignKey(
+        "Activation", null=False, on_delete=models.CASCADE
+    )
+    activation_instance = models.ForeignKey(
+        "ActivationInstance", on_delete=models.CASCADE
+    )
+    event_number = models.IntegerField(null=False)
+    event_chunk_start_line = models.BigIntegerField(null=False)
+    event_chunk_end_line = models.BigIntegerField(null=False)
+    event_chunk = models.TextField(null=False, default="")
 
 
 class ActivationInstance(models.Model):

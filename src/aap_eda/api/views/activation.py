@@ -26,6 +26,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services import ActivationExecution
 from aap_eda.tasks.ruleset import activate_rulesets
 
 
@@ -90,14 +91,6 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
-
-        activate_rulesets.delay(
-            response.id,
-            response.execution_environment,
-            settings.DEPLOYMENT_TYPE,
-            settings.WEBSOCKET_SERVER_NAME,
-            settings.WEBSOCKET_SERVER_PORT,
-        )
 
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
@@ -310,29 +303,55 @@ class ActivationInstanceViewSet(
     serializer_class = serializers.ActivationInstanceSerializer
 
     @extend_schema(
+        request=serializers.ActivationInstanceSerializer,
+        responses={
+            status.HTTP_201_CREATED: serializers.ActivationInstanceSerializer
+        },
+    )
+    def create(self, request):
+        serializer = serializers.ActivationInstanceSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        activation_instance = serializer.create(serializer.validated_data)
+        response_serializer = serializers.ActivationInstanceSerializer(
+            activation_instance
+        )
+        execution = ActivationExecution(activation_instance)
+        activate_rulesets.delay(execution)
+
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED
+        )
+
+    @extend_schema(
         description="List all logs for the Activation Instance",
         responses={
-            status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer
+            status.HTTP_200_OK: serializers.ActivationInstanceEventSerializer
         },
     )
     @action(detail=True)
     def logs(self, request, pk):
-        instance_exists = models.Activation.objects.filter(pk=pk).exists()
+        instance_exists = models.ActivationInstance.objects.filter(
+            pk=pk
+        ).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
                 detail=f"Activation Instance with ID={pk} does not exist.",
             )
 
-        activation_instance_logs = models.ActivationInstanceLog.objects.filter(
-            activation_instance_id=pk
+        activation_instance_logs = (
+            models.ActivationInstanceEvent.objects.filter(
+                activation_instance_id=pk
+            ).order_by("event_chunk_start_line")
         )
 
         activation_instance_logs = self.paginate_queryset(
             activation_instance_logs
         )
 
-        serializer = serializers.ActivationInstanceLogSerializer(
+        serializer = serializers.ActivationInstanceEventSerializer(
             activation_instance_logs, many=True
         )
         return self.get_paginated_response(serializer.data)

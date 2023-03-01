@@ -12,7 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation import Activation, ActivationInstance, ActivationInstanceLog
+from .activation import (
+    Activation,
+    ActivationInstance,
+    ActivationInstanceEvent,
+    ActivationInstanceLog,
+)
 from .auth import Permission, Role
 from .inventory import Inventory
 from .job import (
@@ -35,7 +40,7 @@ from .user import AwxToken, User
 
 __all__ = [
     "ActivationInstanceJobInstance",
-    "ActivationInstanceLog",
+    "ActivationInstanceEvent",
     "ActivationInstance",
     "Activation",
     "AuditAction",
@@ -43,8 +48,8 @@ __all__ = [
     "AuditRule",
     "ExtraVar",
     "Inventory",
-    "JobInstanceEvent",
     "JobInstanceHost",
+    "JobInstanceEvent",
     "JobInstance",
     "Job",
     "Playbook",
