@@ -13,11 +13,14 @@
 #  limitations under the License.
 import json
 from typing import Any, Dict
+from unittest import mock
 
 import pytest
+from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api import serializers
 from aap_eda.core import models
 from aap_eda.core.enums import RestartPolicy
 from tests.integration.constants import api_url_v1
@@ -128,6 +131,27 @@ def test_create_activation_bad_entity(client: APIClient):
         data=test_activation,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db(transaction=True)
+def test_create_activation_unprocessible_entity(client: APIClient):
+    test_activation = {
+        "name": "test-activation",
+        "description": "test activation",
+        "is_enabled": True,
+        "rulebook_id": 100,
+    }
+
+    with mock.patch.object(
+        serializers.ActivationCreateSerializer,
+        "create",
+        mock.Mock(side_effect=IntegrityError),
+    ):
+        response = client.post(
+            f"{api_url_v1}/activations/",
+            data=test_activation,
+        )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 @pytest.mark.django_db
