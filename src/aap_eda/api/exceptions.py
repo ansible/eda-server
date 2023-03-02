@@ -18,6 +18,7 @@ from rest_framework.exceptions import APIException, NotFound
 __all__ = (
     "NotFound",
     "Conflict",
+    "Unprocessable",
 )
 
 
@@ -25,3 +26,9 @@ class Conflict(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = _("Conflict.")
     default_code = "conflict"
+
+
+class Unprocessable(APIException):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    default_detail = _("Unprocessable.")
+    default_code = "Unprocessable"
