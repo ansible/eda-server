@@ -13,27 +13,16 @@
 #  limitations under the License.
 
 import django_filters
-from django.forms import DateInput
 
 from aap_eda.core import models
 
 
 class ProjectFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
-        field_name="name", lookup_expr="icontains"
+        field_name="name", lookup_expr="startswith"
     )
     url = django_filters.CharFilter(field_name="url", lookup_expr="icontains")
-    created_at = django_filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="gte",
-        widget=DateInput(attrs={"type": "date"}),
-    )
-    modified_at = django_filters.DateTimeFilter(
-        field_name="modified_at",
-        lookup_expr="gte",
-        widget=DateInput(attrs={"type": "date"}),
-    )
 
     class Meta:
         model = models.Project
-        fields = ["name", "url", "created_at", "modified_at"]
+        fields = ["name", "url"]
