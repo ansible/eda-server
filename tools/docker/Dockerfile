@@ -1,7 +1,10 @@
 FROM registry.access.redhat.com/ubi9/ubi
 ARG USER_ID=${USER_ID:-1001}
 
-RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda
+RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
+    && mkdir -p /var/lib/eda/ \
+    && chown "${USER_ID}:0" /var/lib/eda \
+    && chmod g+w /var/lib/eda
 
 RUN DNF=dnf \
     INSTALL_PACKAGES="python3 python3-devel python3-pip libpq-devel gcc git" \
