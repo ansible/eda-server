@@ -6,7 +6,6 @@ import aap_eda.core.enums
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("core", "0005_remove_activationinstance_ix_act_inst_name_and_more"),
     ]
