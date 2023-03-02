@@ -36,9 +36,10 @@ class RulebookSerializer(serializers.ModelSerializer):
         help_text="The contained rulesets in the rulebook",
     )
 
-    project = serializers.IntegerField(
+    project = serializers.PrimaryKeyRelatedField(
         required=False,
         allow_null=True,
+        queryset=models.Project.objects.all(),
         help_text="ID of the project",
     )
 
