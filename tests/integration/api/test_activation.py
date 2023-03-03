@@ -101,7 +101,11 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
-def test_create_activation(client: APIClient):
+@mock.patch("aap_eda.tasks.ruleset.activate_rulesets")
+def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
+    job = mock.Mock()
+    activate_rulesets.delay.return_value = job
+
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["project_id"] = fks["project_id"]

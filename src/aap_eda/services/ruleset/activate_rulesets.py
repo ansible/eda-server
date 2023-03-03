@@ -17,7 +17,6 @@ import os
 from enum import Enum
 from typing import Optional
 
-from django.db import transaction
 from django.utils import timezone
 
 from aap_eda.core import models
@@ -43,10 +42,9 @@ class ActivateRulesets:
     ):
         self.service = AnsibleRulebookService(timeout, cwd)
 
-    @transaction.atomic
     def activate(
         self,
-        activation_instance_id: int,
+        activation_id: int,
         execution_environment: str,
         working_directory: StrPath,
         deployment_type: str,
@@ -54,8 +52,8 @@ class ActivateRulesets:
         port: int = 8000,
     ):
         try:
-            instance = models.ActivationInstance.objects.get(
-                id=activation_instance_id
+            instance = models.ActivationInstance.objects.create(
+                activation_id=activation_id
             )
             instance.status = ActivationStatus.RUNNING
 
@@ -64,9 +62,7 @@ class ActivateRulesets:
             dtype = DeploymentType(deployment_type)
 
             if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(
-                    LOCAL_WS_ADDRESS, activation_instance_id
-                )
+                self.activate_in_local(LOCAL_WS_ADDRESS, instance.id)
             elif (
                 dtype == DeploymentType.PODMAN
                 or dtype == DeploymentType.DOCKER

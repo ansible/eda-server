@@ -101,9 +101,6 @@ def test_rulesets_activate_local(run_mock: mock.Mock):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    activation_instance = models.ActivationInstance.objects.create(
-        activation_id=activation.id
-    )
     out = "test_output_line_1\ntest_output_line_2"
 
     run_mock.return_value = CompletedProcess(
@@ -113,18 +110,19 @@ def test_rulesets_activate_local(run_mock: mock.Mock):
     )
 
     assert models.ActivationInstanceLog.objects.count() == 0
-    assert activation_instance.status == ActivationStatus.PENDING
 
     ActivateRulesets().activate(
-        activation_instance_id=activation_instance.id,
+        activation_id=activation.id,
         execution_environment="quay.io/ansible-rulebook",
         working_directory="tmp",
         deployment_type="local",
     )
 
-    activation_instance.refresh_from_db()
     assert models.ActivationInstanceLog.objects.count() == 2
-    assert activation_instance.status == ActivationStatus.COMPLETED.value
+    assert (
+        models.ActivationInstance.objects.first().status
+        == ActivationStatus.COMPLETED.value
+    )
 
 
 @pytest.mark.django_db
@@ -133,18 +131,16 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    activation_instance = models.ActivationInstance.objects.create(
-        activation_id=activation.id
-    )
-
-    assert activation_instance.status == ActivationStatus.PENDING
+    assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_instance_id=activation_instance.id,
+        activation_id=activation.id,
         execution_environment="quay.io/ansible-rulebook",
         working_directory="tmp",
         deployment_type="bad_type",
     )
 
-    activation_instance.refresh_from_db()
-    assert activation_instance.status == ActivationStatus.FAILED.value
+    assert (
+        models.ActivationInstance.objects.first().status
+        == ActivationStatus.FAILED.value
+    )

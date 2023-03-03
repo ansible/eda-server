@@ -23,17 +23,17 @@ logger = logging.getLogger(__name__)
 
 @job
 def activate_rulesets(
-    activation_instance_id: int,
+    activation_id: int,
     execution_environment: str,
     working_directory: StrPath,
     deployment_type: str,
     host: str,
     port: int,
 ) -> None:
-    logger.info(f"Task started: Activate ruleset ({activation_instance_id=})")
+    logger.info(f"Task started: Activate ruleset ({activation_id=})")
 
     ActivateRulesets().activate(
-        activation_instance_id,
+        activation_id,
         execution_environment,
         working_directory,
         deployment_type,
@@ -41,6 +41,4 @@ def activate_rulesets(
         port,
     )
 
-    logger.info(
-        f"Task finished: Ruleset ({activation_instance_id}) is activated."
-    )
+    logger.info(f"Task finished: Ruleset ({activation_id}) is activated.")

@@ -88,7 +88,15 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
-        # TODO(doston): need to implement backend process and instance creation
+
+        activate_rulesets.delay(
+            response.id,
+            response.execution_environment,
+            response.working_directory,
+            settings.DEPLOYMENT_TYPE,
+            settings.DOCKER_SERVER_NAME,
+            settings.DOCKER_PORT_NUMBER,
+        )
 
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
@@ -193,43 +201,11 @@ class ActivationViewSet(
     ),
 )
 class ActivationInstanceViewSet(
-    mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
     queryset = models.ActivationInstance.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
-
-    @extend_schema(
-        request=serializers.ActivationInstanceCreateSerializer,
-        responses={
-            status.HTTP_201_CREATED: serializers.ActivationInstanceSerializer
-        },
-    )
-    def create(self, request):
-        serializer = serializers.ActivationInstanceCreateSerializer(
-            data=request.data
-        )
-        serializer.is_valid(raise_exception=True)
-        response = serializer.create(serializer.validated_data)
-
-        activation = models.Activation.objects.get(id=response.activation_id)
-        activate_rulesets.delay(
-            response.id,
-            activation.execution_environment,
-            activation.working_directory,
-            settings.DEPLOYMENT_TYPE,
-            settings.DOCKER_SERVER_NAME,
-            settings.DOCKER_PORT_NUMBER,
-        )
-
-        response_serializer = serializers.ActivationInstanceSerializer(
-            response
-        )
-
-        return Response(
-            response_serializer.data, status=status.HTTP_201_CREATED
-        )
 
     @extend_schema(
         description="List all logs for the Activation Instance",
