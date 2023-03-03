@@ -38,6 +38,7 @@ psycopg2-binary = { version = "*", optional = true }
 django-rq = "*"
 rq = "*"
 django-filter = "*"
+pydantic = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
