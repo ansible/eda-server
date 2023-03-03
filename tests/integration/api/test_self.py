@@ -12,8 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pytest
 from rest_framework.test import APIClient
 
 
+@pytest.mark.django_db
 def test_client_fixture(client: APIClient):
     assert isinstance(client, APIClient)
