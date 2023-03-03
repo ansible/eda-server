@@ -59,7 +59,7 @@ openapi_urls = [
 v1_urls = [
     *router.urls,
     path("", include(openapi_urls)),
-    path("auth", include("rest_framework.urls")),
+    path("auth/", include("rest_framework.urls")),
 ]
 
 urlpatterns = [
