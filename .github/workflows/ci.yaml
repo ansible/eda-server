@@ -47,11 +47,14 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      EDA_SECRET_KEY: 'test'
+      EDA_DB_PASSWORD: 'secret'
     services:
       postgres:
         image: 'postgres:13'
         env:
-          POSTGRES_PASSWORD: secret
+          POSTGRES_PASSWORD: 'secret'
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
