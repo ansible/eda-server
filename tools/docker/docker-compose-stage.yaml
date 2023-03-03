@@ -44,6 +44,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    deploy:
+      replicas: 2
 
   postgres:
     image: 'docker.io/library/postgres:13'
