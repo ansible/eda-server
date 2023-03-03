@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "django_rq",
+    "django_filters",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
