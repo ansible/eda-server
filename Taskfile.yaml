@@ -233,6 +233,13 @@ tasks:
         vars:
           CLI_ARGS: port-forward-api {{.CLI_ARGS}}
 
+  minikube:fp:pg:
+    desc: "Forward local port to postgres instance port in minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: port-forward-pg {{.CLI_ARGS}}
+
   minikube:logs:eda:
     desc: "Stream logs for EDA application"
     cmds:

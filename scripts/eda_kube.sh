@@ -38,6 +38,7 @@ usage() {
     log-info "\t clean                        remove deployment directory and all EDA resource from minikube"
     log-info "\t port-forward-api             forward local port to EDA API (default: 8000)"
     log-info "\t port-forward-ui              forward local port to EDA UI (default: 8080)"
+    log-info "\t port-forward-pg              forward local port to Postgres (default: 5432)"
     log-info "\t eda-logs                     stream logs for all container in eda application"
     log-info "\t help                         show usage"
 }
@@ -190,6 +191,16 @@ port-forward-api() {
   port-forward "${_svc_name}" "${_local_port}" "${_svc_port}"
 }
 
+port-forward-pg() {
+  local _local_port=${1}
+  local _svc_name=eda-postgres
+  local _svc_port=5432
+
+  log-debug "port-forward ${_svc_name} ${_local_port} ${_svc_port}"
+  port-forward "${_svc_name}" "${_local_port}" "${_svc_port}"
+}
+
+
 get-eda-logs() {
   log-debug "kubectl logs -n ${NAMESPACE} -l app=eda -f"
   kubectl logs -n "${NAMESPACE}" -l app=eda -f
@@ -204,6 +215,7 @@ case ${CMD} in
   "deploy") deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api 8000 ;;
   "port-forward-ui") port-forward-ui 8080 ;;
+  "port-forward-pg") port-forward-pg 5432 ;;
   "eda-logs") get-eda-logs ;;
   "help") usage ;;
    *) usage ;;
