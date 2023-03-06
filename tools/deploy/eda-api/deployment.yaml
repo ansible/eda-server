@@ -31,7 +31,7 @@ spec:
               value: secret
             - name: EDA_MQ_HOST
               value: eda-redis
-            - name: ALLOWED_HOSTS
+            - name: EDA_ALLOWED_HOSTS
               value: "['*']"
           image: aap-eda
           imagePullPolicy: Never
