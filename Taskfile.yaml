@@ -174,12 +174,19 @@ tasks:
         vars:
           CLI_ARGS: exec postgres psql -U postgres eda
 
-  docker:shell:
-    desc: "Run the management shell"
+  docker:shell:api:
+      desc: "Run the management shell in api container"
+      cmds:
+        - task: docker
+          vars:
+            CLI_ARGS: exec -it api aap-eda-manage shell
+
+  docker:shell:worker:
+    desc: "Run the management shell in worker container"
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: run --rm api aap-eda-manage shell
+          CLI_ARGS: exec -it worker aap-eda-manage shell
 
   minikube:
     desc: "Run eda_kube.sh with specified CLI arguments."
