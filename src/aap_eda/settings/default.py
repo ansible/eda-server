@@ -56,6 +56,11 @@ SECRET_KEY = settings.get("SECRET_KEY")
 DEBUG = settings.get("DEBUG", False)
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
+ALLOWED_HOSTS = (
+    ALLOWED_HOSTS.split(",")
+    if isinstance(ALLOWED_HOSTS, str)
+    else ALLOWED_HOSTS
+)
 
 
 # Application definition
