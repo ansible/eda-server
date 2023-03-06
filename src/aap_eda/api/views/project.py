@@ -11,8 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-from django_filters import rest_framework as defaultfilters
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -141,29 +140,38 @@ class PlaybookViewSet(
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
 
     @extend_schema(
         description="Import a project.",
-        request=serializers.ProjectCreateSerializer,
+        request=serializers.ProjectCreateRequestSerializer,
         responses={
-            status.HTTP_202_ACCEPTED: OpenApiResponse(
-                serializers.TaskRefSerializer,
-                description="Return a reference to a project import task.",
+            status.HTTP_201_CREATED: OpenApiResponse(
+                serializers.ProjectSerializer,
+                description="Return a created project.",
             ),
         },
     )
     def create(self, request):
-        serializer = serializers.ProjectCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        job = tasks.import_project.delay(**data)
-        serializer = serializers.TaskRefSerializer(
-            {"id": job.id}, context={"request": request}
+        serializer = serializers.ProjectCreateRequestSerializer(
+            data=request.data
         )
-        return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
+        serializer.is_valid(raise_exception=True)
+        project = serializer.save()
+
+        job = tasks.import_project.delay(project_id=project.id)
+
+        # Atomically update `import_task_id` field only.
+        models.Project.objects.filter(pk=project.id).update(
+            import_task_id=job.id
+        )
+        project.import_task_id = job.id
+        serializer = self.get_serializer(project)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
     @extend_schema(
         responses={status.HTTP_202_ACCEPTED: serializers.TaskRefSerializer}

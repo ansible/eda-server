@@ -14,6 +14,7 @@
 
 import logging
 
+from aap_eda.core import models
 from aap_eda.core.tasking import job
 from aap_eda.services.project import ProjectImportService
 
@@ -21,17 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 @job
-def import_project(name: str, url: str, description: str = ""):
-    logger.info(
-        f"Task started: Import project ( {name=} {url=} {description=} )"
-    )
-    project = ProjectImportService().run(
-        name=name,
-        url=url,
-        description=description,
-    )
+def import_project(project_id: int):
+    logger.info(f"Task started: Import project ( {project_id=} )")
+
+    project = models.Project.objects.get(pk=project_id)
+    ProjectImportService().run(project)
+
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
-    return {"project_id": project.id}
 
 
 @job

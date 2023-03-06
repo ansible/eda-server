@@ -48,18 +48,28 @@ class ProjectImportService:
             git_cls = GitRepository
         self._git_cls = git_cls
 
-    @transaction.atomic
-    def run(self, *, name: str, url: str, description: str = ""):
+    def run(self, project: models.Project):
+        project.import_state = models.Project.ImportState.RUNNING
+        project.save()
+        try:
+            with transaction.atomic():
+                self._perform_import(project)
+                project.import_state = models.Project.ImportState.COMPLETED
+                project.save()
+        except Exception:
+            project.import_state = models.Project.ImportState.FAILED
+            project.save()
+            raise
+
+    def _perform_import(self, project: models.Project):
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
-            repo = self._git_cls.clone(url, repo_dir, depth=1)
-            commit_id = repo.rev_parse("HEAD")
-            project = models.Project.objects.create(
-                url=url, git_hash=commit_id, name=name, description=description
-            )
+
+            repo = self._git_cls.clone(project.url, repo_dir, depth=1)
+            project.git_hash = repo.rev_parse("HEAD")
+
             self._import_rulebooks(project, repo_dir)
             self._save_project_archive(project, repo, tempdir)
-            return project
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
