@@ -25,8 +25,14 @@ spec:
               value: postgresql+asyncpg://postgres:secret@postgres/eda
             - name: EDA_DB_HOST
               value: eda-postgres
+            - name: EDA_DB_PASSWORD
+              value: secret
+            - name: EDA_SECRET_KEY
+              value: secret
             - name: EDA_MQ_HOST
               value: eda-redis
+            - name: ALLOWED_HOSTS
+              value: "['*']"
           image: aap-eda
           imagePullPolicy: Never
           name: eda-api
