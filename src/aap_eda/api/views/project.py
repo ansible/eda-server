@@ -11,8 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-from django_filters import rest_framework as defaultfilters
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -24,7 +23,7 @@ from rest_framework.response import Response
 
 from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
-from aap_eda.core import models
+from aap_eda.core import models, tasking
 
 
 @extend_schema_view(
@@ -141,27 +140,34 @@ class PlaybookViewSet(
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
 
     @extend_schema(
         description="Import a project.",
-        request=serializers.ProjectCreateSerializer,
+        request=serializers.ProjectCreateRequestSerializer,
         responses={
             status.HTTP_202_ACCEPTED: OpenApiResponse(
-                serializers.TaskRefSerializer,
+                serializers.ProjectSerializer,
                 description="Return a reference to a project import task.",
             ),
         },
     )
     def create(self, request):
-        serializer = serializers.ProjectCreateSerializer(data=request.data)
+        serializer = serializers.ProjectCreateRequestSerializer(
+            data=request.data
+        )
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
+        project = serializer.save()
 
-        job = tasks.import_project.delay(**data)
-        serializer = serializers.TaskRefSerializer(
-            {"id": job.id}, context={"request": request}
+        # SELECT FOR UPDATE
+        job = tasking.enqueue(tasks.import_project, project_id=project.id)
+
+        project.import_task_id = job.id
+        project.save()
+
+        serializer = serializers.ProjectSerializer(
+            project, context={"request": request}
         )
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
 
