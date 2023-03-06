@@ -28,10 +28,7 @@ class AnsibleRulebookServiceFailed(Exception):
 
 
 class AnsibleRulebookService:
-    def __init__(
-        self, timeout: Optional[float] = None, cwd: Optional[str] = None
-    ):
-        self.timeout = timeout
+    def __init__(self, cwd: Optional[str] = None):
         self.cwd = cwd
 
     def run_worker_mode(
@@ -48,25 +45,28 @@ class AnsibleRulebookService:
             str(activation_id),
         ]
 
-        try:
-            result = subprocess.run(
-                [SSH_AGENT_BIN, ANSIBLE_RULEBOOK_BIN, *args],
-                check=True,
-                encoding="utf-8",
-                capture_output=True,
-                timeout=self.timeout,
-                cwd=self.cwd,
-            )
-        except subprocess.TimeoutExpired as exc:
-            logging.warning("%s", str(exc))
-            raise AnsibleRulebookServiceFailed("timeout")
-        except subprocess.CalledProcessError as exc:
+        if ANSIBLE_RULEBOOK_BIN and SSH_AGENT_BIN:
+            try:
+                # TODO: subprocess.run may run a while and will block the
+                # following DB updates. Need to find a better way to solve it.
+                return subprocess.run(
+                    [SSH_AGENT_BIN, ANSIBLE_RULEBOOK_BIN, *args],
+                    check=True,
+                    encoding="utf-8",
+                    capture_output=True,
+                    cwd=self.cwd,
+                )
+            except subprocess.CalledProcessError as exc:
+                message = (
+                    f"Command returned non-zero exit status {exc.returncode}:"
+                    f"\n\tcommand: {exc.cmd}"
+                    f"\n\tstderr: {exc.stderr}"
+                )
+                logger.warning("%s", message)
+                raise AnsibleRulebookServiceFailed(exc.stderr)
+        else:
             message = (
-                f"Command returned non-zero exit status {exc.returncode}:"
-                f"\n\tcommand: {exc.cmd}"
-                f"\n\tstderr: {exc.stderr}"
+                f"Commands: SSH_AGENT_BIN[{SSH_AGENT_BIN}] "
+                f"or ANSIBLE_RULEBOOK_BIN [{ANSIBLE_RULEBOOK_BIN}] not found"
             )
-            logger.warning("%s", message)
-            raise AnsibleRulebookServiceFailed(exc.stderr)
-
-        return result
+            raise AnsibleRulebookServiceFailed(message)

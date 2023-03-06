@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 LOCAL_WS_ADDRESS = "ws://localhost:8000/api/eda/ws/ansible-rulebook"
 
 
+class ActivateRulesetsFailed(Exception):
+    pass
+
+
 class DeploymentType(Enum):
     LOCAL = "local"
     DOCKER = "docker"
@@ -37,10 +41,8 @@ class DeploymentType(Enum):
 
 
 class ActivateRulesets:
-    def __init__(
-        self, timeout: Optional[float] = None, cwd: Optional[str] = None
-    ):
-        self.service = AnsibleRulebookService(timeout, cwd)
+    def __init__(self, cwd: Optional[str] = None):
+        self.service = AnsibleRulebookService(cwd)
 
     def activate(
         self,
@@ -71,7 +73,7 @@ class ActivateRulesets:
             elif dtype == DeploymentType.K8S:
                 logger.error(f"{deployment_type} is not implemented yet")
             else:
-                raise Exception(f"Unsupported {deployment_type}")
+                raise ActivateRulesetsFailed(f"Unsupported {deployment_type}")
 
             instance.status = ActivationStatus.COMPLETED
         except Exception as exe:

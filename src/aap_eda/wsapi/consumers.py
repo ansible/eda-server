@@ -98,9 +98,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         inventory_message = Inventory(
             data=base64.b64encode(inventory.inventory.encode()).decode()
         )
-        extra_var_message = ExtraVars(
-            data=base64.b64encode(extra_var.extra_var.encode()).decode()
-        )
+        if extra_var:
+            extra_var_message = ExtraVars(
+                data=base64.b64encode(extra_var.extra_var.encode()).decode()
+            )
+        else:
+            # ansible-rulebook needs this to pass loop checking
+            extra_var_message = ExtraVars(
+                data=base64.b64encode("".encode()).decode()
+            )
 
         await self.send(text_data=rulebook_message.json())
         await self.send(text_data=inventory_message.json())
@@ -247,7 +253,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_resources(
         self, activation_instance_id: str
-    ) -> tuple[models.Rulebook, models.inventory, models.ExtraVar]:
+    ) -> tuple[models.Rulebook, models.Inventory, models.ExtraVar]:
         activation_instance = models.ActivationInstance.objects.get(
             id=activation_instance_id
         )
@@ -258,5 +264,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         inventory = models.Inventory.objects.get(
             project_id=activation.project_id
         )
-        extra_var = models.ExtraVar.objects.get(id=activation.extra_var_id)
+        extra_var = models.ExtraVar.objects.filter(
+            id=activation.extra_var_id
+        ).first()
         return (rulebook, inventory, extra_var)

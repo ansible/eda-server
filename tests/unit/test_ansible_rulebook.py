@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import shutil
 import subprocess
 from unittest import mock
 
@@ -24,6 +23,13 @@ from aap_eda.services.ruleset.ansible_rulebook import (
 )
 
 
+@mock.patch(
+    "aap_eda.services.ruleset.ansible_rulebook.ANSIBLE_RULEBOOK_BIN",
+    "ansible-rulebook",
+)
+@mock.patch(
+    "aap_eda.services.ruleset.ansible_rulebook.SSH_AGENT_BIN", "ssh-agent"
+)
 @mock.patch("subprocess.run")
 def test_run_worker_mode(run_mock: mock.Mock):
     AnsibleRulebookService().run_worker_mode(
@@ -32,8 +38,8 @@ def test_run_worker_mode(run_mock: mock.Mock):
 
     run_mock.assert_called_once_with(
         [
-            shutil.which("ssh-agent"),
-            shutil.which("ansible-rulebook"),
+            "ssh-agent",
+            "ansible-rulebook",
             "--worker",
             "--websocket-address",
             "ws://localhost:8000/api/eda/ws/ansible-rulebook",
@@ -43,7 +49,6 @@ def test_run_worker_mode(run_mock: mock.Mock):
         check=True,
         encoding="utf-8",
         capture_output=True,
-        timeout=None,
         cwd=None,
     )
 

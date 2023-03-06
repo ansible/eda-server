@@ -96,6 +96,13 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
+@mock.patch(
+    "aap_eda.services.ruleset.ansible_rulebook.ANSIBLE_RULEBOOK_BIN",
+    "ansible-rulebook",
+)
+@mock.patch(
+    "aap_eda.services.ruleset.ansible_rulebook.SSH_AGENT_BIN", "ssh-agent"
+)
 @mock.patch("subprocess.run")
 def test_rulesets_activate_local(run_mock: mock.Mock):
     fks = create_activation_related_data()
