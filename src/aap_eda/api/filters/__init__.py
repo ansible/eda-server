@@ -13,11 +13,12 @@
 #  limitations under the License.
 
 from .project import ProjectFilter
-from .rulebook import RulebookFilter
+from .rulebook import RulebookFilter, RulesetFilter
 
 __all__ = (
     # project
     "ProjectFilter",
     # rulebook
     "RulebookFilter",
+    "RulesetFilter",
 )

@@ -244,6 +244,39 @@ def test_list_rulesets(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
+def test_rulesets_filter_name(client: APIClient):
+    _prepare_rulesets_and_rules(client)
+
+    filter_name = "Test sample 001"
+    response = client.get(f"{api_url_v1}/rulesets/?name={filter_name}")
+    assert response.status_code == status.HTTP_200_OK
+    rulesets = response.json()["results"]
+
+    assert len(rulesets) == 1
+    assert rulesets[0]["name"] == "Test sample 001"
+    assert rulesets[0]["rule_count"] == 2
+    assert list(rulesets[0]) == [
+        "id",
+        "name",
+        "created_at",
+        "modified_at",
+        "source_types",
+        "rule_count",
+        "fired_stats",
+    ]
+
+
+@pytest.mark.django_db
+def test_rulesets_filter_name_none_exist(client: APIClient):
+    _prepare_rulesets_and_rules(client)
+    filter_name = "not in existance"
+    response = client.get(f"{api_url_v1}/rulesets/?name={filter_name}")
+    assert response.status_code == status.HTTP_200_OK
+    rulesets = response.data["results"]
+    assert rulesets == []
+
+
+@pytest.mark.django_db
 def test_retrieve_ruleset(client: APIClient, init_db):
     ruleset_id = init_db.ruleset.id
     response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/")

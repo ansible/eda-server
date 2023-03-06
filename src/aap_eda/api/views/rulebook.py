@@ -67,8 +67,11 @@ class RulebookViewSet(
     )
     @action(detail=True)
     def rulesets(self, request, pk):
+        self.filterset_class = filters.RulesetFilter
         rulebook = get_object_or_404(models.Rulebook, pk=pk)
-        rulesets = models.Ruleset.objects.filter(rulebook=rulebook)
+        self.queryset = models.Ruleset.objects.filter(rulebook=rulebook)
+
+        rulesets = self.filter_queryset(self.queryset)
 
         result = []
         for ruleset in rulesets:
@@ -99,6 +102,8 @@ class RulesetViewSet(
 ):
     queryset = models.Ruleset.objects.order_by("id")
     serializer_class = serializers.RulesetSerializer
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filterset_class = filters.RulesetFilter
 
     @extend_schema(
         description="Get the ruleset by its id",
@@ -127,6 +132,7 @@ class RulesetViewSet(
     )
     def list(self, _request):
         rulesets = models.Ruleset.objects.all()
+        rulesets = self.filter_queryset(rulesets)
 
         result = []
         for ruleset in rulesets:
