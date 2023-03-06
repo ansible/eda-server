@@ -82,7 +82,8 @@ class ProjectImportService:
         self, project: models.Project, rulebook_info: RulebookInfo
     ) -> models.Rulebook:
         rulebook = models.Rulebook.objects.create(
-            project=project, name=rulebook_info.relpath
+            project=project, name=rulebook_info.relpath,
+            rulesets=rulebook_info.raw_content
         )
 
         expanded_sources = expand_ruleset_sources(rulebook_info.content)

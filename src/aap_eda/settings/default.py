@@ -53,7 +53,7 @@ settings = dynaconf.Dynaconf(envvar_prefix="EDA")
 
 SECRET_KEY = settings.get("SECRET_KEY")
 
-DEBUG = settings.get("DEBUG", False)
+DEBUG = settings.get("DEBUG", True)
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 
@@ -219,7 +219,7 @@ SPECTACULAR_SETTINGS = {
 # LOGGING SETTINGS
 # ---------------------------------------------------------
 
-APP_LOG_LEVEL = settings.get("APP_LOG_LEVEL", "INFO")
+APP_LOG_LEVEL = settings.get("APP_LOG_LEVEL", "DEBUG")
 
 LOGGING = {
     "version": 1,

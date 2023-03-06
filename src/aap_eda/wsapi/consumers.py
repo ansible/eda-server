@@ -89,28 +89,21 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulebook, inventory, extra_var = await self.get_resources(
+        rulebook, extra_var = await self.get_resources(
             message.activation_id
         )
 
         rulebook_message = Rulebook(
             data=base64.b64encode(rulebook.rulesets.encode()).decode()
         )
-        inventory_message = Inventory(
-            data=base64.b64encode(inventory.inventory.encode()).decode()
-        )
         extra_var_message = ExtraVars(
             data=base64.b64encode(extra_var.extra_var.encode()).decode()
         )
-        # TODO: add secret manager later
-        ssh_key_message = SSHPrivateKey(
-            data=base64.b64encode("".encode()).decode()
-        )
 
+        logger.debug(f'handle_workers send {rulebook_message.json()}')
         await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=inventory_message.json())
+        logger.debug(f'handle_workers send {extra_var_message.json()}')
         await self.send(text_data=extra_var_message.json())
-        await self.send(text_data=ssh_key_message.json())
 
         # TODO: add broadcasting later by channel groups
 
@@ -253,16 +246,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_resources(
         self, activation_instance_id: str
-    ) -> tuple[models.Rulebook, models.inventory, models.ExtraVar]:
+    ) -> tuple[models.Rulebook, models.ExtraVar]:
         activation_instance = models.ActivationInstance.objects.get(
             id=activation_instance_id
         )
         activation = models.Activation.objects.get(
             id=activation_instance.activation_id
         )
+        logger.debug(f"rulebook_id {activation.rulebook_id}")
+        logger.debug(f"extra_var_id {activation.extra_var_id}")
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        inventory = models.Inventory.objects.get(
-            project_id=activation.project_id
-        )
         extra_var = models.ExtraVar.objects.get(id=activation.extra_var_id)
-        return (rulebook, inventory, extra_var)
+        return (rulebook,  extra_var)
