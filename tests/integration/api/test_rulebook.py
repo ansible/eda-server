@@ -12,12 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Any, Dict
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from tests.integration.constants import api_url_v1
+
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 TEST_RULESETS_SAMPLE = """
 ---
@@ -53,19 +57,67 @@ TEST_RULESETS_SAMPLE = """
 """.strip()
 
 
+# ------------------------------------------
+# Test Rulebook:
+# ------------------------------------------
 @pytest.mark.django_db
 def test_list_rulebooks(client: APIClient):
-    obj = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
+    rulebooks = models.Rulebook.objects.bulk_create(
+        [
+            models.Rulebook(
+                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
+            ),
+            models.Rulebook(
+                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
+            ),
+        ]
     )
     response = client.get(f"{api_url_v1}/rulebooks/")
     assert response.status_code == status.HTTP_200_OK
-    rulebook = response.data["results"][0]
 
-    assert rulebook["id"] == obj.id
-    assert rulebook["name"] == "test-rulebook.yml"
-    assert rulebook["rulesets"] == TEST_RULESETS_SAMPLE
-    assert rulebook["project"] is None
+    for data, rulebook in zip(response.data["results"], rulebooks):
+        assert_rulebook_data(data, rulebook)
+
+
+@pytest.mark.django_db
+def test_list_rulebooks_filter_name(client: APIClient):
+    rulebooks = models.Rulebook.objects.bulk_create(
+        [
+            models.Rulebook(
+                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
+            ),
+            models.Rulebook(
+                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
+            ),
+        ]
+    )
+
+    filter_name = "00"
+    response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
+    data = response.json()["results"][0]
+    rulebook = rulebooks[0]
+    assert response.status_code == status.HTTP_200_OK
+    assert_rulebook_data(data, rulebook)
+
+
+@pytest.mark.django_db
+def test_list_rulebooks_filter_name_non_existant(client: APIClient):
+    models.Rulebook.objects.bulk_create(
+        [
+            models.Rulebook(
+                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
+            ),
+            models.Rulebook(
+                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
+            ),
+        ]
+    )
+
+    filter_name = "doesn't exist"
+    response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
+    data = response.json()["results"]
+    assert response.status_code == status.HTTP_200_OK
+    assert data == []
 
 
 @pytest.mark.django_db
@@ -91,16 +143,13 @@ def test_create_rulebook(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_rulebook(client: APIClient):
-    obj = models.Rulebook.objects.create(
+    rulebook = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
     )
-    response = client.get(f"{api_url_v1}/rulebooks/{obj.id}/")
-    assert response.status_code == status.HTTP_200_OK
+    response = client.get(f"{api_url_v1}/rulebooks/{rulebook.id}/")
 
-    assert response.data["id"] == obj.id
-    assert response.data["name"] == "test-rulebook.yml"
-    assert response.data["rulesets"] == TEST_RULESETS_SAMPLE
-    assert response.data["project"] is None
+    assert response.status_code == status.HTTP_200_OK
+    assert_rulebook_data(response.json(), rulebook)
 
 
 @pytest.mark.django_db
@@ -156,6 +205,21 @@ def test_list_rulesets_from_rulebook(client: APIClient):
     ]
 
 
+def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
+    assert data == {
+        "id": rulebook.id,
+        "name": rulebook.name,
+        "description": rulebook.description,
+        "rulesets": rulebook.rulesets,
+        "project": rulebook.project,
+        "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
+        "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
+    }
+
+
+# ------------------------------------------
+# Test Ruleset:
+# ------------------------------------------
 @pytest.mark.django_db
 def test_list_rulesets(client: APIClient):
     _prepare_rulesets_and_rules(client)
@@ -223,6 +287,9 @@ def test_retrieve_ruleset_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+# ------------------------------------------
+# Test Rule:
+# ------------------------------------------
 @pytest.mark.django_db
 def test_list_rules(client: APIClient):
     _prepare_rulesets_and_rules(client)
