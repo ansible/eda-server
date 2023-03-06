@@ -5,10 +5,12 @@ commonLabels:
   comp: api
 
 resources:
-- deployment.yaml
-- service.yaml
-
+  - deployment.yaml
+  - service.yaml
+  - pvc.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 images:
-- name: aap-eda
-  newName: aap-eda
-  newTag: latest
+  - name: aap-eda
+    newName: aap-eda
+    newTag: latest

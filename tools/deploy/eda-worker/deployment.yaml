@@ -63,12 +63,12 @@ spec:
           ports:
             - containerPort: 8000
           resources: {}
-#          volumeMounts:
-#            - mountPath: /app/src
-#              name: app-src
+          volumeMounts:
+            - mountPath: /var/lib/eda/files
+              name: media
       restartPolicy: Always
-#      volumes:
-#        - name: app-src
-#          persistentVolumeClaim:
-#            claimName: app-src
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: media
 status: {}

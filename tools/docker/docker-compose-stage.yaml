@@ -30,6 +30,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+    volumes:
+      - 'media:/var/lib/eda/files'
 
   worker:
     deploy:
@@ -46,6 +48,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - 'media:/var/lib/eda/files'
 
   postgres:
     image: 'docker.io/library/postgres:13'
@@ -81,3 +85,4 @@ services:
 
 volumes:
   postgres_data: {}
+  media: {}

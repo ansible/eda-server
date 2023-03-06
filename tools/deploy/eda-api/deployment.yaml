@@ -66,6 +66,9 @@ spec:
           ports:
             - containerPort: 8000
           resources: {}
+          volumeMounts:
+            - mountPath: /var/lib/eda/files
+              name: media
       restartPolicy: Always
       initContainers:
         - name: wait-for-postgres
@@ -73,5 +76,14 @@ spec:
             - name: EDA_DB_HOST
               value: eda-postgres
           image: docker.io/alpine:latest
-          command: [ 'sh', '-c', "until nslookup ${EDA_DB_HOST}.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for ${EDA_DB_HOST}; sleep 2; done" ]
+          command:
+            [
+              "sh",
+              "-c",
+              "until nslookup ${EDA_DB_HOST}.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for ${EDA_DB_HOST}; sleep 2; done",
+            ]
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: media
 status: {}
