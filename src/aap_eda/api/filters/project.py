@@ -12,10 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pytest
-from rest_framework.test import APIClient
+import django_filters
+
+from aap_eda.core import models
 
 
-@pytest.mark.django_db
-def test_client_fixture(client: APIClient):
-    assert isinstance(client, APIClient)
+class ProjectFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name", lookup_expr="startswith"
+    )
+    url = django_filters.CharFilter(field_name="url", lookup_expr="icontains")
+
+    class Meta:
+        model = models.Project
+        fields = ["name", "url"]

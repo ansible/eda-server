@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Any, Optional, Union
 from unittest import mock
 
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 from rq.job import JobStatus
@@ -23,6 +24,7 @@ from rq.job import JobStatus
 from tests.integration.constants import api_url_v1
 
 
+@pytest.mark.django_db
 @mock.patch("aap_eda.api.views.tasks.list_jobs")
 def test_list_tasks(list_jobs: mock.Mock, client: APIClient):
     list_jobs.return_value = [
@@ -68,6 +70,7 @@ def test_list_tasks(list_jobs: mock.Mock, client: APIClient):
     ]
 
 
+@pytest.mark.django_db
 @mock.patch("aap_eda.api.views.tasks.get_job")
 def test_retrieve_task(get_job: mock.Mock, client: APIClient):
     get_job.return_value = _create_job(
@@ -91,6 +94,7 @@ def test_retrieve_task(get_job: mock.Mock, client: APIClient):
     }
 
 
+@pytest.mark.django_db
 @mock.patch("aap_eda.api.views.tasks.get_job")
 def test_retrieve_task_not_exists(get_job: mock.Mock, client: APIClient):
     get_job.return_value = None

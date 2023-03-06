@@ -15,12 +15,29 @@
 import pytest
 from rest_framework.test import APIClient
 
+from aap_eda.core import models
+
+ADMIN_USERNAME = "test.admin"
+ADMIN_PASSWORD = "test.admin.123"
+
 
 @pytest.fixture
-def client() -> APIClient:
+def admin_user():
+    return models.User.objects.create(
+        username=ADMIN_USERNAME,
+        password=ADMIN_PASSWORD,
+        email="admin@localhost",
+        is_superuser=True,
+    )
+
+
+@pytest.fixture
+def client(admin_user) -> APIClient:
     """Override pytest-django client fixture.
 
     Return an instance of ``rest_framework.test.APIClient`` class
     instead of base ``django.test.Client`` class.
     """
-    return APIClient()
+    client = APIClient()
+    client.force_authenticate(user=admin_user)
+    return client

@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_spectacular",
     "django_rq",
+    "django_filters",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -170,6 +171,13 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",  # noqa: E501
     "PAGE_SIZE": 20,
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
 }
 
 # ---------------------------------------------------------
