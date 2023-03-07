@@ -20,7 +20,7 @@ from aap_eda.core import models
 class ProjectFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
-        lookup_expr="startswith",
+        lookup_expr="istartswith",
         label="Filter by project name.",
     )
     url = django_filters.CharFilter(
