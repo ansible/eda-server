@@ -31,6 +31,8 @@ services:
       - '../../:/app/src:z'
 
   worker:
+    deploy:
+      replicas: 2
     image: 'localhost/aap-eda'
     environment: *common-env
     command:
