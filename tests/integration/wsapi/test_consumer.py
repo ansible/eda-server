@@ -35,7 +35,7 @@ TEST_RULESETS = """
 """
 
 
-@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
 async def test_ansible_rulebook_consumer():
     communicator = await _prepare_websocket_connection()
 
@@ -82,8 +82,7 @@ async def test_ansible_rulebook_consumer():
     await communicator.disconnect()
 
 
-@pytest.mark.asyncio
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 async def test_handle_workers():
     activation_instance_id = await _prepare_db_data()
     communicator = await _prepare_websocket_connection()
@@ -104,8 +103,7 @@ async def test_handle_workers():
     await communicator.disconnect()
 
 
-@pytest.mark.asyncio
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_validation_errors():
     activation_instance_id = await _prepare_db_data()
     communicator = await _prepare_websocket_connection()
@@ -120,9 +118,9 @@ async def test_handle_workers_with_validation_errors():
         await communicator.disconnect()
 
 
-@pytest.mark.asyncio
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 async def test_handle_jobs():
+    activation_instance_id = await _prepare_db_data()
     communicator = await _prepare_websocket_connection()
 
     assert (await get_job_instance_count()) == 0
@@ -130,8 +128,8 @@ async def test_handle_jobs():
 
     payload = {
         "type": "Job",
-        "job_id": "c4fc111d-67b9-4916-b46f-0926dd6e881a",
-        "ansible_rulebook_id": 1,
+        "job_id": "940730a1-8b6f-45f3-84c9-bde8f04390e0",
+        "ansible_rulebook_id": activation_instance_id,
         "name": "ansible.eda.hello",
         "ruleset": "ruleset",
         "rule": "rule",
@@ -146,17 +144,17 @@ async def test_handle_jobs():
     assert (await get_activation_instance_job_instance_count()) == 1
 
 
-@pytest.mark.asyncio
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 async def test_handle_events():
     communicator = await _prepare_websocket_connection()
+    job_instance = await _prepare_job_instance()
 
     assert (await get_job_instance_event_count()) == 0
     payload = {
         "type": "AnsibleEvent",
         "event": {
             "event": "verbose",
-            "job_id": "c4fc111d-67b9-4916-b46f-0926dd6e881a",
+            "job_id": job_instance.uuid,
             "counter": 1,
             "stdout": "the playbook is completed",
         },
@@ -167,10 +165,10 @@ async def test_handle_events():
     assert (await get_job_instance_event_count()) == 1
 
 
-@pytest.mark.asyncio
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 async def test_handle_actions():
     activation_instance_id = await _prepare_db_data()
+    job_instance = await _prepare_job_instance()
 
     communicator = WebsocketCommunicator(
         AnsibleRulebookConsumer.as_asgi(), "ws/"
@@ -184,7 +182,7 @@ async def test_handle_actions():
         "action": "run_playbook",
         "activation_id": activation_instance_id,
         "playbook_name": "ansible.eda.hello",
-        "job_id": "c4fc111d-67b9-4916-b46f-0926dd6e881a",
+        "job_id": job_instance.uuid,
         "ruleset": "ruleset",
         "rule": "rule",
         "rc": 0,
@@ -276,6 +274,19 @@ def _prepare_db_data():
     )
 
     return activation_instance.id
+
+
+@database_sync_to_async
+def _prepare_job_instance():
+    job_instance, _ = models.JobInstance.objects.get_or_create(
+        uuid="940730a1-8b6f-45f3-84c9-bde8f04390e0",
+        action="debug",
+        name="test",
+        ruleset="test-ruleset",
+        rule="test-rule",
+        hosts="test-hosts",
+    )
+    return job_instance
 
 
 async def _prepare_websocket_connection() -> WebsocketCommunicator:

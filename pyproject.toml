@@ -43,6 +43,7 @@ pydantic = "*"
 [tool.poetry.group.test.dependencies]
 pytest = "*"
 pytest-django = "*"
+pytest-asyncio = "*"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"
