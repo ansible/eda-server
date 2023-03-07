@@ -31,7 +31,9 @@ class RulebookFilter(django_filters.FilterSet):
 
 class RulesetFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
-        field_name="name", lookup_expr="istartswith"
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by ruleset name.",
     )
 
     class Meta:
