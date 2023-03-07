@@ -20,5 +20,6 @@ os.environ.setdefault("EDA_SECRET_KEY", "insecure")
 os.environ.setdefault("EDA_DB_PASSWORD", "secret")
 os.environ.setdefault("EDA_DB_HOST", "localhost")
 os.environ.setdefault("EDA_MQ_HOST", "localhost")
+os.environ.setdefault("EDA_MEDIA_ROOT", "./media")
 
 from .default import *

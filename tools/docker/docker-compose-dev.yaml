@@ -29,7 +29,6 @@ services:
       retries: 10
     volumes:
       - '../../:/app/src:z'
-      - 'media:/var/lib/eda/files'
 
   worker:
     deploy:
@@ -46,7 +45,6 @@ services:
         condition: service_healthy
     volumes:
       - '../../:/app/src:z'
-      - 'media:/var/lib/eda/files'
 
   postgres:
     image: 'docker.io/library/postgres:13'
@@ -82,4 +80,3 @@ services:
 
 volumes:
   postgres_data: {}
-  media: {}
