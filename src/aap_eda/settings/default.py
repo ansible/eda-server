@@ -39,6 +39,8 @@ Database settings:
 
 Redis queue settings:
 
+* MQ_UNIX_SOCKET_PATH - Redis unix socket path, mutually exclusive with
+    host and port (default: None)
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
 * MQ_DB - Redis queue database (default: 0)
@@ -183,19 +185,27 @@ REST_FRAMEWORK = {
 # ---------------------------------------------------------
 # TASKING SETTINGS
 # ---------------------------------------------------------
-
 RQ = {
     "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
     "JOB_CLASS": "aap_eda.core.tasking.Job",
 }
 
-RQ_QUEUES = {
-    "default": {
-        "HOST": settings.get("MQ_HOST", "localhost"),
-        "PORT": settings.get("MQ_PORT", 6379),
-        "DB": settings.get("MQ_DB", 0),
+RQ_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
+
+if RQ_UNIX_SOCKET_PATH:
+    RQ_QUEUES = {
+        "default": {
+            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+        },
     }
-}
+else:
+    RQ_QUEUES = {
+        "default": {
+            "HOST": settings.get("MQ_HOST", "localhost"),
+            "PORT": settings.get("MQ_PORT", 6379),
+        }
+    }
+RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
 
 # ---------------------------------------------------------
 # APPLICATION SETTINGS
