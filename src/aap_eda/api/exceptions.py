@@ -13,22 +13,36 @@
 #  limitations under the License.
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
-from rest_framework.exceptions import APIException, NotFound
+from rest_framework.exceptions import (
+    APIException,
+    AuthenticationFailed,
+    NotAuthenticated,
+    NotFound,
+)
 
 __all__ = (
+    "AuthenticationFailed",
+    "NotAuthenticated",
+    "BadRequest",
     "NotFound",
     "Conflict",
     "Unprocessable",
 )
 
 
+class BadRequest(APIException):
+    status = status.HTTP_400_BAD_REQUEST
+    default_code = "bad_request"
+    default_detail = _("Bad request.")
+
+
 class Conflict(APIException):
     status_code = status.HTTP_409_CONFLICT
-    default_detail = _("Conflict.")
     default_code = "conflict"
+    default_detail = _("Conflict.")
 
 
 class Unprocessable(APIException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    default_code = "unprocessable"
     default_detail = _("Unprocessable.")
-    default_code = "Unprocessable"

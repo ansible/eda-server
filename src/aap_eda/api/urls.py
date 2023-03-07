@@ -58,8 +58,10 @@ openapi_urls = [
 
 v1_urls = [
     *router.urls,
+    path("auth/session/login/", views.SessionLoginView.as_view()),
+    path("auth/session/logout/", views.SessionLogoutView.as_view()),
+    path("users/me/", views.CurrentUserView.as_view()),
     path("", include(openapi_urls)),
-    path("auth/", include("rest_framework.urls")),
 ]
 
 urlpatterns = [
