@@ -19,7 +19,9 @@ from aap_eda.core import models
 
 class RulebookFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
-        field_name="name", lookup_expr="icontains"
+        field_name="name",
+        lookup_expr="icontains",
+        label="Filter by rulebook name.",
     )
 
     class Meta:
