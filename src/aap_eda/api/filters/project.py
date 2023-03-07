@@ -19,9 +19,15 @@ from aap_eda.core import models
 
 class ProjectFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
-        field_name="name", lookup_expr="startswith", label="Filter by project name."
+        field_name="name",
+        lookup_expr="startswith",
+        label="Filter by project name.",
     )
-    url = django_filters.CharFilter(field_name="url", lookup_expr="icontains", label="Filter by project url.")
+    url = django_filters.CharFilter(
+        field_name="url",
+        lookup_expr="icontains",
+        label="Filter by project url.",
+    )
 
     class Meta:
         model = models.Project
