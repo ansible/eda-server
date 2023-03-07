@@ -25,9 +25,14 @@ See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 Common settings:
 
+The following values can be defined as well as environment variables.
+
 * SECRET_KEY
 * DEBUG
-* ALLOWED_HOSTS
+* ALLOWED_HOSTS - A list of allowed hostnames or
+    a comma separated string.
+    Ex: export ALLOWED_HOSTS = "localhost,127.0.0.1"
+    Ex: export ALLOWED_HOSTS = '["localhost", "127.0.0.1"]'
 
 Database settings:
 
