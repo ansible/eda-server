@@ -25,9 +25,15 @@ See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 Common settings:
 
+The following values can be defined as well as environment variables
+with the prefix EDA_:
+
 * SECRET_KEY
 * DEBUG
-* ALLOWED_HOSTS
+* ALLOWED_HOSTS - A list of allowed hostnames or
+    a comma separated string.
+    Ex: export EDA_ALLOWED_HOSTS = "localhost,127.0.0.1"
+    Ex: export EDA_ALLOWED_HOSTS = '["localhost", "127.0.0.1"]'
 
 Database settings:
 
@@ -58,6 +64,11 @@ SECRET_KEY = settings.get("SECRET_KEY")
 DEBUG = settings.get("DEBUG", False)
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
+ALLOWED_HOSTS = (
+    ALLOWED_HOSTS.split(",")
+    if isinstance(ALLOWED_HOSTS, str)
+    else ALLOWED_HOSTS
+)
 
 
 # Application definition
