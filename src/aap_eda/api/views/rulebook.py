@@ -15,6 +15,7 @@
 import yaml
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -24,7 +25,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import serializers
+from aap_eda.api import filters, serializers
 from aap_eda.api.services.rulebook import rule_out_data, ruleset_out_data
 from aap_eda.core import models
 
@@ -64,6 +65,8 @@ class RulebookViewSet(
 ):
     queryset = models.Rulebook.objects.order_by("id")
     serializer_class = serializers.RulebookSerializer
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filterset_class = filters.RulebookFilter
 
     @extend_schema(
         description="Ruleset list of a rulebook by its id",

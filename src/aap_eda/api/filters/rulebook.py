@@ -12,12 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .project import ProjectFilter
-from .rulebook import RulebookFilter
+import django_filters
 
-__all__ = (
-    # project
-    "ProjectFilter",
-    # rulebook
-    "RulebookFilter",
-)
+from aap_eda.core import models
+
+
+class RulebookFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="icontains",
+        label="Filter by rulebook name.",
+    )
+
+    class Meta:
+        model = models.Rulebook
+        fields = ["name"]
