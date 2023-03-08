@@ -5,7 +5,7 @@
 * [Git](https://git-scm.com/)
 * [Docker](https://www.docker.com/) or [Podman](https://podman.io/)
 * [Docker Compose plugin](https://docs.docker.com/compose/) or `docker-compose` python package.
-* [Poetry](https://python-poetry.org/)
+* [Poetry](https://python-poetry.org/) >= 1.4.0
 * [Taskfile](https://taskfile.dev/)
 * [pre-commit](https://pre-commit.com/)
 
