@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from aap_eda.core import models
+
 
 def expand_ruleset_sources(rulebook_data: dict) -> dict:
     # TODO(cutwater): Docstring needed
@@ -35,3 +37,45 @@ def expand_ruleset_sources(rulebook_data: dict) -> dict:
                 xp_sources.append(xp_src)
 
     return expanded_ruleset_sources
+
+
+def insert_rulebook_related_data(
+    rulebook: models.Rulebook, data: dict
+) -> None:
+    expanded_sources = expand_ruleset_sources(data)
+
+    rule_sets = [
+        models.Ruleset(
+            rulebook=rulebook,
+            name=data["name"],
+            sources=expanded_sources.get(data["name"]),
+        )
+        for data in (data or [])
+    ]
+    rule_sets = models.Ruleset.objects.bulk_create(rule_sets)
+
+    rules = [
+        models.Rule(name=rule["name"], action=rule["action"], ruleset=rule_set)
+        for rule_set, rule_set_data in zip(rule_sets, data)
+        for rule in rule_set_data["rules"]
+    ]
+    models.Rule.objects.bulk_create(rules)
+
+
+def build_ruleset_out_data(data: dict) -> dict:
+    ruleset_id = int(data["id"])
+    data["source_types"] = [src["type"] for src in (data["sources"] or [])]
+    data["rule_count"] = models.Rule.objects.filter(
+        ruleset_id=ruleset_id
+    ).count()
+    data["fired_stats"] = build_fired_stats(data)
+
+    for key in ["rulebook", "sources"]:
+        data.pop(key)
+
+    return data
+
+
+# TODO: define when audit rules/rulesets are available
+def build_fired_stats(ruleset_data: dict) -> list[dict]:
+    return [{}]

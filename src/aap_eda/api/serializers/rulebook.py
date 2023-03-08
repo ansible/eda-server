@@ -12,10 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import yaml
 from rest_framework import serializers
 
-from aap_eda.api.services.rulebook import insert_rulebook_related_data
 from aap_eda.core import models
 
 
@@ -47,14 +45,6 @@ class RulebookSerializer(serializers.ModelSerializer):
         model = models.Rulebook
         fields = "__all__"
         read_only_fields = ["id", "created_at", "modified_at"]
-
-    def create(self, validated_data):
-        rulebook_data = validated_data["rulesets"]
-        rulebook = models.Rulebook.objects.create(**validated_data)
-
-        insert_rulebook_related_data(rulebook, yaml.safe_load(rulebook_data))
-
-        return rulebook
 
 
 class RulebookRefSerializer(serializers.ModelSerializer):
@@ -162,8 +152,23 @@ class RuleOutSerializer(serializers.Serializer):
         help_text="List of stats",
     )
 
-    rulebook = serializers.IntegerField(help_text="ID of the rulebook")
+    rulebook = serializers.PrimaryKeyRelatedField(
+        required=False,
+        allow_null=True,
+        queryset=models.Rulebook.objects.all(),
+        help_text="ID of the rulebook",
+    )
 
-    ruleset = serializers.IntegerField(help_text="ID of the ruleset")
+    ruleset = serializers.PrimaryKeyRelatedField(
+        required=False,
+        allow_null=True,
+        queryset=models.Ruleset.objects.all(),
+        help_text="ID of the ruleset",
+    )
 
-    project = serializers.IntegerField(help_text="ID of the project")
+    project = serializers.PrimaryKeyRelatedField(
+        required=False,
+        allow_null=True,
+        queryset=models.Project.objects.all(),
+        help_text="ID of the project",
+    )

@@ -26,8 +26,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
-from aap_eda.api.services.rulebook import rule_out_data, ruleset_out_data
 from aap_eda.core import models
+from aap_eda.services.rulebook import (
+    build_fired_stats,
+    build_ruleset_out_data,
+    insert_rulebook_related_data,
+)
 
 
 @extend_schema_view(
@@ -49,15 +53,6 @@ from aap_eda.core import models
             ),
         },
     ),
-    create=extend_schema(
-        description="Create a rulebook",
-        responses={
-            status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.RulebookSerializer,
-                description="Return the created rulebook.",
-            ),
-        },
-    ),
 )
 class RulebookViewSet(
     mixins.CreateModelMixin,
@@ -67,6 +62,24 @@ class RulebookViewSet(
     serializer_class = serializers.RulebookSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulebookFilter
+
+    @extend_schema(
+        request=serializers.RulebookSerializer,
+        responses={status.HTTP_201_CREATED: serializers.RulebookSerializer},
+    )
+    def create(self, request):
+        serializer = serializers.RulebookSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        rulebook = serializer.create(serializer.validated_data)
+        data = yaml.safe_load(request.data["rulesets"] or [])
+
+        insert_rulebook_related_data(rulebook, data)
+
+        response_serializer = serializers.RulebookSerializer(rulebook)
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED
+        )
 
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
@@ -82,7 +95,8 @@ class RulebookViewSet(
 
         result = []
         for ruleset in rulesets:
-            data = ruleset_out_data(ruleset)
+            ruleset_data = serializers.RulesetSerializer(ruleset).data
+            data = build_ruleset_out_data(ruleset_data)
             result.append(data)
 
         result = self.paginate_queryset(result)
@@ -120,7 +134,8 @@ class RulesetViewSet(
     )
     def retrieve(self, request, pk=None):
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
-        data = ruleset_out_data(ruleset)
+        ruleset_data = serializers.RulesetSerializer(ruleset).data
+        data = build_ruleset_out_data(ruleset_data)
 
         return Response(data)
 
@@ -138,7 +153,8 @@ class RulesetViewSet(
 
         result = []
         for ruleset in rulesets:
-            data = ruleset_out_data(ruleset)
+            ruleset_data = serializers.RulesetSerializer(ruleset).data
+            data = build_ruleset_out_data(ruleset_data)
             result.append(data)
 
         result = self.paginate_queryset(result)
@@ -178,7 +194,7 @@ class RuleViewSet(
     )
     def retrieve(self, _request, pk=None):
         rule = get_object_or_404(models.Rule, pk=pk)
-        data = rule_out_data(rule)
+        data = self._build_rule_out_data(rule)
 
         return Response(data)
 
@@ -196,9 +212,23 @@ class RuleViewSet(
 
         result = []
         for rule in rules:
-            data = rule_out_data(rule)
+            data = self._build_rule_out_data(rule)
             result.append(data)
 
         result = self.paginate_queryset(result)
 
         return self.get_paginated_response(result)
+
+    def _build_rule_out_data(self, rule: models.Rule) -> dict:
+        data = serializers.RuleSerializer(rule).data
+
+        ruleset = models.Ruleset.objects.get(id=rule.ruleset_id)
+        rulebook = models.Rulebook.objects.get(id=ruleset.rulebook_id)
+        project = models.Project.objects.get(id=rulebook.project_id)
+
+        data["fired_stats"] = build_fired_stats(data)
+        data["rulebook"] = serializers.RulebookSerializer(rulebook).data
+        data["ruleset"] = serializers.RulesetSerializer(ruleset).data
+        data["project"] = serializers.ProjectSerializer(project).data
+
+        return data
