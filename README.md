@@ -10,7 +10,7 @@ Refer to the [deployment guide](docs/deployment.md) for further information if y
 
 ## Development environment
 
-Refer to the [deployment guide](docs/development.md) for further information if you want to setup a development environment.
+Refer to the [development guide](docs/development.md) for further information if you want to setup a development environment.
 
 ## Contributing
 
