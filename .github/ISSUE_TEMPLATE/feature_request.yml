@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Feature Request issues are for **feature requests** only.
-        For debugging help or technical support, please see the [our ways of contact](https://github.com/ansible/aap-eda/docs/contributing.md#Contact)
+        For debugging help or technical support, please see the [our ways of contact](https://github.com/ansible/aap-eda/blob/main/docs/contributing.md#contact)
 
   - type: checkboxes
     id: terms

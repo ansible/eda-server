@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: For debugging help or technical support
-    url: https://github.com/ansible/aap-eda/docs/contributing.md#Contact
+    url: https://github.com/ansible/aap-eda/blob/main/docs/contributing.md#contact
     about: For general debugging or technical support please see the linked section of our docs.
 
   - name: 📝 Ansible Code of Conduct
