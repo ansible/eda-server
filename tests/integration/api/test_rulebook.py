@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from dataclasses import dataclass
 from typing import Any, Dict
 
 import pytest
@@ -55,6 +56,14 @@ TEST_RULESETS_SAMPLE = """
       action:
         debug:
 """.strip()
+
+
+@dataclass
+class InitData:
+    project: models.Project
+    rulebook: models.Rulebook
+    ruleset: models.Ruleset
+    rule: models.Rule
 
 
 # ------------------------------------------
@@ -181,19 +190,15 @@ def test_retrieve_json_rulebook_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_rulesets_from_rulebook(client: APIClient):
-    _prepare_rulesets_and_rules(client)
-
-    response = client.get(f"{api_url_v1}/rulebooks/")
-    rulebook_id = response.data["results"][0]["id"]
+def test_list_rulesets_from_rulebook(client: APIClient, init_db):
+    rulebook_id = init_db.rulebook.id
 
     response = client.get(f"{api_url_v1}/rulebooks/{rulebook_id}/rulesets/")
     assert response.status_code == status.HTTP_200_OK
     response_rulesets = response.data["results"]
 
-    assert len(response_rulesets) == 2
-    assert response_rulesets[0]["name"] == "Test sample 001"
-    assert response_rulesets[1]["name"] == "Test sample 002"
+    assert len(response_rulesets) == 1
+    assert response_rulesets[0]["name"] == "test-ruleset"
     assert list(response_rulesets[0]) == [
         "id",
         "name",
@@ -221,18 +226,14 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
 # Test Ruleset:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_rulesets(client: APIClient):
-    _prepare_rulesets_and_rules(client)
-
+def test_list_rulesets(client: APIClient, init_db):
     response = client.get(f"{api_url_v1}/rulesets/")
     assert response.status_code == status.HTTP_200_OK
     rulesets = response.data["results"]
 
-    assert len(rulesets) == 2
-    assert rulesets[0]["name"] == "Test sample 001"
-    assert rulesets[0]["rule_count"] == 2
-    assert rulesets[1]["name"] == "Test sample 002"
-    assert rulesets[1]["rule_count"] == 1
+    assert len(rulesets) == 1
+    assert rulesets[0]["name"] == "test-ruleset"
+    assert rulesets[0]["rule_count"] == 1
     assert list(rulesets[0]) == [
         "id",
         "name",
@@ -245,34 +246,24 @@ def test_list_rulesets(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_ruleset(client: APIClient):
-    _prepare_rulesets_and_rules(client)
-    # TODO: Refactor to not call list when testing retrieve
-    response = client.get(f"{api_url_v1}/rulesets/")
-    rulesets = response.data
-
-    ruleset_id = rulesets["results"][0]["id"]
+def test_retrieve_ruleset(client: APIClient, init_db):
+    ruleset_id = init_db.ruleset.id
     response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["name"] == "Test sample 001"
+    assert response.data["name"] == "test-ruleset"
 
 
 @pytest.mark.django_db
-def test_list_rules_from_ruleset(client: APIClient):
-    _prepare_rulesets_and_rules(client)
-    # TODO: Refactor to not call list when testing retrieve
-    response = client.get(f"{api_url_v1}/rulesets/")
-    rulesets = response.data
+def test_list_rules_from_ruleset(client: APIClient, init_db):
+    ruleset_id = init_db.ruleset.id
 
-    ruleset_id = rulesets["results"][0]["id"]
     response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/rules/")
     assert response.status_code == status.HTTP_200_OK
 
     rules = response.data["results"]
-    assert len(rules) == 2
-    assert rules[0]["name"] == "r1"
-    assert rules[1]["name"] == "r2"
+    assert len(rules) == 1
+    assert rules[0]["name"] == "say hello"
     assert list(rules[0]) == [
         "id",
         "name",
@@ -291,38 +282,32 @@ def test_retrieve_ruleset_not_exist(client: APIClient):
 # Test Rule:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_rules(client: APIClient):
-    _prepare_rulesets_and_rules(client)
-
+def test_list_rules(client: APIClient, init_db):
     response = client.get(f"{api_url_v1}/rules/")
     assert response.status_code == status.HTTP_200_OK
     rules = response.data["results"]
 
-    assert len(rules) == 3
-    assert rules[0]["name"] == "r1"
-    assert rules[1]["name"] == "r2"
-    assert rules[2]["name"] == "r3"
+    assert len(rules) == 1
+    assert rules[0]["name"] == "say hello"
     assert list(rules[0]) == [
         "id",
         "name",
         "action",
         "ruleset",
         "fired_stats",
+        "rulebook",
+        "project",
     ]
 
 
 @pytest.mark.django_db
-def test_retrieve_rule(client: APIClient):
-    _prepare_rulesets_and_rules(client)
-    # TODO: Refactor to not call list when testing retrieve
-    response = client.get(f"{api_url_v1}/rules/")
-    rules = response.data
+def test_retrieve_rule(client: APIClient, init_db):
+    rule_id = init_db.rule.id
 
-    rule_id = rules["results"][0]["id"]
     response = client.get(f"{api_url_v1}/rules/{rule_id}/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["name"] == "r1"
+    assert response.data["name"] == "say hello"
 
 
 @pytest.mark.django_db
@@ -331,11 +316,39 @@ def test_retrieve_rule_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.django_db
-def _prepare_rulesets_and_rules(client: APIClient):
-    # TODO: Refactor to not use API to populate database with initial data
-    data_in = {
-        "name": "test-rulebook.yml",
-        "rulesets": TEST_RULESETS_SAMPLE,
-    }
-    client.post(f"{api_url_v1}/rulebooks/", data=data_in)
+@pytest.fixture
+def init_db():
+    project = models.Project.objects.create(
+        name="test-project",
+        description="Test Project",
+        url="https://github.com/eda-project",
+    )
+    rulebook = models.Rulebook.objects.create(
+        name="test-rulebook.yml",
+        rulesets=TEST_RULESETS_SAMPLE,
+        project=project,
+    )
+    ruleset = models.Ruleset.objects.create(
+        name="test-ruleset",
+        sources=[
+            {
+                "name": "<unnamed>",
+                "type": "range",
+                "config": {"limit": 5},
+                "source": "ansible.eda.range",
+            }
+        ],
+        rulebook=rulebook,
+    )
+    rule = models.Rule.objects.create(
+        name="say hello",
+        action={"run_playbook": {"name": "ansible.eda.hello"}},
+        ruleset=ruleset,
+    )
+
+    return InitData(
+        project=project,
+        rulebook=rulebook,
+        ruleset=ruleset,
+        rule=rule,
+    )

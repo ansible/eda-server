@@ -23,7 +23,7 @@ from django.db import transaction
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
 from aap_eda.services.project.git import GitRepository
-from aap_eda.services.rulebook import expand_ruleset_sources
+from aap_eda.services.rulebook import insert_rulebook_related_data
 
 logger = logging.getLogger(__name__)
 
@@ -75,29 +75,7 @@ class ProjectImportService:
             project=project, name=rulebook_info.relpath
         )
 
-        expanded_sources = expand_ruleset_sources(rulebook_info.content)
-
-        rule_sets = [
-            models.Ruleset(
-                rulebook=rulebook,
-                name=data["name"],
-                sources=expanded_sources.get(data["name"]),
-            )
-            for data in (rulebook_info.content or [])
-        ]
-        rule_sets = models.Ruleset.objects.bulk_create(rule_sets)
-
-        rules = [
-            models.Rule(
-                name=rule["name"], action=rule["action"], ruleset=rule_set
-            )
-            for rule_set, rule_set_data in zip(
-                rule_sets, rulebook_info.content
-            )
-            for rule in rule_set_data["rules"]
-        ]
-        models.Rule.objects.bulk_create(rules)
-
+        insert_rulebook_related_data(rulebook, rulebook_info.content)
         return rulebook
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:
