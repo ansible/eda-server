@@ -27,35 +27,18 @@ usage() {
 }
 
 create_user() {
-  local _heath_check=".State.Health.Status"
-  local _cnt=0
-  local _timeout=15
-  local _container_name="$( docker container ls -f name=^eda-postgres --format {{.Names}})"
+  local _container_name="$(docker container ls -f name=^eda-postgres --format {{.Names}} 2> /dev/null)"
 
-  log-info "Creating super user account..."
-  log-debug "Checking for ${_container_name} container"
-
-  log-debug "docker inspect -f {{${_heath_check}}} ${_container_name} == healthy"
-  until [ "$(docker inspect -f {{${_heath_check}}} "${_container_name}")" == "healthy" ] || [ "${_cnt}" -eq "${_timeout}" ]; do
-    log-debug "Healthcheck waiting...[$((++_cnt))s]"
-    sleep 1;
-
-    if [ "${_cnt}" -eq "${_timeout}" ]; then
-      log-err "timeout waiting for postgres service!"
-      exit 1
-    fi
-  done;
-
-  log-debug "${_container_name} is healthy"
+  wait-for-container "${_container_name}"
 
   log-debug "task manage -- createsuperuser --noinput"
   if task manage -- createsuperuser --noinput &> /dev/null; then
-    log-info "Superuser created:"
+    log-info "Superuser created"
     log-debug "\t User: ${DJANGO_SUPERUSER_USERNAME}"
     log-debug "\t Password: ${DJANGO_SUPERUSER_PASSWORD}"
     log-debug "\t Email: ${DJANGO_SUPERUSER_EMAIL}"
   else
-    log-debug "Superuser Already Exists!"
+    log-info "Superuser \'${DJANGO_SUPERUSER_USERNAME}\' Already Exists!"
   fi
 }
 
