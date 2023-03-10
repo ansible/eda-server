@@ -257,13 +257,13 @@ Run `createsuperuser` management command to create a user:
 Locally:
 
 ```shell
-task manage -- createsuperuser
+task createsuperuser
 ```
 
 With docker compose:
 
 ```shell
-task docker -- run --rm api aap-eda-manage createsuperuser
+task create:superuser
 ```
 
 ### Starting API server
