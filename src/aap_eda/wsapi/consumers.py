@@ -13,8 +13,9 @@ from .messages import (
     ActionMessage,
     AnsibleEventMessage,
     ExtraVars,
-    Inventory,
     JobMessage,
+    Message,
+    Project,
     Rulebook,
     WorkerMessage,
 )
@@ -63,6 +64,8 @@ host_status_map = {
     Event.NO_REMAINING: "no remaining",
 }
 
+BLOCK_SIZE = 4 * 1024
+
 
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
@@ -88,23 +91,32 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulebook, inventory, extra_var = await self.get_resources(
+        rulebook, extra_var, project = await self.get_resources(
             message.activation_id
         )
 
         rulebook_message = Rulebook(
             data=base64.b64encode(rulebook.rulesets.encode()).decode()
         )
-        inventory_message = Inventory(
-            data=base64.b64encode(inventory.inventory.encode()).decode()
-        )
         extra_var_message = ExtraVars(
             data=base64.b64encode(extra_var.extra_var.encode()).decode()
         )
 
+        if project.archive_file:
+            with open(project.archive_file.path, "rb") as f:
+                while filedata := f.read(BLOCK_SIZE):
+                    project_data_message = Project(
+                        more=True,
+                        data=base64.b64encode(filedata).decode("utf-8"),
+                    )
+                    await self.send(text_data=project_data_message.json())
+        else:
+            project_data_message = Project()
+            await self.send(text_data=project_data_message.json())
+
         await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=inventory_message.json())
         await self.send(text_data=extra_var_message.json())
+        await self.send(text_data=Message().json())
 
         # TODO: add broadcasting later by channel groups
 
@@ -196,6 +208,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             rules = models.Rule.objects.filter(
                 ruleset_id__in=[ruleset.id for ruleset in rulesets]
             )
+            logger.info(
+                f"Found {rules.count()} possible rules for message: {message}"
+            )
 
             audit_rules = []
             job_instance_id = job_instance.id if job_instance else None
@@ -255,8 +270,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             id=activation_instance.activation_id
         )
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        inventory = models.Inventory.objects.get(
-            project_id=activation.project_id
-        )
         extra_var = models.ExtraVar.objects.get(id=activation.extra_var_id)
-        return (rulebook, inventory, extra_var)
+        project = models.Project.objects.get(id=activation.project_id)
+        return (rulebook, extra_var, project)

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 
 class Message(BaseModel):
-    type: str
+    type: str = "EndOfData"
 
 
 class ActionMessage(Message):
@@ -59,6 +59,12 @@ class Rulebook(BaseModel):
 class Inventory(BaseModel):
     data: str
     type: str = "Inventory"
+
+
+class Project(BaseModel):
+    data: str = None
+    more: bool = False
+    type: str = "ProjectData"
 
 
 class ExtraVars(BaseModel):

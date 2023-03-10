@@ -92,9 +92,10 @@ async def test_handle_workers():
 
     for type in [
         "Hello",
+        "ProjectData",
         "Rulebook",
-        "Inventory",
         "ExtraVars",
+        "EndOfData",
     ]:
         response = await communicator.receive_json_from()
         assert response["type"] == type
