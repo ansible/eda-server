@@ -252,16 +252,6 @@ task docker:migrate
 
 ### Create superuser
 
-Run `createsuperuser` management command to create a user:
-
-Locally:
-
-```shell
-task createsuperuser
-```
-
-With docker compose:
-
 ```shell
 task create:superuser
 ```
