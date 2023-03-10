@@ -66,11 +66,6 @@ class ExtraVars(BaseModel):
     type: str = "ExtraVars"
 
 
-class SSHPrivateKey(BaseModel):
-    data: str
-    type: str = "SSHPrivateKey"
-
-
 class Hello(BaseModel):
     data: str = {}
     type: str = "Hello"

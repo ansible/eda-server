@@ -95,7 +95,6 @@ async def test_handle_workers():
         "Rulebook",
         "Inventory",
         "ExtraVars",
-        "SSHPrivateKey",
     ]:
         response = await communicator.receive_json_from()
         assert response["type"] == type

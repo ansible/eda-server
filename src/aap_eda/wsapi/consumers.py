@@ -16,7 +16,6 @@ from .messages import (
     Inventory,
     JobMessage,
     Rulebook,
-    SSHPrivateKey,
     WorkerMessage,
 )
 
@@ -102,15 +101,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         extra_var_message = ExtraVars(
             data=base64.b64encode(extra_var.extra_var.encode()).decode()
         )
-        # TODO: add secret manager later
-        ssh_key_message = SSHPrivateKey(
-            data=base64.b64encode("".encode()).decode()
-        )
 
         await self.send(text_data=rulebook_message.json())
         await self.send(text_data=inventory_message.json())
         await self.send(text_data=extra_var_message.json())
-        await self.send(text_data=ssh_key_message.json())
 
         # TODO: add broadcasting later by channel groups
 
