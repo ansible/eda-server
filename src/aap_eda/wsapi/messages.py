@@ -64,6 +64,8 @@ class Inventory(BaseModel):
 class Project(BaseModel):
     data: str = None
     more: bool = False
+    size: int = 0
+    sha256: str = ""
     type: str = "ProjectData"
 
 

@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
+from django.test import override_settings
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import models
@@ -82,6 +83,7 @@ async def test_ansible_rulebook_consumer():
     await communicator.disconnect()
 
 
+@override_settings(MEDIA_ROOT="./tests/data")
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers():
     activation_instance_id = await _prepare_db_data()
@@ -92,6 +94,7 @@ async def test_handle_workers():
 
     for type in [
         "Hello",
+        "ProjectData",
         "ProjectData",
         "Rulebook",
         "ExtraVars",
@@ -221,6 +224,7 @@ def _prepare_db_data():
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        archive_file="test.archive.tar.gz",
     )
 
     models.Inventory.objects.get_or_create(

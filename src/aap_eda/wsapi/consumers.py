@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -67,6 +68,10 @@ host_status_map = {
 BLOCK_SIZE = 4 * 1024
 
 
+class AnsibleRulebookExeception(Exception):
+    pass
+
+
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         await self.send(text_data=json.dumps({"type": "Hello"}))
@@ -102,17 +107,27 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             data=base64.b64encode(extra_var.extra_var.encode()).decode()
         )
 
+        sha256_hash = hashlib.sha256()
         if project.archive_file:
             with open(project.archive_file.path, "rb") as f:
                 while filedata := f.read(BLOCK_SIZE):
+                    sha256_hash.update(filedata)
                     project_data_message = Project(
                         more=True,
                         data=base64.b64encode(filedata).decode("utf-8"),
                     )
                     await self.send(text_data=project_data_message.json())
+
+            await self.send(
+                text_data=Project(
+                    size=project.archive_file.size,
+                    sha256=sha256_hash.hexdigest(),
+                ).json()
+            )
         else:
-            project_data_message = Project()
-            await self.send(text_data=project_data_message.json())
+            raise AnsibleRulebookExeception(
+                f"Project {project.id} has no archive_file"
+            )
 
         await self.send(text_data=rulebook_message.json())
         await self.send(text_data=extra_var_message.json())
