@@ -36,3 +36,8 @@ urlpatterns = [
     path("", include(core_urls)),
     path(f"{settings.API_PREFIX}/", include(api_urls)),
 ]
+
+if settings.DEBUG:
+    urlpatterns += [
+        path("_dev/auth/", include("rest_framework.urls")),
+    ]

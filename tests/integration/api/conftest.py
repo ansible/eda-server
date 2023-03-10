@@ -23,7 +23,7 @@ ADMIN_PASSWORD = "test.admin.123"
 
 @pytest.fixture
 def admin_user():
-    return models.User.objects.create(
+    return models.User.objects.create_user(
         username=ADMIN_USERNAME,
         password=ADMIN_PASSWORD,
         email="admin@localhost",
@@ -32,12 +32,14 @@ def admin_user():
 
 
 @pytest.fixture
-def client(admin_user) -> APIClient:
-    """Override pytest-django client fixture.
-
-    Return an instance of ``rest_framework.test.APIClient`` class
-    instead of base ``django.test.Client`` class.
-    """
-    client = APIClient()
-    client.force_authenticate(user=admin_user)
+def base_client() -> APIClient:
+    """Return APIClient instance with minimal required configuration."""
+    client = APIClient(default_format="json")
     return client
+
+
+@pytest.fixture
+def client(base_client: APIClient, admin_user: models.User) -> APIClient:
+    """Return a pre-configured instance of an APIClient."""
+    base_client.force_authenticate(user=admin_user)
+    return base_client

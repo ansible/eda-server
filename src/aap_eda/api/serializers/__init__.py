@@ -20,6 +20,7 @@ from .activation import (
     ActivationSerializer,
     ActivationUpdateSerializer,
 )
+from .auth import LoginSerializer
 from .project import (
     ExtraVarRefSerializer,
     ExtraVarSerializer,
@@ -37,8 +38,11 @@ from .rulebook import (
     RulesetSerializer,
 )
 from .tasks import TaskRefSerializer, TaskSerializer
+from .user import UserSerializer
 
 __all__ = (
+    # auth
+    "LoginSerializer",
     # project
     "ExtraVarSerializer",
     "ExtraVarRefSerializer",
@@ -62,4 +66,6 @@ __all__ = (
     "ActivationReadSerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
+    # users
+    "UserSerializer",
 )
