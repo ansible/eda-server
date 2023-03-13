@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import hashlib
 import logging
 import os
 import tempfile
@@ -143,6 +144,12 @@ class ProjectImportService:
         repo.archive("HEAD", archive_file, format="tar.gz")
 
         filename = f"{project.id:010}.archive.tar.gz"
+        sha256_hash = hashlib.sha256()
         with open(archive_file, "rb") as fp:
             project.archive_file.save(filename, fp)
+
+            sha256_hash.update(fp.read())
+            project.archive_file_sha256 = sha256_hash.hexdigest()
+            project.save()
+
         return project
