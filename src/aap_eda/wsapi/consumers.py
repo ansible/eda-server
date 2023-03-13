@@ -1,4 +1,6 @@
+import asyncio
 import base64
+import concurrent.futures
 import json
 import logging
 from datetime import datetime, timezone
@@ -111,6 +113,20 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 f"Project {project.id} has no archive_file"
             )
 
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            executor.map(self.wrap_send_project_data, [project])
+
+        await self.send(text_data=rulebook_message.json())
+        await self.send(text_data=extra_var_message.json())
+        await self.send(text_data=Message().json())
+
+        # TODO: add broadcasting later by channel groups
+
+    def wrap_send_project_data(self, project: models.Project) -> None:
+        asyncio.run(self.send_project_data(project))
+
+    async def send_project_data(self, project: models.Project) -> None:
+        logger.info("Start to send archive file data.........")
         with project.archive_file.open(mode="rb") as f:
             while filedata := f.read(BLOCK_SIZE):
                 project_data_message = Project(
@@ -125,12 +141,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                     sha256=project.archive_file_sha256,
                 ).json()
             )
-
-        await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=extra_var_message.json())
-        await self.send(text_data=Message().json())
-
-        # TODO: add broadcasting later by channel groups
+        logger.info("End of sending project data")
 
     async def handle_jobs(self, message: JobMessage):
         logger.info(f"Start to handle jobs: {message}")
