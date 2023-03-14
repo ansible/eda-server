@@ -40,4 +40,25 @@ spec:
             - containerPort: 8000
           resources: {}
       restartPolicy: Always
+      initContainers:
+        - name: wait-for-postgres
+          args:
+            - /bin/bash
+            - -c
+            - aap-eda-manage createsuperuser --noinput
+          env:
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: DJANGO_SUPERUSER_USERNAME
+              value: ${DJANGO_SUPERUSER_USERNAME:-admin}
+            - name: DJANGO_SUPERUSER_PASSWORD
+              value: ${DJANGO_SUPERUSER_PASSWORD:-testpass}
+            - name: DJANGO_SUPERUSER_EMAIL
+              value: ${DJANGO_SUPERUSER_EMAIL:-admin@test.com}
+          image: docker.io/alpine:latest
+          command: [ 'sh', '-c', "until nslookup eda-${EDA_DB_HOST}.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for ${EDA_DB_HOST}; sleep 2; done" ]
+        - name: add-superuser
+          image: aap-eda
+          imagePullPolicy: Never
+          command: [ 'sh', '-c', "aap-eda-manage createsuperuser --noinput" ]
 status: {}
