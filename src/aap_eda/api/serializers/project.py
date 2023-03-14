@@ -24,13 +24,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
             "url",
             "git_hash",
+            "import_state",
+            "import_task_id",
             "created_at",
             "modified_at",
         ]
         fields = ["name", "description", *read_only_fields]
 
 
-class ProjectCreateSerializer(serializers.ModelSerializer):
+class ProjectCreateRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
         fields = ["url", "name", "description"]

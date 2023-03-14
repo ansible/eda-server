@@ -25,7 +25,7 @@ from .project import (
     ExtraVarRefSerializer,
     ExtraVarSerializer,
     PlaybookSerializer,
-    ProjectCreateSerializer,
+    ProjectCreateRequestSerializer,
     ProjectRefSerializer,
     ProjectSerializer,
 )
@@ -48,7 +48,7 @@ __all__ = (
     "ExtraVarRefSerializer",
     "PlaybookSerializer",
     "ProjectSerializer",
-    "ProjectCreateSerializer",
+    "ProjectCreateRequestSerializer",
     "ProjectRefSerializer",
     "RulebookSerializer",
     "RulebookRefSerializer",

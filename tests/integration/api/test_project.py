@@ -32,18 +32,22 @@ def test_list_projects(client: APIClient):
                 name="test-project-01",
                 url="https://git.example.com/acme/project-01",
                 git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+                import_state=models.Project.ImportState.PENDING,
+                import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
             ),
             models.Project(
                 name="test-project-02",
                 url="https://git.example.com/acme/project-02",
                 description="Project description.",
                 git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+                import_state=models.Project.ImportState.COMPLETED,
+                import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
             ),
         ]
     )
     response = client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_200_OK
-    for data, project in zip(response.data["results"], projects):
+    for data, project in zip(response.json()["results"], projects):
         assert_project_data(data, project)
 
 
@@ -130,16 +134,27 @@ def test_create_project(import_project_task: mock.Mock, client: APIClient):
             "url": "https://git.example.com/acme/project-01",
         },
     )
-    assert response.status_code == status.HTTP_202_ACCEPTED
-    assert response.json() == {
-        "id": job_id,
-        "href": f"http://testserver{api_url_v1}/tasks/{job_id}/",
-    }
 
-    import_project_task.delay.assert_called_once_with(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    data = response.json()
+
+    try:
+        project = models.Project.objects.get(pk=data["id"])
+    except models.Project.DoesNotExist:
+        raise AssertionError("Project doesn't exist in the database")
+
+    # Check that project was created with valid data
+    assert project.name == "test-project-01"
+    assert project.url == "https://git.example.com/acme/project-01"
+    assert project.import_state == "pending"
+    assert str(project.import_task_id) == job_id
+
+    # Check that response returned the valid representation of the project
+    assert_project_data(data, project)
+
+    # Check that import task job was created
+    import_project_task.delay.assert_called_once_with(project_id=project.id)
 
 
 @pytest.mark.django_db
@@ -237,7 +252,7 @@ def test_update_project_not_found(client: APIClient):
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     data = response.json()
 
-    response = client.get(f"{api_url_v1}/projects/42/", data=data)
+    response = client.put(f"{api_url_v1}/projects/42/", data=data)
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -362,12 +377,18 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def assert_project_data(data: Dict[str, Any], project: models.Project):
+    import_task_id = project.import_task_id
+    if import_task_id is not None:
+        import_task_id = str(import_task_id)
+
     assert data == {
         "id": project.id,
         "url": project.url,
         "name": project.name,
         "description": project.description,
         "git_hash": project.git_hash,
+        "import_state": project.import_state,
+        "import_task_id": import_task_id,
         "created_at": project.created_at.strftime(DATETIME_FORMAT),
         "modified_at": project.modified_at.strftime(DATETIME_FORMAT),
     }

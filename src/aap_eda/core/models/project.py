@@ -39,16 +39,28 @@ class Project(models.Model):
             )
         ]
 
-    git_hash = models.TextField()
-    url = models.TextField()
+    class ImportState(models.TextChoices):
+        PENDING = "pending"
+        RUNNING = "running"
+        FAILED = "failed"
+        COMPLETED = "completed"
+
     name = models.TextField(null=False, unique=True)
-    description = models.TextField(default="")
-    created_at = models.DateTimeField(auto_now_add=True, null=False)
-    modified_at = models.DateTimeField(auto_now=True, null=False)
+    description = models.TextField(default="", blank=True, null=False)
+    url = models.TextField(null=False)
+    git_hash = models.TextField()
     archive_file = models.FileField(upload_to=PROJECT_ARCHIVE_DIR)
 
+    import_state = models.TextField(
+        choices=ImportState.choices, default=ImportState.PENDING, null=False
+    )
+    import_task_id = models.UUIDField(null=True, default=None)
+
+    created_at = models.DateTimeField(auto_now_add=True, null=False)
+    modified_at = models.DateTimeField(auto_now=True, null=False)
+
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(id={self.id}, name={self.name})"
+        return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
 class Playbook(models.Model):

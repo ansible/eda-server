@@ -67,10 +67,12 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
 
     repo_mock.archive.side_effect = archive_project
 
-    service = ProjectImportService(git_cls=git_mock)
-    project = service.run(
+    project = models.Project.objects.create(
         name="test-project-01", url="https://git.example.com/repo.git"
     )
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.run(project)
 
     git_mock.clone.assert_called_once_with(
         "https://git.example.com/repo.git",
@@ -78,12 +80,9 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
         depth=1,
     )
 
-    assert project is not None
-    assert project.id is not None
-    assert project.name == "test-project-01"
-    assert project.url == "https://git.example.com/repo.git"
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     assert project.archive_file.name == "project.tar.gz"
+    assert project.import_state == models.Project.ImportState.COMPLETED
 
     rulebooks = list(project.rulebook_set.order_by("name"))
     assert len(rulebooks) == 2
@@ -95,6 +94,9 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
         assert_rulebook_is_valid(rulebook, expected)
 
     storage_save_mock.assert_called_once()
+
+
+# TODO(cutwater): Add negative tests
 
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):
