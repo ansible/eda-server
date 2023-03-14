@@ -7,8 +7,6 @@ SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PROJECT_DIR="${SCRIPTS_DIR}/.."
 
 export DEBUG=${DEBUG:-false}
-export EDA_DB_HOST=${EDA_DB_HOST:-localhost}
-export EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-secret}
 
 # import common & logging
 source "${SCRIPTS_DIR}"/common/logging.sh
@@ -47,6 +45,8 @@ create_user() {
 export DJANGO_SUPERUSER_USERNAME="admin"
 export DJANGO_SUPERUSER_PASSWORD="testpass"
 export DJANGO_SUPERUSER_EMAIL="admin@test.com"
+export EDA_DB_HOST=${EDA_DB_HOST:-localhost}
+export EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-secret}
 
 while getopts p:u:e:h opt; do
   case $opt in
