@@ -7,7 +7,8 @@ SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PROJECT_DIR="${SCRIPTS_DIR}/.."
 
 export DEBUG=${DEBUG:-false}
-export IN_DOCKER=${IN_DOCKER:-false}
+export EDA_DB_HOST=${EDA_DB_HOST:-localhost}
+export EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-secret}
 
 # import common & logging
 source "${SCRIPTS_DIR}"/common/logging.sh
@@ -28,8 +29,7 @@ usage() {
 }
 
 create_user() {
-  local _container_name="$(docker container ls -f name=^eda-postgres --format {{.Names}} 2> /dev/null)"
-
+  log-debug "EDA_DB_HOST: ${EDA_DB_HOST}"
   log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
   if poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput &> /dev/null; then
     log-info "Superuser created"
