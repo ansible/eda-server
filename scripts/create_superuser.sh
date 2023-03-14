@@ -32,7 +32,7 @@ create_user() {
 
   if [[ "${_result}" =~ "username is already taken" ]]; then
     log-warn "username ${DJANGO_SUPERUSER_USERNAME} is already taken"
-  elif [ ! -z "${_result}" ]; then
+  elif [ -n "${_result}" ]; then
     log-err "${_result}"
     exit 1
   else
