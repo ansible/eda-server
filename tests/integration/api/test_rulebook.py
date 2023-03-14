@@ -219,6 +219,7 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
         "project": rulebook.project,
         "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
         "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
+        "fired_stats": [{}],
     }
 
 

@@ -62,6 +62,12 @@ def insert_rulebook_related_data(
     models.Rule.objects.bulk_create(rules)
 
 
+def build_rulebook_out_data(data: dict) -> dict:
+    data["fired_stats"] = build_fired_stats(data)
+
+    return data
+
+
 def build_ruleset_out_data(data: dict) -> dict:
     ruleset_id = int(data["id"])
     data["source_types"] = [src["type"] for src in (data["sources"] or [])]

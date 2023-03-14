@@ -29,6 +29,7 @@ from aap_eda.api import filters, serializers
 from aap_eda.core import models
 from aap_eda.services.rulebook import (
     build_fired_stats,
+    build_rulebook_out_data,
     build_ruleset_out_data,
     insert_rulebook_related_data,
 )
@@ -44,15 +45,6 @@ from aap_eda.services.rulebook import (
             ),
         },
     ),
-    list=extend_schema(
-        description="List all rulebooks",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulebookSerializer,
-                description="Return a list of rulebooks.",
-            ),
-        },
-    ),
 )
 class RulebookViewSet(
     mixins.CreateModelMixin,
@@ -62,6 +54,30 @@ class RulebookViewSet(
     serializer_class = serializers.RulebookSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulebookFilter
+
+    @extend_schema(
+        description="List all rulebooks",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.RulebookSerializer,
+                description="Return a list of rulebooks.",
+            ),
+        },
+    )
+    def list(self, request, pk=None):
+        rulebooks = models.Rulebook.objects.all()
+        rulebooks = self.filter_queryset(rulebooks)
+
+        response_data = []
+        for rulebook in rulebooks:
+            rulebook_data = serializers.RulebookSerializer(rulebook).data
+            data = build_rulebook_out_data(rulebook_data)
+            response_data.append(data)
+
+        response_data = self.paginate_queryset(response_data)
+
+        return self.get_paginated_response(response_data)
 
     @extend_schema(
         request=serializers.RulebookSerializer,
