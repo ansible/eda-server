@@ -27,15 +27,19 @@ usage() {
 }
 
 create_user() {
-  log-debug "EDA_DB_HOST: ${EDA_DB_HOST}"
   log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
-  if poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput &> /dev/null; then
+  local _result=$(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput 2>&1)
+
+  if [[ "${_result}" =~ "username is already taken" ]]; then
+    log-warn "username ${DJANGO_SUPERUSER_USERNAME} is already taken"
+  elif [ ! -z "${_result}" ]; then
+    log-err "${_result}"
+    exit 1
+  else
     log-info "Superuser created"
     log-debug "\t User: ${DJANGO_SUPERUSER_USERNAME}"
     log-debug "\t Password: ${DJANGO_SUPERUSER_PASSWORD}"
     log-debug "\t Email: ${DJANGO_SUPERUSER_EMAIL}"
-  else
-    log-warn $(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput)
   fi
 }
 
