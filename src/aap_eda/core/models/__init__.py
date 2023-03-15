@@ -14,6 +14,8 @@
 
 from .activation import Activation, ActivationInstance, ActivationInstanceLog
 from .auth import Role, RolePermission, UserRole
+from .credential import Credential
+from .decision_environment import DecisionEnvironment
 from .inventory import Inventory
 from .job import (
     ActivationInstanceJobInstance,
@@ -47,4 +49,6 @@ __all__ = [
     "Ruleset",
     "UserRole",
     "User",
+    "Credential",
+    "DecisionEnvironment",
 ]

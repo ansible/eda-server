@@ -12,18 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .credential import CredentialFilter
-from .decision_environment import DecisionEnvironmentFilter
-from .project import ProjectFilter
-from .rulebook import RulebookFilter
+import django_filters
 
-__all__ = (
-    # project
-    "ProjectFilter",
-    # rulebook
-    "RulebookFilter",
-    # credential
-    "Credential",
-    # decision_environment
-    "DecisionEnvironment",
-)
+from aap_eda.core import models
+
+
+class DecisionEnvironmentFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="image_name",
+        lookup_expr="istartswith",
+        label="Filter by decision environment image name.",
+    )
+
+    class Meta:
+        model = models.DecisionEnvironment
+        fields = ["image_name"]
