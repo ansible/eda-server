@@ -8,6 +8,7 @@ vars:
   DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose-dev.yaml" .DOCKER_COMPOSE_ARGS }}'
   PYTEST_CMD: "poetry run python -m pytest"
   MINIKUBE_CMD: "scripts/eda_kube.sh"
+  SUSER_CMD: "scripts/create_superuser.sh"
 
 tasks:
   default:
@@ -187,6 +188,22 @@ tasks:
       - task: docker
         vars:
           CLI_ARGS: exec -it worker aap-eda-manage shell
+
+  create:superuser:
+    desc: "create a superuser to use with EDA API."
+    summary: |
+      Run create_superuser.sh with specified CLI arguments. If no arguments are 
+      given the following defaults are used.
+        Defaults:
+          user:     admin
+          password: testpass
+          email:    admin@test.com
+
+      Examples:
+        $ task create:superuser
+        $ task create:superuser -- -u test_user -p none2tuff -e test_user@test.com
+    cmds:
+      - "{{.SUSER_CMD}} {{.CLI_ARGS}}"
 
   minikube:
     desc: "Run eda_kube.sh with specified CLI arguments."

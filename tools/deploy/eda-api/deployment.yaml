@@ -19,7 +19,7 @@ spec:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage migrate && aap-eda-manage runserver 0.0.0.0:8000
+            - aap-eda-manage migrate && scripts/create_superuser.sh && aap-eda-manage runserver 0.0.0.0:8000
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda
@@ -40,4 +40,8 @@ spec:
             - containerPort: 8000
           resources: {}
       restartPolicy: Always
+      initContainers:
+        - name: wait-for-postgres
+          image: docker.io/alpine:latest
+          command: [ 'sh', '-c', "until nslookup ${EDA_DB_HOST}.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for ${EDA_DB_HOST}; sleep 2; done" ]
 status: {}
