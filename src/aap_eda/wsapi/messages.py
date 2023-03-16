@@ -19,6 +19,10 @@ class Message(BaseModel):
     type: str
 
 
+class EndOfResponse(BaseModel):
+    type: str = "EndOfResponse"
+
+
 class ActionMessage(Message):
     action: str
     activation_id: int
@@ -51,19 +55,9 @@ class WorkerMessage(Message):
     activation_id: int
 
 
-class Rulebook(BaseModel):
+class DataPackage(BaseModel):
     data: str
-    type: str = "Rulebook"
-
-
-class Inventory(BaseModel):
-    data: str
-    type: str = "Inventory"
-
-
-class ExtraVars(BaseModel):
-    data: str
-    type: str = "ExtraVars"
+    type: str
 
 
 class Hello(BaseModel):

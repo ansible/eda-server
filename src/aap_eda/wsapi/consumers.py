@@ -6,16 +6,16 @@ from enum import Enum
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.conf import settings
 
 from aap_eda.core import models
 
 from .messages import (
     ActionMessage,
     AnsibleEventMessage,
-    ExtraVars,
-    Inventory,
+    DataPackage,
+    EndOfResponse,
     JobMessage,
-    Rulebook,
     WorkerMessage,
 )
 
@@ -88,23 +88,32 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulebook, inventory, extra_var = await self.get_resources(
-            message.activation_id
+        rulebook, extra_var = await self.get_resources(message.activation_id)
+
+        rulebook_package = DataPackage(
+            data=base64.b64encode(rulebook.rulesets.encode()).decode(),
+            type="Rulebook",
+        )
+        extra_var_package = DataPackage(
+            data=base64.b64encode(extra_var.extra_var.encode()).decode(),
+            type="ExtraVars",
+        )
+        controller_url_package = DataPackage(
+            data=settings.EDA_CONTROLLER_URL, type="ControllerUrl"
+        )
+        controller_token_package = DataPackage(
+            data=settings.EDA_CONTROLLER_TOKEN, type="ControllerToken"
+        )
+        controller_ssl_verify_package = DataPackage(
+            data=settings.EDA_CONTROLLER_SSL_VERIFY, type="ControllerSslVerify"
         )
 
-        rulebook_message = Rulebook(
-            data=base64.b64encode(rulebook.rulesets.encode()).decode()
-        )
-        inventory_message = Inventory(
-            data=base64.b64encode(inventory.inventory.encode()).decode()
-        )
-        extra_var_message = ExtraVars(
-            data=base64.b64encode(extra_var.extra_var.encode()).decode()
-        )
-
-        await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=inventory_message.json())
-        await self.send(text_data=extra_var_message.json())
+        await self.send(text_data=rulebook_package.json())
+        await self.send(text_data=extra_var_package.json())
+        await self.send(text_data=controller_url_package.json())
+        await self.send(text_data=controller_token_package.json())
+        await self.send(text_data=controller_ssl_verify_package.json())
+        await self.send(text_data=EndOfResponse().json())
 
         # TODO: add broadcasting later by channel groups
 
@@ -247,7 +256,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_resources(
         self, activation_instance_id: str
-    ) -> tuple[models.Rulebook, models.inventory, models.ExtraVar]:
+    ) -> tuple[models.Rulebook, models.ExtraVar]:
         activation_instance = models.ActivationInstance.objects.get(
             id=activation_instance_id
         )
@@ -255,8 +264,5 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             id=activation_instance.activation_id
         )
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        inventory = models.Inventory.objects.get(
-            project_id=activation.project_id
-        )
         extra_var = models.ExtraVar.objects.get(id=activation.extra_var_id)
-        return (rulebook, inventory, extra_var)
+        return (rulebook, extra_var)
