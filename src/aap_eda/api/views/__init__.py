@@ -17,7 +17,7 @@ from .auth import SessionLoginView, SessionLogoutView
 from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
 from .rulebook import RulebookViewSet, RulesetViewSet, RuleViewSet
 from .tasks import TaskViewSet
-from .user import CurrentUserView
+from .user import CurrentUserControllerTokensViewSet, CurrentUserView
 
 __all__ = (
     # auth
@@ -37,4 +37,5 @@ __all__ = (
     "ActivationInstanceViewSet",
     # user
     "CurrentUserView",
+    "CurrentUserControllerTokensViewSet",
 )

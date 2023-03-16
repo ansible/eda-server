@@ -24,7 +24,7 @@ from .job import (
 )
 from .project import ExtraVar, Playbook, Project
 from .rulebook import AuditRule, Rule, Rulebook, Ruleset
-from .user import User
+from .user import ControllerToken, User
 
 __all__ = [
     "ActivationInstanceJobInstance",
@@ -47,4 +47,5 @@ __all__ = [
     "Ruleset",
     "UserRole",
     "User",
+    "ControllerToken",
 ]
