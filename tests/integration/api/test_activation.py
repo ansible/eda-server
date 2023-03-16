@@ -197,8 +197,14 @@ def test_retrieve_activation(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, activation)
-    assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
-    assert data["rulebook"] == {"id": activation.rulebook.id, **TEST_RULEBOOK}
+    assert data["project"] == {
+        "id": activation.project.id,
+        "name": TEST_PROJECT["name"],
+    }
+    assert data["rulebook"] == {
+        "id": activation.rulebook.id,
+        "name": TEST_RULEBOOK["name"],
+    }
     assert data["extra_var"] == {
         "id": activation.extra_var.id,
         "name": "test-extra-var.yml",

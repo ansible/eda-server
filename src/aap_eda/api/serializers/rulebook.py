@@ -54,7 +54,7 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = ["id", "name", "description"]
+        fields = ["id", "name"]
         read_only_fields = ["id"]
 
 
