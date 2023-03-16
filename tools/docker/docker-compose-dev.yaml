@@ -6,10 +6,10 @@ x-environment:
 
 services:
   api:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: "${EDA_IMAGE:-localhost/aap-eda-api}"
     build:
       context: ../../
-      dockerfile: tools/docker/Dockerfile
+      dockerfile: tools/docker/api/Dockerfile
     environment: *common-env
     command:
       - /bin/bash
@@ -33,7 +33,10 @@ services:
   worker:
     deploy:
       replicas: 2
-    image: 'localhost/aap-eda'
+    image: 'localhost/aap-eda-worker'
+    build:
+      context: ../../
+      dockerfile: tools/docker/worker/Dockerfile
     environment: *common-env
     command:
       - aap-eda-manage
