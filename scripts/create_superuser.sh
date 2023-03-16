@@ -26,23 +26,22 @@ usage() {
 }
 
 create_user() {
-    log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
-    local _result
-    _result=$(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput 2>&1 || true)
-    
-    if [[ "${_result}" =~ "username is already taken" ]]; then
-        log-info "username ${DJANGO_SUPERUSER_USERNAME} is already taken"
-        exit 0
-    elif [[ "${_result}" =~ "Superuser created successfully" ]]; then
-        log-info "Superuser created"
-        log-info "\t User: ${DJANGO_SUPERUSER_USERNAME}"
-        log-info "\t Password: ${DJANGO_SUPERUSER_PASSWORD}"
-        log-info "\t Email: ${DJANGO_SUPERUSER_EMAIL}"
-        exit 0
-    else
-        log-err "${_result}"
-        exit 1
-    fi
+  log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
+  local _result=$(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput 2>&1)
+
+  if [[ "${_result}" =~ "Superuser created successfully" ]]; then
+    log-info "Superuser created"
+    log-debug "\t User: ${DJANGO_SUPERUSER_USERNAME}"
+    log-debug "\t Password: ${DJANGO_SUPERUSER_PASSWORD}"
+    log-debug "\t Email: ${DJANGO_SUPERUSER_EMAIL}"
+
+  elif [[ "${_result}" =~ "username is already taken" ]]; then
+    log-warn "username ${DJANGO_SUPERUSER_USERNAME} is already taken"
+
+  else [ -n "${_result}" ]
+    log-err "${_result}"
+    exit 1
+  fi
 }
 
 #
