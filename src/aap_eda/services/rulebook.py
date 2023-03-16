@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from aap_eda.api import serializers
 from aap_eda.core import models
 
 
@@ -62,16 +63,31 @@ def insert_rulebook_related_data(
     models.Rule.objects.bulk_create(rules)
 
 
-def build_ruleset_out_data(data: dict) -> dict:
-    ruleset_id = int(data["id"])
-    data["source_types"] = [src["type"] for src in (data["sources"] or [])]
-    data["rule_count"] = models.Rule.objects.filter(
-        ruleset_id=ruleset_id
-    ).count()
-    data["fired_stats"] = build_fired_stats(data)
+def get_ruleset_project(ruleset: int):
+    rulebook = models.Rulebook.objects.get(id=ruleset)
+    project = serializers.ProjectRefSerializer(rulebook.project).data
+    return project
 
-    for key in ["rulebook", "sources"]:
-        data.pop(key)
+
+def get_ruleset_rule_count(data_id: int) -> int:
+    rule_count = models.Rule.objects.filter(ruleset_id=data_id).count()
+    return rule_count
+
+
+def build_ruleset_list(data: models.Ruleset):
+    ruleset_id = data.id
+    data.rule_count = get_ruleset_rule_count(ruleset_id)
+    data.fired_stats = build_fired_stats(data)
+
+    return data
+
+
+def build_ruleset_details(data: models.Ruleset):
+    ruleset_id = data.id
+    data.project = get_ruleset_project(data.rulebook.id)
+    data.source_types = [src["type"] for src in (data.sources)]
+    data.rule_count = get_ruleset_rule_count(ruleset_id)
+    data.fired_stats = build_fired_stats(data)
 
     return data
 

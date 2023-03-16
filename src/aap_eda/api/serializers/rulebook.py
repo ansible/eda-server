@@ -16,6 +16,8 @@ from rest_framework import serializers
 
 from aap_eda.core import models
 
+from .project import ProjectRefSerializer
+
 
 class RulebookSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
@@ -73,7 +75,7 @@ class RulesetSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "modified_at"]
 
 
-class RulesetOutSerializer(serializers.Serializer):
+class RulesetListSerializer(serializers.Serializer):
     id = serializers.IntegerField(
         required=True,
         help_text="ID of the ruleset",
@@ -89,18 +91,29 @@ class RulesetOutSerializer(serializers.Serializer):
         help_text="Number of rules the ruleset contains",
     )
 
-    source_types = serializers.ListField(
-        child=serializers.CharField(),
-        required=True,
-        help_text="List of source types",
-    )
-
     fired_stats = serializers.ListField(
         child=serializers.JSONField(),
         required=True,
         help_text="List of stats",
     )
 
+
+class RulesetDetailSerializer(RulesetListSerializer):
+    description = serializers.CharField(
+        required=False,
+        default="",
+        help_text="Description of the ruleset",
+    )
+
+    rulebook = RulebookRefSerializer()
+
+    project = ProjectRefSerializer()
+
+    source_types = serializers.ListField(
+        child=serializers.CharField(),
+        required=True,
+        help_text="List of source types",
+    )
     created_at = serializers.DateTimeField(
         required=True,
         help_text="The created_at timestamp of the ruleset",

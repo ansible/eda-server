@@ -29,7 +29,8 @@ from aap_eda.api import filters, serializers
 from aap_eda.core import models
 from aap_eda.services.rulebook import (
     build_fired_stats,
-    build_ruleset_out_data,
+    build_ruleset_details,
+    build_ruleset_list,
     insert_rulebook_related_data,
 )
 
@@ -85,7 +86,7 @@ class RulebookViewSet(
         description="Ruleset list of a rulebook by its id",
         request=None,
         responses={
-            status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)
+            status.HTTP_200_OK: serializers.RulesetListSerializer(many=True)
         },
     )
     @action(detail=True)
@@ -95,8 +96,9 @@ class RulebookViewSet(
 
         result = []
         for ruleset in rulesets:
-            ruleset_data = serializers.RulesetSerializer(ruleset).data
-            data = build_ruleset_out_data(ruleset_data)
+            data = build_ruleset_list(ruleset)
+            data = serializers.RulesetListSerializer(data).data
+
             result.append(data)
 
         result = self.paginate_queryset(result)
@@ -127,23 +129,23 @@ class RulesetViewSet(
         description="Get the ruleset by its id",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulesetOutSerializer,
+                serializers.RulesetDetailSerializer,
                 description="Return the ruleset by its id.",
             ),
         },
     )
     def retrieve(self, request, pk=None):
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
-        ruleset_data = serializers.RulesetSerializer(ruleset).data
-        data = build_ruleset_out_data(ruleset_data)
+        ruleset_data = build_ruleset_details(ruleset)
+        ruleset_data = serializers.RulesetDetailSerializer(ruleset_data).data
 
-        return Response(data)
+        return Response(ruleset_data)
 
     @extend_schema(
         description="List all rulesets",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulesetOutSerializer(many=True),
+                serializers.RulesetListSerializer(many=True),
                 description="Return a list of rulesets.",
             ),
         },
@@ -153,8 +155,8 @@ class RulesetViewSet(
 
         result = []
         for ruleset in rulesets:
-            ruleset_data = serializers.RulesetSerializer(ruleset).data
-            data = build_ruleset_out_data(ruleset_data)
+            data = build_ruleset_list(ruleset)
+            data = serializers.RulesetListSerializer(data).data
             result.append(data)
 
         result = self.paginate_queryset(result)

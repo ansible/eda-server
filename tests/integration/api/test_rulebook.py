@@ -202,9 +202,6 @@ def test_list_rulesets_from_rulebook(client: APIClient, init_db):
     assert list(response_rulesets[0]) == [
         "id",
         "name",
-        "created_at",
-        "modified_at",
-        "source_types",
         "rule_count",
         "fired_stats",
     ]
@@ -237,9 +234,6 @@ def test_list_rulesets(client: APIClient, init_db):
     assert list(rulesets[0]) == [
         "id",
         "name",
-        "created_at",
-        "modified_at",
-        "source_types",
         "rule_count",
         "fired_stats",
     ]

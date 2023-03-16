@@ -34,7 +34,8 @@ from .rulebook import (
     RulebookSerializer,
     RuleOutSerializer,
     RuleSerializer,
-    RulesetOutSerializer,
+    RulesetDetailSerializer,
+    RulesetListSerializer,
     RulesetSerializer,
 )
 from .tasks import TaskRefSerializer, TaskSerializer
@@ -52,7 +53,8 @@ __all__ = (
     "ProjectRefSerializer",
     "RulebookSerializer",
     "RulebookRefSerializer",
-    "RulesetOutSerializer",
+    "RulesetDetailSerializer",
+    "RulesetListSerializer",
     "RulesetSerializer",
     "RuleOutSerializer",
     "RuleSerializer",
