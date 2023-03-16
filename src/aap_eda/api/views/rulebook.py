@@ -65,13 +65,16 @@ class RulebookViewSet(
             status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)
         },
     )
-    @action(detail=True)
+    @action(
+        detail=True,
+        queryset=models.Ruleset.objects.order_by("id"),
+        filterset_class=filters.RulesetFilter,
+    )
     def rulesets(self, request, pk):
-        self.filterset_class = filters.RulesetFilter
         rulebook = get_object_or_404(models.Rulebook, pk=pk)
-        self.queryset = models.Ruleset.objects.filter(rulebook=rulebook)
+        rulesets = models.Ruleset.objects.filter(rulebook=rulebook)
 
-        rulesets = self.filter_queryset(self.queryset)
+        rulesets = self.filter_queryset(rulesets)
 
         result = []
         for ruleset in rulesets:
