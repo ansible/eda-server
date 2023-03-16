@@ -4,7 +4,6 @@ set -o pipefail
 set -o nounset
 
 SCRIPTS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-PROJECT_DIR="${SCRIPTS_DIR}/.."
 
 export DEBUG=${DEBUG:-false}
 
@@ -15,8 +14,8 @@ source "${SCRIPTS_DIR}"/common/utils.sh
 trap handle_errors ERR
 
 handle_errors() {
-  log-err "An error occurred on or around line ${BASH_LINENO[0]}. Unable to continue."
-  exit 1
+    log-err "An error occurred on or around line ${BASH_LINENO[0]}. Unable to continue."
+    exit 1
 }
 
 usage() {
@@ -27,20 +26,23 @@ usage() {
 }
 
 create_user() {
-  log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
-  local _result=$(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput 2>&1)
-
-  if [[ "${_result}" =~ "username is already taken" ]]; then
-    log-warn "username ${DJANGO_SUPERUSER_USERNAME} is already taken"
-  elif [ -n "${_result}" ]; then
-    log-err "${_result}"
-    exit 1
-  else
-    log-info "Superuser created"
-    log-debug "\t User: ${DJANGO_SUPERUSER_USERNAME}"
-    log-debug "\t Password: ${DJANGO_SUPERUSER_PASSWORD}"
-    log-debug "\t Email: ${DJANGO_SUPERUSER_EMAIL}"
-  fi
+    log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
+    local _result
+    _result=$(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput 2>&1 || true)
+    
+    if [[ "${_result}" =~ "username is already taken" ]]; then
+        log-info "username ${DJANGO_SUPERUSER_USERNAME} is already taken"
+        exit 0
+    elif [[ "${_result}" =~ "Superuser created successfully" ]]; then
+        log-info "Superuser created"
+        log-info "\t User: ${DJANGO_SUPERUSER_USERNAME}"
+        log-info "\t Password: ${DJANGO_SUPERUSER_PASSWORD}"
+        log-info "\t Email: ${DJANGO_SUPERUSER_EMAIL}"
+        exit 0
+    else
+        log-err "${_result}"
+        exit 1
+    fi
 }
 
 #
@@ -53,13 +55,13 @@ export EDA_DB_HOST=${EDA_DB_HOST:-localhost}
 export EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-secret}
 
 while getopts p:u:e:h opt; do
-  case $opt in
-    p) export DJANGO_SUPERUSER_PASSWORD=$OPTARG ;;
-    u) export DJANGO_SUPERUSER_USERNAME=$OPTARG ;;
-    e) export DJANGO_SUPERUSER_EMAIL=$OPTARG ;;
-    h) usage ;;
-    *) log-err "Invalid flag supplied"; exit 2
-  esac
+    case $opt in
+        p) export DJANGO_SUPERUSER_PASSWORD=$OPTARG ;;
+        u) export DJANGO_SUPERUSER_USERNAME=$OPTARG ;;
+        e) export DJANGO_SUPERUSER_EMAIL=$OPTARG ;;
+        h) usage ;;
+        *) log-err "Invalid flag supplied"; exit 2
+    esac
 done
 
 shift "$(( OPTIND - 1 ))"
