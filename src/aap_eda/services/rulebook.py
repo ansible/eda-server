@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from aap_eda.api import serializers
 from aap_eda.core import models
 
 
@@ -65,8 +64,7 @@ def insert_rulebook_related_data(
 
 def get_ruleset_project(ruleset: int):
     rulebook = models.Rulebook.objects.get(id=ruleset)
-    project = serializers.ProjectRefSerializer(rulebook.project).data
-    return project
+    return rulebook.project
 
 
 def get_ruleset_rule_count(data_id: int) -> int:
