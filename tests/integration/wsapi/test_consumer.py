@@ -92,8 +92,10 @@ async def test_handle_workers():
 
     for type in [
         "Hello",
+        "ControllerUrl",
+        "ControllerToken",
+        "ControllerSslVerify",
         "Rulebook",
-        "Inventory",
         "ExtraVars",
     ]:
         response = await communicator.receive_json_from()

@@ -123,6 +123,8 @@ def test_rulesets_activate_local(run_mock: mock.Mock):
         execution_environment="quay.io/ansible-rulebook",
         working_directory="tmp",
         deployment_type="local",
+        host="localhost",
+        port="8000"
     )
 
     assert models.ActivationInstanceLog.objects.count() == 2
@@ -145,6 +147,8 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
         execution_environment="quay.io/ansible-rulebook",
         working_directory="tmp",
         deployment_type="bad_type",
+        host="localhost",
+        port="8000"
     )
 
     assert (
