@@ -94,8 +94,8 @@ class ActivationViewSet(
             response.execution_environment,
             response.working_directory,
             settings.DEPLOYMENT_TYPE,
-            settings.DOCKER_SERVER_NAME,
-            settings.DOCKER_PORT_NUMBER,
+            settings.WEBSOCKET_SERVER_NAME,
+            settings.WEBSOCKET_SERVER_PORT,
         )
 
         return Response(

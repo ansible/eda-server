@@ -285,5 +285,5 @@ LOGGING = {
 # ---------------------------------------------------------
 
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
-DOCKER_SERVER_NAME = settings.get("DOCKER_SERVER_NAME", "localhost")
-DOCKER_PORT_NUMBER = settings.get("DOCKER_PORT_NUMBER", "8000")
+WEBSOCKET_SERVER_NAME = settings.get("WEBSOCKET_SERVER_NAME", "localhost")
+WEBSOCKET_SERVER_PORT = settings.get("WEBSOCKET_SERVER_PORT", "8000")
