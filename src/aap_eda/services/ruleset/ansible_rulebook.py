@@ -62,7 +62,7 @@ class AnsibleRulebookService:
                     f"\n\tcommand: {exc.cmd}"
                     f"\n\tstderr: {exc.stderr}"
                 )
-                logger.warning("%s", message)
+                logger.error("%s", message)
                 raise AnsibleRulebookServiceFailed(exc.stderr)
         else:
             message = (
