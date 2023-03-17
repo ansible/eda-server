@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timezone
 from enum import Enum
 
+from django.conf import settings
+
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
@@ -16,6 +18,9 @@ from .messages import (
     JobMessage,
     Rulebook,
     WorkerMessage,
+    ControllerUrl,
+    ControllerToken,
+    ControllerSslVerify
 )
 
 logger = logging.getLogger(__name__)
@@ -104,6 +109,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 data=base64.b64encode(json.dumps({}).encode()).decode()
             )
 
+        await self.send(text_data=ControllerUrl(data=settings.AWX_URL).json())
+        await self.send(text_data=ControllerToken(data=settings.AWX_TOKEN).json())
+        await self.send(text_data=ControllerSslVerify(data=settings.AWX_SSL_VERIFY).json())
         await self.send(text_data=rulebook_message.json())
         await self.send(text_data=extra_var_message.json())
 

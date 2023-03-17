@@ -287,3 +287,7 @@ LOGGING = {
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
 WEBSOCKET_SERVER_NAME = settings.get("WEBSOCKET_SERVER_NAME", "localhost")
 WEBSOCKET_SERVER_PORT = settings.get("WEBSOCKET_SERVER_PORT", "8000")
+AWX_TOKEN = settings.get("AWX_TOKEN", "*********")
+AWX_URL = settings.get("AWX_URL", "https://localhost:8043")
+AWX_SSL_VERIFY = settings.get("AWX_SSL_VERIFY", False)
+

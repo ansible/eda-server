@@ -69,3 +69,18 @@ class ExtraVars(BaseModel):
 class Hello(BaseModel):
     data: str = {}
     type: str = "Hello"
+
+
+class ControllerUrl(BaseModel):
+    data: str
+    type: str = "ControllerUrl"
+
+
+class ControllerToken(BaseModel):
+    data: str
+    type: str = "ControllerToken"
+
+
+class ControllerSslVerify(BaseModel):
+    data: bool
+    type: str = "ControllerSslVerify"
