@@ -187,4 +187,3 @@ class ProjectViewSet(viewsets.ModelViewSet):
             {"id": job.id}, context={"request": request}
         )
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
-

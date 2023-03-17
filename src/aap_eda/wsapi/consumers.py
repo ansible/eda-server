@@ -20,7 +20,7 @@ from .messages import (
     WorkerMessage,
     ControllerUrl,
     ControllerToken,
-    ControllerSslVerify
+    ControllerSslVerify,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,9 +92,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulebook, extra_var = await self.get_resources(
-            message.activation_id
-        )
+        rulebook, extra_var = await self.get_resources(message.activation_id)
 
         rulebook_message = Rulebook(
             data=base64.b64encode(rulebook.rulesets.encode()).decode()
@@ -110,8 +108,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
         await self.send(text_data=ControllerUrl(data=settings.AWX_URL).json())
-        await self.send(text_data=ControllerToken(data=settings.AWX_TOKEN).json())
-        await self.send(text_data=ControllerSslVerify(data=settings.AWX_SSL_VERIFY).json())
+        await self.send(
+            text_data=ControllerToken(data=settings.AWX_TOKEN).json()
+        )
+        await self.send(
+            text_data=ControllerSslVerify(data=settings.AWX_SSL_VERIFY).json()
+        )
         await self.send(text_data=rulebook_message.json())
         await self.send(text_data=extra_var_message.json())
 

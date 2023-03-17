@@ -64,7 +64,9 @@ class ActivateRulesets:
             dtype = DeploymentType(deployment_type)
 
             if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(LOCAL_WS_ADDRESS.format(host=host, port=port), instance.id)
+                self.activate_in_local(
+                    LOCAL_WS_ADDRESS.format(host=host, port=port), instance.id
+                )
             elif (
                 dtype == DeploymentType.PODMAN
                 or dtype == DeploymentType.DOCKER

@@ -290,4 +290,3 @@ WEBSOCKET_SERVER_PORT = settings.get("WEBSOCKET_SERVER_PORT", "8000")
 AWX_TOKEN = settings.get("AWX_TOKEN", "*********")
 AWX_URL = settings.get("AWX_URL", "https://localhost:8043")
 AWX_SSL_VERIFY = settings.get("AWX_SSL_VERIFY", False)
-
