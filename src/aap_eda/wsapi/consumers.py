@@ -13,7 +13,6 @@ from .messages import (
     ActionMessage,
     AnsibleEventMessage,
     ExtraVars,
-    Inventory,
     JobMessage,
     Rulebook,
     WorkerMessage,
@@ -88,15 +87,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulebook, inventory, extra_var = await self.get_resources(
+        rulebook, extra_var = await self.get_resources(
             message.activation_id
         )
 
         rulebook_message = Rulebook(
             data=base64.b64encode(rulebook.rulesets.encode()).decode()
-        )
-        inventory_message = Inventory(
-            data=base64.b64encode(inventory.inventory.encode()).decode()
         )
         if extra_var:
             extra_var_message = ExtraVars(
@@ -105,11 +101,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         else:
             # ansible-rulebook needs this to pass loop checking
             extra_var_message = ExtraVars(
-                data=base64.b64encode("".encode()).decode()
+                data=base64.b64encode(json.dumps({}).encode()).decode()
             )
 
         await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=inventory_message.json())
         await self.send(text_data=extra_var_message.json())
 
         # TODO: add broadcasting later by channel groups
@@ -253,7 +248,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_resources(
         self, activation_instance_id: str
-    ) -> tuple[models.Rulebook, models.Inventory, models.ExtraVar]:
+    ) -> tuple[models.Rulebook, models.ExtraVar]:
         activation_instance = models.ActivationInstance.objects.get(
             id=activation_instance_id
         )
@@ -261,10 +256,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             id=activation_instance.activation_id
         )
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        inventory = models.Inventory.objects.get(
-            project_id=activation.project_id
-        )
         extra_var = models.ExtraVar.objects.filter(
             id=activation.extra_var_id
         ).first()
-        return (rulebook, inventory, extra_var)
+        return (rulebook, extra_var)
