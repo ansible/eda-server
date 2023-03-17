@@ -24,7 +24,6 @@ TEST_ACTIVATION = {
     "name": "test-activation",
     "description": "test activation",
     "is_enabled": True,
-    "working_directory": "/tmp",
     "execution_environment": "quay.io/aizquier/ansible-rulebook",
     "project_id": 1,
     "rulebook_id": 1,
@@ -121,7 +120,6 @@ def test_rulesets_activate_local(run_mock: mock.Mock):
     ActivateRulesets().activate(
         activation_id=activation.id,
         execution_environment="quay.io/ansible-rulebook",
-        working_directory="tmp",
         deployment_type="local",
         host="localhost",
         port="8000",
@@ -145,7 +143,6 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
     ActivateRulesets().activate(
         activation_id=activation.id,
         execution_environment="quay.io/ansible-rulebook",
-        working_directory="tmp",
         deployment_type="bad_type",
         host="localhost",
         port="8000",

@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 def activate_rulesets(
     activation_id: int,
     execution_environment: str,
-    working_directory: StrPath,
     deployment_type: str,
     host: str,
     port: int,
@@ -35,7 +34,6 @@ def activate_rulesets(
     ActivateRulesets().activate(
         activation_id,
         execution_environment,
-        working_directory,
         deployment_type,
         host,
         port,

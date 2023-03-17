@@ -29,7 +29,6 @@ TEST_ACTIVATION = {
     "name": "test-activation",
     "description": "test activation",
     "is_enabled": True,
-    "working_directory": "/tmp",
     "execution_environment": "quay.io/aizquier/ansible-rulebook",
     "project_id": 1,
     "rulebook_id": 1,
@@ -234,7 +233,6 @@ def assert_activation_base_data(
     assert data["name"] == activation.name
     assert data["description"] == activation.description
     assert data["is_enabled"] == activation.is_enabled
-    assert data["working_directory"] == activation.working_directory
     assert data["execution_environment"] == activation.execution_environment
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count

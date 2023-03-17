@@ -92,7 +92,6 @@ class ActivationViewSet(
         activate_rulesets.delay(
             response.id,
             response.execution_environment,
-            response.working_directory,
             settings.DEPLOYMENT_TYPE,
             settings.WEBSOCKET_SERVER_NAME,
             settings.WEBSOCKET_SERVER_PORT,

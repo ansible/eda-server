@@ -48,7 +48,6 @@ class ActivateRulesets:
         self,
         activation_id: int,
         execution_environment: str,
-        working_directory: StrPath,
         deployment_type: str,
         host: str,
         port: int,
@@ -58,8 +57,6 @@ class ActivateRulesets:
                 activation_id=activation_id
             )
             instance.status = ActivationStatus.RUNNING
-
-            os.makedirs(working_directory, exist_ok=True)
 
             dtype = DeploymentType(deployment_type)
 
