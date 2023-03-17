@@ -244,8 +244,8 @@ def test_list_rulesets(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_rulesets_filter_name(client: APIClient, init_db):
-    filter_name = "test-ruleset"
+def test_rulesets_filter_name(client: APIClient, init_db_multiple_rulesets):
+    filter_name = "ruleset"
     response = client.get(f"{api_url_v1}/rulesets/?name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     rulesets = response.json()["results"]
@@ -431,4 +431,54 @@ def init_db():
         ruleset=ruleset,
         rule=rule,
         action=action,
+    )
+
+
+@pytest.fixture
+def init_db_multiple_rulesets():
+    project = models.Project.objects.create(
+        name="test-project",
+        description="Test Project",
+        url="https://github.com/eda-project",
+    )
+
+    rulebook = models.Rulebook.objects.create(
+        name="test-rulebook.yml",
+        rulesets=TEST_RULESETS_SAMPLE,
+        project=project,
+    )
+    source_list = [
+        {
+            "name": "<unnamed>",
+            "type": "range",
+            "config": {"limit": 5},
+            "source": "ansible.eda.range",
+        }
+    ]
+
+    rulesets = models.Ruleset.objects.bulk_create(
+        [
+            models.Ruleset(
+                name="test-ruleset", sources=source_list, rulebook=rulebook
+            ),
+            models.Ruleset(
+                name="test-ruleset-01", sources=source_list, rulebook=rulebook
+            ),
+            models.Ruleset(
+                name="ruleset", sources=source_list, rulebook=rulebook
+            ),
+        ]
+    )
+
+    rule = models.Rule.objects.create(
+        name="say hello",
+        action={"run_playbook": {"name": "ansible.eda.hello"}},
+        ruleset=rulesets[2],
+    )
+
+    return InitData(
+        project=project,
+        rulebook=rulebook,
+        ruleset=rulesets,
+        rule=rule,
     )
