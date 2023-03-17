@@ -26,7 +26,7 @@ from aap_eda.core.types import StrPath
 from .ansible_rulebook import AnsibleRulebookService
 
 logger = logging.getLogger(__name__)
-LOCAL_WS_ADDRESS = "ws://localhost:8000/api/eda/ws/ansible-rulebook"
+LOCAL_WS_ADDRESS = "ws://{host}:{port}/api/eda/ws/ansible-rulebook"
 
 
 class ActivateRulesetsFailed(Exception):
@@ -50,8 +50,8 @@ class ActivateRulesets:
         execution_environment: str,
         working_directory: StrPath,
         deployment_type: str,
-        host: str = "localhost",
-        port: int = 8000,
+        host: str,
+        port: int,
     ):
         try:
             instance = models.ActivationInstance.objects.create(
@@ -64,7 +64,7 @@ class ActivateRulesets:
             dtype = DeploymentType(deployment_type)
 
             if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(LOCAL_WS_ADDRESS, instance.id)
+                self.activate_in_local(LOCAL_WS_ADDRESS.format(host=host, port=port), instance.id)
             elif (
                 dtype == DeploymentType.PODMAN
                 or dtype == DeploymentType.DOCKER
