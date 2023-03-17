@@ -31,8 +31,9 @@ RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
 
 # Install ansible
 ARG EDA_COLLECTION=${EDA_COLLECTION:-ansible.eda}
-RUN python3 -m pip install --user ansible \
-    && ansible-galaxy collection install "$EDA_COLLECTION"
+RUN python3 -m pip install ansible \
+    && ansible-galaxy collection install "$EDA_COLLECTION" \
+    && python3 -m pip install -r "/app/.ansible/collections/ansible_collections/${EDA_COLLECTION/.//}/requirements.txt"
 
 # Install ansible-rulebook
 ARG ANSIBLE_RULEBOOK=${ANSIBLE_RULEBOOK:-ansible-rulebook}
