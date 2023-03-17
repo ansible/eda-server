@@ -56,7 +56,7 @@ class Queue(_Queue):
 
         super().__init__(
             name=name,
-            default_timeout=default_timeout,
+            default_timeout=-1,
             connection=connection,
             is_async=is_async,
             job_class=job_class,
