@@ -55,9 +55,22 @@ class WorkerMessage(Message):
     activation_id: int
 
 
-class DataPackage(BaseModel):
+class Rulebook(BaseModel):
     data: str
-    type: str
+    type: str = "Rulebook"
+
+
+class ExtraVars(BaseModel):
+    data: str
+    type: str = "ExtraVars"
+
+
+# ssl_verify is either yes|no, future may have cert
+class ControllerInfo(BaseModel):
+    type: str = "ControllerInfo"
+    url: str
+    token: str
+    ssl_verify: str
 
 
 class Hello(BaseModel):

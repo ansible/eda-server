@@ -13,9 +13,11 @@ from aap_eda.core import models
 from .messages import (
     ActionMessage,
     AnsibleEventMessage,
-    DataPackage,
+    ControllerInfo,
     EndOfResponse,
+    ExtraVars,
     JobMessage,
+    Rulebook,
     WorkerMessage,
 )
 
@@ -90,29 +92,21 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         logger.info(f"Start to handle workers: {message}")
         rulebook, extra_var = await self.get_resources(message.activation_id)
 
-        rulebook_package = DataPackage(
-            data=base64.b64encode(rulebook.rulesets.encode()).decode(),
-            type="Rulebook",
+        rulebook_message = Rulebook(
+            data=base64.b64encode(rulebook.rulesets.encode()).decode()
         )
-        extra_var_package = DataPackage(
-            data=base64.b64encode(extra_var.extra_var.encode()).decode(),
-            type="ExtraVars",
+        extra_var_message = ExtraVars(
+            data=base64.b64encode(extra_var.extra_var.encode()).decode()
         )
-        controller_url_package = DataPackage(
-            data=settings.EDA_CONTROLLER_URL, type="ControllerUrl"
-        )
-        controller_token_package = DataPackage(
-            data=settings.EDA_CONTROLLER_TOKEN, type="ControllerToken"
-        )
-        controller_ssl_verify_package = DataPackage(
-            data=settings.EDA_CONTROLLER_SSL_VERIFY, type="ControllerSslVerify"
+        controller_info = ControllerInfo(
+            url=settings.EDA_CONTROLLER_URL,
+            token=settings.EDA_CONTROLLER_TOKEN,
+            ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
         )
 
-        await self.send(text_data=rulebook_package.json())
-        await self.send(text_data=extra_var_package.json())
-        await self.send(text_data=controller_url_package.json())
-        await self.send(text_data=controller_token_package.json())
-        await self.send(text_data=controller_ssl_verify_package.json())
+        await self.send(text_data=rulebook_message.json())
+        await self.send(text_data=extra_var_message.json())
+        await self.send(text_data=controller_info.json())
         await self.send(text_data=EndOfResponse().json())
 
         # TODO: add broadcasting later by channel groups

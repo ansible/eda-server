@@ -94,9 +94,7 @@ async def test_handle_workers():
         "Hello",
         "Rulebook",
         "ExtraVars",
-        "ControllerUrl",
-        "ControllerToken",
-        "ControllerSslVerify",
+        "ControllerInfo",
         "EndOfResponse",
     ]:
         response = await communicator.receive_json_from()
