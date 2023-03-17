@@ -124,7 +124,7 @@ def test_rulesets_activate_local(run_mock: mock.Mock):
         working_directory="tmp",
         deployment_type="local",
         host="localhost",
-        port="8000"
+        port="8000",
     )
 
     assert models.ActivationInstanceLog.objects.count() == 2
@@ -148,7 +148,7 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
         working_directory="tmp",
         deployment_type="bad_type",
         host="localhost",
-        port="8000"
+        port="8000",
     )
 
     assert (
