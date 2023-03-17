@@ -4,23 +4,22 @@ import logging
 from datetime import datetime, timezone
 from enum import Enum
 
-from django.conf import settings
-
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.conf import settings
 
 from aap_eda.core import models
 
 from .messages import (
     ActionMessage,
     AnsibleEventMessage,
+    ControllerSslVerify,
+    ControllerToken,
+    ControllerUrl,
     ExtraVars,
     JobMessage,
     Rulebook,
     WorkerMessage,
-    ControllerUrl,
-    ControllerToken,
-    ControllerSslVerify,
 )
 
 logger = logging.getLogger(__name__)
