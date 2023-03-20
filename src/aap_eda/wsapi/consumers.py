@@ -1,7 +1,6 @@
 import base64
 import json
 import logging
-from datetime import datetime, timezone
 from enum import Enum
 
 from channels.db import database_sync_to_async
@@ -131,16 +130,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             # TODO: broadcasting
             logger.debug(f"Job instance {job_instance.id} is broadcasting.")
 
-        created = event_data.get("created")
-        if created:
-            created = datetime.strptime(created, "%Y-%m-%dT%H:%M:%S.%f")
-
         job_instance_event = models.JobInstanceEvent.objects.create(
             job_uuid=event_data.get("job_id"),
             counter=event_data.get("counter"),
-            stdout=event_data.get("stdout"),
-            type=event_data.get("event"),
-            created_at=created,
+            stdout=event_data.get("stdout", ""),
+            type=event_data.get("event", ""),
+            created_at=event_data.get("created"),
         )
         logger.info(f"Job instance event {job_instance_event.id} is created.")
 
@@ -148,9 +143,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         if event and event in [item.value for item in host_status_map]:
             data = event_data.get("event_data", {})
 
-            playbook = data.get("playbook")
-            play = data.get("play")
-            task = data.get("task")
+            playbook = data.get("playbook", "")
+            play = data.get("play", "")
+            task = data.get("task", "")
             status = host_status_map[Event(event)]
 
             if event == "runner_on_ok" and data.get("res", {}).get("changed"):
@@ -175,9 +170,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             action_name = message.action
             playbook_name = message.playbook_name
             job_id = message.job_id
-            fired_date = datetime.strptime(
-                message.run_at, "%Y-%m-%d %H:%M:%S.%f"
-            ).replace(tzinfo=timezone.utc)
+            fired_date = message.run_at
             status = message.status
 
             if job_id:

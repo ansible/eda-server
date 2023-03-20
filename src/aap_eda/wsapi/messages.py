@@ -22,11 +22,11 @@ class Message(BaseModel):
 class ActionMessage(Message):
     action: str
     activation_id: int
-    playbook_name: str
+    playbook_name: str = ""
     job_id: str
     ruleset: str
     rule: str
-    rc: int
+    rc: int = 0
     status: str
     run_at: str = None
     matching_events: dict = {}
