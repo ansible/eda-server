@@ -39,6 +39,7 @@ django-rq = "*"
 rq = "*"
 django-filter = "*"
 pydantic = "*"
+cryptography = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
