@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -22,14 +24,19 @@ class Message(BaseModel):
 class ActionMessage(Message):
     action: str
     activation_id: int
-    playbook_name: str = ""
-    job_id: str
+    run_at: str
     ruleset: str
     rule: str
-    rc: int = 0
-    status: str
-    run_at: str = None
     matching_events: dict = {}
+    status: Optional[str] = ""
+    playbook_name: Optional[str]
+    job_template_name: Optional[str]
+    organization: Optional[str]
+    job_id: Optional[str]
+    rc: Optional[int]
+    delay: Optional[float]
+    message: Optional[str]
+    kind: Optional[str]
 
 
 class AnsibleEventMessage(Message):
