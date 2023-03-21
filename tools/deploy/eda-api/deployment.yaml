@@ -42,6 +42,9 @@ spec:
       restartPolicy: Always
       initContainers:
         - name: wait-for-postgres
+          env:
+            - name: EDA_DB_HOST
+              value: eda-postgres
           image: docker.io/alpine:latest
           command: [ 'sh', '-c', "until nslookup ${EDA_DB_HOST}.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for ${EDA_DB_HOST}; sleep 2; done" ]
 status: {}
