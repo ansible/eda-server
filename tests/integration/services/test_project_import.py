@@ -13,6 +13,7 @@
 #  limitations under the License.
 import json
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -23,6 +24,7 @@ import pytest
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportService
 from aap_eda.services.project.git import GitRepository
+from aap_eda.services.project.imports import ProjectImportError
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -96,7 +98,36 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
     storage_save_mock.assert_called_once()
 
 
-# TODO(cutwater): Add negative tests
+@pytest.mark.django_db
+@mock.patch("django.core.files.storage.FileSystemStorage.save")
+def test_project_import_rulebook_directory_missing(
+    storage_save_mock, service_tempdir_mock
+):
+    storage_save_mock.return_value = "project.tar.gz"
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.return_value = repo_mock
+
+    project = models.Project.objects.create(
+        name="test-project-01", url="https://git.example.com/repo.git"
+    )
+    message_expected = (
+        "The 'rulebooks' directory doesn't exist within the project root."
+    )
+
+    service = ProjectImportService(git_cls=git_mock)
+    with pytest.raises(
+        ProjectImportError,
+        match=re.escape(message_expected),
+    ):
+        service.run(project)
+
+    project = models.Project.objects.get(id=project.id)
+    assert project.import_state == models.Project.ImportState.FAILED
+    assert project.import_error == message_expected
 
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):

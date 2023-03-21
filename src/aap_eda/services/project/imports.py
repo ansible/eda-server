@@ -56,8 +56,14 @@ class ProjectImportService:
                 self._perform_import(project)
                 project.import_state = models.Project.ImportState.COMPLETED
                 project.save()
+        except ProjectImportError as e:
+            project.import_state = models.Project.ImportState.FAILED
+            project.import_error = str(e)
+            project.save()
+            raise
         except Exception:
             project.import_state = models.Project.ImportState.FAILED
+            project.import_error = "Unexpected error. Please contact support."
             project.save()
             raise
 
