@@ -140,23 +140,6 @@ def test_retrieve_rulebook_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_json_rulebook(client: APIClient, init_db):
-    rulebook = init_db.rulebook[0]
-    expected_response = rulebook_detail_expected_response(rulebook)
-    response = client.get(f"{api_url_v1}/rulebooks/{rulebook.id}/json/")
-    assert response.status_code == status.HTTP_200_OK
-
-    data = response.json()
-    assert data == expected_response
-
-
-@pytest.mark.django_db
-def test_retrieve_json_rulebook_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/rulebooks/42/json/")
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
-@pytest.mark.django_db
 def test_list_rulesets_from_rulebook(client: APIClient, init_db):
     rulebook_id = init_db.rulebook[0].id
 

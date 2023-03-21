@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import yaml
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -122,21 +121,6 @@ class RulebookViewSet(
         result = self.paginate_queryset(result)
 
         return self.get_paginated_response(result)
-
-    @extend_schema(
-        description="Get the JSON format of a rulebook by its id",
-        request=None,
-        responses={status.HTTP_200_OK: serializers.RulebookDetailSerializer},
-    )
-    @action(detail=True)
-    def json(self, request, pk):
-        rulebook = get_object_or_404(models.Rulebook, pk=pk)
-        rulebook_data = build_rulebook_out_data(rulebook)
-        rulebook_data = serializers.RulebookDetailSerializer(
-            rulebook_data
-        ).data
-
-        return JsonResponse(rulebook_data)
 
 
 class RulesetViewSet(
