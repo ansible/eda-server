@@ -31,7 +31,6 @@ class Activation(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
-    working_directory = models.TextField(default="")
     execution_environment = models.TextField(
         default="quay.io/aizquier/ansible-rulebook"
     )

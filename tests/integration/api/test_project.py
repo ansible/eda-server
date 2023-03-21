@@ -321,29 +321,6 @@ def test_partial_update_project(client: APIClient):
     assert_project_data(response.json(), project)
 
 
-# Test: Delete project
-# -------------------------------------
-# NOTE(cutwater): Remove this test and xfail marks below once
-#  the project deletion is enabled
-@pytest.mark.django_db
-def test_delete_project_not_implemented(client: APIClient):
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-    )
-    response = client.delete(f"{api_url_v1}/projects/{project.id}/")
-
-    assert response.status_code == status.HTTP_501_NOT_IMPLEMENTED
-
-
-@pytest.mark.xfail(
-    reason=(
-        "Project deletion is not allowed until"
-        " resource versioning is implemented"
-    ),
-    strict=True,
-)
 @pytest.mark.django_db
 def test_delete_project(client: APIClient):
     project = models.Project.objects.create(
@@ -351,7 +328,7 @@ def test_delete_project(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.delete(f"{api_url_v1}/projects/{project.id}")
+    response = client.delete(f"{api_url_v1}/projects/{project.id}/")
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not models.Project.objects.filter(pk=project.id).exists()
