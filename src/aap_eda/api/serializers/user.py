@@ -10,9 +10,9 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["username"]
 
 
-class ControllerTokenSerializer(serializers.ModelSerializer):
+class AwxTokenSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.ControllerToken
+        model = models.AwxToken
         fields = [
             "id",
             "name",

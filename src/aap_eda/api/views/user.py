@@ -49,43 +49,43 @@ class CurrentUserView(views.APIView):
 
 @extend_schema_view(
     list=extend_schema(
-        description="List current user controller tokens.",
+        description="List current user AWX tokens.",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.ControllerTokenSerializer,
-                description="Return a list of controller tokens.",
+                serializers.AwxTokenSerializer,
+                description="Return a list of AWX tokens.",
             ),
         },
     ),
     retrieve=extend_schema(
-        description="Get current user controller token by ID.",
+        description="Get current user AWX token by ID.",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.ControllerTokenSerializer,
-                description="Return a controller tokens.",
+                serializers.AwxTokenSerializer,
+                description="Return a AWX tokens.",
             ),
         },
     ),
     create=extend_schema(
-        description="Create a controller token for a current user.",
+        description="Create a AWX token for a current user.",
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.ControllerTokenSerializer,
-                description="Return the created controller token.",
+                serializers.AwxTokenSerializer,
+                description="Return the created AWX token.",
             ),
         },
     ),
     destroy=extend_schema(
-        description="Delete controller token of a current user by ID.",
+        description="Delete AWX token of a current user by ID.",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None,
-                description="The controller token has been deleted.",
+                description="The AWX token has been deleted.",
             ),
         },
     ),
 )
-class CurrentUserControllerTokensViewSet(
+class CurrentUserAwxTokensViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
@@ -93,18 +93,18 @@ class CurrentUserControllerTokensViewSet(
     GenericViewSet,
 ):
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = serializers.ControllerTokenSerializer
+    serializer_class = serializers.AwxTokenSerializer
 
     def get_queryset(self):
-        return models.ControllerToken.objects.filter(
-            user=self.request.user
-        ).order_by("id")
+        return models.AwxToken.objects.filter(user=self.request.user).order_by(
+            "id"
+        )
 
     def perform_create(self, serializer):
         try:
             serializer.save(user=self.request.user)
         except django.db.utils.IntegrityError:
-            name_exists = models.ControllerToken.objects.filter(
+            name_exists = models.AwxToken.objects.filter(
                 user=self.request.user, name=serializer.validated_data["name"]
             ).exists()
             if name_exists:

@@ -33,8 +33,8 @@ router.register("tasks", views.TaskViewSet, basename="task")
 router.register("activations", views.ActivationViewSet)
 router.register("activation-instances", views.ActivationInstanceViewSet)
 router.register(
-    "users/me/controller-tokens",
-    views.CurrentUserControllerTokensViewSet,
+    "users/me/awx-tokens",
+    views.CurrentUserAwxTokensViewSet,
     basename="controller-token",
 )
 

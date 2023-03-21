@@ -43,7 +43,7 @@ def client(base_client: APIClient, user: models.User) -> APIClient:
 @pytest.mark.django_db
 def test_create_controller_token(client: APIClient, user: models.User):
     response = client.post(
-        f"{api_url_v1}/users/me/controller-tokens/",
+        f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "Test token 1",
             "token": "test-token-value",
@@ -56,19 +56,19 @@ def test_create_controller_token(client: APIClient, user: models.User):
     assert data["user"] == user.id
     assert "token" not in data
 
-    obj = models.ControllerToken.objects.get(pk=data["id"])
+    obj = models.AwxToken.objects.get(pk=data["id"])
     assert obj.token.get_secret_value() == "test-token-value"
     assert_token_data(data, obj)
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT token FROM core_controllertoken WHERE id = %s", (obj.id,)
+            "SELECT token FROM core_awxtoken WHERE id = %s", (obj.id,)
         )
         row = cursor.fetchone()
         assert row[0].startswith("$encrypted$fernet-256$")
 
     response = client.post(
-        f"{api_url_v1}/users/me/controller-tokens/",
+        f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "Test token 2",
             "description": "Token description",
@@ -86,7 +86,7 @@ def test_create_controller_token(client: APIClient, user: models.User):
 @pytest.mark.django_db
 def test_create_token_missing_field(client: APIClient, user: models.User):
     response = client.post(
-        f"{api_url_v1}/users/me/controller-tokens/",
+        f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "token": "test-token-value",
         },
@@ -97,7 +97,7 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
     }
 
     response = client.post(
-        f"{api_url_v1}/users/me/controller-tokens/",
+        f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "test-token",
         },
@@ -110,12 +110,12 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
 
 @pytest.mark.django_db(transaction=True)
 def test_create_token_duplicate_name(client: APIClient, user: models.User):
-    models.ControllerToken.objects.create(
+    models.AwxToken.objects.create(
         user=user, name="test-token", token="test-token-value"
     )
 
     response = client.post(
-        f"{api_url_v1}/users/me/controller-tokens/",
+        f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "test-token",
             "token": "test-token-value",
@@ -129,17 +129,17 @@ def test_create_token_duplicate_name(client: APIClient, user: models.User):
 
 @pytest.mark.django_db
 def test_list_controller_tokens(client: APIClient, user: models.User):
-    tokens = models.ControllerToken.objects.bulk_create(
+    tokens = models.AwxToken.objects.bulk_create(
         [
-            models.ControllerToken(
+            models.AwxToken(
                 name="token-01", token="token-value-01", user=user
             ),
-            models.ControllerToken(
+            models.AwxToken(
                 name="token-02", token="token-value-02", user=user
             ),
         ]
     )
-    response = client.get(f"{api_url_v1}/users/me/controller-tokens/")
+    response = client.get(f"{api_url_v1}/users/me/awx-tokens/")
     data = response.json()
     assert data["count"] == 2
     for token_response, token_db in zip(data["results"], tokens):
@@ -148,10 +148,10 @@ def test_list_controller_tokens(client: APIClient, user: models.User):
 
 @pytest.mark.django_db
 def test_retrieve_controller_token(client: APIClient, user: models.User):
-    obj = models.ControllerToken.objects.create(
+    obj = models.AwxToken.objects.create(
         name="token-01", token="token-value-01", user=user
     )
-    response = client.get(f"{api_url_v1}/users/me/controller-tokens/{obj.id}/")
+    response = client.get(f"{api_url_v1}/users/me/awx-tokens/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_token_data(response.json(), obj)
 
@@ -160,21 +160,19 @@ def test_retrieve_controller_token(client: APIClient, user: models.User):
 def test_retrieve_controller_token_not_found(
     client: APIClient, user: models.User
 ):
-    response = client.get(f"{api_url_v1}/users/me/controller-tokens/42/")
+    response = client.get(f"{api_url_v1}/users/me/awx-tokens/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_delete_controller_token(client: APIClient, user: models.User):
-    obj = models.ControllerToken.objects.create(
+    obj = models.AwxToken.objects.create(
         name="token-01", token="token-value-01", user=user
     )
-    response = client.delete(
-        f"{api_url_v1}/users/me/controller-tokens/{obj.id}/"
-    )
+    response = client.delete(f"{api_url_v1}/users/me/awx-tokens/{obj.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    exists = models.ControllerToken.objects.filter(id=obj.id).exists()
+    exists = models.AwxToken.objects.filter(id=obj.id).exists()
     assert not exists
 
 
@@ -182,7 +180,7 @@ def test_delete_controller_token(client: APIClient, user: models.User):
 def test_delete_controller_token_not_found(
     client: APIClient, user: models.User
 ):
-    response = client.delete(f"{api_url_v1}/users/me/controller-tokens/42/")
+    response = client.delete(f"{api_url_v1}/users/me/awx-tokens/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -191,7 +189,7 @@ def test_delete_controller_token_not_found(
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
-def assert_token_data(data: Dict[str, Any], token: models.ControllerToken):
+def assert_token_data(data: Dict[str, Any], token: models.AwxToken):
     assert data == {
         "id": token.id,
         "name": token.name,

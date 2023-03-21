@@ -32,7 +32,7 @@ class User(AbstractUser):
     pass
 
 
-class ControllerToken(models.Model):
+class AwxToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     name = models.TextField(null=False, blank=False)
     description = models.TextField(null=False, blank=True, default="")
