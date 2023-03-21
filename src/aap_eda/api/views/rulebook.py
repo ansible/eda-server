@@ -16,11 +16,7 @@ import yaml
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
-from drf_spectacular.utils import (
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -35,17 +31,6 @@ from aap_eda.services.rulebook import (
 )
 
 
-@extend_schema_view(
-    retrieve=extend_schema(
-        description="Get the rulebook by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulebookSerializer,
-                description="Return the rulebook by its id.",
-            ),
-        },
-    ),
-)
 class RulebookViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
@@ -60,7 +45,7 @@ class RulebookViewSet(
         request=None,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulebookSerializer,
+                serializers.RulebookListSerializer,
                 description="Return a list of rulebooks.",
             ),
         },
@@ -71,13 +56,32 @@ class RulebookViewSet(
 
         response_data = []
         for rulebook in rulebooks:
-            rulebook_data = serializers.RulebookSerializer(rulebook).data
-            data = build_rulebook_out_data(rulebook_data)
+            data = build_rulebook_out_data(rulebook)
+            data = serializers.RulebookListSerializer(data).data
             response_data.append(data)
 
         response_data = self.paginate_queryset(response_data)
 
         return self.get_paginated_response(response_data)
+
+    @extend_schema(
+        description="Get the rulebook by its id",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.RulebookDetailSerializer,
+                description="Return the rulebook by its id.",
+            ),
+        },
+    )
+    def retrieve(self, request, pk=None):
+        rulebook = get_object_or_404(models.Rulebook, pk=pk)
+        rulebook_data = build_rulebook_out_data(rulebook)
+        rulebook_data = serializers.RulebookDetailSerializer(
+            rulebook_data
+        ).data
+
+        return Response(rulebook_data)
 
     @extend_schema(
         request=serializers.RulebookSerializer,
@@ -122,15 +126,17 @@ class RulebookViewSet(
     @extend_schema(
         description="Get the JSON format of a rulebook by its id",
         request=None,
-        responses={status.HTTP_200_OK: serializers.RulebookSerializer},
+        responses={status.HTTP_200_OK: serializers.RulebookDetailSerializer},
     )
     @action(detail=True)
     def json(self, request, pk):
         rulebook = get_object_or_404(models.Rulebook, pk=pk)
-        data = serializers.RulebookSerializer(rulebook).data
-        data["rulesets"] = yaml.safe_load(data["rulesets"])
+        rulebook_data = build_rulebook_out_data(rulebook)
+        rulebook_data = serializers.RulebookDetailSerializer(
+            rulebook_data
+        ).data
 
-        return JsonResponse(data)
+        return JsonResponse(rulebook_data)
 
 
 class RulesetViewSet(

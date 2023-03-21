@@ -70,58 +70,31 @@ class InitData:
 # Test Rulebook:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_rulebooks(client: APIClient):
-    rulebooks = models.Rulebook.objects.bulk_create(
-        [
-            models.Rulebook(
-                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
-            ),
-            models.Rulebook(
-                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
-            ),
-        ]
-    )
+def test_list_rulebooks(client: APIClient, init_db):
+    rulebooks = models.Rulebook.objects.all()
     response = client.get(f"{api_url_v1}/rulebooks/")
+    expected_data = rulebook_list_expected_response(rulebooks)
     assert response.status_code == status.HTTP_200_OK
-
-    for data, rulebook in zip(response.data["results"], rulebooks):
-        assert_rulebook_data(data, rulebook)
+    for rulebook, expected_rulebook in zip(
+        response.data["results"], expected_data
+    ):
+        assert rulebook == expected_rulebook
 
 
 @pytest.mark.django_db
-def test_list_rulebooks_filter_name(client: APIClient):
-    rulebooks = models.Rulebook.objects.bulk_create(
-        [
-            models.Rulebook(
-                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
-            ),
-            models.Rulebook(
-                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
-            ),
-        ]
-    )
-
-    filter_name = "00"
+def test_list_rulebooks_filter_name(client: APIClient, init_db):
+    rulebooks = models.Rulebook.objects.all()
+    filter_name = "test"
     response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
-    data = response.json()["results"][0]
-    rulebook = rulebooks[0]
-    assert response.status_code == status.HTTP_200_OK
-    assert_rulebook_data(data, rulebook)
+    expected_data = rulebook_list_expected_response(rulebooks)
+    for rulebook, expected_rulebook in zip(
+        response.data["results"], expected_data
+    ):
+        assert rulebook == expected_rulebook
 
 
 @pytest.mark.django_db
-def test_list_rulebooks_filter_name_non_existant(client: APIClient):
-    models.Rulebook.objects.bulk_create(
-        [
-            models.Rulebook(
-                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
-            ),
-            models.Rulebook(
-                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
-            ),
-        ]
-    )
-
+def test_list_rulebooks_filter_name_non_existant(client: APIClient, init_db):
     filter_name = "doesn't exist"
     response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
     data = response.json()["results"]
@@ -151,14 +124,13 @@ def test_create_rulebook(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_rulebook(client: APIClient):
-    rulebook = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
-    )
+def test_retrieve_rulebook(client: APIClient, init_db):
+    rulebook = init_db.rulebook[0]
+    expected_response = rulebook_detail_expected_response(rulebook)
     response = client.get(f"{api_url_v1}/rulebooks/{rulebook.id}/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert_rulebook_data(response.json(), rulebook)
+    assert response.json() == expected_response
 
 
 @pytest.mark.django_db
@@ -168,19 +140,14 @@ def test_retrieve_rulebook_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_json_rulebook(client: APIClient):
-    obj = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
-    )
-    response = client.get(f"{api_url_v1}/rulebooks/{obj.id}/json/")
+def test_retrieve_json_rulebook(client: APIClient, init_db):
+    rulebook = init_db.rulebook[0]
+    expected_response = rulebook_detail_expected_response(rulebook)
+    response = client.get(f"{api_url_v1}/rulebooks/{rulebook.id}/json/")
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
-    assert data["id"] == obj.id
-    assert data["name"] == "test-rulebook.yml"
-    assert len(data["rulesets"]) == 2
-    assert data["rulesets"][0]["name"] == "Test sample 001"
-    assert data["rulesets"][1]["name"] == "Test sample 002"
+    assert data == expected_response
 
 
 @pytest.mark.django_db
@@ -191,7 +158,7 @@ def test_retrieve_json_rulebook_not_exist(client: APIClient):
 
 @pytest.mark.django_db
 def test_list_rulesets_from_rulebook(client: APIClient, init_db):
-    rulebook_id = init_db.rulebook.id
+    rulebook_id = init_db.rulebook[0].id
 
     response = client.get(f"{api_url_v1}/rulebooks/{rulebook_id}/rulesets/")
     assert response.status_code == status.HTTP_200_OK
@@ -208,6 +175,33 @@ def test_list_rulesets_from_rulebook(client: APIClient, init_db):
         "rule_count",
         "fired_stats",
     ]
+
+
+def rulebook_list_expected_response(data: list) -> Dict:
+    expected_response = []
+    for rulebook in data:
+        rulebook_data = {
+            "id": rulebook.id,
+            "name": rulebook.name,
+            "rule_count": 1,
+            "fired_stats": [{}],
+        }
+        expected_response.append(rulebook_data)
+    return expected_response
+
+
+def rulebook_detail_expected_response(rulebook: models.Rulebook) -> Dict:
+    rulebook_data = {
+        "id": rulebook.id,
+        "name": rulebook.name,
+        "description": rulebook.description,
+        "rule_count": 1,
+        "fired_stats": [{}],
+        "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
+        "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
+    }
+
+    return rulebook_data
 
 
 def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
@@ -232,7 +226,7 @@ def test_list_rulesets(client: APIClient, init_db):
     assert response.status_code == status.HTTP_200_OK
     rulesets = response.data["results"]
 
-    assert len(rulesets) == 1
+    assert len(rulesets) == 3
     assert rulesets[0]["name"] == "test-ruleset"
     assert rulesets[0]["rule_count"] == 1
     assert list(rulesets[0]) == [
@@ -248,16 +242,17 @@ def test_list_rulesets(client: APIClient, init_db):
 
 @pytest.mark.django_db
 def test_retrieve_ruleset(client: APIClient, init_db):
-    ruleset_id = init_db.ruleset.id
+    ruleset_id = init_db.ruleset[0].id
     response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/")
 
     assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == ruleset_id
     assert response.data["name"] == "test-ruleset"
 
 
 @pytest.mark.django_db
 def test_list_rules_from_ruleset(client: APIClient, init_db):
-    ruleset_id = init_db.ruleset.id
+    ruleset_id = init_db.ruleset[0].id
 
     response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/rules/")
     assert response.status_code == status.HTTP_200_OK
@@ -288,7 +283,7 @@ def test_list_rules(client: APIClient, init_db):
     assert response.status_code == status.HTTP_200_OK
     rules = response.data["results"]
 
-    assert len(rules) == 1
+    assert len(rules) == 3
     assert rules[0]["name"] == "say hello"
     assert list(rules[0]) == [
         "id",
@@ -303,7 +298,7 @@ def test_list_rules(client: APIClient, init_db):
 
 @pytest.mark.django_db
 def test_retrieve_rule(client: APIClient, init_db):
-    rule_id = init_db.rule.id
+    rule_id = init_db.rule[0].id
 
     response = client.get(f"{api_url_v1}/rules/{rule_id}/")
 
@@ -317,6 +312,65 @@ def test_retrieve_rule_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+# ------------------------------------------
+# Initialize Database:
+# ------------------------------------------
+def init_rulebooks(project: models.project):
+    rulebooks = models.Rulebook.objects.bulk_create(
+        [
+            models.Rulebook(
+                name="test-rulebook.yml",
+                rulesets=TEST_RULESETS_SAMPLE,
+                project=project,
+            ),
+            models.Rulebook(
+                name="test-rulebook-00.yml",
+                rulesets=TEST_RULESETS_SAMPLE,
+                project=project,
+            ),
+            models.Rulebook(
+                name="rulebook.yml",
+                rulesets=TEST_RULESETS_SAMPLE,
+                project=project,
+            ),
+        ]
+    )
+    return rulebooks
+
+
+def init_rulesets(rulebooks: list):
+    rulesets = []
+    names = ["test-ruleset", "test-ruleset-00", "ruleset"]
+    for rulebook, rulebook_name in zip(rulebooks, names):
+        ruleset = models.Ruleset.objects.create(
+            name=rulebook_name,
+            sources=[
+                {
+                    "name": "<unnamed>",
+                    "type": "range",
+                    "config": {"limit": 5},
+                    "source": "ansible.eda.range",
+                }
+            ],
+            rulebook=rulebook,
+        )
+        rulesets.append(ruleset)
+    return rulesets
+
+
+def init_rules(rulesets: list):
+    rules = []
+    names = ["say hello", "test hello", "hello world"]
+    for ruleset, rule_name in zip(rulesets, names):
+        rule = models.Rule.objects.create(
+            name=rule_name,
+            action={"run_playbook": {"name": "ansible.eda.hello"}},
+            ruleset=ruleset,
+        )
+        rules.append(rule)
+    return rules
+
+
 @pytest.fixture
 def init_db():
     project = models.Project.objects.create(
@@ -324,32 +378,13 @@ def init_db():
         description="Test Project",
         url="https://github.com/eda-project",
     )
-    rulebook = models.Rulebook.objects.create(
-        name="test-rulebook.yml",
-        rulesets=TEST_RULESETS_SAMPLE,
-        project=project,
-    )
-    ruleset = models.Ruleset.objects.create(
-        name="test-ruleset",
-        sources=[
-            {
-                "name": "<unnamed>",
-                "type": "range",
-                "config": {"limit": 5},
-                "source": "ansible.eda.range",
-            }
-        ],
-        rulebook=rulebook,
-    )
-    rule = models.Rule.objects.create(
-        name="say hello",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset,
-    )
+    rulebooks = init_rulebooks(project)
+    rulesets = init_rulesets(rulebooks)
+    rules = init_rules(rulesets)
 
     return InitData(
         project=project,
-        rulebook=rulebook,
-        ruleset=ruleset,
-        rule=rule,
+        rulebook=rulebooks,
+        ruleset=rulesets,
+        rule=rules,
     )

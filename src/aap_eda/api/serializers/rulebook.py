@@ -47,6 +47,68 @@ class RulebookSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "modified_at"]
 
 
+class RulebookListSerializer(serializers.Serializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the rulebook",
+    )
+
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the rulebook",
+    )
+
+    rule_count = serializers.IntegerField(
+        required=True,
+        help_text="Number of rules the rulebook contains",
+    )
+
+    fired_stats = serializers.ListField(
+        child=serializers.JSONField(),
+        required=True,
+        help_text="List of fired stats",
+    )
+
+
+class RulebookDetailSerializer(serializers.Serializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the rulebook",
+    )
+
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the rulebook",
+    )
+
+    description = serializers.CharField(
+        default="",
+        help_text="Description of the rulebook",
+        allow_null=True,
+    )
+
+    rule_count = serializers.IntegerField(
+        required=True,
+        help_text="Number of rules the ruleset contains",
+    )
+
+    fired_stats = serializers.ListField(
+        child=serializers.JSONField(),
+        required=True,
+        help_text="List of stats",
+    )
+
+    created_at = serializers.DateTimeField(
+        required=True,
+        help_text="The created_at timestamp of the ruleset",
+    )
+
+    modified_at = serializers.DateTimeField(
+        required=True,
+        help_text="The modified_at timestamp of the ruleset",
+    )
+
+
 class RulebookRefSerializer(serializers.ModelSerializer):
     """Serializer for Rulebook reference."""
 

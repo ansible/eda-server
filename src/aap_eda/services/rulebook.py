@@ -62,9 +62,21 @@ def insert_rulebook_related_data(
     models.Rule.objects.bulk_create(rules)
 
 
-def build_rulebook_out_data(data: dict) -> dict:
-    data["fired_stats"] = build_fired_stats(data)
+def get_rulebook_rule_count(data_id: int) -> int:
+    rulesets = models.Ruleset.objects.filter(rulebook=data_id)
+    rule_count = 0
+    for ruleset in rulesets:
+        count = models.Rule.objects.filter(ruleset_id=ruleset.id).count()
+        rule_count = +count
 
+    return rule_count
+
+
+def build_rulebook_out_data(data: models.Rulebook):
+    rulebook_id = int(data.id)
+    data.fired_stats = build_fired_stats(data)
+    rule_count = get_rulebook_rule_count(rulebook_id)
+    data.rule_count = rule_count
     return data
 
 
