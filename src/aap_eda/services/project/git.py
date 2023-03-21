@@ -31,7 +31,7 @@ class GitError(Exception):
     pass
 
 
-class ENFError(Exception):
+class ExecutableNotFoundError(Exception):
     """Executable Not Found error."""
 
     pass
@@ -134,8 +134,7 @@ class GitExecutor:
 
         if command is None:
             message = f"'{orig_cmd}' Command not found or is not executable"
-            logger.error(message)
-            raise ENFError(message)
+            raise ExecutableNotFoundError(message)
 
         self.command = command
 
