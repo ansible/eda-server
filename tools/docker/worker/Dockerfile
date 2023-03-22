@@ -7,12 +7,11 @@ RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && chmod g+w /var/lib/eda
 
 RUN DNF=dnf \
-    INSTALL_PACKAGES="python3 python3-devel python3-pip libpq-devel gcc git-core" \
+    INSTALL_PACKAGES="python3 python3-devel python3-pip libpq-devel gcc git-core java-17-openjdk-devel" \
     && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf
 
-RUN dnf install -y java-17-openjdk-devel
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 
 RUN pip install -U pip \
@@ -51,4 +50,4 @@ RUN poetry install -E all --no-root
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 
-CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
+CMD ["aap-eda-manage", "rqworker", "--worker-class", "aap_eda.core.tasking.Worker"]

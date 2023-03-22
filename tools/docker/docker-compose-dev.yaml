@@ -6,10 +6,10 @@ x-environment:
 
 services:
   api:
-    image: "${EDA_IMAGE:-localhost/aap-eda-api}"
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
     build:
       context: ../../
-      dockerfile: tools/docker/api/Dockerfile
+      dockerfile: tools/docker/Dockerfile
     environment: *common-env
     command:
       - /bin/bash
