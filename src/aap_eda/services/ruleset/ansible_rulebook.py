@@ -37,6 +37,14 @@ class AnsibleRulebookService:
         activation_id: str,
     ) -> subprocess.CompletedProcess:
         """Run ansible-rulebook in worker mode."""
+        if ANSIBLE_RULEBOOK_BIN is None:
+            raise AnsibleRulebookServiceFailed(
+                "command ansible-rulebook not found"
+            )
+
+        if SSH_AGENT_BIN is None:
+            raise AnsibleRulebookServiceFailed("command ssh-agent not found")
+
         args = [
             "--worker",
             "--websocket-address",
@@ -45,28 +53,21 @@ class AnsibleRulebookService:
             str(activation_id),
         ]
 
-        if ANSIBLE_RULEBOOK_BIN and SSH_AGENT_BIN:
-            try:
-                # TODO: subprocess.run may run a while and will block the
-                # following DB updates. Need to find a better way to solve it.
-                return subprocess.run(
-                    [SSH_AGENT_BIN, ANSIBLE_RULEBOOK_BIN, *args],
-                    check=True,
-                    encoding="utf-8",
-                    capture_output=True,
-                    cwd=self.cwd,
-                )
-            except subprocess.CalledProcessError as exc:
-                message = (
-                    f"Command returned non-zero exit status {exc.returncode}:"
-                    f"\n\tcommand: {exc.cmd}"
-                    f"\n\tstderr: {exc.stderr}"
-                )
-                logger.error("%s", message)
-                raise AnsibleRulebookServiceFailed(exc.stderr)
-        else:
-            message = (
-                f"Commands: SSH_AGENT_BIN[{SSH_AGENT_BIN}] "
-                f"or ANSIBLE_RULEBOOK_BIN [{ANSIBLE_RULEBOOK_BIN}] not found"
+        try:
+            # TODO: subprocess.run may run a while and will block the
+            # following DB updates. Need to find a better way to solve it.
+            return subprocess.run(
+                [SSH_AGENT_BIN, ANSIBLE_RULEBOOK_BIN, *args],
+                check=True,
+                encoding="utf-8",
+                capture_output=True,
+                cwd=self.cwd,
             )
-            raise AnsibleRulebookServiceFailed(message)
+        except subprocess.CalledProcessError as exc:
+            message = (
+                f"Command returned non-zero exit status {exc.returncode}:"
+                f"\n\tcommand: {exc.cmd}"
+                f"\n\tstderr: {exc.stderr}"
+            )
+            logger.error("%s", message)
+            raise AnsibleRulebookServiceFailed(exc.stderr)
