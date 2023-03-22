@@ -279,3 +279,13 @@ LOGGING = {
         },
     },
 }
+
+# ---------------------------------------------------------
+# CONTROLLER SETTINGS
+# ---------------------------------------------------------
+
+EDA_CONTROLLER_URL = settings.get("CONTROLLER_URL", "default_controller_url")
+EDA_CONTROLLER_TOKEN = settings.get(
+    "CONTROLLER_TOKEN", "default_controller_token"
+)
+EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")

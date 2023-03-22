@@ -19,6 +19,10 @@ class Message(BaseModel):
     type: str
 
 
+class EndOfResponse(BaseModel):
+    type: str = "EndOfResponse"
+
+
 class ActionMessage(Message):
     action: str
     activation_id: int
@@ -56,14 +60,17 @@ class Rulebook(BaseModel):
     type: str = "Rulebook"
 
 
-class Inventory(BaseModel):
-    data: str
-    type: str = "Inventory"
-
-
 class ExtraVars(BaseModel):
     data: str
     type: str = "ExtraVars"
+
+
+# ssl_verify is either yes|no, future may have cert
+class ControllerInfo(BaseModel):
+    type: str = "ControllerInfo"
+    url: str
+    token: str
+    ssl_verify: str
 
 
 class Hello(BaseModel):
