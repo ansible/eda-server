@@ -31,6 +31,12 @@ class GitError(Exception):
     pass
 
 
+class ExecutableNotFoundError(Exception):
+    """Executable Not Found error."""
+
+    pass
+
+
 class GitRepository:
     """Represents a git repository."""
 
@@ -123,8 +129,13 @@ class GitExecutor:
         self,
         command: Optional[str] = None,
     ):
+        orig_cmd = command or self.DEFAULT_CMD
+        command = shutil.which(orig_cmd)
+
         if command is None:
-            command = shutil.which(self.DEFAULT_CMD)
+            message = f"'{orig_cmd}' Command not found or is not executable"
+            raise ExecutableNotFoundError(message)
+
         self.command = command
 
     def __call__(
