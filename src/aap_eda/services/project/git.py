@@ -37,6 +37,11 @@ class ExecutableNotFoundError(Exception):
     pass
 
 
+GIT_COMMAND = shutil.which("git")
+if GIT_COMMAND is None:
+    raise ExecutableNotFoundError("Cannot find git executable")
+
+
 class GitRepository:
     """Represents a git repository."""
 
@@ -119,24 +124,10 @@ class GitRepository:
 
 
 class GitExecutor:
-    DEFAULT_CMD: Final = "git"
     DEFAULT_TIMEOUT: Final = 30
     DEFAULT_ENVIRON: Final = {
         "GIT_TERMINAL_PROMPT": "0",
     }
-
-    def __init__(
-        self,
-        command: Optional[str] = None,
-    ):
-        orig_cmd = command or self.DEFAULT_CMD
-        command = shutil.which(orig_cmd)
-
-        if command is None:
-            message = f"'{orig_cmd}' Command not found or is not executable"
-            raise ExecutableNotFoundError(message)
-
-        self.command = command
 
     def __call__(
         self,
@@ -153,7 +144,7 @@ class GitExecutor:
             timeout = self.DEFAULT_TIMEOUT
         try:
             return subprocess.run(
-                [self.command, *args],
+                [GIT_COMMAND, *args],
                 check=True,
                 encoding="utf-8",
                 env=self.DEFAULT_ENVIRON,
