@@ -82,7 +82,9 @@ class ProjectImportService:
         self, project: models.Project, rulebook_info: RulebookInfo
     ) -> models.Rulebook:
         rulebook = models.Rulebook.objects.create(
-            project=project, name=rulebook_info.relpath
+            project=project,
+            name=rulebook_info.relpath,
+            rulesets=rulebook_info.raw_content,
         )
 
         insert_rulebook_related_data(rulebook, rulebook_info.content)
