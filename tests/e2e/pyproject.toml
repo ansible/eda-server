@@ -1,0 +1,82 @@
+[project]
+name = "eda-qa"
+description = "Test suite and QA tools for Ansible Rulebook and Event Driven Ansible"
+readme = "README.md"
+requires-python = ">=3.8"
+
+maintainers = [{ name = "Alejandro Izquierdo", email = "aizquier@redhat.com" }]
+
+classifiers = [
+  "Natural Language :: English",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Testing",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Operating System :: OS Independent",
+  "Private :: Do Not Upload",
+]
+
+keywords = [
+  "pytest",
+  "plugin",
+  "eda",
+  "ansible-rulebook",
+  "ansible",
+  "ansible-event-driven",
+  "event-driven-ansible",
+  "expert system",
+]
+
+dependencies = [
+  "pytest",
+  "pytest-datadir",
+  "urllib3 >= 1.25.3",
+  "python-dateutil",
+  "dynaconf[yaml]",
+  "cryptography",
+  "pyjwt",
+  "nanoid",
+  "httpx",
+  "websockets",
+  "pytest-asyncio",
+  "pytest-timeout",
+]
+
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["pre-commit"]
+dev = [
+  "pre-commit",
+  "black",
+  "flake8 ~=5.0.0",
+  "flake8-bugbear",
+  "flake8-builtins",
+  "flake8-eradicate",
+  "flake8-debugger",
+  "flake8-comprehensions",
+]
+
+[project.urls]
+source = "https://github.com/ansible/eda-qa"
+
+[project.scripts]
+edaqa = "eda_qa.cmd:main"
+
+[tool.black]
+line-length = 100
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "eda_qa/__version__.py"
+
+[tool.hatch.build.targets.sdist]
+[tool.hatch.build.targets.wheel]

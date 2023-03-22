@@ -1,0 +1,3 @@
+[allowlist]
+
+regexes = ['''#(\s+)?gitleaks:allow(\s+|$)''']

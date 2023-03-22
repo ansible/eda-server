@@ -1,0 +1,2838 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Event Driven Ansible API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/activation-instances/": {
+      "get": {
+        "operationId": "activation_instances_list",
+        "description": "List all the Activation Instances",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "activation-instances"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedActivationInstanceList"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/activation-instances/{id}/": {
+      "get": {
+        "operationId": "activation_instances_retrieve",
+        "description": "Get the Activation Instance by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation instance.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activation-instances"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationInstance"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "operationId": "activation_instances_destroy",
+        "description": "Delete an existing Activation Instance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation instance.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activation-instances"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The Activation Instance has been deleted."
+          }
+        }
+      }
+    },
+    "/activation-instances/{id}/logs/": {
+      "get": {
+        "operationId": "activation_instances_logs_retrieve",
+        "description": "List all logs for the Activation Instance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation instance.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activation-instances"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationInstanceLog"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/activations/": {
+      "get": {
+        "operationId": "activations_list",
+        "description": "List all activations",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "activations"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedActivationList"
+                }
+              }
+            },
+            "description": "A list of all activations is returned."
+          }
+        }
+      },
+      "post": {
+        "operationId": "activations_create",
+        "tags": [
+          "activations"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationCreate"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationCreate"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Activation"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/activations/{id}/": {
+      "get": {
+        "operationId": "activations_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activations"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationRead"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "patch": {
+        "operationId": "activations_partial_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activations"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedActivationUpdate"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedActivationUpdate"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedActivationUpdate"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Activation"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "operationId": "activations_destroy",
+        "description": "Delete an existing Activation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activations"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The Activation has been deleted."
+          }
+        }
+      }
+    },
+    "/activations/{id}/instances/": {
+      "get": {
+        "operationId": "activations_instances_retrieve",
+        "description": "List all instances for the Activation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this activation.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "activations"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationInstance"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/auth/session/login/": {
+      "get": {
+        "operationId": "auth_session_preflight",
+        "description": "Use this method to set a CSRF cookie.",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "operationId": "auth_session_login",
+        "description": "Session cookie login",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid credentials or user is disabled."
+          },
+          "204": {
+            "description": "Login successful."
+          }
+        }
+      }
+    },
+    "/auth/session/logout/": {
+      "post": {
+        "operationId": "auth_session_logout",
+        "description": "Session logout.",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Logout successful."
+          }
+        }
+      }
+    },
+    "/extra-vars/": {
+      "get": {
+        "operationId": "extra_vars_list",
+        "description": "List all extra_vars",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "extra-vars"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedExtraVarList"
+                }
+              }
+            },
+            "description": "Return a list of extra_vars."
+          }
+        }
+      },
+      "post": {
+        "operationId": "extra_vars_create",
+        "description": "Create an extra_var",
+        "tags": [
+          "extra-vars"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtraVar"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtraVar"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtraVar"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtraVar"
+                }
+              }
+            },
+            "description": "Return the created extra_var."
+          }
+        }
+      }
+    },
+    "/extra-vars/{id}/": {
+      "get": {
+        "operationId": "extra_vars_retrieve",
+        "description": "Get the extra_var by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this extra var.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "extra-vars"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtraVar"
+                }
+              }
+            },
+            "description": "Return the extra_var by its id."
+          }
+        }
+      }
+    },
+    "/playbooks/": {
+      "get": {
+        "operationId": "playbooks_list",
+        "description": "List all playbooks",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "playbooks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedPlaybookList"
+                }
+              }
+            },
+            "description": "Return a list of playbooks."
+          }
+        }
+      }
+    },
+    "/playbooks/{id}/": {
+      "get": {
+        "operationId": "playbooks_retrieve",
+        "description": "Get the playbook by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this playbook.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "playbooks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Playbook"
+                }
+              }
+            },
+            "description": "Return the playbook by its id."
+          }
+        }
+      }
+    },
+    "/projects/": {
+      "get": {
+        "operationId": "projects_list",
+        "description": "List all projects",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by project name."
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "url",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by project url."
+          }
+        ],
+        "tags": [
+          "projects"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedProjectList"
+                }
+              }
+            },
+            "description": "Return a list of projects."
+          }
+        }
+      },
+      "post": {
+        "operationId": "projects_create",
+        "description": "Import a project.",
+        "tags": [
+          "projects"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Return a created project."
+          }
+        }
+      }
+    },
+    "/projects/{id}/": {
+      "get": {
+        "operationId": "projects_retrieve",
+        "description": "Get project by id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this project.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "projects"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Return a project by id."
+          }
+        }
+      },
+      "put": {
+        "operationId": "projects_update",
+        "description": "Update a project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this project.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "projects"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Update successful. Return an updated project."
+          }
+        }
+      },
+      "patch": {
+        "operationId": "projects_partial_update",
+        "description": "Partial update of a project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this project.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "projects"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedProject"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedProject"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedProject"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Update successful. Return an updated project."
+          }
+        }
+      },
+      "delete": {
+        "operationId": "projects_destroy",
+        "description": "Delete a project by id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this project.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "projects"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            },
+            "description": "Delete successful."
+          }
+        }
+      }
+    },
+    "/projects/{id}/sync/": {
+      "post": {
+        "operationId": "projects_sync_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this project.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "projects"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Project"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRef"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/rulebooks/": {
+      "get": {
+        "operationId": "rulebooks_list",
+        "description": "List all rulebooks",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by rulebook name."
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "rulebooks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRulebookList"
+                }
+              }
+            },
+            "description": "Return a list of rulebooks."
+          }
+        }
+      },
+      "post": {
+        "operationId": "rulebooks_create",
+        "tags": [
+          "rulebooks"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rulebook"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Rulebook"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Rulebook"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rulebook"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/rulebooks/{id}/": {
+      "get": {
+        "operationId": "rulebooks_retrieve",
+        "description": "Get the rulebook by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this rulebook.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "rulebooks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rulebook"
+                }
+              }
+            },
+            "description": "Return the rulebook by its id."
+          }
+        }
+      }
+    },
+    "/rulebooks/{id}/json/": {
+      "get": {
+        "operationId": "rulebooks_json_retrieve",
+        "description": "Get the JSON format of a rulebook by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this rulebook.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "rulebooks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rulebook"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/rulebooks/{id}/rulesets/": {
+      "get": {
+        "operationId": "rulebooks_rulesets_list",
+        "description": "Ruleset list of a rulebook by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this rulebook.",
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by rulebook name."
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "rulebooks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRulesetOutList"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/rules/": {
+      "get": {
+        "operationId": "rules_list",
+        "description": "List all rules",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "rules"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRuleOutList"
+                }
+              }
+            },
+            "description": "Return a list of rules."
+          }
+        }
+      }
+    },
+    "/rules/{id}/": {
+      "get": {
+        "operationId": "rules_retrieve",
+        "description": "Get the rule by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this rule.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "rules"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleOut"
+                }
+              }
+            },
+            "description": "Return the rule by its id."
+          }
+        }
+      }
+    },
+    "/rulesets/": {
+      "get": {
+        "operationId": "rulesets_list",
+        "description": "List all rulesets",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "rulesets"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRulesetOutList"
+                }
+              }
+            },
+            "description": "Return a list of rulesets."
+          }
+        }
+      }
+    },
+    "/rulesets/{id}/": {
+      "get": {
+        "operationId": "rulesets_retrieve",
+        "description": "Get the ruleset by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this ruleset.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "rulesets"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesetOut"
+                }
+              }
+            },
+            "description": "Return the ruleset by its id."
+          }
+        }
+      }
+    },
+    "/rulesets/{id}/rules/": {
+      "get": {
+        "operationId": "rulesets_rules_list",
+        "description": "Rule list of a ruleset by its id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this ruleset.",
+            "required": true
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "rulesets"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRuleList"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/tasks/": {
+      "get": {
+        "operationId": "tasks_list",
+        "tags": [
+          "tasks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/tasks/{id}/": {
+      "get": {
+        "operationId": "tasks_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "tasks"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/users/me/": {
+      "get": {
+        "operationId": "retrieve_current_user",
+        "description": "Get current user.",
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Return current user."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Activation": {
+        "type": "object",
+        "description": "Serializer for the Activation model.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          },
+          "working_directory": {
+            "type": "string"
+          },
+          "execution_environment": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string",
+            "readOnly": true
+          },
+          "rulebook_id": {
+            "type": "string",
+            "readOnly": true
+          },
+          "extra_var_id": {
+            "type": "string",
+            "readOnly": true
+          },
+          "restart_policy": {
+            "$ref": "#/components/schemas/RestartPolicyEnum"
+          },
+          "restart_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "created_at",
+          "extra_var_id",
+          "id",
+          "modified_at",
+          "name",
+          "project_id",
+          "rulebook_id"
+        ]
+      },
+      "ActivationCreate": {
+        "type": "object",
+        "description": "Serializer for creating the Activation.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          },
+          "working_directory": {
+            "type": "string"
+          },
+          "execution_environment": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "rulebook_id": {
+            "type": "integer"
+          },
+          "extra_var_id": {
+            "type": "integer"
+          },
+          "restart_policy": {
+            "$ref": "#/components/schemas/RestartPolicyEnum"
+          }
+        },
+        "required": [
+          "name",
+          "rulebook_id"
+        ]
+      },
+      "ActivationInstance": {
+        "type": "object",
+        "description": "Serializer for the Activation Instance model.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ActivationInstanceStatusEnum"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "nullable": true
+          },
+          "activation": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ended_at",
+          "id",
+          "started_at"
+        ]
+      },
+      "ActivationInstanceLog": {
+        "type": "object",
+        "description": "Serializer for the Activation Instance Log model.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "line_number": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "log": {
+            "type": "string"
+          },
+          "activation_instance": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "activation_instance",
+          "id",
+          "line_number",
+          "log"
+        ]
+      },
+      "ActivationInstanceStatusEnum": {
+        "enum": [
+          "running",
+          "pending",
+          "failed",
+          "stopped",
+          "completed"
+        ],
+        "type": "string"
+      },
+      "ActivationRead": {
+        "type": "object",
+        "description": "Serializer for reading the Activation with related objects info.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          },
+          "working_directory": {
+            "type": "string"
+          },
+          "execution_environment": {
+            "type": "string"
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectRef"
+          },
+          "rulebook": {
+            "$ref": "#/components/schemas/RulebookRef"
+          },
+          "extra_var": {
+            "$ref": "#/components/schemas/ExtraVarRef"
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivationInstance"
+            }
+          },
+          "restart_policy": {
+            "$ref": "#/components/schemas/RestartPolicyEnum"
+          },
+          "restart_count": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": -2147483648
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "created_at",
+          "id",
+          "instances",
+          "modified_at",
+          "name",
+          "rulebook"
+        ]
+      },
+      "ExtraVar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the extra_var"
+          },
+          "extra_var": {
+            "type": "string",
+            "description": "Content of the extra_var"
+          },
+          "project": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "extra_var",
+          "id",
+          "name"
+        ]
+      },
+      "ExtraVarRef": {
+        "type": "object",
+        "description": "Serializer for Extra Var reference.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ImportStateEnum": {
+        "enum": [
+          "pending",
+          "running",
+          "failed",
+          "completed"
+        ],
+        "type": "string"
+      },
+      "Login": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "username"
+        ]
+      },
+      "PaginatedActivationInstanceList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivationInstance"
+            }
+          }
+        }
+      },
+      "PaginatedActivationList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activation"
+            }
+          }
+        }
+      },
+      "PaginatedExtraVarList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtraVar"
+            }
+          }
+        }
+      },
+      "PaginatedPlaybookList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Playbook"
+            }
+          }
+        }
+      },
+      "PaginatedProjectList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            }
+          }
+        }
+      },
+      "PaginatedRuleList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            }
+          }
+        }
+      },
+      "PaginatedRuleOutList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleOut"
+            }
+          }
+        }
+      },
+      "PaginatedRulebookList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rulebook"
+            }
+          }
+        }
+      },
+      "PaginatedRulesetOutList": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=51&page_size=100"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "/eda/api/v1/example/?page=49&page_size=100"
+          },
+          "page_size": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "page": {
+            "type": "integer",
+            "nullable": true,
+            "example": 50
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulesetOut"
+            }
+          }
+        }
+      },
+      "PatchedActivationUpdate": {
+        "type": "object",
+        "description": "Serializer for updating the Activation.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PatchedProject": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "url": {
+            "type": "string",
+            "readOnly": true
+          },
+          "git_hash": {
+            "type": "string",
+            "readOnly": true
+          },
+          "import_state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportStateEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "import_task_id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true,
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        }
+      },
+      "Playbook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the playbook"
+          },
+          "playbook": {
+            "type": "string",
+            "description": "Content of the playbook"
+          },
+          "project": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "playbook"
+        ]
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "url": {
+            "type": "string",
+            "readOnly": true
+          },
+          "git_hash": {
+            "type": "string",
+            "readOnly": true
+          },
+          "import_state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportStateEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "import_task_id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true,
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "created_at",
+          "git_hash",
+          "id",
+          "import_state",
+          "import_task_id",
+          "modified_at",
+          "name",
+          "url"
+        ]
+      },
+      "ProjectCreateRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url"
+        ]
+      },
+      "ProjectRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "url": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url"
+        ]
+      },
+      "RestartPolicyEnum": {
+        "enum": [
+          "always",
+          "on-failure",
+          "never"
+        ],
+        "type": "string"
+      },
+      "Rule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the rule"
+          },
+          "action": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "The action in the rule"
+          },
+          "ruleset": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "action",
+          "id",
+          "name",
+          "ruleset"
+        ]
+      },
+      "RuleOut": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the ruleset"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the rule"
+          },
+          "action": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true,
+            "description": "The action in the rule"
+          },
+          "fired_stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "List of stats"
+          },
+          "rulebook": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the rulebook"
+          },
+          "ruleset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the ruleset"
+          },
+          "project": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the project"
+          }
+        },
+        "required": [
+          "fired_stats",
+          "id",
+          "name"
+        ]
+      },
+      "Rulebook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the rulebook"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "default": "",
+            "description": "Description of the rulebook"
+          },
+          "rulesets": {
+            "type": "string",
+            "description": "The contained rulesets in the rulebook"
+          },
+          "project": {
+            "type": "integer",
+            "nullable": true,
+            "description": "ID of the project"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "created_at",
+          "id",
+          "modified_at",
+          "name",
+          "rulesets"
+        ]
+      },
+      "RulebookRef": {
+        "type": "object",
+        "description": "Serializer for Rulebook reference.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "RulesetOut": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the ruleset"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the ruleset"
+          },
+          "rule_count": {
+            "type": "integer",
+            "description": "Number of rules the ruleset contains"
+          },
+          "source_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of source types"
+          },
+          "fired_stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "List of stats"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The created_at timestamp of the ruleset"
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The modified_at timestamp of the ruleset"
+          }
+        },
+        "required": [
+          "created_at",
+          "fired_stats",
+          "id",
+          "modified_at",
+          "name",
+          "rule_count",
+          "source_types"
+        ]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskStatusEnum"
+              }
+            ],
+            "readOnly": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "enqueued_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "created_at",
+          "enqueued_at",
+          "finished_at",
+          "id",
+          "result",
+          "started_at",
+          "status"
+        ]
+      },
+      "TaskRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "href": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "href",
+          "id"
+        ]
+      },
+      "TaskStatusEnum": {
+        "enum": [
+          "queued",
+          "finished",
+          "failed",
+          "started",
+          "deferred",
+          "scheduled",
+          "stopped",
+          "canceled"
+        ],
+        "type": "string"
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email address",
+            "maxLength": 254
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 150
+          }
+        },
+        "required": [
+          "username"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionid"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/eda/v1"
+    }
+  ]
+}

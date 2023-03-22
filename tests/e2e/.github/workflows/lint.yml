@@ -1,0 +1,23 @@
+name: lint
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install pre-commit
+        run: python -m pip install pre-commit
+      - name: init pre-commit
+        run: pre-commit install
+      - name: run pre-commit
+        run: pre-commit run --all

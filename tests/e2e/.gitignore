@@ -1,0 +1,21 @@
+# pytest
+.pytest_cache
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+
+# IDE's and development
+.venv
+.vscode
+.idea
+
+# config
+.env

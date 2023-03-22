@@ -1,0 +1,4 @@
+projectName: eda_api
+packageName: eda_api
+generateSourceCodeOnly: true
+packageVersion: 1.0.0

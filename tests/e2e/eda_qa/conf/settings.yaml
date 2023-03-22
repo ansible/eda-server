@@ -1,0 +1,27 @@
+default:
+  default_user: test
+  default_timeout: 15
+  default_task_timeout: 30
+  default_project_url: https://github.com/Alex-Izquierdo/eda-sample-project
+  default_rulebook: "local-test-rules.yml"
+  default_inventory: "inventory.yml"
+  default_ruleset: "Local Test Runner Rules"
+  default_auth_method: basicauth
+  users:
+    test:
+      username: admin
+      password: testpass
+      auth_method: basicauth
+    qa:
+      username: root@example.com
+      password: secret #gitleaks:allow
+    admin:
+      username: admin@redhat.com
+      # password encrypted
+      password: "!fernet:gAAAAABjD2hLMOOBcLjPgBD-6wYJgfZper2zJ5d7mEYCKUpMyZlkUNIxHJR78FPPvauuOICbr94K_NrlX2PCNkobMIljXpZD5Q==" #gitleaks:allow
+  http:
+    host: localhost
+    port: 8000
+    api_path: /api/eda/v1
+    scheme: http
+    verify_ssl: False
