@@ -130,27 +130,6 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_create_rulebook(client: APIClient):
-    data_in = {
-        "name": "test-rulebook.yml",
-        "rulesets": TEST_RULESETS_SAMPLE,
-    }
-
-    response = client.post(f"{api_url_v1}/rulebooks/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-
-    id_ = response.data["id"]
-    assert response.data["name"] == "test-rulebook.yml"
-    assert response.data["rulesets"] == TEST_RULESETS_SAMPLE
-    assert response.data["project"] is None
-    assert models.Rulebook.objects.filter(pk=id_).exists()
-
-    assert len(models.Ruleset.objects.all()) == 2
-    assert models.Ruleset.objects.first().name == "Test sample 001"
-    assert models.Ruleset.objects.last().name == "Test sample 002"
-
-
-@pytest.mark.django_db
 def test_retrieve_rulebook(client: APIClient):
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE

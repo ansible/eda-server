@@ -21,17 +21,13 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import mixins, status, viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
-from aap_eda.services.rulebook import (
-    build_fired_stats,
-    build_ruleset_out_data,
-    insert_rulebook_related_data,
-)
+from aap_eda.services.rulebook import build_fired_stats, build_ruleset_out_data
 
 
 @extend_schema_view(
@@ -55,31 +51,12 @@ from aap_eda.services.rulebook import (
     ),
 )
 class RulebookViewSet(
-    mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.Rulebook.objects.order_by("id")
     serializer_class = serializers.RulebookSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulebookFilter
-
-    @extend_schema(
-        request=serializers.RulebookSerializer,
-        responses={status.HTTP_201_CREATED: serializers.RulebookSerializer},
-    )
-    def create(self, request):
-        serializer = serializers.RulebookSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        rulebook = serializer.create(serializer.validated_data)
-        data = yaml.safe_load(request.data["rulesets"] or [])
-
-        insert_rulebook_related_data(rulebook, data)
-
-        response_serializer = serializers.RulebookSerializer(rulebook)
-        return Response(
-            response_serializer.data, status=status.HTTP_201_CREATED
-        )
 
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
