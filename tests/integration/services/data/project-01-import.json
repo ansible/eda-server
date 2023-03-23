@@ -1,6 +1,7 @@
 [
     {
-        "name": "rulebooks/hello_events.yml",
+        "name": "hello_events.yml",
+        "path": "rulebooks",
         "rulesets": [
             {
                 "name": "Hello Events",
@@ -18,7 +19,8 @@
         ]
     },
     {
-        "name": "rulebooks/kafka/kafka-test-rules.yml",
+        "name": "kafka-test-rules.yml",
+        "path": "rulebooks/kafka",
         "rulesets": [
             {
                 "name": "Demo rules with kafka as source",

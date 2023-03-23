@@ -74,10 +74,14 @@ def test_list_rulebooks(client: APIClient):
     rulebooks = models.Rulebook.objects.bulk_create(
         [
             models.Rulebook(
-                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
+                name="test-rulebook-00.yml",
+                path="rulebooks",
+                rulesets=TEST_RULESETS_SAMPLE,
             ),
             models.Rulebook(
-                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
+                name="test-rulebook-01.yml",
+                path="rulebooks",
+                rulesets=TEST_RULESETS_SAMPLE,
             ),
         ]
     )
@@ -93,10 +97,14 @@ def test_list_rulebooks_filter_name(client: APIClient):
     rulebooks = models.Rulebook.objects.bulk_create(
         [
             models.Rulebook(
-                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
+                name="test-rulebook-00.yml",
+                path="rulebooks",
+                rulesets=TEST_RULESETS_SAMPLE,
             ),
             models.Rulebook(
-                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
+                name="test-rulebook-01.yml",
+                path="rulebooks",
+                rulesets=TEST_RULESETS_SAMPLE,
             ),
         ]
     )
@@ -114,10 +122,14 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient):
     models.Rulebook.objects.bulk_create(
         [
             models.Rulebook(
-                name="test-rulebook-00.yml", rulesets=TEST_RULESETS_SAMPLE
+                name="test-rulebook-00.yml",
+                path="rulebooks",
+                rulesets=TEST_RULESETS_SAMPLE,
             ),
             models.Rulebook(
-                name="test-rulebook-01.yml", rulesets=TEST_RULESETS_SAMPLE
+                name="test-rulebook-01.yml",
+                path="rulebooks",
+                rulesets=TEST_RULESETS_SAMPLE,
             ),
         ]
     )
@@ -132,7 +144,9 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_rulebook(client: APIClient):
     rulebook = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
+        name="test-rulebook.yml",
+        path="rulebooks",
+        rulesets=TEST_RULESETS_SAMPLE,
     )
     response = client.get(f"{api_url_v1}/rulebooks/{rulebook.id}/")
 
@@ -149,7 +163,9 @@ def test_retrieve_rulebook_not_exist(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_json_rulebook(client: APIClient):
     obj = models.Rulebook.objects.create(
-        name="test-rulebook.yml", rulesets=TEST_RULESETS_SAMPLE
+        name="test-rulebook.yml",
+        path="rulebooks",
+        rulesets=TEST_RULESETS_SAMPLE,
     )
     response = client.get(f"{api_url_v1}/rulebooks/{obj.id}/json/")
     assert response.status_code == status.HTTP_200_OK
@@ -157,6 +173,7 @@ def test_retrieve_json_rulebook(client: APIClient):
     data = response.json()
     assert data["id"] == obj.id
     assert data["name"] == "test-rulebook.yml"
+    assert data["path"] == "rulebooks"
     assert len(data["rulesets"]) == 2
     assert data["rulesets"][0]["name"] == "Test sample 001"
     assert data["rulesets"][1]["name"] == "Test sample 002"
@@ -193,6 +210,7 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
     assert data == {
         "id": rulebook.id,
         "name": rulebook.name,
+        "path": rulebook.path,
         "description": rulebook.description,
         "rulesets": rulebook.rulesets,
         "project": rulebook.project,
@@ -304,6 +322,7 @@ def init_db():
     )
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook.yml",
+        path="rulebooks",
         rulesets=TEST_RULESETS_SAMPLE,
         project=project,
     )
