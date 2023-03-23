@@ -46,6 +46,7 @@ async def test_ansible_rulebook_consumer():
                 "type": "Action",
                 "action": "run_playbook",
                 "activation_id": 1,
+                "run_at": "2023-03-20T18:14:55.036753Z",
                 "playbook_name": "playbook",
                 "job_id": "uuid_1234",
                 "ruleset": "ruleset",
@@ -64,6 +65,7 @@ async def test_ansible_rulebook_consumer():
                 "rule": "rule",
                 "hosts": "hosts",
                 "action": "run_playbook",
+                "run_at": "2023-03-20T18:14:55.036753Z",
             }
         },
         {"handle_events": {"type": "AnsibleEvent", "event": {}}},
@@ -255,7 +257,7 @@ def _prepare_db_data():
     )
 
     ruleset, _ = models.Ruleset.objects.get_or_create(
-        name="test-ruleset",
+        name="ruleset",
         sources=[
             {
                 "name": "<unnamed>",

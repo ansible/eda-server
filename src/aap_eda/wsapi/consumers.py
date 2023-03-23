@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 
 from channels.db import database_sync_to_async
@@ -79,6 +79,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             await self.handle_workers(WorkerMessage.parse_obj(data))
         elif msg_type == MessageType.JOB:
             await self.handle_jobs(JobMessage.parse_obj(data))
+        # AnsibleEvent messages are no longer sent by ansible-rulebook
+        # TODO: remove later if no need to keep
         elif msg_type == MessageType.ANSIBLE_EVENT:
             await self.handle_events(AnsibleEventMessage.parse_obj(data))
         elif msg_type == MessageType.ACTION:
@@ -178,13 +180,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             action_name = message.action
             playbook_name = message.playbook_name
             job_id = message.job_id
-            fired_date = datetime.strptime(
-                message.run_at, "%Y-%m-%d %H:%M:%S.%f"
-            ).replace(tzinfo=timezone.utc)
+            rule_name = message.rule
+            ruleset_name = message.ruleset
+            fired_date = message.run_at
             status = message.status
 
-            if job_id:
-                job_instance = models.JobInstance.objects.get(uuid=job_id)
+            job_instance = models.JobInstance.objects.filter(
+                uuid=job_id
+            ).first()
 
             activation_instance = models.ActivationInstance.objects.get(
                 id=activation_instance_id
@@ -193,32 +196,36 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 id=activation_instance.activation_id
             )
             rulesets = models.Ruleset.objects.filter(
-                rulebook_id=activation.rulebook_id
+                name=ruleset_name,
+                rulebook_id=activation.rulebook_id,
             )
 
             rules = models.Rule.objects.filter(
-                ruleset_id__in=[ruleset.id for ruleset in rulesets]
+                name=rule_name,
+                ruleset_id__in=[ruleset.id for ruleset in rulesets],
             )
 
             audit_rules = []
             job_instance_id = job_instance.id if job_instance else None
 
             for rule in rules:
-                if (
-                    rule.action.get(action_name, {}).get("name")
-                    == playbook_name
-                ):
-                    audit_rule = models.AuditRule(
-                        activation_instance_id=activation_instance_id,
-                        ruleset_id=rule.ruleset_id,
-                        rule_id=rule.id,
-                        name=rule.name,
-                        definition=rule.action,
-                        job_instance_id=job_instance_id,
-                        fired_date=fired_date,
-                        status=status,
-                    )
-                    audit_rules.append(audit_rule)
+                if playbook_name:
+                    if playbook_name != rule.action.get(action_name, {}).get(
+                        "name"
+                    ):
+                        continue
+
+                audit_rule = models.AuditRule(
+                    activation_instance_id=activation_instance_id,
+                    ruleset_id=rule.ruleset_id,
+                    rule_id=rule.id,
+                    name=rule.name,
+                    definition=rule.action,
+                    job_instance_id=job_instance_id,
+                    fired_date=fired_date,
+                    status=status,
+                )
+                audit_rules.append(audit_rule)
 
             if len(audit_rules) > 0:
                 models.AuditRule.objects.bulk_create(audit_rules)
