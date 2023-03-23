@@ -29,16 +29,6 @@ RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
     && python3 -m venv "$VIRTUAL_ENV" \
     && poetry config virtualenvs.create false
 
-# Install ansible
-ARG EDA_COLLECTION=${EDA_COLLECTION:-ansible.eda}
-RUN python3 -m pip install ansible \
-    && ansible-galaxy collection install "$EDA_COLLECTION" \
-    && python3 -m pip install -r "/app/.ansible/collections/ansible_collections/${EDA_COLLECTION/.//}/requirements.txt"
-
-# Install ansible-rulebook
-ARG ANSIBLE_RULEBOOK=${ANSIBLE_RULEBOOK:-ansible-rulebook}
-RUN python3 -m pip install --user "$ANSIBLE_RULEBOOK"
-
 WORKDIR $SOURCES_DIR
 
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"

@@ -35,11 +35,10 @@ services:
       replicas: 2
     image: 'localhost/aap-eda'
     environment: *common-env
-    command:
-      - aap-eda-manage
-      - rqworker
-      - --worker-class
-      - aap_eda.core.tasking.Worker
+    image: 'localhost/aap-eda-worker'
+    build:
+      context: ../../
+      dockerfile: tools/docker/worker/Dockerfile
     depends_on:
       redis:
         condition: service_healthy
