@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import re
+import shutil
 import subprocess
 from unittest import mock
 
@@ -76,13 +77,12 @@ def test_git_rev_parse_head():
 
 
 @mock.patch("subprocess.run")
-@mock.patch("shutil.which", return_value="/test/bin/git")
-def test_git_executor_call(shutil_mock, run_mock: mock.Mock):
-    executor = GitExecutor(command=shutil_mock)
+def test_git_executor_call(run_mock: mock.Mock):
+    executor = GitExecutor()
     executor(["clone", "https://git.example.com/repo.git", "/test/repo"])
     run_mock.assert_called_once_with(
         [
-            "/test/bin/git",
+            shutil.which("git"),
             "clone",
             "https://git.example.com/repo.git",
             "/test/repo",
@@ -100,8 +100,7 @@ def test_git_executor_call(shutil_mock, run_mock: mock.Mock):
 
 
 @mock.patch("subprocess.run")
-@mock.patch("shutil.which", return_value="/test/bin/git")
-def test_git_executor_timeout(shutil_mock, run_mock: mock.Mock):
+def test_git_executor_timeout(run_mock: mock.Mock):
     timeout = 10
 
     def raise_timeout(cmd, **_kwargs):
@@ -109,17 +108,17 @@ def test_git_executor_timeout(shutil_mock, run_mock: mock.Mock):
 
     run_mock.side_effect = raise_timeout
 
-    executor = GitExecutor(command=shutil_mock)
+    executor = GitExecutor()
     message = re.escape(
-        "Command '['/test/bin/git', 'status']' timed out after 10 seconds"
+        f"""Command '['{shutil.which("git")}', 'status']' """
+        """timed out after 10 seconds"""
     )
     with pytest.raises(GitError, match=message):
         executor(["status"], timeout=timeout)
 
 
 @mock.patch("subprocess.run")
-@mock.patch("shutil.which", return_value="/test/bin/git")
-def test_git_executor_error(shutil_mock, run_mock: mock.Mock):
+def test_git_executor_error(run_mock: mock.Mock):
     def raise_error(cmd, **_kwargs):
         raise subprocess.CalledProcessError(
             128, cmd, stderr="fatal: not a git repository"
@@ -127,9 +126,9 @@ def test_git_executor_error(shutil_mock, run_mock: mock.Mock):
 
     run_mock.side_effect = raise_error
 
-    executor = GitExecutor(command=shutil_mock)
+    executor = GitExecutor()
     message = re.escape(
-        "Command '['/test/bin/git', 'status']'"
+        f"""Command '['{shutil.which("git")}', 'status']'"""
         " returned non-zero exit status 128."
     )
     with pytest.raises(GitError, match=message):
