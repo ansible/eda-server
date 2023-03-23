@@ -132,8 +132,9 @@ class PlaybookViewSet(
         description="Delete a project by id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                serializers.ProjectSerializer, description="Delete successful."
-            )
+                None,
+                description="Delete successful.",
+            ),
         },
     ),
 )
