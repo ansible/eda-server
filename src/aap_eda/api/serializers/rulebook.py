@@ -23,6 +23,10 @@ class RulebookSerializer(serializers.ModelSerializer):
         help_text="Name of the rulebook",
     )
 
+    path = serializers.CharField(
+        required=True, help_text="Relative path of the rulebook"
+    )
+
     description = serializers.CharField(
         default="",
         help_text="Description of the rulebook",
@@ -52,7 +56,7 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = ["id", "name", "description"]
+        fields = ["id", "name", "path", "description"]
         read_only_fields = ["id"]
 
 

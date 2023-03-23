@@ -81,9 +81,11 @@ class ProjectImportService:
     def _import_rulebook(
         self, project: models.Project, rulebook_info: RulebookInfo
     ) -> models.Rulebook:
+        rel_path, filename = os.path.split(rulebook_info.relpath)
         rulebook = models.Rulebook.objects.create(
             project=project,
-            name=rulebook_info.relpath,
+            path=rel_path,
+            name=filename,
             rulesets=rulebook_info.raw_content,
         )
 
