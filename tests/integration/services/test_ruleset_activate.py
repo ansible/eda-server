@@ -95,20 +95,14 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
-@mock.patch(
-    "aap_eda.services.ruleset.ansible_rulebook.ANSIBLE_RULEBOOK_BIN",
-    "ansible-rulebook",
-)
-@mock.patch(
-    "aap_eda.services.ruleset.ansible_rulebook.SSH_AGENT_BIN", "ssh-agent"
-)
 @mock.patch("subprocess.run")
-def test_rulesets_activate_local(run_mock: mock.Mock):
+@mock.patch("shutil.which")
+def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
+    which_mock.return_value = "/bin/cmd"
     out = "test_output_line_1\ntest_output_line_2"
-
     run_mock.return_value = CompletedProcess(
         args="command",
         returncode=0,

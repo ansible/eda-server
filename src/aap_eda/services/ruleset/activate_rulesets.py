@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import shutil
 from enum import Enum
 from typing import Optional
 
@@ -85,7 +86,18 @@ class ActivateRulesets:
         url: str,
         activation_instance_id: str,
     ) -> None:
-        proc = self.service.run_worker_mode(url, activation_instance_id)
+        ssh_agent = shutil.which("ssh-agent")
+        ansible_rulebook = shutil.which("ansible-rulebook")
+
+        if ansible_rulebook is None:
+            raise ActivateRulesetsFailed("command ansible-rulebook not found")
+
+        if ssh_agent is None:
+            raise ActivateRulesetsFailed("command ssh-agent not found")
+
+        proc = self.service.run_worker_mode(
+            url, ssh_agent, ansible_rulebook, activation_instance_id
+        )
 
         line_number = 0
 

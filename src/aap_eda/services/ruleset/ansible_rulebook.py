@@ -13,14 +13,10 @@
 #  limitations under the License.
 
 import logging
-import shutil
 import subprocess
-from typing import Final, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
-
-ANSIBLE_RULEBOOK_BIN: Final = shutil.which("ansible-rulebook")
-SSH_AGENT_BIN: Final = shutil.which("ssh-agent")
 
 
 class AnsibleRulebookServiceFailed(Exception):
@@ -33,18 +29,12 @@ class AnsibleRulebookService:
 
     def run_worker_mode(
         self,
+        ssh_agent: str,
+        ansible_rulebook: str,
         url: str,
         activation_id: str,
     ) -> subprocess.CompletedProcess:
         """Run ansible-rulebook in worker mode."""
-        if ANSIBLE_RULEBOOK_BIN is None:
-            raise AnsibleRulebookServiceFailed(
-                "command ansible-rulebook not found"
-            )
-
-        if SSH_AGENT_BIN is None:
-            raise AnsibleRulebookServiceFailed("command ssh-agent not found")
-
         args = [
             "--worker",
             "--websocket-address",
@@ -57,7 +47,7 @@ class AnsibleRulebookService:
             # TODO: subprocess.run may run a while and will block the
             # following DB updates. Need to find a better way to solve it.
             return subprocess.run(
-                [SSH_AGENT_BIN, ANSIBLE_RULEBOOK_BIN, *args],
+                [ssh_agent, ansible_rulebook, *args],
                 check=True,
                 encoding="utf-8",
                 capture_output=True,

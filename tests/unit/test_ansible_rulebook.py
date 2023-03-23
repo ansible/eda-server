@@ -23,17 +23,13 @@ from aap_eda.services.ruleset.ansible_rulebook import (
 )
 
 
-@mock.patch(
-    "aap_eda.services.ruleset.ansible_rulebook.ANSIBLE_RULEBOOK_BIN",
-    "ansible-rulebook",
-)
-@mock.patch(
-    "aap_eda.services.ruleset.ansible_rulebook.SSH_AGENT_BIN", "ssh-agent"
-)
 @mock.patch("subprocess.run")
 def test_run_worker_mode(run_mock: mock.Mock):
     AnsibleRulebookService().run_worker_mode(
-        "ws://localhost:8000/api/eda/ws/ansible-rulebook", "1"
+        "ssh-agent",
+        "ansible-rulebook",
+        "ws://localhost:8000/api/eda/ws/ansible-rulebook",
+        "1",
     )
 
     run_mock.assert_called_once_with(
@@ -64,7 +60,10 @@ def test_raise_error(run_mock: mock.Mock):
 
     with pytest.raises(AnsibleRulebookServiceFailed):
         executor = AnsibleRulebookService().run_worker_mode(
-            "ws://localhost:8000/api/eda/ws/ansible-rulebook", "1"
+            "ssh-agent",
+            "ansible-rulebook",
+            "ws://localhost:8000/api/eda/ws/ansible-rulebook",
+            "1",
         )
 
         assert executor.stderr == "fatal: ansible-rulebook crashed"
