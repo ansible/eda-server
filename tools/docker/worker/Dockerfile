@@ -23,7 +23,8 @@ RUN pip install -U pip \
     aiohttp \
     aiokafka \
     watchdog \
-    azure-servicebus \
+#  This dep causes build failures, see https://issues.redhat.com/browse/AAP-10415
+#    azure-servicebus \
     && ansible-galaxy collection install ansible.eda
 
 RUN ansible-galaxy collection install git+https://github.com/ansible/event-driven-ansible.git --force
