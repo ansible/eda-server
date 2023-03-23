@@ -289,3 +289,11 @@ EDA_CONTROLLER_TOKEN = settings.get(
     "CONTROLLER_TOKEN", "default_controller_token"
 )
 EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
+
+# ---------------------------------------------------------
+# DEPLOYMENT SETTINGS
+# ---------------------------------------------------------
+
+DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
+WEBSOCKET_SERVER_NAME = settings.get("WEBSOCKET_SERVER_NAME", "localhost")
+WEBSOCKET_SERVER_PORT = settings.get("WEBSOCKET_SERVER_PORT", "8000")

@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from django.conf import settings
 from django.db import IntegrityError
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -23,6 +24,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
+from aap_eda.tasks.ruleset import activate_rulesets
 
 
 def handle_activation_create_conflict(activation):
@@ -86,7 +88,14 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
-        # TODO(doston): need to implement backend process and instance creation
+
+        activate_rulesets.delay(
+            response.id,
+            response.execution_environment,
+            settings.DEPLOYMENT_TYPE,
+            settings.WEBSOCKET_SERVER_NAME,
+            settings.WEBSOCKET_SERVER_PORT,
+        )
 
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
