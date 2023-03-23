@@ -240,7 +240,7 @@ def _prepare_db_data():
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
-        path="rulebooks/",
+        path="rulebooks",
         rulesets=TEST_RULESETS,
         project=project,
     )

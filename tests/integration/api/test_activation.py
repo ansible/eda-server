@@ -45,7 +45,7 @@ TEST_PROJECT = {
 
 TEST_RULEBOOK = {
     "name": "test-rulebook.yml",
-    "path": "rulebooks/",
+    "path": "rulebooks",
     "description": "test rulebok",
 }
 
