@@ -30,6 +30,7 @@ from .project import (
     ProjectSerializer,
 )
 from .rulebook import (
+    AuditRuleSerializer,
     RulebookRefSerializer,
     RulebookSerializer,
     RuleOutSerializer,
@@ -50,6 +51,7 @@ __all__ = (
     "ProjectSerializer",
     "ProjectCreateRequestSerializer",
     "ProjectRefSerializer",
+    "AuditRuleSerializer",
     "RulebookSerializer",
     "RulebookRefSerializer",
     "RulesetOutSerializer",

@@ -64,6 +64,7 @@ class InitData:
     rulebook: models.Rulebook
     ruleset: models.Ruleset
     rule: models.Rule
+    action: models.AuditRule
 
 
 # ------------------------------------------
@@ -313,6 +314,48 @@ def test_retrieve_rule_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+# ------------------------------------------
+# Test Action:
+# ------------------------------------------
+@pytest.mark.django_db
+def test_list_actions(client: APIClient, init_db):
+    response = client.get(f"{api_url_v1}/actions/")
+    assert response.status_code == status.HTTP_200_OK
+    actions = response.data["results"]
+
+    assert len(actions) == 1
+    assert actions[0]["name"] == "test_action"
+    assert list(actions[0]) == [
+        "id",
+        "name",
+        "description",
+        "status",
+        "fired_date",
+        "definition",
+        "created_at",
+        "rule",
+        "ruleset",
+        "activation_instance",
+        "job_instance",
+    ]
+
+
+@pytest.mark.django_db
+def test_retrieve_action(client: APIClient, init_db):
+    action_id = init_db.action.id
+
+    response = client.get(f"{api_url_v1}/actions/{action_id}/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["name"] == "test_action"
+
+
+@pytest.mark.django_db
+def test_retrieve_action_not_exist(client: APIClient):
+    response = client.get(f"{api_url_v1}/actions/42/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
 @pytest.fixture
 def init_db():
     project = models.Project.objects.create(
@@ -343,10 +386,19 @@ def init_db():
         action={"run_playbook": {"name": "ansible.eda.hello"}},
         ruleset=ruleset,
     )
+    action = models.AuditRule.objects.create(
+        name="test_action",
+        description="test action",
+        fired_date="2023-03-23T01:36:36.835248Z",
+        definition={"action": "run_playbook"},
+        rule=rule,
+        ruleset=ruleset,
+    )
 
     return InitData(
         project=project,
         rulebook=rulebook,
         ruleset=ruleset,
         rule=rule,
+        action=action,
     )
