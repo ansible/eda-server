@@ -185,7 +185,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
     )
 
     name = serializers.CharField(
-        required=False,
+        required=True,
         help_text="Name of the fired rule",
     )
 
