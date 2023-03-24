@@ -96,7 +96,7 @@ class ActivateRulesets:
             raise ActivateRulesetsFailed("command ssh-agent not found")
 
         proc = self.service.run_worker_mode(
-            url, ssh_agent, ansible_rulebook, activation_instance_id
+            ssh_agent, ansible_rulebook, url, activation_instance_id
         )
 
         line_number = 0
