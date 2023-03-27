@@ -25,7 +25,7 @@ __all__ = (
 class Rulebook(models.Model):
     class Meta:
         db_table = "core_rulebook"
-        unique_together = ["project_id", "name"]
+        unique_together = ["project_id", "path", "name"]
         constraints = [
             models.CheckConstraint(
                 check=~models.Q(name=""),
@@ -34,7 +34,7 @@ class Rulebook(models.Model):
         ]
 
     name = models.TextField(null=False)
-    path = models.TextField(null=False, default="")
+    path = models.TextField(null=False)
     description = models.TextField(null=True, default="")
     rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)

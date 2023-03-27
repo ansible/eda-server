@@ -101,6 +101,7 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):
     assert rulebook.name == expected["name"]
+    assert rulebook.path == expected["path"]
 
     rulesets = list(rulebook.ruleset_set.order_by("id"))
     assert len(rulesets) == len(expected["rulesets"])
