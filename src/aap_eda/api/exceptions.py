@@ -18,6 +18,7 @@ from rest_framework.exceptions import (
     AuthenticationFailed,
     NotAuthenticated,
     NotFound,
+    PermissionDenied,
 )
 
 __all__ = (
@@ -27,6 +28,7 @@ __all__ = (
     "NotFound",
     "Conflict",
     "Unprocessable",
+    "PermissionDenied",
 )
 
 
