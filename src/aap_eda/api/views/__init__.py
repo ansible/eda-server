@@ -15,7 +15,12 @@
 from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView
 from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
-from .rulebook import RulebookViewSet, RulesetViewSet, RuleViewSet
+from .rulebook import (
+    AuditRuleViewSet,
+    RulebookViewSet,
+    RulesetViewSet,
+    RuleViewSet,
+)
 from .tasks import TaskViewSet
 from .user import CurrentUserAwxTokensViewSet, CurrentUserView
 
@@ -27,6 +32,7 @@ __all__ = (
     "ExtraVarViewSet",
     "PlaybookViewSet",
     "ProjectViewSet",
+    "AuditRuleViewSet",
     "RulebookViewSet",
     "RulesetViewSet",
     "RuleViewSet",

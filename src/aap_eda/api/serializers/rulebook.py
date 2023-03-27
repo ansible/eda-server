@@ -176,3 +176,40 @@ class RuleOutSerializer(serializers.Serializer):
         queryset=models.Project.objects.all(),
         help_text="ID of the project",
     )
+
+
+class AuditRuleSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the fired rule",
+    )
+
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the fired rule",
+    )
+
+    description = serializers.CharField(
+        required=False,
+        help_text="Description of the fired rule",
+    )
+
+    status = serializers.CharField(
+        required=False,
+        help_text="Status of the fired rule",
+    )
+
+    fired_date = serializers.DateTimeField(
+        required=True,
+        help_text="The fired timestamp of the rule",
+    )
+
+    definition = serializers.JSONField(
+        required=True,
+        help_text="The action in the rule",
+    )
+
+    class Meta:
+        model = models.AuditRule
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]

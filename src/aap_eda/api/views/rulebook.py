@@ -154,6 +154,34 @@ class RulesetViewSet(
         return self.get_paginated_response(serializer.data)
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        description="Get the fired rule by its id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.AuditRuleSerializer,
+                description="Return the fired rule by its id.",
+            ),
+        },
+    ),
+    list=extend_schema(
+        description="List all fired rules",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.AuditRuleSerializer,
+                description="Return a list of fired rules.",
+            ),
+        },
+    ),
+)
+class AuditRuleViewSet(
+    viewsets.ReadOnlyModelViewSet,
+):
+    queryset = models.AuditRule.objects.order_by("id")
+    serializer_class = serializers.AuditRuleSerializer
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+
+
 class RuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
