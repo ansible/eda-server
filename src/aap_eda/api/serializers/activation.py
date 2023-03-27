@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
+
 from rest_framework import serializers
 
 from aap_eda.api.serializers.project import (
@@ -47,17 +49,17 @@ class ActivationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
-    def get_project_id(self, activation):
+    def get_project_id(self, activation) -> Optional[int]:
         return (
             ProjectRefSerializer(activation.project).data["id"]
             if activation.project
             else None
         )
 
-    def get_rulebook_id(self, activation):
+    def get_rulebook_id(self, activation) -> int:
         return RulebookRefSerializer(activation.rulebook).data["id"]
 
-    def get_extra_var_id(self, activation):
+    def get_extra_var_id(self, activation) -> Optional[int]:
         return (
             ExtraVarRefSerializer(activation.extra_var).data["id"]
             if activation.extra_var
@@ -68,9 +70,9 @@ class ActivationSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
-    project_id = serializers.IntegerField(required=False)
+    project_id = serializers.IntegerField(required=False, allow_null=True)
     rulebook_id = serializers.IntegerField()
-    extra_var_id = serializers.IntegerField(required=False)
+    extra_var_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = models.Activation
@@ -119,9 +121,9 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
 class ActivationReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the Activation with related objects info."""
 
-    project = ProjectRefSerializer(required=False)
+    project = ProjectRefSerializer(required=False, allow_null=True)
     rulebook = RulebookRefSerializer()
-    extra_var = ExtraVarRefSerializer(required=False)
+    extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
 
     class Meta:
