@@ -83,7 +83,7 @@ def test_session_login_invalid_credentials(
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json() == {
-        "detail": "Incorrect authentication credentials."
+        "detail": "Invalid credentials or user is disabled."
     }
 
 

@@ -46,7 +46,7 @@ class SessionLoginView(APIView):
         description="Session cookie login",
         request=LoginSerializer,
         responses={
-            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
                 description="Invalid credentials or user is disabled."
             ),
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
@@ -66,7 +66,9 @@ class SessionLoginView(APIView):
         )
 
         if user is None:
-            raise exceptions.AuthenticationFailed
+            raise exceptions.PermissionDenied(
+                "Invalid credentials or user is disabled."
+            )
 
         login(request, user)
         return Response(status=status.HTTP_204_NO_CONTENT)
