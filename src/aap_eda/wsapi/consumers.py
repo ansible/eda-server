@@ -97,9 +97,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         rulebook_message = Rulebook(
             data=base64.b64encode(rulebook.rulesets.encode()).decode()
         )
-        extra_var_message = ExtraVars(
-            data=base64.b64encode(extra_var.extra_var.encode()).decode()
-        )
+        if extra_var:
+            extra_var_message = ExtraVars(
+                data=base64.b64encode(extra_var.extra_var.encode()).decode()
+            )
+            await self.send(text_data=extra_var_message.json())
+
         controller_info = ControllerInfo(
             url=settings.EDA_CONTROLLER_URL,
             token=settings.EDA_CONTROLLER_TOKEN,
@@ -107,7 +110,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         )
 
         await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=extra_var_message.json())
         await self.send(text_data=controller_info.json())
         await self.send(text_data=EndOfResponse().json())
 
@@ -265,5 +267,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             id=activation_instance.activation_id
         )
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        extra_var = models.ExtraVar.objects.get(id=activation.extra_var_id)
+
+        if activation.extra_var_id:
+            extra_var = models.ExtraVar.objects.filter(
+                id=activation.extra_var_id
+            ).first()
+        else:
+            extra_var = None
+
         return (rulebook, extra_var)

@@ -86,16 +86,37 @@ async def test_ansible_rulebook_consumer():
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers():
-    activation_instance_id = await _prepare_db_data()
+    activation_instance_with_extra_var = await _prepare_db_data()
+    activation_instance_without_extra_var = (
+        await _prepare_acitvation_instance_without_extra_var()
+    )
     communicator = await _prepare_websocket_connection()
 
-    payload = {"type": "Worker", "activation_id": activation_instance_id}
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_with_extra_var,
+    }
+    await communicator.send_json_to(payload)
+
+    for type in [
+        "Hello",
+        "ExtraVars",
+        "Rulebook",
+        "ControllerInfo",
+        "EndOfResponse",
+    ]:
+        response = await communicator.receive_json_from()
+        assert response["type"] == type
+
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_without_extra_var,
+    }
     await communicator.send_json_to(payload)
 
     for type in [
         "Hello",
         "Rulebook",
-        "ExtraVars",
         "ControllerInfo",
         "EndOfResponse",
     ]:
@@ -225,13 +246,6 @@ def _prepare_db_data():
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
     )
 
-    models.Inventory.objects.get_or_create(
-        name="test-inventory",
-        inventory=TEST_INVENTORY,
-        inventory_source="collection",
-        project_id=project.id,
-    )
-
     extra_var, _ = models.ExtraVar.objects.get_or_create(
         name="test-extra_var",
         extra_var=TEST_EXTRA_VAR,
@@ -274,6 +288,35 @@ def _prepare_db_data():
         name="rule",
         action={"run_playbook": {"name": "ansible.eda.hello"}},
         ruleset=ruleset,
+    )
+
+    return activation_instance.id
+
+
+@database_sync_to_async
+def _prepare_acitvation_instance_without_extra_var():
+    project = models.Project.objects.create(
+        name="test-project-no-extra_var",
+        url="https://github.com/test/project",
+        git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+    )
+
+    rulebook = models.Rulebook.objects.create(
+        name="test-rulebook",
+        path="rulebooks",
+        rulesets=TEST_RULESETS,
+        project=project,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test-activation-no-extra_var",
+        restart_policy="always",
+        rulebook=rulebook,
+        project=project,
+    )
+
+    activation_instance = models.ActivationInstance.objects.create(
+        activation=activation,
     )
 
     return activation_instance.id
