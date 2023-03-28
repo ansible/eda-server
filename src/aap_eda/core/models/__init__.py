@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from .activation import Activation, ActivationInstance, ActivationInstanceLog
-from .auth import Role, RolePermission, UserRole
+from .auth import Permission, Role
 from .inventory import Inventory
 from .job import (
     ActivationInstanceJobInstance,
@@ -40,12 +40,11 @@ __all__ = [
     "Job",
     "Playbook",
     "Project",
-    "RolePermission",
+    "Permission",
     "Role",
     "Rule",
     "Rulebook",
     "Ruleset",
-    "UserRole",
     "User",
     "AwxToken",
 ]
