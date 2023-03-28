@@ -476,9 +476,19 @@ def init_db_multiple_rulesets():
         ruleset=rulesets[2],
     )
 
+    action = models.AuditRule.objects.create(
+        name="test_action",
+        description="test action",
+        fired_date="2023-03-23T01:36:36.835248Z",
+        definition={"action": "run_playbook"},
+        rule=rule,
+        ruleset=rulesets[0],
+    )
+
     return InitData(
         project=project,
         rulebook=rulebook,
         ruleset=rulesets,
         rule=rule,
+        action=action,
     )
