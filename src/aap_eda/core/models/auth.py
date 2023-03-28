@@ -35,6 +35,8 @@ class Role(models.Model):
 
     users = models.ManyToManyField("User", related_name="roles")
     permissions = models.ManyToManyField("Permission", related_name="roles")
+    created_at = models.DateTimeField(auto_now_add=True, null=False)
+    modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
 class Permission(models.Model):
