@@ -24,6 +24,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.tasks.ruleset import activate_rulesets
 
 
@@ -43,6 +44,17 @@ def handle_activation_create_conflict(activation):
                 " does not exist.",
             )
     raise api_exc.Unprocessable(detail="Integrity error.")
+
+
+def get_activation_or_raise_exception(activation_id: int) -> models.Activation:
+    activation = models.Activation.objects.filter(id=activation_id).first()
+    if not activation:
+        raise api_exc.NotFound(
+            code=status.HTTP_404_NOT_FOUND,
+            detail=f"Activation with ID={activation_id} does not exist.",
+        )
+    else:
+        return activation
 
 
 @extend_schema_view(
@@ -155,12 +167,7 @@ class ActivationViewSet(
     )
     @action(detail=True)
     def instances(self, request, pk):
-        activation_exists = models.Activation.objects.filter(pk=pk).exists()
-        if not activation_exists:
-            raise api_exc.NotFound(
-                code=status.HTTP_404_NOT_FOUND,
-                detail=f"Activation with id {pk} does not exist.",
-            )
+        get_activation_or_raise_exception(pk)
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
         )
@@ -170,6 +177,107 @@ class ActivationViewSet(
             activation_instances, many=True
         )
         return self.get_paginated_response(serializer.data)
+
+    @extend_schema(
+        description="Enable the Activation",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                None,
+                description="Activation has been enabled.",
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True)
+    def enable(self, request, pk):
+        activation = get_activation_or_raise_exception(pk)
+        if activation.is_enabled:
+            return Response(status=status.HTTP_200_OK)
+        else:
+            activation.is_enabled = True
+            activation.save(update_fields=["is_enabled"])
+            activate_rulesets.delay(
+                pk,
+                activation.execution_environment,
+                settings.DEPLOYMENT_TYPE,
+                settings.WEBSOCKET_SERVER_NAME,
+                settings.WEBSOCKET_SERVER_PORT,
+            )
+
+            return Response(status=status.HTTP_200_OK)
+
+    @extend_schema(
+        description="Disable the Activation",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                None,
+                description="Activation has been disabled.",
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True)
+    def disable(self, request, pk):
+        current_instance = (
+            models.ActivationInstance.objects.filter(pk=pk)
+            .filter(status=ActivationStatus.RUNNING)
+            .first()
+        )
+        if current_instance:
+            # TODO(doston): add logic to stop current running instance
+            raise api_exc.HttpNotImplemented(
+                detail="An instance is currently running for this Activation. "
+                "Stop function for Activations is not implemented."
+            )
+
+        activation = get_activation_or_raise_exception(pk)
+        activation.is_enabled = False
+        activation.restart_count += 1
+        activation.save(update_fields=["is_enabled", "restart_count"])
+
+        return Response(status=status.HTTP_200_OK)
+
+    @extend_schema(
+        description="Restart the Activation",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                None,
+                description="Activation restart was successful.",
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True)
+    def restart(self, request, pk):
+        activation = get_activation_or_raise_exception(pk)
+        if not activation.is_enabled:
+            raise api_exc.HttpForbidden(
+                detail="Activation is disabled and cannot be run."
+            )
+
+        instance_running = (
+            models.ActivationInstance.objects.filter(activation_id=pk)
+            .filter(status=ActivationStatus.RUNNING)
+            .exists()
+        )
+        if instance_running:
+            # TODO(doston): add logic to stop current running instance
+            raise api_exc.HttpNotImplemented(
+                detail="An instance is currently running for this Activation. "
+                "Stop function for Activations is not implemented."
+            )
+        activate_rulesets.delay(
+            pk,
+            activation.execution_environment,
+            settings.DEPLOYMENT_TYPE,
+            settings.WEBSOCKET_SERVER_NAME,
+            settings.WEBSOCKET_SERVER_PORT,
+        )
+
+        activation.restart_count += 1
+        activation.save(update_fields=["restart_count"])
+
+        return Response(status=status.HTTP_200_OK)
 
 
 @extend_schema_view(
@@ -218,7 +326,7 @@ class ActivationInstanceViewSet(
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
-                detail=f"Activation Instance with id {pk} does not exist.",
+                detail=f"Activation Instance with ID={pk} does not exist.",
             )
 
         activation_instance_logs = models.ActivationInstanceLog.objects.filter(
