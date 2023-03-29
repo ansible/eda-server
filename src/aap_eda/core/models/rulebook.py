@@ -90,3 +90,18 @@ class AuditRule(models.Model):
         "JobInstance", on_delete=models.CASCADE, null=True
     )
     definition = models.JSONField(null=False)
+
+
+class AuditEvent(models.Model):
+    class Meta:
+        db_table = "core_audit_event"
+
+    uuid = models.UUIDField(null=True)
+    source_name = models.TextField()
+    source_type = models.TextField()
+    received_at = models.DateTimeField()
+
+    # TODO: may change to many-2-many relationship later
+    audit_rule = models.ForeignKey(
+        "AuditRule", on_delete=models.CASCADE, null=True
+    )
