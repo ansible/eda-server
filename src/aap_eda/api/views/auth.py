@@ -12,17 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from django.contrib.auth import authenticate, login, logout
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import authentication, permissions, status
+from rest_framework import authentication, permissions, status, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from aap_eda.api import exceptions
+from aap_eda.api import exceptions, serializers
 from aap_eda.api.serializers import LoginSerializer
+from aap_eda.core import models
+from aap_eda.services.auth import display_permissions
 
 
 class SessionLoginView(APIView):
@@ -92,3 +95,43 @@ class SessionLogoutView(APIView):
     def post(self, request: Request, *args, **kwargs):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoleViewSet(
+    viewsets.ReadOnlyModelViewSet,
+):
+    queryset = models.Role.objects.order_by("id")
+    serializer_class = serializers.RoleSerializer
+
+    @extend_schema(
+        description="List all roles",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.RoleListSerializer,
+                description="Return a list of roles.",
+            ),
+        },
+    )
+    def list(self, _request):
+        roles = models.Role.objects.all()
+        roles_data = serializers.RoleListSerializer(roles, many=True).data
+        result = self.paginate_queryset(roles_data)
+
+        return self.get_paginated_response(result)
+
+    @extend_schema(
+        description="Retrieve a role by id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.RoleDetailSerializer,
+                description="Return a role.",
+            ),
+        },
+    )
+    def retrieve(self, _request, pk=None):
+        queryset = models.Role.objects.all()
+        role = get_object_or_404(queryset, pk=pk)
+        roles_data = serializers.RoleDetailSerializer(role).data
+        result = display_permissions(roles_data)
+
+        return Response(result)

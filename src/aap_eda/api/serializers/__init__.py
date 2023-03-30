@@ -20,7 +20,12 @@ from .activation import (
     ActivationSerializer,
     ActivationUpdateSerializer,
 )
-from .auth import LoginSerializer
+from .auth import (
+    LoginSerializer,
+    RoleDetailSerializer,
+    RoleListSerializer,
+    RoleSerializer,
+)
 from .credential import CredentialCreateSerializer, CredentialSerializer
 from .decision_environment import DecisionEnvironmentSerializer
 from .project import (
@@ -84,4 +89,8 @@ __all__ = (
     "CredentialCreateSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
+    # roles
+    "RoleSerializer",
+    "RoleListSerializer",
+    "RoleDetailSerializer",
 )
