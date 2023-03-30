@@ -57,6 +57,8 @@ TEST_RULESETS_SAMPLE = """
         debug:
 """.strip()
 
+DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
+
 
 @dataclass
 class InitData:
@@ -363,8 +365,8 @@ def test_list_actions(client: APIClient, init_db):
         "fired_date",
         "definition",
         "created_at",
-        "rule",
-        "ruleset",
+        "rule_uuid",
+        "ruleset_uuid",
         "activation_instance",
         "job_instance",
     ]
@@ -418,11 +420,9 @@ def init_db():
     )
     action = models.AuditRule.objects.create(
         name="test_action",
-        description="test action",
         fired_date="2023-03-23T01:36:36.835248Z",
-        definition={"action": "run_playbook"},
-        rule=rule,
-        ruleset=ruleset,
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
     )
 
     return InitData(
@@ -478,11 +478,9 @@ def init_db_multiple_rulesets():
 
     action = models.AuditRule.objects.create(
         name="test_action",
-        description="test action",
         fired_date="2023-03-23T01:36:36.835248Z",
-        definition={"action": "run_playbook"},
-        rule=rule,
-        ruleset=rulesets[0],
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
     )
 
     return InitData(

@@ -23,7 +23,14 @@ from .job import (
     JobInstanceHost,
 )
 from .project import ExtraVar, Playbook, Project
-from .rulebook import AuditEvent, AuditRule, Rule, Rulebook, Ruleset
+from .rulebook import (
+    AuditAction,
+    AuditEvent,
+    AuditRule,
+    Rule,
+    Rulebook,
+    Ruleset,
+)
 from .user import AwxToken, User
 
 __all__ = [
@@ -31,6 +38,7 @@ __all__ = [
     "ActivationInstanceLog",
     "ActivationInstance",
     "Activation",
+    "AuditAction",
     "AuditEvent",
     "AuditRule",
     "ExtraVar",

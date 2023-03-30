@@ -205,8 +205,8 @@ class AuditRuleSerializer(serializers.ModelSerializer):
     )
 
     definition = serializers.JSONField(
-        required=True,
-        help_text="The action in the rule",
+        required=False,
+        help_text="The action definition in the rule",
     )
 
     class Meta:

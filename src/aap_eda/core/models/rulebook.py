@@ -79,17 +79,33 @@ class AuditRule(models.Model):
     name = models.TextField(null=False)
     description = models.TextField()
     status = models.TextField()
-    fired_date = models.DateTimeField(null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
-    rule = models.ForeignKey("Rule", on_delete=models.CASCADE, null=True)
-    ruleset = models.ForeignKey("Ruleset", on_delete=models.CASCADE, null=True)
+    fired_date = models.DateTimeField(auto_now_add=True, null=False)
+    rule_uuid = models.UUIDField(null=True)
+    ruleset_uuid = models.UUIDField(null=True)
     activation_instance = models.ForeignKey(
         "ActivationInstance", on_delete=models.CASCADE, null=True
     )
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.CASCADE, null=True
     )
-    definition = models.JSONField(null=False)
+    definition = models.JSONField(null=False, default=dict)
+
+
+class AuditAction(models.Model):
+    class Meta:
+        db_table = "core_audit_action"
+        unique_together = ["uuid", "name"]
+
+    uuid = models.UUIDField()
+    name = models.TextField()
+    status = models.TextField(blank=True)
+    url = models.URLField(blank=True)
+    fired_at = models.DateTimeField()
+
+    audit_rule = models.ForeignKey(
+        "AuditRule", on_delete=models.CASCADE, null=True
+    )
 
 
 class AuditEvent(models.Model):
@@ -100,8 +116,9 @@ class AuditEvent(models.Model):
     source_name = models.TextField()
     source_type = models.TextField()
     received_at = models.DateTimeField()
+    payload = models.JSONField(null=True)
 
     # TODO: may change to many-2-many relationship later
-    audit_rule = models.ForeignKey(
-        "AuditRule", on_delete=models.CASCADE, null=True
+    audit_action = models.ForeignKey(
+        "AuditAction", on_delete=models.CASCADE, null=True
     )

@@ -176,25 +176,34 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
-        activation_instance_id = message.activation_id
-        rule_name = message.rule
-        fired_date = message.run_at
-        matching_events = message.matching_events
-        status = message.status
         job_id = message.job_id
-
         job_instance = models.JobInstance.objects.filter(uuid=job_id).first()
         job_instance_id = job_instance.id if job_instance else None
 
-        audit_rule = models.AuditRule.objects.create(
-            activation_instance_id=activation_instance_id,
-            name=rule_name,
-            job_instance_id=job_instance_id,
-            fired_date=fired_date,
-            status=status,
-            definition={},  # TODO: will add back when rule/ruleset available
+        audit_rule, created = models.AuditRule.objects.get_or_create(
+            activation_instance_id=message.activation_id,
+            name=message.rule,
+            rule_uuid=message.rule_uuid,
+            ruleset_uuid=message.ruleset_uuid,
         )
+        if created:
+            audit_rule.job_instance_id = job_instance_id
+            audit_rule.status = message.status
+            audit_rule.save()
 
+            logger.info(f"Audit rule [{audit_rule.name}] is created.")
+
+        audit_action, created = models.AuditAction.objects.get_or_create(
+            uuid=message.action_uuid,
+            name=message.action,
+            status=message.status,
+            fired_at=message.run_at,
+            audit_rule_id=audit_rule.id,
+        )
+        if created:
+            logger.info(f"Audit action [{audit_action.name}] is created.")
+
+        matching_events = message.matching_events
         events = []
         for event_meta in matching_events.values():
             meta = event_meta.get("meta")
@@ -204,7 +213,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                     source_type=meta.get("source", {}).get("type"),
                     received_at=meta.get("received_at"),
                     uuid=meta.get("uuid"),
-                    audit_rule_id=audit_rule.id,
+                    payload=meta,
+                    audit_action_id=audit_action.id,
                 )
                 events.append(event)
 
