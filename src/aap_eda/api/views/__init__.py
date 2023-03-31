@@ -16,6 +16,7 @@ from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView
 from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
 from .rulebook import (
+    AuditEventViewSet,
     AuditRuleViewSet,
     RulebookViewSet,
     RulesetViewSet,
@@ -32,6 +33,7 @@ __all__ = (
     "ExtraVarViewSet",
     "PlaybookViewSet",
     "ProjectViewSet",
+    "AuditEventViewSet",
     "AuditRuleViewSet",
     "RulebookViewSet",
     "RulesetViewSet",

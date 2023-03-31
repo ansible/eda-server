@@ -204,12 +204,123 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         help_text="The fired timestamp of the rule",
     )
 
+    class Meta:
+        model = models.AuditRule
+        fields = "__all__"
+        read_only_fields = ["id", "created_at"]
+
+
+class AuditRuleOutSerializer(serializers.Serializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the fired rule",
+    )
+
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the fired rule",
+    )
+
+    status = serializers.CharField(
+        required=False,
+        help_text="Status of the fired rule",
+    )
+
+    fired_date = serializers.DateTimeField(
+        required=True,
+        help_text="The fired timestamp of the rule",
+    )
+
     definition = serializers.JSONField(
         required=False,
         help_text="The action definition in the rule",
     )
 
+    created_at = serializers.DateTimeField(
+        required=True,
+        help_text="The created timestamp of the action",
+    )
+
+    activation_id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the related Activation",
+    )
+
+    activation_name = serializers.IntegerField(
+        required=True,
+        help_text="Name of the related Activation",
+    )
+
+
+class AuditActionSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the triggered action",
+    )
+
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the action",
+    )
+
+    status = serializers.CharField(
+        required=False,
+        help_text="Status of the action",
+    )
+
+    url = serializers.URLField(
+        required=False,
+        help_text="The URL in the action",
+    )
+
+    fired_at = serializers.DateTimeField(
+        required=True,
+        help_text="The fired timestamp of the action",
+    )
+
+    uuid = serializers.UUIDField(
+        required=True,
+        help_text="UUID of the action",
+    )
+
     class Meta:
-        model = models.AuditRule
+        model = models.AuditAction
         fields = "__all__"
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id"]
+
+
+class AuditEventSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the triggered event",
+    )
+
+    source_name = serializers.CharField(
+        required=True,
+        help_text="Name of the source",
+    )
+
+    source_type = serializers.CharField(
+        required=True,
+        help_text="Type of the source",
+    )
+
+    received_at = serializers.DateTimeField(
+        required=True,
+        help_text="The received timestamp of the event",
+    )
+
+    uuid = serializers.UUIDField(
+        required=True,
+        help_text="UUID of the event",
+    )
+
+    payload = serializers.JSONField(
+        required=False,
+        help_text="The payload in the event",
+    )
+
+    class Meta:
+        model = models.AuditEvent
+        fields = "__all__"
+        read_only_fields = ["id"]

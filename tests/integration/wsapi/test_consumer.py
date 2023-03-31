@@ -215,7 +215,7 @@ async def test_handle_actions():
         "rule": "rule",
         "ruleset_uuid": DUMMY_UUID,
         "rule_uuid": DUMMY_UUID,
-        "run_at": "2023-02-27 18:11:12.566748",
+        "run_at": "2023-03-29T15:00:17.260803Z",
         "matching_events": {
             "m_1": {
                 "meta": {

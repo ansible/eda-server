@@ -54,8 +54,14 @@ def insert_rulebook_related_data(
     ]
     rule_sets = models.Ruleset.objects.bulk_create(rule_sets)
 
+    # Changed to support rules with multiple actions. Will be skipped
+    # when removing rulebook introspection.
     rules = [
-        models.Rule(name=rule["name"], action=rule["action"], ruleset=rule_set)
+        models.Rule(
+            name=rule.get("name"),
+            action=rule.get("action") or rule.get("actions", {}),
+            ruleset=rule_set,
+        )
         for rule_set, rule_set_data in zip(rule_sets, data)
         for rule in rule_set_data["rules"]
     ]
