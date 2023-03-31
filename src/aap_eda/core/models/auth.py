@@ -33,10 +33,12 @@ class Role(models.Model):
     description = models.TextField(null=False, default="")
     is_default = models.BooleanField(null=True, default=False)
 
-    users = models.ManyToManyField("User", related_name="roles")
     permissions = models.ManyToManyField("Permission", related_name="roles")
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.name}>"
 
 
 class Permission(models.Model):
@@ -57,3 +59,8 @@ class Permission(models.Model):
     action = models.TextField(
         null=False, blank=False, choices=Action.choices()
     )
+
+    def __repr__(self):
+        return (
+            f"<{self.__class__.__name__}: {self.resource_type}:{self.action}>"
+        )
