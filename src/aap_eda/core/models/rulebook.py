@@ -71,16 +71,14 @@ class AuditRule(models.Model):
         db_table = "core_audit_rule"
         indexes = [
             models.Index(fields=["name"], name="ix_audit_rule_name"),
-            models.Index(
-                fields=["fired_date"], name="ix_audit_rule_fired_date"
-            ),
+            models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ]
 
     name = models.TextField(null=False)
     description = models.TextField()
     status = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True, null=False)
-    fired_date = models.DateTimeField(auto_now_add=True, null=False)
+    fired_at = models.DateTimeField(auto_now_add=True, null=False)
     rule_uuid = models.UUIDField(null=True)
     ruleset_uuid = models.UUIDField(null=True)
     activation_instance = models.ForeignKey(

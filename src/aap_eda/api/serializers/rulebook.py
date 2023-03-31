@@ -199,7 +199,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         help_text="Status of the fired rule",
     )
 
-    fired_date = serializers.DateTimeField(
+    fired_at = serializers.DateTimeField(
         required=True,
         help_text="The fired timestamp of the rule",
     )
@@ -226,7 +226,7 @@ class AuditRuleOutSerializer(serializers.Serializer):
         help_text="Status of the fired rule",
     )
 
-    fired_date = serializers.DateTimeField(
+    fired_at = serializers.DateTimeField(
         required=True,
         help_text="The fired timestamp of the rule",
     )
@@ -246,7 +246,7 @@ class AuditRuleOutSerializer(serializers.Serializer):
         help_text="ID of the related Activation",
     )
 
-    activation_name = serializers.IntegerField(
+    activation_name = serializers.CharField(
         required=True,
         help_text="Name of the related Activation",
     )

@@ -363,7 +363,7 @@ def test_list_audit_rules(client: APIClient, init_db):
         "name",
         "description",
         "status",
-        "fired_date",
+        "fired_at",
         "created_at",
         "rule_uuid",
         "ruleset_uuid",
@@ -480,7 +480,7 @@ def init_db():
     )
     audit_rule = models.AuditRule.objects.create(
         name="test_action",
-        fired_date="2023-03-23T01:36:36.835248Z",
+        fired_at="2023-03-23T01:36:36.835248Z",
         rule_uuid=DUMMY_UUID,
         ruleset_uuid=DUMMY_UUID,
         activation_instance=activation_instance,
@@ -583,7 +583,7 @@ def init_db_multiple_rulesets():
 
     audit_rule = models.AuditRule.objects.create(
         name="test_action",
-        fired_date="2023-03-23T01:36:36.835248Z",
+        fired_at="2023-03-23T01:36:36.835248Z",
         rule_uuid=DUMMY_UUID,
         ruleset_uuid=DUMMY_UUID,
     )

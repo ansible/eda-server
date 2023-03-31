@@ -257,7 +257,7 @@ class AuditRuleViewSet(
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.AuditEventSerializer,
-                description="Return the rulebook by its id.",
+                description="Return the audit event by its id.",
             ),
         },
     ),
