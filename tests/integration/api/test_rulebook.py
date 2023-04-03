@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict
 
@@ -67,6 +68,7 @@ class InitData:
     ruleset: models.Ruleset
     rule: models.Rule
     audit_rule: models.AuditRule
+    audit_action: models.AuditAction
     audit_event: models.AuditEvent
 
 
@@ -421,7 +423,6 @@ def test_list_audit_events(client: APIClient, init_db):
     audit_events = response.data["results"]
 
     assert len(audit_events) == 4
-    assert audit_events[0]["source_name"] == "event-1"
 
 
 @pytest.mark.django_db
@@ -487,47 +488,48 @@ def init_db():
     )
 
     action_1 = models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
         name="action-1",
-        uuid=DUMMY_UUID,
         audit_rule=audit_rule,
         status="pending",
         fired_at="2023-03-30T20:59:42.042148Z",
     )
     action_2 = models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
         name="action-2",
-        uuid=DUMMY_UUID,
         audit_rule=audit_rule,
         status="pending",
         fired_at="2023-03-30T20:59:42.042148Z",
     )
-    audit_event = models.AuditEvent.objects.create(
+    audit_event_1 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
         source_name="event-1",
         source_type="type-1",
-        uuid=DUMMY_UUID,
         received_at="2023-03-30T20:59:42.042148Z",
-        audit_action=action_1,
     )
-    models.AuditEvent.objects.create(
+    audit_event_2 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
         source_name="event-2",
         source_type="type-2",
-        uuid=DUMMY_UUID,
         received_at="2023-03-30T20:59:42.042148Z",
-        audit_action=action_1,
     )
-    models.AuditEvent.objects.create(
+    audit_event_3 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
         source_name="event-3",
         source_type="type-3",
-        uuid=DUMMY_UUID,
         received_at="2023-03-30T20:59:42.042148Z",
-        audit_action=action_2,
     )
-    models.AuditEvent.objects.create(
+    audit_event_4 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
         source_name="event-2",
         source_type="type-2",
-        uuid=DUMMY_UUID,
         received_at="2023-03-30T20:59:42.042148Z",
-        audit_action=action_2,
     )
+    audit_event_1.audit_actions.add(action_1)
+    audit_event_1.audit_actions.add(action_2)
+    audit_event_2.audit_actions.add(action_1)
+    audit_event_3.audit_actions.add(action_2)
+    audit_event_4.audit_actions.add(action_2)
 
     return InitData(
         project=project,
@@ -535,7 +537,8 @@ def init_db():
         ruleset=ruleset,
         rule=rule,
         audit_rule=audit_rule,
-        audit_event=audit_event,
+        audit_action=action_1,
+        audit_event=audit_event_1,
     )
 
 
@@ -588,10 +591,18 @@ def init_db_multiple_rulesets():
         ruleset_uuid=DUMMY_UUID,
     )
 
+    audit_action = models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="action",
+        audit_rule=audit_rule,
+        status="pending",
+        fired_at="2023-03-30T20:59:42.042148Z",
+    )
+
     audit_event = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
         source_name="event-1",
         source_type="type-1",
-        uuid=DUMMY_UUID,
         received_at="2023-03-30T20:59:42.042148Z",
     )
     return InitData(
@@ -600,5 +611,6 @@ def init_db_multiple_rulesets():
         ruleset=rulesets,
         rule=rule,
         audit_rule=audit_rule,
+        audit_action=audit_action,
         audit_event=audit_event,
     )

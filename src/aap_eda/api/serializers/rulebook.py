@@ -253,9 +253,9 @@ class AuditRuleOutSerializer(serializers.Serializer):
 
 
 class AuditActionSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(
+    id = serializers.UUIDField(
         required=True,
-        help_text="ID of the triggered action",
+        help_text="UUID of the triggered action",
     )
 
     name = serializers.CharField(
@@ -278,11 +278,6 @@ class AuditActionSerializer(serializers.ModelSerializer):
         help_text="The fired timestamp of the action",
     )
 
-    uuid = serializers.UUIDField(
-        required=True,
-        help_text="UUID of the action",
-    )
-
     class Meta:
         model = models.AuditAction
         fields = "__all__"
@@ -290,9 +285,9 @@ class AuditActionSerializer(serializers.ModelSerializer):
 
 
 class AuditEventSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(
+    id = serializers.UUIDField(
         required=True,
-        help_text="ID of the triggered event",
+        help_text="UUID of the triggered event",
     )
 
     source_name = serializers.CharField(
@@ -308,11 +303,6 @@ class AuditEventSerializer(serializers.ModelSerializer):
     received_at = serializers.DateTimeField(
         required=True,
         help_text="The received timestamp of the event",
-    )
-
-    uuid = serializers.UUIDField(
-        required=True,
-        help_text="UUID of the event",
     )
 
     payload = serializers.JSONField(
