@@ -27,6 +27,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
+from aap_eda.core.enums import Action, ResourceType
 from aap_eda.services.rulebook import build_fired_stats, build_ruleset_out_data
 
 
@@ -58,6 +59,8 @@ class RulebookViewSet(
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulebookFilter
 
+    rbac_action = None
+
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
         request=None,
@@ -69,6 +72,7 @@ class RulebookViewSet(
         detail=True,
         queryset=models.Ruleset.objects.order_by("id"),
         filterset_class=filters.RulesetFilter,
+        rbac_action=Action.READ,
     )
     def rulesets(self, request, pk):
         rulebook = get_object_or_404(models.Rulebook, pk=pk)
@@ -91,7 +95,7 @@ class RulebookViewSet(
         request=None,
         responses={status.HTTP_200_OK: serializers.RulebookSerializer},
     )
-    @action(detail=True)
+    @action(detail=True, rbac_action=Action.READ)
     def json(self, request, pk):
         rulebook = get_object_or_404(models.Rulebook, pk=pk)
         data = serializers.RulebookSerializer(rulebook).data
@@ -107,6 +111,9 @@ class RulesetViewSet(
     serializer_class = serializers.RulesetSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulesetFilter
+
+    rbac_action = None
+    rbac_resource_type = ResourceType.RULEBOOK
 
     @extend_schema(
         description="Get the ruleset by its id",
@@ -152,7 +159,7 @@ class RulesetViewSet(
         request=None,
         responses={status.HTTP_200_OK: serializers.RuleSerializer(many=True)},
     )
-    @action(detail=True)
+    @action(detail=True, rbac_action=Action.READ)
     def rules(self, _request, pk):
         ruleset = get_object_or_404(models.Ruleset, pk=pk)
         rules = models.Rule.objects.filter(ruleset=ruleset).order_by("id")
@@ -168,6 +175,8 @@ class AuditRuleViewSet(
 ):
     queryset = models.AuditRule.objects.order_by("id")
     serializer_class = serializers.AuditRuleSerializer
+    rbac_resource_type = "audit_rule"
+    rbac_action = None
 
     @extend_schema(
         description="Get the fired rule by its id",
@@ -213,7 +222,7 @@ class AuditRuleViewSet(
             status.HTTP_200_OK: serializers.AuditActionSerializer(many=True)
         },
     )
-    @action(detail=True)
+    @action(detail=True, rbac_action=Action.READ)
     def actions(self, _request, pk):
         audit_rule = get_object_or_404(models.AuditRule, pk=pk)
         audit_actions = models.AuditAction.objects.filter(
@@ -233,7 +242,11 @@ class AuditRuleViewSet(
             status.HTTP_200_OK: serializers.AuditEventSerializer(many=True)
         },
     )
-    @action(detail=True)
+    @action(
+        detail=True,
+        rbac_resource_type=ResourceType.AUDIT_EVENT,
+        rbac_action=Action.READ,
+    )
     def events(self, _request, pk):
         audit_rule = get_object_or_404(models.AuditRule, pk=pk)
         audit_actions = models.AuditAction.objects.filter(
@@ -277,12 +290,16 @@ class AuditEventViewSet(
     queryset = models.AuditEvent.objects.order_by("id")
     serializer_class = serializers.AuditEventSerializer
 
+    rbac_resource_type = ResourceType.AUDIT_RULE
+
 
 class RuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.Rule.objects.order_by("id")
     serializer_class = serializers.RuleSerializer
+
+    rbac_resource_type = ResourceType.RULEBOOK
 
     @extend_schema(
         description="Get the rule by its id",

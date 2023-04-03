@@ -58,7 +58,12 @@ def test_create_playbook_not_allowed(client: APIClient):
         "playbook": TEST_PLAYBOOK,
     }
     response = client.post(f"{api_url_v1}/playbooks/", data=data_in)
-    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    # NOTE(cutwater): The resource code is 403 Forbidden here, because
+    #   permission checks are executed in DRF before the view method
+    #   is resolved for the HTTP request. Instead of adding special case
+    #   in RoleBasedPermission, we will return 403 Forbidden for now.
+    #   This behavior may be revisited in future.
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -67,4 +72,4 @@ def test_destroy_playbook_not_allowed(client: APIClient):
         name="test-playbook.yml", playbook=TEST_PLAYBOOK
     )
     response = client.delete(f"{api_url_v1}/playbooks/{obj.id}/")
-    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    assert response.status_code == status.HTTP_403_FORBIDDEN
