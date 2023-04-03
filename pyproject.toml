@@ -80,7 +80,10 @@ line_length = 79
 
 [tool.ruff]
 line-length = 79
-extend-select = [
+select = [
+    "E",
+    "F",
+    "D",        # flake8-docstrings
     "TID",      # flake8-tidy-imports
 ]
 extend-ignore = [
@@ -93,3 +96,6 @@ extend-ignore = [
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"
+
+[tool.ruff.pydocstyle]
+convention = "pep257"
