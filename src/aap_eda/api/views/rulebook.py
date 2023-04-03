@@ -163,17 +163,32 @@ class RulesetViewSet(
         return self.get_paginated_response(serializer.data)
 
 
-@extend_schema_view(
-    retrieve=extend_schema(
+class AuditRuleViewSet(
+    viewsets.ReadOnlyModelViewSet,
+):
+    queryset = models.AuditRule.objects.order_by("id")
+    serializer_class = serializers.AuditRuleSerializer
+
+    @extend_schema(
         description="Get the fired rule by its id",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.AuditRuleSerializer,
+                serializers.AuditRuleOutSerializer,
                 description="Return the fired rule by its id.",
             ),
         },
-    ),
-    list=extend_schema(
+    )
+    def retrieve(self, _request, pk=None):
+        audit_rule = get_object_or_404(models.AuditRule, pk=pk)
+        activation = audit_rule.activation_instance.activation
+
+        data = serializers.AuditRuleSerializer(audit_rule).data
+        data["activation_id"] = activation.id
+        data["activation_name"] = activation.name
+
+        return Response(data)
+
+    @extend_schema(
         description="List all fired rules",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
@@ -181,14 +196,84 @@ class RulesetViewSet(
                 description="Return a list of fired rules.",
             ),
         },
+    )
+    def list(self, _request):
+        audit_rules = models.AuditRule.objects.order_by("id")
+        results = self.filter_queryset(audit_rules)
+
+        results = self.paginate_queryset(results)
+        serializer = serializers.AuditRuleSerializer(results, many=True)
+
+        return self.get_paginated_response(serializer.data)
+
+    @extend_schema(
+        description="Action list of a fired rule by its id",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.AuditActionSerializer(many=True)
+        },
+    )
+    @action(detail=True)
+    def actions(self, _request, pk):
+        audit_rule = get_object_or_404(models.AuditRule, pk=pk)
+        audit_actions = models.AuditAction.objects.filter(
+            audit_rule=audit_rule
+        ).order_by("id")
+
+        results = self.paginate_queryset(audit_actions)
+        serializer = serializers.AuditActionSerializer(results, many=True)
+
+        return self.get_paginated_response(serializer.data)
+
+    @extend_schema(
+        description="Event list of a fired rule by its id",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.AuditEventSerializer(many=True)
+        },
+    )
+    @action(detail=True)
+    def events(self, _request, pk):
+        audit_rule = get_object_or_404(models.AuditRule, pk=pk)
+        audit_actions = models.AuditAction.objects.filter(
+            audit_rule=audit_rule
+        ).order_by("id")
+
+        eqs = models.AuditEvent.objects.none()
+        for audit_action in audit_actions:
+            eqs = eqs.union(audit_action.audit_events.all())
+
+        results = self.paginate_queryset(eqs.order_by("id"))
+        serializer = serializers.AuditEventSerializer(results, many=True)
+
+        return self.get_paginated_response(serializer.data)
+
+
+@extend_schema_view(
+    retrieve=extend_schema(
+        description="Get the audit event by its id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.AuditEventSerializer,
+                description="Return the audit event by its id.",
+            ),
+        },
+    ),
+    list=extend_schema(
+        description="List all audit events",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.AuditEventSerializer,
+                description="Return a list of audit events.",
+            ),
+        },
     ),
 )
-class AuditRuleViewSet(
+class AuditEventViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.AuditRule.objects.order_by("id")
-    serializer_class = serializers.AuditRuleSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    queryset = models.AuditEvent.objects.order_by("id")
+    serializer_class = serializers.AuditEventSerializer
 
 
 class RuleViewSet(

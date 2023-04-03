@@ -27,10 +27,13 @@ class EndOfResponse(BaseModel):
 
 class ActionMessage(Message):
     action: str
+    action_uuid: str
     activation_id: int
     run_at: str
     ruleset: str
+    ruleset_uuid: str
     rule: str
+    rule_uuid: str
     matching_events: dict = {}
     status: Optional[str] = ""
     playbook_name: Optional[str]

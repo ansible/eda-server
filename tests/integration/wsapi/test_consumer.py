@@ -34,6 +34,8 @@ TEST_RULESETS = """
         msg: hello
 """
 
+DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_ansible_rulebook_consumer():
@@ -45,12 +47,15 @@ async def test_ansible_rulebook_consumer():
             "handle_actions": {
                 "type": "Action",
                 "action": "run_playbook",
+                "action_uuid": DUMMY_UUID,
                 "activation_id": 1,
                 "run_at": "2023-03-20T18:14:55.036753Z",
                 "playbook_name": "playbook",
                 "job_id": "uuid_1234",
                 "ruleset": "ruleset",
+                "ruleset_uuid": DUMMY_UUID,
                 "rule": "rule",
+                "rule_uuid": DUMMY_UUID,
                 "rc": 0,
                 "status": "succeeded",
             }
@@ -203,19 +208,55 @@ async def test_handle_actions():
     payload = {
         "type": "Action",
         "action": "run_playbook",
+        "action_uuid": DUMMY_UUID,
         "activation_id": activation_instance_id,
-        "playbook_name": "ansible.eda.hello",
         "job_id": job_instance.uuid,
         "ruleset": "ruleset",
         "rule": "rule",
-        "rc": 0,
-        "run_at": "2023-02-27 18:11:12.566748",
-        "status": "succeeded",
+        "ruleset_uuid": DUMMY_UUID,
+        "rule_uuid": DUMMY_UUID,
+        "run_at": "2023-03-29T15:00:17.260803Z",
+        "matching_events": {
+            "m_1": {
+                "meta": {
+                    "received_at": "2023-03-29T15:00:17.260803Z",
+                    "source": {
+                        "name": "my test source",
+                        "type": "ansible.eda.range",
+                    },
+                    "uuid": "523af123-2783-448f-9e2a-d33ad89b04fa",
+                },
+                "i": 7,
+            },
+            "m_0": {
+                "meta": {
+                    "received_at": "2023-03-29T15:00:17.248686Z",
+                    "source": {
+                        "name": "my test source",
+                        "type": "ansible.eda.range",
+                    },
+                    "uuid": "58d7bbfe-4205-4d25-8cc1-d7e8eea06d21",
+                },
+                "i": 3,
+            },
+        },
     }
     await communicator.send_json_to(payload)
     await communicator.disconnect()
 
     assert (await get_audit_rule_count()) == 1
+    assert (await get_audit_action_count()) == 1
+    assert (await get_audit_event_count()) == 2
+
+
+@database_sync_to_async
+def get_audit_event_count():
+    return models.AuditEvent.objects.count()
+
+
+@database_sync_to_async
+def get_audit_action_count():
+    return models.AuditAction.objects.count()
 
 
 @database_sync_to_async

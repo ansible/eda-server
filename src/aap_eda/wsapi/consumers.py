@@ -176,62 +176,61 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
-        activation_instance_id = message.activation_id
+        job_id = message.job_id
+        job_instance = models.JobInstance.objects.filter(uuid=job_id).first()
+        job_instance_id = job_instance.id if job_instance else None
 
-        if activation_instance_id:
-            action_name = message.action
-            playbook_name = message.playbook_name
-            job_id = message.job_id
-            rule_name = message.rule
-            ruleset_name = message.ruleset
-            fired_date = message.run_at
-            status = message.status
-
-            job_instance = models.JobInstance.objects.filter(
-                uuid=job_id
-            ).first()
-
-            activation_instance = models.ActivationInstance.objects.get(
-                id=activation_instance_id
-            )
-            activation = models.Activation.objects.get(
-                id=activation_instance.activation_id
-            )
-            rulesets = models.Ruleset.objects.filter(
-                name=ruleset_name,
-                rulebook_id=activation.rulebook_id,
+        audit_rule = models.AuditRule.objects.filter(
+            rule_uuid=message.rule_uuid
+        ).first()
+        if audit_rule is None:
+            audit_rule = models.AuditRule.objects.create(
+                activation_instance_id=message.activation_id,
+                name=message.rule,
+                rule_uuid=message.rule_uuid,
+                ruleset_uuid=message.ruleset_uuid,
+                fired_at=message.run_at,
+                job_instance_id=job_instance_id,
+                status=message.status,
             )
 
-            rules = models.Rule.objects.filter(
-                name=rule_name,
-                ruleset_id__in=[ruleset.id for ruleset in rulesets],
+            logger.info(f"Audit rule [{audit_rule.name}] is created.")
+
+        audit_action = models.AuditAction.objects.filter(
+            id=message.action_uuid
+        ).first()
+
+        if audit_action is None:
+            audit_action = models.AuditAction.objects.create(
+                id=message.action_uuid,
+                fired_at=message.run_at,
+                name=message.action,
+                status=message.status,
+                audit_rule_id=audit_rule.id,
             )
 
-            audit_rules = []
-            job_instance_id = job_instance.id if job_instance else None
+            logger.info(f"Audit action [{audit_action.name}] is created.")
 
-            for rule in rules:
-                if playbook_name:
-                    if playbook_name != rule.action.get(action_name, {}).get(
-                        "name"
-                    ):
-                        continue
+        matching_events = message.matching_events
+        for event_meta in matching_events.values():
+            meta = event_meta.get("meta")
+            if meta:
+                audit_event = models.AuditEvent.objects.filter(
+                    id=meta.get("uuid")
+                ).first()
 
-                audit_rule = models.AuditRule(
-                    activation_instance_id=activation_instance_id,
-                    ruleset_id=rule.ruleset_id,
-                    rule_id=rule.id,
-                    name=rule.name,
-                    definition=rule.action,
-                    job_instance_id=job_instance_id,
-                    fired_date=fired_date,
-                    status=status,
-                )
-                audit_rules.append(audit_rule)
+                if audit_event is None:
+                    audit_event = models.AuditEvent.objects.create(
+                        id=meta.get("uuid"),
+                        source_name=meta.get("source", {}).get("name"),
+                        source_type=meta.get("source", {}).get("type"),
+                        payload=meta,
+                        received_at=meta.get("received_at"),
+                    )
+                    audit_event.audit_actions.add(audit_action),
+                    audit_event.save()
 
-            if len(audit_rules) > 0:
-                models.AuditRule.objects.bulk_create(audit_rules)
-                logger.info(f"{len(audit_rules)} audit rules are created.")
+                    logger.info(f"Audit event [{audit_event.id}] is created.")
 
     @database_sync_to_async
     def insert_job_related_data(

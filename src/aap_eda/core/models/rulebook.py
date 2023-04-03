@@ -71,22 +71,51 @@ class AuditRule(models.Model):
         db_table = "core_audit_rule"
         indexes = [
             models.Index(fields=["name"], name="ix_audit_rule_name"),
-            models.Index(
-                fields=["fired_date"], name="ix_audit_rule_fired_date"
-            ),
+            models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ]
 
     name = models.TextField(null=False)
     description = models.TextField()
     status = models.TextField()
-    fired_date = models.DateTimeField(null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
-    rule = models.ForeignKey("Rule", on_delete=models.CASCADE, null=True)
-    ruleset = models.ForeignKey("Ruleset", on_delete=models.CASCADE, null=True)
+    fired_at = models.DateTimeField(null=False)
+    rule_uuid = models.UUIDField(null=True)
+    ruleset_uuid = models.UUIDField(null=True)
     activation_instance = models.ForeignKey(
         "ActivationInstance", on_delete=models.CASCADE, null=True
     )
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.CASCADE, null=True
     )
-    definition = models.JSONField(null=False)
+    definition = models.JSONField(null=False, default=dict)
+
+
+class AuditAction(models.Model):
+    class Meta:
+        db_table = "core_audit_action"
+        unique_together = ["id", "name"]
+
+    id = models.UUIDField(primary_key=True)
+    name = models.TextField()
+    status = models.TextField(blank=True)
+    url = models.URLField(blank=True)
+    fired_at = models.DateTimeField()
+
+    audit_rule = models.ForeignKey(
+        "AuditRule", on_delete=models.CASCADE, null=True
+    )
+
+
+class AuditEvent(models.Model):
+    class Meta:
+        db_table = "core_audit_event"
+
+    id = models.UUIDField(primary_key=True)
+    source_name = models.TextField()
+    source_type = models.TextField()
+    received_at = models.DateTimeField()
+    payload = models.JSONField(null=True)
+
+    audit_actions = models.ManyToManyField(
+        "AuditAction", related_name="audit_events"
+    )

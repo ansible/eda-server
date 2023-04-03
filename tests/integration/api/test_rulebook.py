@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict
 
@@ -57,6 +58,8 @@ TEST_RULESETS_SAMPLE = """
         debug:
 """.strip()
 
+DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
+
 
 @dataclass
 class InitData:
@@ -64,7 +67,9 @@ class InitData:
     rulebook: models.Rulebook
     ruleset: models.Ruleset
     rule: models.Rule
-    action: models.AuditRule
+    audit_rule: models.AuditRule
+    audit_action: models.AuditAction
+    audit_event: models.AuditEvent
 
 
 # ------------------------------------------
@@ -345,44 +350,94 @@ def test_retrieve_rule_not_exist(client: APIClient):
 
 
 # ------------------------------------------
-# Test Action:
+# Test Audit Rule:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_actions(client: APIClient, init_db):
-    response = client.get(f"{api_url_v1}/actions/")
+def test_list_audit_rules(client: APIClient, init_db):
+    response = client.get(f"{api_url_v1}/audit-rules/")
     assert response.status_code == status.HTTP_200_OK
-    actions = response.data["results"]
+    audit_rules = response.data["results"]
 
-    assert len(actions) == 1
-    assert actions[0]["name"] == "test_action"
-    assert list(actions[0]) == [
+    assert len(audit_rules) == 1
+    assert audit_rules[0]["name"] == "test_action"
+    assert list(audit_rules[0]) == [
         "id",
         "name",
         "description",
         "status",
-        "fired_date",
-        "definition",
+        "fired_at",
         "created_at",
-        "rule",
-        "ruleset",
+        "rule_uuid",
+        "ruleset_uuid",
+        "definition",
         "activation_instance",
         "job_instance",
     ]
 
 
 @pytest.mark.django_db
-def test_retrieve_action(client: APIClient, init_db):
-    action_id = init_db.action.id
+def test_retrieve_audit_rule(client: APIClient, init_db):
+    audit_rule_id = init_db.audit_rule.id
 
-    response = client.get(f"{api_url_v1}/actions/{action_id}/")
+    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "test_action"
 
 
 @pytest.mark.django_db
-def test_retrieve_action_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/actions/42/")
+def test_retrieve_audit_rule_not_exist(client: APIClient):
+    response = client.get(f"{api_url_v1}/audit-rules/42/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_list_actions_from_audit_rule(client: APIClient, init_db):
+    audit_rule_id = init_db.audit_rule.id
+
+    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/")
+    assert response.status_code == status.HTTP_200_OK
+
+    actions = response.data["results"]
+    assert len(actions) == 2
+
+
+@pytest.mark.django_db
+def test_list_events_from_audit_rule(client: APIClient, init_db):
+    audit_rule_id = init_db.audit_rule.id
+
+    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/events/")
+    assert response.status_code == status.HTTP_200_OK
+
+    events = response.data["results"]
+    assert len(events) == 4
+
+
+# ------------------------------------------
+# Test Audit Event:
+# ------------------------------------------
+@pytest.mark.django_db
+def test_list_audit_events(client: APIClient, init_db):
+    response = client.get(f"{api_url_v1}/audit-events/")
+    assert response.status_code == status.HTTP_200_OK
+    audit_events = response.data["results"]
+
+    assert len(audit_events) == 4
+
+
+@pytest.mark.django_db
+def test_retrieve_audit_event(client: APIClient, init_db):
+    audit_event_id = init_db.audit_event.id
+
+    response = client.get(f"{api_url_v1}/audit-events/{audit_event_id}/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["source_name"] == "event-1"
+
+
+@pytest.mark.django_db
+def test_retrieve_audit_event_not_exist(client: APIClient):
+    response = client.get(f"{api_url_v1}/audit-events/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -416,21 +471,74 @@ def init_db():
         action={"run_playbook": {"name": "ansible.eda.hello"}},
         ruleset=ruleset,
     )
-    action = models.AuditRule.objects.create(
-        name="test_action",
-        description="test action",
-        fired_date="2023-03-23T01:36:36.835248Z",
-        definition={"action": "run_playbook"},
-        rule=rule,
-        ruleset=ruleset,
+    activation = models.Activation.objects.create(
+        name="test-activation",
+        rulebook=rulebook,
+        project=project,
     )
+    activation_instance = models.ActivationInstance.objects.create(
+        activation=activation,
+    )
+    audit_rule = models.AuditRule.objects.create(
+        name="test_action",
+        fired_at="2023-03-23T01:36:36.835248Z",
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
+        activation_instance=activation_instance,
+    )
+
+    action_1 = models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="action-1",
+        audit_rule=audit_rule,
+        status="pending",
+        fired_at="2023-03-30T20:59:42.042148Z",
+    )
+    action_2 = models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="action-2",
+        audit_rule=audit_rule,
+        status="pending",
+        fired_at="2023-03-30T20:59:42.042148Z",
+    )
+    audit_event_1 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="event-1",
+        source_type="type-1",
+        received_at="2023-03-30T20:59:42.042148Z",
+    )
+    audit_event_2 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="event-2",
+        source_type="type-2",
+        received_at="2023-03-30T20:59:42.042148Z",
+    )
+    audit_event_3 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="event-3",
+        source_type="type-3",
+        received_at="2023-03-30T20:59:42.042148Z",
+    )
+    audit_event_4 = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="event-2",
+        source_type="type-2",
+        received_at="2023-03-30T20:59:42.042148Z",
+    )
+    audit_event_1.audit_actions.add(action_1)
+    audit_event_1.audit_actions.add(action_2)
+    audit_event_2.audit_actions.add(action_1)
+    audit_event_3.audit_actions.add(action_2)
+    audit_event_4.audit_actions.add(action_2)
 
     return InitData(
         project=project,
         rulebook=rulebook,
         ruleset=ruleset,
         rule=rule,
-        action=action,
+        audit_rule=audit_rule,
+        audit_action=action_1,
+        audit_event=audit_event_1,
     )
 
 
@@ -476,19 +584,33 @@ def init_db_multiple_rulesets():
         ruleset=rulesets[2],
     )
 
-    action = models.AuditRule.objects.create(
+    audit_rule = models.AuditRule.objects.create(
         name="test_action",
-        description="test action",
-        fired_date="2023-03-23T01:36:36.835248Z",
-        definition={"action": "run_playbook"},
-        rule=rule,
-        ruleset=rulesets[0],
+        fired_at="2023-03-23T01:36:36.835248Z",
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
     )
 
+    audit_action = models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="action",
+        audit_rule=audit_rule,
+        status="pending",
+        fired_at="2023-03-30T20:59:42.042148Z",
+    )
+
+    audit_event = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="event-1",
+        source_type="type-1",
+        received_at="2023-03-30T20:59:42.042148Z",
+    )
     return InitData(
         project=project,
         rulebook=rulebook,
         ruleset=rulesets,
         rule=rule,
-        action=action,
+        audit_rule=audit_rule,
+        audit_action=audit_action,
+        audit_event=audit_event,
     )
