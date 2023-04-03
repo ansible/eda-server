@@ -13,6 +13,7 @@
 #  limitations under the License.
 from django.conf import settings
 from django.db import IntegrityError
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -44,17 +45,6 @@ def handle_activation_create_conflict(activation):
                 " does not exist.",
             )
     raise api_exc.Unprocessable(detail="Integrity error.")
-
-
-def get_activation_or_raise_exception(activation_id: int) -> models.Activation:
-    activation = models.Activation.objects.filter(id=activation_id).first()
-    if not activation:
-        raise api_exc.NotFound(
-            code=status.HTTP_404_NOT_FOUND,
-            detail=f"Activation with ID={activation_id} does not exist.",
-        )
-    else:
-        return activation
 
 
 @extend_schema_view(
@@ -167,11 +157,16 @@ class ActivationViewSet(
     )
     @action(detail=True)
     def instances(self, request, pk):
-        get_activation_or_raise_exception(pk)
+        activation_exists = models.Activation.objects.filter(id=pk).exists()
+        if not activation_exists:
+            raise api_exc.NotFound(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Activation with ID={pk} does not exist.",
+            )
+
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
         )
-
         activation_instances = self.paginate_queryset(activation_instances)
         serializer = serializers.ActivationInstanceSerializer(
             activation_instances, many=True
@@ -190,7 +185,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True)
     def enable(self, request, pk):
-        activation = get_activation_or_raise_exception(pk)
+        activation = get_object_or_404(models.Activation, pk=pk)
         if activation.is_enabled:
             return Response(status=status.HTTP_200_OK)
         else:
@@ -230,7 +225,7 @@ class ActivationViewSet(
                 "Stop function for Activations is not implemented."
             )
 
-        activation = get_activation_or_raise_exception(pk)
+        activation = get_object_or_404(models.Activation, pk=pk)
         activation.is_enabled = False
         activation.restart_count += 1
         activation.save(update_fields=["is_enabled", "restart_count"])
@@ -249,7 +244,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True)
     def restart(self, request, pk):
-        activation = get_activation_or_raise_exception(pk)
+        activation = get_object_or_404(models.Activation, pk=pk)
         if not activation.is_enabled:
             raise api_exc.HttpForbidden(
                 detail="Activation is disabled and cannot be run."
