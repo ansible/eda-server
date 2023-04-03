@@ -48,3 +48,15 @@ class Unprocessable(APIException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     default_code = "unprocessable"
     default_detail = _("Unprocessable.")
+
+
+class HttpNotImplemented(APIException):
+    status_code = status.HTTP_501_NOT_IMPLEMENTED
+    default_code = "not_implemented"
+    default_detail = _("Not implemented.")
+
+
+class HttpForbidden(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = "forbidden"
+    default_detail = _("Forbidden.")

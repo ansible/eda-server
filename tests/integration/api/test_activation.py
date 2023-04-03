@@ -225,6 +225,40 @@ def test_delete_activation(client: APIClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
+@pytest.mark.django_db
+def test_restart_activation(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    response = client.post(
+        f"{api_url_v1}/activations/{activation.id}/restart/"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_enable_activation(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    response = client.post(f"{api_url_v1}/activations/{activation.id}/enable/")
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_disable_activation(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    response = client.post(
+        f"{api_url_v1}/activations/{activation.id}/disable/"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
