@@ -56,8 +56,9 @@ class ProjectImportService:
                 self._perform_import(project)
                 project.import_state = models.Project.ImportState.COMPLETED
                 project.save()
-        except Exception:
+        except Exception as e:
             project.import_state = models.Project.ImportState.FAILED
+            project.import_error = str(e)
             project.save()
             raise
 

@@ -25,6 +25,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "url",
             "git_hash",
             "import_state",
+            "import_error",
             "import_task_id",
             "created_at",
             "modified_at",
