@@ -168,8 +168,6 @@ class ActivateRulesets:
         # execute job
         asyncio.run(
             k8s.run_activation_job(
-                job_name=job_name,
-                job_spec=job_spec,
-                namespace=namespace
+                job_name=job_name, job_spec=job_spec, namespace=namespace
             )
         )
