@@ -20,3 +20,4 @@ __pycache__/
 .task/
 Taskfile.yml
 Taskfile.yaml
+/tools/deploy/environment.properties

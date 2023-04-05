@@ -11,9 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import asyncio
 import logging
 import shutil
+import uuid
 from enum import Enum
 from typing import Optional
 
@@ -22,10 +23,11 @@ from django.utils import timezone
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
+from .activation_kubernetes import ActivationKubernetes
 from .ansible_rulebook import AnsibleRulebookService
 
 logger = logging.getLogger(__name__)
-LOCAL_WS_ADDRESS = "ws://{host}:{port}/api/eda/ws/ansible-rulebook"
+WS_ADDRESS = "ws://{host}:{port}/api/eda/ws/ansible-rulebook"
 
 
 class ActivateRulesetsFailed(Exception):
@@ -46,7 +48,7 @@ class ActivateRulesets:
     def activate(
         self,
         activation_id: int,
-        execution_environment: str,
+        decision_environment: str,
         deployment_type: str,
         host: str,
         port: int,
@@ -61,15 +63,19 @@ class ActivateRulesets:
 
             if dtype == DeploymentType.LOCAL:
                 self.activate_in_local(
-                    LOCAL_WS_ADDRESS.format(host=host, port=port), instance.id
+                    WS_ADDRESS.format(host=host, port=port), instance.id
                 )
             elif (
                 dtype == DeploymentType.PODMAN
                 or dtype == DeploymentType.DOCKER
             ):
                 self.activate_in_docker_podman()
+
             elif dtype == DeploymentType.K8S:
-                logger.error(f"{deployment_type} is not implemented yet")
+                logger.info(f"Activation DeploymentType: {dtype}")
+                self.activate_in_k8s(
+                    WS_ADDRESS.format(host=host, port=port), instance.id
+                )
             else:
                 raise ActivateRulesetsFailed(f"Unsupported {deployment_type}")
 
@@ -120,3 +126,50 @@ class ActivateRulesets:
     # TODO(hsong) implement later
     def activate_in_docker_podman():
         pass
+
+    def activate_in_k8s(
+        self,
+        url: str,
+        activation_instance_id: str,
+    ) -> None:
+        k8s = ActivationKubernetes()
+
+        # TODO: These DE values will be configurable(passed in)
+        # Decision Environment (DE)
+        _decision_environment = "quay.io/ansible/ansible-rulebook:main"
+        _decision_environment_name = "ansible-rulebook"
+        _pull_policy = "Always"
+
+        ns_fileref = open(
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
+        )
+        namespace = ns_fileref.read()
+        ns_fileref.close()
+
+        guid = uuid.uuid4()
+        job_name = f"activation-job-{guid}"
+        pod_name = f"activation-pod-{guid}"
+
+        # build out container,pod,job specs
+        container_spec = k8s.create_container(
+            image=_decision_environment,
+            name=_decision_environment_name,
+            pull_policy=_pull_policy,
+            url=url,
+            activation_id=activation_instance_id,
+        )
+        pod_spec = k8s.create_pod_template(
+            pod_name=pod_name, container=container_spec
+        )
+        job_spec = k8s.create_job(
+            job_name=job_name, pod_template=pod_spec, ttl=30
+        )
+
+        # execute job
+        asyncio.run(
+            k8s.run_activation_job(
+                job_name=job_name,
+                job_spec=job_spec,
+                namespace=namespace
+            )
+        )

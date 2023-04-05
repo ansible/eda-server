@@ -113,7 +113,7 @@ def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
 
     ActivateRulesets().activate(
         activation_id=activation.id,
-        execution_environment="quay.io/ansible-rulebook",
+        decision_environment="quay.io/ansible/ansible-rulebook",
         deployment_type="local",
         host="localhost",
         port="8000",
@@ -136,7 +136,7 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
 
     ActivateRulesets().activate(
         activation_id=activation.id,
-        execution_environment="quay.io/ansible-rulebook",
+        decision_environment="quay.io/ansible/ansible-rulebook",
         deployment_type="bad_type",
         host="localhost",
         port="8000",
