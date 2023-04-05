@@ -33,6 +33,33 @@ spec:
               value: eda-redis
             - name: EDA_ALLOWED_HOSTS
               value: "['*']"
+            - name: EDA_DEPLOYMENT_TYPE
+              value: k8s
+            - name: EDA_WEBSOCKET_SERVER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_WEBSOCKET_SERVER_NAME
+            - name: EDA_WEBSOCKET_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_WEBSOCKET_SERVER_PORT
+            - name: EDA_CONTROLLER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_URL
+            - name: EDA_CONTROLLER_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_TOKEN
+            - name: EDA_CONTROLLER_SSL_VERIFY
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
           imagePullPolicy: Never
           name: eda-api
