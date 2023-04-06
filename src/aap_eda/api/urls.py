@@ -39,6 +39,7 @@ router.register(
     views.CurrentUserAwxTokensViewSet,
     basename="controller-token",
 )
+router.register("credentials", views.CredentialViewSet)
 
 openapi_urls = [
     path(
