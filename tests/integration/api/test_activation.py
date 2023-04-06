@@ -38,6 +38,7 @@ TEST_ACTIVATION = {
 }
 
 TEST_PROJECT = {
+    "git_hash": "684f62df18ce5f8d5c428e53203b9b975426eed0",
     "name": "test-project-01",
     "url": "https://git.example.com/acme/project-01",
     "description": "test project",
@@ -69,6 +70,7 @@ collections:
 
 def create_activation_related_data():
     project_id = models.Project.objects.create(
+        git_hash=TEST_PROJECT["git_hash"],
         name=TEST_PROJECT["name"],
         url=TEST_PROJECT["url"],
         description=TEST_PROJECT["description"],
