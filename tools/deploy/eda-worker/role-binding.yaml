@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eda-activation-rb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eda-activation-job
+subjects:
+- kind: ServiceAccount
+  name: eda-activation-sa
+  namespace: aap-eda

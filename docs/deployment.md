@@ -79,21 +79,36 @@ Minikube is the recommended method for macOS users
 
 ### Deployment steps
 
-1. Start minikube if it is not already running:
+1. Copy environment properties example file to default location
 
-    minikube start
+   ```shell
+   cp ./tools/deploy/environment.properties.example ./tools/deploy/environment.properties
+   ```
 
-2. Ensure minikube instance is up and running:
+2. Edit ./tools/deploy/environment.properties file and add your values.
+   
+3. Start minikube if it is not already running:
 
-    minikube status
+   ```shell
+   minikube start
+   ```
+   
+4. Ensure minikube instance is up and running:
 
-3. Run the deployment:
+   ```shell
+   minikube status
+   ```
 
-    task minikube:all
+5. Run the deployment:
 
-4. Forward the webserver port to the localhost:
+   ```shell
+   task minikube:all
+   ```
+6. Forward the webserver port to the localhost:
 
-    task minikube:fp:ui
+   ```shell
+   task minikube:fp:ui
+   ```
 
 **Note**: For fedora, the binary may be `go-task`.
 
