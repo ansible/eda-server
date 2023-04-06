@@ -42,7 +42,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 class ProjectRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
-        fields = ["id", "url", "name", "description"]
+        fields = ["id", "git_hash", "url", "name", "description"]
         read_only_fields = ["id"]
 
 
