@@ -48,7 +48,6 @@ class ActivateRulesets:
     def activate(
         self,
         activation_id: int,
-        decision_environment: str,
         deployment_type: str,
         host: str,
         port: int,
