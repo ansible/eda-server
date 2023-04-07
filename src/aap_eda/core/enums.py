@@ -76,4 +76,6 @@ class ActivationStatus(DjangoEnum):
 
 
 class CredentialType(DjangoEnum):
-    REGISTRY = "registry"
+    REGISTRY = "Container Registry"
+    GITHUB = "GitHub Personal Access Token"
+    GITLAB = "GitLab Personal Access Token"
