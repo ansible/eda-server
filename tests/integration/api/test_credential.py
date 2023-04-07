@@ -20,6 +20,7 @@ def test_list_credentials(client: APIClient):
     assert result == {
         "name": "credential1",
         "description": "",
+        "username": "me",
         "credential_type": CredentialType.REGISTRY.value,
         "id": obj.id,
     }
@@ -42,6 +43,7 @@ def test_create_credential(client: APIClient):
     assert result == {
         "name": "credential1",
         "description": "desc here",
+        "username": "me",
         "credential_type": CredentialType.REGISTRY.value,
         "id": id_,
     }
@@ -63,6 +65,7 @@ def test_retrieve_credential(client: APIClient):
     assert result == {
         "name": "credential1",
         "description": "",
+        "username": "me",
         "credential_type": CredentialType.REGISTRY.value,
         "id": obj.id,
     }
@@ -88,6 +91,7 @@ def test_update_credential(client: APIClient):
     assert result == {
         "name": "credential2",
         "description": "",
+        "username": "he",
         "credential_type": CredentialType.REGISTRY.value,
         "id": obj.id,
     }
@@ -110,6 +114,7 @@ def test_partial_update_credential(client: APIClient):
     assert result == {
         "name": "credential1",
         "description": "",
+        "username": "me",
         "credential_type": CredentialType.REGISTRY.value,
         "id": obj.id,
     }

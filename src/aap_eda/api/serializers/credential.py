@@ -25,7 +25,13 @@ class CredentialSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         ]
-        fields = ["name", "description", "credential_type", *read_only_fields]
+        fields = [
+            "name",
+            "description",
+            "username",
+            "credential_type",
+            *read_only_fields,
+        ]
 
 
 class CredentialCreateSerializer(serializers.ModelSerializer):
