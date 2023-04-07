@@ -40,6 +40,7 @@ router.register(
     basename="controller-token",
 )
 router.register("credentials", views.CredentialViewSet)
+router.register("decision-environments", views.DecisionEnvironmentViewSet)
 
 openapi_urls = [
     path(
