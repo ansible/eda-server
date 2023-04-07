@@ -14,6 +14,7 @@
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView
+from .credential import CredentialViewSet
 from .project import ExtraVarViewSet, PlaybookViewSet, ProjectViewSet
 from .rulebook import (
     AuditEventViewSet,
@@ -46,4 +47,6 @@ __all__ = (
     # user
     "CurrentUserView",
     "CurrentUserAwxTokensViewSet",
+    # credential
+    "CredentialViewSet",
 )

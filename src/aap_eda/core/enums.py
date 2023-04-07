@@ -73,3 +73,7 @@ class ActivationStatus(DjangoEnum):
     FAILED = "failed"
     STOPPED = "stopped"
     COMPLETED = "completed"
+
+
+class CredentialType(DjangoEnum):
+    REGISTRY = "registry"
