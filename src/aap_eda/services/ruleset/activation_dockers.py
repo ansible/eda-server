@@ -35,7 +35,8 @@ class ActivationDockers:
 
         logger.info(
             f"Created container: name: {container.name}, "
-            f"image: {container.image}"
+            f"image: {container.image}, "
+            f"command: {cmd}"
         )
 
         return container

@@ -150,8 +150,8 @@ class ActivateRulesets:
         # TODO: remove this when decision environment is available
         decision_environment = "quay.io/ansible/ansible-rulebook:main"
 
-        container_svc = ActivationDockers(decision_environment)
-        container = container_svc.create_container(url, activation_instance_id)
+        docker = ActivationDockers(decision_environment)
+        container = docker.create_container(url, activation_instance_id)
         container.start()
 
         line_number = 0

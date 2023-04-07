@@ -11,6 +11,7 @@ services:
       context: ../../
       dockerfile: tools/docker/Dockerfile
     environment: *common-env
+    env_file: docker.env
     command:
       - /bin/bash
       - -c

@@ -19,7 +19,6 @@ RUN DNF=dnf \
     && rm -rf /var/cache/dnf
 
 USER "$USER_ID"
-# TODO: need to set EDA_CONTROLLER_URL, EDA_CONTROLLER_TOKEN and EDA_CONTROLLER_SSL_VERIFY
 ENV POETRY_VERSION='1.4.0' \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -28,8 +27,6 @@ ENV POETRY_VERSION='1.4.0' \
     POETRY_NO_INTERACTION=1 \
     VIRTUAL_ENV=/app/venv \
     SOURCES_DIR=/app/src \
-    EDA_DEPLOYMENT_TYPE=docker \
-    EDA_WEBSOCKET_SERVER_NAME=host.docker.internal \
     PATH="/app/.local/bin:$PATH"
 
 # Install poetry, create virtual environment
