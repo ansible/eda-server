@@ -49,6 +49,7 @@ services:
         condition: service_healthy
     volumes:
       - '../../:/app/src:z'
+      - '/var/run/docker.sock:/var/run/docker.sock:z'
 
   postgres:
     image: 'docker.io/library/postgres:13'

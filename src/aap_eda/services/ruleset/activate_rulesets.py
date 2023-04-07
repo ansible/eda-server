@@ -23,6 +23,7 @@ from django.utils import timezone
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
+from .activation_dockers import ActivationDockers
 from .activation_kubernetes import ActivationKubernetes
 from .ansible_rulebook import AnsibleRulebookService
 
@@ -83,7 +84,11 @@ class ActivateRulesets:
                 dtype == DeploymentType.PODMAN
                 or dtype == DeploymentType.DOCKER
             ):
-                self.activate_in_docker_podman()
+                self.activate_in_docker_podman(
+                    decision_environment,
+                    WS_ADDRESS.format(host=host, port=port),
+                    instance.id,
+                )
 
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
@@ -139,9 +144,32 @@ class ActivateRulesets:
         )
         logger.info(f"{line_number} of activation instance log are created.")
 
-    # TODO(hsong) implement later
-    def activate_in_docker_podman():
-        pass
+    def activate_in_docker_podman(
+        self, decision_environment: str, url: str, activation_instance_id: str
+    ):
+        # TODO: remove this when decision environment is available
+        decision_environment = "quay.io/ansible/ansible-rulebook:main"
+
+        container_svc = ActivationDockers(decision_environment)
+        container = container_svc.create_container(url, activation_instance_id)
+        container.start()
+
+        line_number = 0
+        activation_instance_logs = []
+        for line in container.logs(stream=True):
+            activation_instance_log = models.ActivationInstanceLog(
+                line_number=line_number,
+                log=line.decode("ASCII"),
+                activation_instance_id=int(activation_instance_id),
+            )
+            activation_instance_logs.append(activation_instance_log)
+
+            line_number += 1
+
+        models.ActivationInstanceLog.objects.bulk_create(
+            activation_instance_logs
+        )
+        logger.info(f"{line_number} of activation instance log are created.")
 
     def activate_in_k8s(
         self,

@@ -51,4 +51,5 @@ RUN poetry install -E all --no-root
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 
+USER root
 CMD ["aap-eda-manage", "rqworker", "--worker-class", "aap_eda.core.tasking.Worker"]
