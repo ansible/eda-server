@@ -32,3 +32,12 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "credential",
             *read_only_fields,
         ]
+
+
+class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
+    """Serializer for DecisionEnvironment reference."""
+
+    class Meta:
+        model = models.DecisionEnvironment
+        fields = ["id", "name", "description", "image_url"]
+        read_only_fields = ["id"]

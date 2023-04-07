@@ -31,8 +31,8 @@ class Activation(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
-    execution_environment = models.TextField(
-        default="quay.io/aizquier/ansible-rulebook"
+    decision_environment = models.ForeignKey(
+        "DecisionEnvironment", on_delete=models.CASCADE, null=True
     )
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     rulebook = models.ForeignKey(

@@ -29,7 +29,7 @@ TEST_ACTIVATION = {
     "name": "test-activation",
     "description": "test activation",
     "is_enabled": True,
-    "execution_environment": "quay.io/aizquier/ansible-rulebook",
+    "decision_environment_id": 1,
     "project_id": 1,
     "rulebook_id": 1,
     "extra_var_id": 1,
@@ -47,7 +47,13 @@ TEST_PROJECT = {
 TEST_RULEBOOK = {
     "name": "test-rulebook.yml",
     "path": "rulebooks",
-    "description": "test rulebok",
+    "description": "test rulebook",
+}
+
+TEST_DECISION_ENV = {
+    "name": "test-de",
+    "description": "test de",
+    "image_url": "quay.io/ansible/ansible-rulebook",
 }
 
 TEST_RULESETS = """
@@ -69,6 +75,11 @@ collections:
 
 
 def create_activation_related_data():
+    decision_environment_id = models.DecisionEnvironment.objects.create(
+        name=TEST_DECISION_ENV["name"],
+        image_url=TEST_DECISION_ENV["image_url"],
+        description=TEST_DECISION_ENV["description"],
+    ).pk
     project_id = models.Project.objects.create(
         git_hash=TEST_PROJECT["git_hash"],
         name=TEST_PROJECT["name"],
@@ -86,6 +97,7 @@ def create_activation_related_data():
     ).pk
 
     return {
+        "decision_environment_id": decision_environment_id,
         "project_id": project_id,
         "rulebook_id": rulebook_id,
         "extra_var_id": extra_var_id,
@@ -94,6 +106,7 @@ def create_activation_related_data():
 
 def create_activation(fks: dict):
     activation_data = TEST_ACTIVATION.copy()
+    activation_data["decision_environment_id"] = fks["decision_environment_id"]
     activation_data["project_id"] = fks["project_id"]
     activation_data["rulebook_id"] = fks["rulebook_id"]
     activation_data["extra_var_id"] = fks["extra_var_id"]
@@ -111,6 +124,7 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
 
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
@@ -206,6 +220,10 @@ def test_retrieve_activation(client: APIClient):
     assert_activation_base_data(data, activation)
     assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
     assert data["rulebook"] == {"id": activation.rulebook.id, **TEST_RULEBOOK}
+    assert data["decision_environment"] == {
+        "id": activation.decision_environment.id,
+        **TEST_DECISION_ENV,
+    }
     assert data["extra_var"] == {
         "id": activation.extra_var.id,
         "name": "test-extra-var.yml",
@@ -271,7 +289,6 @@ def assert_activation_base_data(
     assert data["name"] == activation.name
     assert data["description"] == activation.description
     assert data["is_enabled"] == activation.is_enabled
-    assert data["execution_environment"] == activation.execution_environment
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
     assert data["created_at"] == activation.created_at.strftime(
@@ -288,3 +305,6 @@ def assert_activation_related_object_fks(
     assert data["project_id"] == activation.project.id
     assert data["rulebook_id"] == activation.rulebook.id
     assert data["extra_var_id"] == activation.extra_var.id
+    assert (
+        data["decision_environment_id"] == activation.decision_environment.id
+    )

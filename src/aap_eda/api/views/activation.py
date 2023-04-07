@@ -93,7 +93,6 @@ class ActivationViewSet(
 
         activate_rulesets.delay(
             response.id,
-            response.execution_environment,
             settings.DEPLOYMENT_TYPE,
             settings.WEBSOCKET_SERVER_NAME,
             settings.WEBSOCKET_SERVER_PORT,
@@ -111,6 +110,13 @@ class ActivationViewSet(
         activation.data["project"] = (
             models.Project.objects.get(pk=activation.data["project_id"])
             if activation.data["project_id"]
+            else None
+        )
+        activation.data["decision_environment"] = (
+            models.DecisionEnvironment.objects.get(
+                pk=activation.data["decision_environment_id"]
+            )
+            if activation.data["decision_environment_id"]
             else None
         )
         activation.data["rulebook"] = models.Rulebook.objects.get(
@@ -193,7 +199,6 @@ class ActivationViewSet(
             activation.save(update_fields=["is_enabled"])
             activate_rulesets.delay(
                 pk,
-                activation.execution_environment,
                 settings.DEPLOYMENT_TYPE,
                 settings.WEBSOCKET_SERVER_NAME,
                 settings.WEBSOCKET_SERVER_PORT,
@@ -263,7 +268,6 @@ class ActivationViewSet(
             )
         activate_rulesets.delay(
             pk,
-            activation.execution_environment,
             settings.DEPLOYMENT_TYPE,
             settings.WEBSOCKET_SERVER_NAME,
             settings.WEBSOCKET_SERVER_PORT,

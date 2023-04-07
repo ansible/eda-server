@@ -16,6 +16,9 @@ from typing import Optional
 
 from rest_framework import serializers
 
+from aap_eda.api.serializers.decision_environment import (
+    DecisionEnvironmentRefSerializer,
+)
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
     ProjectRefSerializer,
@@ -30,6 +33,7 @@ class ActivationSerializer(serializers.ModelSerializer):
     project_id = serializers.SerializerMethodField()
     rulebook_id = serializers.SerializerMethodField()
     extra_var_id = serializers.SerializerMethodField()
+    decision_environment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Activation
@@ -38,7 +42,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "is_enabled",
-            "execution_environment",
+            "decision_environment_id",
             "project_id",
             "rulebook_id",
             "extra_var_id",
@@ -53,6 +57,15 @@ class ActivationSerializer(serializers.ModelSerializer):
         return (
             ProjectRefSerializer(activation.project).data["id"]
             if activation.project
+            else None
+        )
+
+    def get_decision_environment_id(self, activation) -> Optional[int]:
+        return (
+            DecisionEnvironmentRefSerializer(
+                activation.decision_environment
+            ).data["id"]
+            if activation.decision_environment
             else None
         )
 
@@ -73,6 +86,9 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     project_id = serializers.IntegerField(required=False, allow_null=True)
     rulebook_id = serializers.IntegerField()
     extra_var_id = serializers.IntegerField(required=False, allow_null=True)
+    decision_environment_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Activation
@@ -80,7 +96,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "is_enabled",
-            "execution_environment",
+            "decision_environment_id",
             "project_id",
             "rulebook_id",
             "extra_var_id",
@@ -121,6 +137,9 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
 class ActivationReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the Activation with related objects info."""
 
+    decision_environment = DecisionEnvironmentRefSerializer(
+        required=False, allow_null=True
+    )
     project = ProjectRefSerializer(required=False, allow_null=True)
     rulebook = RulebookRefSerializer()
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
@@ -133,7 +152,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "is_enabled",
-            "execution_environment",
+            "decision_environment",
             "project",
             "rulebook",
             "extra_var",
@@ -146,6 +165,13 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "modified_at"]
 
     def to_representation(self, activation):
+        decision_environment = (
+            DecisionEnvironmentRefSerializer(
+                activation["decision_environment"]
+            ).data
+            if activation["decision_environment"]
+            else None
+        )
         project = (
             ProjectRefSerializer(activation["project"]).data
             if activation["project"]
@@ -161,7 +187,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "name": activation["name"],
             "description": activation["description"],
             "is_enabled": activation["is_enabled"],
-            "execution_environment": activation["execution_environment"],
+            "decision_environment": decision_environment,
             "project": project,
             "rulebook": RulebookRefSerializer(activation["rulebook"]).data,
             "extra_var": extra_var,
