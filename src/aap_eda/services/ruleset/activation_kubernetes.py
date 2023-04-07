@@ -1,6 +1,24 @@
+#  Copyright 2023 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+import asyncio
 import logging
 
+from channels.db import database_sync_to_async
 from kubernetes import client, config, watch
+
+from aap_eda.core import models
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +89,9 @@ class ActivationKubernetes:
 
         return job
 
-    async def run_activation_job(self, job_name, job_spec, namespace):
+    async def run_activation_job(
+        self, job_name, job_spec, namespace, activation_instance_id
+    ):
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
             namespace=namespace, body=job_spec, async_req=True
@@ -85,23 +105,34 @@ class ActivationKubernetes:
             timeout_seconds=0,
             _request_timeout=300,
         ):
+            await asyncio.sleep(0)
             o = event["object"]
             obj_name = o.metadata.name
 
             if o.status.succeeded:
                 logger.info(f"Job {obj_name}: Succeeded")
-                self.log_job_result(job_name=obj_name, namespace=namespace)
+                await self.log_job_result(
+                    job_name=obj_name,
+                    namespace=namespace,
+                    activation_instance_id=activation_instance_id,
+                )
                 w.stop()
 
             if o.status.active:
                 logger.info(f"Job {obj_name}: Active")
 
-            if not o.status.active and o.status.failed:
+            if o.status.failed:
                 logger.info(f"Job {obj_name}: Failed")
-                self.log_job_result(job_name=obj_name, namespace=namespace)
+                await self.log_job_result(
+                    job_name=obj_name,
+                    namespace=namespace,
+                    activation_instance_id=activation_instance_id,
+                )
                 w.stop()
 
-    def log_job_result(self, job_name, namespace):
+    async def log_job_result(
+        self, job_name, namespace, activation_instance_id
+    ):
         pod_list = self.client_api.list_namespaced_pod(
             namespace=namespace,
             label_selector=f"job-name={job_name}",
@@ -114,12 +145,36 @@ class ActivationKubernetes:
             logger.info(f"Job Pod Name: {i.metadata.name}")
 
         if job_pod_name is not None:
-            pod_log = self.client_api.read_namespaced_pod_log(
+            job_pod_log = self.client_api.read_namespaced_pod_log(
                 name=job_pod_name, namespace=namespace, pretty=True
             )
 
+            # log to worker pod log
             logger.info("Job Pod Logs:")
-            logger.info(f"{pod_log}")
+            logger.info(f"{job_pod_log}")
+
+            await self.log_job_to_db(
+                log=job_pod_log, activation_instance_id=activation_instance_id
+            )
 
         else:
             logger.info("No job logs found")
+
+    @database_sync_to_async
+    def log_job_to_db(self, log, activation_instance_id):
+        line_number = 0
+        activation_instance_logs = []
+        for line in log.splitlines():
+            activation_instance_log = models.ActivationInstanceLog(
+                line_number=line_number,
+                log=line,
+                activation_instance_id=int(activation_instance_id),
+            )
+            activation_instance_logs.append(activation_instance_log)
+
+            line_number += 1
+
+        models.ActivationInstanceLog.objects.bulk_create(
+            activation_instance_logs
+        )
+        logger.info(f"{line_number} of activation instance log are created.")
