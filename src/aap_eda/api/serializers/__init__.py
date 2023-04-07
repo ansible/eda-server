@@ -22,6 +22,7 @@ from .activation import (
 )
 from .auth import LoginSerializer
 from .credential import CredentialCreateSerializer, CredentialSerializer
+from .decision_environment import DecisionEnvironmentSerializer
 from .project import (
     ExtraVarRefSerializer,
     ExtraVarSerializer,
@@ -81,4 +82,6 @@ __all__ = (
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",
+    # decision environment
+    "DecisionEnvironmentSerializer",
 )
