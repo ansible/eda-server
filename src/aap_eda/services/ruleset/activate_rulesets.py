@@ -48,6 +48,7 @@ class ActivateRulesets:
     def activate(
         self,
         activation_id: int,
+        decision_environment_id: int,
         deployment_type: str,
         host: str,
         port: int,
@@ -57,6 +58,12 @@ class ActivateRulesets:
                 activation_id=activation_id
             )
             instance.status = ActivationStatus.RUNNING
+
+            decision_environment = models.DecisionEnvironment.objects.get(
+                id=decision_environment_id
+            )
+            decision_environment_url = decision_environment.image_url
+            decision_environment_name = decision_environment.name
 
             dtype = DeploymentType(deployment_type)
 
@@ -73,7 +80,10 @@ class ActivateRulesets:
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.activate_in_k8s(
-                    WS_ADDRESS.format(host=host, port=port), instance.id
+                    ws_url=WS_ADDRESS.format(host=host, port=port),
+                    activation_instance_id=instance.id,
+                    decision_environment_url=decision_environment_url,
+                    decision_environment_name=decision_environment_name,
                 )
             else:
                 raise ActivateRulesetsFailed(f"Unsupported {deployment_type}")
@@ -128,15 +138,12 @@ class ActivateRulesets:
 
     def activate_in_k8s(
         self,
-        url: str,
+        ws_url: str,
         activation_instance_id: str,
+        decision_environment_url: str,
+        decision_environment_name: str,
     ) -> None:
         k8s = ActivationKubernetes()
-
-        # TODO: These DE values will be configurable(passed in)
-        # Decision Environment (DE)
-        _decision_environment = "quay.io/ansible/ansible-rulebook:main"
-        _decision_environment_name = "ansible-rulebook"
         _pull_policy = "Always"
 
         ns_fileref = open(
@@ -151,10 +158,10 @@ class ActivateRulesets:
 
         # build out container,pod,job specs
         container_spec = k8s.create_container(
-            image=_decision_environment,
-            name=_decision_environment_name,
+            image=decision_environment_url,
+            name=decision_environment_name,
             pull_policy=_pull_policy,
-            url=url,
+            url=ws_url,
             activation_id=activation_instance_id,
         )
         pod_spec = k8s.create_pod_template(

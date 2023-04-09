@@ -91,11 +91,16 @@ class ActivationViewSet(
 
         response_serializer = serializers.ActivationSerializer(response)
 
+        decision_environment_id = (
+            response_serializer.get_decision_environment_id(response)
+        )
+
         activate_rulesets.delay(
-            response.id,
-            settings.DEPLOYMENT_TYPE,
-            settings.WEBSOCKET_SERVER_NAME,
-            settings.WEBSOCKET_SERVER_PORT,
+            activation_id=response.id,
+            decision_environment_id=decision_environment_id,
+            deployment_type=settings.DEPLOYMENT_TYPE,
+            host=settings.WEBSOCKET_SERVER_NAME,
+            port=settings.WEBSOCKET_SERVER_PORT,
         )
 
         return Response(
@@ -197,11 +202,13 @@ class ActivationViewSet(
         else:
             activation.is_enabled = True
             activation.save(update_fields=["is_enabled"])
+
             activate_rulesets.delay(
-                pk,
-                settings.DEPLOYMENT_TYPE,
-                settings.WEBSOCKET_SERVER_NAME,
-                settings.WEBSOCKET_SERVER_PORT,
+                activation_id=pk,
+                decision_environment_id=activation.decision_environment.id,
+                deployment_type=settings.DEPLOYMENT_TYPE,
+                host=settings.WEBSOCKET_SERVER_NAME,
+                port=settings.WEBSOCKET_SERVER_PORT,
             )
 
             return Response(status=status.HTTP_200_OK)
@@ -267,10 +274,11 @@ class ActivationViewSet(
                 "Stop function for Activations is not implemented."
             )
         activate_rulesets.delay(
-            pk,
-            settings.DEPLOYMENT_TYPE,
-            settings.WEBSOCKET_SERVER_NAME,
-            settings.WEBSOCKET_SERVER_PORT,
+            activationid=pk,
+            decision_environment_id=activation.decision_environment.id,
+            deployment_type=settings.DEPLOYMENT_TYPE,
+            host=settings.WEBSOCKET_SERVER_NAME,
+            port=settings.WEBSOCKET_SERVER_PORT,
         )
 
         activation.restart_count += 1
