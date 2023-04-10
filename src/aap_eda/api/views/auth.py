@@ -16,7 +16,11 @@ from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import authentication, permissions, status, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -97,13 +101,8 @@ class SessionLogoutView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class RoleViewSet(
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.Role.objects.order_by("id")
-    serializer_class = serializers.RoleSerializer
-
-    @extend_schema(
+@extend_schema_view(
+    list=extend_schema(
         description="List all roles",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
@@ -112,12 +111,17 @@ class RoleViewSet(
             ),
         },
     )
-    def list(self, _request):
-        roles = models.Role.objects.all()
-        roles_data = serializers.RoleListSerializer(roles, many=True).data
-        result = self.paginate_queryset(roles_data)
+)
+class RoleViewSet(
+    viewsets.ReadOnlyModelViewSet,
+):
+    queryset = models.Role.objects.order_by("id")
 
-        return self.get_paginated_response(result)
+    def get_serializer_class(self):
+        if self.action == "list":
+            return serializers.RoleListSerializer
+        elif self.action == "retrieve":
+            return serializers.RoleDetailSerializer
 
     @extend_schema(
         description="Retrieve a role by id",
@@ -129,9 +133,11 @@ class RoleViewSet(
         },
     )
     def retrieve(self, _request, pk=None):
-        queryset = models.Role.objects.all()
-        role = get_object_or_404(queryset, pk=pk)
-        roles_data = serializers.RoleDetailSerializer(role).data
-        result = display_permissions(roles_data)
+        # TODO: Optimization by querying to retrieve desired permission format
+        role = get_object_or_404(self.queryset, pk=pk)
+
+        detail_serialzer = self.get_serializer_class()
+        role = detail_serialzer(role).data
+        result = display_permissions(role)
 
         return Response(result)
