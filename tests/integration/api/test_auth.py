@@ -133,7 +133,7 @@ def test_list_roles(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_get_role(client: APIClient, init_db):
+def test_retrieve_role(client: APIClient, init_db):
     test_uuid = init_db.role.id
     response = client.get(f"{api_url_v1}/roles/{test_uuid}/")
     assert response.status_code == status.HTTP_200_OK
