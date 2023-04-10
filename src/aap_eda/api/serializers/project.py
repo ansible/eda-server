@@ -25,6 +25,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "url",
             "git_hash",
             "import_state",
+            "import_error",
             "import_task_id",
             "created_at",
             "modified_at",
@@ -41,7 +42,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 class ProjectRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
-        fields = ["id", "url", "name", "description"]
+        fields = ["id", "git_hash", "url", "name", "description"]
         read_only_fields = ["id"]
 
 

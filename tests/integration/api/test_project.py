@@ -113,6 +113,27 @@ def test_retrieve_project(client: APIClient):
 
 
 @pytest.mark.django_db
+def test_retrieve_project_failed_state(client: APIClient):
+    project = models.Project.objects.create(
+        name="test-project-01",
+        url="https://git.example.com/acme/project-01",
+        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+        import_state=models.Project.ImportState.FAILED,
+        import_task_id="3677eb4a-de4a-421a-a73b-411aa502484d",
+        import_error="Unexpected error. Please contact support.",
+    )
+    response = client.get(f"{api_url_v1}/projects/{project.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+
+    assert data["import_state"] == "failed"
+    assert data["import_task_id"] == "3677eb4a-de4a-421a-a73b-411aa502484d"
+    assert data["import_error"] == "Unexpected error. Please contact support."
+
+    assert_project_data(data, project)
+
+
+@pytest.mark.django_db
 def test_retrieve_project_not_exist(client: APIClient):
     response = client.get(f"{api_url_v1}/projects/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -359,6 +380,7 @@ def assert_project_data(data: Dict[str, Any], project: models.Project):
         "git_hash": project.git_hash,
         "import_state": project.import_state,
         "import_task_id": import_task_id,
+        "import_error": project.import_error,
         "created_at": project.created_at.strftime(DATETIME_FORMAT),
         "modified_at": project.modified_at.strftime(DATETIME_FORMAT),
     }

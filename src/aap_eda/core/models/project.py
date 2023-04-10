@@ -55,6 +55,7 @@ class Project(models.Model):
         choices=ImportState.choices, default=ImportState.PENDING, null=False
     )
     import_task_id = models.UUIDField(null=True, default=None)
+    import_error = models.TextField(null=True, default=None)
 
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)

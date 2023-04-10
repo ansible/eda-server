@@ -24,12 +24,17 @@ TEST_ACTIVATION = {
     "name": "test-activation",
     "description": "test activation",
     "is_enabled": True,
-    "execution_environment": "quay.io/aizquier/ansible-rulebook",
     "project_id": 1,
     "rulebook_id": 1,
     "extra_var_id": 1,
     "restart_policy": "on-failure",
     "restart_count": 0,
+}
+
+TEST_DECISION_ENV = {
+    "name": "test-de",
+    "image_url": "quay.io/ansible/ansible-rulebook",
+    "description": "test de",
 }
 
 TEST_PROJECT = {
@@ -40,7 +45,7 @@ TEST_PROJECT = {
 
 TEST_RULEBOOK = {
     "name": "test-rulebook.yml",
-    "description": "test rulebok",
+    "description": "test rulebook",
 }
 
 TEST_RULESETS = """
@@ -62,6 +67,11 @@ collections:
 
 
 def create_activation_related_data():
+    decision_environment_id = models.DecisionEnvironment.objects.create(
+        name=TEST_DECISION_ENV["name"],
+        image_url=TEST_DECISION_ENV["image_url"],
+        description=TEST_DECISION_ENV["description"],
+    ).pk
     project_id = models.Project.objects.create(
         name=TEST_PROJECT["name"],
         url=TEST_PROJECT["url"],
@@ -77,6 +87,7 @@ def create_activation_related_data():
     ).pk
 
     return {
+        "decision_environment_id": decision_environment_id,
         "project_id": project_id,
         "rulebook_id": rulebook_id,
         "extra_var_id": extra_var_id,
@@ -85,6 +96,7 @@ def create_activation_related_data():
 
 def create_activation(fks: dict):
     activation_data = TEST_ACTIVATION.copy()
+    activation_data["decision_environment_id"] = fks["decision_environment_id"]
     activation_data["project_id"] = fks["project_id"]
     activation_data["rulebook_id"] = fks["rulebook_id"]
     activation_data["extra_var_id"] = fks["extra_var_id"]
@@ -113,7 +125,6 @@ def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
 
     ActivateRulesets().activate(
         activation_id=activation.id,
-        execution_environment="quay.io/ansible-rulebook",
         deployment_type="local",
         host="localhost",
         port="8000",
@@ -136,7 +147,6 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
 
     ActivateRulesets().activate(
         activation_id=activation.id,
-        execution_environment="quay.io/ansible-rulebook",
         deployment_type="bad_type",
         host="localhost",
         port="8000",

@@ -15,6 +15,7 @@ spec:
         app: eda
         comp: worker
     spec:
+      serviceAccountName: eda-activation-sa
       containers:
         - args:
             - /bin/bash
@@ -31,6 +32,31 @@ spec:
               value: secret
             - name: EDA_MQ_HOST
               value: eda-redis
+            - name: EDA_WEBSOCKET_SERVER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_WEBSOCKET_SERVER_NAME
+            - name: EDA_WEBSOCKET_SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_WEBSOCKET_SERVER_PORT
+            - name: EDA_CONTROLLER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_URL
+            - name: EDA_CONTROLLER_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_TOKEN
+            - name: EDA_CONTROLLER_SSL_VERIFY
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
           imagePullPolicy: Never
           name: eda-worker

@@ -149,10 +149,21 @@ clean-deployment() {
   if kubectl get ns -o jsonpath='{..name}'| grep "${NAMESPACE}" &> /dev/null; then
     log-debug "kubectl delete all -l 'app in (eda)' -n ${NAMESPACE}"
     kubectl delete all -l 'app in (eda)' -n "${NAMESPACE}"
+
     log-debug "kubectl delete pvc --all --grace-period=0 --force -n ${NAMESPACE}"
     kubectl delete pvc --all --grace-period=0 --force -n "${NAMESPACE}"
     log-debug "kubectl delete pv --all --grace-period=0 --force -n ${NAMESPACE}"
     kubectl delete pv --all --grace-period=0 --force -n "${NAMESPACE}"
+
+    log-debug "kubectl delete role -n ${NAMESPACE} -l app=eda"
+    kubectl delete role -n "${NAMESPACE}" -l app=eda
+    log-debug "kubectl delete rolebinding -n ${NAMESPACE} -l app=eda"
+    kubectl delete rolebinding -n "${NAMESPACE}" -l app=eda
+    log-debug "kubectl delete serviceaccount -n ${NAMESPACE} -l app=eda"
+    kubectl delete serviceaccount -n "${NAMESPACE}" -l app=eda
+
+    log-debug "kubectl delete configmap -n ${NAMESPACE} -l app=eda"
+    kubectl delete configmap -n "${NAMESPACE}" -l app=eda
   else
     log-debug "${NAMESPACE} does not exist"
   fi

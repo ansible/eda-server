@@ -73,3 +73,9 @@ class ActivationStatus(DjangoEnum):
     FAILED = "failed"
     STOPPED = "stopped"
     COMPLETED = "completed"
+
+
+class CredentialType(DjangoEnum):
+    REGISTRY = "Container Registry"
+    GITHUB = "GitHub Personal Access Token"
+    GITLAB = "GitLab Personal Access Token"

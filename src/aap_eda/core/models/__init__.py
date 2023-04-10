@@ -14,6 +14,8 @@
 
 from .activation import Activation, ActivationInstance, ActivationInstanceLog
 from .auth import Permission, Role
+from .credential import Credential
+from .decision_environment import DecisionEnvironment
 from .inventory import Inventory
 from .job import (
     ActivationInstanceJobInstance,
@@ -56,4 +58,6 @@ __all__ = [
     "Ruleset",
     "User",
     "AwxToken",
+    "Credential",
+    "DecisionEnvironment",
 ]

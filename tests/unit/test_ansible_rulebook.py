@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import re
 import subprocess
 from unittest import mock
 
@@ -53,18 +53,18 @@ def test_run_worker_mode(run_mock: mock.Mock):
 def test_raise_error(run_mock: mock.Mock):
     def raise_error(cmd, **_kwargs):
         raise subprocess.CalledProcessError(
-            128, cmd, stderr="fatal: ansible-rulebook crashed"
+            returncode=128, cmd=cmd, stderr="fatal: ansible-rulebook crashed"
         )
 
     run_mock.side_effect = raise_error
 
-    with pytest.raises(AnsibleRulebookServiceFailed):
-        executor = AnsibleRulebookService().run_worker_mode(
+    with pytest.raises(
+        AnsibleRulebookServiceFailed,
+        match=re.escape("fatal: ansible-rulebook crashed"),
+    ):
+        AnsibleRulebookService().run_worker_mode(
             "ssh-agent",
             "ansible-rulebook",
             "ws://localhost:8000/api/eda/ws/ansible-rulebook",
             "1",
         )
-
-        assert executor.stderr == "fatal: ansible-rulebook crashed"
-        assert executor.returncode == 128
