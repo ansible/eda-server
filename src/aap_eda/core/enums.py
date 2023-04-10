@@ -41,7 +41,7 @@ class ResourceType(DjangoEnum):
     ACTIVATION = "activation"
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
-    JOB = "job"
+    AUDIT_EVENT = "audit_event"
     TASK = "task"
     USER = "user"
     PROJECT = "project"
@@ -49,8 +49,9 @@ class ResourceType(DjangoEnum):
     EXTRA_VAR = "extra_var"
     PLAYBOOK = "playbook"
     RULEBOOK = "rulebook"
-    EXECUTION_ENV = "execution_env"
     ROLE = "role"
+    DECISION_ENVIRONMENT = "decision_environment"
+    CREDENTIAL = "credential"
 
 
 class Action(DjangoEnum):
@@ -58,6 +59,9 @@ class Action(DjangoEnum):
     READ = "read"
     UPDATE = "update"
     DELETE = "delete"
+    ENABLE = "enable"
+    DISABLE = "disable"
+    RESTART = "restart"
 
 
 class InventorySource(DjangoEnum):

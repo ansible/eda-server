@@ -29,7 +29,7 @@ class User(AbstractUser):
     Refer to https://docs.djangoproject.com/en/4.1/topics/auth/customizing/#substituting-a-custom-user-model
     """  # noqa: E501
 
-    pass
+    roles = models.ManyToManyField("Role", related_name="users")
 
 
 class AwxToken(models.Model):
