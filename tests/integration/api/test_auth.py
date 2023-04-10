@@ -11,12 +11,24 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import uuid
+from dataclasses import dataclass
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient, RequestsClient
 
 from aap_eda.core import models
 from tests.integration.constants import api_url_v1
+
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+@dataclass
+class InitData:
+    role: models.Role
+    permisson: models.Permission
+
 
 auth_url = f"http://testserver{api_url_v1}/auth/session"
 login_url = f"{auth_url}/login/"
@@ -101,3 +113,91 @@ def _get_crsf_token(client: RequestsClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     return response.cookies["csrftoken"]
+
+
+# -----------------------------------------------------
+# Roles
+# -----------------------------------------------------
+@pytest.mark.django_db
+def test_list_roles(client: APIClient, init_db):
+    response = client.get(f"{api_url_v1}/roles/")
+    assert response.status_code == status.HTTP_200_OK
+    roles = response.json()["results"]
+
+    assert len(roles) == 1
+    assert roles[0] == {
+        "id": str(init_db.role.id),
+        "name": init_db.role.name,
+        "description": init_db.role.description,
+    }
+
+
+@pytest.mark.django_db
+def test_retrieve_role(client: APIClient, init_db):
+    test_uuid = init_db.role.id
+    response = client.get(f"{api_url_v1}/roles/{test_uuid}/")
+    assert response.status_code == status.HTTP_200_OK
+    role = response.json()
+
+    assert role == {
+        "id": str(init_db.role.id),
+        "name": init_db.role.name,
+        "description": init_db.role.description,
+        "permissions": [
+            {"resource_type": "activation", "action": ["read", "write"]},
+            {"resource_type": "user", "action": ["read"]},
+        ],
+        "created_at": init_db.role.created_at.strftime(DATETIME_FORMAT),
+        "modified_at": init_db.role.modified_at.strftime(DATETIME_FORMAT),
+    }
+
+
+def init_role():
+    roles = models.Role.objects.create(
+        id=uuid.uuid4(),
+        name="Test Role",
+        description="testing role",
+        is_default=False,
+    )
+    return roles
+
+
+def init_permissions():
+    permissions = models.Permission.objects.bulk_create(
+        [
+            models.Permission(
+                id=uuid.uuid4(),
+                resource_type="activation",
+                action="read",
+            ),
+            models.Permission(
+                id=uuid.uuid4(),
+                resource_type="activation",
+                action="write",
+            ),
+            models.Permission(
+                id=uuid.uuid4(),
+                resource_type="user",
+                action="read",
+            ),
+        ]
+    )
+
+    return permissions
+
+
+def init_role_permissions(role_data, permission_data, user: models.User):
+    role_data.permissions.set(list(permission_data))
+    role_data.users.add(user)
+
+
+@pytest.fixture
+def init_db(user: models.User):
+    permissions = init_permissions()
+    role = init_role()
+    init_role_permissions(role, permissions, user)
+
+    return InitData(
+        role=role,
+        permisson=permissions,
+    )
