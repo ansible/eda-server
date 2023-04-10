@@ -62,8 +62,15 @@ class ActivateRulesets:
             decision_environment = models.DecisionEnvironment.objects.get(
                 id=decision_environment_id
             )
-            decision_environment_url = decision_environment.image_url
-            decision_environment_name = decision_environment.name
+
+            if decision_environment:
+                decision_environment_url = decision_environment.image_url
+                decision_environment_name = decision_environment.name
+            else:
+                raise ActivateRulesetsFailed(
+                    f"Unable to retrieve Decision Environment ID: "
+                    f"{decision_environment_id}"
+                )
 
             dtype = DeploymentType(deployment_type)
 
