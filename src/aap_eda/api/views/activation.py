@@ -90,10 +90,9 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
-
-        decision_environment_id = (
-            response_serializer.get_decision_environment_id(response)
-        )
+        decision_environment_id = response_serializer.data[
+            "decision_environment_id"
+        ]
 
         activate_rulesets.delay(
             activation_id=response.id,
