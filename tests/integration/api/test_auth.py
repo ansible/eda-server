@@ -145,7 +145,7 @@ def test_get_role(client: APIClient, init_db):
         "description": init_db.role.description,
         "permissions": [
             {"resource_type": "activation", "action": ["read", "write"]},
-            {"resource_type": "user", "action": "read"},
+            {"resource_type": "user", "action": ["read"]},
         ],
         "created_at": init_db.role.created_at.strftime(DATETIME_FORMAT),
         "modified_at": init_db.role.modified_at.strftime(DATETIME_FORMAT),

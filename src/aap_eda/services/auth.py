@@ -21,11 +21,7 @@ def group_permission_resource(permission_data):
         permission_data, key=lambda x: (x["resource_type"])
     ):
         actions = [item["action"] for item in group]
-        if len(actions) == 1:
-            action = actions[0]
-        else:
-            action = actions
-        grouped_permissions.append({"resource_type": key, "action": action})
+        grouped_permissions.append({"resource_type": key, "action": actions})
     return grouped_permissions
 
 
