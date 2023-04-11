@@ -254,7 +254,7 @@ def test_restart_activation(client: APIClient):
         f"{api_url_v1}/activations/{activation.id}/restart/"
     )
 
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
@@ -264,7 +264,7 @@ def test_enable_activation(client: APIClient):
 
     response = client.post(f"{api_url_v1}/activations/{activation.id}/enable/")
 
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
@@ -276,7 +276,7 @@ def test_disable_activation(client: APIClient):
         f"{api_url_v1}/activations/{activation.id}/disable/"
     )
 
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
