@@ -187,7 +187,7 @@ class ActivationViewSet(
         description="Enable the Activation",
         request=None,
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None,
                 description="Activation has been enabled.",
             ),
@@ -197,7 +197,7 @@ class ActivationViewSet(
     def enable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
         if activation.is_enabled:
-            return Response(status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             activation.is_enabled = True
             activation.save(update_fields=["is_enabled"])
@@ -210,13 +210,13 @@ class ActivationViewSet(
                 port=settings.WEBSOCKET_SERVER_PORT,
             )
 
-            return Response(status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         description="Disable the Activation",
         request=None,
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None,
                 description="Activation has been disabled.",
             ),
@@ -241,13 +241,13 @@ class ActivationViewSet(
         activation.restart_count += 1
         activation.save(update_fields=["is_enabled", "restart_count"])
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         description="Restart the Activation",
         request=None,
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None,
                 description="Activation restart was successful.",
             ),
@@ -283,7 +283,7 @@ class ActivationViewSet(
         activation.restart_count += 1
         activation.save(update_fields=["restart_count"])
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema_view(
