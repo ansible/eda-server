@@ -110,15 +110,6 @@ class PlaybookViewSet(
             ),
         },
     ),
-    update=extend_schema(
-        description="Update a project",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ProjectSerializer,
-                description="Update successful. Return an updated project.",
-            )
-        },
-    ),
     partial_update=extend_schema(
         description="Partial update of a project",
         responses={
@@ -143,6 +134,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.ProjectSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
+    http_method_names = ["get", "post", "patch", "head", "delete"]
 
     @extend_schema(
         description="Import a project.",

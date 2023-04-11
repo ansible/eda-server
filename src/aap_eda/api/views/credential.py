@@ -58,6 +58,7 @@ class CredentialViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.CredentialSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialFilter
+    http_method_names = ["get", "post", "patch", "head", "delete"]
 
     @extend_schema(
         description="Create a new credential.",
@@ -76,25 +77,6 @@ class CredentialViewSet(viewsets.ModelViewSet):
         return Response(
             status=status.HTTP_201_CREATED, data=output_serializer.data
         )
-
-    @extend_schema(
-        description="Update a credential",
-        request=serializers.CredentialCreateSerializer,
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.CredentialSerializer,
-                description="Update successful. Return an updated credential.",
-            )
-        },
-    )
-    def update(self, request, *args, **kwargs):
-        instance = self.queryset.get(pk=kwargs.get("pk"))
-        serializer = serializers.CredentialCreateSerializer(
-            instance, data=request.data, partial=False
-        )
-        serializer.is_valid(raise_exception=True)
-        output_serializer = serializers.CredentialSerializer(serializer.save())
-        return Response(output_serializer.data)
 
     @extend_schema(
         description="Partial update of a credential",

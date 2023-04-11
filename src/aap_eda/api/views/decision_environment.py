@@ -52,15 +52,6 @@ from aap_eda.core import models
             ),
         },
     ),
-    update=extend_schema(
-        description="Update a decision environment",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.DecisionEnvironmentSerializer,
-                description="Update successful. Return an updated decision environment.",  # noqa: E501
-            )
-        },
-    ),
     partial_update=extend_schema(
         description="Partial update of a decision environment",
         responses={
@@ -84,3 +75,4 @@ class DecisionEnvironmentViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.DecisionEnvironmentSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.DecisionEnvironmentFilter
+    http_method_names = ["get", "post", "patch", "head", "delete"]
