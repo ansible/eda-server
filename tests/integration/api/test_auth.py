@@ -27,7 +27,6 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 @dataclass
 class InitData:
     role: models.Role
-    permisson: models.Permission
 
 
 auth_url = f"http://testserver{api_url_v1}/auth/session"
@@ -144,8 +143,14 @@ def test_retrieve_role(client: APIClient, init_db):
         "name": init_db.role.name,
         "description": init_db.role.description,
         "permissions": [
-            {"resource_type": "activation", "action": ["read", "write"]},
-            {"resource_type": "user", "action": ["read"]},
+            {
+                "resource_type": "activation_instance",
+                "action": ["read", "delete"],
+            },
+            {
+                "resource_type": "user",
+                "action": ["create", "read", "update", "delete"],
+            },
         ],
         "created_at": init_db.role.created_at.strftime(DATETIME_FORMAT),
         "modified_at": init_db.role.modified_at.strftime(DATETIME_FORMAT),
@@ -162,42 +167,21 @@ def init_role():
     return roles
 
 
-def init_permissions():
-    permissions = models.Permission.objects.bulk_create(
-        [
-            models.Permission(
-                id=uuid.uuid4(),
-                resource_type="activation",
-                action="read",
-            ),
-            models.Permission(
-                id=uuid.uuid4(),
-                resource_type="activation",
-                action="write",
-            ),
-            models.Permission(
-                id=uuid.uuid4(),
-                resource_type="user",
-                action="read",
-            ),
-        ]
+def init_role_permissions(role_data, user: models.User):
+    resource_types = ["activation_instance", "user"]
+    permission_data = models.Permission.objects.filter(
+        resource_type__in=resource_types
     )
 
-    return permissions
-
-
-def init_role_permissions(role_data, permission_data, user: models.User):
     role_data.permissions.set(list(permission_data))
     role_data.users.add(user)
 
 
 @pytest.fixture
 def init_db(user: models.User):
-    permissions = init_permissions()
     role = init_role()
-    init_role_permissions(role, permissions, user)
+    init_role_permissions(role, user)
 
     return InitData(
         role=role,
-        permisson=permissions,
     )
