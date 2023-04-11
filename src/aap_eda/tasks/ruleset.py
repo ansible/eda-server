@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @job
 def activate_rulesets(
     activation_id: int,
+    decision_environment_id: int,
     deployment_type: str,
     host: str,
     port: int,
@@ -31,6 +32,7 @@ def activate_rulesets(
 
     ActivateRulesets().activate(
         activation_id,
+        decision_environment_id,
         deployment_type,
         host,
         port,
