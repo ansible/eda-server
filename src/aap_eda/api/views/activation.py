@@ -28,8 +28,6 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.tasks.ruleset import activate_rulesets
 
-from .mixins import ResponseSerializerMixin
-
 
 def handle_activation_create_conflict(activation):
     activation_dependent_objects = [
@@ -70,7 +68,6 @@ def handle_activation_create_conflict(activation):
     ),
 )
 class ActivationViewSet(
-    ResponseSerializerMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
