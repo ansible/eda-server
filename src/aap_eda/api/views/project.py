@@ -25,6 +25,8 @@ from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 
+from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+
 
 @extend_schema_view(
     retrieve=extend_schema(
@@ -129,12 +131,19 @@ class PlaybookViewSet(
         },
     ),
 )
-class ProjectViewSet(viewsets.ModelViewSet):
+class ProjectViewSet(
+    ResponseSerializerMixin,
+    PartialUpdateOnlyModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
-    http_method_names = ["get", "post", "patch", "head", "delete"]
 
     @extend_schema(
         description="Import a project.",

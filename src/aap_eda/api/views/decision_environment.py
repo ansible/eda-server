@@ -18,10 +18,12 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
+
+from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -70,9 +72,16 @@ from aap_eda.core import models
         },
     ),
 )
-class DecisionEnvironmentViewSet(viewsets.ModelViewSet):
+class DecisionEnvironmentViewSet(
+    ResponseSerializerMixin,
+    PartialUpdateOnlyModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = models.DecisionEnvironment.objects.order_by("id")
     serializer_class = serializers.DecisionEnvironmentSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.DecisionEnvironmentFilter
-    http_method_names = ["get", "post", "patch", "head", "delete"]

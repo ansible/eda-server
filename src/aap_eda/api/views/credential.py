@@ -18,11 +18,16 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import mixins, status, viewsets
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
+
+from .mixins import (
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    ResponseSerializerMixin,
+)
 
 
 @extend_schema_view(
@@ -44,6 +49,26 @@ from aap_eda.core import models
             ),
         },
     ),
+    create=extend_schema(
+        description="Create a new credential.",
+        request=serializers.CredentialCreateSerializer,
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                serializers.CredentialSerializer,
+                description="Return the new credential.",
+            ),
+        },
+    ),
+    partial_update=extend_schema(
+        description="Partial update of a credential",
+        request=serializers.CredentialCreateSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.CredentialSerializer,
+                description="Update successful. Return an updated credential.",
+            )
+        },
+    ),
     destroy=extend_schema(
         description="Delete a credential by id",
         responses={
@@ -53,46 +78,23 @@ from aap_eda.core import models
         },
     ),
 )
-class CredentialViewSet(viewsets.ModelViewSet):
+class CredentialViewSet(
+    ResponseSerializerMixin,
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = models.Credential.objects.order_by("id")
-    serializer_class = serializers.CredentialSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialFilter
-    http_method_names = ["get", "post", "patch", "head", "delete"]
 
-    @extend_schema(
-        description="Create a new credential.",
-        request=serializers.CredentialCreateSerializer,
-        responses={
-            status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.CredentialSerializer,
-                description="Return the new credential.",
-            ),
-        },
-    )
-    def create(self, request):
-        serializer = serializers.CredentialCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        output_serializer = serializers.CredentialSerializer(serializer.save())
-        return Response(
-            status=status.HTTP_201_CREATED, data=output_serializer.data
-        )
+    def get_serializer_class(self):
+        if self.action in ["create", "partial_update"]:
+            return serializers.CredentialCreateSerializer
+        return serializers.CredentialSerializer
 
-    @extend_schema(
-        description="Partial update of a credential",
-        request=serializers.CredentialCreateSerializer,
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.CredentialSerializer,
-                description="Update successful. Return an updated credential.",
-            )
-        },
-    )
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.queryset.get(pk=kwargs.get("pk"))
-        serializer = serializers.CredentialCreateSerializer(
-            instance, data=request.data, partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        output_serializer = serializers.CredentialSerializer(serializer.save())
-        return Response(output_serializer.data)
+    def get_response_serializer_class(self):
+        return serializers.CredentialSerializer

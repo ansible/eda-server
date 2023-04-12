@@ -28,6 +28,8 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.tasks.ruleset import activate_rulesets
 
+from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+
 
 def handle_activation_create_conflict(activation):
     activation_dependent_objects = [
@@ -57,6 +59,10 @@ def handle_activation_create_conflict(activation):
             ),
         },
     ),
+    patch=extend_schema(
+        request=serializers.ActivationUpdateSerializer,
+        responses={status.HTTP_200_OK: serializers.ActivationSerializer},
+    ),
     destroy=extend_schema(
         description="Delete an existing Activation",
         responses={
@@ -68,6 +74,8 @@ def handle_activation_create_conflict(activation):
     ),
 )
 class ActivationViewSet(
+    ResponseSerializerMixin,
+    PartialUpdateOnlyModelMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
@@ -138,25 +146,6 @@ class ActivationViewSet(
         return Response(
             serializers.ActivationReadSerializer(activation.data).data
         )
-
-    @extend_schema(
-        request=serializers.ActivationUpdateSerializer,
-        responses={status.HTTP_200_OK: serializers.ActivationSerializer},
-    )
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        if getattr(instance, "_prefetched_objects_cache", None):
-            # If 'prefetch_related' has been applied to a queryset, we need to
-            # forcibly invalidate the prefetch cache on the instance.
-            instance._prefetched_objects_cache = {}
-
-        return Response(serializer.data)
 
     @extend_schema(
         description="List all instances for the Activation",
