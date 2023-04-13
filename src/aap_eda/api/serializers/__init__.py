@@ -16,6 +16,7 @@ from .activation import (
     ActivationCreateSerializer,
     ActivationInstanceLogSerializer,
     ActivationInstanceSerializer,
+    ActivationListSerializer,
     ActivationReadSerializer,
     ActivationSerializer,
 )
@@ -75,6 +76,7 @@ __all__ = (
     "TaskSerializer",
     # activations
     "ActivationSerializer",
+    "ActivationListSerializer",
     "ActivationCreateSerializer",
     "ActivationReadSerializer",
     "ActivationInstanceSerializer",

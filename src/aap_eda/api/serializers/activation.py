@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from typing import Optional
-
 from rest_framework import serializers
 
 from aap_eda.api.serializers.decision_environment import (
@@ -25,15 +23,11 @@ from aap_eda.api.serializers.project import (
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 
 
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
-
-    project_id = serializers.SerializerMethodField()
-    rulebook_id = serializers.SerializerMethodField()
-    extra_var_id = serializers.SerializerMethodField()
-    decision_environment_id = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Activation
@@ -53,31 +47,32 @@ class ActivationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
-    def get_project_id(self, activation) -> Optional[int]:
-        return (
-            ProjectRefSerializer(activation.project).data["id"]
-            if activation.project
-            else None
-        )
 
-    def get_decision_environment_id(self, activation) -> Optional[int]:
-        return (
-            DecisionEnvironmentRefSerializer(
-                activation.decision_environment
-            ).data["id"]
-            if activation.decision_environment
-            else None
-        )
+class ActivationListSerializer(serializers.ModelSerializer):
+    """Serializer for listing the Activation model objects."""
 
-    def get_rulebook_id(self, activation) -> int:
-        return RulebookRefSerializer(activation.rulebook).data["id"]
+    status = serializers.ChoiceField(
+        choices=[x.value for x in ActivationStatus]
+    )
 
-    def get_extra_var_id(self, activation) -> Optional[int]:
-        return (
-            ExtraVarRefSerializer(activation.extra_var).data["id"]
-            if activation.extra_var
-            else None
-        )
+    class Meta:
+        model = models.Activation
+        fields = [
+            "id",
+            "name",
+            "description",
+            "is_enabled",
+            "status",
+            "decision_environment_id",
+            "project_id",
+            "rulebook_id",
+            "extra_var_id",
+            "restart_policy",
+            "restart_count",
+            "created_at",
+            "modified_at",
+        ]
+        read_only_fields = ["id", "created_at", "modified_at"]
 
 
 class ActivationCreateSerializer(serializers.ModelSerializer):
@@ -132,6 +127,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer()
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
+    status = serializers.ChoiceField(
+        choices=[x.value for x in ActivationStatus]
+    )
 
     class Meta:
         model = models.Activation
@@ -141,6 +139,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "description",
             "is_enabled",
             "decision_environment",
+            "status",
             "project",
             "rulebook",
             "extra_var",
@@ -176,6 +175,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "description": activation["description"],
             "is_enabled": activation["is_enabled"],
             "decision_environment": decision_environment,
+            "status": activation["status"],
             "project": project,
             "rulebook": RulebookRefSerializer(activation["rulebook"]).data,
             "extra_var": extra_var,
