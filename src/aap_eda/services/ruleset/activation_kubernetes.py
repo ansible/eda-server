@@ -37,6 +37,7 @@ class ActivationKubernetes:
             image=image,
             name=name,
             image_pull_policy=pull_policy,
+            env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="tmp")],
             args=[
                 "--worker",
                 "--websocket-address",
