@@ -18,7 +18,6 @@ from .activation import (
     ActivationInstanceSerializer,
     ActivationReadSerializer,
     ActivationSerializer,
-    ActivationUpdateSerializer,
 )
 from .auth import (
     LoginSerializer,
@@ -77,7 +76,6 @@ __all__ = (
     # activations
     "ActivationSerializer",
     "ActivationCreateSerializer",
-    "ActivationUpdateSerializer",
     "ActivationReadSerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",

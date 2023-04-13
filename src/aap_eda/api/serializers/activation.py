@@ -104,18 +104,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         ]
 
 
-class ActivationUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating the Activation."""
-
-    class Meta:
-        model = models.Activation
-        fields = [
-            "name",
-            "description",
-            "is_enabled",
-        ]
-
-
 class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
 
