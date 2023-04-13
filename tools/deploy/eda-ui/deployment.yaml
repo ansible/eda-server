@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-ui
+spec:
+  selector:
+    matchLabels:
+      app: eda
+      comp: ui
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: eda
+        comp: ui
+    spec:
+      containers:
+      - name: eda-ui
+        imagePullPolicy: Always
+        image: default-route-openshift-image-registry.apps.cluster-s5s8d.s5s8d.sandbox1409.opentlc.com/aap-eda/aap-ui
+        ports:
+        - containerPort: 8080
+status: {}

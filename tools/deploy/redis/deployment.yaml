@@ -17,10 +17,17 @@ spec:
     spec:
       containers:
         - env: []
-          image: docker.io/library/redis:7
+          image: docker.io/library/redis:6
           name: redis
           ports:
             - containerPort: 6379
           resources: {}
+          volumeMounts:
+            - readOnly: false
+              mountPath: /data
+              name: 'eda-redis-data'
       restartPolicy: Always
+      volumes:
+        - name: eda-redis-data
+          emptyDir: {}
 status: {}

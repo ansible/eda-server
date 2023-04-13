@@ -2,13 +2,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 commonLabels:
-  comp: api
+  comp: ui
 
 resources:
 - deployment.yaml
 - service.yaml
 
 images:
-- name: aap-eda
-  newName: default-route-openshift-image-registry.apps.cluster-s5s8d.s5s8d.sandbox1409.opentlc.com/aap-eda/aap-eda 
+- name: aap-ui
+  newName: default-route-openshift-image-registry.apps.cluster-s5s8d.s5s8d.sandbox1409.opentlc.com/aap-eda/aap-ui
   newTag: latest

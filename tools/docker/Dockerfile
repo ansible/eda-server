@@ -41,6 +41,7 @@ COPY pyproject.toml poetry.lock $SOURCES_DIR/
 RUN poetry install -E all --no-root --no-cache
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
+RUN /app/venv/bin/pip3 install poetry
 
 USER 0
 RUN for dir in \
