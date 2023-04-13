@@ -76,38 +76,6 @@ def test_retrieve_decision_environment_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_update_decision_environment(client: APIClient):
-    obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1"
-    )
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
-    data = {
-        "name": "de1-new",
-        "description": "desc here",
-        "credential": credential.id,
-        "image_url": "registry.com/img1:tag2",
-    }
-    response = client.put(
-        f"{api_url_v1}/decision-environments/{obj.id}/", data=data
-    )
-    assert response.status_code == status.HTTP_200_OK
-    result = response.data
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == {
-        "name": "de1-new",
-        "description": "desc here",
-        "image_url": "registry.com/img1:tag2",
-        "credential": credential.id,
-        "id": obj.id,
-    }
-    updated_obj = models.DecisionEnvironment.objects.filter(pk=obj.id).first()
-    assert updated_obj.credential == credential
-
-
-@pytest.mark.django_db
 def test_partial_update_decision_environment(client: APIClient):
     obj = models.DecisionEnvironment.objects.create(
         name="de1", image_url="registry.com/img1:tag1"

@@ -25,6 +25,8 @@ from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 
+from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+
 
 @extend_schema_view(
     retrieve=extend_schema(
@@ -110,15 +112,6 @@ class PlaybookViewSet(
             ),
         },
     ),
-    update=extend_schema(
-        description="Update a project",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ProjectSerializer,
-                description="Update successful. Return an updated project.",
-            )
-        },
-    ),
     partial_update=extend_schema(
         description="Partial update of a project",
         responses={
@@ -138,7 +131,15 @@ class PlaybookViewSet(
         },
     ),
 )
-class ProjectViewSet(viewsets.ModelViewSet):
+class ProjectViewSet(
+    ResponseSerializerMixin,
+    PartialUpdateOnlyModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
     filter_backends = (DjangoFilterBackend,)

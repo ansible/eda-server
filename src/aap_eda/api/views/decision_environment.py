@@ -18,10 +18,12 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
+
+from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -52,15 +54,6 @@ from aap_eda.core import models
             ),
         },
     ),
-    update=extend_schema(
-        description="Update a decision environment",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.DecisionEnvironmentSerializer,
-                description="Update successful. Return an updated decision environment.",  # noqa: E501
-            )
-        },
-    ),
     partial_update=extend_schema(
         description="Partial update of a decision environment",
         responses={
@@ -79,7 +72,15 @@ from aap_eda.core import models
         },
     ),
 )
-class DecisionEnvironmentViewSet(viewsets.ModelViewSet):
+class DecisionEnvironmentViewSet(
+    ResponseSerializerMixin,
+    PartialUpdateOnlyModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = models.DecisionEnvironment.objects.order_by("id")
     serializer_class = serializers.DecisionEnvironmentSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)

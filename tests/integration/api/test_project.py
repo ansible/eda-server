@@ -233,36 +233,8 @@ def test_sync_project_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-# Test: Update project
+# Test: Partial update project
 # -------------------------------------
-@pytest.mark.django_db
-def test_update_project(client: APIClient):
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-    )
-    response = client.get(f"{api_url_v1}/projects/{project.id}/")
-    assert response.status_code == status.HTTP_200_OK
-
-    update_data = {
-        **response.json(),
-        "name": "test-project-01-updated",
-        "description": "Updated description",
-    }
-
-    response = client.put(
-        f"{api_url_v1}/projects/{project.id}/", data=update_data
-    )
-    assert response.status_code == status.HTTP_200_OK
-
-    project = models.Project.objects.get(pk=project.id)
-    assert project.name == "test-project-01-updated"
-    assert project.description == "Updated description"
-
-    assert_project_data(response.json(), project)
-
-
 @pytest.mark.django_db
 def test_update_project_not_found(client: APIClient):
     project = models.Project.objects.create(
@@ -273,7 +245,7 @@ def test_update_project_not_found(client: APIClient):
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     data = response.json()
 
-    response = client.put(f"{api_url_v1}/projects/42/", data=data)
+    response = client.patch(f"{api_url_v1}/projects/42/", data=data)
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -294,33 +266,12 @@ def test_update_project_conflict(client: APIClient):
         **response.json(),
         "name": second.name,
     }
-    response = client.put(f"{api_url_v1}/projects/{first.id}/", data=data)
+    response = client.patch(f"{api_url_v1}/projects/{first.id}/", data=data)
     # NOTE(cutwater): Should be 409 Conflict
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {
         "name": ["project with this name already exists."]
     }
-
-
-@pytest.mark.django_db
-def test_update_project_empty_name(client: APIClient):
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-    )
-    response = client.get(f"{api_url_v1}/projects/{project.id}/")
-    data = {
-        **response.json(),
-        "name": "",
-    }
-    response = client.put(f"{api_url_v1}/projects/{project.id}/", data=data)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json() == {"name": ["This field may not be blank."]}
-
-
-# Test: Partial update project
-# -------------------------------------
 
 
 @pytest.mark.django_db
@@ -330,7 +281,7 @@ def test_partial_update_project(client: APIClient):
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    response = client.put(
+    response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
         data={"name": "test-project-01-updated"},
     )
