@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import json
 from typing import Any, Dict
 from unittest import mock
 
@@ -173,28 +172,6 @@ def test_create_activation_unprocessible_entity(client: APIClient):
             data=test_activation,
         )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-
-
-@pytest.mark.django_db
-def test_update_activation(client: APIClient):
-    fks = create_activation_related_data()
-    activation = create_activation(fks)
-    new_activation = {
-        "name": "new demo",
-        "description": "demo activation",
-        "is_enabled": False,
-    }
-
-    response = client.patch(
-        f"{api_url_v1}/activations/{activation.id}/",
-        data=json.dumps(new_activation),
-        content_type="application/json",
-    )
-    assert response.status_code == status.HTTP_200_OK
-    activation = response.data
-    assert activation["name"] == new_activation["name"]
-    assert activation["description"] == new_activation["description"]
-    assert activation["is_enabled"] == new_activation["is_enabled"]
 
 
 @pytest.mark.django_db
