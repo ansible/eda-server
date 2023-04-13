@@ -34,6 +34,17 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
         ]
 
 
+class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.DecisionEnvironment
+        fields = [
+            "name",
+            "description",
+            "image_url",
+            "credential",
+        ]
+
+
 class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
     """Serializer for DecisionEnvironment reference."""
 

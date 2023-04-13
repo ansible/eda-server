@@ -23,7 +23,11 @@ from rest_framework import mixins, status, viewsets
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
 
-from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+from .mixins import (
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    ResponseSerializerMixin,
+)
 
 
 @extend_schema_view(
@@ -74,14 +78,21 @@ from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 )
 class DecisionEnvironmentViewSet(
     ResponseSerializerMixin,
+    CreateModelMixin,
     PartialUpdateOnlyModelMixin,
-    mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
     queryset = models.DecisionEnvironment.objects.order_by("id")
-    serializer_class = serializers.DecisionEnvironmentSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.DecisionEnvironmentFilter
+
+    def get_serializer_class(self):
+        if self.action in ["create", "partial_update"]:
+            return serializers.DecisionEnvironmentCreateSerializer
+        return serializers.DecisionEnvironmentSerializer
+
+    def get_response_serializer_class(self):
+        return serializers.DecisionEnvironmentSerializer
