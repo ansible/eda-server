@@ -195,6 +195,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
+        else:
+            audit_rule.fired_at = message.run_at
+            audit_rule.status = message.status
+            audit_rule.save()
 
         audit_action = models.AuditAction.objects.filter(
             id=message.action_uuid
