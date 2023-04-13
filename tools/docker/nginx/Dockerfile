@@ -17,6 +17,27 @@ ENV DIST_UI="/opt/app-root/ui/eda"
 
 ADD ${NGINX_CONF} ${NGINX_CONFIGURATION_PATH}
 
+# Set up permissions
+ARG USER_ID=${USER_ID:-1001}
+RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda
+
+# Pre-create things we need to access
+USER 0
+
+RUN for dir in \
+      ${DIST_UI}/ \
+      ${NGINX_CONF} \
+      ${NGINX_CONFIGURATION_PATH} \
+      /var/cache/nginx \
+      /var/log/nginx \
+      /var/lib/nginx ; \
+    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done && \
+    for file in \
+      /var/run/nginx.pid ; \
+    do touch $file ; chmod g+rw $file ; done
+
 # Copy dist dir to final location
 RUN mkdir -p ${DIST_UI}/
 COPY --from=ui-builder /app/ansible-ui/build/eda/ ${DIST_UI}
+
+USER "$USER_ID"
