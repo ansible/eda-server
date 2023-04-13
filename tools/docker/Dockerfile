@@ -7,9 +7,14 @@ RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && chmod 0775 /app /var/lib/eda
 
 RUN DNF=dnf \
-    INSTALL_PACKAGES=(python3 python3-devel python3-pip libpq-devel  \
-                      gcc git-core java-17-openjdk-headless) \
-    && $DNF -y install "${INSTALL_PACKAGES[@]}" \
+    INSTALL_PACKAGES="python3 \
+    python3-devel \
+    python3-pip \
+    libpq-devel \
+    gcc \
+    git-core \
+    java-17-openjdk-headless" \
+    && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf
 
@@ -36,5 +41,14 @@ COPY pyproject.toml poetry.lock $SOURCES_DIR/
 RUN poetry install -E all --no-root --no-cache
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
+
+USER 0
+RUN for dir in \
+      /app \
+      /app/venv \
+      /app/venv/bin ; \
+    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done
+
+USER "$USER_ID"
 
 CMD ["aap-eda-manage", "runserver", "0.0.0.0:8000"]
