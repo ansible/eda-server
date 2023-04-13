@@ -65,7 +65,6 @@ class ActivateRulesets:
 
             if decision_environment:
                 decision_environment_url = decision_environment.image_url
-                decision_environment_name = decision_environment.name
             else:
                 raise ActivateRulesetsFailed(
                     f"Unable to retrieve Decision Environment ID: "
@@ -90,7 +89,6 @@ class ActivateRulesets:
                     ws_url=WS_ADDRESS.format(host=host, port=port),
                     activation_instance_id=instance.id,
                     decision_environment_url=decision_environment_url,
-                    decision_environment_name=decision_environment_name,
                 )
             else:
                 raise ActivateRulesetsFailed(f"Unsupported {deployment_type}")
@@ -148,7 +146,6 @@ class ActivateRulesets:
         ws_url: str,
         activation_instance_id: str,
         decision_environment_url: str,
-        decision_environment_name: str,
     ) -> None:
         k8s = ActivationKubernetes()
         _pull_policy = "Always"
@@ -166,7 +163,7 @@ class ActivateRulesets:
         # build out container,pod,job specs
         container_spec = k8s.create_container(
             image=decision_environment_url,
-            name=decision_environment_name,
+            name=pod_name,
             pull_policy=_pull_policy,
             url=ws_url,
             activation_id=activation_instance_id,
