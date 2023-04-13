@@ -58,7 +58,13 @@ from .rulebook import (
     RulesetSerializer,
 )
 from .tasks import TaskRefSerializer, TaskSerializer
-from .user import AwxTokenSerializer, UserSerializer
+from .user import (
+    AwxTokenListSerializer,
+    AwxTokenSerializer,
+    UserCreateUpdateSerializer,
+    UserListSerializer,
+    UserSerializer,
+)
 
 __all__ = (
     # auth
@@ -92,7 +98,10 @@ __all__ = (
     "ActivationInstanceLogSerializer",
     # users
     "UserSerializer",
+    "UserListSerializer",
+    "UserCreateUpdateSerializer",
     "AwxTokenSerializer",
+    "AwxTokenListSerializer",
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",

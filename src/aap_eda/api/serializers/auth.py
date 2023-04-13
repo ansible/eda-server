@@ -123,3 +123,10 @@ class RoleDetailSerializer(serializers.Serializer):
         required=True,
         help_text="The modified_at timestamp of the ruleset",
     )
+
+
+class RoleRefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Role
+        fields = ["id", "name"]
+        read_only_fields = ["id", "name"]
