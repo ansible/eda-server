@@ -28,7 +28,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.tasks.ruleset import activate_rulesets
 
-from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+from .mixins import ResponseSerializerMixin
 
 
 def handle_activation_create_conflict(activation):
@@ -59,10 +59,6 @@ def handle_activation_create_conflict(activation):
             ),
         },
     ),
-    patch=extend_schema(
-        request=serializers.ActivationUpdateSerializer,
-        responses={status.HTTP_200_OK: serializers.ActivationSerializer},
-    ),
     destroy=extend_schema(
         description="Delete an existing Activation",
         responses={
@@ -75,7 +71,6 @@ def handle_activation_create_conflict(activation):
 )
 class ActivationViewSet(
     ResponseSerializerMixin,
-    PartialUpdateOnlyModelMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
