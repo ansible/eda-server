@@ -492,6 +492,7 @@ def init_db():
         name="action-1",
         audit_rule=audit_rule,
         status="pending",
+        rule_fired_at="2023-03-23T01:36:36.835248Z",
         fired_at="2023-03-30T20:59:42.042148Z",
     )
     action_2 = models.AuditAction.objects.create(
@@ -499,18 +500,21 @@ def init_db():
         name="action-2",
         audit_rule=audit_rule,
         status="pending",
+        rule_fired_at="2023-03-23T01:36:36.835248Z",
         fired_at="2023-03-30T20:59:42.042148Z",
     )
     audit_event_1 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
         source_name="event-1",
         source_type="type-1",
+        rule_fired_at="2023-03-23T01:36:36.835248Z",
         received_at="2023-03-30T20:59:42.042148Z",
     )
     audit_event_2 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
         source_name="event-2",
         source_type="type-2",
+        rule_fired_at="2023-03-23T01:36:36.835248Z",
         received_at="2023-03-30T20:59:42.042148Z",
     )
     audit_event_3 = models.AuditEvent.objects.create(
