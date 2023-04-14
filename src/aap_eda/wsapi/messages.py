@@ -37,6 +37,7 @@ class ActionMessage(Message):
     matching_events: dict = {}
     status: Optional[str] = ""
     url: Optional[str] = ""
+    rule_run_at: Optional[str] = ""
     playbook_name: Optional[str]
     job_template_name: Optional[str]
     organization: Optional[str]
