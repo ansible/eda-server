@@ -14,6 +14,7 @@
 
 from rest_framework import serializers
 
+from aap_eda.api.serializers.credential import CredentialRefSerializer
 from aap_eda.core import models
 
 
@@ -29,20 +30,59 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "image_url",
-            "credential",
+            "credential_id",
             *read_only_fields,
         ]
 
 
 class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating the DecisionEnvironment."""
+
+    credential_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = models.DecisionEnvironment
         fields = [
             "name",
             "description",
             "image_url",
-            "credential",
+            "credential_id",
         ]
+
+
+class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
+    """Serializer for reading the DecisionEnvironment with embedded objects."""
+
+    credential = CredentialRefSerializer(required=False, allow_null=True)
+
+    class Meta:
+        model = models.DecisionEnvironment()
+        fields = [
+            "id",
+            "name",
+            "description",
+            "image_url",
+            "credential",
+            "created_at",
+            "modified_at",
+        ]
+        read_only_fields = ["id", "created_at", "modified_at"]
+
+    def to_representation(self, decision_environment):
+        credential = (
+            CredentialRefSerializer(decision_environment["credential"]).data
+            if decision_environment["credential"]
+            else None
+        )
+        return {
+            "id": decision_environment["id"],
+            "name": decision_environment["name"],
+            "description": decision_environment["description"],
+            "image_url": decision_environment["image_url"],
+            "credential": credential,
+            "created_at": decision_environment["created_at"],
+            "modified_at": decision_environment["modified_at"],
+        }
 
 
 class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):

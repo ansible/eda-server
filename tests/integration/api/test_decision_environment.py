@@ -8,8 +8,11 @@ from tests.integration.constants import api_url_v1
 
 @pytest.mark.django_db
 def test_list_decision_environments(client: APIClient):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
     obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1"
+        name="de1", image_url="registry.com/img1:tag1", credential=credential
     )
     response = client.get(f"{api_url_v1}/decision-environments/")
     assert response.status_code == status.HTTP_200_OK
@@ -20,17 +23,21 @@ def test_list_decision_environments(client: APIClient):
         "name": "de1",
         "description": "",
         "image_url": "registry.com/img1:tag1",
-        "credential": None,
+        "credential_id": credential.id,
         "id": obj.id,
     }
 
 
 @pytest.mark.django_db
 def test_create_decision_environment(client: APIClient):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
     data_in = {
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
+        "credential_id": credential.id,
     }
     response = client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
@@ -44,7 +51,7 @@ def test_create_decision_environment(client: APIClient):
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
-        "credential": None,
+        "credential_id": credential.id,
         "id": id_,
     }
     assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
@@ -52,8 +59,11 @@ def test_create_decision_environment(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_decision_environment(client: APIClient):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
     obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1"
+        name="de1", image_url="registry.com/img1:tag1", credential=credential
     )
     response = client.get(f"{api_url_v1}/decision-environments/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
@@ -61,11 +71,17 @@ def test_retrieve_decision_environment(client: APIClient):
     result.pop("created_at")
     result.pop("modified_at")
     assert result == {
+        "id": obj.id,
         "name": "de1",
         "description": "",
         "image_url": "registry.com/img1:tag1",
-        "credential": None,
-        "id": obj.id,
+        "credential": {
+            "id": credential.id,
+            "name": credential.name,
+            "description": credential.description,
+            "credential_type": credential.credential_type.value,
+            "username": credential.username,
+        },
     }
 
 
@@ -83,7 +99,7 @@ def test_partial_update_decision_environment(client: APIClient):
     credential = models.Credential.objects.create(
         name="credential1", username="me", secret="sec1"
     )
-    data = {"credential": credential.id}
+    data = {"credential_id": credential.id}
     response = client.patch(
         f"{api_url_v1}/decision-environments/{obj.id}/", data=data
     )
@@ -95,7 +111,7 @@ def test_partial_update_decision_environment(client: APIClient):
         "name": "de1",
         "description": "",
         "image_url": "registry.com/img1:tag1",
-        "credential": credential.id,
+        "credential_id": credential.id,
         "id": obj.id,
     }
     updated_obj = models.DecisionEnvironment.objects.filter(pk=obj.id).first()
