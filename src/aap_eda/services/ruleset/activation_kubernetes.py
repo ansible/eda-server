@@ -19,6 +19,7 @@ from channels.db import database_sync_to_async
 from kubernetes import client, config, watch
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +33,26 @@ class ActivationKubernetes:
         self.client_api = client.CoreV1Api()
 
     @staticmethod
-    def create_container(image, name, pull_policy, url, activation_id):
+    def create_container(
+        image, name, pull_policy, url, activation_id, verbosity=2
+    ):
         container = client.V1Container(
             image=image,
             name=name,
             image_pull_policy=pull_policy,
-            env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="tmp")],
+            env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
             args=[
                 "--worker",
                 "--websocket-address",
                 url,
                 "--id",
                 str(activation_id),
+                "-vv",
+            ],
+            ports=[
+                client.V1ContainerPort(
+                    container_port=5000, host_port=5000, host_ip="0.0.0.0"
+                )
             ],
             command=["ansible-rulebook"],
         )
@@ -91,7 +100,7 @@ class ActivationKubernetes:
         return job
 
     async def run_activation_job(
-        self, job_name, job_spec, namespace, activation_instance_id
+        self, job_name, job_spec, namespace, activation_instance
     ):
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
@@ -112,22 +121,34 @@ class ActivationKubernetes:
 
             if o.status.succeeded:
                 logger.info(f"Job {obj_name}: Succeeded")
+                await self.activation_status_completed(
+                    activation_instance=activation_instance
+                )
+
                 await self.log_job_result(
                     job_name=obj_name,
                     namespace=namespace,
-                    activation_instance_id=activation_instance_id,
+                    activation_instance_id=activation_instance.id,
                 )
                 w.stop()
 
             if o.status.active:
                 logger.info(f"Job {obj_name}: Active")
+                await self.activation_status_running(
+                    activation_instance=activation_instance
+                )
+                w.stop()
 
             if o.status.failed:
                 logger.info(f"Job {obj_name}: Failed")
+                await self.activation_status_failed(
+                    activation_instance=activation_instance
+                )
+
                 await self.log_job_result(
                     job_name=obj_name,
                     namespace=namespace,
-                    activation_instance_id=activation_instance_id,
+                    activation_instance_id=activation_instance.id,
                 )
                 w.stop()
 
@@ -179,3 +200,18 @@ class ActivationKubernetes:
             activation_instance_logs
         )
         logger.info(f"{line_number} of activation instance log are created.")
+
+    @database_sync_to_async
+    def activation_status_failed(self, activation_instance):
+        activation_instance.status = ActivationStatus.FAILED
+        activation_instance.save()
+
+    @database_sync_to_async
+    def activation_status_running(self, activation_instance):
+        activation_instance.status = ActivationStatus.RUNNING
+        activation_instance.save()
+
+    @database_sync_to_async
+    def activation_status_completed(self, activation_instance):
+        activation_instance.status = ActivationStatus.COMPLETED
+        activation_instance.save()

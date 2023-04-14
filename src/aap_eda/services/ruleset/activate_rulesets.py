@@ -57,7 +57,6 @@ class ActivateRulesets:
             instance = models.ActivationInstance.objects.create(
                 activation_id=activation_id
             )
-            instance.status = ActivationStatus.RUNNING
 
             decision_environment = models.DecisionEnvironment.objects.get(
                 id=decision_environment_id
@@ -87,18 +86,16 @@ class ActivateRulesets:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.activate_in_k8s(
                     ws_url=WS_ADDRESS.format(host=host, port=port),
-                    activation_instance_id=instance.id,
+                    activation_instance=instance,
                     decision_environment_url=decision_environment_url,
                 )
             else:
                 raise ActivateRulesetsFailed(f"Unsupported {deployment_type}")
 
-            instance.status = ActivationStatus.COMPLETED
         except Exception as exe:
             logger.error(f"Activation error: {str(exe)}")
             instance.status = ActivationStatus.FAILED
         finally:
-            instance.ended_at = timezone.now()
             instance.save()
 
     def activate_in_local(
@@ -144,7 +141,7 @@ class ActivateRulesets:
     def activate_in_k8s(
         self,
         ws_url: str,
-        activation_instance_id: str,
+        activation_instance: models.ActivationInstance,
         decision_environment_url: str,
     ) -> None:
         k8s = ActivationKubernetes()
@@ -166,7 +163,7 @@ class ActivateRulesets:
             name=pod_name,
             pull_policy=_pull_policy,
             url=ws_url,
-            activation_id=activation_instance_id,
+            activation_id=activation_instance.id,
         )
         pod_spec = k8s.create_pod_template(
             pod_name=pod_name, container=container_spec
@@ -181,6 +178,6 @@ class ActivateRulesets:
                 job_name=job_name,
                 job_spec=job_spec,
                 namespace=namespace,
-                activation_instance_id=activation_instance_id,
+                activation_instance=activation_instance,
             )
         )
