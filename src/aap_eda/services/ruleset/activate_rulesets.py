@@ -172,7 +172,7 @@ class ActivateRulesets:
             pod_name=pod_name, container=container_spec
         )
         job_spec = k8s.create_job(
-            job_name=job_name, pod_template=pod_spec, ttl=30
+            job_name=job_name, pod_template=pod_spec, ttl=900
         )
 
         # execute job
