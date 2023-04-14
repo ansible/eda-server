@@ -112,35 +112,70 @@ class ActivationViewSet(
     @extend_schema(
         responses={status.HTTP_200_OK: serializers.ActivationReadSerializer},
     )
-    def retrieve(self, request, pk):
-        activation = super().retrieve(request, pk)
-        activation.data["project"] = (
-            models.Project.objects.get(pk=activation.data["project_id"])
-            if activation.data["project_id"]
+    def retrieve(self, request, pk: int):
+        response = super().retrieve(request, pk)
+        activation = response.data
+        activation["project"] = (
+            models.Project.objects.get(pk=activation["project_id"])
+            if activation["project_id"]
             else None
         )
-        activation.data["decision_environment"] = (
+        activation["decision_environment"] = (
             models.DecisionEnvironment.objects.get(
-                pk=activation.data["decision_environment_id"]
+                pk=activation["decision_environment_id"]
             )
-            if activation.data["decision_environment_id"]
+            if activation["decision_environment_id"]
             else None
         )
-        activation.data["rulebook"] = models.Rulebook.objects.get(
-            pk=activation.data["rulebook_id"]
+        activation["rulebook"] = models.Rulebook.objects.get(
+            pk=activation["rulebook_id"]
         )
-        activation.data["extra_var"] = (
-            models.ExtraVar.objects.get(pk=activation.data["extra_var_id"])
-            if activation.data["extra_var_id"]
+        activation["extra_var"] = (
+            models.ExtraVar.objects.get(pk=activation["extra_var_id"])
+            if activation["extra_var_id"]
             else None
         )
-        activation.data[
-            "instances"
-        ] = models.ActivationInstance.objects.filter(activation_id=pk)
+        activation_instances = models.ActivationInstance.objects.filter(
+            activation_id=pk
+        )
+        activation["instances"] = activation_instances
+        if activation_instances:
+            activation["status"] = activation_instances.latest(
+                "started_at"
+            ).status
+        else:
+            activation["status"] = ActivationStatus.FAILED.value
 
-        return Response(
-            serializers.ActivationReadSerializer(activation.data).data
-        )
+        return Response(serializers.ActivationReadSerializer(activation).data)
+
+    @extend_schema(
+        description="List all Activations",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ActivationListSerializer(many=True),
+                description="Return a list of Activations.",
+            ),
+        },
+    )
+    def list(self, request):
+        response = super().list(request)
+        activations = {}
+        if response and response.data:
+            activations = response.data["results"]
+
+        for activation in activations:
+            activation_instances = models.ActivationInstance.objects.filter(
+                activation_id=activation["id"]
+            )
+            if activation_instances:
+                activation["status"] = activation_instances.latest(
+                    "started_at"
+                ).status
+            else:
+                activation["status"] = ActivationStatus.FAILED.value
+
+        return self.get_paginated_response(activations)
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -312,7 +347,9 @@ class ActivationInstanceViewSet(
     )
     @action(detail=True)
     def logs(self, request, pk):
-        instance_exists = models.Activation.objects.filter(pk=pk).exists()
+        instance_exists = models.ActivationInstance.objects.filter(
+            pk=pk
+        ).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
