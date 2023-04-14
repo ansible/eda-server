@@ -61,7 +61,7 @@ spec:
                   name: eda-env-properties
                   key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
-          imagePullPolicy: Never
+          imagePullPolicy: Always
           name: eda-api
           ports:
             - containerPort: 8000
