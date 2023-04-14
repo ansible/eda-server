@@ -49,11 +49,7 @@ class ActivationKubernetes:
                 str(activation_id),
                 "-vv",
             ],
-            ports=[
-                client.V1ContainerPort(
-                    container_port=5000, host_port=5000, host_ip="0.0.0.0"
-                )
-            ],
+            ports=[client.V1ContainerPort(container_port=5000)],
             command=["ansible-rulebook"],
         )
 
