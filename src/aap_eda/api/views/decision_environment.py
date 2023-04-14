@@ -19,6 +19,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
@@ -40,17 +41,9 @@ from .mixins import (
             ),
         },
     ),
-    retrieve=extend_schema(
-        description="Get decision environment by id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.DecisionEnvironmentSerializer,
-                description="Return a decision environment by id.",
-            ),
-        },
-    ),
     create=extend_schema(
-        description="Import a decision environment.",
+        description="Create a new decision environment.",
+        request=serializers.DecisionEnvironmentCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.DecisionEnvironmentSerializer,
@@ -59,7 +52,8 @@ from .mixins import (
         },
     ),
     partial_update=extend_schema(
-        description="Partial update of a decision environment",
+        description="Partially update a decision environment",
+        request=serializers.DecisionEnvironmentCreateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.DecisionEnvironmentSerializer,
@@ -96,3 +90,28 @@ class DecisionEnvironmentViewSet(
 
     def get_response_serializer_class(self):
         return serializers.DecisionEnvironmentSerializer
+
+    @extend_schema(
+        description="Get a decision environment by id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.DecisionEnvironmentReadSerializer,
+                description="Return a decision environment by id.",
+            ),
+        },
+    )
+    def retrieve(self, request, pk):
+        decision_environment = super().retrieve(request, pk)
+        decision_environment.data["credential"] = (
+            models.Credential.objects.get(
+                pk=decision_environment.data["credential_id"]
+            )
+            if decision_environment.data["credential_id"]
+            else None
+        )
+
+        return Response(
+            serializers.DecisionEnvironmentReadSerializer(
+                decision_environment.data
+            ).data
+        )

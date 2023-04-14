@@ -44,3 +44,12 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "username",
             "secret",
         ]
+
+
+class CredentialRefSerializer(serializers.ModelSerializer):
+    """Serializer for Credential reference."""
+
+    class Meta:
+        model = models.Credential
+        fields = ["id", "name", "description", "credential_type", "username"]
+        read_only_fields = ["id"]

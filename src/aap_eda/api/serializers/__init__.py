@@ -26,9 +26,14 @@ from .auth import (
     RoleListSerializer,
     RoleSerializer,
 )
-from .credential import CredentialCreateSerializer, CredentialSerializer
+from .credential import (
+    CredentialCreateSerializer,
+    CredentialRefSerializer,
+    CredentialSerializer,
+)
 from .decision_environment import (
     DecisionEnvironmentCreateSerializer,
+    DecisionEnvironmentReadSerializer,
     DecisionEnvironmentRefSerializer,
     DecisionEnvironmentSerializer,
 )
