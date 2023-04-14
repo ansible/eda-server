@@ -205,6 +205,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 id=message.action_uuid,
                 fired_at=message.run_at,
                 name=message.action,
+                url=message.url,
                 status=message.status,
                 audit_rule_id=audit_rule.id,
             )
