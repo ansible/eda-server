@@ -217,8 +217,9 @@ class AuditRuleViewSet(
     def actions(self, _request, pk):
         audit_rule = get_object_or_404(models.AuditRule, pk=pk)
         audit_actions = models.AuditAction.objects.filter(
-            audit_rule=audit_rule
-        ).order_by("id")
+            audit_rule=audit_rule,
+            rule_fired_at=audit_rule.fired_at,
+        ).order_by("fired_at")
 
         results = self.paginate_queryset(audit_actions)
         serializer = serializers.AuditActionSerializer(results, many=True)
@@ -236,7 +237,8 @@ class AuditRuleViewSet(
     def events(self, _request, pk):
         audit_rule = get_object_or_404(models.AuditRule, pk=pk)
         audit_actions = models.AuditAction.objects.filter(
-            audit_rule=audit_rule
+            audit_rule=audit_rule,
+            rule_fired_at=audit_rule.fired_at,
         ).order_by("id")
 
         eqs = models.AuditEvent.objects.none()
