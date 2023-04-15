@@ -65,6 +65,8 @@ host_status_map = {
     Event.NO_REMAINING: "no remaining",
 }
 
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
+
 
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
@@ -189,12 +191,21 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 name=message.rule,
                 rule_uuid=message.rule_uuid,
                 ruleset_uuid=message.ruleset_uuid,
-                fired_at=message.run_at,
+                fired_at=message.rule_run_at,
                 job_instance_id=job_instance_id,
                 status=message.status,
             )
 
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
+        elif audit_rule.fired_at > datetime.strptime(
+            message.rule_run_at, DATETIME_FORMAT
+        ):
+            logger.info(f"Ignore the fired audit rule {audit_rule.name}")
+            return
+        else:
+            audit_rule.fired_at = message.rule_run_at
+            audit_rule.status = message.status
+            audit_rule.save()
 
         audit_action = models.AuditAction.objects.filter(
             id=message.action_uuid
@@ -205,7 +216,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 id=message.action_uuid,
                 fired_at=message.run_at,
                 name=message.action,
+                url=message.url,
                 status=message.status,
+                rule_fired_at=message.rule_run_at,
                 audit_rule_id=audit_rule.id,
             )
 
@@ -226,6 +239,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                         source_type=meta.get("source", {}).get("type"),
                         payload=meta,
                         received_at=meta.get("received_at"),
+                        rule_fired_at=message.rule_run_at,
                     )
                     audit_event.audit_actions.add(audit_action),
                     audit_event.save()
