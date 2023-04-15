@@ -100,6 +100,7 @@ class AuditAction(models.Model):
     status = models.TextField(blank=True)
     url = models.URLField(blank=True)
     fired_at = models.DateTimeField()
+    rule_fired_at = models.DateTimeField(null=True)
 
     audit_rule = models.ForeignKey(
         "AuditRule", on_delete=models.CASCADE, null=True
@@ -115,6 +116,7 @@ class AuditEvent(models.Model):
     source_type = models.TextField()
     received_at = models.DateTimeField()
     payload = models.JSONField(null=True)
+    rule_fired_at = models.DateTimeField(null=True)
 
     audit_actions = models.ManyToManyField(
         "AuditAction", related_name="audit_events"
