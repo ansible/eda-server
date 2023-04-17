@@ -175,7 +175,7 @@ class AuditRuleViewSet(
 ):
     queryset = models.AuditRule.objects.order_by("id")
     serializer_class = serializers.AuditRuleSerializer
-    rbac_resource_type = "audit_rule"
+    rbac_resource_type = ResourceType.AUDIT_RULE
     rbac_action = None
 
     @extend_schema(
@@ -290,7 +290,7 @@ class AuditEventViewSet(
     queryset = models.AuditEvent.objects.order_by("id")
     serializer_class = serializers.AuditEventSerializer
 
-    rbac_resource_type = ResourceType.AUDIT_RULE
+    rbac_resource_type = ResourceType.AUDIT_EVENT
 
 
 class RuleViewSet(
