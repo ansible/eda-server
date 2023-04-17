@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
 - ./eda-api
 - ./eda-worker
-- ./nginx
+- eda-ui
 - ./postgres
 - ./redis
 

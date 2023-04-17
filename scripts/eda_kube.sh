@@ -9,6 +9,9 @@ PROJECT_DIR="${SCRIPTS_DIR}/.."
 CMD=${1:-help}
 VERSION=${2:-'latest'}
 
+# dev environment variables
+export EDA_DEV_UI_GIT_REPO=${EDA_DEV_UI_GIT_REPO:-'git@github.com:ansible/ansible-ui.git'}
+export EDA_DEV_UI_BRANCH=${EDA_DEV_UI_BRANCH:-'main'}
 
 export DEBUG=${DEBUG:-false}
 
@@ -49,7 +52,7 @@ help() {
 
 build-deployment() {
   local _api_image="aap-eda:${1}"
-  local _ngx_image="eda-nginx:${1}"
+  local _ui_image="eda-ui:${1}"
   local _temp_dir="${DEPLOY_DIR}"/temp
 
   log-info "Using Deployment Directory: ${DEPLOY_DIR}/temp"
@@ -63,16 +66,16 @@ build-deployment() {
   log-debug "kustomize edit set image aap-eda=${_api_image}"
   kustomize edit set image aap-eda="${_api_image}"
 
-  cd "${DEPLOY_DIR}"/nginx
-  log-debug "kustomize edit set image eda-nginx=${_ngx_image}"
-  kustomize edit set image ngx-server="${_ngx_image}"
+  cd "${DEPLOY_DIR}"/eda-ui
+  log-debug "kustomize edit set image eda-ui=${_ui_image}"
+  kustomize edit set image eda-ui="${_ui_image}"
 
   cd "${PROJECT_DIR}"
   log-debug "kustomize build ${DEPLOY_DIR} -o ${DEPLOY_DIR}/temp"
   kustomize build "${DEPLOY_DIR}" -o "${DEPLOY_DIR}/temp"
 }
 
-build-eda-image() {
+build-eda-api-image() {
   local _image="aap-eda:${1}"
 
   log-info "Building aap-eda image"
@@ -80,8 +83,8 @@ build-eda-image() {
   minikube image build . -t "${_image}" -f tools/docker/Dockerfile
 }
 
-build-nginx-image() {
-  local _image="eda-nginx:${1}"
+build-eda-ui-image() {
+  local _image="eda-ui:${1}"
   local _temp_dir=./tmp
 
   if [ -d "${_temp_dir}" ]; then
@@ -90,18 +93,18 @@ build-nginx-image() {
   mkdir "${_temp_dir}"
 
   log-info "Clone ansible-ui"
-  log-debug "git clone git@github.com:ansible/ansible-ui.git ${_temp_dir}/ansible-ui"
-  git clone git@github.com:ansible/ansible-ui.git "${_temp_dir}"/ansible-ui
+  log-debug "git clone -b ${EDA_DEV_UI_BRANCH} ${EDA_DEV_UI_GIT_REPO} ${_temp_dir}/ansible-ui"
+  git clone -b "${EDA_DEV_UI_BRANCH}" "${EDA_DEV_UI_GIT_REPO}" "${_temp_dir}"/ansible-ui
 
-  log-info "Build eda-nginx image"
+  log-info "Build eda-ui image"
   log-debug "minikube image build . -t ${_image} -f tools/docker/nginx/Dockerfile"
   minikube image build . -t "${_image}" -f tools/docker/nginx/Dockerfile
   rm -rf "${_temp_dir}"
 }
 
 build-all() {
-  build-eda-image "${1}"
-  build-nginx-image "${1}"
+  build-eda-api-image "${1}"
+  build-eda-ui-image "${1}"
   build-deployment "${1}"
 }
 
@@ -168,7 +171,7 @@ clean-deployment() {
     log-debug "${NAMESPACE} does not exist"
   fi
 
-  for image in  redis:7 postgres:13 aap-eda:latest eda-nginx:latest; do
+  for image in  redis:7 postgres:13 aap-eda:latest eda-ui:latest; do
     remove-image "${image}"
   done
 

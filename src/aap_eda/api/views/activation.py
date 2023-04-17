@@ -291,7 +291,7 @@ class ActivationViewSet(
                 "Stop function for Activations is not implemented."
             )
         activate_rulesets.delay(
-            activationid=pk,
+            activation_id=pk,
             decision_environment_id=activation.decision_environment.id,
             deployment_type=settings.DEPLOYMENT_TYPE,
             host=settings.WEBSOCKET_SERVER_NAME,
