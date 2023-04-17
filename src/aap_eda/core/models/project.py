@@ -77,7 +77,7 @@ class ExtraVar(models.Model):
     class Meta:
         db_table = "core_extra_var"
 
-    name = models.TextField(unique=True)
+    name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
 

@@ -47,11 +47,6 @@ class ProjectRefSerializer(serializers.ModelSerializer):
 
 
 class ExtraVarSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the extra_var",
-    )
-
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
@@ -59,7 +54,7 @@ class ExtraVarSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ExtraVar
-        fields = "__all__"
+        fields = ["id", "extra_var"]
         read_only_fields = ["id"]
 
 
@@ -68,7 +63,7 @@ class ExtraVarRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ExtraVar
-        fields = ["id", "name"]
+        fields = ["id"]
         read_only_fields = ["id"]
 
 
