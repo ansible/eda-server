@@ -10,8 +10,9 @@ CMD=${1:-help}
 VERSION=${2:-'latest'}
 
 # dev environment variables
-export UI_GIT_REPO=${UI_GIT_REPO:-'git@github.com:ansible/ansible-ui.git'}
-export UI_BRANCH=${UI_BRANCH:-'main'}
+export EDA_DEV_UI_GIT_REPO=${EDA_DEV_UI_GIT_REPO:-'git@github.com:ansible/ansible-ui.git'}
+export EDA_DEV_UI_BRANCH=${EDA_DEV_UI_BRANCH:-'main'}
+
 export DEBUG=${DEBUG:-false}
 
 # import common & logging
@@ -92,8 +93,8 @@ build-eda-ui-image() {
   mkdir "${_temp_dir}"
 
   log-info "Clone ansible-ui"
-  log-debug "git clone -b ${UI_BRANCH} ${UI_GIT_REPO} ${_temp_dir}/ansible-ui"
-  git clone -b "${UI_BRANCH}" "${UI_GIT_REPO}" "${_temp_dir}"/ansible-ui
+  log-debug "git clone -b ${EDA_DEV_UI_BRANCH} ${EDA_DEV_UI_GIT_REPO} ${_temp_dir}/ansible-ui"
+  git clone -b "${EDA_DEV_UI_BRANCH}" "${EDA_DEV_UI_GIT_REPO}" "${_temp_dir}"/ansible-ui
 
   log-info "Build eda-ui image"
   log-debug "minikube image build . -t ${_image} -f tools/docker/nginx/Dockerfile"
