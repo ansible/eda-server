@@ -54,10 +54,12 @@ class ActivateRulesets:
         port: int,
     ):
         try:
+            activation = models.Activation.objects.get(id=activation_id)
             instance = models.ActivationInstance.objects.create(
-                activation_id=activation_id
+                activation_id=activation_id,
+                name=activation.name,
+                status=ActivationStatus.RUNNING,
             )
-            instance.status = ActivationStatus.RUNNING
 
             decision_environment = models.DecisionEnvironment.objects.get(
                 id=decision_environment_id
