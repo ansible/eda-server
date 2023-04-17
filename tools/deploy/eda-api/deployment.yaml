@@ -19,7 +19,11 @@ spec:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage migrate && scripts/create_superuser.sh && aap-eda-manage runserver 0.0.0.0:8000
+            - >-
+              aap-eda-manage migrate
+              && aap-eda-manage create_initial_data 
+              && scripts/create_superuser.sh
+              && aap-eda-manage runserver 0.0.0.0:8000
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda

@@ -82,7 +82,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     rulebook_id = serializers.IntegerField()
     extra_var_id = serializers.IntegerField(required=False, allow_null=True)
     decision_environment_id = serializers.IntegerField(
-        required=False, allow_null=True
+        required=True, allow_null=True
     )
 
     class Meta:
