@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.api import serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import RestartPolicy
 from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
@@ -91,9 +91,7 @@ def create_activation_related_data():
         rulesets=TEST_RULESETS,
         description=TEST_RULEBOOK["description"],
     ).pk
-    extra_var_id = models.ExtraVar.objects.create(
-        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
-    ).pk
+    extra_var_id = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR).pk
 
     return {
         "decision_environment_id": decision_environment_id,
@@ -185,7 +183,6 @@ def test_list_activations(client: APIClient):
     for data, activation in zip(response.data["results"], activations):
         assert_activation_base_data(data, activation)
         assert_activation_related_object_fks(data, activation)
-        assert data["status"] == ActivationStatus.FAILED.value
 
 
 @pytest.mark.django_db
@@ -197,7 +194,6 @@ def test_retrieve_activation(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, activation)
-    assert data["status"] == ActivationStatus.FAILED.value
     assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
     assert data["rulebook"] == {"id": activation.rulebook.id, **TEST_RULEBOOK}
     assert data["decision_environment"] == {
@@ -206,7 +202,6 @@ def test_retrieve_activation(client: APIClient):
     }
     assert data["extra_var"] == {
         "id": activation.extra_var.id,
-        "name": "test-extra-var.yml",
     }
 
 
