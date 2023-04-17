@@ -365,6 +365,7 @@ def test_list_audit_rules(client: APIClient, init_db):
         "name",
         "description",
         "status",
+        "ruleset_name",
         "fired_at",
         "created_at",
         "rule_uuid",
@@ -383,6 +384,7 @@ def test_retrieve_audit_rule(client: APIClient, init_db):
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "test_action"
+    assert response.data["ruleset_name"] == "test-audit-ruleset-name"
 
 
 @pytest.mark.django_db
@@ -484,6 +486,7 @@ def init_db():
         fired_at="2023-03-23T01:36:36.835248Z",
         rule_uuid=DUMMY_UUID,
         ruleset_uuid=DUMMY_UUID,
+        ruleset_name="test-audit-ruleset-name",
         activation_instance=activation_instance,
     )
 

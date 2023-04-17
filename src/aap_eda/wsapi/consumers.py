@@ -191,6 +191,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 name=message.rule,
                 rule_uuid=message.rule_uuid,
                 ruleset_uuid=message.ruleset_uuid,
+                ruleset_name=message.ruleset,
                 fired_at=message.rule_run_at,
                 job_instance_id=job_instance_id,
                 status=message.status,

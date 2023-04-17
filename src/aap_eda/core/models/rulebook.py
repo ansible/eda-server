@@ -81,6 +81,7 @@ class AuditRule(models.Model):
     fired_at = models.DateTimeField(null=False)
     rule_uuid = models.UUIDField(null=True)
     ruleset_uuid = models.UUIDField(null=True)
+    ruleset_name = models.TextField(null=True)
     activation_instance = models.ForeignKey(
         "ActivationInstance", on_delete=models.CASCADE, null=True
     )
