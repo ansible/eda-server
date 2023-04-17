@@ -8,20 +8,24 @@ x-environment:
   - EDA_ALLOWED_HOSTS=['*']
 
 services:
-  api:
-    image: 'localhost/aap-eda'
-    build:
-      context: ../../
-      dockerfile: tools/docker/Dockerfile
+  ui:
+    image: "quay.io/ansible/eda-ui:${EDA_UI_IMAGE_TAG:-latest}"
+    ports:
+      - '8080:8080'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+  eda-api:
+    image: "quay.io/ansible/eda-server:${EDA_IMAGE_TAG:-main}"
     environment: *common-env
     command:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage migrate
-        && aap-eda-manage create_initial_data
-        && scripts/create_superuser.sh
-        && aap-eda-manage runserver 0.0.0.0:8000
+        aap-eda-manage migrate &&
+        aap-eda-manage create_initial_data &&
+        scripts/create_superuser.sh &&
+        aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - '8000:8000'
     depends_on:
@@ -35,10 +39,10 @@ services:
       timeout: 5s
       retries: 10
 
-  worker:
+  eda-worker:
     deploy:
       replicas: 2
-    image: 'localhost/aap-eda'
+    image: "quay.io/ansible/eda-server:${EDA_IMAGE_TAG:-main}"
     environment: *common-env
     command:
       - aap-eda-manage
@@ -56,15 +60,8 @@ services:
     environment:
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: eda
-    command: >
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c log_statement=${PG_LOG_STATEMENT:-none}
     ports:
       - '5432:5432'
-    volumes:
-      - "./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:z"
-      - "./postgres/initdb.d:/docker-entrypoint-initdb.d:z"
-      - "./postgres/conf.d:/etc/postgresql/conf.d:z"
-      - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
