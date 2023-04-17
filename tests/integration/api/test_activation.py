@@ -159,6 +159,7 @@ def test_create_activation_unprocessible_entity(client: APIClient):
         "name": "test-activation",
         "description": "test activation",
         "is_enabled": True,
+        "decision_environment_id": 32,
         "rulebook_id": 100,
     }
 
