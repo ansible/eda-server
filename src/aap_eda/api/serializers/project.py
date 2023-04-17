@@ -22,7 +22,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = models.Project
         read_only_fields = [
             "id",
-            "url",
             "git_hash",
             "import_state",
             "import_error",
@@ -30,7 +29,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         ]
-        fields = ["name", "description", *read_only_fields]
+        fields = ["name", "description", "url", *read_only_fields]
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):

@@ -283,12 +283,16 @@ def test_partial_update_project(client: APIClient):
     )
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
-        data={"name": "test-project-01-updated"},
+        data={
+            "name": "test-project-01-updated",
+            "url": "https://git.example.com/acme/project-02",
+        },
     )
     assert response.status_code == status.HTTP_200_OK
 
     project = models.Project.objects.get(pk=project.id)
     assert project.name == "test-project-01-updated"
+    assert project.url == "https://git.example.com/acme/project-02"
 
     assert_project_data(response.json(), project)
 
