@@ -227,7 +227,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         matching_events = message.matching_events
         for event_meta in matching_events.values():
-            meta = event_meta.get("meta")
+            meta = event_meta.pop("meta")
             if meta:
                 audit_event = models.AuditEvent.objects.filter(
                     id=meta.get("uuid")
@@ -238,7 +238,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                         id=meta.get("uuid"),
                         source_name=meta.get("source", {}).get("name"),
                         source_type=meta.get("source", {}).get("type"),
-                        payload=meta,
+                        payload=event_meta,
                         received_at=meta.get("received_at"),
                         rule_fired_at=message.rule_run_at,
                     )
