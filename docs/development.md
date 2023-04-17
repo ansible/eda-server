@@ -240,7 +240,7 @@ environment variables:
 
 Locally:
 
-```task
+```shell
 task manage -- migrate
 ```
 
@@ -248,6 +248,19 @@ With docker compose:
 
 ```shell
 task docker:migrate 
+```
+
+### Seeding the database
+
+Locally:
+```shell
+task manage -- create_initial_data
+```
+
+With docker compose:
+
+```
+task docker -- run api --rm aap-eda-manage create_initial_data
 ```
 
 ### Create superuser
@@ -260,7 +273,7 @@ task create:superuser
 
 Locally:
 
-```task
+```shell
 task manage -- runserver
 ```
 
