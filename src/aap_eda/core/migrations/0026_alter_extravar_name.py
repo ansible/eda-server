@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0024_auto_20230414_1537"),
+        ("core", "0025_activationinstance_name"),
     ]
 
     operations = [
