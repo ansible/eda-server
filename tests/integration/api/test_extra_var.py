@@ -15,16 +15,12 @@ collections:
 
 @pytest.mark.django_db
 def test_list_extra_var(client: APIClient):
-    obj = models.ExtraVar.objects.create(
-        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
-    )
+    obj = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR)
     response = client.get(f"{api_url_v1}/extra-vars/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["results"] == [
         {
             "id": obj.id,
-            "project": None,
-            "name": "test-extra-var.yml",
             "extra_var": TEST_EXTRA_VAR,
         }
     ]
@@ -33,7 +29,6 @@ def test_list_extra_var(client: APIClient):
 @pytest.mark.django_db
 def test_create_extra_var(client: APIClient):
     data_in = {
-        "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
     response = client.post(f"{api_url_v1}/extra-vars/", data=data_in)
@@ -41,8 +36,6 @@ def test_create_extra_var(client: APIClient):
     id_ = response.data["id"]
     assert response.data == {
         "id": id_,
-        "project": None,
-        "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
     assert models.ExtraVar.objects.filter(pk=id_).exists()
@@ -50,15 +43,11 @@ def test_create_extra_var(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_extra_var(client: APIClient):
-    obj = models.ExtraVar.objects.create(
-        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
-    )
+    obj = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR)
     response = client.get(f"{api_url_v1}/extra-vars/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
         "id": obj.id,
-        "project": None,
-        "name": "test-extra-var.yml",
         "extra_var": TEST_EXTRA_VAR,
     }
 

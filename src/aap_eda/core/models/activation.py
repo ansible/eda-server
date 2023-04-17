@@ -54,6 +54,7 @@ class ActivationInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance"
 
+    name = models.TextField(null=False, default="")
     status = models.TextField(
         choices=ActivationStatus.choices(),
         default=ActivationStatus.PENDING,

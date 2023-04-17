@@ -12,22 +12,23 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation_instance import ActivationInstanceFilter
-from .credential import CredentialFilter
-from .decision_environment import DecisionEnvironmentFilter
-from .project import ProjectFilter
-from .rulebook import RulebookFilter, RulesetFilter
+import django_filters
 
-__all__ = (
-    # project
-    "ProjectFilter",
-    # rulebook
-    "RulebookFilter",
-    "RulesetFilter",
-    # credential
-    "CredentialFilter",
-    # decision_environment
-    "DecisionEnvironmentFilter",
-    # activation instance
-    "ActivationInstanceFilter",
-)
+from aap_eda.core import models
+
+
+class ActivationInstanceFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by activation instance name.",
+    )
+    status = django_filters.CharFilter(
+        field_name="status",
+        lookup_expr="istartswith",
+        label="Filter by activation instance status.",
+    )
+
+    class Meta:
+        model = models.ActivationInstance
+        fields = ["name", "status"]

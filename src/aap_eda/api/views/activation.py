@@ -14,6 +14,7 @@
 from django.conf import settings
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -23,7 +24,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, serializers
+from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.tasks.ruleset import activate_rulesets
@@ -192,7 +193,7 @@ class ActivationViewSet(
 
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
-        )
+        ).order_by("started_at")
         activation_instances = self.paginate_queryset(activation_instances)
         serializer = serializers.ActivationInstanceSerializer(
             activation_instances, many=True
@@ -289,7 +290,7 @@ class ActivationViewSet(
                 "Stop function for Activations is not implemented."
             )
         activate_rulesets.delay(
-            activationid=pk,
+            activation_id=pk,
             decision_environment_id=activation.decision_environment.id,
             deployment_type=settings.DEPLOYMENT_TYPE,
             host=settings.WEBSOCKET_SERVER_NAME,
@@ -333,8 +334,10 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.ActivationInstance.objects.all()
+    queryset = models.ActivationInstance.objects.order_by("started_at")
     serializer_class = serializers.ActivationInstanceSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = filters.ActivationInstanceFilter
 
     @extend_schema(
         description="List all logs for the Activation Instance",
@@ -355,7 +358,7 @@ class ActivationInstanceViewSet(
 
         activation_instance_logs = models.ActivationInstanceLog.objects.filter(
             activation_instance_id=pk
-        )
+        ).order_by("id")
 
         activation_instance_logs = self.paginate_queryset(
             activation_instance_logs
