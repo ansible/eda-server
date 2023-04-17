@@ -8,7 +8,7 @@ x-environment:
   - EDA_ALLOWED_HOSTS=['*']
 
 services:
-  ui:
+  eda-ui:
     image: "quay.io/ansible/eda-ui:${EDA_UI_IMAGE_TAG:-latest}"
     ports:
       - '8080:8080'
@@ -22,9 +22,9 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage migrate
-        && aap-eda-manage create_initial_data
-        && scripts/create_superuser.sh
+        aap-eda-manage migrate 
+        && aap-eda-manage create_initial_data 
+        && scripts/create_superuser.sh 
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - '8000:8000'
