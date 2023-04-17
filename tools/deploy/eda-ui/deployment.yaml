@@ -17,7 +17,7 @@ spec:
       containers:
       - name: eda-ui
         imagePullPolicy: Never
-        image: eda-nginx
+        image: eda-ui
         ports:
         - containerPort: 8080
 status: {}
