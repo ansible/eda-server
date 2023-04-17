@@ -10,7 +10,9 @@ on:
   # workflow_dispatch:
 
 env:
-  eda_path: "./eda-qa"
+  EDA_QA_PATH: "./eda-qa"
+  REGISTRY: quay.io
+  QUAY_USER: ansible+eda_gha
 
 jobs:
   api-e2e-tests:
@@ -18,6 +20,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Run api in background
         working-directory: tools/docker
@@ -31,7 +40,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: ansible/eda-qa
-          path: ${{ env.eda_path }}
+          path: ${{ env.EDA_QA_PATH }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -39,11 +48,11 @@ jobs:
           python-version: "3.9"
 
       - name: Install dependencies
-        working-directory: ${{ env.eda_path }}
+        working-directory: ${{ env.EDA_QA_PATH }}
         run: pip install .
 
       - name: Run tests
-        working-directory: ${{ env.eda_path }}
+        working-directory: ${{ env.EDA_QA_PATH }}
         run: pytest
 
       - name: Notify to slack if failure
