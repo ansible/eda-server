@@ -36,34 +36,25 @@ For further information please refer our [guidelines](development.md#Taskfile).
 git clone git@github.com:ansible/aap-eda.git
 ```
 
-#### Building container images
+#### Running services
 
 ```shell
 cd tools/docker
 ```
 
-First you need to build the container image:
+You may want to pull the latest images from the registry:
 
 ```shell
-docker-compose -p eda -f docker-compose-stage.yaml build
+docker-compose -p eda -f docker-compose-stage.yaml pull
 ```
-
-This will build `localhost/aap-eda:latest` image:
-
-```shell
-$ docker images
-
-REPOSITORY                                    TAG         IMAGE ID       CREATED        SIZE
-localhost/aap-eda                             latest      28fd94c8cf89   5 hours ago    611MB
-```
-
-#### Running services
 
 You can start all services with:
 
 ```shell
 docker-compose -p eda -f docker-compose-stage.yaml up
 ```
+
+Note: **You can use the environment variables `EDA_IMAGE_TAG` and `EDA_UI_IMAGE_TAG` to use a different image tag. By default is the latest code from the main branch.**
 
 ## Deploy using Minikube and Taskfile
 
@@ -86,13 +77,13 @@ Minikube is the recommended method for macOS users
    ```
 
 2. Edit ./tools/deploy/environment.properties file and add your values.
-   
+
 3. Start minikube if it is not already running:
 
    ```shell
    minikube start
    ```
-   
+
 4. Ensure minikube instance is up and running:
 
    ```shell
@@ -104,6 +95,7 @@ Minikube is the recommended method for macOS users
    ```shell
    task minikube:all
    ```
+
 6. Forward the webserver port to the localhost:
 
    ```shell
