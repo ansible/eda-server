@@ -26,7 +26,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import Action, ActivationStatus
 from aap_eda.tasks.ruleset import activate_rulesets
 
 
@@ -77,6 +77,7 @@ class ActivationViewSet(
 ):
     queryset = models.Activation.objects.order_by("id")
     serializer_class = serializers.ActivationSerializer
+    rbac_action = None
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -210,7 +211,7 @@ class ActivationViewSet(
             ),
         },
     )
-    @action(methods=["post"], detail=True)
+    @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
         if activation.is_enabled:
@@ -239,7 +240,7 @@ class ActivationViewSet(
             ),
         },
     )
-    @action(methods=["post"], detail=True)
+    @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
         current_instance = (
             models.ActivationInstance.objects.filter(pk=pk)
@@ -270,7 +271,7 @@ class ActivationViewSet(
             ),
         },
     )
-    @action(methods=["post"], detail=True)
+    @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
         if not activation.is_enabled:
@@ -338,6 +339,8 @@ class ActivationInstanceViewSet(
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
+    rbac_resource_type = "activation_instance"
+    rbac_action = None
 
     @extend_schema(
         description="List all logs for the Activation Instance",
@@ -345,7 +348,7 @@ class ActivationInstanceViewSet(
             status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer
         },
     )
-    @action(detail=True)
+    @action(detail=True, rbac_action=Action.READ)
     def logs(self, request, pk):
         instance_exists = models.ActivationInstance.objects.filter(
             pk=pk
