@@ -96,10 +96,3 @@ class AwxTokenSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "user", "created_at", "modified_at"]
         extra_kwargs = {"token": {"write_only": True}}
-
-
-class AwxTokenListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.AwxToken
-        fields = ["id", "name", "description", "token"]
-        read_only_fields = ["id", "name", "descritption", "token"]
