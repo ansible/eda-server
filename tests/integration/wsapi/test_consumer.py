@@ -249,6 +249,24 @@ async def test_handle_actions():
     assert (await get_audit_action_count()) == 1
     assert (await get_audit_event_count()) == 2
 
+    event1, event2 = await get_audit_events()
+
+    assert str(event1.id) == "523af123-2783-448f-9e2a-d33ad89b04fa"
+    assert event1.payload == {"i": 7}
+    assert event1.source_name == "my test source"
+    assert event1.source_type == "ansible.eda.range"
+
+    assert str(event2.id) == "58d7bbfe-4205-4d25-8cc1-d7e8eea06d21"
+    assert event2.payload == {"i": 3}
+
+
+@database_sync_to_async
+def get_audit_events():
+    return (
+        models.AuditEvent.objects.first(),
+        models.AuditEvent.objects.last(),
+    )
+
 
 @database_sync_to_async
 def get_audit_event_count():

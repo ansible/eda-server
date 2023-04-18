@@ -199,6 +199,11 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         help_text="Status of the fired rule",
     )
 
+    ruleset_name = serializers.CharField(
+        required=False,
+        help_text="Name of the related ruleset",
+    )
+
     fired_at = serializers.DateTimeField(
         required=True,
         help_text="The fired timestamp of the rule",
