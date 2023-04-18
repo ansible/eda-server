@@ -85,9 +85,9 @@ class ActivateRulesets:
                 or dtype == DeploymentType.DOCKER
             ):
                 self.activate_in_docker_podman(
-                    decision_environment,
-                    WS_ADDRESS.format(host=host, port=port),
-                    instance.id,
+                    ws_url=WS_ADDRESS.format(host=host, port=port),
+                    activation_instance_id=instance.id,
+                    decision_environment_url=decision_environment_url,
                 )
 
             elif dtype == DeploymentType.K8S:
@@ -145,14 +145,13 @@ class ActivateRulesets:
         logger.info(f"{line_number} of activation instance log are created.")
 
     def activate_in_docker_podman(
-        self, decision_environment: str, url: str, activation_instance_id: str
-    ):
-        # TODO: remove this when decision environment is available
-        decision_environment = "quay.io/ansible/ansible-rulebook:main"
-
-        docker = ActivationDockers(decision_environment)
-        container = docker.create_container(url, activation_instance_id)
-        container.start()
+        self,
+        ws_url: str,
+        activation_instance_id: str,
+        decision_environment_url: str,
+    ) -> None:
+        docker = ActivationDockers(decision_environment_url)
+        container = docker.run_container(ws_url, activation_instance_id)
 
         line_number = 0
         activation_instance_logs = []

@@ -15,7 +15,6 @@ __pycache__/
 
 # Local development
 .env
-/tools/docker/docker.env
 
 # Task
 .task/

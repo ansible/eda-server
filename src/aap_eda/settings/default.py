@@ -295,6 +295,9 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 # DEPLOYMENT SETTINGS
 # ---------------------------------------------------------
 
+EDA_DOCKER_SOCKET_PATH = settings.get(
+    "EDA_DOCKER_SOCKET_PATH", "unix://var/run/docker.sock"
+)
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
 WEBSOCKET_SERVER_NAME = settings.get("WEBSOCKET_SERVER_NAME", "localhost")
 WEBSOCKET_SERVER_PORT = settings.get("WEBSOCKET_SERVER_PORT", "8000")
