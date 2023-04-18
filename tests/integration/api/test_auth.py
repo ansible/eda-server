@@ -13,6 +13,7 @@
 #  limitations under the License.
 import uuid
 from dataclasses import dataclass
+from operator import itemgetter
 
 import pytest
 from rest_framework import status
@@ -121,10 +122,10 @@ def _get_crsf_token(client: RequestsClient):
 def test_list_roles(client: APIClient, init_db):
     response = client.get(f"{api_url_v1}/roles/")
     assert response.status_code == status.HTTP_200_OK
-    roles = response.json()["results"]
+    roles = sorted(response.json()["results"], key=itemgetter("name"))
 
-    assert len(roles) == 1
-    assert roles[0] == {
+    assert len(roles) == 2
+    assert roles[1] == {
         "id": str(init_db.role.id),
         "name": init_db.role.name,
         "description": init_db.role.description,

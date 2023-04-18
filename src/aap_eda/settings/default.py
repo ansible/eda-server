@@ -182,7 +182,7 @@ AUTH_USER_MODEL = "core.User"
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",  # noqa: E501
+    "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
@@ -190,6 +190,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
+        "aap_eda.api.permissions.RoleBasedPermission",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }

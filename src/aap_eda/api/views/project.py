@@ -24,6 +24,7 @@ from rest_framework.response import Response
 from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
+from aap_eda.core.enums import Action, ResourceType
 
 from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 
@@ -64,6 +65,8 @@ class ExtraVarViewSet(
     queryset = models.ExtraVar.objects.order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
+
+    rbac_resource_type = ResourceType.EXTRA_VAR
 
 
 @extend_schema_view(
@@ -145,6 +148,8 @@ class ProjectViewSet(
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
 
+    rbac_action = None
+
     @extend_schema(
         description="Import a project.",
         request=serializers.ProjectCreateRequestSerializer,
@@ -178,7 +183,11 @@ class ProjectViewSet(
     @extend_schema(
         responses={status.HTTP_202_ACCEPTED: serializers.TaskRefSerializer}
     )
-    @action(methods=["post"], detail=True)
+    @action(
+        methods=["post"],
+        detail=True,
+        rbac_action=Action.UPDATE,
+    )
     def sync(self, request, pk):
         project_exists = models.Project.objects.filter(pk=pk).exists()
         if not project_exists:

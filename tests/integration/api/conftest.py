@@ -11,10 +11,12 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from unittest import mock
 
 import pytest
 from rest_framework.test import APIClient
 
+from aap_eda.api.permissions import RoleBasedPermission
 from aap_eda.core import models
 
 ADMIN_USERNAME = "test.admin"
@@ -23,12 +25,15 @@ ADMIN_PASSWORD = "test.admin.123"
 
 @pytest.fixture
 def admin_user():
-    return models.User.objects.create_user(
+    user = models.User.objects.create_user(
         username=ADMIN_USERNAME,
         password=ADMIN_PASSWORD,
         email="admin@localhost",
-        is_superuser=True,
     )
+    admin_role = models.Role.objects.create(name="Test Admin")
+    admin_role.permissions.add(*models.Permission.objects.all())
+    user.roles.add(admin_role)
+    return user
 
 
 @pytest.fixture
@@ -43,3 +48,14 @@ def client(base_client: APIClient, admin_user: models.User) -> APIClient:
     """Return a pre-configured instance of an APIClient."""
     base_client.force_authenticate(user=admin_user)
     return base_client
+
+
+@pytest.fixture
+def check_permission_mock():
+    with mock.patch.object(
+        RoleBasedPermission,
+        "_check_permission",
+        autospec=True,
+        wraps=RoleBasedPermission._check_permission,
+    ) as m:
+        yield m
