@@ -1,13 +1,11 @@
 name: Scheduled e2e tests
 
 on:
-  pull_request:
-    branches: ["main"]
-  # schedule:
-  #   # Run at 10:00 AM/PM UTC
-  #   - cron: "0 10,22 * * *"
-  # # Run on demand
-  # workflow_dispatch:
+  schedule:
+    # Run at 10:00 AM/PM UTC
+    - cron: "0 10,22 * * *"
+  # Run on demand
+  workflow_dispatch:
 
 env:
   EDA_QA_PATH: "./eda-qa"
