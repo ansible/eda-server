@@ -62,6 +62,7 @@ from .user import (
     AwxTokenListSerializer,
     AwxTokenSerializer,
     UserCreateUpdateSerializer,
+    UserDetailSerializer,
     UserListSerializer,
     UserSerializer,
 )
@@ -100,6 +101,7 @@ __all__ = (
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",
+    "UserDetailSerializer",
     "AwxTokenSerializer",
     "AwxTokenListSerializer",
     # credential

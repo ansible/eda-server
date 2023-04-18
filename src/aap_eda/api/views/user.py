@@ -12,15 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import django.db.utils
-from django.contrib.auth.hashers import make_password
-from django.shortcuts import get_list_or_404
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import mixins, permissions, status, views, viewsets
-from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -29,7 +26,11 @@ from aap_eda.api import serializers
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
-from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+from .mixins import (
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    ResponseSerializerMixin,
+)
 
 
 class CurrentUserView(views.APIView):
@@ -118,6 +119,16 @@ class CurrentUserAwxTokensViewSet(
 
 
 @extend_schema_view(
+    create=extend_schema(
+        description="Create a user",
+        request=serializers.UserCreateUpdateSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.UserDetailSerializer,
+                description="Return the created user.",
+            ),
+        },
+    ),
     list=extend_schema(
         description="List all users",
         responses={
@@ -131,7 +142,7 @@ class CurrentUserAwxTokensViewSet(
         description="Retrieve a user by their id",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.UserSerializer,
+                serializers.UserDetailSerializer,
                 description="Return a user.",
             ),
         },
@@ -141,55 +152,39 @@ class CurrentUserAwxTokensViewSet(
         request=serializers.UserCreateUpdateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.UserSerializer,
+                serializers.UserDetailSerializer,
                 description="Update successful. Return an updated user.",
             )
+        },
+    ),
+    destroy=extend_schema(
+        description="Delete a user by id",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None,
+                description="Delete successful.",
+            ),
         },
     ),
 )
 class UserViewSet(
     viewsets.ReadOnlyModelViewSet,
+    CreateModelMixin,
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
+    mixins.DestroyModelMixin,
 ):
     queryset = models.User.objects.order_by("id")
 
     def get_serializer_class(self):
         if self.action == "list":
             return serializers.UserListSerializer
-        elif self.action in ["retrieve", "create", "partial_update"]:
-            return serializers.UserSerializer
-        elif self.action == "tokens":
-            return serializers.AwxTokenListSerializer
+        elif self.action == "retrieve":
+            return serializers.UserDetailSerializer
+        elif self.action in ["create", "partial_update"]:
+            return serializers.UserCreateUpdateSerializer
 
-    @extend_schema(
-        description="Create a user",
-        request=serializers.UserCreateUpdateSerializer,
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.UserSerializer,
-                description="Return the created user.",
-            ),
-        },
-    )
-    def create(self, request):
-        request.data["password"] = make_password(request.data["password"])
-        serializer = serializers.UserCreateUpdateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+        return serializers.UserSerializer
 
-        serializer = self.get_serializer(user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    @extend_schema(
-        description="list of AWK tokens for the user.",
-        request=None,
-        responses={
-            status.HTTP_200_OK: serializers.AwxTokenListSerializer(many=True)
-        },
-    )
-    @action(detail=True, methods=["get"])
-    def tokens(self, request, pk):
-        tokens = get_list_or_404(models.AwxToken, user=pk)
-        serializer = self.get_serializer(tokens)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    def get_response_serializer_class(self):
+        return serializers.UserDetailSerializer

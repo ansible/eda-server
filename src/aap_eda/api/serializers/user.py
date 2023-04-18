@@ -1,3 +1,4 @@
+from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
 
 from aap_eda.core import models
@@ -8,15 +9,22 @@ from .auth import RoleRefSerializer
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.User
+        fields = "__all__"
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(source="date_joined")
+
+    class Meta:
+        model = models.User
         fields = [
             "id",
             "username",
             "email",
             "first_name",
             "last_name",
-            "is_superuser",
             "roles",
-            "date_joined",
+            "created_at",
             "modified_at",
         ]
 
@@ -41,14 +49,12 @@ class UserListSerializer(serializers.Serializer):
         help_text="The user's last name.",
     )
 
-    is_superuser = serializers.BooleanField(
-        required=True, help_text="The user's type."
-    )
-
     roles = RoleRefSerializer(read_only=True, many=True)
 
 
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
     class Meta:
         model = models.User
         fields = [
@@ -58,8 +64,25 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             "email",
             "password",
             "roles",
-            "is_superuser",
         ]
+
+    def create(self, validated_data):
+        return self.create_or_update(validated_data)
+
+    def update(self, instance, validated_data):
+        return self.create_or_update(validated_data, instance)
+
+    def create_or_update(self, validated_data, instance=None):
+        password = validated_data.pop("password")
+        validated_data["password"] = make_password(password)
+        if instance:
+            return super(UserCreateUpdateSerializer, self).update(
+                instance, validated_data
+            )
+        else:
+            return super(UserCreateUpdateSerializer, self).create(
+                validated_data
+            )
 
 
 class AwxTokenSerializer(serializers.ModelSerializer):
