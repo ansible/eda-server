@@ -15,6 +15,8 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(source="date_joined")
 
+    roles = RoleRefSerializer(read_only=True, many=True)
+
     class Meta:
         model = models.User
         fields = [
@@ -67,22 +69,17 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        return self.create_or_update(validated_data)
-
-    def update(self, instance, validated_data):
-        return self.create_or_update(validated_data, instance)
-
-    def create_or_update(self, validated_data, instance=None):
         password = validated_data.pop("password")
         validated_data["password"] = make_password(password)
-        if instance:
-            return super(UserCreateUpdateSerializer, self).update(
-                instance, validated_data
-            )
-        else:
-            return super(UserCreateUpdateSerializer, self).create(
-                validated_data
-            )
+        return super(UserCreateUpdateSerializer, self).create(validated_data)
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        if password:
+            validated_data["password"] = make_password(password)
+        return super(UserCreateUpdateSerializer, self).update(
+            instance, validated_data
+        )
 
 
 class AwxTokenSerializer(serializers.ModelSerializer):

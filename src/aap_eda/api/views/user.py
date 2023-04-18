@@ -43,13 +43,13 @@ class CurrentUserView(views.APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Return current user.",
-                response=serializers.UserSerializer,
+                response=serializers.UserDetailSerializer,
             ),
         },
     )
     def get(self, request: Request, *args, **kwargs) -> Response:
         user = request.user
-        serializer = serializers.UserSerializer(user)
+        serializer = serializers.UserDetailSerializer(user)
         return Response(data=serializer.data)
 
 
@@ -179,12 +179,12 @@ class UserViewSet(
     def get_serializer_class(self):
         if self.action == "list":
             return serializers.UserListSerializer
-        elif self.action == "retrieve":
-            return serializers.UserDetailSerializer
+        elif self.action == "destroy":
+            return serializers.UserSerializer
         elif self.action in ["create", "partial_update"]:
             return serializers.UserCreateUpdateSerializer
 
-        return serializers.UserSerializer
+        return serializers.UserDetailSerializer
 
     def get_response_serializer_class(self):
         return serializers.UserDetailSerializer

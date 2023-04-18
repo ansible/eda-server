@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0027_auditrule_ruleset_name'),
+        ("core", "0027_auditrule_ruleset_name"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='modified_at',
+            model_name="user",
+            name="modified_at",
             field=models.DateTimeField(auto_now=True),
         ),
     ]
