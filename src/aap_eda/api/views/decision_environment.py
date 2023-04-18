@@ -82,6 +82,7 @@ class DecisionEnvironmentViewSet(
     queryset = models.DecisionEnvironment.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.DecisionEnvironmentFilter
+    rbac_resource_type = "decision_environment"
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:
