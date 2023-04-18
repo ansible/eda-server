@@ -9,6 +9,6 @@ resources:
 - service.yaml
 
 images:
-- name: ngx-server
-  newName: eda-nginx
+- name: eda-ui
+  newName: eda-ui
   newTag: latest
