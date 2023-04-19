@@ -1,0 +1,69 @@
+name: Scheduled e2e tests
+
+on:
+  schedule:
+    # Run at 10:00 AM/PM UTC
+    - cron: "0 10,22 * * *"
+  # Run on demand
+  workflow_dispatch:
+
+env:
+  EDA_QA_PATH: "./eda-qa"
+  REGISTRY: quay.io
+  QUAY_USER: ansible+eda_gha
+
+jobs:
+  api-e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Run api in background
+        working-directory: tools/docker
+        run: |
+          docker-compose -p eda -f docker-compose-stage.yaml pull
+          docker-compose -p eda -f docker-compose-stage.yaml up -d
+          while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
+            echo "Waiting for API to be ready..."
+            sleep 1
+          done
+
+      - name: Fetch test suite
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          repository: ansible/eda-qa
+          path: ${{ env.EDA_QA_PATH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        working-directory: ${{ env.EDA_QA_PATH }}
+        run: pip install .
+
+      - name: Run tests
+        working-directory: ${{ env.EDA_QA_PATH }}
+        run: pytest
+
+      - name: Notify to slack if failure
+        if: ${{ failure() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_USERNAME: GH Slack Notifier for EDA
+          SLACK_TITLE: Failure of scheduled tests for eda-server
+          SLACK_MESSAGE: |
+            Scheduled tests for eda-server failed.
+            Id: ${{ github.run_id }}"
+            Workflow: ${{ github.workflow }}
