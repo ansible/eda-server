@@ -180,7 +180,10 @@ class ActivationViewSet(
         description="List all instances for the Activation",
         request=None,
         responses={
-            status.HTTP_200_OK: serializers.ActivationInstanceSerializer
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ActivationInstanceSerializer(many=True),
+                description="Return a list of Activation Instances.",
+            ),
         },
     )
     @action(detail=True)
