@@ -35,6 +35,7 @@ router.register("activations", views.ActivationViewSet)
 router.register("activation-instances", views.ActivationInstanceViewSet)
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("audit-events", views.AuditEventViewSet)
+router.register("users", views.UserViewSet)
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokensViewSet,
@@ -67,11 +68,11 @@ openapi_urls = [
 ]
 
 v1_urls = [
-    *router.urls,
+    path("", include(openapi_urls)),
     path("auth/session/login/", views.SessionLoginView.as_view()),
     path("auth/session/logout/", views.SessionLogoutView.as_view()),
     path("users/me/", views.CurrentUserView.as_view()),
-    path("", include(openapi_urls)),
+    *router.urls,
 ]
 
 urlpatterns = [

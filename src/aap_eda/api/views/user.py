@@ -17,7 +17,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import mixins, permissions, status, views
+from rest_framework import mixins, permissions, status, views, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -25,6 +25,12 @@ from rest_framework.viewsets import GenericViewSet
 from aap_eda.api import serializers
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
+
+from .mixins import (
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    ResponseSerializerMixin,
+)
 
 
 class CurrentUserView(views.APIView):
@@ -37,13 +43,13 @@ class CurrentUserView(views.APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 description="Return current user.",
-                response=serializers.UserSerializer,
+                response=serializers.UserDetailSerializer,
             ),
         },
     )
     def get(self, request: Request, *args, **kwargs) -> Response:
         user = request.user
-        serializer = serializers.UserSerializer(user)
+        serializer = serializers.UserDetailSerializer(user)
         return Response(data=serializer.data)
 
 
@@ -110,3 +116,75 @@ class CurrentUserAwxTokensViewSet(
             if name_exists:
                 raise Conflict("Token with this name already exists.")
             raise Conflict
+
+
+@extend_schema_view(
+    create=extend_schema(
+        description="Create a user",
+        request=serializers.UserCreateUpdateSerializer,
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                serializers.UserDetailSerializer,
+                description="Return the created user.",
+            ),
+        },
+    ),
+    list=extend_schema(
+        description="List all users",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.UserListSerializer,
+                description="Return a list of users.",
+            ),
+        },
+    ),
+    retrieve=extend_schema(
+        description="Retrieve a user by their id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.UserDetailSerializer,
+                description="Return a user.",
+            ),
+        },
+    ),
+    partial_update=extend_schema(
+        description="Partial update of a user.",
+        request=serializers.UserCreateUpdateSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.UserDetailSerializer,
+                description="Update successful. Return an updated user.",
+            )
+        },
+    ),
+    destroy=extend_schema(
+        description="Delete a user by id",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None,
+                description="The user has been deleted successful.",
+            ),
+        },
+    ),
+)
+class UserViewSet(
+    viewsets.ReadOnlyModelViewSet,
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    ResponseSerializerMixin,
+    mixins.DestroyModelMixin,
+):
+    queryset = models.User.objects.order_by("id")
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return serializers.UserListSerializer
+        elif self.action == "destroy":
+            return serializers.UserSerializer
+        elif self.action in ["create", "partial_update"]:
+            return serializers.UserCreateUpdateSerializer
+
+        return serializers.UserDetailSerializer
+
+    def get_response_serializer_class(self):
+        return serializers.UserDetailSerializer

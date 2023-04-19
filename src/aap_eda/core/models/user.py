@@ -30,6 +30,7 @@ class User(AbstractUser):
     """  # noqa: E501
 
     roles = models.ManyToManyField("Role", related_name="users")
+    modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
 class AwxToken(models.Model):

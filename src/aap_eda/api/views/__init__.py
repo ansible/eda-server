@@ -25,7 +25,7 @@ from .rulebook import (
     RuleViewSet,
 )
 from .tasks import TaskViewSet
-from .user import CurrentUserAwxTokensViewSet, CurrentUserView
+from .user import CurrentUserAwxTokensViewSet, CurrentUserView, UserViewSet
 
 __all__ = (
     # auth
@@ -49,6 +49,7 @@ __all__ = (
     # user
     "CurrentUserView",
     "CurrentUserAwxTokensViewSet",
+    "UserViewSet",
     # credential
     "CredentialViewSet",
     # decision_environment
