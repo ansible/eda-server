@@ -110,7 +110,7 @@ def test_list_rulebooks_filter_project(client: APIClient, init_db):
     filter_project = init_db.project[0].id
     rulebook = init_db.rulebook[0]
     response = client.get(
-        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
+        f"{api_url_v1}/rulebooks/?project={filter_project}"
     )
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
@@ -122,7 +122,7 @@ def test_list_rulebooks_filter_project(client: APIClient, init_db):
 def test_list_rulebooks_filter_project_non_existant(client: APIClient):
     filter_project = "10000"
     response = client.get(
-        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
+        f"{api_url_v1}/rulebooks/?project={filter_project}"
     )
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK

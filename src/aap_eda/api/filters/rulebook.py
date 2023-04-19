@@ -24,7 +24,7 @@ class RulebookFilter(django_filters.FilterSet):
         label="Filter by rulebook name.",
     )
 
-    project_id = django_filters.NumberFilter(
+    project = django_filters.NumberFilter(
         field_name="project",
         lookup_expr="exact",
         label="Filter by rulebook's project id.",
