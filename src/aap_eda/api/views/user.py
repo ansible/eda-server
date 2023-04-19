@@ -162,7 +162,7 @@ class CurrentUserAwxTokensViewSet(
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None,
-                description="Delete successful.",
+                description="The user has been deleted successful.",
             ),
         },
     ),
