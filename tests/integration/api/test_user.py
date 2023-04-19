@@ -81,6 +81,29 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
 
 
 @pytest.mark.django_db
+def test_create_user(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    init_db,
+):
+    create_user_data = {
+        "username": "test.user",
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "test.user@example.com",
+        "password": "secret",
+        "roles": [str(init_db.role.id)],
+    }
+
+    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
 def test_retrieve_user_details(
     client: APIClient,
     user: models.User,

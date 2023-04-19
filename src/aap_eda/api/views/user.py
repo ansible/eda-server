@@ -123,7 +123,7 @@ class CurrentUserAwxTokensViewSet(
         description="Create a user",
         request=serializers.UserCreateUpdateSerializer,
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
+            status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.UserDetailSerializer,
                 description="Return the created user.",
             ),
