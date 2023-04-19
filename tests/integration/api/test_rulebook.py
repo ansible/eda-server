@@ -109,9 +109,7 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient, init_db):
 def test_list_rulebooks_filter_project(client: APIClient, init_db):
     filter_project = init_db.project[0].id
     rulebook = init_db.rulebook[0]
-    response = client.get(
-        f"{api_url_v1}/rulebooks/?project={filter_project}"
-    )
+    response = client.get(f"{api_url_v1}/rulebooks/?project={filter_project}")
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
     assert data["project"] == filter_project
@@ -121,9 +119,7 @@ def test_list_rulebooks_filter_project(client: APIClient, init_db):
 @pytest.mark.django_db
 def test_list_rulebooks_filter_project_non_existant(client: APIClient):
     filter_project = "10000"
-    response = client.get(
-        f"{api_url_v1}/rulebooks/?project={filter_project}"
-    )
+    response = client.get(f"{api_url_v1}/rulebooks/?project={filter_project}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
