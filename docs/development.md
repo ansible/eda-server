@@ -309,6 +309,34 @@ With docker compose:
 task docker -- run api --rm python -m pytest  
 ```
 
+### Running eda-ui
+To Build with a different repository or branch you can use the below variables
+
+Shown below with default values:
+    
+    export EDA_DEV_UI_GIT_REPO='git@github.com:ansible/ansible-ui.git'
+    export EDA_DEV_UI_BRANCH='main'
+
+Build & Start UI docker container:
+
+```shell 
+task docker:ui:build
+task docker:ui:up  
+```
+
+You can then connect to the UI with teh below URL
+
+    http://localhost:8080/login
+    
+    Default login - user: admin, password: testpass
+
+
+Stop & remove UI docker container:
+
+```shell 
+task docker:ui:down
+```
+
 ### Running linters
 
 The project uses `flake8` with a set of plugins, `black`, `isort` and `ruff` (experimental),

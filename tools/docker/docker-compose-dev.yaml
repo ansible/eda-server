@@ -9,6 +9,7 @@ x-environment:
 
 services:
   api:
+    container_name: eda-api
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     build:
       context: ../../

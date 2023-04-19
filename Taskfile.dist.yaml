@@ -8,6 +8,7 @@ vars:
   DOCKER_COMPOSE_ARGS: '{{ default "-p eda -f tools/docker/docker-compose-dev.yaml" .DOCKER_COMPOSE_ARGS }}'
   PYTEST_CMD: "poetry run python -m pytest"
   MINIKUBE_CMD: "scripts/eda_kube.sh"
+  EDA_UI_CMD: "scripts/eda_ui_docker.sh"
   SUSER_CMD: "scripts/create_superuser.sh"
   PODMAN_CMD: "scripts/eda_podman.sh"
 
@@ -165,6 +166,7 @@ tasks:
   docker:down:
     desc: "Stop all services."
     cmds:
+      - task: docker:ui:down
       - task: docker
         vars:
           CLI_ARGS: down
@@ -196,6 +198,37 @@ tasks:
       - task: docker
         vars:
           CLI_ARGS: exec -it worker aap-eda-manage shell
+
+  ui_docker:
+    desc: "Run eda_ui_docker.sh with specified CLI arguments."
+    summary: |
+      Run eda_ui_docker.sh with specified CLI arguments.
+
+      Example:
+        $ task ui_docker -- build
+    cmds:
+      - "{{.EDA_UI_CMD}} {{.CLI_ARGS}}"
+
+  docker:ui:build:
+    desc: "Build eda-ui docker image"
+    cmds:
+      - task: ui_docker
+        vars:
+          CLI_ARGS: build-ui-image {{.CLI_ARGS}}
+
+  docker:ui:up:
+    desc: "Start eda-ui docker image"
+    cmds:
+      - task: ui_docker
+        vars:
+          CLI_ARGS: start-ui-image {{.CLI_ARGS}}
+
+  docker:ui:down:
+    desc: "Stop eda-ui docker image"
+    cmds:
+      - task: ui_docker
+        vars:
+          CLI_ARGS: stop-ui-image {{.CLI_ARGS}}
 
   create:superuser:
     desc: "create a superuser to use with EDA API."
