@@ -100,6 +100,44 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
 
 @pytest.mark.django_db
 @mock.patch("django.core.files.storage.FileSystemStorage.save")
+def test_project_import_with_new_layout(
+    storage_save_mock, service_tempdir_mock
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-02"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    def archive_project(_treeish, output, *_args, **_kwargs):
+        with open(output, "w") as fp:
+            fp.write("REPOSITORY ARCHIVE")
+
+    storage_save_mock.return_value = "project.tar.gz"
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    repo_mock.archive.side_effect = archive_project
+
+    project = models.Project.objects.create(
+        name="test-project-01", url="https://git.example.com/repo.git"
+    )
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.run(project)
+
+    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.archive_file.name == "project.tar.gz"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+
+
+@pytest.mark.django_db
+@mock.patch("django.core.files.storage.FileSystemStorage.save")
 def test_project_import_rulebook_directory_missing(
     storage_save_mock, service_tempdir_mock
 ):
@@ -115,7 +153,8 @@ def test_project_import_rulebook_directory_missing(
         name="test-project-01", url="https://git.example.com/repo.git"
     )
     message_expected = (
-        "The 'rulebooks' directory doesn't exist within the project root."
+        "The 'extensions/eda/rulebooks' or 'rulebooks'"
+        + " directory doesn't exist within the project root."
     )
 
     service = ProjectImportService(git_cls=git_mock)

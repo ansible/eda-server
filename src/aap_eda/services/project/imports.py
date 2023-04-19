@@ -94,11 +94,16 @@ class ProjectImportService:
         return rulebook
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:
-        rulebooks_dir = os.path.join(repo, "rulebooks")
-        if not os.path.isdir(rulebooks_dir):
+        rulebooks_dir = None
+        for name in ["extensions/eda/rulebooks", "rulebooks"]:
+            if os.path.exists(os.path.join(repo, name)):
+                rulebooks_dir = os.path.join(repo, name)
+                break
+
+        if not rulebooks_dir:
             raise ProjectImportError(
-                "The 'rulebooks' directory doesn't exist"
-                " within the project root."
+                "The 'extensions/eda/rulebooks' or 'rulebooks' directory"
+                " doesn't exist within the project root."
             )
 
         for root, _dirs, files in os.walk(rulebooks_dir):
