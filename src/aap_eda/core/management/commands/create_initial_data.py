@@ -165,6 +165,10 @@ class Command(BaseCommand):
         self._create_roles()
 
     def _create_roles(self):
+        if models.Role.objects.exists():
+            self.stdout.write("Roles already exist. Nothing to do.")
+            return
+
         for role_data in ROLES:
             role = models.Role.objects.create(
                 name=role_data["name"], description=role_data["description"]
