@@ -31,7 +31,10 @@ jobs:
         run: |
           docker-compose -p eda -f docker-compose-stage.yaml pull
           docker-compose -p eda -f docker-compose-stage.yaml up -d
-          sleep 10
+          while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
+            echo "Waiting for API to be ready..."
+            sleep 1
+          done
 
       - name: Fetch test suite
         uses: actions/checkout@v3
