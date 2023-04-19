@@ -50,21 +50,24 @@ def client(base_client: APIClient, user: models.User) -> APIClient:
 
 
 @pytest.mark.django_db
-def test_retrieve_current_user(
-    client: APIClient, check_permission_mock: mock.Mock
-):
+def test_retrieve_current_user(client: APIClient, user: models.User, init_db):
     response = client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
-        "username": "luke.skywalker",
-        "first_name": "Luke",
-        "last_name": "Skywalker",
-        "email": "luke.skywalker@example.com",
+        "id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "roles": [
+            {
+                "id": str(init_db.role.id),
+                "name": init_db.role.name,
+            }
+        ],
+        "created_at": user.date_joined.strftime(DATETIME_FORMAT),
+        "modified_at": user.modified_at.strftime(DATETIME_FORMAT),
     }
-
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
 
 
 @pytest.mark.django_db
