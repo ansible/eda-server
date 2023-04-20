@@ -11,11 +11,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from __future__ import annotations
+
 import logging
 import os
 import tempfile
 from dataclasses import dataclass
-from typing import Any, Final, Iterator, Optional, Type
+from functools import wraps
+from typing import Any, Callable, Final, Iterator, Optional, Type
 
 import yaml
 from django.db import transaction
@@ -42,18 +45,16 @@ class ProjectImportError(Exception):
     pass
 
 
-class ProjectImportService:
-    def __init__(self, git_cls: Optional[Type[GitRepository]] = None):
-        if git_cls is None:
-            git_cls = GitRepository
-        self._git_cls = git_cls
-
-    def run(self, project: models.Project):
+def _project_import_wrapper(
+    func: Callable[[ProjectImportService, models.Project], None]
+):
+    @wraps(func)
+    def wrapper(self: ProjectImportService, project: models.Project):
         project.import_state = models.Project.ImportState.RUNNING
         project.save()
         try:
             with transaction.atomic():
-                self._perform_import(project)
+                func(self, project)
                 project.import_state = models.Project.ImportState.COMPLETED
                 project.save()
         except Exception as e:
@@ -62,7 +63,20 @@ class ProjectImportService:
             project.save()
             raise
 
-    def _perform_import(self, project: models.Project):
+    return wrapper
+
+
+# TODO(cutwater): The project import and project sync are mostly
+#   similar operations. Current implementation has some code duplication.
+#   This needs to be refactored in the future.
+class ProjectImportService:
+    def __init__(self, git_cls: Optional[Type[GitRepository]] = None):
+        if git_cls is None:
+            git_cls = GitRepository
+        self._git_cls = git_cls
+
+    @_project_import_wrapper
+    def import_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
@@ -72,12 +86,51 @@ class ProjectImportService:
             self._import_rulebooks(project, repo_dir)
             self._save_project_archive(project, repo, tempdir)
 
+    @_project_import_wrapper
+    def sync_project(self, project: models.Project) -> None:
+        with self._temporary_directory() as tempdir:
+            repo_dir = os.path.join(tempdir, "src")
+
+            repo = self._git_cls.clone(project.url, repo_dir, depth=1)
+            git_hash = repo.rev_parse("HEAD")
+
+            if project.git_hash == git_hash:
+                logger.info(
+                    "Project (id=%s, name=%s) is up to date. Nothing to sync.",
+                    project.id,
+                    project.name,
+                )
+                return
+
+            project.git_hash = git_hash
+
+            self._sync_rulebooks(project, repo_dir)
+            self._save_project_archive(project, repo, tempdir)
+
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
 
     def _import_rulebooks(self, project: models.Project, repo: StrPath):
         for rulebook in self._find_rulebooks(repo):
             self._import_rulebook(project, rulebook)
+
+    def _sync_rulebooks(self, project: models.Project, repo: StrPath):
+        # TODO(cutwater): The sync must take into account
+        #  not rulebook name, but path.
+        #  Must be fixed in https://github.com/ansible/aap-eda/pull/139
+        existing_rulebooks = {
+            obj.name: obj for obj in project.rulebook_set.all()
+        }
+        for rulebook_info in self._find_rulebooks(repo):
+            rel_path, filename = os.path.split(rulebook_info.relpath)
+            rulebook = existing_rulebooks.pop(filename, None)
+            if rulebook is None:
+                self._import_rulebook(project, rulebook_info)
+            else:
+                self._sync_rulebook(rulebook, rulebook_info)
+        models.Rulebook.objects.filter(
+            pk__in=[obj.id for obj in existing_rulebooks.values()]
+        ).delete()
 
     def _import_rulebook(
         self, project: models.Project, rulebook_info: RulebookInfo
@@ -89,9 +142,22 @@ class ProjectImportService:
             name=filename,
             rulesets=rulebook_info.raw_content,
         )
-
         insert_rulebook_related_data(rulebook, rulebook_info.content)
         return rulebook
+
+    def _sync_rulebook(
+        self,
+        rulebook: models.Rulebook,
+        rulebook_info: RulebookInfo,
+    ):
+        if rulebook.rulesets == rulebook_info.raw_content:
+            return
+        rulebook.rulesets = rulebook_info.raw_content
+        rulebook.ruleset_set.clear()
+        insert_rulebook_related_data(rulebook, rulebook_info.content)
+        models.Activation.objects.filter(rulebook=rulebook).update(
+            rulebook_rulesets=rulebook.rulesets
+        )
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:
         rulebooks_dir = None

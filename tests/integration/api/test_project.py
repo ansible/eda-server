@@ -221,15 +221,24 @@ def test_create_project_name_conflict(client: APIClient):
 # -------------------------------------
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.sync_project")
+@pytest.mark.parametrize(
+    "initial_state",
+    [
+        models.Project.ImportState.COMPLETED,
+        models.Project.ImportState.FAILED,
+    ],
+)
 def test_sync_project(
     sync_project_task: mock.Mock,
     client: APIClient,
     check_permission_mock: mock.Mock,
+    initial_state: models.Project.ImportState,
 ):
     project = models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+        import_state=initial_state,
     )
 
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
@@ -238,14 +247,61 @@ def test_sync_project(
 
     response = client.post(f"{api_url_v1}/projects/{project.id}/sync/")
     assert response.status_code == status.HTTP_202_ACCEPTED
-    assert response.json() == {
-        "id": job_id,
-        "href": f"http://testserver{api_url_v1}/tasks/{job_id}/",
-    }
+    data = response.json()
+
+    try:
+        project = models.Project.objects.get(pk=data["id"])
+    except models.Project.DoesNotExist:
+        raise AssertionError("Project doesn't exist in the database")
+
+    assert project.import_state == "pending"
+    assert project.import_error is None
+    assert str(project.import_task_id) == job_id
+
+    assert_project_data(data, project)
 
     sync_project_task.delay.assert_called_once_with(
         project_id=project.id,
     )
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.sync_project")
+@pytest.mark.parametrize(
+    "initial_state",
+    [
+        models.Project.ImportState.PENDING,
+        models.Project.ImportState.RUNNING,
+    ],
+)
+def test_sync_project_conflict_already_running(
+    sync_project_task: mock.Mock,
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    initial_state: models.Project.ImportState,
+):
+    project = models.Project.objects.create(
+        name="test-project-01",
+        url="https://git.example.com/acme/project-01",
+        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+        import_state=initial_state,
+    )
+
+    response = client.post(f"{api_url_v1}/projects/{project.id}/sync/")
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {
+        "detail": "Project import or sync is already running."
+    }
+
+    project.refresh_from_db()
+    assert project.import_state == initial_state
+    assert project.import_task_id is None
+
+    sync_project_task.delay.assert_not_called()
+
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
     )
