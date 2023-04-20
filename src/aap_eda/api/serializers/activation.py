@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
 from rest_framework import serializers
 
 from aap_eda.api.serializers.decision_environment import (
@@ -42,10 +41,16 @@ class ActivationSerializer(serializers.ModelSerializer):
             "extra_var_id",
             "restart_policy",
             "restart_count",
+            "rulebook_name",
             "created_at",
             "modified_at",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+            "rulebook_name",
+        ]
 
 
 class ActivationListSerializer(serializers.ModelSerializer):
@@ -98,6 +103,14 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "restart_policy",
         ]
 
+    def create(self, validated_data):
+        rulebook = models.Rulebook.objects.get(
+            pk=validated_data["rulebook_id"]
+        )
+        validated_data["rulebook_name"] = rulebook.name
+        validated_data["rulebook_rulesets"] = rulebook.rulesets
+        return super().create(validated_data)
+
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
@@ -146,6 +159,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "instances",
             "restart_policy",
             "restart_count",
+            "rulebook_name",
             "created_at",
             "modified_at",
         ]
@@ -184,6 +198,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             ).data,
             "restart_policy": activation["restart_policy"],
             "restart_count": activation["restart_count"],
+            "rulebook_name": activation["rulebook_name"],
             "created_at": activation["created_at"],
             "modified_at": activation["modified_at"],
         }

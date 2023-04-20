@@ -68,6 +68,8 @@ def handle_activation_create_conflict(activation):
         },
     ),
 )
+# REVIEW(cutwater): Since this class implements `create` method,
+#   the `CreateModelMixin` is redundant.
 class ActivationViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
@@ -86,6 +88,7 @@ class ActivationViewSet(
     def create(self, request):
         serializer = serializers.ActivationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
         try:
             response = serializer.create(serializer.validated_data)
         except IntegrityError:
