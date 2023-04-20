@@ -63,6 +63,7 @@ DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
 @dataclass
 class InitData:
+    activation: models.Activation
     project: models.Project
     rulebook: models.Rulebook
     ruleset: models.Ruleset
@@ -443,6 +444,19 @@ def test_retrieve_audit_event_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.django_db
+def test_delete_project_and_rulebooks(client: APIClient, init_db):
+    response = client.delete(f"{api_url_v1}/projects/{init_db.project.id}/")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    activation = models.Activation.objects.get(pk=init_db.activation.id)
+    assert activation.project is None
+    assert activation.rulebook is None
+    assert not models.Project.objects.filter(id=init_db.project.id).exists()
+    assert not models.Rulebook.objects.filter(id=init_db.rulebook.id).exists()
+    assert not models.Ruleset.objects.filter(id=init_db.ruleset.id).exists()
+    assert not models.Rule.objects.filter(id=init_db.rule.id).exists()
+
+
 @pytest.fixture
 def init_db():
     project = models.Project.objects.create(
@@ -539,6 +553,7 @@ def init_db():
     audit_event_4.audit_actions.add(action_2)
 
     return InitData(
+        activation=activation,
         project=project,
         rulebook=rulebook,
         ruleset=ruleset,
@@ -613,6 +628,7 @@ def init_db_multiple_rulesets():
         received_at="2023-03-30T20:59:42.042148Z",
     )
     return InitData(
+        activation=None,
         project=project,
         rulebook=rulebook,
         ruleset=rulesets,

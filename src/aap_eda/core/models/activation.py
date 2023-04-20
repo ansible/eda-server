@@ -34,9 +34,11 @@ class Activation(models.Model):
     decision_environment = models.ForeignKey(
         "DecisionEnvironment", on_delete=models.CASCADE, null=True
     )
-    project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
+    project = models.ForeignKey(
+        "Project", on_delete=models.SET_NULL, null=True
+    )
     rulebook = models.ForeignKey(
-        "Rulebook", on_delete=models.CASCADE, null=False
+        "Rulebook", on_delete=models.SET_NULL, null=True
     )
     extra_var = models.ForeignKey(
         "ExtraVar", on_delete=models.CASCADE, null=True
