@@ -135,6 +135,8 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
         activation,
     )
     assert_activation_related_object_fks(data, activation)
+    assert activation.rulebook_name == TEST_RULEBOOK["name"]
+    assert activation.rulebook_rulesets == TEST_RULESETS
 
 
 @pytest.mark.django_db
@@ -266,6 +268,7 @@ def assert_activation_base_data(
     assert data["is_enabled"] == activation.is_enabled
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
+    assert data["rulebook_name"] == activation.rulebook_name
     assert data["created_at"] == activation.created_at.strftime(
         DATETIME_FORMAT
     )

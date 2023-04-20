@@ -48,6 +48,14 @@ class Activation(models.Model):
         default=RestartPolicy.ON_FAILURE,
     )
     restart_count = models.IntegerField(default=0)
+    rulebook_name = models.TextField(
+        null=False,
+        help_text="Name of the referenced rulebook",
+    )
+    rulebook_rulesets = models.TextField(
+        null=False,
+        help_text="Content of the last referenced rulebook",
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 

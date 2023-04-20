@@ -94,10 +94,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulebook, extra_var = await self.get_resources(message.activation_id)
+        rulesets, extra_var = await self.get_resources(message.activation_id)
 
         rulebook_message = Rulebook(
-            data=base64.b64encode(rulebook.rulesets.encode()).decode()
+            data=base64.b64encode(rulesets.encode()).decode()
         )
         if extra_var:
             extra_var_message = ExtraVars(
@@ -273,14 +273,13 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_resources(
         self, activation_instance_id: str
-    ) -> tuple[models.Rulebook, models.ExtraVar]:
+    ) -> tuple[str, models.ExtraVar]:
         activation_instance = models.ActivationInstance.objects.get(
             id=activation_instance_id
         )
         activation = models.Activation.objects.get(
             id=activation_instance.activation_id
         )
-        rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
 
         if activation.extra_var_id:
             extra_var = models.ExtraVar.objects.filter(
@@ -289,4 +288,4 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         else:
             extra_var = None
 
-        return (rulebook, extra_var)
+        return activation.rulebook_rulesets, extra_var
