@@ -109,17 +109,21 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient, init_db):
 def test_list_rulebooks_filter_project(client: APIClient, init_db):
     filter_project = init_db.project[0].id
     rulebook = init_db.rulebook[0]
-    response = client.get(f"{api_url_v1}/rulebooks/?project={filter_project}")
+    response = client.get(
+        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
+    )
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
-    assert data["project"] == filter_project
+    assert data["project_id"] == filter_project
     assert_rulebook_data(data, rulebook)
 
 
 @pytest.mark.django_db
 def test_list_rulebooks_filter_project_non_existant(client: APIClient):
     filter_project = "10000"
-    response = client.get(f"{api_url_v1}/rulebooks/?project={filter_project}")
+    response = client.get(
+        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
+    )
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -194,7 +198,7 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
         "path": rulebook.path,
         "description": rulebook.description,
         "rulesets": rulebook.rulesets,
-        "project": rulebook.project.id,
+        "project_id": rulebook.project.id,
         "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
         "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
     }
