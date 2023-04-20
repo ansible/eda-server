@@ -420,13 +420,16 @@ def test_retrieve_audit_event_not_exist(client: APIClient):
 
 @pytest.mark.django_db
 def test_delete_project_and_rulebooks(client: APIClient, init_db):
-    response = client.delete(f"{api_url_v1}/projects/{init_db.project.id}/")
+    project_id = init_db.project[0].id
+    response = client.delete(f"{api_url_v1}/projects/{project_id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
     activation = models.Activation.objects.get(pk=init_db.activation.id)
     assert activation.project is None
     assert activation.rulebook is None
-    assert not models.Project.objects.filter(id=init_db.project.id).exists()
-    assert not models.Rulebook.objects.filter(id=init_db.rulebook.id).exists()
+    assert not models.Project.objects.filter(id=project_id).exists()
+    assert not models.Rulebook.objects.filter(
+        id=init_db.rulebook[0].id
+    ).exists()
     assert not models.Ruleset.objects.filter(id=init_db.ruleset.id).exists()
     assert not models.Rule.objects.filter(id=init_db.rule.id).exists()
 
