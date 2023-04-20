@@ -1,28 +1,16 @@
 import logging
 
 import docker
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
-class ActivationDockers:
+class ActivationDocker:
     def __init__(self, image_name: str):
-        self.client = docker.DockerClient(
-            base_url=settings.EDA_DOCKER_SOCKET_PATH, version="auto"
-        )
+        self.client = docker.from_env()
         self.image = self.client.images.pull(image_name)
 
-    def run_container(self, url, activation_id):
-        cmd = [
-            "ansible-rulebook",
-            "--worker",
-            "--websocket-address",
-            url,
-            "--id",
-            str(activation_id),
-        ]
-
+    def run_container(self, cmd: list[str]):
         env = ["ANSIBLE_FORCE_COLOR=True"]
         extra_hosts = ("host.docker.internal:host-gateway",)
 

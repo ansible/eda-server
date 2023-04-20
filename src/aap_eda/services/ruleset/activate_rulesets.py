@@ -14,18 +14,17 @@
 import asyncio
 import logging
 import shutil
+import subprocess
 import uuid
 from enum import Enum
-from typing import Optional
 
 from django.utils import timezone
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
-from .activation_dockers import ActivationDockers
+from .activation_docker import ActivationDocker
 from .activation_kubernetes import ActivationKubernetes
-from .ansible_rulebook import AnsibleRulebookService
 
 logger = logging.getLogger(__name__)
 WS_ADDRESS = "ws://{host}:{port}/api/eda/ws/ansible-rulebook"
@@ -43,9 +42,6 @@ class DeploymentType(Enum):
 
 
 class ActivateRulesets:
-    def __init__(self, cwd: Optional[str] = None):
-        self.service = AnsibleRulebookService(cwd)
-
     def activate(
         self,
         activation_id: int,
@@ -78,12 +74,17 @@ class ActivateRulesets:
 
             if dtype == DeploymentType.LOCAL:
                 self.activate_in_local(
-                    WS_ADDRESS.format(host=host, port=port), instance.id
+                    ws_url=WS_ADDRESS.format(host=host, port=port),
+                    activation_instance_id=instance.id,
+                    decision_environment_url=decision_environment_url,
                 )
-            elif (
-                dtype == DeploymentType.PODMAN
-                or dtype == DeploymentType.DOCKER
-            ):
+            elif dtype == DeploymentType.PODMAN:
+                self.activate_in_podman(
+                    ws_url=WS_ADDRESS.format(host=host, port=port),
+                    activation_instance_id=instance.id,
+                    decision_environment_url=decision_environment_url,
+                )
+            elif dtype == DeploymentType.DOCKER:
                 self.activate_in_docker_podman(
                     ws_url=WS_ADDRESS.format(host=host, port=port),
                     activation_instance_id=instance.id,
@@ -108,23 +109,91 @@ class ActivateRulesets:
             instance.ended_at = timezone.now()
             instance.save()
 
+    # TODO: (POC) call podman directly
+    def activate_in_podman(
+        self,
+        ws_url: str,
+        activation_instance_id: str,
+        decision_environment_url: str,
+    ) -> None:
+        podman = shutil.which("podman")
+
+        if podman is None:
+            raise ActivateRulesetsFailed("command podman not found")
+
+        podman_args = [
+            "run",
+            decision_environment_url,
+            "ansible-rulebook",
+            "--worker",
+            "--websocket-address",
+            ws_url,
+            "--id",
+            str(activation_instance_id),
+        ]
+
+        proc = self._run_subprocess(podman, podman_args)
+
+        line_number = 0
+
+        activation_instance_logs = []
+        for line in proc.stdout.splitlines():
+            activation_instance_log = models.ActivationInstanceLog(
+                line_number=line_number,
+                log=line,
+                activation_instance_id=int(activation_instance_id),
+            )
+            activation_instance_logs.append(activation_instance_log)
+
+            line_number += 1
+
+        models.ActivationInstanceLog.objects.bulk_create(
+            activation_instance_logs
+        )
+        logger.info(f"{line_number} of activation instance log are created.")
+
+    def _run_subprocess(
+        self, cmd: str, args: list[str]
+    ) -> subprocess.CompletedProcess:
+        try:
+            # TODO: subprocess.run may run a while and will block the
+            # following DB updates. Need to find a better way to solve it.
+            return subprocess.run(
+                [cmd, *args],
+                check=True,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+        except subprocess.CalledProcessError as exc:
+            message = (
+                f"Command returned non-zero exit status {exc.returncode}:"
+                f"\n\tcommand: {exc.cmd}"
+                f"\n\tstderr: {exc.stderr}"
+            )
+            logger.error("%s", message)
+            raise ActivateRulesetsFailed(exc.stderr)
+
     def activate_in_local(
         self,
-        url: str,
+        ws_url: str,
         activation_instance_id: str,
+        decision_environment_url: str,
     ) -> None:
-        ssh_agent = shutil.which("ssh-agent")
         ansible_rulebook = shutil.which("ansible-rulebook")
 
         if ansible_rulebook is None:
             raise ActivateRulesetsFailed("command ansible-rulebook not found")
 
-        if ssh_agent is None:
-            raise ActivateRulesetsFailed("command ssh-agent not found")
+        local_args = [
+            "--worker",
+            "--websocket-address",
+            ws_url,
+            "--id",
+            str(activation_instance_id),
+        ]
 
-        proc = self.service.run_worker_mode(
-            ssh_agent, ansible_rulebook, url, activation_instance_id
-        )
+        proc = self._run_subprocess(ansible_rulebook, local_args)
 
         line_number = 0
 
@@ -150,8 +219,16 @@ class ActivateRulesets:
         activation_instance_id: str,
         decision_environment_url: str,
     ) -> None:
-        docker = ActivationDockers(decision_environment_url)
-        container = docker.run_container(ws_url, activation_instance_id)
+        docker = ActivationDocker(decision_environment_url)
+        docker_cmd = [
+            "ansible-rulebook",
+            "--worker",
+            "--websocket-address",
+            ws_url,
+            "--id",
+            str(activation_instance_id),
+        ]
+        container = docker.run_container(docker_cmd)
 
         line_number = 0
         activation_instance_logs = []
