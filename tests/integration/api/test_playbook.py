@@ -23,7 +23,7 @@ def test_list_playbooks(client: APIClient):
     assert response.data["results"] == [
         {
             "id": obj.id,
-            "project": None,
+            "project_id": None,
             "name": "test-playbook.yml",
             "playbook": TEST_PLAYBOOK,
         }
@@ -39,7 +39,7 @@ def test_retrieve_playbook(client: APIClient):
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
         "id": obj.id,
-        "project": None,
+        "project_id": None,
         "name": "test-playbook.yml",
         "playbook": TEST_PLAYBOOK,
     }
