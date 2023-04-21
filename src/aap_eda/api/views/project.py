@@ -213,3 +213,14 @@ class ProjectViewSet(
 
         serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
+
+    def perform_destroy(self, instance: models.Project):
+        if instance.import_state in [
+            models.Project.ImportState.PENDING,
+            models.Project.ImportState.RUNNING,
+        ]:
+            raise api_exc.Conflict(
+                detail="Cannot delete project while import "
+                "operation is in progress."
+            )
+        instance.delete()
