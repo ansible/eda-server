@@ -444,12 +444,14 @@ def init_db():
         name="test-project",
         description="Test Project",
         url="https://github.com/eda-project",
+        import_state=models.Project.ImportState.COMPLETED,
     )
 
     project_1 = models.Project.objects.create(
         name="test-project-1",
         description="Test Project 1",
         url="https://git.example.com/acme/project-01",
+        import_state=models.Project.ImportState.COMPLETED,
     )
 
     rulebook = models.Rulebook.objects.create(
