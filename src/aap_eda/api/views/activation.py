@@ -129,8 +129,10 @@ class ActivationViewSet(
             if activation["decision_environment_id"]
             else None
         )
-        activation["rulebook"] = models.Rulebook.objects.get(
-            pk=activation["rulebook_id"]
+        activation["rulebook"] = (
+            models.Rulebook.objects.get(pk=activation["rulebook_id"])
+            if activation["rulebook_id"]
+            else None
         )
         activation["extra_var"] = (
             models.ExtraVar.objects.get(pk=activation["extra_var_id"])

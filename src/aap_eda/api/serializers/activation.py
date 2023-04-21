@@ -178,6 +178,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation["project"]
             else None
         )
+        rulebook = (
+            RulebookRefSerializer(activation["rulebook"]).data
+            if activation["rulebook"]
+            else None
+        )
         extra_var = (
             ExtraVarRefSerializer(activation["extra_var"]).data
             if activation["extra_var"]
@@ -191,7 +196,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "decision_environment": decision_environment,
             "status": activation["status"],
             "project": project,
-            "rulebook": RulebookRefSerializer(activation["rulebook"]).data,
+            "rulebook": rulebook,
             "extra_var": extra_var,
             "instances": ActivationInstanceSerializer(
                 activation["instances"], many=True
