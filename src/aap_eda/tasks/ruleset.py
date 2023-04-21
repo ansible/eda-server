@@ -25,7 +25,7 @@ def activate_rulesets(
     activation_id: int,
     decision_environment_id: int,
     deployment_type: str,
-    ws_url: str,
+    ws_base_url: str,
     ssl_verify: str,
 ) -> None:
     logger.info(f"Task started: Activate ruleset ({activation_id=})")
@@ -34,7 +34,7 @@ def activate_rulesets(
         activation_id,
         decision_environment_id,
         deployment_type,
-        ws_url,
+        ws_base_url,
         ssl_verify,
     )
 
