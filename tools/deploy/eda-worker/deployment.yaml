@@ -32,11 +32,11 @@ spec:
               value: secret
             - name: EDA_MQ_HOST
               value: eda-redis
-            - name: EDA_WEBSOCKET_URL
+            - name: EDA_WEBSOCKET_BASE_URL
               valueFrom:
                 configMapKeyRef:
                   name: eda-env-properties
-                  key: EDA_WEBSOCKET_URL
+                  key: EDA_WEBSOCKET_BASE_URL
             - name: EDA_WEBSOCKET_SSL_VERIFY
               valueFrom:
                 configMapKeyRef:

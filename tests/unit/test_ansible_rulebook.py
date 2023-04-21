@@ -28,7 +28,7 @@ def test_run_worker_mode(run_mock: mock.Mock):
     AnsibleRulebookService().run_worker_mode(
         "ssh-agent",
         "ansible-rulebook",
-        "ws://localhost:8000/api/eda/ws/ansible-rulebook",
+        "ws://localhost:8000",
         "no",
         "1",
     )
@@ -39,7 +39,7 @@ def test_run_worker_mode(run_mock: mock.Mock):
             "ansible-rulebook",
             "--worker",
             "--websocket-address",
-            "ws://localhost:8000/api/eda/ws/ansible-rulebook",
+            "ws://localhost:8000",
             "--websocket-ssl-verify",
             "no",
             "--id",
@@ -68,7 +68,7 @@ def test_raise_error(run_mock: mock.Mock):
         AnsibleRulebookService().run_worker_mode(
             "ssh-agent",
             "ansible-rulebook",
-            "ws://localhost:8000/api/eda/ws/ansible-rulebook",
+            "ws://localhost:8000",
             "no",
             "1",
         )
