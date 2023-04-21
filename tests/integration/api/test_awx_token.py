@@ -53,7 +53,7 @@ def test_create_controller_token(client: APIClient, user: models.User):
     data = response.json()
     assert data["name"] == "Test token 1"
     assert data["description"] == ""
-    assert data["user"] == user.id
+    assert data["user_id"] == user.id
     assert "token" not in data
 
     obj = models.AwxToken.objects.get(pk=data["id"])
@@ -79,7 +79,7 @@ def test_create_controller_token(client: APIClient, user: models.User):
     data = response.json()
     assert data["name"] == "Test token 2"
     assert data["description"] == "Token description"
-    assert data["user"] == user.id
+    assert data["user_id"] == user.id
     assert "token" not in data
 
 
@@ -193,7 +193,7 @@ def assert_token_data(data: Dict[str, Any], token: models.AwxToken):
     assert data == {
         "id": token.id,
         "name": token.name,
-        "user": token.user_id,
+        "user_id": token.user_id,
         "description": token.description,
         "created_at": token.created_at.strftime(DATETIME_FORMAT),
         "modified_at": token.modified_at.strftime(DATETIME_FORMAT),

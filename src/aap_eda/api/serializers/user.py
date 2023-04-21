@@ -83,6 +83,12 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class AwxTokenSerializer(serializers.ModelSerializer):
+    user_id = serializers.PrimaryKeyRelatedField(
+        required=False,
+        queryset=models.User.objects.all(),
+        help_text="ID of the User",
+    )
+
     class Meta:
         model = models.AwxToken
         fields = [
@@ -90,9 +96,9 @@ class AwxTokenSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "token",
-            "user",
+            "user_id",
             "created_at",
             "modified_at",
         ]
-        read_only_fields = ["id", "user", "created_at", "modified_at"]
+        read_only_fields = ["id", "user_id", "created_at", "modified_at"]
         extra_kwargs = {"token": {"write_only": True}}

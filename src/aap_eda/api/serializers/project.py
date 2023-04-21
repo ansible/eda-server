@@ -78,7 +78,19 @@ class PlaybookSerializer(serializers.ModelSerializer):
         help_text="Content of the playbook",
     )
 
+    project_id = serializers.PrimaryKeyRelatedField(
+        required=False,
+        allow_null=True,
+        queryset=models.Project.objects.all(),
+        help_text="ID of the project",
+    )
+
     class Meta:
         model = models.Playbook
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "playbook",
+            "project_id",
+        ]
         read_only_fields = ["id"]
