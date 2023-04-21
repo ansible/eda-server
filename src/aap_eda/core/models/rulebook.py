@@ -73,6 +73,7 @@ class AuditRule(models.Model):
             models.Index(fields=["name"], name="ix_audit_rule_name"),
             models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ]
+        ordering = ("-fired_at",)
 
     name = models.TextField(null=False)
     description = models.TextField()
@@ -95,6 +96,7 @@ class AuditAction(models.Model):
     class Meta:
         db_table = "core_audit_action"
         unique_together = ["id", "name"]
+        ordering = ("-fired_at", "-rule_fired_at")
 
     id = models.UUIDField(primary_key=True)
     name = models.TextField()
@@ -111,6 +113,7 @@ class AuditAction(models.Model):
 class AuditEvent(models.Model):
     class Meta:
         db_table = "core_audit_event"
+        ordering = ("-rule_fired_at", "-received_at")
 
     id = models.UUIDField(primary_key=True)
     source_name = models.TextField()

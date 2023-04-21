@@ -103,8 +103,8 @@ class ActivationViewSet(
             activation_id=response.id,
             decision_environment_id=decision_environment_id,
             deployment_type=settings.DEPLOYMENT_TYPE,
-            host=settings.WEBSOCKET_SERVER_NAME,
-            port=settings.WEBSOCKET_SERVER_PORT,
+            ws_url=settings.WEBSOCKET_URL,
+            ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         )
 
         return Response(
@@ -232,8 +232,8 @@ class ActivationViewSet(
                 activation_id=pk,
                 decision_environment_id=activation.decision_environment.id,
                 deployment_type=settings.DEPLOYMENT_TYPE,
-                host=settings.WEBSOCKET_SERVER_NAME,
-                port=settings.WEBSOCKET_SERVER_PORT,
+                ws_url=settings.WEBSOCKET_URL,
+                ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
             )
 
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -302,8 +302,8 @@ class ActivationViewSet(
             activation_id=pk,
             decision_environment_id=activation.decision_environment.id,
             deployment_type=settings.DEPLOYMENT_TYPE,
-            host=settings.WEBSOCKET_SERVER_NAME,
-            port=settings.WEBSOCKET_SERVER_PORT,
+            ws_url=settings.WEBSOCKET_URL,
+            ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         )
 
         activation.restart_count += 1
