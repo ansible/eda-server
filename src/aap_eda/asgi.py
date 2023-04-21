@@ -25,10 +25,10 @@ import os
 from channels.routing import ProtocolTypeRouter
 from django.core.asgi import get_asgi_application
 
-from .wsapi.routes import router
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
 
 django_app = get_asgi_application()
+
+from .wsapi.routes import router  # noqa E402
 
 application = ProtocolTypeRouter({"http": django_app, "websocket": router})

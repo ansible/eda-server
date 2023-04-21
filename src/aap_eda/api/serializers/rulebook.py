@@ -18,27 +18,7 @@ from aap_eda.core import models
 
 
 class RulebookSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the rulebook",
-    )
-
-    path = serializers.CharField(
-        required=True, help_text="Relative path of the rulebook"
-    )
-
-    description = serializers.CharField(
-        default="",
-        help_text="Description of the rulebook",
-        allow_null=True,
-    )
-
-    rulesets = serializers.CharField(
-        required=True,
-        help_text="The contained rulesets in the rulebook",
-    )
-
-    project = serializers.PrimaryKeyRelatedField(
+    project_id = serializers.PrimaryKeyRelatedField(
         required=False,
         allow_null=True,
         queryset=models.Project.objects.all(),
@@ -47,7 +27,16 @@ class RulebookSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "path",
+            "description",
+            "rulesets",
+            "project_id",
+            "created_at",
+            "modified_at",
+        ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
 
