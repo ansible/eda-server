@@ -18,12 +18,11 @@ handle_errors() {
     exit 1
 }
 
-usage() {
-    log-info "Usage: "
-    log-info "$(basename "$0") -u <username>(default:admin) -p <password>(default:testpass) -e <email>(default: admin@test.com"
-    log-info "$(basename "$0") -h (returns command usage)"
-    exit 0
-}
+export DJANGO_SUPERUSER_USERNAME="${DJANGO_SUPERUSER_USERNAME:-admin}"
+export DJANGO_SUPERUSER_PASSWORD="${DJANGO_SUPERUSER_PASSWORD:-testpass}"
+export DJANGO_SUPERUSER_EMAIL="${DJANGO_SUPERUSER_EMAIL:-admin@test.com}"
+export EDA_DB_HOST=${EDA_DB_HOST:-localhost}
+export EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-secret}
 
 create_user() {
     log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
@@ -44,27 +43,6 @@ create_user() {
         exit 1
     fi
 }
-
-#
-# args check
-#
-export DJANGO_SUPERUSER_USERNAME="admin"
-export DJANGO_SUPERUSER_PASSWORD="testpass"
-export DJANGO_SUPERUSER_EMAIL="admin@test.com"
-export EDA_DB_HOST=${EDA_DB_HOST:-localhost}
-export EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-secret}
-
-while getopts p:u:e:h opt; do
-    case $opt in
-        p) export DJANGO_SUPERUSER_PASSWORD=$OPTARG ;;
-        u) export DJANGO_SUPERUSER_USERNAME=$OPTARG ;;
-        e) export DJANGO_SUPERUSER_EMAIL=$OPTARG ;;
-        h) usage ;;
-        *) log-err "Invalid flag supplied"; exit 2
-    esac
-done
-
-shift "$(( OPTIND - 1 ))"
 
 #
 # execute

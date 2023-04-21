@@ -192,16 +192,14 @@ tasks:
   create:superuser:
     desc: "create a superuser to use with EDA API."
     summary: |
-      Run create_superuser.sh with specified CLI arguments. If no arguments are 
-      given the following defaults are used.
-        Defaults:
-          user:     admin
-          password: testpass
-          email:    admin@test.com
-
+      To override defaults set the following env variables.
+        DJANGO_SUPERUSER_USERNAME (default: admin)
+        DJANGO_SUPERUSER_PASSWORD (default: testpass)
+        DJANGO_SUPERUSER_EMAIL (default: admin@test.com)
+      
       Examples:
         $ task create:superuser
-        $ task create:superuser -- -u test_user -p none2tuff -e test_user@test.com
+
     cmds:
       - "{{.SUSER_CMD}} {{.CLI_ARGS}}"
 
