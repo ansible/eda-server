@@ -27,6 +27,7 @@ from .activation_kubernetes import ActivationKubernetes
 from .ansible_rulebook import AnsibleRulebookService
 
 logger = logging.getLogger(__name__)
+ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
 
 
 class ActivateRulesetsFailed(Exception):
@@ -49,7 +50,7 @@ class ActivateRulesets:
         activation_id: int,
         decision_environment_id: int,
         deployment_type: str,
-        ws_url: str,
+        ws_base_url: str,
         ssl_verify: str,
     ):
         try:
@@ -73,6 +74,7 @@ class ActivateRulesets:
                 )
 
             dtype = DeploymentType(deployment_type)
+            ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
             if dtype == DeploymentType.LOCAL:
                 self.activate_in_local(ws_url, ssl_verify, instance.id)

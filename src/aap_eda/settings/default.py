@@ -296,7 +296,5 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 # ---------------------------------------------------------
 
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
-WEBSOCKET_URL = settings.get(
-    "WEBSOCKET_URL", "ws://localhost:8000/api/eda/ws/ansible-rulebook"
-)
+WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
