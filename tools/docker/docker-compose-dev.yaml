@@ -3,6 +3,9 @@ x-environment:
   - EDA_DB_HOST=postgres
   - EDA_MQ_HOST=redis
   - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
+  - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-local}
+  - EDA_WEBSOCKET_URL=${EDA_WEBSOCKET_URL:-ws://localhost:8000/api/eda/ws/ansible-rulebook}
+  - EDA_WEBSOCKET_SSL_VERIFY=no
 
 services:
   api:
