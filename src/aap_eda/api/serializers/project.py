@@ -78,13 +78,6 @@ class PlaybookSerializer(serializers.ModelSerializer):
         help_text="Content of the playbook",
     )
 
-    project_id = serializers.PrimaryKeyRelatedField(
-        required=False,
-        allow_null=True,
-        queryset=models.Project.objects.all(),
-        help_text="ID of the project",
-    )
-
     class Meta:
         model = models.Playbook
         fields = [

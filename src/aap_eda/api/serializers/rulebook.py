@@ -116,13 +116,6 @@ class RuleSerializer(serializers.ModelSerializer):
         help_text="The action in the rule",
     )
 
-    ruleset_id = serializers.PrimaryKeyRelatedField(
-        required=False,
-        allow_null=True,
-        queryset=models.Rulebook.objects.all(),
-        help_text="ID of the ruleset",
-    )
-
     class Meta:
         model = models.Rule
         fields = [

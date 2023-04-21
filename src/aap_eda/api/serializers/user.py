@@ -83,12 +83,6 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class AwxTokenSerializer(serializers.ModelSerializer):
-    user_id = serializers.PrimaryKeyRelatedField(
-        required=False,
-        queryset=models.User.objects.all(),
-        help_text="ID of the User",
-    )
-
     class Meta:
         model = models.AwxToken
         fields = [

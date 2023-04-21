@@ -115,13 +115,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
 
-    activation_id = serializers.PrimaryKeyRelatedField(
-        required=True,
-        allow_null=False,
-        queryset=models.Activation.objects.all(),
-        help_text="ID of the activation",
-    )
-
     class Meta:
         model = models.ActivationInstance
         fields = [
