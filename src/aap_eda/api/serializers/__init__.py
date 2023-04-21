@@ -42,6 +42,7 @@ from .project import (
     ExtraVarSerializer,
     PlaybookSerializer,
     ProjectCreateRequestSerializer,
+    ProjectReadSerializer,
     ProjectRefSerializer,
     ProjectSerializer,
 )

@@ -107,15 +107,6 @@ class PlaybookViewSet(
             ),
         },
     ),
-    retrieve=extend_schema(
-        description="Get project by id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ProjectSerializer,
-                description="Return a project by id.",
-            ),
-        },
-    ),
     partial_update=extend_schema(
         description="Partial update of a project",
         responses={
@@ -180,6 +171,25 @@ class ProjectViewSet(
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
+
+    @extend_schema(
+        description="Get a project by id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ProjectReadSerializer,
+                description="Return a project by id.",
+            ),
+        },
+    )
+    def retrieve(self, request, pk):
+        project = super().retrieve(request, pk)
+        project.data["credential"] = (
+            models.Credential.objects.get(pk=project.data["credential_id"])
+            if project.data["credential_id"]
+            else None
+        )
+
+        return Response(serializers.ProjectReadSerializer(project.data).data)
 
     @extend_schema(
         responses={status.HTTP_202_ACCEPTED: serializers.TaskRefSerializer}

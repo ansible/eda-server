@@ -14,6 +14,7 @@
 
 from rest_framework import serializers
 
+from aap_eda.api.serializers.credential import CredentialRefSerializer
 from aap_eda.core import models
 
 
@@ -30,13 +31,55 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         ]
-        fields = ["name", "description", *read_only_fields]
+        fields = ["name", "description", "credential_id", *read_only_fields]
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
+    credential_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = models.Project
-        fields = ["url", "name", "description"]
+        fields = ["url", "name", "description", "credential_id"]
+
+
+class ProjectReadSerializer(serializers.ModelSerializer):
+    """Serializer for reading the Project with embedded objects."""
+
+    credential = CredentialRefSerializer(required=False, allow_null=True)
+
+    class Meta:
+        model = models.Project()
+        read_only_fields = [
+            "id",
+            "url",
+            "git_hash",
+            "import_state",
+            "import_error",
+            "import_task_id",
+            "created_at",
+            "modified_at",
+        ]
+        fields = ["name", "description", "credential", *read_only_fields]
+
+    def to_representation(self, project):
+        credential = (
+            CredentialRefSerializer(project["credential"]).data
+            if project["credential"]
+            else None
+        )
+        return {
+            "id": project["id"],
+            "name": project["name"],
+            "description": project["description"],
+            "url": project["url"],
+            "git_hash": project["git_hash"],
+            "credential": credential,
+            "import_state": project["import_state"],
+            "import_error": project["import_error"],
+            "import_task_id": project["import_task_id"],
+            "created_at": project["created_at"],
+            "modified_at": project["modified_at"],
+        }
 
 
 class ProjectRefSerializer(serializers.ModelSerializer):
