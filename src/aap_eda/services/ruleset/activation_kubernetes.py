@@ -32,7 +32,9 @@ class ActivationKubernetes:
         self.client_api = client.CoreV1Api()
 
     @staticmethod
-    def create_container(image, name, pull_policy, url, activation_id):
+    def create_container(
+        image, name, pull_policy, url, ssl_verify, activation_id
+    ):
         container = client.V1Container(
             image=image,
             name=name,
@@ -41,6 +43,8 @@ class ActivationKubernetes:
                 "--worker",
                 "--websocket-address",
                 url,
+                "--websocket-ssl-verify",
+                ssl_verify,
                 "--id",
                 str(activation_id),
             ],

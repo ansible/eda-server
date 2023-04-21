@@ -27,7 +27,6 @@ from .activation_kubernetes import ActivationKubernetes
 from .ansible_rulebook import AnsibleRulebookService
 
 logger = logging.getLogger(__name__)
-WS_ADDRESS = "ws://{host}:{port}/api/eda/ws/ansible-rulebook"
 
 
 class ActivateRulesetsFailed(Exception):
@@ -50,8 +49,8 @@ class ActivateRulesets:
         activation_id: int,
         decision_environment_id: int,
         deployment_type: str,
-        host: str,
-        port: int,
+        ws_url: str,
+        ssl_verify: str,
     ):
         try:
             activation = models.Activation.objects.get(id=activation_id)
@@ -76,9 +75,7 @@ class ActivateRulesets:
             dtype = DeploymentType(deployment_type)
 
             if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(
-                    WS_ADDRESS.format(host=host, port=port), instance.id
-                )
+                self.activate_in_local(ws_url, ssl_verify, instance.id)
             elif (
                 dtype == DeploymentType.PODMAN
                 or dtype == DeploymentType.DOCKER
@@ -88,7 +85,8 @@ class ActivateRulesets:
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.activate_in_k8s(
-                    ws_url=WS_ADDRESS.format(host=host, port=port),
+                    ws_url=ws_url,
+                    ssl_verify=ssl_verify,
                     activation_instance_id=instance.id,
                     decision_environment_url=decision_environment_url,
                 )
@@ -106,6 +104,7 @@ class ActivateRulesets:
     def activate_in_local(
         self,
         url: str,
+        ssl_verify: str,
         activation_instance_id: str,
     ) -> None:
         ssh_agent = shutil.which("ssh-agent")
@@ -118,7 +117,11 @@ class ActivateRulesets:
             raise ActivateRulesetsFailed("command ssh-agent not found")
 
         proc = self.service.run_worker_mode(
-            ssh_agent, ansible_rulebook, url, activation_instance_id
+            ssh_agent,
+            ansible_rulebook,
+            url,
+            ssl_verify,
+            activation_instance_id,
         )
 
         line_number = 0
@@ -146,6 +149,7 @@ class ActivateRulesets:
     def activate_in_k8s(
         self,
         ws_url: str,
+        ssl_verify: str,
         activation_instance_id: str,
         decision_environment_url: str,
     ) -> None:
@@ -168,6 +172,7 @@ class ActivateRulesets:
             name=pod_name,
             pull_policy=_pull_policy,
             url=ws_url,
+            ssl_verify=ssl_verify,
             activation_id=activation_instance_id,
         )
         pod_spec = k8s.create_pod_template(

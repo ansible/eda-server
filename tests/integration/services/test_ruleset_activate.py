@@ -127,8 +127,8 @@ def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
         activation_id=activation.id,
         decision_environment_id=fks.get("decision_environment_id"),
         deployment_type="local",
-        host="localhost",
-        port="8000",
+        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebooklocalhost",
+        ssl_verify="no",
     )
 
     assert models.ActivationInstanceLog.objects.count() == 2
@@ -150,8 +150,8 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
         activation_id=activation.id,
         decision_environment_id=fks.get("decision_environment_id"),
         deployment_type="bad_type",
-        host="localhost",
-        port="8000",
+        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebooklocalhost",
+        ssl_verify="no",
     )
 
     assert (

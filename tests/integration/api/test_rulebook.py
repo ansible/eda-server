@@ -339,7 +339,8 @@ def test_list_audit_rules(client: APIClient, init_db):
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
 
-    assert len(audit_rules) == 1
+    assert len(audit_rules) == 2
+    assert audit_rules[0]["fired_at"] > audit_rules[1]["fired_at"]
     assert audit_rules[0]["name"] == "test_action"
     assert list(audit_rules[0]) == [
         "id",
@@ -383,6 +384,7 @@ def test_list_actions_from_audit_rule(client: APIClient, init_db):
 
     actions = response.data["results"]
     assert len(actions) == 2
+    assert actions[0]["fired_at"] > actions[1]["rule_fired_at"]
 
 
 @pytest.mark.django_db
@@ -406,6 +408,7 @@ def test_list_audit_events(client: APIClient, init_db):
     audit_events = response.data["results"]
 
     assert len(audit_events) == 4
+    assert audit_events[0]["rule_fired_at"] > audit_events[1]["rule_fired_at"]
 
 
 @pytest.mark.django_db
@@ -514,6 +517,14 @@ def init_db():
         ruleset_name="test-audit-ruleset-name",
         activation_instance=activation_instance,
     )
+    models.AuditRule.objects.create(
+        name="test_action",
+        fired_at="2023-03-23T01:46:36.835248Z",
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
+        ruleset_name="test-audit-ruleset-name",
+        activation_instance=activation_instance,
+    )
 
     action_1 = models.AuditAction.objects.create(
         id=str(uuid.uuid4()),
@@ -529,13 +540,13 @@ def init_db():
         audit_rule=audit_rule,
         status="pending",
         rule_fired_at="2023-03-23T01:36:36.835248Z",
-        fired_at="2023-03-30T20:59:42.042148Z",
+        fired_at="2023-03-30T20:59:42.052148Z",
     )
     audit_event_1 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
         source_name="event-1",
         source_type="type-1",
-        rule_fired_at="2023-03-23T01:36:36.835248Z",
+        rule_fired_at="2023-03-23T01:37:36.835248Z",
         received_at="2023-03-30T20:59:42.042148Z",
     )
     audit_event_2 = models.AuditEvent.objects.create(
@@ -549,12 +560,14 @@ def init_db():
         id=str(uuid.uuid4()),
         source_name="event-3",
         source_type="type-3",
+        rule_fired_at="2023-03-23T03:58:36.835248Z",
         received_at="2023-03-30T20:59:42.042148Z",
     )
     audit_event_4 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
         source_name="event-2",
         source_type="type-2",
+        rule_fired_at="2023-03-23T06:56:36.835248Z",
         received_at="2023-03-30T20:59:42.042148Z",
     )
     audit_event_1.audit_actions.add(action_1)
