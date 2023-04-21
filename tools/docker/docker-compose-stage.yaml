@@ -9,14 +9,14 @@ x-environment:
 
 services:
   eda-ui:
-    image: "quay.io/ansible/eda-ui:${EDA_UI_IMAGE_TAG:-latest}"
+    image: "${EDA_UI_IMAGE_URL:-quay.io/ansible/eda-ui:main}"
     ports:
       - '8080:8080'
     depends_on:
       eda-api:
         condition: service_healthy
   eda-api:
-    image: "quay.io/ansible/eda-server:${EDA_IMAGE_TAG:-main}"
+    image: "${EDA_IMAGE_URL:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     command:
       - /bin/bash
