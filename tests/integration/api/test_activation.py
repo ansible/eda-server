@@ -73,24 +73,32 @@ collections:
 """
 
 
-def create_activation_related_data():
+def create_activation_related_data(with_project=True):
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
         description=TEST_DECISION_ENV["description"],
     ).pk
-    project_id = models.Project.objects.create(
-        git_hash=TEST_PROJECT["git_hash"],
-        name=TEST_PROJECT["name"],
-        url=TEST_PROJECT["url"],
-        description=TEST_PROJECT["description"],
-    ).pk
-    rulebook_id = models.Rulebook.objects.create(
-        name=TEST_RULEBOOK["name"],
-        path=TEST_RULEBOOK["path"],
-        rulesets=TEST_RULESETS,
-        description=TEST_RULEBOOK["description"],
-    ).pk
+    project_id = (
+        models.Project.objects.create(
+            git_hash=TEST_PROJECT["git_hash"],
+            name=TEST_PROJECT["name"],
+            url=TEST_PROJECT["url"],
+            description=TEST_PROJECT["description"],
+        ).pk
+        if with_project
+        else None
+    )
+    rulebook_id = (
+        models.Rulebook.objects.create(
+            name=TEST_RULEBOOK["name"],
+            path=TEST_RULEBOOK["path"],
+            rulesets=TEST_RULESETS,
+            description=TEST_RULEBOOK["description"],
+        ).pk
+        if with_project
+        else None
+    )
     extra_var_id = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR).pk
 
     return {
@@ -188,16 +196,26 @@ def test_list_activations(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_activation(client: APIClient):
-    fks = create_activation_related_data()
+@pytest.mark.parametrize("with_project", [True, False])
+def test_retrieve_activation(client: APIClient, with_project):
+    fks = create_activation_related_data(with_project)
     activation = create_activation(fks)
 
     response = client.get(f"{api_url_v1}/activations/{activation.id}/")
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, activation)
-    assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
-    assert data["rulebook"] == {"id": activation.rulebook.id, **TEST_RULEBOOK}
+    if activation.project:
+        assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
+    else:
+        assert not data["project"]
+    if activation.rulebook:
+        assert data["rulebook"] == {
+            "id": activation.rulebook.id,
+            **TEST_RULEBOOK,
+        }
+    else:
+        assert not data["rulebook"]
     assert data["decision_environment"] == {
         "id": activation.decision_environment.id,
         **TEST_DECISION_ENV,
@@ -280,8 +298,14 @@ def assert_activation_base_data(
 def assert_activation_related_object_fks(
     data: Dict[str, Any], activation: models.Activation
 ):
-    assert data["project_id"] == activation.project.id
-    assert data["rulebook_id"] == activation.rulebook.id
+    if activation.project:
+        assert data["project_id"] == activation.project.id
+    else:
+        assert not data["project_id"]
+    if activation.rulebook:
+        assert data["rulebook_id"] == activation.rulebook.id
+    else:
+        assert not data["rulebook_id"]
     assert data["extra_var_id"] == activation.extra_var.id
     assert (
         data["decision_environment_id"] == activation.decision_environment.id
