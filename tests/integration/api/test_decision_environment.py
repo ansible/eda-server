@@ -1,9 +1,23 @@
+from dataclasses import dataclass
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from tests.integration.constants import api_url_v1
+
+
+@dataclass
+class InitData:
+    project: models.Project
+    activation: models.Activation
+    decision_environment: models.DecisionEnvironment
+    credential: models.Credential
+    rulebook: models.Rulebook
+    ruleset: models.Ruleset
+    rule: models.Rule
+    activation_instance: models.ActivationInstance
 
 
 @pytest.mark.django_db
@@ -58,13 +72,10 @@ def test_create_decision_environment(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_decision_environment(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
-    obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1", credential=credential
-    )
+def test_retrieve_decision_environment(client: APIClient, init_db):
+    credential = init_db.credential
+    obj = init_db.decision_environment
+
     response = client.get(f"{api_url_v1}/decision-environments/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data
@@ -92,12 +103,10 @@ def test_retrieve_decision_environment_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_partial_update_decision_environment(client: APIClient):
-    obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1"
-    )
+def test_partial_update_decision_environment(client: APIClient, init_db):
+    obj = init_db.decision_environment
     credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
+        name="newcredential", username="me2", secret="sec2"
     )
     data = {"credential_id": credential.id}
     response = client.patch(
@@ -114,16 +123,109 @@ def test_partial_update_decision_environment(client: APIClient):
         "credential_id": credential.id,
         "id": obj.id,
     }
-    updated_obj = models.DecisionEnvironment.objects.filter(pk=obj.id).first()
+    updated_obj = models.DecisionEnvironment.objects.filter(
+        pk=int(obj.id)
+    ).first()
     assert updated_obj.credential == credential
 
 
 @pytest.mark.django_db
-def test_delete_decision_environment(client: APIClient):
-    obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1"
-    )
-    response = client.delete(f"{api_url_v1}/decision-environments/{obj.id}/")
+def test_delete_decision_environment(client: APIClient, init_db):
+    obj_id = int(init_db.decision_environment.id)
+    activation_id = int(init_db.activation.id)
+    response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert models.DecisionEnvironment.objects.filter(pk=obj.id).count() == 0
+    assert (
+        models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
+    )
+    activation = models.Activation.objects.get(pk=activation_id)
+    assert activation.decision_environment is None
+
+
+@pytest.fixture
+def init_db():
+    test_rulesets_sample = """
+        ---
+        - name: Test sample 001
+        hosts: all
+        sources:
+            - ansible.eda.range:
+                limit: 5
+                delay: 1
+            filters:
+                - noop:
+        rules:
+            - name: r1
+            condition: event.i == 1
+            action:
+                debug:
+            - name: r2
+            condition: event.i == 2
+            action:
+                debug:
+        """.strip()
+
+    project = models.Project.objects.create(
+        name="test-project",
+        description="Test Project",
+        url="https://github.com/eda-project",
+    )
+
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de1",
+        image_url="registry.com/img1:tag1",
+        credential=credential,
+    )
+
+    rulebook = models.Rulebook.objects.create(
+        name="test-rulebook.yml",
+        rulesets=test_rulesets_sample,
+        project=project,
+    )
+
+    source_list = [
+        {
+            "name": "<unnamed>",
+            "type": "range",
+            "config": {"limit": 5},
+            "source": "ansible.eda.range",
+        }
+    ]
+
+    ruleset = models.Ruleset.objects.create(
+        name="test-ruleset",
+        sources=source_list,
+        rulebook=rulebook,
+    )
+
+    rule = models.Rule.objects.create(
+        name="say hello",
+        action={"run_playbook": {"name": "ansible.eda.hello"}},
+        ruleset=ruleset,
+    )
+    activation = models.Activation.objects.create(
+        name="test-activation",
+        rulebook=rulebook,
+        project=project,
+        decision_environment=decision_environment,
+    )
+
+    activation_instance = models.ActivationInstance.objects.create(
+        activation=activation,
+    )
+
+    return InitData(
+        activation=activation,
+        project=project,
+        decision_environment=decision_environment,
+        credential=credential,
+        rulebook=rulebook,
+        ruleset=ruleset,
+        rule=rule,
+        activation_instance=activation_instance,
+    )
