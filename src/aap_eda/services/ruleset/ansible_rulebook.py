@@ -32,6 +32,7 @@ class AnsibleRulebookService:
         ssh_agent: str,
         ansible_rulebook: str,
         url: str,
+        ssl_verify: str,
         activation_id: str,
     ) -> subprocess.CompletedProcess:
         """Run ansible-rulebook in worker mode."""
@@ -39,6 +40,8 @@ class AnsibleRulebookService:
             "--worker",
             "--websocket-address",
             url,
+            "--websocket-ssl-verify",
+            ssl_verify,
             "--id",
             str(activation_id),
         ]
