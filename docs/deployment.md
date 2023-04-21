@@ -54,7 +54,7 @@ You can start all services with:
 docker-compose -p eda -f docker-compose-stage.yaml up
 ```
 
-Note: **You can use the environment variables `EDA_IMAGE_TAG` and `EDA_UI_IMAGE_TAG` to use a different image tag. By default is the latest code from the main branch.**
+Note: **You can use the environment variables `EDA_IMAGE_URL` and `EDA_UI_IMAGE_URL` to use a different image url. By default is the latest code from the main branch.**
 
 ## Deploy using Minikube and Taskfile
 
