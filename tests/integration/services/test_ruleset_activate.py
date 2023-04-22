@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from dataclasses import dataclass
 from subprocess import CompletedProcess
 from unittest import mock
 
@@ -66,58 +67,62 @@ collections:
 """
 
 
+@dataclass
+class InitData:
+    activation: models.Activation
+    decision_environment: models.DecisionEnvironment
+    project: models.Project
+    rulebook: models.Rulebook
+    extra_var: models.ExtraVar
+
+
 @pytest.fixture(autouse=True)
 def use_dummy_socket_url(settings):
     settings.EDA_PODMAN_SOCKET_URL = "unix://socket_url"
 
 
-def create_activation_related_data():
-    decision_environment_id = models.DecisionEnvironment.objects.create(
+@pytest.fixture()
+def init_data():
+    decision_environment = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
         description=TEST_DECISION_ENV["description"],
-    ).pk
-    project_id = models.Project.objects.create(
+    )
+    project = models.Project.objects.create(
         name=TEST_PROJECT["name"],
         url=TEST_PROJECT["url"],
         description=TEST_PROJECT["description"],
-    ).pk
-    rulebook_id = models.Rulebook.objects.create(
+    )
+    rulebook = models.Rulebook.objects.create(
         name=TEST_RULEBOOK["name"],
         rulesets=TEST_RULESETS,
         description=TEST_RULEBOOK["description"],
-    ).pk
-    extra_var_id = models.ExtraVar.objects.create(
+    )
+    extra_var = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
-    ).pk
+    )
+    activation = models.Activation.objects.create(
+        decision_environment=decision_environment,
+        project=project,
+        rulebook=rulebook,
+        extra_var=extra_var,
+    )
 
-    return {
-        "decision_environment_id": decision_environment_id,
-        "project_id": project_id,
-        "rulebook_id": rulebook_id,
-        "extra_var_id": extra_var_id,
-    }
-
-
-def create_activation(fks: dict):
-    activation_data = TEST_ACTIVATION.copy()
-    activation_data["decision_environment_id"] = fks["decision_environment_id"]
-    activation_data["project_id"] = fks["project_id"]
-    activation_data["rulebook_id"] = fks["rulebook_id"]
-    activation_data["extra_var_id"] = fks["extra_var_id"]
-    activation = models.Activation(**activation_data)
-    activation.save()
-
-    return activation
+    return InitData(
+        activation=activation,
+        decision_environment=decision_environment,
+        project=project,
+        rulebook=rulebook,
+        extra_var=extra_var,
+    )
 
 
 @pytest.mark.django_db
 @mock.patch("subprocess.run")
 @mock.patch("shutil.which")
-def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
-    fks = create_activation_related_data()
-    activation = create_activation(fks)
-
+def test_rulesets_activate_local(
+    which_mock: mock.Mock, run_mock: mock.Mock, init_data
+):
     which_mock.return_value = "/bin/cmd"
     out = "test_output_line_1\ntest_output_line_2"
     run_mock.return_value = CompletedProcess(
@@ -129,8 +134,8 @@ def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
     assert models.ActivationInstanceLog.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_id=activation.id,
-        decision_environment_id=fks.get("decision_environment_id"),
+        activation_id=init_data.activation.id,
+        decision_environment_id=init_data.decision_environment.id,
         deployment_type="local",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
@@ -145,15 +150,12 @@ def test_rulesets_activate_local(which_mock: mock.Mock, run_mock: mock.Mock):
 
 @pytest.mark.django_db
 @mock.patch("subprocess.run")
-def test_rulesets_activate_with_errors(run_mock: mock.Mock):
-    fks = create_activation_related_data()
-    activation = create_activation(fks)
-
+def test_rulesets_activate_with_errors(run_mock: mock.Mock, init_data):
     assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_id=activation.id,
-        decision_environment_id=fks.get("decision_environment_id"),
+        activation_id=init_data.activation.id,
+        decision_environment_id=init_data.decision_environment.id,
         deployment_type="bad_type",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
@@ -167,9 +169,7 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
-def test_rulesets_activate_with_podman(my_mock: mock.Mock):
-    fks = create_activation_related_data()
-    activation = create_activation(fks)
+def test_rulesets_activate_with_podman(my_mock: mock.Mock, init_data):
     pod_mock = mock.Mock()
     my_mock.return_value = pod_mock
 
@@ -183,13 +183,21 @@ def test_rulesets_activate_with_podman(my_mock: mock.Mock):
     assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_id=activation.id,
-        decision_environment_id=fks.get("decision_environment_id"),
+        activation_id=init_data.activation.id,
+        decision_environment_id=init_data.decision_environment.id,
         deployment_type="podman",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
     )
+    assert models.ActivationInstance.objects.count() == 1
+    instance = models.ActivationInstance.objects.first()
 
+    my_mock.assert_called_once_with(init_data.decision_environment, None)
+    pod_mock.run_worker_mode.assert_called_once_with(
+        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
+        ws_ssl_verify="no",
+        activation_instance_id=instance.id,
+    )
     assert (
         models.ActivationInstance.objects.first().status
         == ActivationStatus.COMPLETED.value

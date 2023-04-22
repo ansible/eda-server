@@ -88,7 +88,7 @@ class ActivateRulesets:
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
                     activation_instance_id=instance.id,
-                    decision_environment_url=decision_environment_url,
+                    decision_environment=decision_environment,
                 )
             elif dtype == DeploymentType.DOCKER:
                 self.activate_in_docker()
@@ -158,10 +158,10 @@ class ActivateRulesets:
         ws_url: str,
         ssl_verify: str,
         activation_instance_id: str,
-        decision_environment_url: str,
-    ):
+        decision_environment: models.DecisionEnvironment,
+    ) -> None:
         podman = ActivationPodman(
-            decision_environment_url, settings.EDA_PODMAN_SOCKET_URL
+            decision_environment, settings.PODMAN_SOCKET_URL
         )
         container = podman.run_worker_mode(
             ws_url=ws_url,
@@ -175,7 +175,7 @@ class ActivateRulesets:
         for line in container.logs():
             activation_instance_log = models.ActivationInstanceLog(
                 line_number=line_number,
-                log=line.decode("ASCII"),
+                log=line.decode("utf-8"),
                 activation_instance_id=int(activation_instance_id),
             )
             activation_instance_logs.append(activation_instance_log)

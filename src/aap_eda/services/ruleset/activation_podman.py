@@ -14,9 +14,15 @@
 
 import logging
 import os
+import uuid
 
 from podman import PodmanClient
+from podman.domain.containers import Container
+from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
+from podman.errors.exceptions import APIError
+
+from aap_eda.core import models
 
 from .exceptions import ActivationException
 
@@ -24,15 +30,27 @@ logger = logging.getLogger(__name__)
 
 
 class ActivationPodman:
-    def __init__(self, image_name: str, podman_url: str):
+    def __init__(
+        self, decision_environment: models.DecisionEnvironment, podman_url: str
+    ) -> None:
+        self.decision_environment = decision_environment
+
+        if not self.decision_environment.image_url:
+            raise ActivationException(
+                f"DecisionEnvironment: {self.decision_environment.name} does"
+                " not have image_url set"
+            )
+
         if podman_url:
             self.podman_url = podman_url
         else:
             self._default_podman_url()
-        logger.info(self.podman_url)
+        logger.info(f"Using podman socket: {self.podman_url}")
 
         self.client = PodmanClient(base_url=self.podman_url)
-        self.image = self.client.images.pull(image_name)
+        self._login()
+
+        self.image = self._pull_image()
         logger.info(self.client.version())
 
     def run_worker_mode(
@@ -40,7 +58,7 @@ class ActivationPodman:
         ws_url: str,
         ws_ssl_verify: str,
         activation_instance_id: str,
-    ):
+    ) -> Container:
         try:
             """Run ansible-rulebook in worker mode."""
             args = [
@@ -55,21 +73,23 @@ class ActivationPodman:
             ]
 
             container = self.client.containers.run(
-                image=self.image,
+                image=self.decision_environment.image_url,
                 command=args,
                 stdout=True,
                 stderr=True,
                 remove=True,
                 detach=True,
+                name=f"eda-{activation_instance_id}-{uuid.uuid4()}",
             )
-
-            container.wait(condition="exited")
 
             logger.info(
                 f"Created container: name: {container.name}, "
                 f"status: {container.status}, "
                 f"command: {args}"
             )
+
+            # TODO: future need to use asyncio so no blocking anymore
+            container.wait(condition="exited")
 
             return container
         except ContainerError:
@@ -79,7 +99,7 @@ class ActivationPodman:
             logger.exception("Image not found")
             raise ActivationException("Image not found")
 
-    def _default_podman_url(self):
+    def _default_podman_url(self) -> None:
         if os.getuid() == 0:
             self.podman_url = "unix:///run/podman/podman.sock"
         else:
@@ -87,3 +107,32 @@ class ActivationPodman:
                 "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
             )
             self.podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
+
+    def _login(self) -> None:
+        credential = self.decision_environment.credential
+        if not credential:
+            return
+
+        try:
+            registry = self.decision_environment.image_url.split("/")[0]
+            self.client.login(
+                username=credential.username,
+                password=credential.secret.get_secret_value(),
+                registry=registry,
+            )
+
+            logger.debug(
+                f"{credential.username} login succeeded to {registry}"
+            )
+        except APIError:
+            logger.exception("Login failed")
+            raise ActivationException("Login failed")
+
+    def _pull_image(self) -> Image:
+        try:
+            return self.client.images.pull(self.decision_environment.image_url)
+        except ImageNotFound:
+            logger.exception(
+                f"Image {self.decision_environment.image_url} not found"
+            )
+            raise ActivationException("Image not found")
