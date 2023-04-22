@@ -345,7 +345,7 @@ class RuleViewSet(
         project = models.Project.objects.get(id=rulebook.project_id)
 
         data["fired_stats"] = build_fired_stats(data)
-        data["rulebook"] = rulebook.id
-        data["project"] = project.id
+        data["rulebook_id"] = rulebook.id
+        data["project_id"] = project.id
 
         return data

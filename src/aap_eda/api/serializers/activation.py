@@ -117,7 +117,14 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ActivationInstance
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "status",
+            "activation_id",
+            "started_at",
+            "ended_at",
+        ]
         read_only_fields = ["id", "started_at", "ended_at"]
 
 

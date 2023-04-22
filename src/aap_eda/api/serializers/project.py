@@ -80,5 +80,10 @@ class PlaybookSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Playbook
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "playbook",
+            "project_id",
+        ]
         read_only_fields = ["id"]

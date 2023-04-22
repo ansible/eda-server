@@ -282,7 +282,7 @@ def test_list_rules_from_ruleset(client: APIClient, init_db):
         "id",
         "name",
         "action",
-        "ruleset",
+        "ruleset_id",
     ]
 
 
@@ -307,10 +307,10 @@ def test_list_rules(client: APIClient, init_db):
         "id",
         "name",
         "action",
-        "ruleset",
+        "ruleset_id",
         "fired_stats",
-        "rulebook",
-        "project",
+        "rulebook_id",
+        "project_id",
     ]
 
 
