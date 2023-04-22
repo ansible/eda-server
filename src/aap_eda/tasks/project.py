@@ -26,7 +26,7 @@ def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
     project = models.Project.objects.get(pk=project_id)
-    ProjectImportService().run(project)
+    ProjectImportService().import_project(project)
 
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
@@ -34,4 +34,8 @@ def import_project(project_id: int):
 @job
 def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
-    raise NotImplementedError
+
+    project = models.Project.objects.get(pk=project_id)
+    ProjectImportService().sync_project(project)
+
+    logger.info(f"Task complete: Sync project ( project_id={project.id} )")

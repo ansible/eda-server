@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -188,15 +189,29 @@ class ProjectViewSet(
         detail=True,
         rbac_action=Action.UPDATE,
     )
+    @transaction.atomic
     def sync(self, request, pk):
-        project_exists = models.Project.objects.filter(pk=pk).exists()
-        if not project_exists:
+        try:
+            project = models.Project.objects.select_for_update().get(pk=pk)
+        except models.Project.DoesNotExist:
             raise api_exc.NotFound
 
-        job = tasks.sync_project.delay(project_id=int(pk))
-        serializer = serializers.TaskRefSerializer(
-            {"id": job.id}, context={"request": request}
-        )
+        if project.import_state in [
+            models.Project.ImportState.PENDING,
+            models.Project.ImportState.RUNNING,
+        ]:
+            raise api_exc.Conflict(
+                detail="Project import or sync is already running."
+            )
+
+        job = tasks.sync_project.delay(project_id=project.id)
+
+        project.import_state = models.Project.ImportState.PENDING
+        project.import_task_id = job.id
+        project.import_error = None
+        project.save()
+
+        serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
 
     def perform_destroy(self, instance: models.Project):
