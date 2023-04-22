@@ -66,6 +66,11 @@ collections:
 """
 
 
+@pytest.fixture(autouse=True)
+def use_dummy_socket_url(settings):
+    settings.EDA_PODMAN_SOCKET_URL = "unix://socket_url"
+
+
 def create_activation_related_data():
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
@@ -158,3 +163,35 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock):
         models.ActivationInstance.objects.first().status
         == ActivationStatus.FAILED.value
     )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
+def test_rulesets_activate_with_podman(my_mock: mock.Mock):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    pod_mock = mock.Mock()
+    my_mock.return_value = pod_mock
+
+    container_mock = mock.Mock()
+    pod_mock.run_worker_mode.return_value = container_mock
+    container_mock.logs.return_value = [
+        b"test_output_line_1",
+        b"test_output_line_2",
+    ]
+
+    assert models.ActivationInstance.objects.count() == 0
+
+    ActivateRulesets().activate(
+        activation_id=activation.id,
+        decision_environment_id=fks.get("decision_environment_id"),
+        deployment_type="podman",
+        ws_base_url="ws://localhost:8000",
+        ssl_verify="no",
+    )
+
+    assert (
+        models.ActivationInstance.objects.first().status
+        == ActivationStatus.COMPLETED.value
+    )
+    assert models.ActivationInstanceLog.objects.count() == 2
