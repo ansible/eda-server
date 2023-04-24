@@ -22,5 +22,13 @@ spec:
           ports:
             - containerPort: 6379
           resources: {}
+          volumeMounts:
+            - readOnly: false
+              mountPath: /data
+              name: 'eda-redis-data'
       restartPolicy: Always
+      volumes:
+        - name: eda-redis-data
+          persistentVolumeClaim:
+            claimName: eda-redis-data
 status: {}

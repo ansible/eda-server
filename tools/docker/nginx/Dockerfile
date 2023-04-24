@@ -1,5 +1,5 @@
 # Build eda-ui
-FROM docker.io/node:16-alpine AS ui-builder
+FROM docker.io/node:18-alpine AS ui-builder
 
 WORKDIR /app/ansible-ui
 
