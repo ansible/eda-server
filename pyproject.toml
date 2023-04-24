@@ -41,6 +41,7 @@ django-filter = "*"
 pydantic = "*"
 cryptography = "*"
 kubernetes = "*"
+podman = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

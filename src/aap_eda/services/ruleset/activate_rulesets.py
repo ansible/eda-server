@@ -18,20 +18,19 @@ import uuid
 from enum import Enum
 from typing import Optional
 
+from django.conf import settings
 from django.utils import timezone
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
 from .activation_kubernetes import ActivationKubernetes
+from .activation_podman import ActivationPodman
 from .ansible_rulebook import AnsibleRulebookService
+from .exceptions import ActivationException
 
 logger = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
-
-
-class ActivateRulesetsFailed(Exception):
-    pass
 
 
 class DeploymentType(Enum):
@@ -68,21 +67,31 @@ class ActivateRulesets:
             if decision_environment:
                 decision_environment_url = decision_environment.image_url
             else:
-                raise ActivateRulesetsFailed(
+                raise ActivationException(
                     f"Unable to retrieve Decision Environment ID: "
                     f"{decision_environment_id}"
                 )
 
-            dtype = DeploymentType(deployment_type)
+            try:
+                dtype = DeploymentType(deployment_type)
+            except ValueError:
+                raise ActivationException(
+                    f"Invalid deployment type: {deployment_type}"
+                )
+
             ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
             if dtype == DeploymentType.LOCAL:
                 self.activate_in_local(ws_url, ssl_verify, instance.id)
-            elif (
-                dtype == DeploymentType.PODMAN
-                or dtype == DeploymentType.DOCKER
-            ):
-                self.activate_in_docker_podman()
+            elif dtype == DeploymentType.PODMAN:
+                self.activate_in_podman(
+                    ws_url=ws_url,
+                    ssl_verify=ssl_verify,
+                    activation_instance_id=instance.id,
+                    decision_environment=decision_environment,
+                )
+            elif dtype == DeploymentType.DOCKER:
+                self.activate_in_docker()
 
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
@@ -93,10 +102,10 @@ class ActivateRulesets:
                     decision_environment_url=decision_environment_url,
                 )
             else:
-                raise ActivateRulesetsFailed(f"Unsupported {deployment_type}")
+                raise ActivationException(f"Unsupported {deployment_type}")
 
             instance.status = ActivationStatus.COMPLETED
-        except Exception as exe:
+        except ActivationException as exe:
             logger.error(f"Activation error: {str(exe)}")
             instance.status = ActivationStatus.FAILED
         finally:
@@ -113,10 +122,10 @@ class ActivateRulesets:
         ansible_rulebook = shutil.which("ansible-rulebook")
 
         if ansible_rulebook is None:
-            raise ActivateRulesetsFailed("command ansible-rulebook not found")
+            raise ActivationException("command ansible-rulebook not found")
 
         if ssh_agent is None:
-            raise ActivateRulesetsFailed("command ssh-agent not found")
+            raise ActivationException("command ssh-agent not found")
 
         proc = self.service.run_worker_mode(
             ssh_agent,
@@ -144,8 +153,42 @@ class ActivateRulesets:
         )
         logger.info(f"{line_number} of activation instance log are created.")
 
+    def activate_in_podman(
+        self,
+        ws_url: str,
+        ssl_verify: str,
+        activation_instance_id: str,
+        decision_environment: models.DecisionEnvironment,
+    ) -> None:
+        podman = ActivationPodman(
+            decision_environment, settings.PODMAN_SOCKET_URL
+        )
+        container = podman.run_worker_mode(
+            ws_url=ws_url,
+            ws_ssl_verify=ssl_verify,
+            activation_instance_id=activation_instance_id,
+        )
+
+        line_number = 0
+
+        activation_instance_logs = []
+        for line in container.logs():
+            activation_instance_log = models.ActivationInstanceLog(
+                line_number=line_number,
+                log=line.decode("utf-8"),
+                activation_instance_id=int(activation_instance_id),
+            )
+            activation_instance_logs.append(activation_instance_log)
+
+            line_number += 1
+
+        models.ActivationInstanceLog.objects.bulk_create(
+            activation_instance_logs
+        )
+        logger.info(f"{line_number} of activation instance log are created.")
+
     # TODO(hsong) implement later
-    def activate_in_docker_podman():
+    def activate_in_docker():
         pass
 
     def activate_in_k8s(
