@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.api import serializers
 from aap_eda.core import models
-from aap_eda.core.enums import RestartPolicy
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
@@ -145,6 +145,27 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     assert_activation_related_object_fks(data, activation)
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
+
+
+@pytest.mark.django_db
+def test_create_activation_disabled(client: APIClient):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["is_enabled"] = False
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+    response = client.get(f"{api_url_v1}/activations/{response.data['id']}/")
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.rulebook_name == TEST_RULEBOOK["name"]
+    assert activation.rulebook_rulesets == TEST_RULESETS
+    assert data["status"] == ActivationStatus.STOPPED.value
+    assert not data["instances"]
 
 
 @pytest.mark.django_db
