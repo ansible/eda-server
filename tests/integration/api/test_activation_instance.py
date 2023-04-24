@@ -224,7 +224,7 @@ def assert_activation_instance_data(
         "id": instance.id,
         "name": instance.name,
         "status": str(instance.status),
-        "activation": instance.activation.id,
+        "activation_id": instance.activation.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
     }

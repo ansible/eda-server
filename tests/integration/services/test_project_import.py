@@ -26,44 +26,59 @@ from aap_eda.services.project import ProjectImportService
 from aap_eda.services.project.git import GitRepository
 from aap_eda.services.project.imports import ProjectImportError
 
+# TODO(cutwater): The test cases in this test suite share a lot of common code
+#   and it's ugly. It requires refactoring.
+
 DATA_DIR = Path(__file__).parent / "data"
+ARCHIVE_NAME = "project.tar.gz"
+
+
+class TestTempdirFactory:
+    def __init__(self):
+        self.last_name = None
+
+    def __call__(self):
+        tempdir = tempfile.TemporaryDirectory(prefix="test")
+        self.last_name = tempdir.name
+        return tempdir
 
 
 @pytest.fixture
-def service_tempdir_mock():
-    with (
-        tempfile.TemporaryDirectory(prefix="test") as tempdir,
-        mock.patch.object(
-            ProjectImportService, "_temporary_directory"
-        ) as method_mock,
+def service_tempdir_patch():
+    factory = TestTempdirFactory()
+    with mock.patch.object(
+        ProjectImportService, "_temporary_directory", factory
     ):
-        tmp_mock = mock.Mock()
-        tmp_mock.name = tempdir
-        tmp_mock.__enter__ = mock.Mock(return_value=tmp_mock.name)
-        tmp_mock.__exit__ = mock.Mock(return_value=None)
-        method_mock.return_value = tmp_mock
-        yield tmp_mock
+        yield factory
+
+
+@pytest.fixture
+def storage_save_patch():
+    save_mock = mock.Mock()
+    save_mock.return_value = ARCHIVE_NAME
+    with mock.patch(
+        "django.core.files.storage.FileSystemStorage.save",
+        save_mock,
+    ):
+        yield save_mock
+
+
+def archive_project(treeish, output, *args, **kwargs):
+    with open(output, "w") as fp:
+        fp.write("PROJECT ARCHIVE")
 
 
 @pytest.mark.django_db
-@mock.patch("django.core.files.storage.FileSystemStorage.save")
-def test_project_import(storage_save_mock, service_tempdir_mock):
+def test_project_import(storage_save_patch, service_tempdir_patch):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-01"
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    def archive_project(_treeish, output, *_args, **_kwargs):
-        with open(output, "w") as fp:
-            fp.write("REPOSITORY ARCHIVE")
-
-    storage_save_mock.return_value = "project.tar.gz"
-
     repo_mock = mock.Mock(name="GitRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
-
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
     git_mock.clone.side_effect = clone_project
 
@@ -74,16 +89,16 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
     )
 
     service = ProjectImportService(git_cls=git_mock)
-    service.run(project)
+    service.import_project(project)
 
     git_mock.clone.assert_called_once_with(
         "https://git.example.com/repo.git",
-        os.path.join(service_tempdir_mock.name, "src"),
+        os.path.join(service_tempdir_patch.last_name, "src"),
         depth=1,
     )
 
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    assert project.archive_file.name == "project.tar.gz"
+    assert project.archive_file.name == ARCHIVE_NAME
     assert project.import_state == models.Project.ImportState.COMPLETED
 
     rulebooks = list(project.rulebook_set.order_by("name"))
@@ -95,24 +110,17 @@ def test_project_import(storage_save_mock, service_tempdir_mock):
     for rulebook, expected in zip(rulebooks, expected_rulebooks):
         assert_rulebook_is_valid(rulebook, expected)
 
-    storage_save_mock.assert_called_once()
+    storage_save_patch.assert_called_once()
 
 
 @pytest.mark.django_db
-@mock.patch("django.core.files.storage.FileSystemStorage.save")
 def test_project_import_with_new_layout(
-    storage_save_mock, service_tempdir_mock
+    storage_save_patch, service_tempdir_patch
 ):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-02"
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
-
-    def archive_project(_treeish, output, *_args, **_kwargs):
-        with open(output, "w") as fp:
-            fp.write("REPOSITORY ARCHIVE")
-
-    storage_save_mock.return_value = "project.tar.gz"
 
     repo_mock = mock.Mock(name="GitRepository()")
     repo_mock.rev_parse.return_value = (
@@ -129,19 +137,17 @@ def test_project_import_with_new_layout(
     )
 
     service = ProjectImportService(git_cls=git_mock)
-    service.run(project)
+    service.import_project(project)
 
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    assert project.archive_file.name == "project.tar.gz"
+    assert project.archive_file.name == ARCHIVE_NAME
     assert project.import_state == models.Project.ImportState.COMPLETED
 
 
 @pytest.mark.django_db
-@mock.patch("django.core.files.storage.FileSystemStorage.save")
 def test_project_import_rulebook_directory_missing(
-    storage_save_mock, service_tempdir_mock
+    storage_save_patch, service_tempdir_patch
 ):
-    storage_save_mock.return_value = "project.tar.gz"
     repo_mock = mock.Mock(name="GitRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
@@ -162,11 +168,113 @@ def test_project_import_rulebook_directory_missing(
         ProjectImportError,
         match=re.escape(message_expected),
     ):
-        service.run(project)
+        service.import_project(project)
 
     project = models.Project.objects.get(id=project.id)
     assert project.import_state == models.Project.ImportState.FAILED
     assert project.import_error == message_expected
+
+
+def _setup_project_sync():
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-02"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_hash = "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    repo_mock.rev_parse.return_value = repo_hash
+    repo_mock.archive.side_effect = archive_project
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    project = models.Project.objects.create(
+        name="test-project-01", url="https://git.example.com/repo.git"
+    )
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.import_project(project)
+
+    assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    assert project.archive_file.name == ARCHIVE_NAME
+    assert project.import_state == models.Project.ImportState.COMPLETED
+
+    rulebooks = list(project.rulebook_set.order_by("name"))
+    assert len(rulebooks) == 2
+
+    return project
+
+
+@pytest.mark.django_db
+def test_project_sync(storage_save_patch, service_tempdir_patch):
+    # TODO(cutwater): Create activations and verify that rulebook content
+    #       is updated
+    project = _setup_project_sync()
+    storage_save_patch.reset_mock()
+
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-03"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_hash = "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
+    repo_mock.rev_parse.return_value = repo_hash
+    repo_mock.archive.side_effect = archive_project
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.sync_project(project)
+
+    assert project.git_hash == "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
+    assert project.archive_file.name == ARCHIVE_NAME
+    assert project.import_state == models.Project.ImportState.COMPLETED
+
+    rulebooks = list(project.rulebook_set.order_by("name"))
+    assert len(rulebooks) == 2
+
+    with open(DATA_DIR / "project-03-import.json") as fp:
+        expected_rulebooks = json.load(fp)
+
+    for rulebook, expected in zip(rulebooks, expected_rulebooks):
+        assert_rulebook_is_valid(rulebook, expected)
+
+    storage_save_patch.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
+    project = _setup_project_sync()
+    storage_save_patch.reset_mock()
+
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-03"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_hash = "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    repo_mock.rev_parse.return_value = repo_hash
+    repo_mock.archive.side_effect = archive_project
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.sync_project(project)
+
+    assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    assert project.archive_file.name == ARCHIVE_NAME
+    assert project.import_state == models.Project.ImportState.COMPLETED
+
+    rulebooks = list(project.rulebook_set.order_by("name"))
+    assert len(rulebooks) == 2
+
+    with open(DATA_DIR / "project-01-import.json") as fp:
+        expected_rulebooks = json.load(fp)
+    for rulebook, expected in zip(rulebooks, expected_rulebooks):
+        assert_rulebook_is_valid(rulebook, expected)
+    storage_save_patch.assert_not_called()
 
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):

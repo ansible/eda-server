@@ -32,7 +32,7 @@ class Activation(models.Model):
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     decision_environment = models.ForeignKey(
-        "DecisionEnvironment", on_delete=models.CASCADE, null=True
+        "DecisionEnvironment", on_delete=models.SET_NULL, null=True
     )
     project = models.ForeignKey(
         "Project", on_delete=models.SET_NULL, null=True

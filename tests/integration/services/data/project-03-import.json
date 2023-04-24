@@ -1,0 +1,44 @@
+[
+    {
+        "name": "hello_events-new.yml",
+        "path": "rulebooks",
+        "rulesets": [
+            {
+                "name": "Hello Events (New)",
+                "rules": [
+                    {
+                        "name": "Say Hello (New)",
+                        "action": {
+                            "run_playbook": {
+                                "name": "ansible.eda.hello"
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "kafka-test-rules.yml",
+        "path": "rulebooks/kafka",
+        "rulesets": [
+            {
+                "name": "Demo rules with kafka as source",
+                "rules": [
+                    {
+                        "name": "Check defined (updated)",
+                        "action": {
+                            "debug": null
+                        }
+                    },
+                    {
+                        "name": "Shutdown (updated)",
+                        "action": {
+                            "shutdown": null
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+]

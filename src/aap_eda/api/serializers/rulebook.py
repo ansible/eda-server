@@ -118,7 +118,12 @@ class RuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rule
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "action",
+            "ruleset_id",
+        ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
 
@@ -145,21 +150,21 @@ class RuleOutSerializer(serializers.Serializer):
         help_text="List of stats",
     )
 
-    rulebook = serializers.PrimaryKeyRelatedField(
+    rulebook_id = serializers.PrimaryKeyRelatedField(
         required=False,
         allow_null=True,
         queryset=models.Rulebook.objects.all(),
         help_text="ID of the rulebook",
     )
 
-    ruleset = serializers.PrimaryKeyRelatedField(
+    ruleset_id = serializers.PrimaryKeyRelatedField(
         required=False,
         allow_null=True,
         queryset=models.Ruleset.objects.all(),
         help_text="ID of the ruleset",
     )
 
-    project = serializers.PrimaryKeyRelatedField(
+    project_id = serializers.PrimaryKeyRelatedField(
         required=False,
         allow_null=True,
         queryset=models.Project.objects.all(),
@@ -235,8 +240,9 @@ class AuditRuleOutSerializer(serializers.Serializer):
         help_text="The created timestamp of the action",
     )
 
-    activation_id = serializers.IntegerField(
+    activation_id = serializers.PrimaryKeyRelatedField(
         required=True,
+        queryset=models.Activation.objects.all(),
         help_text="ID of the related Activation",
     )
 
