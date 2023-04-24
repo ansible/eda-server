@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import traceback
 
 from django.utils import timezone
 from kubernetes import client, config, watch
@@ -149,6 +150,7 @@ class ActivationKubernetes:
                         activation_instance.save()
                         w.stop()
             except Exception as e:
+                logger.error(traceback.format_exc())
                 logger.error(f"Job {obj_name} Failed: {e}")
 
     def log_job_result(self, job_name, namespace, activation_instance_id):
@@ -260,6 +262,7 @@ class ActivationKubernetes:
                         done = True
 
             except Exception as e:
+                logger.error(traceback.format_exc())
                 logger.error(f"Pod Failed: {e}")
 
     def read_job_pod_log(self, pod_name, namespace):
@@ -269,12 +272,12 @@ class ActivationKubernetes:
         while not done:
             try:
                 for line in w.stream(
-                    self.client_api.read_namespaced_pod_log(
-                        name=pod_name,
-                        namespace=namespace,
-                        pretty=True,
-                    )
+                    self.client_api.read_namespaced_pod_log,
+                    name=pod_name,
+                    namespace=namespace,
+                    pretty=True,
                 ):
                     print(line)
             except Exception as e:
+                logger.error(traceback.format_exc())
                 logger.error(e)
