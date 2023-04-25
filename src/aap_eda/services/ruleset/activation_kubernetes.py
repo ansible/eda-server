@@ -98,13 +98,12 @@ class ActivationKubernetes:
     def run_activation_job(
         self, job_name, job_spec, namespace, activation_instance
     ):
-        activation_instance_id = activation_instance.id
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
             namespace=namespace, body=job_spec, async_req=True
         )
-
         w = watch.Watch()
+
         done = False
         while not done:
             try:
@@ -137,6 +136,9 @@ class ActivationKubernetes:
                             activation_instance=activation_instance,
                         )
 
+                        done = True
+                        w.stop()
+
                     if o.status.failed:
                         logger.info(f"Job {obj_name}: Failed")
 
@@ -149,6 +151,7 @@ class ActivationKubernetes:
                         activation_instance.ended_at = timezone.now()
                         activation_instance.save()
                         w.stop()
+
             except Exception as e:
                 logger.error(traceback.format_exc())
                 logger.error(f"Job {obj_name} Failed: {e}")
@@ -207,8 +210,8 @@ class ActivationKubernetes:
 
     def watch_job_pod(self, job_name, namespace, activation_instance):
         w = watch.Watch()
-        done = False
 
+        done = False
         while not done:
             try:
                 for event in w.stream(
@@ -277,7 +280,8 @@ class ActivationKubernetes:
                     namespace=namespace,
                     pretty=True,
                 ):
-                    print(line)
+                    logger.info(line)
+                done = True
             except Exception as e:
                 logger.error(traceback.format_exc())
                 logger.error(e)
