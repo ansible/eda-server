@@ -265,6 +265,16 @@ class ActivateRulesets:
             job_name=job_name, pod_template=pod_spec, ttl=30
         )
 
+        for host, port in find_ports(
+                activation_instance.activation.rulebook_rulesets):
+            k8s.create_service(namespace=namespace,
+                               pod_name=pod_name,
+                               port=port)
+            k8s.create_ingress(host=host,
+                               port=port,
+                               pod_name=pod_name,
+                               namespace=namespace)
+
         # execute job
         k8s.run_activation_job(
             job_name=job_name,
