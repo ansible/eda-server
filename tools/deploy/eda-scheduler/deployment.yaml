@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: eda-worker
+  name: eda-scheduler
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: eda
-      comp: worker
-  strategy: {}
+      comp: scheduler
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
         app: eda
-        comp: worker
+        comp: scheduler
     spec:
-      serviceAccountName: eda-activation-sa
       containers:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage rqworker --worker-class aap_eda.core.tasking.Worker
+            - aap-eda-manage scheduler
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda
@@ -54,16 +54,7 @@ spec:
                   key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
           imagePullPolicy: Never
-          name: eda-worker
-          ports:
-            - containerPort: 8000
+          name: eda-scheduler
           resources: {}
-#          volumeMounts:
-#            - mountPath: /app/src
-#              name: app-src
       restartPolicy: Always
-#      volumes:
-#        - name: app-src
-#          persistentVolumeClaim:
-#            claimName: app-src
 status: {}
