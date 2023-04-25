@@ -20,6 +20,7 @@ import shutil
 import subprocess
 from typing import IO, Final, Iterable, Optional
 
+from aap_eda.core.models import Credential
 from aap_eda.core.types import StrPath
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,7 @@ class GitRepository:
         url: str,
         path: StrPath,
         *,
+        credential: Optional[Credential] = None,
         depth: Optional[int] = None,
         _executor: Optional[GitExecutor] = None,
     ) -> GitRepository:
@@ -109,6 +111,15 @@ class GitRepository:
         :param _executor: Optional command executor.
         :return:
         """
+        if credential:
+            index = 0
+            if url.startswith("https://"):
+                index = 8
+            elif url.startswith("http://"):
+                index = 7
+            if index > 0:
+                url = f"{url[:index]}{credential.username}:{credential.secret}@{url[index:]}"  # noqa: E501
+
         if _executor is None:
             _executor = GitExecutor()
 

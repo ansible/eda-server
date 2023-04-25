@@ -49,6 +49,13 @@ class Project(models.Model):
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
     git_hash = models.TextField()
+    credential = models.ForeignKey(
+        "Credential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
     archive_file = models.FileField(upload_to=PROJECT_ARCHIVE_DIR)
 
     import_state = models.TextField(
