@@ -256,6 +256,10 @@ else:
     }
 RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
 
+RQ_STARTUP_JOBS = []
+RQ_PERIODIC_JOBS = []
+RQ_CRON_JOBS = []
+
 # ---------------------------------------------------------
 # APPLICATION SETTINGS
 # ---------------------------------------------------------
