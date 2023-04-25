@@ -72,6 +72,7 @@ class InventorySource(DjangoEnum):
 
 
 class ActivationStatus(DjangoEnum):
+    STARTING = "starting"
     RUNNING = "running"
     PENDING = "pending"
     FAILED = "failed"

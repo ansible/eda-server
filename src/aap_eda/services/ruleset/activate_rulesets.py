@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import asyncio
 import logging
 import shutil
 import uuid
@@ -57,20 +56,13 @@ class ActivateRulesets:
             instance = models.ActivationInstance.objects.create(
                 activation_id=activation_id,
                 name=activation.name,
-                status=ActivationStatus.RUNNING,
+                status=ActivationStatus.STARTING,
             )
+            instance.save()
 
             decision_environment = models.DecisionEnvironment.objects.get(
                 id=decision_environment_id
             )
-
-            if decision_environment:
-                decision_environment_url = decision_environment.image_url
-            else:
-                raise ActivationException(
-                    f"Unable to retrieve Decision Environment ID: "
-                    f"{decision_environment_id}"
-                )
 
             try:
                 dtype = DeploymentType(deployment_type)
@@ -98,8 +90,8 @@ class ActivateRulesets:
                 self.activate_in_k8s(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
-                    activation_instance_id=instance.id,
-                    decision_environment_url=decision_environment_url,
+                    activation_instance=instance,
+                    decision_environment=decision_environment,
                 )
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
@@ -195,8 +187,8 @@ class ActivateRulesets:
         self,
         ws_url: str,
         ssl_verify: str,
-        activation_instance_id: str,
-        decision_environment_url: str,
+        activation_instance: models.ActivationInstance,
+        decision_environment: models.DecisionEnvironment,
     ) -> None:
         k8s = ActivationKubernetes()
         _pull_policy = "Always"
@@ -213,26 +205,38 @@ class ActivateRulesets:
 
         # build out container,pod,job specs
         container_spec = k8s.create_container(
-            image=decision_environment_url,
+            image=decision_environment.image_url,
             name=pod_name,
             pull_policy=_pull_policy,
             url=ws_url,
             ssl_verify=ssl_verify,
-            activation_id=activation_instance_id,
+            activation_id=activation_instance.id,
         )
+
+        secret_name = None
+        if decision_environment.credential:
+            secret_name = f"activation-secret-{guid}"
+            k8s.create_secret(
+                secret_name=secret_name,
+                namespace=namespace,
+                decision_environment=decision_environment,
+            )
+
         pod_spec = k8s.create_pod_template(
-            pod_name=pod_name, container=container_spec
+            pod_name=pod_name,
+            container=container_spec,
+            secret_name=secret_name,
         )
+
         job_spec = k8s.create_job(
             job_name=job_name, pod_template=pod_spec, ttl=30
         )
 
         # execute job
-        asyncio.run(
-            k8s.run_activation_job(
-                job_name=job_name,
-                job_spec=job_spec,
-                namespace=namespace,
-                activation_instance_id=activation_instance_id,
-            )
+        k8s.run_activation_job(
+            job_name=job_name,
+            job_spec=job_spec,
+            namespace=namespace,
+            activation_instance=activation_instance,
+            secret_name=secret_name,
         )
