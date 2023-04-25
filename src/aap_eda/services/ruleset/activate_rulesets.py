@@ -61,7 +61,7 @@ def find_ports(rulebook_text: str):
         for source in ruleset.get("sources", []):
             # Remove name from source
             if "name" in source:
-                del source['name']
+                del source["name"]
             # The first remaining key is the type and the arguments
             source_plugin = list(source.keys())[0]
             source_args = source[source_plugin]
@@ -257,6 +257,12 @@ class ActivateRulesets:
             url=ws_url,
             ssl_verify=ssl_verify,
             activation_id=activation_instance.id,
+            ports=[
+                port
+                for _, port in find_ports(
+                    activation_instance.activation.rulebook_rulesets
+                )
+            ],
         )
         pod_spec = k8s.create_pod_template(
             pod_name=pod_name, container=container_spec
@@ -266,14 +272,14 @@ class ActivateRulesets:
         )
 
         for host, port in find_ports(
-                activation_instance.activation.rulebook_rulesets):
-            k8s.create_service(namespace=namespace,
-                               pod_name=pod_name,
-                               port=port)
-            k8s.create_ingress(host=host,
-                               port=port,
-                               pod_name=pod_name,
-                               namespace=namespace)
+            activation_instance.activation.rulebook_rulesets
+        ):
+            k8s.create_service(
+                namespace=namespace, pod_name=pod_name, port=port
+            )
+            k8s.create_ingress(
+                host=host, port=port, pod_name=pod_name, namespace=namespace
+            )
 
         # execute job
         k8s.run_activation_job(

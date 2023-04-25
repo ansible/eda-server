@@ -35,7 +35,7 @@ class ActivationKubernetes:
 
     @staticmethod
     def create_container(
-            image, name, pull_policy, url, ssl_verify, activation_id
+        image, name, pull_policy, url, ssl_verify, activation_id, ports
     ):
         container = client.V1Container(
             image=image,
@@ -50,6 +50,9 @@ class ActivationKubernetes:
                 ssl_verify,
                 "--id",
                 str(activation_id),
+            ],
+            ports=[
+                client.V1ContainerPort(container_port=port) for port in ports
             ],
             command=["ansible-rulebook"],
         )
@@ -80,17 +83,13 @@ class ActivationKubernetes:
             spec=client.V1ServiceSpec(
                 ports=[
                     client.V1ServicePort(
-                        protocol='TCP',
-                        port=port,
-                        target_port=port
+                        protocol="TCP", port=port, target_port=port
                     )
                 ]
             ),
             metadata=client.V1ObjectMeta(
-                name=pod_name,
-                labels={"app": "eda"},
-                namespace=namespace
-            )
+                name=pod_name, labels={"app": "eda"}, namespace=namespace
+            ),
         )
 
         logger.info(f"Create Service: {pod_name}")
@@ -102,36 +101,41 @@ class ActivationKubernetes:
             kind="Ingress",
             metadata=client.V1ObjectMeta(
                 name=pod_name,
-                annotations={"nginx.ingress.kubernetes.io/rewrite-target": "/"},
+                annotations={
+                    "nginx.ingress.kubernetes.io/rewrite-target": "/"
+                },
                 labels={"app": "eda"},
-                namespace=namespace
+                namespace=namespace,
             ),
             spec=client.V1IngressSpec(
-                rules=[client.V1IngressRule(
-                    host=host + ".eda.io",
-                    http=client.V1HTTPIngressRuleValue(
-                        paths=[client.V1HTTPIngressPath(
-                            path="/",
-                            path_type="Exact",
-                            backend=client.V1IngressBackend(
-                                service=client.V1IngressServiceBackend(
-                                    port=client.V1ServiceBackendPort(
-                                        number=port,
+                rules=[
+                    client.V1IngressRule(
+                        host=host + ".eda.io",
+                        http=client.V1HTTPIngressRuleValue(
+                            paths=[
+                                client.V1HTTPIngressPath(
+                                    path="/",
+                                    path_type="Exact",
+                                    backend=client.V1IngressBackend(
+                                        service=client.V1IngressServiceBackend(
+                                            port=client.V1ServiceBackendPort(
+                                                number=port,
+                                            ),
+                                            name=pod_name,
+                                        )
                                     ),
-                                    name=pod_name)
-                            )
-                        )]
+                                )
+                            ]
+                        ),
                     )
-                )
                 ]
-            )
+            ),
         )
         # Creation of the Deployment in specified namespace
         # (Can replace "default" with a namespace you may have created)
         logger.info(f"Create Route: {pod_name}")
         self.network_api.create_namespaced_ingress(
-            namespace=namespace,
-            body=body
+            namespace=namespace, body=body
         )
 
     @staticmethod
@@ -156,7 +160,7 @@ class ActivationKubernetes:
         return job
 
     def run_activation_job(
-            self, job_name, job_spec, namespace, activation_instance
+        self, job_name, job_spec, namespace, activation_instance
     ):
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
@@ -168,10 +172,10 @@ class ActivationKubernetes:
         while not done:
             try:
                 for event in w.stream(
-                        self.batch_api.list_namespaced_job,
-                        namespace=namespace,
-                        label_selector=f"job-name={job_name}",
-                        timeout_seconds=0,
+                    self.batch_api.list_namespaced_job,
+                    namespace=namespace,
+                    label_selector=f"job-name={job_name}",
+                    timeout_seconds=0,
                 ):
                     o = event["object"]
                     obj_name = o.metadata.name
@@ -235,7 +239,7 @@ class ActivationKubernetes:
         logger.info(f"{line_number} of activation instance log are created.")
 
     def set_activation_status(
-            self, instance: models.ActivationInstance, status: ActivationStatus
+        self, instance: models.ActivationInstance, status: ActivationStatus
     ):
         instance.status = status
         instance.save()
@@ -247,9 +251,9 @@ class ActivationKubernetes:
         while not done:
             try:
                 for event in w.stream(
-                        self.client_api.list_namespaced_pod,
-                        namespace=namespace,
-                        label_selector=f"job-name={job_name}",
+                    self.client_api.list_namespaced_pod,
+                    namespace=namespace,
+                    label_selector=f"job-name={job_name}",
                 ):
                     if event["object"].status.phase == "Pending":
                         pod_name = event["object"].metadata.name
@@ -314,10 +318,10 @@ class ActivationKubernetes:
         while not done:
             try:
                 for line in w.stream(
-                        self.client_api.read_namespaced_pod_log,
-                        name=pod_name,
-                        namespace=namespace,
-                        pretty=True,
+                    self.client_api.read_namespaced_pod_log,
+                    name=pod_name,
+                    namespace=namespace,
+                    pretty=True,
                 ):
                     # log info to worker log
                     logger.info(line)
