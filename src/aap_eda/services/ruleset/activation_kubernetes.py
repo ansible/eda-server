@@ -156,34 +156,6 @@ class ActivationKubernetes:
                 logger.error(traceback.format_exc())
                 logger.error(f"Job {obj_name} Failed: {e}")
 
-    def log_job_result(self, job_name, namespace, activation_instance_id):
-        pod_list = self.client_api.list_namespaced_pod(
-            namespace=namespace,
-            label_selector=f"job-name={job_name}",
-            watch=False,
-        )
-
-        job_pod_name = None
-        for i in pod_list.items:
-            job_pod_name = i.metadata.name
-            logger.info(f"Job Pod Name: {i.metadata.name}")
-
-        if job_pod_name is not None:
-            job_pod_log = self.client_api.read_namespaced_pod_log(
-                name=job_pod_name, namespace=namespace, pretty=True
-            )
-
-            # log to worker pod log
-            logger.info("Job Pod Logs:")
-            logger.info(f"{job_pod_log}")
-
-            self.log_job_to_db(
-                log=job_pod_log, activation_instance_id=activation_instance_id
-            )
-
-        else:
-            logger.info("No job logs found")
-
     def log_job_to_db(self, log, activation_instance_id):
         line_number = 0
         activation_instance_logs = []
@@ -231,7 +203,9 @@ class ActivationKubernetes:
                             status=ActivationStatus.RUNNING,
                         )
                         self.read_job_pod_log(
-                            pod_name=pod_name, namespace=namespace
+                            pod_name=pod_name,
+                            namespace=namespace,
+                            activation_instance_id=activation_instance.id,
                         )
 
                     if event["object"].status.phase == "Succeeded":
@@ -243,7 +217,9 @@ class ActivationKubernetes:
                         )
 
                         self.read_job_pod_log(
-                            pod_name=pod_name, namespace=namespace
+                            pod_name=pod_name,
+                            namespace=namespace,
+                            activation_instance_id=activation_instance.id,
                         )
                         w.stop()
                         done = True
@@ -258,7 +234,9 @@ class ActivationKubernetes:
                         )
 
                         self.read_job_pod_log(
-                            pod_name=pod_name, namespace=namespace
+                            pod_name=pod_name,
+                            namespace=namespace,
+                            activation_instance_id=activation_instance.id,
                         )
 
                         w.stop()
@@ -268,9 +246,10 @@ class ActivationKubernetes:
                 logger.error(traceback.format_exc())
                 logger.error(f"Pod Failed: {e}")
 
-    def read_job_pod_log(self, pod_name, namespace):
+    def read_job_pod_log(self, pod_name, namespace, activation_instance_id):
         w = watch.Watch()
         done = False
+        line_number = 0
 
         while not done:
             try:
@@ -280,7 +259,19 @@ class ActivationKubernetes:
                     namespace=namespace,
                     pretty=True,
                 ):
+                    # log info to worker log
                     logger.info(line)
+
+                    # log info to DB
+                    activation_instance_log = models.ActivationInstanceLog(
+                        line_number=line_number,
+                        log=line,
+                        activation_instance_id=activation_instance_id,
+                    )
+                    activation_instance_log.save()
+
+                    line_number += 1
+
                 done = True
             except Exception as e:
                 logger.error(traceback.format_exc())
