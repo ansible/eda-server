@@ -125,8 +125,8 @@ class ActivationKubernetes:
 
                         activation_instance.ended_at = timezone.now()
                         activation_instance.save()
-                        w.stop()
                         done = True
+                        w.stop()
 
                     if o.status.active:
                         logger.info(f"Job {obj_name}: Active")
@@ -147,9 +147,9 @@ class ActivationKubernetes:
                             status=ActivationStatus.FAILED,
                         )
 
-                        done = True
                         activation_instance.ended_at = timezone.now()
                         activation_instance.save()
+                        done = True
                         w.stop()
 
             except Exception as e:
