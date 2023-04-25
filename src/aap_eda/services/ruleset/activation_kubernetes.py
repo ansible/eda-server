@@ -12,13 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
 import logging
+import traceback
 
-from channels.db import database_sync_to_async
+from django.utils import timezone
 from kubernetes import client, config, watch
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class ActivationKubernetes:
             image=image,
             name=name,
             image_pull_policy=pull_policy,
+            env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
             args=[
                 "--worker",
                 "--websocket-address",
@@ -93,78 +95,67 @@ class ActivationKubernetes:
 
         return job
 
-    async def run_activation_job(
-        self, job_name, job_spec, namespace, activation_instance_id
+    def run_activation_job(
+        self, job_name, job_spec, namespace, activation_instance
     ):
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
             namespace=namespace, body=job_spec, async_req=True
         )
-
         w = watch.Watch()
-        for event in w.stream(
-            self.batch_api.list_namespaced_job,
-            namespace=namespace,
-            label_selector=f"job-name={job_name}",
-            timeout_seconds=0,
-            _request_timeout=300,
-        ):
-            await asyncio.sleep(0)
-            o = event["object"]
-            obj_name = o.metadata.name
 
-            if o.status.succeeded:
-                logger.info(f"Job {obj_name}: Succeeded")
-                await self.log_job_result(
-                    job_name=obj_name,
+        done = False
+        while not done:
+            try:
+                for event in w.stream(
+                    self.batch_api.list_namespaced_job,
                     namespace=namespace,
-                    activation_instance_id=activation_instance_id,
-                )
-                w.stop()
+                    label_selector=f"job-name={job_name}",
+                    timeout_seconds=0,
+                ):
+                    o = event["object"]
+                    obj_name = o.metadata.name
 
-            if o.status.active:
-                logger.info(f"Job {obj_name}: Active")
+                    if o.status.succeeded:
+                        logger.info(f"Job {obj_name}: Succeeded")
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.COMPLETED,
+                        )
 
-            if o.status.failed:
-                logger.info(f"Job {obj_name}: Failed")
-                await self.log_job_result(
-                    job_name=obj_name,
-                    namespace=namespace,
-                    activation_instance_id=activation_instance_id,
-                )
-                w.stop()
+                        activation_instance.ended_at = timezone.now()
+                        activation_instance.save()
+                        done = True
+                        w.stop()
 
-    async def log_job_result(
-        self, job_name, namespace, activation_instance_id
-    ):
-        pod_list = self.client_api.list_namespaced_pod(
-            namespace=namespace,
-            label_selector=f"job-name={job_name}",
-            watch=False,
-        )
+                    if o.status.active:
+                        logger.info(f"Job {obj_name}: Active")
+                        self.watch_job_pod(
+                            job_name=job_name,
+                            namespace=namespace,
+                            activation_instance=activation_instance,
+                        )
 
-        job_pod_name = None
-        for i in pod_list.items:
-            job_pod_name = i.metadata.name
-            logger.info(f"Job Pod Name: {i.metadata.name}")
+                        done = True
+                        w.stop()
 
-        if job_pod_name is not None:
-            job_pod_log = self.client_api.read_namespaced_pod_log(
-                name=job_pod_name, namespace=namespace, pretty=True
-            )
+                    if o.status.failed:
+                        logger.info(f"Job {obj_name}: Failed")
 
-            # log to worker pod log
-            logger.info("Job Pod Logs:")
-            logger.info(f"{job_pod_log}")
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.FAILED,
+                        )
 
-            await self.log_job_to_db(
-                log=job_pod_log, activation_instance_id=activation_instance_id
-            )
+                        activation_instance.ended_at = timezone.now()
+                        activation_instance.save()
+                        done = True
+                        w.stop()
 
-        else:
-            logger.info("No job logs found")
+            except Exception as e:
+                logger.error(traceback.format_exc())
+                logger.error(f"Job {obj_name} Failed: {e}")
 
-    @database_sync_to_async
     def log_job_to_db(self, log, activation_instance_id):
         line_number = 0
         activation_instance_logs = []
@@ -182,3 +173,106 @@ class ActivationKubernetes:
             activation_instance_logs
         )
         logger.info(f"{line_number} of activation instance log are created.")
+
+    def set_activation_status(
+        self, instance: models.ActivationInstance, status: ActivationStatus
+    ):
+        instance.status = status
+        instance.save()
+
+    def watch_job_pod(self, job_name, namespace, activation_instance):
+        w = watch.Watch()
+
+        done = False
+        while not done:
+            try:
+                for event in w.stream(
+                    self.client_api.list_namespaced_pod,
+                    namespace=namespace,
+                    label_selector=f"job-name={job_name}",
+                ):
+                    if event["object"].status.phase == "Pending":
+                        pod_name = event["object"].metadata.name
+                        logger.info(f"Pod {pod_name} - Pending")
+
+                    if event["object"].status.phase == "Running":
+                        pod_name = event["object"].metadata.name
+                        logger.info(f"Pod {pod_name} - Running")
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.RUNNING,
+                        )
+                        self.read_job_pod_log(
+                            pod_name=pod_name,
+                            namespace=namespace,
+                            activation_instance_id=activation_instance.id,
+                        )
+
+                    if event["object"].status.phase == "Succeeded":
+                        pod_name = event["object"].metadata.name
+                        logger.info(f"Pod {pod_name} - Succeeded")
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.COMPLETED,
+                        )
+
+                        self.read_job_pod_log(
+                            pod_name=pod_name,
+                            namespace=namespace,
+                            activation_instance_id=activation_instance.id,
+                        )
+                        w.stop()
+                        done = True
+
+                    if event["object"].status.phase == "Failed":
+                        pod_name = event["object"].metadata.name
+                        logger.info(f"Pod {pod_name} - Failed")
+
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.FAILED,
+                        )
+
+                        self.read_job_pod_log(
+                            pod_name=pod_name,
+                            namespace=namespace,
+                            activation_instance_id=activation_instance.id,
+                        )
+
+                        w.stop()
+                        done = True
+
+            except Exception as e:
+                logger.error(traceback.format_exc())
+                logger.error(f"Pod Failed: {e}")
+
+    def read_job_pod_log(self, pod_name, namespace, activation_instance_id):
+        w = watch.Watch()
+        done = False
+        line_number = 0
+
+        while not done:
+            try:
+                for line in w.stream(
+                    self.client_api.read_namespaced_pod_log,
+                    name=pod_name,
+                    namespace=namespace,
+                    pretty=True,
+                ):
+                    # log info to worker log
+                    logger.info(line)
+
+                    # log info to DB
+                    activation_instance_log = models.ActivationInstanceLog(
+                        line_number=line_number,
+                        log=line,
+                        activation_instance_id=activation_instance_id,
+                    )
+                    activation_instance_log.save()
+
+                    line_number += 1
+
+                done = True
+            except Exception as e:
+                logger.error(traceback.format_exc())
+                logger.error(e)
