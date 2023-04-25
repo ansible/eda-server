@@ -35,7 +35,7 @@ tasks:
     cmds:
       - task: manage
         vars:
-          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.Worker'
+          CLI_ARGS: rqworker --with-scheduler --worker-class 'aap_eda.core.tasking.Worker'
 
   manage:
     desc: "Run django management command"

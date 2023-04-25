@@ -50,6 +50,7 @@ services:
     command:
       - aap-eda-manage
       - rqworker
+      - --with-scheduler
       - --worker-class
       - aap_eda.core.tasking.Worker
     depends_on:

@@ -20,7 +20,7 @@ spec:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage rqworker --worker-class aap_eda.core.tasking.Worker
+            - aap-eda-manage rqworker --with-scheduler --worker-class aap_eda.core.tasking.Worker
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda
