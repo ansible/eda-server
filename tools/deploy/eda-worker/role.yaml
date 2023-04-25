@@ -5,8 +5,8 @@ metadata:
   name: eda-activation-job
 rules:
 - apiGroups: [""] # "" indicates the core API group
-  resources: ["pods", "pods/log", "jobs"]
-  verbs: ["get", "list", "watch"]
+  resources: ["pods", "pods/log", "jobs", "secrets"]
+  verbs: ["get", "list", "watch", "create", "delete"]
 - apiGroups: ["batch", "extensions"]
   resources: ["jobs"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
