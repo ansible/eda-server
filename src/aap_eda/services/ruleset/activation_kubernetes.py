@@ -34,10 +34,11 @@ class ActivationKubernetes:
 
         self.batch_api = client.BatchV1Api()
         self.client_api = client.CoreV1Api()
+        self.network_api = client.NetworkingV1Api()
 
     @staticmethod
     def create_container(
-        image, name, pull_policy, url, ssl_verify, activation_id
+        image, name, pull_policy, url, ssl_verify, activation_id, ports
     ):
         container = client.V1Container(
             image=image,
@@ -52,6 +53,9 @@ class ActivationKubernetes:
                 ssl_verify,
                 "--id",
                 str(activation_id),
+            ],
+            ports=[
+                client.V1ContainerPort(container_port=port) for port in ports
             ],
             command=["ansible-rulebook"],
         )
@@ -123,6 +127,26 @@ class ActivationKubernetes:
         logger.info(f"Created Pod template: {pod_name}")
 
         return pod_template
+
+    def create_service(self, job_name, port, namespace):
+        service_template = client.V1Service(
+            spec=client.V1ServiceSpec(
+                selector={"app": "eda", "job-name": job_name},
+                ports=[
+                    client.V1ServicePort(
+                        protocol="TCP", port=port, target_port=port
+                    )
+                ],
+            ),
+            metadata=client.V1ObjectMeta(
+                name=f"{job_name}-{port}",
+                labels={"app": "eda", "job-name": job_name},
+                namespace=namespace,
+            ),
+        )
+
+        logger.info(f"Create Service: {job_name}")
+        self.client_api.create_namespaced_service(namespace, service_template)
 
     @staticmethod
     def create_job(job_name, pod_template, backoff_limit=0, ttl=0):
