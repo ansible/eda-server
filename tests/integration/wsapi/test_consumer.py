@@ -373,10 +373,8 @@ def _prepare_db_data():
         email="luke.skywalker@example.com",
         password="secret",
     )
-    token = models.AwxToken.objects.get_or_create(
-        user=user, name="token", token="XXX"
-    )
-    print(token)
+
+    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
