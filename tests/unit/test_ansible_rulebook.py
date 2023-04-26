@@ -31,6 +31,7 @@ def test_run_worker_mode(run_mock: mock.Mock):
         "ws://localhost:8000",
         "no",
         "1",
+        "5",
     )
 
     run_mock.assert_called_once_with(
@@ -44,6 +45,8 @@ def test_run_worker_mode(run_mock: mock.Mock):
             "no",
             "--id",
             "1",
+            "--heartbeat",
+            "5",
         ],
         check=True,
         encoding="utf-8",
@@ -72,4 +75,5 @@ def test_raise_error(run_mock: mock.Mock):
             "ws://localhost:8000",
             "no",
             "1",
+            5,
         )

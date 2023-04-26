@@ -16,6 +16,7 @@ from subprocess import CompletedProcess
 from unittest import mock
 
 import pytest
+from django.conf import settings
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -197,6 +198,7 @@ def test_rulesets_activate_with_podman(my_mock: mock.Mock, init_data):
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
         activation_instance_id=instance.id,
+        heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
     )
     assert (
         models.ActivationInstance.objects.first().status

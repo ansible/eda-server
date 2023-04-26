@@ -34,6 +34,7 @@ class AnsibleRulebookService:
         url: str,
         ssl_verify: str,
         activation_id: str,
+        heartbeat: str,
     ) -> subprocess.CompletedProcess:
         """Run ansible-rulebook in worker mode."""
         args = [
@@ -44,6 +45,8 @@ class AnsibleRulebookService:
             ssl_verify,
             "--id",
             str(activation_id),
+            "--heartbeat",
+            str(heartbeat),
         ]
 
         try:
