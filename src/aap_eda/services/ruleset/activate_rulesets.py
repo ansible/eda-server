@@ -42,12 +42,8 @@ class DeploymentType(Enum):
 
 # Move this to rulebook parser module
 def find_ports(rulebook_text: str):
-    """
-    Returns (host, port) pairs for all sources in a rulebook.
-    """
-
+    """D401: Returns (host, port) pairs for all sources in a rulebook."""
     # Walk the rulebook and find ports in source parameters
-
     # Assume the rulebook is valid if it imported
     rulebook = yaml.safe_load(rulebook_text)
 
@@ -276,7 +272,7 @@ class ActivateRulesets:
             job_name=job_name, pod_template=pod_spec, ttl=30
         )
 
-        for host, port in find_ports(
+        for _, port in find_ports(
             activation_instance.activation.rulebook_rulesets
         ):
             k8s.create_service(
