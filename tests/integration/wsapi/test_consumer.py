@@ -436,9 +436,7 @@ def _prepare_acitvation_instance_without_extra_var():
         password="secret",
     )
 
-    token = models.AwxToken.objects.get_or_create(
-        user=user, name="token", token="XXX"
-    )
+    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
 
     activation = models.Activation.objects.create(
         name="test-activation-no-extra_var",
