@@ -38,7 +38,14 @@ class ActivationKubernetes:
 
     @staticmethod
     def create_container(
-        image, name, pull_policy, url, ssl_verify, activation_id, ports
+        image,
+        name,
+        pull_policy,
+        url,
+        ssl_verify,
+        activation_id,
+        ports,
+        heartbeat,
     ):
         container = client.V1Container(
             image=image,
@@ -53,6 +60,8 @@ class ActivationKubernetes:
                 ssl_verify,
                 "--id",
                 str(activation_id),
+                "--heartbeat",
+                str(heartbeat),
             ],
             ports=[
                 client.V1ContainerPort(container_port=port) for port in ports

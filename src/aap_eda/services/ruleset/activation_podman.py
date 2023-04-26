@@ -58,6 +58,7 @@ class ActivationPodman:
         ws_url: str,
         ws_ssl_verify: str,
         activation_instance_id: str,
+        heartbeat: str,
     ) -> Container:
         try:
             """Run ansible-rulebook in worker mode."""
@@ -70,6 +71,8 @@ class ActivationPodman:
                 ws_url,
                 "--id",
                 str(activation_instance_id),
+                "--heartbeat",
+                str(heartbeat),
             ]
 
             container = self.client.containers.run(
@@ -94,10 +97,10 @@ class ActivationPodman:
             return container
         except ContainerError:
             logger.exception("Container error")
-            raise ActivationException("Container error")
+            raise
         except ImageNotFound:
             logger.exception("Image not found")
-            raise ActivationException("Image not found")
+            raise
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
@@ -126,7 +129,7 @@ class ActivationPodman:
             )
         except APIError:
             logger.exception("Login failed")
-            raise ActivationException("Login failed")
+            raise
 
     def _pull_image(self) -> Image:
         try:
@@ -135,4 +138,4 @@ class ActivationPodman:
             logger.exception(
                 f"Image {self.decision_environment.image_url} not found"
             )
-            raise ActivationException("Image not found")
+            raise

@@ -22,7 +22,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
@@ -84,7 +84,7 @@ class ActivateRulesets:
         deployment_type: str,
         ws_base_url: str,
         ssl_verify: str,
-    ):
+    ) -> models.ActivationInstance:
         try:
             activation = models.Activation.objects.get(id=activation_id)
             instance = models.ActivationInstance.objects.create(
@@ -134,9 +134,31 @@ class ActivateRulesets:
         except ActivationException as exe:
             logger.error(f"Activation error: {str(exe)}")
             instance.status = ActivationStatus.FAILED
+        except Exception as exe:
+            instance.status = ActivationStatus.FAILED
+            if (
+                activation.restart_policy == RestartPolicy.ALWAYS.value
+                or activation.restart_policy == RestartPolicy.ON_FAILURE.value
+            ):
+                from aap_eda.tasks.ruleset import enqueue_monitor_task
+
+                logger.warning(f"Activation failed: {str(exe)} but will retry")
+                enqueue_monitor_task(
+                    activation_id,
+                    decision_environment_id,
+                    deployment_type,
+                    ws_base_url,
+                    ssl_verify,
+                )
+            else:
+                logger.error(f"Activation error: {str(exe)}")
         finally:
-            instance.ended_at = timezone.now()
+            now = timezone.now()
+            instance.ended_at = now
+            instance.updated_at = now
             instance.save()
+            instance.refresh_from_db()
+        return instance
 
     def activate_in_local(
         self,
@@ -159,6 +181,7 @@ class ActivateRulesets:
             url,
             ssl_verify,
             activation_instance_id,
+            settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         )
 
         line_number = 0
@@ -193,6 +216,7 @@ class ActivateRulesets:
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
             activation_instance_id=activation_instance_id,
+            heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
         )
 
         line_number = 0
@@ -251,6 +275,7 @@ class ActivateRulesets:
                     activation_instance.activation.rulebook_rulesets
                 )
             ],
+            heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
         )
 
         secret_name = None

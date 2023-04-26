@@ -20,7 +20,6 @@ from podman.errors import exceptions
 from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
 from aap_eda.services.ruleset.activation_podman import ActivationPodman
-from aap_eda.services.ruleset.exceptions import ActivationException
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
@@ -78,6 +77,7 @@ def test_activation_podman_run_worker_mode(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
         activation_instance_id="1",
+        heartbeat="5",
     )
 
     client_mock.containers.run.assert_called_once_with(
@@ -91,6 +91,8 @@ def test_activation_podman_run_worker_mode(
             "ws://localhost:8000/api/eda/ws/ansible-rulebook",
             "--id",
             "1",
+            "--heartbeat",
+            "5",
         ],
         stdout=True,
         stderr=True,
@@ -116,5 +118,5 @@ def test_activation_podman_with_invalid_credential(
 
     client_mock.login.side_effect = raise_error
 
-    with pytest.raises(ActivationException, match="Login failed"):
+    with pytest.raises(exceptions.APIError, match="login attempt failed"):
         ActivationPodman(decision_environment, None)

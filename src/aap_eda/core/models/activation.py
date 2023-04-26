@@ -73,6 +73,7 @@ class ActivationInstance(models.Model):
         "Activation", on_delete=models.CASCADE, null=True
     )
     started_at = models.DateTimeField(auto_now_add=True, null=False)
+    updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
 
 

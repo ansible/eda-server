@@ -16,6 +16,7 @@ from .messages import (
     ControllerInfo,
     EndOfResponse,
     ExtraVars,
+    HeartbeatMessage,
     JobMessage,
     Rulebook,
     WorkerMessage,
@@ -31,6 +32,7 @@ class MessageType(Enum):
     WORKER = "Worker"
     SHUTDOWN = "Shutdown"
     PROCESSED_EVENT = "ProcessedEvent"
+    SESSION_STATS = "SessionStats"
 
 
 # Determine host status based on event type
@@ -89,6 +91,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             await self.handle_actions(ActionMessage.parse_obj(data))
         elif msg_type == MessageType.SHUTDOWN:
             logger.info("Websocket connection is closed.")
+        elif msg_type == MessageType.SESSION_STATS:
+            await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
         else:
             logger.warning(f"Unsupported message received: {data}")
 
@@ -128,6 +132,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def handle_actions(self, message: ActionMessage):
         logger.info(f"Start to handle actions: {message}")
         await self.insert_audit_rule_data(message)
+
+    @database_sync_to_async
+    def handle_heartbeat(self, message: HeartbeatMessage) -> None:
+        logger.info(f"Start to handle heartbeat: {message}")
+        instance = models.ActivationInstance.objects.get(
+            pk=message.activation_id
+        )
+        instance.updated_at = message.reported_at
+        instance.save()
 
     @database_sync_to_async
     def insert_event_related_data(self, message: AnsibleEventMessage) -> None:
