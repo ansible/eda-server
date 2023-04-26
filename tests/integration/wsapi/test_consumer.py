@@ -366,12 +366,23 @@ def _prepare_db_data():
         project=project,
     )
 
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+
+    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy="always",
         extra_var=extra_var,
         rulebook=rulebook,
         project=project,
+        user=user,
     )
 
     activation_instance, _ = models.ActivationInstance.objects.get_or_create(
@@ -415,11 +426,22 @@ def _prepare_acitvation_instance_without_extra_var():
         project=project,
     )
 
+    user = models.User.objects.create_user(
+        username="luke.skywalker2",
+        first_name="Luke",
+        last_name="Skywalker2",
+        email="luke.skywalker2@example.com",
+        password="secret",
+    )
+
+    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+
     activation = models.Activation.objects.create(
         name="test-activation-no-extra_var",
         restart_policy="always",
         rulebook=rulebook,
         project=project,
+        user=user,
     )
 
     activation_instance = models.ActivationInstance.objects.create(

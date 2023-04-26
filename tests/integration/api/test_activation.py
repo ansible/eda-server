@@ -74,6 +74,13 @@ collections:
 
 
 def create_activation_related_data(with_project=True):
+    user_id = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    ).pk
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
@@ -102,6 +109,7 @@ def create_activation_related_data(with_project=True):
     extra_var_id = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR).pk
 
     return {
+        "user_id": user_id,
         "decision_environment_id": decision_environment_id,
         "project_id": project_id,
         "rulebook_id": rulebook_id,
@@ -115,6 +123,7 @@ def create_activation(fks: dict):
     activation_data["project_id"] = fks["project_id"]
     activation_data["rulebook_id"] = fks["rulebook_id"]
     activation_data["extra_var_id"] = fks["extra_var_id"]
+    activation_data["user_id"] = fks["user_id"]
     activation = models.Activation(**activation_data)
     activation.save()
 

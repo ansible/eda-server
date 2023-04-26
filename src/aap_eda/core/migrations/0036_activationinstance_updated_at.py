@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0034_project_credential"),
+        ("core", "0035_activation_user"),
     ]
 
     operations = [

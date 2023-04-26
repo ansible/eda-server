@@ -54,11 +54,6 @@ spec:
                 configMapKeyRef:
                   name: eda-env-properties
                   key: EDA_CONTROLLER_URL
-            - name: EDA_CONTROLLER_TOKEN
-              valueFrom:
-                configMapKeyRef:
-                  name: eda-env-properties
-                  key: EDA_CONTROLLER_TOKEN
             - name: EDA_CONTROLLER_SSL_VERIFY
               valueFrom:
                 configMapKeyRef:

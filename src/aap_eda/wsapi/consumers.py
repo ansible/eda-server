@@ -111,7 +111,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         controller_info = ControllerInfo(
             url=settings.EDA_CONTROLLER_URL,
-            token=settings.EDA_CONTROLLER_TOKEN,
+            token=await self.get_awx_token(message),
             ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
         )
 
@@ -302,3 +302,17 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             extra_var = None
 
         return activation.rulebook_rulesets, extra_var
+
+    @database_sync_to_async
+    def get_awx_token(self, message):
+        # query for activation
+        activation_instance = models.ActivationInstance.objects.get(
+            id=message.activation_id
+        )
+
+        # check/get AWX token
+        awx_token = models.AwxToken.objects.filter(
+            user_id=activation_instance.activation.user_id
+        ).first()
+
+        return awx_token.token.get_secret_value()

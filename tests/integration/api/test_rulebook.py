@@ -501,10 +501,18 @@ def init_db():
         action={"run_playbook": {"name": "ansible.eda.hello"}},
         ruleset=ruleset,
     )
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
     activation = models.Activation.objects.create(
         name="test-activation",
         rulebook=rulebook,
         project=project,
+        user=user,
     )
     activation_instance = models.ActivationInstance.objects.create(
         activation=activation,
