@@ -78,65 +78,25 @@ class ActivationKubernetes:
 
         return pod_template
 
-    def create_service(self, pod_name, port, namespace):
+    def create_service(self, job_name, port, namespace):
         service_template = client.V1Service(
             spec=client.V1ServiceSpec(
+                selector={"app": "eda", "job-name": job_name},
                 ports=[
                     client.V1ServicePort(
                         protocol="TCP", port=port, target_port=port
                     )
-                ]
+                ],
             ),
             metadata=client.V1ObjectMeta(
-                name=pod_name, labels={"app": "eda"}, namespace=namespace
-            ),
-        )
-
-        logger.info(f"Create Service: {pod_name}")
-        self.client_api.create_namespaced_service(namespace, service_template)
-
-    def create_ingress(self, port, host, pod_name, namespace):
-        body = client.V1Ingress(
-            api_version="networking.k8s.io/v1",
-            kind="Ingress",
-            metadata=client.V1ObjectMeta(
-                name=pod_name,
-                annotations={
-                    "nginx.ingress.kubernetes.io/rewrite-target": "/"
-                },
-                labels={"app": "eda"},
+                name=f"{job_name}-{port}",
+                labels={"app": "eda", "job-name": job_name},
                 namespace=namespace,
             ),
-            spec=client.V1IngressSpec(
-                rules=[
-                    client.V1IngressRule(
-                        host=host + ".eda.io",
-                        http=client.V1HTTPIngressRuleValue(
-                            paths=[
-                                client.V1HTTPIngressPath(
-                                    path="/",
-                                    path_type="Exact",
-                                    backend=client.V1IngressBackend(
-                                        service=client.V1IngressServiceBackend(
-                                            port=client.V1ServiceBackendPort(
-                                                number=port,
-                                            ),
-                                            name=pod_name,
-                                        )
-                                    ),
-                                )
-                            ]
-                        ),
-                    )
-                ]
-            ),
         )
-        # Creation of the Deployment in specified namespace
-        # (Can replace "default" with a namespace you may have created)
-        logger.info(f"Create Route: {pod_name}")
-        self.network_api.create_namespaced_ingress(
-            namespace=namespace, body=body
-        )
+
+        logger.info(f"Create Service: {job_name}")
+        self.client_api.create_namespaced_service(namespace, service_template)
 
     @staticmethod
     def create_job(job_name, pod_template, backoff_limit=0, ttl=0):

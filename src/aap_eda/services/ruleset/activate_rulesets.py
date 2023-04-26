@@ -275,10 +275,7 @@ class ActivateRulesets:
             activation_instance.activation.rulebook_rulesets
         ):
             k8s.create_service(
-                namespace=namespace, pod_name=pod_name, port=port
-            )
-            k8s.create_ingress(
-                host=host, port=port, pod_name=pod_name, namespace=namespace
+                namespace=namespace, job_name=job_name, port=port
             )
 
         # execute job
