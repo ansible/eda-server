@@ -94,6 +94,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
     git_mock.clone.assert_called_once_with(
         "https://git.example.com/repo.git",
         os.path.join(service_tempdir_patch.last_name, "src"),
+        credential=None,
         depth=1,
     )
 

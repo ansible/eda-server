@@ -18,21 +18,24 @@ from unittest import mock
 
 import pytest
 
+from aap_eda.core.models import Credential
 from aap_eda.services.project.git import GitError, GitExecutor, GitRepository
 
 
 def test_git_clone():
+    credential = Credential(username="me", secret="pass")
     executor = mock.Mock()
     repository = GitRepository.clone(
         "https://git.example.com/repo.git",
         "/path/to/repository",
+        credential=credential,
         _executor=executor,
     )
     executor.assert_called_once_with(
         [
             "clone",
             "--quiet",
-            "https://git.example.com/repo.git",
+            "https://me:pass@git.example.com/repo.git",
             "/path/to/repository",
         ]
     )

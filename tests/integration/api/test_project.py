@@ -33,6 +33,9 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
                 name="test-project-01",
                 url="https://git.example.com/acme/project-01",
                 git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+                credential=models.Credential.objects.create(
+                    name="credential1", username="me", secret="sec1"
+                ),
                 import_state=models.Project.ImportState.PENDING,
                 import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
             ),
@@ -109,12 +112,15 @@ def test_list_projects_filter_name_none_exist(client: APIClient):
 def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
     project = models.Project.objects.create(
         name="test-project-01",
+        credential=models.Credential.objects.create(
+            name="credential1", username="me", secret="sec1"
+        ),
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
-    assert_project_data(response.json(), project)
+    assert_project_data_details(response.json(), project)
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ
@@ -139,7 +145,7 @@ def test_retrieve_project_failed_state(client: APIClient):
     assert data["import_task_id"] == "3677eb4a-de4a-421a-a73b-411aa502484d"
     assert data["import_error"] == "Unexpected error. Please contact support."
 
-    assert_project_data(data, project)
+    assert_project_data_details(data, project)
 
 
 @pytest.mark.django_db
@@ -442,11 +448,40 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def assert_project_data(data: Dict[str, Any], project: models.Project):
+    credential_id = project.credential.id if project.credential else None
+
+    project_to_data = model_to_data_common(project)
+    project_to_data["credential_id"] = credential_id
+
+    assert data == project_to_data
+
+
+def assert_project_data_details(data: Dict[str, Any], project: models.Project):
+    credential = project.credential
+    credential_data = (
+        {
+            "id": credential.id,
+            "name": credential.name,
+            "description": credential.description,
+            "credential_type": credential.credential_type.value,
+            "username": credential.username,
+        }
+        if credential
+        else None
+    )
+
+    project_to_data = model_to_data_common(project)
+    project_to_data["credential"] = credential_data
+
+    assert data == project_to_data
+
+
+def model_to_data_common(project: models.Project):
     import_task_id = project.import_task_id
     if import_task_id is not None:
         import_task_id = str(import_task_id)
 
-    assert data == {
+    return {
         "id": project.id,
         "url": project.url,
         "name": project.name,

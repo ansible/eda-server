@@ -80,7 +80,9 @@ class ProjectImportService:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
-            repo = self._git_cls.clone(project.url, repo_dir, depth=1)
+            repo = self._git_cls.clone(
+                project.url, repo_dir, credential=project.credential, depth=1
+            )
             project.git_hash = repo.rev_parse("HEAD")
 
             self._import_rulebooks(project, repo_dir)
@@ -91,7 +93,9 @@ class ProjectImportService:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
-            repo = self._git_cls.clone(project.url, repo_dir, depth=1)
+            repo = self._git_cls.clone(
+                project.url, repo_dir, credential=project.credential, depth=1
+            )
             git_hash = repo.rev_parse("HEAD")
 
             if project.git_hash == git_hash:
