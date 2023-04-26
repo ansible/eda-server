@@ -102,11 +102,19 @@ def init_data():
     extra_var = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
     activation = models.Activation.objects.create(
         decision_environment=decision_environment,
         project=project,
         rulebook=rulebook,
         extra_var=extra_var,
+        user=user,
     )
 
     return InitData(

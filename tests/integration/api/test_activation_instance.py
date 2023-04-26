@@ -236,9 +236,17 @@ def prepare_init_data():
         path="rulebooks",
         rulesets=TEST_RULESETS_SAMPLE,
     )
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
     activation = models.Activation.objects.create(
         name="test-activation",
         rulebook=rulebook,
+        user=user,
     )
 
     return activation
