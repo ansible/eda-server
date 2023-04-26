@@ -57,6 +57,7 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    restart: always
 
   postgres:
     image: 'docker.io/library/postgres:13'
