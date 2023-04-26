@@ -103,10 +103,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "restart_policy",
         ]
 
-    def create(self, validated_data):
+    def create(self, validated_data, user):
         rulebook = models.Rulebook.objects.get(
             pk=validated_data["rulebook_id"]
         )
+        validated_data["user_id"] = user.id
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         return super().create(validated_data)

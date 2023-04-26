@@ -109,9 +109,19 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             await self.send(text_data=extra_var_message.json())
 
+        # query for activation
+        activation_instance = models.ActivationInstance.objects.get(
+            id=message.activation_id
+        )
+
+        # check/get AWX token
+        awx_token = models.AwxToken.objects.filter(
+            user_id=activation_instance.activation.user_id
+        ).first()
+
         controller_info = ControllerInfo(
             url=settings.EDA_CONTROLLER_URL,
-            token=settings.EDA_CONTROLLER_TOKEN,
+            token=awx_token,
             ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
         )
 

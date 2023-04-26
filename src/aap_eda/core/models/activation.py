@@ -16,6 +16,8 @@ from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
+from .user import User
+
 __all__ = (
     "Activation",
     "ActivationInstance",
@@ -56,6 +58,7 @@ class Activation(models.Model):
         null=False,
         help_text="Content of the last referenced rulebook",
     )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
