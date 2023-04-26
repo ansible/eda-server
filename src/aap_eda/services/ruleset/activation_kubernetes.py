@@ -12,7 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import base64
+import json
 import logging
+import time
 import traceback
 
 from django.utils import timezone
@@ -65,12 +68,59 @@ class ActivationKubernetes:
 
         return container
 
+    def create_secret(
+        self,
+        secret_name: str,
+        namespace: str,
+        decision_environment: models.DecisionEnvironment,
+    ) -> None:
+        credential = decision_environment.credential
+        server = decision_environment.image_url.split("/")[0]
+        cred_payload = {
+            "auths": {
+                server: {
+                    "username": credential.username,
+                    "password": credential.secret.get_secret_value(),
+                }
+            }
+        }
+
+        data = {
+            ".dockerconfigjson": base64.b64encode(
+                json.dumps(cred_payload).encode()
+            ).decode()
+        }
+
+        secret = client.V1Secret(
+            api_version="v1",
+            data=data,
+            kind="Secret",
+            metadata={"name": secret_name, "namespace": namespace},
+            type="kubernetes.io/dockerconfigjson",
+        )
+
+        self.client_api.create_namespaced_secret(
+            namespace=namespace,
+            body=secret,
+        )
+
     @staticmethod
-    def create_pod_template(pod_name, container):
-        pod_template = client.V1PodTemplateSpec(
-            spec=client.V1PodSpec(
+    def create_pod_template(pod_name, container, secret_name):
+        if secret_name:
+            spec = client.V1PodSpec(
+                restart_policy="Never",
+                containers=[container],
+                image_pull_secrets=[
+                    client.V1LocalObjectReference(secret_name)
+                ],
+            )
+        else:
+            spec = client.V1PodSpec(
                 restart_policy="Never", containers=[container]
-            ),
+            )
+
+        pod_template = client.V1PodTemplateSpec(
+            spec=spec,
             metadata=client.V1ObjectMeta(name=pod_name, labels={"app": "eda"}),
         )
 
@@ -120,7 +170,12 @@ class ActivationKubernetes:
         return job
 
     def run_activation_job(
-        self, job_name, job_spec, namespace, activation_instance
+        self,
+        job_name,
+        job_spec,
+        namespace,
+        activation_instance,
+        secret_name,
     ):
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
@@ -179,6 +234,31 @@ class ActivationKubernetes:
             except Exception as e:
                 logger.error(traceback.format_exc())
                 logger.error(f"Job {obj_name} Failed: {e}")
+
+        # remove secret if created
+        if secret_name:
+            self.delete_secret(
+                secret_name=secret_name, namespace=namespace, job_name=job_name
+            )
+
+    def delete_secret(self, secret_name, namespace, job_name):
+        # wait until job is done
+        while True:
+            ret = client.BatchV1Api().list_namespaced_job(
+                namespace=namespace,
+                field_selector=f"metadata.name={job_name}",
+            )
+            if not ret.items[0].status.active:
+                break
+
+            time.sleep(1)
+
+        logger.info(f"Removing secret: {secret_name}")
+
+        self.client_api.delete_namespaced_secret(
+            name=secret_name,
+            namespace=namespace,
+        )
 
     def log_job_to_db(self, log, activation_instance_id):
         line_number = 0

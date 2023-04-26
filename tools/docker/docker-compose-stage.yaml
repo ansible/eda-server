@@ -7,27 +7,31 @@ x-environment:
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
   - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-wss://host.containers.internal}
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://host.containers.internal:8080}
   - EDA_WEBSOCKET_SSL_VERIFY=no
+  - EDA_PODMAN_SOCKET_URL=unix:///run/podman/podman.sock
+  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
+  - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
+  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
 
 services:
   eda-ui:
-    image: "${EDA_UI_IMAGE_URL:-quay.io/ansible/eda-ui:main}"
+    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     ports:
       - '8080:8080'
     depends_on:
       eda-api:
         condition: service_healthy
   eda-api:
-    image: "${EDA_IMAGE_URL:-quay.io/ansible/eda-server:main}"
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     command:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage migrate 
-        && aap-eda-manage create_initial_data 
-        && scripts/create_superuser.sh 
+        aap-eda-manage migrate
+        && aap-eda-manage create_initial_data
+        && scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - '8000:8000'
@@ -43,13 +47,15 @@ services:
       retries: 10
 
   eda-worker:
+    user: "${EDA_POD_USER_ID:-0}"
     deploy:
       replicas: 2
-    image: "quay.io/ansible/eda-server:${EDA_IMAGE_TAG:-main}"
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     command:
       - aap-eda-manage
       - rqworker
+      - --with-scheduler
       - --worker-class
       - aap_eda.core.tasking.Worker
     depends_on:
@@ -57,6 +63,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
   postgres:
     image: 'docker.io/library/postgres:13'

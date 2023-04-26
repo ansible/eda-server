@@ -47,7 +47,8 @@ def test_run_worker_mode(run_mock: mock.Mock):
         ],
         check=True,
         encoding="utf-8",
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         cwd=None,
     )
 

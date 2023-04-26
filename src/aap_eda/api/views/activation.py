@@ -49,15 +49,6 @@ def handle_activation_create_conflict(activation):
 
 
 @extend_schema_view(
-    list=extend_schema(
-        description="List all activations",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ActivationSerializer,
-                description="A list of all activations is returned.",
-            ),
-        },
-    ),
     destroy=extend_schema(
         description="Delete an existing Activation",
         responses={
@@ -95,17 +86,18 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
-        decision_environment_id = response_serializer.data[
-            "decision_environment_id"
-        ]
+        if response.is_enabled:
+            decision_environment_id = response_serializer.data[
+                "decision_environment_id"
+            ]
 
-        activate_rulesets.delay(
-            activation_id=response.id,
-            decision_environment_id=decision_environment_id,
-            deployment_type=settings.DEPLOYMENT_TYPE,
-            ws_base_url=settings.WEBSOCKET_BASE_URL,
-            ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
-        )
+            activate_rulesets.delay(
+                activation_id=response.id,
+                decision_environment_id=decision_environment_id,
+                deployment_type=settings.DEPLOYMENT_TYPE,
+                ws_base_url=settings.WEBSOCKET_BASE_URL,
+                ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+            )
 
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
@@ -143,12 +135,9 @@ class ActivationViewSet(
             activation_id=pk
         )
         activation["instances"] = activation_instances
-        if activation_instances:
-            activation["status"] = activation_instances.latest(
-                "started_at"
-            ).status
-        else:
-            activation["status"] = ActivationStatus.FAILED.value
+        activation["status"] = self._status_from_instances(
+            activation, activation_instances
+        )
 
         return Response(serializers.ActivationReadSerializer(activation).data)
 
@@ -172,12 +161,9 @@ class ActivationViewSet(
             activation_instances = models.ActivationInstance.objects.filter(
                 activation_id=activation["id"]
             )
-            if activation_instances:
-                activation["status"] = activation_instances.latest(
-                    "started_at"
-                ).status
-            else:
-                activation["status"] = ActivationStatus.FAILED.value
+            activation["status"] = self._status_from_instances(
+                activation, activation_instances
+            )
 
         return self.get_paginated_response(activations)
 
@@ -310,6 +296,14 @@ class ActivationViewSet(
         activation.save(update_fields=["restart_count"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _status_from_instances(self, activation, activation_instances):
+        if activation_instances:
+            return activation_instances.latest("started_at").status
+        elif activation["is_enabled"]:
+            return ActivationStatus.FAILED.value
+        else:
+            return ActivationStatus.STOPPED.value
 
 
 @extend_schema_view(

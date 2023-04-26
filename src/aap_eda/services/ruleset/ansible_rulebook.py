@@ -53,7 +53,8 @@ class AnsibleRulebookService:
                 [ssh_agent, ansible_rulebook, *args],
                 check=True,
                 encoding="utf-8",
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 cwd=self.cwd,
             )
         except subprocess.CalledProcessError as exc:
