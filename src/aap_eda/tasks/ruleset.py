@@ -98,9 +98,6 @@ def monitor_and_restart_activation(
             if timezone.now() - instance.updated_at > timedelta(
                 seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS)
             ):
-                instance.status = ActivationStatus.FAILED
-                instance.ended_at = timezone.now()
-                instance.save()
                 logger.info(
                     f"Lost heartbeat for Rulebook ({activation_id=})."
                     " Restart now."
