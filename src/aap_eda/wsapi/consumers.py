@@ -111,7 +111,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         controller_info = ControllerInfo(
             url=settings.EDA_CONTROLLER_URL,
-            token=self.get_awx_token(message),
+            token=await self.get_awx_token(message),
             ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
         )
 
