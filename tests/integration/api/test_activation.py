@@ -45,7 +45,6 @@ TEST_PROJECT = {
 
 TEST_RULEBOOK = {
     "name": "test-rulebook.yml",
-    "path": "rulebooks",
     "description": "test rulebook",
 }
 
@@ -99,7 +98,6 @@ def create_activation_related_data(with_project=True):
     rulebook_id = (
         models.Rulebook.objects.create(
             name=TEST_RULEBOOK["name"],
-            path=TEST_RULEBOOK["path"],
             rulesets=TEST_RULESETS,
             description=TEST_RULEBOOK["description"],
         ).pk
