@@ -15,6 +15,7 @@ import os
 from unittest import mock
 
 import pytest
+from django.conf import settings
 from podman.errors import exceptions
 
 from aap_eda.core import models
@@ -40,6 +41,11 @@ def init_data():
     )
 
     return (credential, decision_environment)
+
+
+@pytest.fixture(autouse=True)
+def use_dummy_log_level(settings):
+    settings.ANSIBLE_RULEBOOK_LOG_LEVEL = "-vv"
 
 
 @pytest.mark.django_db
@@ -95,6 +101,7 @@ def test_activation_podman_run_worker_mode(
             "1",
             "--heartbeat",
             "5",
+            settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
         ],
         stdout=True,
         stderr=True,
