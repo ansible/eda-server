@@ -113,7 +113,7 @@ class ActivateRulesets:
                 self.activate_in_podman(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
-                    activation_instance_id=instance.id,
+                    activation_instance=instance,
                     decision_environment=decision_environment,
                 )
             elif dtype == DeploymentType.DOCKER:
@@ -206,17 +206,25 @@ class ActivateRulesets:
         self,
         ws_url: str,
         ssl_verify: str,
-        activation_instance_id: str,
+        activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
     ) -> None:
         podman = ActivationPodman(
             decision_environment, settings.PODMAN_SOCKET_URL
         )
+
+        ports = {}
+        for _, port in find_ports(
+            activation_instance.activation.rulebook_rulesets
+        ):
+            ports[f"{port}/tcp"] = port
+
         container = podman.run_worker_mode(
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
-            activation_instance_id=activation_instance_id,
+            activation_instance_id=activation_instance.id,
             heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+            ports=ports,
         )
 
         line_number = 0
@@ -226,7 +234,7 @@ class ActivateRulesets:
             activation_instance_log = models.ActivationInstanceLog(
                 line_number=line_number,
                 log=line.decode("utf-8"),
-                activation_instance_id=int(activation_instance_id),
+                activation_instance_id=int(activation_instance.id),
             )
             activation_instance_logs.append(activation_instance_log)
 
