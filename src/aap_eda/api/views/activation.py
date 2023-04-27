@@ -81,7 +81,9 @@ class ActivationViewSet(
         serializer.is_valid(raise_exception=True)
 
         try:
-            response = serializer.create(serializer.validated_data)
+            response = serializer.create(
+                serializer.validated_data, request.user
+            )
         except IntegrityError:
             handle_activation_create_conflict(serializer.validated_data)
 

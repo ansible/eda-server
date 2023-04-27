@@ -3,10 +3,13 @@ from unittest.mock import patch
 import pytest
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
+from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
+
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 TEST_INVENTORY = """
 ---
@@ -260,6 +263,50 @@ async def test_handle_actions():
     assert event2.payload == {"i": 3}
 
 
+@pytest.mark.django_db(transaction=True)
+async def test_handle_heartbeat():
+    communicator = await _prepare_websocket_connection()
+    activation_instance_id = await _prepare_db_data()
+    connected, _ = await communicator.connect()
+    assert connected
+    activation_instance = await get_activation_instance(activation_instance_id)
+
+    payload = {
+        "type": "SessionStats",
+        "activation_id": activation_instance_id,
+        "stats": {
+            "start": activation_instance.started_at.strftime(DATETIME_FORMAT),
+            "end": None,
+            "numberOfRules": 1,
+            "numberOfDisabledRules": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 2000,
+            "eventsMatched": 1,
+            "eventsSuppressed": 1999,
+            "permanentStorageSize": 0,
+            "asyncResponses": 0,
+            "bytesSentOnAsync": 0,
+            "sessionId": 1,
+            "ruleSetName": "ruleset",
+        },
+        "reported_at": timezone.now().strftime(DATETIME_FORMAT),
+    }
+
+    await communicator.send_json_to(payload)
+    await communicator.disconnect()
+    updated_activation_instance = await get_activation_instance(
+        activation_instance_id
+    )
+    assert (
+        updated_activation_instance.updated_at.strftime(DATETIME_FORMAT)
+    ) == payload["reported_at"]
+
+
+@database_sync_to_async
+def get_activation_instance(instance_id):
+    return models.ActivationInstance.objects.get(pk=instance_id)
+
+
 @database_sync_to_async
 def get_audit_events():
     return (
@@ -319,12 +366,23 @@ def _prepare_db_data():
         project=project,
     )
 
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+
+    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy="always",
         extra_var=extra_var,
         rulebook=rulebook,
         project=project,
+        user=user,
     )
 
     activation_instance, _ = models.ActivationInstance.objects.get_or_create(
@@ -368,11 +426,22 @@ def _prepare_acitvation_instance_without_extra_var():
         project=project,
     )
 
+    user = models.User.objects.create_user(
+        username="luke.skywalker2",
+        first_name="Luke",
+        last_name="Skywalker2",
+        email="luke.skywalker2@example.com",
+        password="secret",
+    )
+
+    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+
     activation = models.Activation.objects.create(
         name="test-activation-no-extra_var",
         restart_policy="always",
         rulebook=rulebook,
         project=project,
+        user=user,
     )
 
     activation_instance = models.ActivationInstance.objects.create(

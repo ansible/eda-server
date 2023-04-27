@@ -88,3 +88,10 @@ class ControllerInfo(BaseModel):
 class Hello(BaseModel):
     data: str = {}
     type: str = "Hello"
+
+
+class HeartbeatMessage(BaseModel):
+    type: str = "SessionStats"
+    activation_id: int
+    stats: dict = {}
+    reported_at: str

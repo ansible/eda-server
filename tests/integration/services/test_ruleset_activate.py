@@ -16,6 +16,7 @@ from subprocess import CompletedProcess
 from unittest import mock
 
 import pytest
+from django.conf import settings
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -101,11 +102,19 @@ def init_data():
     extra_var = models.ExtraVar.objects.create(
         name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
     )
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
     activation = models.Activation.objects.create(
         decision_environment=decision_environment,
         project=project,
         rulebook=rulebook,
         extra_var=extra_var,
+        user=user,
     )
 
     return InitData(
@@ -197,6 +206,7 @@ def test_rulesets_activate_with_podman(my_mock: mock.Mock, init_data):
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
         activation_instance_id=instance.id,
+        heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
     )
     assert (
         models.ActivationInstance.objects.first().status

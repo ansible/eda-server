@@ -299,3 +299,14 @@ DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+
+# ---------------------------------------------------------
+# RULEBOOK LIVENESS SETTINGS
+# ---------------------------------------------------------
+
+RULEBOOK_LIVENESS_CHECK_SECONDS = settings.get(
+    "RULEBOOK_LIVENESS_CHECK_SECONDS", 300
+)
+RULEBOOK_LIVENESS_TIMEOUT_SECONDS = settings.get(
+    "RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610
+)

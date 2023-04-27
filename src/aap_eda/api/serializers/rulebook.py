@@ -205,7 +205,20 @@ class AuditRuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.AuditRule
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "description",
+            "status",
+            "created_at",
+            "fired_at",
+            "rule_uuid",
+            "ruleset_uuid",
+            "ruleset_name",
+            "activation_instance_id",
+            "job_instance_id",
+            "definition",
+        ]
         read_only_fields = ["id", "created_at"]
 
 
@@ -280,7 +293,15 @@ class AuditActionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.AuditAction
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "status",
+            "url",
+            "fired_at",
+            "rule_fired_at",
+            "audit_rule_id",
+        ]
         read_only_fields = ["id"]
 
 
