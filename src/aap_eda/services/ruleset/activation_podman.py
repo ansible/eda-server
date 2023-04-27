@@ -59,6 +59,7 @@ class ActivationPodman:
         ws_ssl_verify: str,
         activation_instance_id: str,
         heartbeat: str,
+        ports: dict,
     ) -> Container:
         try:
             """Run ansible-rulebook in worker mode."""
@@ -83,10 +84,13 @@ class ActivationPodman:
                 remove=True,
                 detach=True,
                 name=f"eda-{activation_instance_id}-{uuid.uuid4()}",
+                ports=ports,
             )
 
             logger.info(
-                f"Created container: name: {container.name}, "
+                f"Created container: "
+                f"name: {container.name}, "
+                f"ports: {container.ports}, "
                 f"status: {container.status}, "
                 f"command: {args}"
             )
@@ -100,6 +104,9 @@ class ActivationPodman:
             raise
         except ImageNotFound:
             logger.exception("Image not found")
+            raise
+        except APIError:
+            logger.exception("Container run failed")
             raise
 
     def _default_podman_url(self) -> None:
