@@ -14,7 +14,7 @@
 from django.conf import settings
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
+from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -70,6 +70,8 @@ class ActivationViewSet(
 ):
     queryset = models.Activation.objects.order_by("id")
     serializer_class = serializers.ActivationSerializer
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filterset_class = filters.ActivationFilter
     rbac_action = None
 
     @extend_schema(
@@ -341,7 +343,7 @@ class ActivationInstanceViewSet(
 ):
     queryset = models.ActivationInstance.objects.order_by("started_at")
     serializer_class = serializers.ActivationInstanceSerializer
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
     rbac_resource_type = "activation_instance"
     rbac_action = None
