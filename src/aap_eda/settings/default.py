@@ -310,3 +310,8 @@ RULEBOOK_LIVENESS_CHECK_SECONDS = settings.get(
 RULEBOOK_LIVENESS_TIMEOUT_SECONDS = settings.get(
     "RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610
 )
+
+# ---------------------------------------------------------
+# RULEBOOK ENGINE LOG LEVEL
+# ---------------------------------------------------------
+ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")

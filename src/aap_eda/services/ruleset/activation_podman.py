@@ -16,6 +16,7 @@ import logging
 import os
 import uuid
 
+from django.conf import settings
 from podman import PodmanClient
 from podman.domain.containers import Container
 from podman.domain.images import Image
@@ -74,6 +75,7 @@ class ActivationPodman:
                 str(activation_instance_id),
                 "--heartbeat",
                 str(heartbeat),
+                settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             ]
 
             container = self.client.containers.run(
