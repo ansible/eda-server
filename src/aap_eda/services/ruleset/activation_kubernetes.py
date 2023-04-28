@@ -17,7 +17,6 @@ import json
 import logging
 import time
 
-from django.utils import timezone
 from kubernetes import client, config, watch
 
 from aap_eda.core import models
@@ -49,7 +48,7 @@ class ActivationKubernetes:
         activation_id,
         ports,
         heartbeat,
-    ):
+    ) -> client.V1Container:
         container = client.V1Container(
             image=image,
             name=name,
@@ -117,7 +116,9 @@ class ActivationKubernetes:
         )
 
     @staticmethod
-    def create_pod_template(pod_name, container, secret_name):
+    def create_pod_template(
+        pod_name, container, secret_name
+    ) -> client.V1PodTemplateSpec:
         if secret_name:
             spec = client.V1PodSpec(
                 restart_policy="Never",
@@ -161,7 +162,9 @@ class ActivationKubernetes:
         self.client_api.create_namespaced_service(namespace, service_template)
 
     @staticmethod
-    def create_job(job_name, pod_template, backoff_limit=0, ttl=0):
+    def create_job(
+        job_name, pod_template, backoff_limit=0, ttl=0
+    ) -> client.V1Job:
         metadata = client.V1ObjectMeta(
             name=job_name, labels={"job-name": job_name, "app": "eda"}
         )
@@ -188,7 +191,7 @@ class ActivationKubernetes:
         namespace,
         activation_instance,
         secret_name,
-    ):
+    ) -> None:
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
             namespace=namespace, body=job_spec, async_req=True
@@ -209,13 +212,6 @@ class ActivationKubernetes:
 
                     if o.status.succeeded:
                         logger.info(f"Job {obj_name}: Succeeded")
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.COMPLETED,
-                        )
-
-                        activation_instance.ended_at = timezone.now()
-                        activation_instance.save()
                         done = True
                         w.stop()
 
@@ -231,6 +227,7 @@ class ActivationKubernetes:
                         w.stop()
 
                     if o.status.failed:
+                        logger.info(f"Job {obj_name}: Failed")
                         w.stop()
                         raise K8sActivationException(f"Job {obj_name} Failed.")
 
@@ -246,7 +243,7 @@ class ActivationKubernetes:
                         job_name=job_name,
                     )
 
-    def delete_secret(self, secret_name, namespace, job_name):
+    def delete_secret(self, secret_name, namespace, job_name) -> None:
         # wait until job is done
         while True:
             ret = client.BatchV1Api().list_namespaced_job(
@@ -265,7 +262,7 @@ class ActivationKubernetes:
             namespace=namespace,
         )
 
-    def log_job_to_db(self, log, activation_instance_id):
+    def log_job_to_db(self, log, activation_instance_id) -> None:
         line_number = 0
         activation_instance_logs = []
         for line in log.splitlines():
@@ -285,11 +282,11 @@ class ActivationKubernetes:
 
     def set_activation_status(
         self, instance: models.ActivationInstance, status: ActivationStatus
-    ):
+    ) -> None:
         instance.status = status
         instance.save()
 
-    def watch_job_pod(self, job_name, namespace, activation_instance):
+    def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()
 
         done = False
@@ -320,10 +317,6 @@ class ActivationKubernetes:
                     if event["object"].status.phase == "Succeeded":
                         pod_name = event["object"].metadata.name
                         logger.info(f"Pod {pod_name} - Succeeded")
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.COMPLETED,
-                        )
 
                         self.read_job_pod_log(
                             pod_name=pod_name,
@@ -348,7 +341,9 @@ class ActivationKubernetes:
             except Exception as e:
                 raise ActivationException(e)
 
-    def read_job_pod_log(self, pod_name, namespace, activation_instance_id):
+    def read_job_pod_log(
+        self, pod_name, namespace, activation_instance_id
+    ) -> None:
         w = watch.Watch()
         done = False
         line_number = 0
