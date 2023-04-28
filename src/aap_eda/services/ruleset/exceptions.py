@@ -15,3 +15,7 @@
 
 class ActivationException(Exception):
     pass
+
+
+class K8sActivationException(Exception):
+    pass

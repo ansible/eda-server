@@ -16,13 +16,16 @@ import base64
 import json
 import logging
 import time
-import traceback
 
 from django.utils import timezone
 from kubernetes import client, config, watch
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.ruleset.exceptions import (
+    ActivationException,
+    K8sActivationException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -228,27 +231,20 @@ class ActivationKubernetes:
                         w.stop()
 
                     if o.status.failed:
-                        logger.info(f"Job {obj_name}: Failed")
-
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.FAILED,
-                        )
-
-                        activation_instance.ended_at = timezone.now()
-                        activation_instance.save()
-                        done = True
                         w.stop()
+                        raise K8sActivationException(f"Job {obj_name} Failed.")
 
             except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(f"Job {obj_name} Failed: {e}")
+                raise ActivationException(f"Job {obj_name} Failed: {e}")
 
-        # remove secret if created
-        if secret_name:
-            self.delete_secret(
-                secret_name=secret_name, namespace=namespace, job_name=job_name
-            )
+            finally:
+                # remove secret if created
+                if secret_name:
+                    self.delete_secret(
+                        secret_name=secret_name,
+                        namespace=namespace,
+                        job_name=job_name,
+                    )
 
     def delete_secret(self, secret_name, namespace, job_name):
         # wait until job is done
@@ -341,23 +337,16 @@ class ActivationKubernetes:
                         pod_name = event["object"].metadata.name
                         logger.info(f"Pod {pod_name} - Failed")
 
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.FAILED,
-                        )
-
                         self.read_job_pod_log(
                             pod_name=pod_name,
                             namespace=namespace,
                             activation_instance_id=activation_instance.id,
                         )
-
                         w.stop()
-                        done = True
+                        raise K8sActivationException(f"Job {job_name} Failed,")
 
             except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(f"Pod Failed: {e}")
+                raise ActivationException(e)
 
     def read_job_pod_log(self, pod_name, namespace, activation_instance_id):
         w = watch.Watch()
@@ -387,5 +376,4 @@ class ActivationKubernetes:
 
                 done = True
             except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(e)
+                raise K8sActivationException(f"Failed to read pod logs: {e}")
