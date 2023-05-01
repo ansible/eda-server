@@ -15,6 +15,7 @@ import os
 from unittest import mock
 
 import pytest
+from django.conf import settings
 from podman.errors import exceptions
 
 from aap_eda.core import models
@@ -40,6 +41,11 @@ def init_data():
     )
 
     return (credential, decision_environment)
+
+
+@pytest.fixture(autouse=True)
+def use_dummy_log_level(settings):
+    settings.ANSIBLE_RULEBOOK_LOG_LEVEL = "-vv"
 
 
 @pytest.mark.django_db
@@ -72,12 +78,14 @@ def test_activation_podman_run_worker_mode(
 
     podman = ActivationPodman(decision_environment, None)
     uuid_mock.return_value = DUMMY_UUID
+    ports = {"5000/tcp": 5000}
 
     podman.run_worker_mode(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
         activation_instance_id="1",
         heartbeat="5",
+        ports=ports,
     )
 
     client_mock.containers.run.assert_called_once_with(
@@ -93,12 +101,14 @@ def test_activation_podman_run_worker_mode(
             "1",
             "--heartbeat",
             "5",
+            settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
         ],
         stdout=True,
         stderr=True,
         remove=True,
         detach=True,
         name=f"eda-1-{DUMMY_UUID}",
+        ports=ports,
     )
 
 
@@ -120,3 +130,28 @@ def test_activation_podman_with_invalid_credential(
 
     with pytest.raises(exceptions.APIError, match="login attempt failed"):
         ActivationPodman(decision_environment, None)
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
+def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
+    def raise_error(*args, **kwargs):
+        raise exceptions.APIError(message="bind: address already in use")
+
+    credential, decision_environment = init_data
+    client_mock = mock.Mock()
+    my_mock.return_value = client_mock
+
+    client_mock.containers.run.side_effect = raise_error
+
+    podman = ActivationPodman(decision_environment, None)
+    with pytest.raises(
+        exceptions.APIError, match="bind: address already in use"
+    ):
+        podman.run_worker_mode(
+            ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
+            ws_ssl_verify="no",
+            activation_instance_id="1",
+            heartbeat="5",
+            ports={"5000/tcp": 5000},
+        )
