@@ -39,8 +39,23 @@ def init_data():
         image_url="quay.io/ansible/ansible-rulebook:main",
         credential=credential,
     )
+    user = models.User.objects.create(
+        username="tester",
+        password="secret",
+        first_name="Adam",
+        last_name="Tester",
+        email="adam@example.com",
+    )
+    activation = models.Activation.objects.create(
+        name="activation",
+        user=user,
+    )
+    activation_instance = models.ActivationInstance.objects.create(
+        name="test-instance",
+        activation=activation,
+    )
 
-    return (credential, decision_environment)
+    return (credential, decision_environment, activation_instance)
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +66,7 @@ def use_dummy_log_level(settings):
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
 def test_activation_podman(my_mock: mock.Mock, init_data):
-    credential, decision_environment = init_data
+    credential, decision_environment, _ = init_data
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
 
@@ -72,18 +87,28 @@ def test_activation_podman(my_mock: mock.Mock, init_data):
 def test_activation_podman_run_worker_mode(
     my_mock: mock.Mock, uuid_mock: mock.Mock, init_data
 ):
-    credential, decision_environment = init_data
+    credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
+    client_mock.containers.run.return_value.logs.return_value = iter(
+        [
+            b"test_output_line_1",
+            b"test_output_line_2",
+        ]
+    )
+    client_mock.containers.run.return_value.wait.return_value = 0
+
     my_mock.return_value = client_mock
 
     podman = ActivationPodman(decision_environment, None)
     uuid_mock.return_value = DUMMY_UUID
     ports = {"5000/tcp": 5000}
 
+    assert models.ActivationInstanceLog.objects.count() == 0
+
     podman.run_worker_mode(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
-        activation_instance_id="1",
+        activation_instance_id=activation_instance.id,
         heartbeat="5",
         ports=ports,
     )
@@ -98,7 +123,7 @@ def test_activation_podman_run_worker_mode(
             "--websocket-address",
             "ws://localhost:8000/api/eda/ws/ansible-rulebook",
             "--id",
-            "1",
+            str(activation_instance.id),
             "--heartbeat",
             "5",
             settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
@@ -107,9 +132,11 @@ def test_activation_podman_run_worker_mode(
         stderr=True,
         remove=True,
         detach=True,
-        name=f"eda-1-{DUMMY_UUID}",
+        name=f"eda-{activation_instance.id}-{DUMMY_UUID}",
         ports=ports,
     )
+
+    assert models.ActivationInstanceLog.objects.count() == 3
 
 
 @pytest.mark.django_db
@@ -122,7 +149,7 @@ def test_activation_podman_with_invalid_credential(
             message="login attempt failed with status: 401 Unauthorized"
         )
 
-    credential, decision_environment = init_data
+    credential, decision_environment, _ = init_data
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
 
@@ -138,7 +165,7 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
     def raise_error(*args, **kwargs):
         raise exceptions.APIError(message="bind: address already in use")
 
-    credential, decision_environment = init_data
+    credential, decision_environment, _ = init_data
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
 

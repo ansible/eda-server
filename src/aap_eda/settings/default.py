@@ -315,3 +315,4 @@ RULEBOOK_LIVENESS_TIMEOUT_SECONDS = settings.get(
 # RULEBOOK ENGINE LOG LEVEL
 # ---------------------------------------------------------
 ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
+ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
