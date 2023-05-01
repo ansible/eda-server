@@ -29,6 +29,8 @@ from .exceptions import ActivationException
 
 logger = logging.getLogger(__name__)
 
+FLUSH_AT_END = -1
+
 
 class ActivationPodman:
     def __init__(
@@ -53,6 +55,13 @@ class ActivationPodman:
 
         self.image = self._pull_image()
         logger.info(self.client.version())
+
+        if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
+            self.flush_after = FLUSH_AT_END
+        else:
+            self.flush_after = int(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER)
+
+        logger.info(f"Log flush setting: {self.flush_after}")
 
     def run_worker_mode(
         self,
@@ -97,8 +106,10 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
-            # TODO: future need to use asyncio so no blocking anymore
-            container.wait(condition="exited")
+            self._save_logs(
+                container=container,
+                activation_instance_id=activation_instance_id,
+            )
 
             return container
         except ContainerError:
@@ -148,3 +159,51 @@ class ActivationPodman:
                 f"Image {self.decision_environment.image_url} not found"
             )
             raise
+
+    def _save_logs(
+        self, container: Container, activation_instance_id: str
+    ) -> None:
+        line_number = 0
+        activation_instance_logs = []
+
+        dkg = container.logs(stream=True, follow=True)
+        try:
+            while True:
+                line = next(dkg).decode("utf-8")
+                activation_instance_log = models.ActivationInstanceLog(
+                    line_number=line_number,
+                    log=line,
+                    activation_instance_id=int(activation_instance_id),
+                )
+
+                activation_instance_logs.append(activation_instance_log)
+                line_number += 1
+
+                if self.flush_after == FLUSH_AT_END:
+                    continue
+                elif line_number % self.flush_after == 0:
+                    models.ActivationInstanceLog.objects.bulk_create(
+                        activation_instance_logs
+                    )
+                    activation_instance_logs = []
+
+        except StopIteration:
+            logger.info(f"log stream ended for {container.name}")
+
+        self.return_code = container.wait(condition="exited")
+        logger.info(f"return_code: {self.return_code}")
+
+        activation_instance_log = models.ActivationInstanceLog(
+            line_number=line_number,
+            log=f"Container exit code: {self.return_code}",
+            activation_instance_id=int(activation_instance_id),
+        )
+        activation_instance_logs.append(activation_instance_log)
+
+        models.ActivationInstanceLog.objects.bulk_create(
+            activation_instance_logs
+        )
+        logger.info(f"{line_number+1} of activation instance log are created.")
+
+        if self.return_code > 0:
+            raise ActivationException(f"Activation failed in {container.name}")
