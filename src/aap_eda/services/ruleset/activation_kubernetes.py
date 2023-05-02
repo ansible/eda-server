@@ -21,10 +21,7 @@ from kubernetes import client, config, watch
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.ruleset.exceptions import (
-    ActivationException,
-    K8sActivationException,
-)
+from aap_eda.services.ruleset.exceptions import K8sActivationException
 
 logger = logging.getLogger(__name__)
 
@@ -229,10 +226,10 @@ class ActivationKubernetes:
                     if o.status.failed:
                         logger.info(f"Job {obj_name}: Failed")
                         w.stop()
-                        raise K8sActivationException(f"Job {obj_name} Failed.")
+                        raise K8sActivationException()
 
             except Exception as e:
-                raise ActivationException(f"Job {obj_name} Failed: {e}")
+                raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
 
             finally:
                 # remove secret if created
@@ -336,10 +333,10 @@ class ActivationKubernetes:
                             activation_instance_id=activation_instance.id,
                         )
                         w.stop()
-                        raise K8sActivationException(f"Job {job_name} Failed,")
+                        raise K8sActivationException()
 
             except Exception as e:
-                raise ActivationException(e)
+                raise K8sActivationException(f"Job {job_name} Failed: \n {e}")
 
     def read_job_pod_log(
         self, pod_name, namespace, activation_instance_id
@@ -371,4 +368,6 @@ class ActivationKubernetes:
 
                 done = True
             except Exception as e:
-                raise K8sActivationException(f"Failed to read pod logs: {e}")
+                raise K8sActivationException(
+                    f"Failed to read pod logs: \n {e}"
+                )
