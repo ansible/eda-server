@@ -219,4 +219,3 @@ def test_rulesets_activate_with_podman(my_mock: mock.Mock, init_data):
         models.ActivationInstance.objects.first().status
         == ActivationStatus.COMPLETED.value
     )
-    assert models.ActivationInstanceLog.objects.count() == 2

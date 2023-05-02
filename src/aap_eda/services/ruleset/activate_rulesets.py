@@ -219,31 +219,13 @@ class ActivateRulesets:
         ):
             ports[f"{port}/tcp"] = port
 
-        container = podman.run_worker_mode(
+        podman.run_worker_mode(
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
             activation_instance_id=activation_instance.id,
             heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
             ports=ports,
         )
-
-        line_number = 0
-
-        activation_instance_logs = []
-        for line in container.logs():
-            activation_instance_log = models.ActivationInstanceLog(
-                line_number=line_number,
-                log=line.decode("utf-8"),
-                activation_instance_id=int(activation_instance.id),
-            )
-            activation_instance_logs.append(activation_instance_log)
-
-            line_number += 1
-
-        models.ActivationInstanceLog.objects.bulk_create(
-            activation_instance_logs
-        )
-        logger.info(f"{line_number} of activation instance log are created.")
 
     # TODO(hsong) implement later
     def activate_in_docker():
