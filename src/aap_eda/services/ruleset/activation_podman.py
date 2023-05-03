@@ -25,6 +25,7 @@ from podman.errors.exceptions import APIError
 
 from aap_eda.core import models
 
+from .activation_db_logger import ActivationDbLogger
 from .exceptions import ActivationException
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,13 @@ FLUSH_AT_END = -1
 
 class ActivationPodman:
     def __init__(
-        self, decision_environment: models.DecisionEnvironment, podman_url: str
+        self,
+        decision_environment: models.DecisionEnvironment,
+        podman_url: str,
+        activation_db_logger: ActivationDbLogger,
     ) -> None:
         self.decision_environment = decision_environment
+        self.activation_db_logger = activation_db_logger
 
         if not self.decision_environment.image_url:
             raise ActivationException(
@@ -55,13 +60,6 @@ class ActivationPodman:
 
         self.image = self._pull_image()
         logger.info(self.client.version())
-
-        if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
-            self.flush_after = FLUSH_AT_END
-        else:
-            self.flush_after = int(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER)
-
-        logger.info(f"Log flush setting: {self.flush_after}")
 
     def run_worker_mode(
         self,
@@ -172,49 +170,26 @@ class ActivationPodman:
     def _save_logs(
         self, container: Container, activation_instance_id: str
     ) -> None:
-        line_number = 0
-        activation_instance_logs = []
-
         dkg = container.logs(
             stream=True, follow=True, stderr=True, stdout=True
         )
         try:
             while True:
                 line = next(dkg).decode("utf-8")
-                activation_instance_log = models.ActivationInstanceLog(
-                    line_number=line_number,
-                    log=line,
-                    activation_instance_id=int(activation_instance_id),
-                )
-
-                activation_instance_logs.append(activation_instance_log)
-                line_number += 1
-
-                if self.flush_after == FLUSH_AT_END:
-                    continue
-                elif line_number % self.flush_after == 0:
-                    models.ActivationInstanceLog.objects.bulk_create(
-                        activation_instance_logs
-                    )
-                    activation_instance_logs = []
-
+                self.activation_db_logger.write(line)
         except StopIteration:
             logger.info(f"log stream ended for {container.name}")
 
         self.return_code = container.wait(condition="exited")
         logger.info(f"return_code: {self.return_code}")
 
-        activation_instance_log = models.ActivationInstanceLog(
-            line_number=line_number,
-            log=f"Container exit code: {self.return_code}",
-            activation_instance_id=int(activation_instance_id),
+        self.activation_db_logger.write(
+            f"Container exit code: {self.return_code}"
         )
-        activation_instance_logs.append(activation_instance_log)
-
-        models.ActivationInstanceLog.objects.bulk_create(
-            activation_instance_logs
+        logger.info(
+            f"{self.activation_db_logger.lines_written()}"
+            " activation instance log entries created."
         )
-        logger.info(f"{line_number+1} of activation instance log are created.")
 
         if self.return_code > 0:
             raise ActivationException(f"Activation failed in {container.name}")
