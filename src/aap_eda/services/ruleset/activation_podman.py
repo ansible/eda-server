@@ -152,8 +152,17 @@ class ActivationPodman:
             raise
 
     def _pull_image(self) -> Image:
+        credential = self.decision_environment.credential
         try:
-            return self.client.images.pull(self.decision_environment.image_url)
+            kwargs = {}
+            if credential:
+                kwargs["auth_config"] = {
+                    "username": credential.username,
+                    "password": credential.secret.get_secret_value(),
+                }
+            return self.client.images.pull(
+                self.decision_environment.image_url, **kwargs
+            )
         except ImageNotFound:
             logger.exception(
                 f"Image {self.decision_environment.image_url} not found"
@@ -166,7 +175,9 @@ class ActivationPodman:
         line_number = 0
         activation_instance_logs = []
 
-        dkg = container.logs(stream=True, follow=True)
+        dkg = container.logs(
+            stream=True, follow=True, stderr=True, stdout=True
+        )
         try:
             while True:
                 line = next(dkg).decode("utf-8")
