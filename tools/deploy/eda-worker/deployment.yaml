@@ -22,8 +22,8 @@ spec:
             - -c
             - aap-eda-manage rqworker --with-scheduler --worker-class aap_eda.core.tasking.Worker
           env:
-#            - name: EDA_DATABASE_URL
-#              value: postgresql+asyncpg://postgres:secret@postgres/eda
+            - name: EDA_DATABASE_URL
+              value: postgresql+asyncpg://postgres:secret@postgres/eda
             - name: EDA_DB_HOST
               value: eda-postgres
             - name: EDA_DB_PASSWORD
