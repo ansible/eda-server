@@ -17,6 +17,18 @@ import django_filters
 from aap_eda.core import models
 
 
+class ActivationFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by activation name.",
+    )
+
+    class Meta:
+        model = models.Activation
+        fields = ["name"]
+
+
 class ActivationInstanceFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
