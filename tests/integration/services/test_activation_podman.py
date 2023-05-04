@@ -20,6 +20,7 @@ from podman.errors import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
+from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 from aap_eda.services.ruleset.activation_podman import ActivationPodman
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
@@ -66,11 +67,12 @@ def use_dummy_log_level(settings):
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
 def test_activation_podman(my_mock: mock.Mock, init_data):
-    credential, decision_environment, _ = init_data
+    credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
+    activation_db_logger = ActivationDbLogger(activation_instance.id)
 
-    podman = ActivationPodman(decision_environment, None)
+    podman = ActivationPodman(decision_environment, None, activation_db_logger)
 
     client_mock.login.assert_called_once_with(
         username="adam", password="secret", registry="quay.io"
@@ -99,7 +101,8 @@ def test_activation_podman_run_worker_mode(
 
     my_mock.return_value = client_mock
 
-    podman = ActivationPodman(decision_environment, None)
+    activation_db_logger = ActivationDbLogger(activation_instance.id)
+    podman = ActivationPodman(decision_environment, None, activation_db_logger)
     uuid_mock.return_value = DUMMY_UUID
     ports = {"5000/tcp": 5000}
 
@@ -136,6 +139,8 @@ def test_activation_podman_run_worker_mode(
         ports=ports,
     )
 
+    activation_db_logger.flush()
+
     assert models.ActivationInstanceLog.objects.count() == 3
 
 
@@ -149,14 +154,15 @@ def test_activation_podman_with_invalid_credential(
             message="login attempt failed with status: 401 Unauthorized"
         )
 
-    credential, decision_environment, _ = init_data
+    credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
 
     client_mock.login.side_effect = raise_error
+    activation_db_logger = ActivationDbLogger(activation_instance.id)
 
     with pytest.raises(exceptions.APIError, match="login attempt failed"):
-        ActivationPodman(decision_environment, None)
+        ActivationPodman(decision_environment, None, activation_db_logger)
 
 
 @pytest.mark.django_db
@@ -165,13 +171,14 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
     def raise_error(*args, **kwargs):
         raise exceptions.APIError(message="bind: address already in use")
 
-    credential, decision_environment, _ = init_data
+    credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
 
     client_mock.containers.run.side_effect = raise_error
+    activation_db_logger = ActivationDbLogger(activation_instance.id)
 
-    podman = ActivationPodman(decision_environment, None)
+    podman = ActivationPodman(decision_environment, None, activation_db_logger)
     with pytest.raises(
         exceptions.APIError, match="bind: address already in use"
     ):
