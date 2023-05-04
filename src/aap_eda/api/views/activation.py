@@ -76,7 +76,9 @@ class ActivationViewSet(
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
-        responses={status.HTTP_201_CREATED: serializers.ActivationSerializer},
+        responses={
+            status.HTTP_201_CREATED: serializers.ActivationReadSerializer
+        },
     )
     def create(self, request):
         serializer = serializers.ActivationCreateSerializer(data=request.data)
@@ -90,10 +92,13 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
+        activation, _ = self.get_activation_dependent_objects(
+            response_serializer.data
+        )
+        activation["status"] = ActivationStatus.STARTING.value
+
         if response.is_enabled:
-            decision_environment_id = response_serializer.data[
-                "decision_environment_id"
-            ]
+            decision_environment_id = activation["decision_environment_id"]
 
             activate_rulesets.delay(
                 activation_id=response.id,
@@ -104,7 +109,8 @@ class ActivationViewSet(
             )
 
         return Response(
-            response_serializer.data, status=status.HTTP_201_CREATED
+            serializers.ActivationReadSerializer(activation).data,
+            status=status.HTTP_201_CREATED,
         )
 
     @extend_schema(
@@ -112,33 +118,10 @@ class ActivationViewSet(
     )
     def retrieve(self, request, pk: int):
         response = super().retrieve(request, pk)
-        activation = response.data
-        activation["project"] = (
-            models.Project.objects.get(pk=activation["project_id"])
-            if activation["project_id"]
-            else None
-        )
-        activation["decision_environment"] = (
-            models.DecisionEnvironment.objects.get(
-                pk=activation["decision_environment_id"]
-            )
-            if activation["decision_environment_id"]
-            else None
-        )
-        activation["rulebook"] = (
-            models.Rulebook.objects.get(pk=activation["rulebook_id"])
-            if activation["rulebook_id"]
-            else None
-        )
-        activation["extra_var"] = (
-            models.ExtraVar.objects.get(pk=activation["extra_var_id"])
-            if activation["extra_var_id"]
-            else None
-        )
-        activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=pk
-        )
-        activation["instances"] = activation_instances
+        (
+            activation,
+            activation_instances,
+        ) = self.get_activation_dependent_objects(response.data)
         activation["status"] = self._status_from_instances(
             activation, activation_instances
         )
@@ -308,6 +291,36 @@ class ActivationViewSet(
             return ActivationStatus.FAILED.value
         else:
             return ActivationStatus.STOPPED.value
+
+    def get_activation_dependent_objects(self, activation):
+        activation["project"] = (
+            models.Project.objects.get(pk=activation["project_id"])
+            if activation["project_id"]
+            else None
+        )
+        activation["decision_environment"] = (
+            models.DecisionEnvironment.objects.get(
+                pk=activation["decision_environment_id"]
+            )
+            if activation["decision_environment_id"]
+            else None
+        )
+        activation["rulebook"] = (
+            models.Rulebook.objects.get(pk=activation["rulebook_id"])
+            if activation["rulebook_id"]
+            else None
+        )
+        activation["extra_var"] = (
+            models.ExtraVar.objects.get(pk=activation["extra_var_id"])
+            if activation["extra_var_id"]
+            else None
+        )
+        activation_instances = models.ActivationInstance.objects.filter(
+            activation_id=activation["id"]
+        )
+        activation["instances"] = activation_instances
+
+        return activation, activation_instances
 
 
 @extend_schema_view(
