@@ -174,7 +174,24 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
         data,
         activation,
     )
-    assert_activation_related_object_fks(data, activation)
+    if activation.project:
+        assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
+    else:
+        assert not data["project"]
+    if activation.rulebook:
+        assert data["rulebook"] == {
+            "id": activation.rulebook.id,
+            **TEST_RULEBOOK,
+        }
+    else:
+        assert not data["rulebook"]
+    assert data["decision_environment"] == {
+        "id": activation.decision_environment.id,
+        **TEST_DECISION_ENV,
+    }
+    assert data["extra_var"] == {
+        "id": activation.extra_var.id,
+    }
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
 
