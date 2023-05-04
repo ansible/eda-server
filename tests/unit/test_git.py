@@ -22,8 +22,12 @@ from aap_eda.core.models import Credential
 from aap_eda.services.project.git import GitError, GitExecutor, GitRepository
 
 
+@pytest.mark.django_db
 def test_git_clone():
-    credential = Credential(username="me", secret="pass")
+    credential = Credential.objects.create(
+        name="name", username="me", secret="pass"
+    )
+    credential.refresh_from_db()
     executor = mock.Mock()
     repository = GitRepository.clone(
         "https://git.example.com/repo.git",
