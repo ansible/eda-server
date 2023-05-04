@@ -24,6 +24,7 @@ from django.utils import timezone
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
+from .activation_db_logger import ActivationDbLogger
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
 from .ansible_rulebook import AnsibleRulebookService
@@ -94,6 +95,8 @@ class ActivateRulesets:
             )
             instance.save()
 
+            activation_db_logger = ActivationDbLogger(instance.id)
+
             decision_environment = models.DecisionEnvironment.objects.get(
                 id=decision_environment_id
             )
@@ -115,6 +118,7 @@ class ActivateRulesets:
                     ssl_verify=ssl_verify,
                     activation_instance=instance,
                     decision_environment=decision_environment,
+                    activation_db_logger=activation_db_logger,
                 )
             elif dtype == DeploymentType.DOCKER:
                 self.activate_in_docker()
@@ -134,6 +138,7 @@ class ActivateRulesets:
         except ActivationException as exe:
             logger.error(f"Activation error: {str(exe)}")
             instance.status = ActivationStatus.FAILED
+            activation_db_logger.write(f"Activation error: {str(exe)}")
         except Exception as exe:
             instance.status = ActivationStatus.FAILED
             if (
@@ -142,7 +147,9 @@ class ActivateRulesets:
             ):
                 from aap_eda.tasks.ruleset import enqueue_monitor_task
 
-                logger.warning(f"Activation failed: {str(exe)} but will retry")
+                msg = f"Activation failed: {str(exe)} but will retry"
+                logger.warning(msg)
+                activation_db_logger.write(msg)
                 enqueue_monitor_task(
                     activation_id,
                     decision_environment_id,
@@ -152,7 +159,9 @@ class ActivateRulesets:
                 )
             else:
                 logger.error(f"Activation error: {str(exe)}")
+                activation_db_logger.write(f"Activation error: {str(exe)}")
         finally:
+            activation_db_logger.flush()
             now = timezone.now()
             instance.ended_at = now
             instance.updated_at = now
@@ -208,9 +217,12 @@ class ActivateRulesets:
         ssl_verify: str,
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
+        activation_db_logger: ActivationDbLogger,
     ) -> None:
         podman = ActivationPodman(
-            decision_environment, settings.PODMAN_SOCKET_URL
+            decision_environment,
+            settings.PODMAN_SOCKET_URL,
+            activation_db_logger,
         )
 
         ports = {}
