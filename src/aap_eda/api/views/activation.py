@@ -92,7 +92,7 @@ class ActivationViewSet(
             handle_activation_create_conflict(serializer.validated_data)
 
         response_serializer = serializers.ActivationSerializer(response)
-        activation, _ = self.get_activation_dependent_objects(
+        activation = self._get_activation_dependent_objects(
             response_serializer.data
         )
         activation["status"] = ActivationStatus.STARTING.value
@@ -118,12 +118,9 @@ class ActivationViewSet(
     )
     def retrieve(self, request, pk: int):
         response = super().retrieve(request, pk)
-        (
-            activation,
-            activation_instances,
-        ) = self.get_activation_dependent_objects(response.data)
+        activation = self._get_activation_dependent_objects(response.data)
         activation["status"] = self._status_from_instances(
-            activation, activation_instances
+            activation, activation["instances"]
         )
 
         return Response(serializers.ActivationReadSerializer(activation).data)
@@ -292,7 +289,7 @@ class ActivationViewSet(
         else:
             return ActivationStatus.STOPPED.value
 
-    def get_activation_dependent_objects(self, activation):
+    def _get_activation_dependent_objects(self, activation):
         activation["project"] = (
             models.Project.objects.get(pk=activation["project_id"])
             if activation["project_id"]
@@ -320,7 +317,7 @@ class ActivationViewSet(
         )
         activation["instances"] = activation_instances
 
-        return activation, activation_instances
+        return activation
 
 
 @extend_schema_view(
