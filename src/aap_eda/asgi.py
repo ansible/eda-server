@@ -29,6 +29,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
 
 django_app = get_asgi_application()
 
-from .wsapi.routes import router  # noqa E402
+from aap_eda.wsapi.routes import router  # noqa E402
 
 application = ProtocolTypeRouter({"http": django_app, "websocket": router})
