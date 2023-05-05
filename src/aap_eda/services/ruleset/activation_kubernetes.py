@@ -17,6 +17,7 @@ import json
 import logging
 import time
 
+from django.conf import settings
 from kubernetes import client, config, watch
 
 from aap_eda.core import models
@@ -61,6 +62,7 @@ class ActivationKubernetes:
                 str(activation_id),
                 "--heartbeat",
                 str(heartbeat),
+                settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             ],
             ports=[
                 client.V1ContainerPort(container_port=port) for port in ports
