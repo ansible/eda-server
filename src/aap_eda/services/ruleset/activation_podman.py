@@ -213,6 +213,7 @@ class ActivationPodman:
     def _save_logs(
         self, container: Container, activation_instance_id: str
     ) -> None:
+        lines_streamed = 0
         dkg = container.logs(
             stream=True, follow=True, stderr=True, stdout=True
         )
@@ -220,11 +221,19 @@ class ActivationPodman:
             while True:
                 line = next(dkg).decode("utf-8")
                 self.activation_db_logger.write(line)
+                lines_streamed += 1
         except StopIteration:
             logger.info(f"log stream ended for {container.name}")
 
         self.return_code = container.wait(condition="exited")
         logger.info(f"return_code: {self.return_code}")
+
+        # If we haven't streamed any lines, collect the logs
+        # when the container ends.
+        # Seems to be differences between 4.1.1 and 4.5 of podman
+        if lines_streamed == 0:
+            for line in container.logs():
+                self.activation_db_logger.write(line.decode("utf-8"))
 
         self.activation_db_logger.write(
             f"Container exit code: {self.return_code}"
