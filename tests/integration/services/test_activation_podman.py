@@ -11,7 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import base64
+import json
 import os
+import tempfile
 from unittest import mock
 
 import pytest
@@ -189,3 +192,90 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
             heartbeat="5",
             ports={"5000/tcp": 5000},
         )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
+def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
+    credential, decision_environment, activation_instance = init_data
+    data = f"{credential.username}:{credential.secret.get_secret_value()}"
+    encoded_data = data.encode("ascii")
+    auth_key_value = base64.b64encode(encoded_data).decode("ascii")
+    client_mock = mock.Mock()
+    my_mock.return_value = client_mock
+    client_mock.containers.run.return_value.logs.return_value = iter(
+        [
+            b"test_output_line_1",
+            b"test_output_line_2",
+        ]
+    )
+    client_mock.containers.run.return_value.wait.return_value = 0
+
+    activation_db_logger = ActivationDbLogger(activation_instance.id)
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        containers_dir = os.path.join(tmpdirname, "containers")
+        os.makedirs(containers_dir)
+        with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmpdirname}):
+            podman = ActivationPodman(
+                decision_environment, None, activation_db_logger
+            )
+            podman.run_worker_mode(
+                ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
+                ws_ssl_verify="no",
+                activation_instance_id=activation_instance.id,
+                heartbeat="5",
+                ports={"5000/tcp": 5000},
+            )
+            with open(os.path.join(containers_dir, "auth.json")) as f:
+                auth_dict = json.load(f)
+                assert auth_dict["auths"]["quay.io"]["auth"] == auth_key_value
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
+def test_activation_podman_with_existing_auth_json(
+    my_mock: mock.Mock, init_data
+):
+    credential, decision_environment, activation_instance = init_data
+    data = f"{credential.username}:{credential.secret.get_secret_value()}"
+    encoded_data = data.encode("ascii")
+    auth_key_value = base64.b64encode(encoded_data).decode("ascii")
+    client_mock = mock.Mock()
+    my_mock.return_value = client_mock
+    client_mock.containers.run.return_value.logs.return_value = iter(
+        [
+            b"test_output_line_1",
+            b"test_output_line_2",
+        ]
+    )
+    client_mock.containers.run.return_value.wait.return_value = 0
+
+    activation_db_logger = ActivationDbLogger(activation_instance.id)
+    old_key = "gobbledegook"
+    old_data = {
+        "auths": {"dummy": {"auth": old_key}, "quay.io": {"auth": old_key}}
+    }
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        containers_dir = os.path.join(tmpdirname, "containers")
+        os.makedirs(containers_dir)
+
+        with open(os.path.join(containers_dir, "auth.json"), "w") as f:
+            json.dump(old_data, f, indent=6)
+
+        with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmpdirname}):
+            podman = ActivationPodman(
+                decision_environment, None, activation_db_logger
+            )
+            podman.run_worker_mode(
+                ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
+                ws_ssl_verify="no",
+                activation_instance_id=activation_instance.id,
+                heartbeat="5",
+                ports={"5000/tcp": 5000},
+            )
+            with open(os.path.join(containers_dir, "auth.json")) as f:
+                auth_dict = json.load(f)
+                assert auth_dict["auths"]["quay.io"]["auth"] == auth_key_value
+                assert auth_dict["auths"]["dummy"]["auth"] == old_key
