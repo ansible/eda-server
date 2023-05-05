@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import base64
+import json
 import logging
 import os
 import uuid
@@ -54,6 +56,8 @@ class ActivationPodman:
         else:
             self._default_podman_url()
         logger.info(f"Using podman socket: {self.podman_url}")
+
+        self._set_auth_json_file()
 
         self.client = PodmanClient(base_url=self.podman_url)
         self._login()
@@ -149,6 +153,44 @@ class ActivationPodman:
             logger.exception("Login failed")
             raise
 
+    def _write_auth_json(self) -> None:
+        if not self.auth_file:
+            logger.debug("No auth file to create")
+            return
+
+        auth_dict = {}
+        if os.path.exists(self.auth_file):
+            with open(self.auth_file) as f:
+                auth_dict = json.load(f)
+
+        if "auths" not in auth_dict:
+            auth_dict["auths"] = {}
+
+        registry = self.decision_environment.image_url.split("/")[0]
+        auth_dict["auths"][registry] = self._create_auth_key()
+
+        with open(self.auth_file, "w") as f:
+            json.dump(auth_dict, f, indent=6)
+
+    def _create_auth_key(self) -> dict:
+        cred = self.decision_environment.credential
+        data = f"{cred.username}:{cred.secret.get_secret_value()}"
+        encoded_data = data.encode("ascii")
+        return {"auth": base64.b64encode(encoded_data).decode("ascii")}
+
+    def _set_auth_json_file(self) -> None:
+        xdg_runtime_dir = os.getenv(
+            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
+        )
+        auth_file = f"{xdg_runtime_dir}/containers/auth.json"
+        dir_name = os.path.dirname(auth_file)
+        if os.path.exists(dir_name):
+            self.auth_file = auth_file
+            logger.debug("Will use auth file %s", auth_file)
+        else:
+            self.auth_file = None
+            logger.debug("Will not use auth file")
+
     def _pull_image(self) -> Image:
         credential = self.decision_environment.credential
         try:
@@ -158,6 +200,7 @@ class ActivationPodman:
                     "username": credential.username,
                     "password": credential.secret.get_secret_value(),
                 }
+                self._write_auth_json()
             return self.client.images.pull(
                 self.decision_environment.image_url, **kwargs
             )
