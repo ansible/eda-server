@@ -233,7 +233,6 @@ def assert_activation_instance_data(
 def prepare_init_data():
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook.yml",
-        path="rulebooks",
         rulesets=TEST_RULESETS_SAMPLE,
     )
     user = models.User.objects.create_user(

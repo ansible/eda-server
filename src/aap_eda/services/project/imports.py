@@ -126,8 +126,7 @@ class ProjectImportService:
             obj.name: obj for obj in project.rulebook_set.all()
         }
         for rulebook_info in self._find_rulebooks(repo):
-            rel_path, filename = os.path.split(rulebook_info.relpath)
-            rulebook = existing_rulebooks.pop(filename, None)
+            rulebook = existing_rulebooks.pop(rulebook_info.relpath, None)
             if rulebook is None:
                 self._import_rulebook(project, rulebook_info)
             else:
@@ -139,11 +138,9 @@ class ProjectImportService:
     def _import_rulebook(
         self, project: models.Project, rulebook_info: RulebookInfo
     ) -> models.Rulebook:
-        rel_path, filename = os.path.split(rulebook_info.relpath)
         rulebook = models.Rulebook.objects.create(
             project=project,
-            path=rel_path,
-            name=filename,
+            name=rulebook_info.relpath,
             rulesets=rulebook_info.raw_content,
         )
         insert_rulebook_related_data(rulebook, rulebook_info.content)
@@ -183,7 +180,7 @@ class ProjectImportService:
                 if ext not in YAML_EXTENSIONS:
                     continue
                 try:
-                    info = self._try_load_rulebook(repo, path)
+                    info = self._try_load_rulebook(rulebooks_dir, path)
                 except Exception:
                     logger.exception(
                         "Unexpected exception when scanning file %s."
@@ -197,7 +194,7 @@ class ProjectImportService:
                 yield info
 
     def _try_load_rulebook(
-        self, repo_path: StrPath, rulebook_path: StrPath
+        self, rulebooks_dir: StrPath, rulebook_path: StrPath
     ) -> Optional[RulebookInfo]:
         with open(rulebook_path) as f:
             raw_content = f.read()
@@ -211,7 +208,7 @@ class ProjectImportService:
         if not self._is_rulebook_file(content):
             return None
 
-        relpath = os.path.relpath(rulebook_path, repo_path)
+        relpath = os.path.relpath(rulebook_path, rulebooks_dir)
         return RulebookInfo(
             relpath=relpath,
             raw_content=raw_content,

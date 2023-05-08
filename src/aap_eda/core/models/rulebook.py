@@ -34,7 +34,6 @@ class Rulebook(models.Model):
         ]
 
     name = models.TextField(null=False)
-    path = models.TextField(null=False, default="")
     description = models.TextField(null=True, default="")
     rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)

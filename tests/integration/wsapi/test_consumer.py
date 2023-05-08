@@ -361,7 +361,6 @@ def _prepare_db_data():
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
-        path="rulebooks",
         rulesets=TEST_RULESETS,
         project=project,
     )
@@ -421,7 +420,6 @@ def _prepare_acitvation_instance_without_extra_var():
 
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook",
-        path="rulebooks",
         rulesets=TEST_RULESETS,
         project=project,
     )
