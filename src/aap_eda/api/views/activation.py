@@ -68,7 +68,7 @@ class ActivationViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.order_by("id")
+    queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
@@ -172,7 +172,7 @@ class ActivationViewSet(
 
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
-        ).order_by("started_at")
+        )
         activation_instances = self.paginate_queryset(activation_instances)
         serializer = serializers.ActivationInstanceSerializer(
             activation_instances, many=True
@@ -351,7 +351,7 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.ActivationInstance.objects.order_by("started_at")
+    queryset = models.ActivationInstance.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter

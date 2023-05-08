@@ -29,6 +29,7 @@ class Activation(models.Model):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
+        ordering = ("-created_at",)
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
@@ -66,6 +67,7 @@ class Activation(models.Model):
 class ActivationInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance"
+        ordering = ("-started_at",)
 
     name = models.TextField(null=False, default="")
     status = models.TextField(
