@@ -17,6 +17,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -67,15 +68,24 @@ class RulebookViewSet(
         responses={
             status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)
         },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this rulebook.",  # noqa: E501
+            )
+        ],
     )
     @action(
-        detail=True,
+        detail=False,
         queryset=models.Ruleset.objects.order_by("id"),
         filterset_class=filters.RulesetFilter,
         rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/rulesets",
     )
-    def rulesets(self, request, pk):
-        rulebook = get_object_or_404(models.Rulebook, pk=pk)
+    def rulesets(self, request, id):
+        rulebook = get_object_or_404(models.Rulebook, id=id)
         rulesets = models.Ruleset.objects.filter(rulebook=rulebook)
 
         rulesets = self.filter_queryset(rulesets)
