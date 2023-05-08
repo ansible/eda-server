@@ -118,7 +118,9 @@ class GitRepository:
             elif url.startswith("http://"):
                 index = 7
             if index > 0:
-                url = f"{url[:index]}{credential.username}:{credential.secret}@{url[index:]}"  # noqa: E501
+                user = credential.username
+                passwd = credential.secret.get_secret_value()
+                url = f"{url[:index]}{user}:{passwd}@{url[index:]}"
 
         if _executor is None:
             _executor = GitExecutor()

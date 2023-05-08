@@ -130,6 +130,29 @@ def create_activation(fks: dict):
     return activation
 
 
+def create_multiple_activations(fks: dict):
+    activation_names = ["test-activation", "filter-test-activation"]
+    activations = []
+    for name in activation_names:
+        activation_data = {
+            "name": name,
+            "description": "test activation",
+            "is_enabled": True,
+            "decision_environment_id": fks["decision_environment_id"],
+            "project_id": fks["project_id"],
+            "rulebook_id": fks["project_id"],
+            "extra_var_id": fks["project_id"],
+            "user_id": fks["user_id"],
+            "restart_policy": RestartPolicy.ON_FAILURE.value,
+            "restart_count": 0,
+        }
+        activation = models.Activation(**activation_data)
+        activations.append(activation)
+        activation.save()
+
+    return activations
+
+
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.activate_rulesets")
 def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
@@ -151,7 +174,24 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
         data,
         activation,
     )
-    assert_activation_related_object_fks(data, activation)
+    if activation.project:
+        assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
+    else:
+        assert not data["project"]
+    if activation.rulebook:
+        assert data["rulebook"] == {
+            "id": activation.rulebook.id,
+            **TEST_RULEBOOK,
+        }
+    else:
+        assert not data["rulebook"]
+    assert data["decision_environment"] == {
+        "id": activation.decision_environment.id,
+        **TEST_DECISION_ENV,
+    }
+    assert data["extra_var"] == {
+        "id": activation.extra_var.id,
+    }
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
 
@@ -223,6 +263,29 @@ def test_list_activations(client: APIClient):
     for data, activation in zip(response.data["results"], activations):
         assert_activation_base_data(data, activation)
         assert_activation_related_object_fks(data, activation)
+
+
+@pytest.mark.django_db
+def test_list_activations_filter_name(client: APIClient):
+    filter_name = "filter"
+    fks = create_activation_related_data()
+    activations = create_multiple_activations(fks)
+
+    response = client.get(f"{api_url_v1}/activations/?name={filter_name}")
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.data["results"]
+    assert_activation_base_data(response_data[0], activations[1])
+
+
+@pytest.mark.django_db
+def test_list_activations_filter_name_none_exist(client: APIClient):
+    filter_name = "noname"
+    fks = create_activation_related_data()
+    create_multiple_activations(fks)
+
+    response = client.get(f"{api_url_v1}/activations/?name={filter_name}")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["results"] == []
 
 
 @pytest.mark.django_db
