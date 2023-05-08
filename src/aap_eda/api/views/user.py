@@ -74,6 +74,7 @@ class CurrentUserView(views.APIView):
     ),
     create=extend_schema(
         description="Create a AWX token for a current user.",
+        request=serializers.AwxTokenCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.AwxTokenSerializer,
@@ -92,14 +93,22 @@ class CurrentUserView(views.APIView):
     ),
 )
 class CurrentUserAwxTokensViewSet(
-    mixins.CreateModelMixin,
+    CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     GenericViewSet,
 ):
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = serializers.AwxTokenSerializer
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.AwxTokenCreateSerializer
+
+        return serializers.AwxTokenSerializer
+
+    def get_response_serializer_class(self):
+        return serializers.AwxTokenSerializer
 
     def get_queryset(self):
         return models.AwxToken.objects.filter(user=self.request.user).order_by(
