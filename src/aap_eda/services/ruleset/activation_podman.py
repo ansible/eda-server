@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import base64
+import json
 import logging
 import os
 import uuid
@@ -25,6 +27,7 @@ from podman.errors.exceptions import APIError
 
 from aap_eda.core import models
 
+from .activation_db_logger import ActivationDbLogger
 from .exceptions import ActivationException
 
 logger = logging.getLogger(__name__)
@@ -34,9 +37,13 @@ FLUSH_AT_END = -1
 
 class ActivationPodman:
     def __init__(
-        self, decision_environment: models.DecisionEnvironment, podman_url: str
+        self,
+        decision_environment: models.DecisionEnvironment,
+        podman_url: str,
+        activation_db_logger: ActivationDbLogger,
     ) -> None:
         self.decision_environment = decision_environment
+        self.activation_db_logger = activation_db_logger
 
         if not self.decision_environment.image_url:
             raise ActivationException(
@@ -50,18 +57,13 @@ class ActivationPodman:
             self._default_podman_url()
         logger.info(f"Using podman socket: {self.podman_url}")
 
+        self._set_auth_json_file()
+
         self.client = PodmanClient(base_url=self.podman_url)
         self._login()
 
         self.image = self._pull_image()
         logger.info(self.client.version())
-
-        if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
-            self.flush_after = FLUSH_AT_END
-        else:
-            self.flush_after = int(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER)
-
-        logger.info(f"Log flush setting: {self.flush_after}")
 
     def run_worker_mode(
         self,
@@ -151,6 +153,44 @@ class ActivationPodman:
             logger.exception("Login failed")
             raise
 
+    def _write_auth_json(self) -> None:
+        if not self.auth_file:
+            logger.debug("No auth file to create")
+            return
+
+        auth_dict = {}
+        if os.path.exists(self.auth_file):
+            with open(self.auth_file) as f:
+                auth_dict = json.load(f)
+
+        if "auths" not in auth_dict:
+            auth_dict["auths"] = {}
+
+        registry = self.decision_environment.image_url.split("/")[0]
+        auth_dict["auths"][registry] = self._create_auth_key()
+
+        with open(self.auth_file, "w") as f:
+            json.dump(auth_dict, f, indent=6)
+
+    def _create_auth_key(self) -> dict:
+        cred = self.decision_environment.credential
+        data = f"{cred.username}:{cred.secret.get_secret_value()}"
+        encoded_data = data.encode("ascii")
+        return {"auth": base64.b64encode(encoded_data).decode("ascii")}
+
+    def _set_auth_json_file(self) -> None:
+        xdg_runtime_dir = os.getenv(
+            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
+        )
+        auth_file = f"{xdg_runtime_dir}/containers/auth.json"
+        dir_name = os.path.dirname(auth_file)
+        if os.path.exists(dir_name):
+            self.auth_file = auth_file
+            logger.debug("Will use auth file %s", auth_file)
+        else:
+            self.auth_file = None
+            logger.debug("Will not use auth file")
+
     def _pull_image(self) -> Image:
         credential = self.decision_environment.credential
         try:
@@ -160,6 +200,7 @@ class ActivationPodman:
                     "username": credential.username,
                     "password": credential.secret.get_secret_value(),
                 }
+                self._write_auth_json()
             return self.client.images.pull(
                 self.decision_environment.image_url, **kwargs
             )
@@ -172,49 +213,35 @@ class ActivationPodman:
     def _save_logs(
         self, container: Container, activation_instance_id: str
     ) -> None:
-        line_number = 0
-        activation_instance_logs = []
-
+        lines_streamed = 0
         dkg = container.logs(
             stream=True, follow=True, stderr=True, stdout=True
         )
         try:
             while True:
                 line = next(dkg).decode("utf-8")
-                activation_instance_log = models.ActivationInstanceLog(
-                    line_number=line_number,
-                    log=line,
-                    activation_instance_id=int(activation_instance_id),
-                )
-
-                activation_instance_logs.append(activation_instance_log)
-                line_number += 1
-
-                if self.flush_after == FLUSH_AT_END:
-                    continue
-                elif line_number % self.flush_after == 0:
-                    models.ActivationInstanceLog.objects.bulk_create(
-                        activation_instance_logs
-                    )
-                    activation_instance_logs = []
-
+                self.activation_db_logger.write(line)
+                lines_streamed += 1
         except StopIteration:
             logger.info(f"log stream ended for {container.name}")
 
         self.return_code = container.wait(condition="exited")
         logger.info(f"return_code: {self.return_code}")
 
-        activation_instance_log = models.ActivationInstanceLog(
-            line_number=line_number,
-            log=f"Container exit code: {self.return_code}",
-            activation_instance_id=int(activation_instance_id),
-        )
-        activation_instance_logs.append(activation_instance_log)
+        # If we haven't streamed any lines, collect the logs
+        # when the container ends.
+        # Seems to be differences between 4.1.1 and 4.5 of podman
+        if lines_streamed == 0:
+            for line in container.logs():
+                self.activation_db_logger.write(line.decode("utf-8"))
 
-        models.ActivationInstanceLog.objects.bulk_create(
-            activation_instance_logs
+        self.activation_db_logger.write(
+            f"Container exit code: {self.return_code}"
         )
-        logger.info(f"{line_number+1} of activation instance log are created.")
+        logger.info(
+            f"{self.activation_db_logger.lines_written()}"
+            " activation instance log entries created."
+        )
 
         if self.return_code > 0:
             raise ActivationException(f"Activation failed in {container.name}")

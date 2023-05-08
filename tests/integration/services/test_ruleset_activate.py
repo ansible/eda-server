@@ -181,10 +181,15 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock, init_data):
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
-def test_rulesets_activate_with_podman(my_mock: mock.Mock, init_data):
+def test_rulesets_activate_with_podman(
+    my_mock: mock.Mock, logger_mock: mock.Mock, init_data
+):
     pod_mock = mock.Mock()
     my_mock.return_value = pod_mock
+    log_mock = mock.Mock()
+    logger_mock.return_value = log_mock
 
     container_mock = mock.Mock()
     pod_mock.run_worker_mode.return_value = container_mock
@@ -206,7 +211,7 @@ def test_rulesets_activate_with_podman(my_mock: mock.Mock, init_data):
     instance = models.ActivationInstance.objects.first()
 
     my_mock.assert_called_once_with(
-        init_data.decision_environment, "unix://socket_url"
+        init_data.decision_environment, "unix://socket_url", log_mock
     )
     pod_mock.run_worker_mode.assert_called_once_with(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
