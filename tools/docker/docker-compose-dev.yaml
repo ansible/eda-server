@@ -52,6 +52,7 @@ services:
         condition: service_healthy
     volumes:
       - '../../:/app/src:z'
+    restart: always
 
   postgres:
     image: 'docker.io/library/postgres:13'

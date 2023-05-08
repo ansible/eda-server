@@ -152,7 +152,6 @@ def test_retrieve_rulebook_not_exist(client: APIClient):
 def test_retrieve_json_rulebook(client: APIClient):
     obj = models.Rulebook.objects.create(
         name="test-rulebook.yml",
-        path="rulebooks",
         rulesets=TEST_RULESETS_SAMPLE,
     )
     response = client.get(f"{api_url_v1}/rulebooks/{obj.id}/json/")
@@ -161,7 +160,6 @@ def test_retrieve_json_rulebook(client: APIClient):
     data = response.json()
     assert data["id"] == obj.id
     assert data["name"] == "test-rulebook.yml"
-    assert data["path"] == "rulebooks"
     assert len(data["rulesets"]) == 2
     assert data["rulesets"][0]["name"] == "Test sample 001"
     assert data["rulesets"][1]["name"] == "Test sample 002"
@@ -198,7 +196,6 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
     assert data == {
         "id": rulebook.id,
         "name": rulebook.name,
-        "path": rulebook.path,
         "description": rulebook.description,
         "rulesets": rulebook.rulesets,
         "project_id": rulebook.project.id,
