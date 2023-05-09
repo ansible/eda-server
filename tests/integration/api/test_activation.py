@@ -36,6 +36,18 @@ TEST_ACTIVATION = {
     "restart_count": 0,
 }
 
+TEST_AWX_TOKEN = {
+    "name": "test-awx-token",
+    "description": "test AWX token",
+    "token": "abc123xyx",
+}
+
+TEST_AWX_TOKEN_2 = {
+    "name": "test-awx-token-2",
+    "description": "test AWX token",
+    "token": "abc123xyx",
+}
+
 TEST_PROJECT = {
     "git_hash": "684f62df18ce5f8d5c428e53203b9b975426eed0",
     "name": "test-project-01",
@@ -73,13 +85,19 @@ collections:
 
 
 def create_activation_related_data(with_project=True):
-    user_id = models.User.objects.create_user(
+    user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
         last_name="Skywalker",
         email="luke.skywalker@example.com",
         password="secret",
-    ).pk
+    )
+    user_id = user.pk
+    models.AwxToken.objects.create(
+        name=TEST_AWX_TOKEN["name"],
+        token=TEST_AWX_TOKEN["token"],
+        user=user,
+    )
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
@@ -164,6 +182,7 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
@@ -204,6 +223,7 @@ def test_create_activation_disabled(client: APIClient):
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     response = client.get(f"{api_url_v1}/activations/{response.data['id']}/")
@@ -400,4 +420,40 @@ def assert_activation_related_object_fks(
     assert data["extra_var_id"] == activation.extra_var.id
     assert (
         data["decision_environment_id"] == activation.decision_environment.id
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_no_token(client: APIClient):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["is_enabled"] = True
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert str(response.data["detail"]) == "No controller token specified"
+
+
+@pytest.mark.django_db
+def test_create_activation_more_tokens(client: APIClient):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["is_enabled"] = True
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN_2)
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert (
+        str(response.data["detail"])
+        == "More than one controller token found, "
+        "currently only 1 token is supported"
     )
