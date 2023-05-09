@@ -196,7 +196,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         job_instance_id = job_instance.id if job_instance else None
 
         audit_rule = models.AuditRule.objects.filter(
-            rule_uuid=message.rule_uuid
+            rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
         ).first()
         if audit_rule is None:
             audit_rule = models.AuditRule.objects.create(
