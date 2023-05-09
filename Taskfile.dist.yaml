@@ -30,6 +30,13 @@ tasks:
         vars:
           CLI_ARGS: runserver
 
+  run:shell:
+    desc: "Run Django shell"
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: shell
+
   run:worker:
     desc: "Run tasking worker locally"
     cmds:
