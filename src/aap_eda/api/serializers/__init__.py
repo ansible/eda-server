@@ -60,6 +60,7 @@ from .rulebook import (
 )
 from .tasks import TaskRefSerializer, TaskSerializer
 from .user import (
+    AwxTokenCreateSerializer,
     AwxTokenSerializer,
     UserCreateUpdateSerializer,
     UserDetailSerializer,

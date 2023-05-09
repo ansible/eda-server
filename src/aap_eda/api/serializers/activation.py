@@ -13,6 +13,7 @@
 #  limitations under the License.
 from rest_framework import serializers
 
+from aap_eda.api.exceptions import NoControllerToken, TooManyControllerTokens
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -104,6 +105,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data, user):
+        self._validate_pre_reqs(user)
         rulebook = models.Rulebook.objects.get(
             pk=validated_data["rulebook_id"]
         )
@@ -111,6 +113,13 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         return super().create(validated_data)
+
+    def _validate_pre_reqs(self, user):
+        tokens = models.AwxToken.objects.filter(user_id=user.id).count()
+        if tokens == 0:
+            raise NoControllerToken()
+        elif tokens > 1:
+            raise TooManyControllerTokens()
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):
