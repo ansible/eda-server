@@ -72,7 +72,8 @@ class ActivationPodman:
         activation_instance_id: str,
         heartbeat: str,
         ports: dict,
-    ) -> Container:
+    ) -> None:
+        container = None
         try:
             """Run ansible-rulebook in worker mode."""
             args = [
@@ -113,7 +114,6 @@ class ActivationPodman:
                 activation_instance_id=activation_instance_id,
             )
 
-            return container
         except ContainerError:
             logger.exception("Container error")
             raise
@@ -123,6 +123,9 @@ class ActivationPodman:
         except APIError:
             logger.exception("Container run failed")
             raise
+        finally:
+            if container:
+                container.remove()
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
