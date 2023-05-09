@@ -26,7 +26,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ActivationStatus
+from aap_eda.core.enums import Action, ActivationStatus, ResourceType
 from aap_eda.tasks.ruleset import activate_rulesets
 
 
@@ -72,6 +72,8 @@ class ActivationViewSet(
     serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
+
+    rbac_resource_type = None
     rbac_action = None
 
     @extend_schema(
@@ -161,7 +163,11 @@ class ActivationViewSet(
             ),
         },
     )
-    @action(detail=True)
+    @action(
+        detail=True,
+        rbac_resource_type=ResourceType.ACTIVATION_INSTANCE,
+        rbac_action=Action.READ,
+    )
     def instances(self, request, pk):
         activation_exists = models.Activation.objects.filter(id=pk).exists()
         if not activation_exists:
