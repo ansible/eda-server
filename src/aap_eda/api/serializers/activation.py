@@ -11,9 +11,15 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import websocket
+from django.conf import settings
 from rest_framework import serializers
 
-from aap_eda.api.exceptions import NoControllerToken, TooManyControllerTokens
+from aap_eda.api.exceptions import (
+    InvalidWebsocketURL,
+    NoControllerToken,
+    TooManyControllerTokens,
+)
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -24,6 +30,7 @@ from aap_eda.api.serializers.project import (
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH
 
 
 class ActivationSerializer(serializers.ModelSerializer):
@@ -93,9 +100,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     project_id = serializers.IntegerField(required=False, allow_null=True)
     rulebook_id = serializers.IntegerField()
     extra_var_id = serializers.IntegerField(required=False, allow_null=True)
-    decision_environment_id = serializers.IntegerField(
-        required=True, allow_null=True
-    )
+    decision_environment_id = serializers.IntegerField()
 
     class Meta:
         model = models.Activation
@@ -126,6 +131,14 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             raise NoControllerToken()
         elif tokens > 1:
             raise TooManyControllerTokens()
+
+        try:
+            ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
+            ws = websocket.create_connection(ws_url)
+            ws.close()
+        except websocket.WebSocketException as e:
+            error_message = f"{InvalidWebsocketURL.default_detail}: {str(e)}"
+            raise InvalidWebsocketURL(error_message)
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):

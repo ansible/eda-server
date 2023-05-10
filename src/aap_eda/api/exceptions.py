@@ -73,3 +73,8 @@ class TooManyControllerTokens(APIException):
         "More than one controller token found, "
         "currently only 1 token is supported"
     )
+
+
+class InvalidWebsocketURL(APIException):
+    status_code = 422
+    default_detail = "Connection Error to provided websocket URL."
