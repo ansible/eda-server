@@ -100,8 +100,6 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
 
     for rulebook, expected in zip(rulebooks, expected_rulebooks):
         assert_rulebook_is_valid(rulebook, expected)
-        assert_rulebook_is_valid(rulebook, expected)
-
 
 @pytest.mark.django_db
 def test_project_import_with_new_layout(
