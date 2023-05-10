@@ -60,3 +60,16 @@ class HttpForbidden(APIException):
     status_code = status.HTTP_403_FORBIDDEN
     default_code = "forbidden"
     default_detail = _("Forbidden.")
+
+
+class NoControllerToken(APIException):
+    status_code = 422
+    default_detail = "No controller token specified"
+
+
+class TooManyControllerTokens(APIException):
+    status_code = 422
+    default_detail = (
+        "More than one controller token found, "
+        "currently only 1 token is supported"
+    )
