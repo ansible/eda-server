@@ -73,7 +73,7 @@ class SessionLoginView(APIView):
         )
 
         if user is None:
-            raise exceptions.PermissionDenied(
+            raise exceptions.AuthenticationFailed(
                 "Invalid credentials or user is disabled."
             )
 

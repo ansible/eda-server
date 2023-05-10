@@ -93,6 +93,7 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {
+        "code": None,
         "name": ["This field is required."],
     }
 
@@ -104,6 +105,7 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {
+        "code": None,
         "token": ["This field is required."],
     }
 
@@ -123,7 +125,8 @@ def test_create_token_duplicate_name(client: APIClient, user: models.User):
     )
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json() == {
-        "detail": "Token with this name already exists."
+        "code": None,
+        "detail": "Token with this name already exists.",
     }
 
 

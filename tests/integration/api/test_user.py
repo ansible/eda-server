@@ -76,7 +76,8 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
     response = client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json() == {
-        "detail": "Authentication credentials were not provided."
+        "code": "not_authenticated",
+        "detail": "Authentication credentials were not provided.",
     }
 
 

@@ -95,7 +95,8 @@ def test_session_login_invalid_credentials(
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json() == {
-        "detail": "Invalid credentials or user is disabled."
+        "code": "authentication_failed",
+        "detail": "Invalid credentials or user is disabled.",
     }
 
 
@@ -104,7 +105,8 @@ def test_logout_unauthenticated(base_client: APIClient):
     response = base_client.post(logout_url)
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert response.json() == {
-        "detail": "Authentication credentials were not provided."
+        "code": "not_authenticated",
+        "detail": "Authentication credentials were not provided.",
     }
 
 

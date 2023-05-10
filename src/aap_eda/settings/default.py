@@ -192,6 +192,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
         "aap_eda.api.permissions.RoleBasedPermission",
     ],
+    "EXCEPTION_HANDLER": "aap_eda.api.exception_handler.exception_handler",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
 
