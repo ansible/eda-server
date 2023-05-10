@@ -39,7 +39,7 @@ services:
 
   worker:
     deploy:
-      replicas: 2
+      replicas: 1
     image: 'localhost/aap-eda-worker'
     build:
       context: ../../
