@@ -28,7 +28,7 @@ from podman.errors.exceptions import APIError
 from aap_eda.core import models
 
 from .activation_db_logger import ActivationDbLogger
-from .exceptions import ActivationException
+from .exceptions import ActivationValidationError, PodmanActivationException
 from .shared_settings import VALID_LOG_LEVELS
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class ActivationPodman:
         self.activation_db_logger = activation_db_logger
 
         if not self.decision_environment.image_url:
-            raise ActivationException(
+            raise ActivationValidationError(
                 f"DecisionEnvironment: {self.decision_environment.name} does"
                 " not have image_url set"
             )
@@ -121,13 +121,13 @@ class ActivationPodman:
 
         except ContainerError:
             logger.exception("Container error")
-            raise
+            raise PodmanActivationException("Container error")
         except ImageNotFound:
             logger.exception("Image not found")
-            raise
+            raise PodmanActivationException("Image not found")
         except APIError:
             logger.exception("Container run failed")
-            raise
+            raise PodmanActivationException("Container run failed")
         finally:
             if container:
                 container.remove()
@@ -159,7 +159,7 @@ class ActivationPodman:
             )
         except APIError:
             logger.exception("Login failed")
-            raise
+            raise PodmanActivationException("Login failed")
 
     def _write_auth_json(self) -> None:
         if not self.auth_file:
@@ -216,7 +216,7 @@ class ActivationPodman:
             logger.exception(
                 f"Image {self.decision_environment.image_url} not found"
             )
-            raise
+            raise PodmanActivationException("Image not found")
 
     def _save_logs(
         self, container: Container, activation_instance_id: str
@@ -252,4 +252,6 @@ class ActivationPodman:
         )
 
         if self.return_code > 0:
-            raise ActivationException(f"Activation failed in {container.name}")
+            raise PodmanActivationException(
+                f"Activation failed in {container.name}"
+            )

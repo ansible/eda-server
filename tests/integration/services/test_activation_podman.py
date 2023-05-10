@@ -25,6 +25,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 from aap_eda.services.ruleset.activation_podman import ActivationPodman
+from aap_eda.services.ruleset.exceptions import PodmanActivationException
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
@@ -164,7 +165,7 @@ def test_activation_podman_with_invalid_credential(
     client_mock.login.side_effect = raise_error
     activation_db_logger = ActivationDbLogger(activation_instance.id)
 
-    with pytest.raises(exceptions.APIError, match="login attempt failed"):
+    with pytest.raises(PodmanActivationException, match="Login failed"):
         ActivationPodman(decision_environment, None, activation_db_logger)
 
 
@@ -183,7 +184,7 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
 
     podman = ActivationPodman(decision_environment, None, activation_db_logger)
     with pytest.raises(
-        exceptions.APIError, match="bind: address already in use"
+        PodmanActivationException, match="Container run failed"
     ):
         podman.run_worker_mode(
             ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",

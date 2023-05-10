@@ -28,7 +28,7 @@ from .activation_db_logger import ActivationDbLogger
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
 from .ansible_rulebook import AnsibleRulebookService
-from .exceptions import ActivationException
+from .exceptions import ActivationException, ActivationValidationError
 
 logger = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -104,7 +104,7 @@ class ActivateRulesets:
             try:
                 dtype = DeploymentType(deployment_type)
             except ValueError:
-                raise ActivationException(
+                raise ActivationValidationError(
                     f"Invalid deployment type: {deployment_type}"
                 )
 
@@ -132,14 +132,17 @@ class ActivateRulesets:
                     decision_environment=decision_environment,
                 )
             else:
-                raise ActivationException(f"Unsupported {deployment_type}")
+                raise ActivationValidationError(
+                    f"Unsupported {deployment_type}"
+                )
 
             instance.status = ActivationStatus.COMPLETED
-        except ActivationException as exe:
+        except ActivationValidationError as exe:
+            # No need to attempt to restart because it will fail again
             logger.error(f"Activation error: {str(exe)}")
             instance.status = ActivationStatus.FAILED
             activation_db_logger.write(f"Activation error: {str(exe)}")
-        except Exception as exe:
+        except ActivationException as exe:
             instance.status = ActivationStatus.FAILED
             if (
                 activation.restart_policy == RestartPolicy.ALWAYS.value
@@ -179,10 +182,12 @@ class ActivateRulesets:
         ansible_rulebook = shutil.which("ansible-rulebook")
 
         if ansible_rulebook is None:
-            raise ActivationException("command ansible-rulebook not found")
+            raise ActivationValidationError(
+                "command ansible-rulebook not found"
+            )
 
         if ssh_agent is None:
-            raise ActivationException("command ssh-agent not found")
+            raise ActivationValidationError("command ssh-agent not found")
 
         proc = self.service.run_worker_mode(
             ssh_agent,

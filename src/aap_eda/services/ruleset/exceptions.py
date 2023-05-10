@@ -19,3 +19,11 @@ class ActivationException(Exception):
 
 class K8sActivationException(ActivationException):
     pass
+
+
+class PodmanActivationException(ActivationException):
+    pass
+
+
+class ActivationValidationError(Exception):
+    pass
