@@ -29,6 +29,7 @@ from aap_eda.core import models
 
 from .activation_db_logger import ActivationDbLogger
 from .exceptions import ActivationException
+from .shared_settings import VALID_LOG_LEVELS
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +88,12 @@ class ActivationPodman:
                 str(activation_instance_id),
                 "--heartbeat",
                 str(heartbeat),
-                settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             ]
+            if (
+                settings.ANSIBLE_RULEBOOK_LOG_LEVEL
+                and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
+            ):
+                args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
 
             container = self.client.containers.run(
                 image=self.decision_environment.image_url,
