@@ -429,7 +429,7 @@ def assert_activation_related_object_fks(
 def _get_rules_count(ruleset_stats):
     rules_count = 0
     rules_fired_count = 0
-    for _, ruleset_stat in ruleset_stats.items():
+    for ruleset_stat in ruleset_stats.values():
         rules_count += ruleset_stat["numberOfRules"]
         rules_fired_count += ruleset_stat["rulesTriggered"]
 
