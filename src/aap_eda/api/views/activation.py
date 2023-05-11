@@ -98,6 +98,8 @@ class ActivationViewSet(
             response_serializer.data
         )
         activation["status"] = ActivationStatus.STARTING.value
+        activation["rules_count"] = 0
+        activation["rules_fired_count"] = 0
 
         if response.is_enabled:
             decision_environment_id = activation["decision_environment_id"]
@@ -124,6 +126,10 @@ class ActivationViewSet(
         activation["status"] = self._status_from_instances(
             activation, activation["instances"]
         )
+        (
+            activation["rules_count"],
+            activation["rules_fired_count"],
+        ) = self._get_rules_count(activation["ruleset_stats"])
 
         return Response(serializers.ActivationReadSerializer(activation).data)
 
@@ -139,7 +145,7 @@ class ActivationViewSet(
     )
     def list(self, request):
         response = super().list(request)
-        activations = {}
+        activations = []
         if response and response.data:
             activations = response.data["results"]
 
@@ -150,8 +156,16 @@ class ActivationViewSet(
             activation["status"] = self._status_from_instances(
                 activation, activation_instances
             )
+            (
+                activation["rules_count"],
+                activation["rules_fired_count"],
+            ) = self._get_rules_count(activation["ruleset_stats"])
 
-        return self.get_paginated_response(activations)
+        serializer = serializers.ActivationListSerializer(
+            activations, many=True
+        )
+
+        return self.get_paginated_response(serializer.data)
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -324,6 +338,15 @@ class ActivationViewSet(
         activation["instances"] = activation_instances
 
         return activation
+
+    def _get_rules_count(self, ruleset_stats):
+        rules_count = 0
+        rules_fired_count = 0
+        for _, ruleset_stat in ruleset_stats.items():
+            rules_count += ruleset_stat["numberOfRules"]
+            rules_fired_count += ruleset_stat["rulesTriggered"]
+
+        return rules_count, rules_fired_count
 
 
 @extend_schema_view(

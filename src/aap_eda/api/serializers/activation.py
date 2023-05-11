@@ -43,6 +43,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "restart_policy",
             "restart_count",
             "rulebook_name",
+            "ruleset_stats",
             "created_at",
             "modified_at",
         ]
@@ -60,6 +61,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
     status = serializers.ChoiceField(
         choices=[x.value for x in ActivationStatus]
     )
+    rules_count = serializers.IntegerField()
+    rules_fired_count = serializers.IntegerField()
 
     class Meta:
         model = models.Activation
@@ -75,6 +78,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "extra_var_id",
             "restart_policy",
             "restart_count",
+            "rulebook_name",
+            "rules_count",
+            "rules_fired_count",
             "created_at",
             "modified_at",
         ]
@@ -160,6 +166,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     status = serializers.ChoiceField(
         choices=[x.value for x in ActivationStatus]
     )
+    rules_count = serializers.IntegerField()
+    rules_fired_count = serializers.IntegerField()
 
     class Meta:
         model = models.Activation
@@ -177,6 +185,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restart_policy",
             "restart_count",
             "rulebook_name",
+            "rules_count",
+            "rules_fired_count",
             "created_at",
             "modified_at",
         ]
@@ -221,6 +231,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restart_policy": activation["restart_policy"],
             "restart_count": activation["restart_count"],
             "rulebook_name": activation["rulebook_name"],
+            "rules_count": activation["rules_count"],
+            "rules_fired_count": activation["rules_fired_count"],
             "created_at": activation["created_at"],
             "modified_at": activation["modified_at"],
         }
