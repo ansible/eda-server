@@ -25,6 +25,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "is_superuser",
             "roles",
             "created_at",
             "modified_at",
@@ -49,6 +50,11 @@ class UserListSerializer(serializers.Serializer):
     last_name = serializers.CharField(
         required=True,
         help_text="The user's last name.",
+    )
+
+    is_superuser = serializers.BooleanField(
+        required=True,
+        help_text="The user is a superuser.",
     )
 
     roles = RoleRefSerializer(read_only=True, many=True)

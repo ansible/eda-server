@@ -59,6 +59,7 @@ def test_retrieve_current_user(client: APIClient, user: models.User, init_db):
         "first_name": user.first_name,
         "last_name": user.last_name,
         "email": user.email,
+        "is_superuser": user.is_superuser,
         "roles": [
             {
                 "id": str(init_db.role.id),
@@ -114,13 +115,13 @@ def test_retrieve_user_details(
     user_id = user.id
     response = client.get(f"{api_url_v1}/users/{user_id}/")
     assert response.status_code == status.HTTP_200_OK
-
     assert response.json() == {
         "id": user.id,
         "username": user.username,
         "first_name": user.first_name,
         "last_name": user.last_name,
         "email": user.email,
+        "is_superuser": user.is_superuser,
         "roles": [
             {
                 "id": str(init_db.role.id),
@@ -153,6 +154,7 @@ def test_list_users(
         "username": user.username,
         "first_name": user.first_name,
         "last_name": user.last_name,
+        "is_superuser": user.is_superuser,
         "roles": [
             {
                 "id": str(init_db.role.id),
@@ -185,6 +187,7 @@ def test_partial_update_user(
         "first_name": updated_user.first_name,
         "last_name": updated_user.last_name,
         "email": updated_user.email,
+        "is_superuser": user.is_superuser,
         "roles": [
             {
                 "id": str(init_db.role.id),
