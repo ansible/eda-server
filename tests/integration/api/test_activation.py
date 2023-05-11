@@ -391,6 +391,7 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 def assert_activation_base_data(
     data: Dict[str, Any], activation: models.Activation
 ):
+    rules_count, rules_fired_count = _get_rules_count(activation.ruleset_stats)
     assert data["id"] == activation.id
     assert data["name"] == activation.name
     assert data["description"] == activation.description
@@ -398,6 +399,8 @@ def assert_activation_base_data(
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
     assert data["rulebook_name"] == activation.rulebook_name
+    assert data["rules_count"] == rules_count
+    assert data["rules_fired_count"] == rules_fired_count
     assert data["created_at"] == activation.created_at.strftime(
         DATETIME_FORMAT
     )
@@ -421,6 +424,16 @@ def assert_activation_related_object_fks(
     assert (
         data["decision_environment_id"] == activation.decision_environment.id
     )
+
+
+def _get_rules_count(ruleset_stats):
+    rules_count = 0
+    rules_fired_count = 0
+    for ruleset_stat in ruleset_stats.values():
+        rules_count += ruleset_stat["numberOfRules"]
+        rules_fired_count += ruleset_stat["rulesTriggered"]
+
+    return rules_count, rules_fired_count
 
 
 @pytest.mark.django_db

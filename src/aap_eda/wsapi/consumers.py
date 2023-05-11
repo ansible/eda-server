@@ -142,6 +142,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         instance.updated_at = message.reported_at
         instance.save()
 
+        activation = models.Activation.objects.get(pk=instance.activation.id)
+        activation.ruleset_stats[message.stats["ruleSetName"]] = message.stats
+        activation.save()
+
     @database_sync_to_async
     def insert_event_related_data(self, message: AnsibleEventMessage) -> None:
         event_data = message.event or {}
