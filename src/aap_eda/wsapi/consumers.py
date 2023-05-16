@@ -142,6 +142,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         instance.updated_at = message.reported_at
         instance.save()
 
+        activation = models.Activation.objects.get(pk=instance.activation.id)
+        activation.ruleset_stats[message.stats["ruleSetName"]] = message.stats
+        activation.save()
+
     @database_sync_to_async
     def insert_event_related_data(self, message: AnsibleEventMessage) -> None:
         event_data = message.event or {}
@@ -196,7 +200,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         job_instance_id = job_instance.id if job_instance else None
 
         audit_rule = models.AuditRule.objects.filter(
-            rule_uuid=message.rule_uuid
+            rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
         ).first()
         if audit_rule is None:
             audit_rule = models.AuditRule.objects.create(

@@ -21,7 +21,8 @@ from functools import wraps
 from typing import Any, Callable, Final, Iterator, Optional, Type
 
 import yaml
-from django.db import transaction
+from django.core import exceptions
+from django.db import utils
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
@@ -53,14 +54,18 @@ def _project_import_wrapper(
         project.import_state = models.Project.ImportState.RUNNING
         project.save()
         try:
-            with transaction.atomic():
-                func(self, project)
-                project.import_state = models.Project.ImportState.COMPLETED
-                project.save()
-        except Exception as e:
-            project.import_state = models.Project.ImportState.FAILED
-            project.import_error = str(e)
+            func(self, project)
+            project.import_state = models.Project.ImportState.COMPLETED
             project.save()
+        except (utils.IntegrityError, exceptions.ObjectDoesNotExist):
+            logger.exception("Object may have been deleted")
+        except Exception as e:
+            try:
+                project.import_state = models.Project.ImportState.FAILED
+                project.import_error = str(e)
+                project.save()
+            except exceptions.ObjectDoesNotExist:
+                logger.exception("Project may have been deleted")
             raise
 
     return wrapper
@@ -86,7 +91,6 @@ class ProjectImportService:
             project.git_hash = repo.rev_parse("HEAD")
 
             self._import_rulebooks(project, repo_dir)
-            self._save_project_archive(project, repo, tempdir)
 
     @_project_import_wrapper
     def sync_project(self, project: models.Project) -> None:
@@ -109,7 +113,6 @@ class ProjectImportService:
             project.git_hash = git_hash
 
             self._sync_rulebooks(project, repo_dir)
-            self._save_project_archive(project, repo, tempdir)
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
@@ -219,17 +222,3 @@ class ProjectImportService:
         if not isinstance(data, list):
             return False
         return all("rules" in entry for entry in data)
-
-    def _save_project_archive(
-        self,
-        project: models.Project,
-        repo: GitRepository,
-        tempdir: StrPath,
-    ):
-        archive_file = os.path.join(tempdir, "archive.tar.gz")
-        repo.archive("HEAD", archive_file, format="tar.gz")
-
-        filename = f"{project.id:010}.archive.tar.gz"
-        with open(archive_file, "rb") as fp:
-            project.archive_file.save(filename, fp)
-        return project

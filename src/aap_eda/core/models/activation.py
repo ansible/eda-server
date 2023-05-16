@@ -29,6 +29,7 @@ class Activation(models.Model):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
+        ordering = ("-created_at",)
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
@@ -58,6 +59,7 @@ class Activation(models.Model):
         null=False,
         help_text="Content of the last referenced rulebook",
     )
+    ruleset_stats = models.JSONField(default=dict)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
@@ -66,6 +68,7 @@ class Activation(models.Model):
 class ActivationInstance(models.Model):
     class Meta:
         db_table = "core_activation_instance"
+        ordering = ("-started_at",)
 
     name = models.TextField(null=False, default="")
     status = models.TextField(

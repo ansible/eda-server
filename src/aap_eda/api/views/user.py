@@ -13,6 +13,7 @@
 #  limitations under the License.
 import django.db.utils
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -65,6 +66,14 @@ class CurrentUserView(views.APIView):
     ),
     retrieve=extend_schema(
         description="Get current user AWX token by ID.",
+        parameters=[
+            OpenApiParameter(
+                "id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this token.",
+            )
+        ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.AwxTokenSerializer,
@@ -84,6 +93,14 @@ class CurrentUserView(views.APIView):
     ),
     destroy=extend_schema(
         description="Delete AWX token of a current user by ID.",
+        parameters=[
+            OpenApiParameter(
+                "id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this token.",
+            )
+        ],
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None,

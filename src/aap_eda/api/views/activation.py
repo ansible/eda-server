@@ -68,7 +68,7 @@ class ActivationViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.order_by("id")
+    queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
@@ -98,6 +98,8 @@ class ActivationViewSet(
             response_serializer.data
         )
         activation["status"] = ActivationStatus.STARTING.value
+        activation["rules_count"] = 0
+        activation["rules_fired_count"] = 0
 
         if response.is_enabled:
             decision_environment_id = activation["decision_environment_id"]
@@ -124,6 +126,10 @@ class ActivationViewSet(
         activation["status"] = self._status_from_instances(
             activation, activation["instances"]
         )
+        (
+            activation["rules_count"],
+            activation["rules_fired_count"],
+        ) = self._get_rules_count(activation["ruleset_stats"])
 
         return Response(serializers.ActivationReadSerializer(activation).data)
 
@@ -139,7 +145,7 @@ class ActivationViewSet(
     )
     def list(self, request):
         response = super().list(request)
-        activations = {}
+        activations = []
         if response and response.data:
             activations = response.data["results"]
 
@@ -150,8 +156,16 @@ class ActivationViewSet(
             activation["status"] = self._status_from_instances(
                 activation, activation_instances
             )
+            (
+                activation["rules_count"],
+                activation["rules_fired_count"],
+            ) = self._get_rules_count(activation["ruleset_stats"])
 
-        return self.get_paginated_response(activations)
+        serializer = serializers.ActivationListSerializer(
+            activations, many=True
+        )
+
+        return self.get_paginated_response(serializer.data)
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -178,7 +192,7 @@ class ActivationViewSet(
 
         activation_instances = models.ActivationInstance.objects.filter(
             activation_id=pk
-        ).order_by("started_at")
+        )
         activation_instances = self.paginate_queryset(activation_instances)
         serializer = serializers.ActivationInstanceSerializer(
             activation_instances, many=True
@@ -325,6 +339,15 @@ class ActivationViewSet(
 
         return activation
 
+    def _get_rules_count(self, ruleset_stats):
+        rules_count = 0
+        rules_fired_count = 0
+        for ruleset_stat in ruleset_stats.values():
+            rules_count += ruleset_stat["numberOfRules"]
+            rules_fired_count += ruleset_stat["rulesTriggered"]
+
+        return rules_count, rules_fired_count
+
 
 @extend_schema_view(
     retrieve=extend_schema(
@@ -357,7 +380,7 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.ActivationInstance.objects.order_by("started_at")
+    queryset = models.ActivationInstance.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter

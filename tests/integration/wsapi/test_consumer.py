@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -38,6 +39,7 @@ TEST_RULESETS = """
 """
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
+DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -197,6 +199,41 @@ async def test_handle_events():
 
 
 @pytest.mark.django_db(transaction=True)
+async def test_handle_actions_multiple_firing():
+    activation_instance_id = await _prepare_db_data()
+    job_instance = await _prepare_job_instance()
+
+    communicator = WebsocketCommunicator(
+        AnsibleRulebookConsumer.as_asgi(), "ws/"
+    )
+    connected, _ = await communicator.connect()
+    assert connected
+
+    assert (await get_audit_rule_count()) == 0
+    payload1 = create_action_payload(
+        DUMMY_UUID,
+        activation_instance_id,
+        job_instance.uuid,
+        DUMMY_UUID,
+        "2023-03-29T15:00:17.260803Z",
+    )
+    payload2 = create_action_payload(
+        DUMMY_UUID2,
+        activation_instance_id,
+        job_instance.uuid,
+        DUMMY_UUID,
+        "2023-03-29T15:00:27.260803Z",
+    )
+    await communicator.send_json_to(payload1)
+    await communicator.send_json_to(payload2)
+    await communicator.disconnect()
+
+    assert (await get_audit_rule_count()) == 2
+    assert (await get_audit_action_count()) == 2
+    assert (await get_audit_event_count()) == 4
+
+
+@pytest.mark.django_db(transaction=True)
 async def test_handle_actions():
     activation_instance_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -208,43 +245,13 @@ async def test_handle_actions():
     assert connected
 
     assert (await get_audit_rule_count()) == 0
-    payload = {
-        "type": "Action",
-        "action": "run_playbook",
-        "action_uuid": DUMMY_UUID,
-        "activation_id": activation_instance_id,
-        "job_id": job_instance.uuid,
-        "ruleset": "ruleset",
-        "rule": "rule",
-        "ruleset_uuid": DUMMY_UUID,
-        "rule_uuid": DUMMY_UUID,
-        "run_at": "2023-03-29T15:00:17.260803Z",
-        "rule_run_at": "2023-03-29T15:00:17.260803Z",
-        "matching_events": {
-            "m_1": {
-                "meta": {
-                    "received_at": "2023-03-29T15:00:17.260803Z",
-                    "source": {
-                        "name": "my test source",
-                        "type": "ansible.eda.range",
-                    },
-                    "uuid": "523af123-2783-448f-9e2a-d33ad89b04fa",
-                },
-                "i": 7,
-            },
-            "m_0": {
-                "meta": {
-                    "received_at": "2023-03-29T15:00:17.248686Z",
-                    "source": {
-                        "name": "my test source",
-                        "type": "ansible.eda.range",
-                    },
-                    "uuid": "58d7bbfe-4205-4d25-8cc1-d7e8eea06d21",
-                },
-                "i": 3,
-            },
-        },
-    }
+    payload = create_action_payload(
+        DUMMY_UUID,
+        activation_instance_id,
+        job_instance.uuid,
+        DUMMY_UUID,
+        "2023-03-29T15:00:17.260803Z",
+    )
     await communicator.send_json_to(payload)
     await communicator.disconnect()
 
@@ -254,13 +261,17 @@ async def test_handle_actions():
 
     event1, event2 = await get_audit_events()
 
-    assert str(event1.id) == "523af123-2783-448f-9e2a-d33ad89b04fa"
-    assert event1.payload == {"i": 7}
-    assert event1.source_name == "my test source"
-    assert event1.source_type == "ansible.eda.range"
+    event1_data = payload["matching_events"]["m_1"]
+    meta = event1_data.pop("meta")
+    assert str(event1.id) == meta["uuid"]
+    assert event1.payload == event1_data
+    assert event1.source_name == meta["source"]["name"]
+    assert event1.source_type == meta["source"]["type"]
 
-    assert str(event2.id) == "58d7bbfe-4205-4d25-8cc1-d7e8eea06d21"
-    assert event2.payload == {"i": 3}
+    event2_data = payload["matching_events"]["m_0"]
+    meta = event2_data.pop("meta")
+    assert str(event2.id) == meta["uuid"]
+    assert event2.payload == event2_data
 
 
 @pytest.mark.django_db(transaction=True)
@@ -470,3 +481,49 @@ async def _prepare_websocket_connection() -> WebsocketCommunicator:
     assert connected
 
     return communicator
+
+
+def create_action_payload(
+    action_uuid,
+    activation_instance_id,
+    job_instance_uuid,
+    rule_uuid,
+    rule_run_at,
+):
+    return {
+        "type": "Action",
+        "action": "run_playbook",
+        "action_uuid": action_uuid,
+        "activation_id": activation_instance_id,
+        "job_id": job_instance_uuid,
+        "ruleset": "ruleset",
+        "rule": "rule",
+        "ruleset_uuid": DUMMY_UUID,
+        "rule_uuid": rule_uuid,
+        "run_at": "2023-03-29T15:00:17.260803Z",
+        "rule_run_at": rule_run_at,
+        "matching_events": {
+            "m_1": {
+                "meta": {
+                    "received_at": "2023-03-29T15:00:17.260803Z",
+                    "source": {
+                        "name": "my test source",
+                        "type": "ansible.eda.range",
+                    },
+                    "uuid": str(uuid.uuid4()),
+                },
+                "i": 7,
+            },
+            "m_0": {
+                "meta": {
+                    "received_at": "2023-03-29T15:00:17.248686Z",
+                    "source": {
+                        "name": "my test source",
+                        "type": "ansible.eda.range",
+                    },
+                    "uuid": str(uuid.uuid4()),
+                },
+                "i": 3,
+            },
+        },
+    }

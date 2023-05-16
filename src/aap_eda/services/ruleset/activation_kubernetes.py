@@ -24,6 +24,8 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.ruleset.exceptions import K8sActivationException
 
+from .shared_settings import VALID_LOG_LEVELS
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,23 +49,29 @@ class ActivationKubernetes:
         ports,
         heartbeat,
     ) -> client.V1Container:
+        args = [
+            "--worker",
+            "--websocket-address",
+            url,
+            "--websocket-ssl-verify",
+            ssl_verify,
+            "--id",
+            str(activation_id),
+            "--heartbeat",
+            str(heartbeat),
+        ]
+        if (
+            settings.ANSIBLE_RULEBOOK_LOG_LEVEL
+            and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
+        ):
+            args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
+
         container = client.V1Container(
             image=image,
             name=name,
             image_pull_policy=pull_policy,
             env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
-            args=[
-                "--worker",
-                "--websocket-address",
-                url,
-                "--websocket-ssl-verify",
-                ssl_verify,
-                "--id",
-                str(activation_id),
-                "--heartbeat",
-                str(heartbeat),
-                settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
-            ],
+            args=args,
             ports=[
                 client.V1ContainerPort(container_port=port) for port in ports
             ],

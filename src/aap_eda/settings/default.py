@@ -34,6 +34,7 @@ with the prefix EDA_:
     a comma separated string.
     Ex: export EDA_ALLOWED_HOSTS = "localhost,127.0.0.1"
     Ex: export EDA_ALLOWED_HOSTS = '["localhost", "127.0.0.1"]'
+* SESSION_COOKIE_AGE - Session cookie expiration time
 
 Database settings:
 
@@ -70,6 +71,9 @@ ALLOWED_HOSTS = (
     else ALLOWED_HOSTS
 )
 
+# Session settings
+SESSION_COOKIE_AGE = settings.get("SESSION_COOKIE_AGE", 1800)
+SESSION_SAVE_EVERY_REQUEST = True
 
 # Application definition
 INSTALLED_APPS = [
