@@ -11,12 +11,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import websocket
+import urllib.parse
+
 from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.api.exceptions import (
-    InvalidWebsocketURL,
+    InvalidWebsocketHost,
+    InvalidWebsocketScheme,
     NoControllerToken,
     TooManyControllerTokens,
 )
@@ -132,13 +134,13 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         elif tokens > 1:
             raise TooManyControllerTokens()
 
-        try:
-            ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
-            ws = websocket.create_connection(ws_url)
-            ws.close()
-        except websocket.WebSocketException as e:
-            error_message = f"{InvalidWebsocketURL.default_detail}: {str(e)}"
-            raise InvalidWebsocketURL(error_message)
+        ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
+        parsed_url = urllib.parse.urlparse(ws_url)
+
+        if parsed_url.scheme not in ["ws", "wss"]:
+            raise InvalidWebsocketScheme()
+        if not parsed_url.hostname:
+            raise InvalidWebsocketHost()
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):

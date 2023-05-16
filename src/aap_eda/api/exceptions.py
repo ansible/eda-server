@@ -75,6 +75,16 @@ class TooManyControllerTokens(APIException):
     )
 
 
-class InvalidWebsocketURL(APIException):
+class InvalidWebsocketScheme(APIException):
     status_code = 422
-    default_detail = "Connection Error to provided websocket URL."
+    default_detail = (
+        "Connection Error: Invalid WebSocket URL scheme. "
+        "Scheme should be either 'ws' or 'wss'."
+    )
+
+
+class InvalidWebsocketHost(APIException):
+    status_code = 422
+    default_detail = (
+        "Connection Error: WebSocket URL must have a valid host address."
+    )
