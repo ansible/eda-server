@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from aap_eda.core import models
@@ -264,6 +265,9 @@ class AuditRuleDetailSerializer(serializers.Serializer):
         help_text="The action definition in the rule",
     )
 
+    @extend_schema_field(
+        {"type": "dict", "example": {"id": "int", "name": "string"}}
+    )
     def get_activation_instance(self, instance):
         activation = instance.activation_instance
         if activation:
@@ -295,6 +299,9 @@ class AuditRuleListSerializer(serializers.Serializer):
         help_text="The fired timestamp of the rule",
     )
 
+    @extend_schema_field(
+        {"type": "dict", "example": {"id": "int", "name": "string"}}
+    )
     def get_activation_instance(self, instance):
         activation = instance.activation_instance
         if activation:
