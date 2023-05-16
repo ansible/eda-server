@@ -134,9 +134,11 @@ class ProjectImportService:
                 self._import_rulebook(project, rulebook_info)
             else:
                 self._sync_rulebook(rulebook, rulebook_info)
-        models.Rulebook.objects.filter(
-            pk__in=[obj.id for obj in existing_rulebooks.values()]
-        ).delete()
+        rulebooks_to_delete = [obj.id for obj in existing_rulebooks.values()]
+        models.Activation.objects.filter(
+            rulebook__in=rulebooks_to_delete
+        ).update(is_enabled=False)
+        models.Rulebook.objects.filter(pk__in=rulebooks_to_delete).delete()
 
     def _import_rulebook(
         self, project: models.Project, rulebook_info: RulebookInfo
