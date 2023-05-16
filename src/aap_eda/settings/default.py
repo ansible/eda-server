@@ -304,9 +304,9 @@ WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
-PODMAN_ENV_VARS = {}
-PODMAN_MOUNTS = []
-PODMAN_EXTRA_ARGS = {}
+PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
+PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
+PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
