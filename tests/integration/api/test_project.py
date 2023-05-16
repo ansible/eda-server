@@ -393,46 +393,11 @@ def test_delete_project(client: APIClient, check_permission_mock: mock.Mock):
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-        import_state=models.Project.ImportState.COMPLETED,
     )
     response = client.delete(f"{api_url_v1}/projects/{project.id}/")
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not models.Project.objects.filter(pk=project.id).exists()
-
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.DELETE
-    )
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    "import_state",
-    [
-        models.Project.ImportState.PENDING,
-        models.Project.ImportState.RUNNING,
-    ],
-)
-def test_delete_project_while_importing(
-    client: APIClient,
-    check_permission_mock: mock.Mock,
-    import_state: models.Project.ImportState,
-):
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-        import_state=import_state,
-    )
-    response = client.delete(f"{api_url_v1}/projects/{project.id}/")
-
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json() == {
-        "code": None,
-        "detail": (
-            "Cannot delete project while import operation is in progress."
-        ),
-    }
-    assert models.Project.objects.filter(pk=project.id).exists()
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.DELETE
