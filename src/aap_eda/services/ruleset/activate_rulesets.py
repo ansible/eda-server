@@ -137,30 +137,48 @@ class ActivateRulesets:
 
             instance.status = ActivationStatus.COMPLETED
         except ActivationException as exe:
-            logger.error(f"Activation error: {str(exe)}")
-            instance.status = ActivationStatus.FAILED
-            activation_db_logger.write(f"Activation error: {str(exe)}")
-        except Exception as exe:
-            instance.status = ActivationStatus.FAILED
-            if (
-                activation.restart_policy == RestartPolicy.ALWAYS.value
-                or activation.restart_policy == RestartPolicy.ON_FAILURE.value
-            ):
-                from aap_eda.tasks.ruleset import enqueue_monitor_task
-
-                msg = f"Activation failed: {str(exe)} but will retry"
-                logger.warning(msg)
-                activation_db_logger.write(msg)
-                enqueue_monitor_task(
-                    activation_id,
-                    decision_environment_id,
-                    deployment_type,
-                    ws_base_url,
-                    ssl_verify,
-                )
-            else:
+            activation = models.Activation.objects.get(id=activation_id)
+            if activation.is_enabled:
                 logger.error(f"Activation error: {str(exe)}")
+                instance.status = ActivationStatus.FAILED
                 activation_db_logger.write(f"Activation error: {str(exe)}")
+            else:
+                logger.info(f"Activation {activation.name} is disabled")
+                instance.status = ActivationStatus.STOPPED
+                activation_db_logger.write(
+                    f"Activation {activation.name} is disabled"
+                )
+
+        except Exception as exe:
+            activation = models.Activation.objects.get(id=activation_id)
+            if activation.is_enabled:
+                instance.status = ActivationStatus.FAILED
+                if (
+                    activation.restart_policy == RestartPolicy.ALWAYS.value
+                    or activation.restart_policy
+                    == RestartPolicy.ON_FAILURE.value
+                ):
+                    from aap_eda.tasks.ruleset import enqueue_monitor_task
+
+                    msg = f"Activation failed: {str(exe)} but will retry"
+                    logger.warning(msg)
+                    activation_db_logger.write(msg)
+                    enqueue_monitor_task(
+                        activation_id,
+                        decision_environment_id,
+                        deployment_type,
+                        ws_base_url,
+                        ssl_verify,
+                    )
+                else:
+                    logger.error(f"Activation error: {str(exe)}")
+                    activation_db_logger.write(f"Activation error: {str(exe)}")
+            else:
+                logger.info(f"Activation {activation.name} is disabled")
+                instance.status = ActivationStatus.STOPPED
+                activation_db_logger.write(
+                    f"Activation {activation.name} is disabled"
+                )
         finally:
             activation_db_logger.flush()
             now = timezone.now()
@@ -177,7 +195,6 @@ class ActivateRulesets:
     ) -> None:
         try:
             activation_db_logger = ActivationDbLogger(instance.id)
-
             try:
                 dtype = DeploymentType(deployment_type)
             except ValueError:

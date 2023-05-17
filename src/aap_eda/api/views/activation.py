@@ -240,20 +240,21 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        current_running_instance = models.ActivationInstance.objects.filter(
-            activation_id=pk,
-            status=ActivationStatus.RUNNING,
-        ).first()
-        if current_running_instance:
-            deactivate_rulesets(
-                instance=current_running_instance,
-                deployment_type=settings.DEPLOYMENT_TYPE,
-            )
-
         activation = get_object_or_404(models.Activation, pk=pk)
         activation.is_enabled = False
         activation.restart_count += 1
         activation.save(update_fields=["is_enabled", "restart_count"])
+
+        current_instance = models.ActivationInstance.objects.filter(
+            activation_id=pk,
+            status=ActivationStatus.RUNNING,
+        ).first()
+
+        if current_instance:
+            deactivate_rulesets(
+                instance=current_instance,
+                deployment_type=settings.DEPLOYMENT_TYPE,
+            )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

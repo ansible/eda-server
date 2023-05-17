@@ -385,7 +385,7 @@ class ActivationKubernetes:
                         raise K8sActivationException()
 
             except Exception as e:
-                raise K8sActivationException(f"Job {job_name} Failed: \n {e}")
+                raise K8sActivationException(f"Pod {pod_name} Failed: \n {e}")
 
     def read_job_pod_log(
         self, pod_name, namespace, activation_instance_id

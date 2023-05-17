@@ -131,7 +131,7 @@ def deactivate_rulesets(
     instance: models.ActivationInstance,
     deployment_type: str,
 ) -> None:
-    logger.info(f"Task started: Deactivate ruleset ({instance.id})")
+    logger.info(f"Task started: Deactivate Activation ({instance.id})")
 
     ActivateRulesets().deactivate(
         instance,
