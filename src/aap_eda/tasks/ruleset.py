@@ -126,6 +126,19 @@ def monitor_and_restart_activation(
         )
 
 
+@job
+def deactivate_rulesets(
+    instance: models.ActivationInstance,
+    deployment_type: str,
+) -> None:
+    logger.info(f"Task started: Deactivate ruleset ({instance.id})")
+
+    ActivateRulesets().deactivate(
+        instance,
+        deployment_type,
+    )
+
+
 def enqueue_monitor_task(
     activation_id: int,
     decision_environment_id: int,

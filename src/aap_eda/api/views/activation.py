@@ -27,7 +27,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
-from aap_eda.tasks.ruleset import activate_rulesets
+from aap_eda.tasks.ruleset import activate_rulesets, deactivate_rulesets
 
 
 def handle_activation_create_conflict(activation):
@@ -240,16 +240,14 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        current_instance = (
-            models.ActivationInstance.objects.filter(pk=pk)
-            .filter(status=ActivationStatus.RUNNING)
-            .first()
-        )
-        if current_instance:
-            # TODO(doston): add logic to stop current running instance
-            raise api_exc.HttpNotImplemented(
-                detail="An instance is currently running for this Activation. "
-                "Stop function for Activations is not implemented."
+        current_running_instance = models.ActivationInstance.objects.filter(
+            activation_id=pk,
+            status=ActivationStatus.RUNNING,
+        ).first()
+        if current_running_instance:
+            deactivate_rulesets(
+                instance=current_running_instance,
+                deployment_type=settings.DEPLOYMENT_TYPE,
             )
 
         activation = get_object_or_404(models.Activation, pk=pk)
@@ -283,10 +281,9 @@ class ActivationViewSet(
             .exists()
         )
         if instance_running:
-            # TODO(doston): add logic to stop current running instance
-            raise api_exc.HttpNotImplemented(
-                detail="An instance is currently running for this Activation. "
-                "Stop function for Activations is not implemented."
+            deactivate_rulesets(
+                instance=instance_running,
+                deployment_type=settings.DEPLOYMENT_TYPE,
             )
         activate_rulesets.delay(
             activation_id=pk,

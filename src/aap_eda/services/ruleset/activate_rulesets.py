@@ -128,6 +128,7 @@ class ActivateRulesets:
                 self.activate_in_k8s(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
+                    activation_name=activation.name,
                     activation_instance=instance,
                     decision_environment=decision_environment,
                 )
@@ -168,6 +169,43 @@ class ActivateRulesets:
             instance.save()
             instance.refresh_from_db()
         return instance
+
+    def deactivate(
+        self,
+        instance: models.ActivationInstance,
+        deployment_type: str,
+    ) -> None:
+        try:
+            activation_db_logger = ActivationDbLogger(instance.id)
+
+            try:
+                dtype = DeploymentType(deployment_type)
+            except ValueError:
+                raise ActivationException(
+                    f"Invalid deployment type: {deployment_type}"
+                )
+
+            if dtype == DeploymentType.LOCAL:
+                raise ActivationException(
+                    f"{deployment_type} Not Implemented Yet"
+                )
+            elif dtype == DeploymentType.PODMAN:
+                raise ActivationException(
+                    f"{deployment_type} Not Implemented Yet"
+                )
+            elif dtype == DeploymentType.DOCKER:
+                raise ActivationException(
+                    f"{deployment_type} Not Implemented Yet"
+                )
+
+            elif dtype == DeploymentType.K8S:
+                logger.info(f"Activation DeploymentType: {dtype}")
+                self.deactivate_in_k8s(activation_instance=instance)
+            else:
+                raise ActivationException(f"Unsupported {deployment_type}")
+        except Exception as exe:
+            logger.error(f"Activation error: {str(exe)}")
+            activation_db_logger.write(f"Activation error: {str(exe)}")
 
     def activate_in_local(
         self,
@@ -247,6 +285,7 @@ class ActivateRulesets:
         self,
         ws_url: str,
         ssl_verify: str,
+        activation_name: str,
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
     ) -> None:
@@ -296,7 +335,10 @@ class ActivateRulesets:
         )
 
         job_spec = k8s.create_job(
-            job_name=job_name, pod_template=pod_spec, ttl=30
+            job_name=job_name,
+            activation_name=activation_name,
+            pod_template=pod_spec,
+            ttl=30,
         )
 
         for _, port in find_ports(
@@ -314,3 +356,16 @@ class ActivateRulesets:
             activation_instance=activation_instance,
             secret_name=secret_name,
         )
+
+    def deactivate_in_k8s(self, activation_instance) -> None:
+        k8s = ActivationKubernetes()
+
+        ns_fileref = open(
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
+        )
+        namespace = ns_fileref.read()
+        ns_fileref.close()
+
+        logger.debug(f"namespace: {namespace}")
+        logger.debug(f"activation_name: {activation_instance.name}")
+        k8s.delete_job(activation_instance, namespace)

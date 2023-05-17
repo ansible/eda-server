@@ -170,10 +170,15 @@ class ActivationKubernetes:
 
     @staticmethod
     def create_job(
-        job_name, pod_template, backoff_limit=0, ttl=0
+        job_name, activation_name, pod_template, backoff_limit=0, ttl=0
     ) -> client.V1Job:
         metadata = client.V1ObjectMeta(
-            name=job_name, labels={"job-name": job_name, "app": "eda"}
+            name=job_name,
+            labels={
+                "job-name": job_name,
+                "app": "eda",
+                "activation-name": activation_name,
+            },
         )
 
         job = client.V1Job(
@@ -190,6 +195,40 @@ class ActivationKubernetes:
         logger.info(f"Created Job template: {job_name},")
 
         return job
+
+    def delete_job(self, activation_instance, namespace) -> None:
+        try:
+            instance_name = activation_instance.name
+            activation_job = self.batch_api.list_namespaced_job(
+                namespace=namespace,
+                label_selector=f"activation-name={instance_name}",
+                timeout_seconds=0,
+            )
+
+            if activation_job is None:
+                logger.info(f"Unable to find running Job for {instance_name}")
+                raise K8sActivationException(
+                    f"Unable to find running Job for {instance_name}"
+                )
+
+            status = self.batch_api.delete_namespaced_job(
+                name=activation_job.items[0].metadata.name,
+                namespace=namespace,
+                propagation_policy="Background",
+            )
+
+            if status.status == "Failure":
+                raise K8sActivationException(f"{status}")
+
+            logger.info(f"Stop Activation {instance_name}: {status.status}")
+            self.set_activation_status(
+                activation_instance, ActivationStatus.STOPPED
+            )
+
+        except Exception as e:
+            raise K8sActivationException(
+                f"Stop {instance_name} Failed: \n {e}"
+            )
 
     def run_activation_job(
         self,
@@ -291,7 +330,7 @@ class ActivationKubernetes:
         self, instance: models.ActivationInstance, status: ActivationStatus
     ) -> None:
         instance.status = status
-        instance.save()
+        instance.save(update_fields=["status"])
 
     def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()
