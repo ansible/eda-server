@@ -157,6 +157,7 @@ class ProjectImportService:
         if rulebook.rulesets == rulebook_info.raw_content:
             return
         rulebook.rulesets = rulebook_info.raw_content
+        rulebook.save()
         rulebook.ruleset_set.clear()
         insert_rulebook_related_data(rulebook, rulebook_info.content)
         models.Activation.objects.filter(rulebook=rulebook).update(
