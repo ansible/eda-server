@@ -75,7 +75,7 @@ def test_retrieve_current_user(client: APIClient, user: models.User, init_db):
 def test_retrieve_current_user_unauthenticated(base_client: APIClient):
     client = base_client
     response = client.get(f"{api_url_v1}/users/me/")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {
         "detail": "Authentication credentials were not provided."
     }
