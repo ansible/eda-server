@@ -149,24 +149,51 @@ class ActivationKubernetes:
         return pod_template
 
     def create_service(self, job_name, port, namespace):
-        service_template = client.V1Service(
-            spec=client.V1ServiceSpec(
-                selector={"app": "eda", "job-name": job_name},
-                ports=[
-                    client.V1ServicePort(
-                        protocol="TCP", port=port, target_port=port
-                    )
-                ],
-            ),
-            metadata=client.V1ObjectMeta(
-                name=f"{job_name}-{port}",
-                labels={"app": "eda", "job-name": job_name},
-                namespace=namespace,
-            ),
+        # only create the service if it does not already exist
+        service_name = f"{job_name}-{port}"
+
+        service = self.client_api.list_namespaced_service(
+            namespace=namespace, field_selector=f"metadata.name={service_name}"
         )
 
-        logger.info(f"Create Service: {job_name}")
-        self.client_api.create_namespaced_service(namespace, service_template)
+        if not service.items:
+            service_template = client.V1Service(
+                spec=client.V1ServiceSpec(
+                    selector={"app": "eda", "job-name": job_name},
+                    ports=[
+                        client.V1ServicePort(
+                            protocol="TCP", port=port, target_port=port
+                        )
+                    ],
+                ),
+                metadata=client.V1ObjectMeta(
+                    name=f"{service_name}",
+                    labels={"app": "eda", "job-name": job_name},
+                    namespace=namespace,
+                ),
+            )
+
+            logger.info(f"Create Service: {service_name}")
+            self.client_api.create_namespaced_service(
+                namespace, service_template
+            )
+
+        else:
+            logger.info(f"Service already exists: {service_name}")
+
+    def delete_services(self, namespace, job_name) -> None:
+        services = self.client_api.list_namespaced_service(
+            namespace=namespace, label_selector=f"job-name={job_name}"
+        )
+
+        for svc in services.items:
+            service_name = svc.metadata.name
+            logger.info(f"Deleting service: {service_name}")
+
+            self.client_api.delete_namespaced_service(
+                name=service_name,
+                namespace=namespace,
+            )
 
     @staticmethod
     def create_job(
@@ -211,10 +238,16 @@ class ActivationKubernetes:
                     f"Unable to find running Job for {instance_name}"
                 )
 
+            activation_job_name = activation_job.items[0].metadata.name
             status = self.batch_api.delete_namespaced_job(
-                name=activation_job.items[0].metadata.name,
+                name=activation_job_name,
                 namespace=namespace,
                 propagation_policy="Background",
+            )
+
+            self.delete_services(
+                namespace=namespace,
+                job_name=activation_job_name,
             )
 
             if status.status == "Failure":
@@ -288,6 +321,11 @@ class ActivationKubernetes:
                         namespace=namespace,
                         job_name=job_name,
                     )
+                # remove service(s) if created
+                self.delete_services(
+                    namespace=namespace,
+                    job_name=job_name,
+                )
 
     def delete_secret(self, secret_name, namespace, job_name) -> None:
         # wait until job is done

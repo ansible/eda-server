@@ -251,6 +251,8 @@ class ActivationViewSet(
         ).first()
 
         if current_instance:
+            current_instance.status = ActivationStatus.STOPPING
+            current_instance.save(update_fields=["status"])
             deactivate_rulesets(
                 instance=current_instance,
                 deployment_type=settings.DEPLOYMENT_TYPE,
