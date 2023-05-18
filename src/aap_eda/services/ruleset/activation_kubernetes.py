@@ -253,11 +253,6 @@ class ActivationKubernetes:
             if status.status == "Failure":
                 raise K8sActivationException(f"{status}")
 
-            logger.info(f"Stop Activation {instance_name}: {status.status}")
-            self.set_activation_status(
-                activation_instance, ActivationStatus.STOPPED
-            )
-
         except Exception as e:
             raise K8sActivationException(
                 f"Stop {instance_name} Failed: \n {e}"

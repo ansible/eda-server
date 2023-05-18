@@ -74,6 +74,13 @@ def find_ports(rulebook_text: str):
     return found_ports
 
 
+def set_activation_status(
+    instance: models.ActivationInstance, status: ActivationStatus
+) -> None:
+    instance.status = status
+    instance.save(update_fields=["status"])
+
+
 class ActivateRulesets:
     def __init__(self, cwd: Optional[str] = None):
         self.service = AnsibleRulebookService(cwd)
@@ -220,6 +227,12 @@ class ActivateRulesets:
                 self.deactivate_in_k8s(activation_instance=instance)
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
+
+            logger.info(
+                f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
+            )
+            self.set_activation_status(instance, ActivationStatus.STOPPED)
+
         except Exception as exe:
             logger.error(f"Activation error: {str(exe)}")
             activation_db_logger.write(f"Activation error: {str(exe)}")
