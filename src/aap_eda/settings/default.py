@@ -189,7 +189,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
