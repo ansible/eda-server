@@ -22,7 +22,10 @@ from kubernetes import client, config, watch
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.ruleset.exceptions import K8sActivationException
+from aap_eda.services.ruleset.exceptions import (
+    DeactivationException,
+    K8sActivationException,
+)
 
 from .shared_settings import VALID_LOG_LEVELS
 
@@ -305,6 +308,8 @@ class ActivationKubernetes:
                         w.stop()
                         raise K8sActivationException()
 
+            except DeactivationException as e:
+                raise
             except Exception as e:
                 raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
 
@@ -418,6 +423,12 @@ class ActivationKubernetes:
                         raise K8sActivationException()
 
             except Exception as e:
+                activation = models.Activation.objects.get(
+                    name=activation_instance.name
+                )
+                if not activation.is_enabled:
+                    raise DeactivationException(f"deactivation called")
+
                 raise K8sActivationException(f"Pod {pod_name} Failed: \n {e}")
 
     def read_job_pod_log(
