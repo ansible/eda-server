@@ -38,7 +38,7 @@ class ActivationDbLogger:
     def lines_written(self) -> int:
         return self.line_number
 
-    def write(self, lines: Union[list[str], str]) -> None:
+    def write(self, lines: Union[list[str], str], flush=False) -> None:
         if self.incremental_flush and self.line_number % self.flush_after == 0:
             self.flush()
 
@@ -54,6 +54,9 @@ class ActivationDbLogger:
                 )
             )
             self.line_number += 1
+
+        if flush:
+            self.flush()
 
     def flush(self) -> None:
         if self.activation_instance_log_buffer:

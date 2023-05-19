@@ -189,7 +189,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -303,6 +303,10 @@ DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
+PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
+PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
+PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS

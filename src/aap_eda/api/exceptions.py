@@ -73,3 +73,18 @@ class TooManyControllerTokens(APIException):
         "More than one controller token found, "
         "currently only 1 token is supported"
     )
+
+
+class InvalidWebsocketScheme(APIException):
+    status_code = 422
+    default_detail = (
+        "Connection Error: Invalid WebSocket URL scheme. "
+        "Scheme should be either 'ws' or 'wss'."
+    )
+
+
+class InvalidWebsocketHost(APIException):
+    status_code = 422
+    default_detail = (
+        "Connection Error: WebSocket URL must have a valid host address."
+    )
