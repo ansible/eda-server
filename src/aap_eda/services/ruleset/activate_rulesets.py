@@ -135,7 +135,7 @@ class ActivateRulesets:
                 self.activate_in_k8s(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
-                    activation_name=activation.name,
+                    activation=activation,
                     activation_instance=instance,
                     decision_environment=decision_environment,
                 )
@@ -305,7 +305,7 @@ class ActivateRulesets:
         self,
         ws_url: str,
         ssl_verify: str,
-        activation_name: str,
+        activation: models.Activation,
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
     ) -> None:
@@ -318,9 +318,10 @@ class ActivateRulesets:
         namespace = ns_fileref.read()
         ns_fileref.close()
 
-        guid = uuid.uuid4()
-        job_name = f"activation-job-{guid}"
-        pod_name = f"activation-pod-{guid}"
+        activation_name = activation.name
+        activation_id = activation.pk
+        job_name = f"activation-job-{activation_id}"
+        pod_name = f"activation-pod-{activation_id}"
 
         # build out container,pod,job specs
         container_spec = k8s.create_container(
