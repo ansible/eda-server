@@ -52,6 +52,16 @@ spec:
                 configMapKeyRef:
                   name: eda-env-properties
                   key: EDA_CONTROLLER_SSL_VERIFY
+            - name: EDA_ACTIVATION_POD_RESOURCE_REQUESTS
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_ACTIVATION_POD_RESOURCE_REQUESTS
+            - name: EDA_ACTIVATION_POD_RESOURCE_LIMITS
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_ACTIVATION_POD_RESOURCE_LIMITS
           image: aap-eda
           imagePullPolicy: Never
           name: eda-worker

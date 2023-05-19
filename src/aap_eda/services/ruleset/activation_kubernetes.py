@@ -72,6 +72,10 @@ class ActivationKubernetes:
             image_pull_policy=pull_policy,
             env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
             args=args,
+            resources=client.V1ResourceRequirements(
+                requests=settings.EDA_ACTIVATION_POD_RESOURCE_REQUESTS,
+                limits=settings.EDA_ACTIVATION_POD_RESOURCE_LIMITS,
+            ),
             ports=[
                 client.V1ContainerPort(container_port=port) for port in ports
             ],

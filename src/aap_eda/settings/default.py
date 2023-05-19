@@ -319,6 +319,13 @@ RULEBOOK_LIVENESS_TIMEOUT_SECONDS = settings.get(
     "RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610
 )
 
+EDA_ACTIVATION_POD_RESOURCE_REQUESTS = settings.get(
+    "EDA_ACTIVATION_POD_RESOURCE_REQUESTS", {"cpu": "50m", "memory": "100Mi"}
+)
+EDA_ACTIVATION_POD_RESOURCE_LIMITS = settings.get(
+    "EDA_ACTIVATION_POD_RESOURCE_LIMITS", {}
+)
+
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL
 # ---------------------------------------------------------
