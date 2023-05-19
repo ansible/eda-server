@@ -308,7 +308,7 @@ class ActivationKubernetes:
                         w.stop()
                         raise K8sActivationException()
 
-            except DeactivationException as e:
+            except DeactivationException:
                 raise
             except Exception as e:
                 raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")

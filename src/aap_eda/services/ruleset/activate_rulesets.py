@@ -142,7 +142,7 @@ class ActivateRulesets:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
             instance.status = ActivationStatus.COMPLETED
-        except DeactivationException as dae:
+        except DeactivationException:
             logger.info(f"Activation {activation.name} is disabled")
             instance.status = ActivationStatus.STOPPED
             activation_db_logger.write(
