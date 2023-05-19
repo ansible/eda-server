@@ -67,6 +67,34 @@ def use_dummy_log_level(settings):
     settings.ANSIBLE_RULEBOOK_LOG_LEVEL = "-vv"
 
 
+@pytest.fixture(autouse=True)
+def use_dummy_env_vars(settings):
+    settings.PODMAN_ENV_VARS = {"A": "1", "B": 2}
+
+
+@pytest.fixture(autouse=True)
+def use_dummy_mem_limit(settings):
+    settings.PODMAN_MEM_LIMIT = "500m"
+
+
+@pytest.fixture(autouse=True)
+def use_dummy_mounts(settings):
+    settings.PODMAN_MOUNTS = [
+        {
+            "type": "bind",
+            "source": "/a",
+            "target": "/b/certs",
+            "read_only": True,
+            "relabel": "Z",
+        }
+    ]
+
+
+@pytest.fixture(autouse=True)
+def use_podman_extra_args(settings):
+    settings.PODMAN_EXTRA_ARGS = {"user": 1001, "userns_mode": "keep-id"}
+
+
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
 def test_activation_podman(my_mock: mock.Mock, init_data):
@@ -109,7 +137,7 @@ def test_activation_podman_run_worker_mode(
     uuid_mock.return_value = DUMMY_UUID
     ports = {"5000/tcp": 5000}
 
-    assert models.ActivationInstanceLog.objects.count() == 0
+    assert models.ActivationInstanceLog.objects.count() == 2
 
     podman.run_worker_mode(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
@@ -140,11 +168,16 @@ def test_activation_podman_run_worker_mode(
         detach=True,
         name=f"eda-{activation_instance.id}-{DUMMY_UUID}",
         ports=ports,
+        mem_limit=settings.PODMAN_MEM_LIMIT,
+        mounts=settings.PODMAN_MOUNTS,
+        environment=settings.PODMAN_ENV_VARS,
+        user=1001,
+        userns_mode="keep-id",
     )
 
     activation_db_logger.flush()
 
-    assert models.ActivationInstanceLog.objects.count() == 3
+    assert models.ActivationInstanceLog.objects.count() == 7
 
 
 @pytest.mark.django_db

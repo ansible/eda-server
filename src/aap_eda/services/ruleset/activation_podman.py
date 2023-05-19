@@ -26,6 +26,7 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 
 from .activation_db_logger import ActivationDbLogger
 from .exceptions import ActivationException
@@ -51,7 +52,7 @@ class ActivationPodman:
                 f"DecisionEnvironment: {self.decision_environment.name} does"
                 " not have image_url set"
             )
-
+        self.pod_args = {}
         if podman_url:
             self.podman_url = podman_url
         else:
@@ -61,6 +62,7 @@ class ActivationPodman:
         self._set_auth_json_file()
 
         self.client = PodmanClient(base_url=self.podman_url)
+
         self._login()
 
         self.image = self._pull_image()
@@ -95,6 +97,14 @@ class ActivationPodman:
             ):
                 args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
 
+            self.pod_args[
+                "name"
+            ] = f"eda-{activation_instance_id}-{uuid.uuid4()}"
+            if ports:
+                self.pod_args["ports"] = ports
+            self._load_extra_args()
+            self.activation_db_logger.write("Starting Container", True)
+            self.activation_db_logger.write(f"Container args {args}", True)
             container = self.client.containers.run(
                 image=self.decision_environment.image_url,
                 command=args,
@@ -102,8 +112,7 @@ class ActivationPodman:
                 stderr=True,
                 remove=True,
                 detach=True,
-                name=f"eda-{activation_instance_id}-{uuid.uuid4()}",
-                ports=ports,
+                **self.pod_args,
             )
 
             logger.info(
@@ -114,6 +123,9 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
+            self.set_activation_status(
+                activation_instance_id, ActivationStatus.RUNNING
+            )
             self._save_logs(
                 container=container,
                 activation_instance_id=activation_instance_id,
@@ -148,6 +160,9 @@ class ActivationPodman:
 
         try:
             registry = self.decision_environment.image_url.split("/")[0]
+            self.activation_db_logger.write(
+                f"Attempting to login to registry: {registry}", True
+            )
             self.client.login(
                 username=credential.username,
                 password=credential.secret.get_secret_value(),
@@ -201,6 +216,9 @@ class ActivationPodman:
 
     def _pull_image(self) -> Image:
         credential = self.decision_environment.credential
+        self.activation_db_logger.write(
+            f"Pulling image {self.decision_environment.image_url}", True
+        )
         try:
             kwargs = {}
             if credential:
@@ -253,3 +271,36 @@ class ActivationPodman:
 
         if self.return_code > 0:
             raise ActivationException(f"Activation failed in {container.name}")
+
+    def _load_extra_args(self) -> None:
+        if hasattr(settings, "PODMAN_MEM_LIMIT") and settings.PODMAN_MEM_LIMIT:
+            self.pod_args["mem_limit"] = settings.PODMAN_MEM_LIMIT
+
+        if hasattr(settings, "PODMAN_MOUNTS") and settings.PODMAN_MOUNTS:
+            self.pod_args["mounts"] = settings.PODMAN_MOUNTS
+
+        if hasattr(settings, "PODMAN_ENV_VARS") and settings.PODMAN_ENV_VARS:
+            self.pod_args["environment"] = settings.PODMAN_ENV_VARS
+
+        if (
+            hasattr(settings, "PODMAN_EXTRA_ARGS")
+            and settings.PODMAN_EXTRA_ARGS
+        ):
+            for key, value in settings.PODMAN_EXTRA_ARGS.items():
+                self.pod_args[key] = value
+
+        for key, value in self.pod_args.items():
+            logger.debug("Key %s Value %s", key, value)
+
+    def set_activation_status(
+        self, activation_instance_id: int, status: ActivationStatus
+    ) -> None:
+        instance = models.ActivationInstance.objects.get(
+            id=activation_instance_id
+        )
+        if not instance:
+            raise ActivationException(
+                (f"Activation instance {activation_instance_id} " "not found")
+            )
+        instance.status = status
+        instance.save()
