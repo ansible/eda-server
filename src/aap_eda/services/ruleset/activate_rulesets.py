@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 import shutil
-import uuid
 from enum import Enum
 from typing import Optional
 
@@ -342,7 +341,7 @@ class ActivateRulesets:
 
         secret_name = None
         if decision_environment.credential:
-            secret_name = f"activation-secret-{guid}"
+            secret_name = f"activation-secret-{activation_id}"
             k8s.create_secret(
                 secret_name=secret_name,
                 namespace=namespace,

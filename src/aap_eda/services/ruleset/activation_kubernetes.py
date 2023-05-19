@@ -427,7 +427,7 @@ class ActivationKubernetes:
                     name=activation_instance.name
                 )
                 if not activation.is_enabled:
-                    raise DeactivationException(f"deactivation called")
+                    raise DeactivationException("deactivation called")
 
                 raise K8sActivationException(f"Pod {pod_name} Failed: \n {e}")
 
