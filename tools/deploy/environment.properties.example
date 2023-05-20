@@ -5,3 +5,7 @@ EDA_CONTROLLER_SSL_VERIFY=no
 # EDA Server
 EDA_WEBSOCKET_BASE_URL=ws://eda-api:8000
 EDA_WEBSOCKET_SSL_VERIFY=no
+
+# Activation Pod Resources
+# EDA_ACTIVATION_POD_RESOURCE_REQUESTS={"cpu": "50m", "memory": "100Mi"}
+# EDA_ACTIVATION_POD_RESOURCE_LIMITS={"cpu": "500m", "memory": "1Gi"}
