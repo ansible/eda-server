@@ -207,6 +207,11 @@ class ActivationViewSet(
                 None,
                 description="Activation has been enabled.",
             ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None,
+                description="Activation not enabled do to current activation "
+                "status",
+            ),
         },
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
@@ -214,19 +219,33 @@ class ActivationViewSet(
         activation = get_object_or_404(models.Activation, pk=pk)
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            activation.is_enabled = True
-            activation.save(update_fields=["is_enabled"])
 
-            activate_rulesets.delay(
-                activation_id=pk,
-                decision_environment_id=activation.decision_environment.id,
-                deployment_type=settings.DEPLOYMENT_TYPE,
-                ws_base_url=settings.WEBSOCKET_BASE_URL,
-                ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
-            )
+        current_instance = models.ActivationInstance.objects.filter(
+            activation_id=pk,
+            status__in=[
+                ActivationStatus.STARTING,
+                ActivationStatus.STOPPING,
+                ActivationStatus.PENDING,
+                ActivationStatus.RUNNING,
+            ],
+        ).first()
 
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        # return activation is in a state that can not be started
+        if current_instance:
+            return Response(status=status.HTTP_409_CONFLICT)
+
+        activation.is_enabled = True
+        activation.save(update_fields=["is_enabled"])
+
+        activate_rulesets.delay(
+            activation_id=pk,
+            decision_environment_id=activation.decision_environment.id,
+            deployment_type=settings.DEPLOYMENT_TYPE,
+            ws_base_url=settings.WEBSOCKET_BASE_URL,
+            ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+        )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         description="Disable the Activation",
@@ -241,20 +260,26 @@ class ActivationViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
-        activation.is_enabled = False
-        activation.restart_count += 1
-        activation.save(update_fields=["is_enabled", "restart_count"])
 
-        current_instance = models.ActivationInstance.objects.filter(
-            activation_id=pk,
-            status=ActivationStatus.RUNNING,
-        ).first()
+        if activation.is_enabled:
+            activation.is_enabled = False
+            activation.restart_count += 1
+            activation.save(update_fields=["is_enabled", "restart_count"])
 
-        if current_instance:
-            deactivate_rulesets(
-                instance=current_instance,
-                deployment_type=settings.DEPLOYMENT_TYPE,
-            )
+            current_instance = models.ActivationInstance.objects.filter(
+                activation_id=pk,
+                status__in=[
+                    ActivationStatus.STARTING,
+                    ActivationStatus.PENDING,
+                    ActivationStatus.RUNNING,
+                ],
+            ).first()
+
+            if current_instance:
+                deactivate_rulesets(
+                    instance=current_instance,
+                    deployment_type=settings.DEPLOYMENT_TYPE,
+                )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
