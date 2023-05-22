@@ -319,13 +319,6 @@ RULEBOOK_LIVENESS_TIMEOUT_SECONDS = settings.get(
     "RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610
 )
 
-ACTIVATION_POD_RESOURCE_REQUESTS = settings.get(
-    "ACTIVATION_POD_RESOURCE_REQUESTS", {"cpu": "50m", "memory": "100Mi"}
-)
-ACTIVATION_POD_RESOURCE_LIMITS = settings.get(
-    "ACTIVATION_POD_RESOURCE_LIMITS", {}
-)
-
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL
 # ---------------------------------------------------------

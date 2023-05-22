@@ -15,6 +15,7 @@ spec:
         app: eda
         comp: api
     spec:
+      serviceAccountName: eda-activation-sa
       containers:
         - args:
             - /bin/bash
