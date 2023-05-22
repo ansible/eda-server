@@ -19,7 +19,7 @@ import pytest
 from django.conf import settings
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 
 TEST_ACTIVATION = {
@@ -147,8 +147,7 @@ def test_rulesets_activate_local(
     assert models.ActivationInstanceLog.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_id=init_data.activation.id,
-        decision_environment_id=init_data.decision_environment.id,
+        activation=init_data.activation,
         deployment_type="local",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
@@ -167,8 +166,7 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock, init_data):
     assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_id=init_data.activation.id,
-        decision_environment_id=init_data.decision_environment.id,
+        activation=init_data.activation,
         deployment_type="bad_type",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
@@ -201,8 +199,7 @@ def test_rulesets_activate_with_podman(
     assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation_id=init_data.activation.id,
-        decision_environment_id=init_data.decision_environment.id,
+        activation=init_data.activation,
         deployment_type="podman",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
@@ -219,4 +216,88 @@ def test_rulesets_activate_with_podman(
         activation_instance=instance,
         heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
         ports={"5000/tcp": 5000},
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+def test_restart_on_failure(task_mock: mock.Mock, init_data):
+    activation = init_data.activation
+    activation.restart_policy = RestartPolicy.ON_FAILURE.value
+    activation.is_valid = True
+    activation.save()
+
+    ActivateRulesets().activate(
+        activation=activation,
+        deployment_type="bad_type",
+        ws_base_url="ws://localhost:8000",
+        ssl_verify="no",
+    )
+    task_mock.assert_called_once_with(
+        settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
+        activation.id,
+        "bad_type",
+        "ws://localhost:8000",
+        "no",
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+def test_not_restart_on_failure_invalid(task_mock: mock.Mock, init_data):
+    activation = init_data.activation
+    activation.restart_policy = RestartPolicy.ON_FAILURE.value
+    activation.is_valid = False
+    activation.save()
+
+    ActivateRulesets().activate(
+        activation=init_data.activation,
+        deployment_type="bad_type",
+        ws_base_url="ws://localhost:8000",
+        ssl_verify="no",
+    )
+    task_mock.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+def test_not_restart_on_failure_exceed_limit(task_mock: mock.Mock, init_data):
+    activation = init_data.activation
+    activation.restart_policy = RestartPolicy.ON_FAILURE.value
+    activation.is_valid = True
+    activation.failure_count = settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE + 1
+    activation.save()
+
+    ActivateRulesets().activate(
+        activation=init_data.activation,
+        deployment_type="bad_type",
+        ws_base_url="ws://localhost:8000",
+        ssl_verify="no",
+    )
+    task_mock.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+@mock.patch.object(ActivateRulesets, "activate_in_k8s")
+def test_restart_on_completed(
+    podman_mock: mock.Mock, task_mock: mock.Mock, init_data
+):
+    activation = init_data.activation
+    activation.restart_policy = RestartPolicy.ALWAYS.value
+    activation.is_valid = True
+    activation.save()
+
+    ActivateRulesets().activate(
+        activation=activation,
+        deployment_type="k8s",
+        ws_base_url="ws://localhost:8000",
+        ssl_verify="no",
+    )
+    task_mock.assert_called_once_with(
+        settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
+        activation.id,
+        "k8s",
+        "ws://localhost:8000",
+        "no",
     )

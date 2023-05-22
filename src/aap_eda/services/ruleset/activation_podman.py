@@ -19,6 +19,7 @@ import os
 import uuid
 
 from django.conf import settings
+from django.utils import timezone
 from podman import PodmanClient
 from podman.domain.containers import Container
 from podman.domain.images import Image
@@ -138,9 +139,7 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
-            activation_instance.status = ActivationStatus.RUNNING
-            activation_instance.activation_pod_id = container.id
-            activation_instance.save()
+            self._save_running_status(activation_instance, container.id)
 
             self._save_logs(container=container, instance=activation_instance)
 
@@ -325,3 +324,17 @@ class ActivationPodman:
 
         for key, value in self.pod_args.items():
             logger.debug("Key %s Value %s", key, value)
+
+    def _save_running_status(
+        self, instance: models.ActivationInstance, container_id: str
+    ) -> None:
+        instance.status = ActivationStatus.RUNNING
+        instance.updated_at = timezone.now()
+        instance.activation_pod_id = container_id
+        instance.save(
+            update_fields=["status", "activation_pod_id", "updated_at"]
+        )
+
+        if not instance.activation.is_valid:
+            instance.activation.is_valid = True
+            instance.activation.save(update_fields=["is_valid", "modified_at"])

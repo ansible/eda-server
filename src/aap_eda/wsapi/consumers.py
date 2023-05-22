@@ -9,6 +9,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 
 from .messages import (
     ActionMessage,
@@ -139,6 +140,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         instance = models.ActivationInstance.objects.get(
             pk=message.activation_id
         )
+        instance.status = ActivationStatus.RUNNING
         instance.updated_at = message.reported_at
         instance.save()
 
