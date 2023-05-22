@@ -117,7 +117,7 @@ class ActivateRulesets:
             ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
             if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(ws_url, ssl_verify, instance.id)
+                self.activate_in_local(ws_url, ssl_verify, instance)
             elif dtype == DeploymentType.PODMAN:
                 self.activate_in_podman(
                     ws_url=ws_url,
@@ -230,7 +230,7 @@ class ActivateRulesets:
         self,
         url: str,
         ssl_verify: str,
-        activation_instance_id: str,
+        activation_instance: models.ActivationInstance,
     ) -> None:
         ssh_agent = shutil.which("ssh-agent")
         ansible_rulebook = shutil.which("ansible-rulebook")
@@ -246,7 +246,7 @@ class ActivateRulesets:
             ansible_rulebook,
             url,
             ssl_verify,
-            activation_instance_id,
+            str(activation_instance.id),
             settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         )
 
@@ -257,7 +257,7 @@ class ActivateRulesets:
             activation_instance_log = models.ActivationInstanceLog(
                 line_number=line_number,
                 log=line,
-                activation_instance_id=int(activation_instance_id),
+                activation_instance_id=activation_instance.id,
             )
             activation_instance_logs.append(activation_instance_log)
 
@@ -267,6 +267,8 @@ class ActivateRulesets:
             activation_instance_logs
         )
         logger.info(f"{line_number} of activation instance log are created.")
+        activation_instance.status = ActivationStatus.COMPLETED
+        activation_instance.save()
 
     def activate_in_podman(
         self,
@@ -291,7 +293,7 @@ class ActivateRulesets:
         podman.run_worker_mode(
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
-            activation_instance_id=activation_instance.id,
+            activation_instance=activation_instance,
             heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
             ports=ports,
         )

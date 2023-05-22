@@ -35,6 +35,7 @@ from .shared_settings import VALID_LOG_LEVELS
 logger = logging.getLogger(__name__)
 
 FLUSH_AT_END = -1
+GRACEFUL_TERM = 143
 
 
 class ActivationPodman:
@@ -72,7 +73,7 @@ class ActivationPodman:
         self,
         ws_url: str,
         ws_ssl_verify: str,
-        activation_instance_id: str,
+        activation_instance: models.ActivationInstance,
         heartbeat: str,
         ports: dict,
     ) -> None:
@@ -87,7 +88,7 @@ class ActivationPodman:
                 "--websocket-address",
                 ws_url,
                 "--id",
-                str(activation_instance_id),
+                str(activation_instance.id),
                 "--heartbeat",
                 str(heartbeat),
             ]
@@ -99,7 +100,7 @@ class ActivationPodman:
 
             self.pod_args[
                 "name"
-            ] = f"eda-{activation_instance_id}-{uuid.uuid4()}"
+            ] = f"eda-{activation_instance.id}-{uuid.uuid4()}"
             if ports:
                 self.pod_args["ports"] = ports
             self._load_extra_args()
@@ -123,13 +124,17 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
-            self.set_activation_status(
-                activation_instance_id, ActivationStatus.RUNNING
-            )
-            self._save_logs(
-                container=container,
-                activation_instance_id=activation_instance_id,
-            )
+            activation_instance.status = ActivationStatus.RUNNING
+            activation_instance.activation_pod_id = container.id
+            activation_instance.save()
+
+            self._save_logs(container=container)
+
+            if self.return_code == GRACEFUL_TERM:
+                activation_instance.status = ActivationStatus.STOPPED
+            else:
+                activation_instance.status = ActivationStatus.COMPLETED
+            activation_instance.save()
 
         except ContainerError:
             logger.exception("Container error")
@@ -140,9 +145,6 @@ class ActivationPodman:
         except APIError:
             logger.exception("Container run failed")
             raise
-        finally:
-            if container:
-                container.remove()
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
@@ -236,9 +238,7 @@ class ActivationPodman:
             )
             raise
 
-    def _save_logs(
-        self, container: Container, activation_instance_id: str
-    ) -> None:
+    def _save_logs(self, container: Container) -> None:
         lines_streamed = 0
         dkg = container.logs(
             stream=True, follow=True, stderr=True, stdout=True
@@ -269,7 +269,11 @@ class ActivationPodman:
             " activation instance log entries created."
         )
 
-        if self.return_code > 0:
+        if self.return_code == GRACEFUL_TERM:  # Graceful Termination (SIGTERM)
+            logger.info(
+                f"Container {container.name} is gracefully terminated."
+            )
+        elif self.return_code > 0:
             raise ActivationException(f"Activation failed in {container.name}")
 
     def _load_extra_args(self) -> None:
@@ -291,16 +295,3 @@ class ActivationPodman:
 
         for key, value in self.pod_args.items():
             logger.debug("Key %s Value %s", key, value)
-
-    def set_activation_status(
-        self, activation_instance_id: int, status: ActivationStatus
-    ) -> None:
-        instance = models.ActivationInstance.objects.get(
-            id=activation_instance_id
-        )
-        if not instance:
-            raise ActivationException(
-                (f"Activation instance {activation_instance_id} " "not found")
-            )
-        instance.status = status
-        instance.save()

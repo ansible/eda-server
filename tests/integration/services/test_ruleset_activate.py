@@ -216,11 +216,7 @@ def test_rulesets_activate_with_podman(
     pod_mock.run_worker_mode.assert_called_once_with(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
-        activation_instance_id=instance.id,
+        activation_instance=instance,
         heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
         ports={"5000/tcp": 5000},
-    )
-    assert (
-        models.ActivationInstance.objects.first().status
-        == ActivationStatus.COMPLETED.value
     )

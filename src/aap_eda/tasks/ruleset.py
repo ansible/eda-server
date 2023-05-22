@@ -22,6 +22,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
+from aap_eda.services.ruleset.deactivate_rulesets import DeactivateRulesets
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,12 @@ def activate_rulesets(
         logger.info(
             f"Task finished: Rulesets ({activation_id=}) {instance.status=}."
         )
+
+
+@job
+def deactivate_rulesets(instance_id: int, deployment_type: str) -> None:
+    logger.info(f"Task started: Deactivate activation instance: {instance_id}")
+    DeactivateRulesets(instance_id, deployment_type).run()
 
 
 @job

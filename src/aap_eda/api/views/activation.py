@@ -167,6 +167,14 @@ class ActivationViewSet(
 
         return self.get_paginated_response(serializer.data)
 
+    def perform_destroy(self, activation):
+        instances = models.ActivationInstance.objects.filter(
+            activation_id=activation.id
+        )
+        for instance in instances:
+            deactivate_rulesets(instance.id, settings.DEPLOYMENT_TYPE)
+        super().perform_destroy(activation)
+
     @extend_schema(
         description="List all instances for the Activation",
         request=None,
@@ -281,6 +289,13 @@ class ActivationViewSet(
                     deployment_type=settings.DEPLOYMENT_TYPE,
                 )
 
+        current_instance = models.ActivationInstance.objects.filter(
+            activation_id=pk, status=ActivationStatus.RUNNING
+        ).first()
+
+        if current_instance:
+            deactivate_rulesets(current_instance.id, settings.DEPLOYMENT_TYPE)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -301,16 +316,16 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
-        instance_running = (
-            models.ActivationInstance.objects.filter(activation_id=pk)
-            .filter(status=ActivationStatus.RUNNING)
-            .exists()
-        )
+        instance_running = models.ActivationInstance.objects.filter(
+            activation_id=pk, status=ActivationStatus.RUNNING
+        ).first()
+
         if instance_running:
             deactivate_rulesets(
                 instance=instance_running,
                 deployment_type=settings.DEPLOYMENT_TYPE,
             )
+
         activate_rulesets.delay(
             activation_id=pk,
             decision_environment_id=activation.decision_environment.id,

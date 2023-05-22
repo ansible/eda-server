@@ -79,6 +79,7 @@ class ActivationInstance(models.Model):
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
+    activation_pod_id = models.TextField(null=True)
 
 
 class ActivationInstanceLog(models.Model):
