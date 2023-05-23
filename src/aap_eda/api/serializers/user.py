@@ -13,6 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        help_text="The user's log in name.",
+    )
     created_at = serializers.DateTimeField(source="date_joined")
 
     roles = RoleRefSerializer(read_only=True, many=True)
@@ -61,6 +64,9 @@ class UserListSerializer(serializers.Serializer):
 
 
 class UserCreateUpdateSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        help_text="The user's log in name.",
+    )
     password = serializers.CharField(write_only=True)
 
     class Meta:
