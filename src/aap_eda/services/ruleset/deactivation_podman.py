@@ -21,6 +21,8 @@ from podman.errors.exceptions import APIError
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
+from .activation_db_logger import ActivationDbLogger
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,7 @@ class DeactivationPodman:
     def __init__(
         self,
         podman_url: str,
+        activation_db_logger: ActivationDbLogger,
     ) -> None:
         if podman_url:
             self.podman_url = podman_url
@@ -37,6 +40,7 @@ class DeactivationPodman:
 
         self.client = PodmanClient(base_url=self.podman_url)
         logger.info(self.client.version())
+        self.activation_db_logger = activation_db_logger
 
     def deactivate(
         self,
@@ -44,14 +48,22 @@ class DeactivationPodman:
     ) -> None:
         container_id = activation_instance.activation_pod_id
         try:
+            self.activation_db_logger.write(
+                "Activation being stopped at user request", True
+            )
             if self.client.containers.exists(container_id):
                 container = self.client.containers.get(container_id)
-                container.stop()
+                container.stop(ignore=True)
                 container.remove(force=True, v=True)
 
-                logger.info(f"Container {container_id} is removed.")
+                message = f"Container {container_id} is removed."
+                logger.info(message)
+                self.activation_db_logger.write(message, True)
             else:
                 logger.warning(f"Container {container_id} not found.")
+                self.activation_db_logger.write(
+                    f"Container {container_id} not found.", True
+                )
 
             activation_instance.activation_pod_id = None
             activation_instance.status = ActivationStatus.STOPPED

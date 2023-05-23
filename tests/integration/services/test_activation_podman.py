@@ -178,7 +178,7 @@ def test_activation_podman_run_worker_mode(
 
     activation_db_logger.flush()
 
-    assert models.ActivationInstanceLog.objects.count() == 7
+    assert models.ActivationInstanceLog.objects.count() == 8
 
 
 @pytest.mark.django_db

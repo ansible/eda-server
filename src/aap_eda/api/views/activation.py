@@ -172,7 +172,7 @@ class ActivationViewSet(
             activation_id=activation.id
         )
         for instance in instances:
-            deactivate_rulesets(instance.id, settings.DEPLOYMENT_TYPE)
+            deactivate_rulesets(instance, settings.DEPLOYMENT_TYPE)
         super().perform_destroy(activation)
 
     @extend_schema(
@@ -288,13 +288,6 @@ class ActivationViewSet(
                     instance=current_instance,
                     deployment_type=settings.DEPLOYMENT_TYPE,
                 )
-
-        current_instance = models.ActivationInstance.objects.filter(
-            activation_id=pk, status=ActivationStatus.RUNNING
-        ).first()
-
-        if current_instance:
-            deactivate_rulesets(current_instance.id, settings.DEPLOYMENT_TYPE)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
