@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 import shutil
-import uuid
 from enum import Enum
 from typing import Optional
 
@@ -28,7 +27,7 @@ from .activation_db_logger import ActivationDbLogger
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
 from .ansible_rulebook import AnsibleRulebookService
-from .exceptions import ActivationException
+from .exceptions import ActivationException, DeactivationException
 
 logger = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -72,6 +71,13 @@ def find_ports(rulebook_text: str):
                 found_ports.append((host, maybe_port))
 
     return found_ports
+
+
+def set_activation_status(
+    instance: models.ActivationInstance, status: ActivationStatus
+) -> None:
+    instance.status = status
+    instance.save(update_fields=["status"])
 
 
 class ActivateRulesets:
@@ -128,6 +134,7 @@ class ActivateRulesets:
                 self.activate_in_k8s(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
+                    activation=activation,
                     activation_instance=instance,
                     decision_environment=decision_environment,
                 )
@@ -135,10 +142,17 @@ class ActivateRulesets:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
             instance.status = ActivationStatus.COMPLETED
+        except DeactivationException:
+            logger.info(f"Activation {activation.name} is disabled")
+            instance.status = ActivationStatus.STOPPED
+            activation_db_logger.write(
+                f"Activation {activation.name} is disabled"
+            )
         except ActivationException as exe:
             logger.error(f"Activation error: {str(exe)}")
             instance.status = ActivationStatus.FAILED
             activation_db_logger.write(f"Activation error: {str(exe)}")
+
         except Exception as exe:
             instance.status = ActivationStatus.FAILED
             if (
@@ -168,6 +182,49 @@ class ActivateRulesets:
             instance.save()
             instance.refresh_from_db()
         return instance
+
+    def deactivate(
+        self,
+        instance: models.ActivationInstance,
+        deployment_type: str,
+    ) -> None:
+        try:
+            set_activation_status(instance, ActivationStatus.STOPPING)
+            activation_db_logger = ActivationDbLogger(instance.id)
+            try:
+                dtype = DeploymentType(deployment_type)
+            except ValueError:
+                raise ActivationException(
+                    f"Invalid deployment type: {deployment_type}"
+                )
+
+            if dtype == DeploymentType.LOCAL:
+                raise ActivationException(
+                    f"{deployment_type} Not Implemented Yet"
+                )
+            elif dtype == DeploymentType.PODMAN:
+                raise ActivationException(
+                    f"{deployment_type} Not Implemented Yet"
+                )
+            elif dtype == DeploymentType.DOCKER:
+                raise ActivationException(
+                    f"{deployment_type} Not Implemented Yet"
+                )
+
+            elif dtype == DeploymentType.K8S:
+                logger.info(f"Activation DeploymentType: {dtype}")
+                self.deactivate_in_k8s(activation_instance=instance)
+            else:
+                raise ActivationException(f"Unsupported {deployment_type}")
+
+            logger.info(
+                f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
+            )
+            set_activation_status(instance, ActivationStatus.STOPPED)
+
+        except Exception as exe:
+            logger.error(f"Activation error: {str(exe)}")
+            activation_db_logger.write(f"Activation error: {str(exe)}")
 
     def activate_in_local(
         self,
@@ -247,6 +304,7 @@ class ActivateRulesets:
         self,
         ws_url: str,
         ssl_verify: str,
+        activation: models.Activation,
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
     ) -> None:
@@ -259,9 +317,10 @@ class ActivateRulesets:
         namespace = ns_fileref.read()
         ns_fileref.close()
 
-        guid = uuid.uuid4()
-        job_name = f"activation-job-{guid}"
-        pod_name = f"activation-pod-{guid}"
+        activation_name = activation.name
+        activation_id = activation.pk
+        job_name = f"activation-job-{activation_id}"
+        pod_name = f"activation-pod-{activation_id}"
 
         # build out container,pod,job specs
         container_spec = k8s.create_container(
@@ -282,7 +341,7 @@ class ActivateRulesets:
 
         secret_name = None
         if decision_environment.credential:
-            secret_name = f"activation-secret-{guid}"
+            secret_name = f"activation-secret-{activation_id}"
             k8s.create_secret(
                 secret_name=secret_name,
                 namespace=namespace,
@@ -296,7 +355,10 @@ class ActivateRulesets:
         )
 
         job_spec = k8s.create_job(
-            job_name=job_name, pod_template=pod_spec, ttl=30
+            job_name=job_name,
+            activation_name=activation_name,
+            pod_template=pod_spec,
+            ttl=30,
         )
 
         for _, port in find_ports(
@@ -314,3 +376,16 @@ class ActivateRulesets:
             activation_instance=activation_instance,
             secret_name=secret_name,
         )
+
+    def deactivate_in_k8s(self, activation_instance) -> None:
+        k8s = ActivationKubernetes()
+
+        ns_fileref = open(
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
+        )
+        namespace = ns_fileref.read()
+        ns_fileref.close()
+
+        logger.debug(f"namespace: {namespace}")
+        logger.debug(f"activation_name: {activation_instance.name}")
+        k8s.delete_job(activation_instance, namespace)
