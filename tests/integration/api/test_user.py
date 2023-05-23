@@ -82,6 +82,68 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
 
 
 @pytest.mark.django_db
+def test_update_current_user(client: APIClient, user: models.User, init_db):
+    response = client.patch(
+        f"{api_url_v1}/users/me/",
+        data={
+            "first_name": "Darth",
+            "last_name": "Vader",
+        },
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["first_name"] == "Darth"
+    assert data["last_name"] == "Vader"
+
+
+@pytest.mark.django_db
+def test_update_current_user_password(
+    client: APIClient, user: models.User, init_db
+):
+    response = client.patch(
+        f"{api_url_v1}/users/me/",
+        data={"password": "updated-password"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "password" not in data
+
+    user.refresh_from_db()
+    assert user.check_password("updated-password")
+
+
+@pytest.mark.django_db
+def test_update_current_user_username_fail(
+    client: APIClient, user: models.User, init_db
+):
+    response = client.patch(
+        f"{api_url_v1}/users/me/",
+        data={"username": "darth.vader"},
+    )
+    # NOTE(cutwater): DRF serializer will not detect an unexpected field
+    #   in PATCH operation, but must ignore it.
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert data["username"] == "luke.skywalker"
+
+    user.refresh_from_db()
+    assert user.username == "luke.skywalker"
+
+
+@pytest.mark.django_db
+def test_update_current_user_roles_fail(
+    client: APIClient, user: models.User, init_db
+):
+    response = client.patch(f"{api_url_v1}/users/me/", data={"roles": []})
+    # NOTE(cutwater): DRF serializer will not detect an unexpected field
+    #   in PATCH operation, but must ignore it.
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert len(data["roles"]) > 0
+
+
+@pytest.mark.django_db
 def test_create_user(
     client: APIClient,
     check_permission_mock: mock.Mock,
