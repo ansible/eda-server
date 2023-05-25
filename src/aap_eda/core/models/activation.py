@@ -51,6 +51,8 @@ class Activation(models.Model):
         default=RestartPolicy.ON_FAILURE,
     )
     restart_count = models.IntegerField(default=0)
+    failure_count = models.IntegerField(default=0)  # internal, since last good
+    is_valid = models.BooleanField(default=False)  # internal, passed first run
     rulebook_name = models.TextField(
         null=False,
         help_text="Name of the referenced rulebook",

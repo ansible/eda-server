@@ -18,6 +18,7 @@ import logging
 import time
 
 from django.conf import settings
+from django.utils import timezone
 from kubernetes import client, config, watch
 
 from aap_eda.core import models
@@ -368,7 +369,15 @@ class ActivationKubernetes:
         self, instance: models.ActivationInstance, status: ActivationStatus
     ) -> None:
         instance.status = status
-        instance.save(update_fields=["status"])
+        instance.updated_at = timezone.now()
+        instance.save(update_fields=["status", "updated_at"])
+
+        if (
+            status == ActivationStatus.RUNNING
+            and not instance.activation.is_valid
+        ):
+            instance.activation.is_valid = True
+            instance.activation.save(update_fields=["is_valid", "modified_at"])
 
     def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()

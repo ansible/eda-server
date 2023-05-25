@@ -102,11 +102,9 @@ class ActivationViewSet(
         activation["rules_fired_count"] = 0
 
         if response.is_enabled:
-            decision_environment_id = activation["decision_environment_id"]
-
             activate_rulesets.delay(
+                is_restart=False,
                 activation_id=response.id,
-                decision_environment_id=decision_environment_id,
                 deployment_type=settings.DEPLOYMENT_TYPE,
                 ws_base_url=settings.WEBSOCKET_BASE_URL,
                 ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
@@ -144,6 +142,11 @@ class ActivationViewSet(
         },
     )
     def list(self, request):
+        # TODO: No need to call monitor when a scheduler is in place
+        from aap_eda.tasks.ruleset import monitor_activations
+
+        monitor_activations()
+
         response = super().list(request)
         activations = []
         if response and response.data:
@@ -235,6 +238,7 @@ class ActivationViewSet(
                 ActivationStatus.STOPPING,
                 ActivationStatus.PENDING,
                 ActivationStatus.RUNNING,
+                ActivationStatus.UNRESPONSIVE,
             ],
         ).first()
 
@@ -243,11 +247,14 @@ class ActivationViewSet(
             return Response(status=status.HTTP_409_CONFLICT)
 
         activation.is_enabled = True
-        activation.save(update_fields=["is_enabled"])
+        activation.failure_count = 0
+        activation.save(
+            update_fields=["is_enabled", "failure_count", "modified_at"]
+        )
 
         activate_rulesets.delay(
+            is_restart=False,
             activation_id=pk,
-            decision_environment_id=activation.decision_environment.id,
             deployment_type=settings.DEPLOYMENT_TYPE,
             ws_base_url=settings.WEBSOCKET_BASE_URL,
             ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
@@ -271,8 +278,7 @@ class ActivationViewSet(
 
         if activation.is_enabled:
             activation.is_enabled = False
-            activation.restart_count += 1
-            activation.save(update_fields=["is_enabled", "restart_count"])
+            activation.save(update_fields=["is_enabled", "modified_at"])
 
             current_instance = models.ActivationInstance.objects.filter(
                 activation_id=pk,
@@ -280,6 +286,7 @@ class ActivationViewSet(
                     ActivationStatus.STARTING,
                     ActivationStatus.PENDING,
                     ActivationStatus.RUNNING,
+                    ActivationStatus.UNRESPONSIVE,
                 ],
             ).first()
 
@@ -320,15 +327,15 @@ class ActivationViewSet(
             )
 
         activate_rulesets.delay(
+            is_restart=False,  # increment restart_count here instead of by task # noqa: E501
             activation_id=pk,
-            decision_environment_id=activation.decision_environment.id,
             deployment_type=settings.DEPLOYMENT_TYPE,
             ws_base_url=settings.WEBSOCKET_BASE_URL,
             ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         )
 
         activation.restart_count += 1
-        activation.save(update_fields=["restart_count"])
+        activation.save(update_fields=["restart_count", "modified_at"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

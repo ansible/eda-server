@@ -87,26 +87,22 @@ class ActivateRulesets:
 
     def activate(
         self,
-        activation_id: int,
-        decision_environment_id: int,
+        activation: models.Activation,
         deployment_type: str,
         ws_base_url: str,
         ssl_verify: str,
     ) -> models.ActivationInstance:
+        self.deployment_type = deployment_type
+        self.ws_base_url = ws_base_url
+        self.ssl_verify = ssl_verify
         try:
-            activation = models.Activation.objects.get(id=activation_id)
             instance = models.ActivationInstance.objects.create(
-                activation_id=activation_id,
+                activation=activation,
                 name=activation.name,
                 status=ActivationStatus.STARTING,
             )
-            instance.save()
 
             activation_db_logger = ActivationDbLogger(instance.id)
-
-            decision_environment = models.DecisionEnvironment.objects.get(
-                id=decision_environment_id
-            )
 
             try:
                 dtype = DeploymentType(deployment_type)
@@ -124,7 +120,7 @@ class ActivateRulesets:
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
                     activation_instance=instance,
-                    decision_environment=decision_environment,
+                    decision_environment=activation.decision_environment,
                     activation_db_logger=activation_db_logger,
                 )
             elif dtype == DeploymentType.DOCKER:
@@ -137,50 +133,41 @@ class ActivateRulesets:
                     ssl_verify=ssl_verify,
                     activation=activation,
                     activation_instance=instance,
-                    decision_environment=decision_environment,
+                    decision_environment=activation.decision_environment,
                 )
                 instance.status = ActivationStatus.COMPLETED
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
-        except DeactivationException:
-            logger.info(f"Activation {activation.name} is disabled")
-            instance.status = ActivationStatus.STOPPED
-            activation_db_logger.write(
-                f"Activation {activation.name} is disabled"
-            )
-        except ActivationException as exe:
-            logger.error(f"Activation error: {str(exe)}")
-            instance.status = ActivationStatus.FAILED
-            activation_db_logger.write(f"Activation error: {str(exe)}")
-
-        except Exception as exe:
-            instance.status = ActivationStatus.FAILED
-            if (
-                activation.restart_policy == RestartPolicy.ALWAYS.value
-                or activation.restart_policy == RestartPolicy.ON_FAILURE.value
-            ):
-                from aap_eda.tasks.ruleset import enqueue_monitor_task
-
-                msg = f"Activation failed: {str(exe)} but will retry"
-                logger.warning(msg)
-                activation_db_logger.write(msg)
-                enqueue_monitor_task(
-                    activation_id,
-                    decision_environment_id,
-                    deployment_type,
-                    ws_base_url,
-                    ssl_verify,
+            if str(instance.status) == ActivationStatus.COMPLETED.value:
+                self._on_activate_complete(
+                    activation,
+                    instance,
+                    activation_db_logger,
                 )
-            else:
-                logger.error(f"Activation error: {str(exe)}")
-                activation_db_logger.write(f"Activation error: {str(exe)}")
+            elif str(instance.status) == ActivationStatus.FAILED.value:
+                self._on_activate_failure(
+                    ActivationException("Activation failed"),
+                    instance,
+                    activation_db_logger,
+                )
+        except DeactivationException:
+            msg = f"Activation {activation.name} is disabled"
+            instance.status = ActivationStatus.STOPPED
+            logger.error(msg)
+            activation_db_logger.write(msg)
+        except Exception as error:
+            self._on_activate_failure(
+                error,
+                instance,
+                activation_db_logger,
+            )
         finally:
             activation_db_logger.flush()
             now = timezone.now()
             instance.ended_at = now
             instance.updated_at = now
-            instance.save()
+            instance.save(update_fields=["status", "ended_at", "updated_at"])
             instance.refresh_from_db()
         return instance
 
@@ -227,6 +214,96 @@ class ActivateRulesets:
         except Exception as exe:
             logger.exception(f"Activation error: {str(exe)}")
             activation_db_logger.write(f"Activation error: {str(exe)}")
+
+    def _on_activate_complete(
+        self,
+        activation: models.Activation,
+        instance: models.ActivationInstance,
+        activation_db_logger: ActivationDbLogger,
+    ):
+        activation.failure_count = 0
+        activation.save(update_fields=["failure_count", "modified_at"])
+        activation.refresh_from_db()
+        restart_policy = (
+            activation.restart_policy == RestartPolicy.ALWAYS.value
+        )
+        if activation.is_enabled and restart_policy:
+            self._restart_activation(
+                None,
+                activation,
+                activation_db_logger,
+            )
+
+    def _on_activate_failure(
+        self,
+        error: Exception,
+        instance: models.ActivationInstance,
+        activation_db_logger: ActivationDbLogger,
+    ):
+        instance.status = ActivationStatus.FAILED
+        activation = instance.activation
+        activation.refresh_from_db()
+        restart_policy = (
+            activation.restart_policy == RestartPolicy.ALWAYS.value
+            or activation.restart_policy == RestartPolicy.ON_FAILURE.value
+        )
+        restart_limit = activation.failure_count < int(
+            settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+        )
+        if (
+            activation.is_enabled
+            and activation.is_valid
+            and restart_policy
+            and restart_limit
+        ):
+            self._restart_activation(
+                error,
+                activation,
+                activation_db_logger,
+                activation.failure_count + 1,
+                int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+            )
+            activation.failure_count += 1
+            activation.save(update_fields=["failure_count", "modified_at"])
+        else:
+            msg = f"Activation {activation.name} failed: {str(error)}"
+            logger.error(msg)
+            activation_db_logger.write(msg)
+
+    def _restart_activation(
+        self,
+        error: Exception,
+        activation: models.Activation,
+        activation_db_logger: ActivationDbLogger,
+        retry_count: int = 0,
+        max_retries: int = 0,
+    ) -> None:
+        from aap_eda.tasks.ruleset import enqueue_restart_task
+
+        if error:
+            seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
+            msg = (
+                f"Activation {activation.name} failed: {str(error)}, but will "
+                f"retry ({retry_count}/{max_retries}) in {seconds} seconds "
+                "according to its restart policy"
+            )
+            logger.warning(msg)
+        else:
+            seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
+            msg = (
+                f"Activation {activation.name} completed successfully. Will "
+                f"restart in {seconds} seconds according to its restart policy"
+            )
+            logger.info(msg)
+
+        activation_db_logger.write(msg)
+        enqueue_restart_task(
+            seconds,
+            activation.id,
+            self.deployment_type,
+            self.ws_base_url,
+            self.ssl_verify,
+        )
 
     def activate_in_local(
         self,

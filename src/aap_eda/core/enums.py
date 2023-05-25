@@ -79,6 +79,7 @@ class ActivationStatus(DjangoEnum):
     STOPPING = "stopping"
     STOPPED = "stopped"
     COMPLETED = "completed"
+    UNRESPONSIVE = "unresponsive"
 
 
 class CredentialType(DjangoEnum):

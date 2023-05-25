@@ -19,7 +19,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.tasking import get_queue, job
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 
@@ -28,102 +28,28 @@ logger = logging.getLogger(__name__)
 
 @job
 def activate_rulesets(
+    is_restart: bool,
     activation_id: int,
-    decision_environment_id: int,
     deployment_type: str,
     ws_base_url: str,
     ssl_verify: str,
 ) -> None:
-    logger.info(f"Task started: Activate rulesets ({activation_id=})")
+    activation = models.Activation.objects.get(pk=activation_id)
+    if is_restart:
+        activation.restart_count += 1
+        activation.save(update_fields=["restart_count", "modified_at"])
+    logger.info(f"Task started: Activate rulesets ({activation.name})")
 
     instance = ActivateRulesets().activate(
-        activation_id,
-        decision_environment_id,
+        activation,
         deployment_type,
         ws_base_url,
         ssl_verify,
     )
 
-    if instance.status == ActivationStatus.COMPLETED.value and (
-        instance.activation.restart_policy == RestartPolicy.ALWAYS.value
-    ):
-        logger.info(
-            f"Task finished: Rulesets ({activation_id=}) are activated."
-            " State is being monitored."
-        )
-        enqueue_monitor_task(
-            activation_id,
-            decision_environment_id,
-            deployment_type,
-            ws_base_url,
-            ssl_verify,
-        )
-    else:
-        logger.info(
-            f"Task finished: Rulesets ({activation_id=}) {instance.status=}."
-        )
-
-
-@job
-def monitor_and_restart_activation(
-    activation_id: int,
-    decision_environment_id: int,
-    deployment_type: str,
-    ws_base_url: str,
-    ssl_verify: str,
-) -> None:
-    logger.info(f"Task started: Monitor activation ({activation_id=})")
-
-    activation = models.Activation.objects.get(pk=activation_id)
-    if not activation.is_enabled:
-        return
-
-    activation_instances = models.ActivationInstance.objects.filter(
-        activation_id=activation.id
+    logger.info(
+        f"Task finished: Rulesets ({activation.name}) {instance.status=}."
     )
-
-    restart = False
-    if activation_instances:
-        instance = activation_instances.latest("started_at")
-        if instance.status == ActivationStatus.FAILED.value and (
-            activation.restart_policy == RestartPolicy.ALWAYS.value
-            or activation.restart_policy == RestartPolicy.ON_FAILURE.value
-        ):
-            logger.info(f"Activation ({activation_id=}) failed. Restart now.")
-            restart = True
-        elif (
-            instance.status == ActivationStatus.COMPLETED.value
-            and activation.restart_policy == RestartPolicy.ALWAYS.value
-        ):
-            if timezone.now() - instance.updated_at > timedelta(
-                seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS)
-            ):
-                logger.info(
-                    f"Lost heartbeat for Rulebook ({activation_id=})."
-                    " Restart now."
-                )
-                restart = True
-            else:
-                logger.info(
-                    f"Rulesets ({activation_id=}) in good state."
-                    " Keep on monitoring."
-                )
-                enqueue_monitor_task(
-                    activation_id,
-                    decision_environment_id,
-                    deployment_type,
-                    ws_base_url,
-                    ssl_verify,
-                )
-
-    if restart:
-        activate_rulesets(
-            activation_id,
-            decision_environment_id,
-            deployment_type,
-            ws_base_url,
-            ssl_verify,
-        )
 
 
 @job
@@ -139,23 +65,76 @@ def deactivate_rulesets(
     )
 
 
-def enqueue_monitor_task(
+# This is job will be scheduled by a scheduler which currently is unavailable
+def monitor_activations() -> None:
+    # 1. Set status = unresponsive (all instances):
+    #    if status in [running, starting] and updated_at has timeouted
+    # 2. Restart (check latest instance):
+    #    if status is unresponsive and updated_at has timeouted
+    logger.info("Task started: monitor_activations")
+    now = timezone.now()
+    running_statuses = [
+        ActivationStatus.RUNNING.value,
+        ActivationStatus.STARTING.value,
+    ]
+    cutoff_time = now - timedelta(
+        seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS)
+    )
+    models.ActivationInstance.objects.filter(
+        status__in=running_statuses, updated_at__lt=cutoff_time
+    ).update(status=ActivationStatus.UNRESPONSIVE.value, updated_at=now)
+
+    # TODO: Temporarily disable the restart logic until a proper worker can
+    # pick up the job
+    """
+    restart_policies = [
+        RestartPolicy.ALWAYS.value,
+        RestartPolicy.ON_FAILURE.value,
+    ]
+    for activation in models.Activation.objects.filter(
+        is_enabled=True, restart_policy__in=restart_policies
+    ):
+        instance = (
+            models.ActivationInstance.objects.filter(activation=activation)
+            .order_by("-started_at")
+            .first()
+        )
+        if (
+            instance
+            and instance.status == ActivationStatus.UNRESPONSIVE.value
+            and now - instance.updated_at
+            > timedelta(seconds=int(settings.RULEBOOK_LIVENESS_CHECK_SECONDS))
+        ):
+            logger.info(f"Now is {now}, updated_at {instance.updated_at}")
+            logger.info(
+                f"Lost heartbeat for activation {activation.name})."
+                " Restart now according to its restart policy."
+            )
+            activate_rulesets.delay(
+                is_restart=True,
+                activation_id=activation.id,
+                deployment_type=settings.DEPLOYMENT_TYPE,
+                ws_base_url=settings.WEBSOCKET_BASE_URL,
+                ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+            )
+    """
+
+
+def enqueue_restart_task(
+    seconds: int,
     activation_id: int,
-    decision_environment_id: int,
     deployment_type: str,
     ws_base_url: str,
     ssl_verify: str,
 ) -> None:
     queue = get_queue()
-    time_at = timezone.now() + timedelta(
-        seconds=int(settings.RULEBOOK_LIVENESS_CHECK_SECONDS)
-    )
+    time_at = timezone.now() + timedelta(seconds=seconds)
     queue.enqueue_at(
         time_at,
-        monitor_and_restart_activation,
+        activate_rulesets,
         args=(
+            True,
             activation_id,
-            decision_environment_id,
             deployment_type,
             ws_base_url,
             ssl_verify,
