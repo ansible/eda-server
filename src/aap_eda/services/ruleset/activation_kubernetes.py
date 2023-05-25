@@ -270,6 +270,20 @@ class ActivationKubernetes:
         activation_instance,
         secret_name,
     ) -> None:
+        # wait until old job instance has completely shut down.
+        done = False
+        while not done:
+            if_job_exists = self.batch_api.list_namespaced_job(
+                namespace=namespace,
+                label_selector=f"job-name={job_name}",
+                timeout_seconds=0,
+            )
+
+            if not if_job_exists.items:
+                break
+
+            time.sleep(10)
+
         logger.info(f"Create Job: {job_name}")
         self.batch_api.create_namespaced_job(
             namespace=namespace, body=job_spec, async_req=True
