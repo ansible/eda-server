@@ -116,13 +116,14 @@ def test_activation_podman(my_mock: mock.Mock, init_data):
 
 @pytest.mark.django_db
 @mock.patch("uuid.uuid4")
+@mock.patch("aap_eda.services.ruleset.activation_podman._container_logs")
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
 def test_activation_podman_run_worker_mode(
-    my_mock: mock.Mock, uuid_mock: mock.Mock, init_data
+    my_mock: mock.Mock, logs_mock: mock.Mock, uuid_mock: mock.Mock, init_data
 ):
     credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
-    client_mock.containers.run.return_value.logs.return_value = iter(
+    logs_mock.return_value = iter(
         [
             b"test_output_line_1",
             b"test_output_line_2",
@@ -228,15 +229,18 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activation_podman._container_logs")
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
-def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
+def test_activation_podman_with_auth_json(
+    my_mock: mock.Mock, logs_mock: mock.Mock, init_data
+):
     credential, decision_environment, activation_instance = init_data
     data = f"{credential.username}:{credential.secret.get_secret_value()}"
     encoded_data = data.encode("ascii")
     auth_key_value = base64.b64encode(encoded_data).decode("ascii")
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
-    client_mock.containers.run.return_value.logs.return_value = iter(
+    logs_mock.return_value = iter(
         [
             b"test_output_line_1",
             b"test_output_line_2",
@@ -266,9 +270,10 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activation_podman._container_logs")
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
 def test_activation_podman_with_existing_auth_json(
-    my_mock: mock.Mock, init_data
+    my_mock: mock.Mock, logs_mock: mock.Mock, init_data
 ):
     credential, decision_environment, activation_instance = init_data
     data = f"{credential.username}:{credential.secret.get_secret_value()}"
@@ -276,7 +281,7 @@ def test_activation_podman_with_existing_auth_json(
     auth_key_value = base64.b64encode(encoded_data).decode("ascii")
     client_mock = mock.Mock()
     my_mock.return_value = client_mock
-    client_mock.containers.run.return_value.logs.return_value = iter(
+    logs_mock.return_value = iter(
         [
             b"test_output_line_1",
             b"test_output_line_2",

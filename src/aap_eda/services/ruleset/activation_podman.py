@@ -13,11 +13,15 @@
 #  limitations under the License.
 
 import base64
+import importlib.metadata
 import json
 import logging
 import os
+import re
 import uuid
+from typing import Iterator, Union
 
+import podman.api
 from django.conf import settings
 from podman import PodmanClient
 from podman.domain.containers import Container
@@ -35,6 +39,8 @@ from .shared_settings import VALID_LOG_LEVELS
 logger = logging.getLogger(__name__)
 
 FLUSH_AT_END = -1
+
+PODMAN_VERSION = importlib.metadata.version("podman")
 
 
 class ActivationPodman:
@@ -239,27 +245,18 @@ class ActivationPodman:
     def _save_logs(
         self, container: Container, activation_instance_id: str
     ) -> None:
-        lines_streamed = 0
-        dkg = container.logs(
-            stream=True, follow=True, stderr=True, stdout=True
+        dkg = _container_logs(
+            container, stream=True, follow=True, stderr=True, stdout=True
         )
         try:
             while True:
                 line = next(dkg).decode("utf-8")
                 self.activation_db_logger.write(line)
-                lines_streamed += 1
         except StopIteration:
             logger.info(f"log stream ended for {container.name}")
 
         self.return_code = container.wait(condition="exited")
         logger.info(f"return_code: {self.return_code}")
-
-        # If we haven't streamed any lines, collect the logs
-        # when the container ends.
-        # Seems to be differences between 4.1.1 and 4.5 of podman
-        if lines_streamed == 0:
-            for line in container.logs():
-                self.activation_db_logger.write(line.decode("utf-8"))
 
         self.activation_db_logger.write(
             f"Container exit code: {self.return_code}"
@@ -300,7 +297,46 @@ class ActivationPodman:
         )
         if not instance:
             raise ActivationException(
-                (f"Activation instance {activation_instance_id} " "not found")
+                f"Activation instance {activation_instance_id} " "not found"
             )
         instance.status = status
         instance.save()
+
+
+def _container_logs(container, **kwargs) -> Union[bytes, Iterator[bytes]]:
+    """
+    Backport of podman container logs function.
+
+    This function includes patch for log streaming issue to be used with
+    versions of podman-py prior to 4.2.
+    """
+    # NOTE(cutwater): This is a dirty hack to compare podman version without
+    #   third party dependencies. While the distribution version is available
+    #   by calling the `importlib.metadata.version` function
+    #   or via the `podman.__version__` attribute, both versions are strings.
+    #   The Python standard library doesn't provide a mechanism to parse and
+    #   appropriately compare PEP440 versions. This is implemented in the
+    #   standalone `packaging` distribution, which is not available
+    #   in the project's main dependency list.
+    if not re.match(r"3|4\.[01]", PODMAN_VERSION):
+        return container.logs(**kwargs)
+
+    stream = bool(kwargs.get("stream", False))
+    params = {
+        "follow": kwargs.get("follow", kwargs.get("stream", None)),
+        "since": podman.api.prepare_timestamp(kwargs.get("since")),
+        "stderr": kwargs.get("stderr", None),
+        "stdout": kwargs.get("stdout", True),
+        "tail": kwargs.get("tail"),
+        "timestamps": kwargs.get("timestamps"),
+        "until": podman.api.prepare_timestamp(kwargs.get("until")),
+    }
+
+    response = container.client.get(
+        f"/containers/{container.id}/logs", stream=stream, params=params
+    )
+    response.raise_for_status()
+
+    if stream:
+        return podman.api.stream_frames(response)
+    return podman.api.frames(response)
