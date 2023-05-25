@@ -22,7 +22,10 @@ from kubernetes import client, config, watch
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.ruleset.exceptions import K8sActivationException
+from aap_eda.services.ruleset.exceptions import (
+    DeactivationException,
+    K8sActivationException,
+)
 
 from .shared_settings import VALID_LOG_LEVELS
 
@@ -72,10 +75,6 @@ class ActivationKubernetes:
             image_pull_policy=pull_policy,
             env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
             args=args,
-            resources=client.V1ResourceRequirements(
-                requests=settings.ACTIVATION_POD_RESOURCE_REQUESTS,
-                limits=settings.ACTIVATION_POD_RESOURCE_LIMITS,
-            ),
             ports=[
                 client.V1ContainerPort(container_port=port) for port in ports
             ],
@@ -153,31 +152,63 @@ class ActivationKubernetes:
         return pod_template
 
     def create_service(self, job_name, port, namespace):
-        service_template = client.V1Service(
-            spec=client.V1ServiceSpec(
-                selector={"app": "eda", "job-name": job_name},
-                ports=[
-                    client.V1ServicePort(
-                        protocol="TCP", port=port, target_port=port
-                    )
-                ],
-            ),
-            metadata=client.V1ObjectMeta(
-                name=f"{job_name}-{port}",
-                labels={"app": "eda", "job-name": job_name},
-                namespace=namespace,
-            ),
+        # only create the service if it does not already exist
+        service_name = f"{job_name}-{port}"
+
+        service = self.client_api.list_namespaced_service(
+            namespace=namespace, field_selector=f"metadata.name={service_name}"
         )
 
-        logger.info(f"Create Service: {job_name}")
-        self.client_api.create_namespaced_service(namespace, service_template)
+        if not service.items:
+            service_template = client.V1Service(
+                spec=client.V1ServiceSpec(
+                    selector={"app": "eda", "job-name": job_name},
+                    ports=[
+                        client.V1ServicePort(
+                            protocol="TCP", port=port, target_port=port
+                        )
+                    ],
+                ),
+                metadata=client.V1ObjectMeta(
+                    name=f"{service_name}",
+                    labels={"app": "eda", "job-name": job_name},
+                    namespace=namespace,
+                ),
+            )
+
+            logger.info(f"Create Service: {service_name}")
+            self.client_api.create_namespaced_service(
+                namespace, service_template
+            )
+
+        else:
+            logger.info(f"Service already exists: {service_name}")
+
+    def delete_services(self, namespace, job_name) -> None:
+        services = self.client_api.list_namespaced_service(
+            namespace=namespace, label_selector=f"job-name={job_name}"
+        )
+
+        for svc in services.items:
+            service_name = svc.metadata.name
+            logger.info(f"Deleting service: {service_name}")
+
+            self.client_api.delete_namespaced_service(
+                name=service_name,
+                namespace=namespace,
+            )
 
     @staticmethod
     def create_job(
-        job_name, pod_template, backoff_limit=0, ttl=0
+        job_name, activation_name, pod_template, backoff_limit=0, ttl=0
     ) -> client.V1Job:
         metadata = client.V1ObjectMeta(
-            name=job_name, labels={"job-name": job_name, "app": "eda"}
+            name=job_name,
+            labels={
+                "job-name": job_name,
+                "app": "eda",
+                "activation-name": activation_name,
+            },
         )
 
         job = client.V1Job(
@@ -194,6 +225,41 @@ class ActivationKubernetes:
         logger.info(f"Created Job template: {job_name},")
 
         return job
+
+    def delete_job(self, activation_instance, namespace) -> None:
+        try:
+            instance_name = activation_instance.name
+            activation_job = self.batch_api.list_namespaced_job(
+                namespace=namespace,
+                label_selector=f"activation-name={instance_name}",
+                timeout_seconds=0,
+            )
+
+            if activation_job is None:
+                logger.info(f"Unable to find running Job for {instance_name}")
+                raise K8sActivationException(
+                    f"Unable to find running Job for {instance_name}"
+                )
+
+            activation_job_name = activation_job.items[0].metadata.name
+            status = self.batch_api.delete_namespaced_job(
+                name=activation_job_name,
+                namespace=namespace,
+                propagation_policy="Background",
+            )
+
+            self.delete_services(
+                namespace=namespace,
+                job_name=activation_job_name,
+            )
+
+            if status.status == "Failure":
+                raise K8sActivationException(f"{status}")
+
+        except Exception as e:
+            raise K8sActivationException(
+                f"Stop {instance_name} Failed: \n {e}"
+            )
 
     def run_activation_job(
         self,
@@ -242,6 +308,8 @@ class ActivationKubernetes:
                         w.stop()
                         raise K8sActivationException()
 
+            except DeactivationException:
+                raise
             except Exception as e:
                 raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
 
@@ -253,6 +321,11 @@ class ActivationKubernetes:
                         namespace=namespace,
                         job_name=job_name,
                     )
+                # remove service(s) if created
+                self.delete_services(
+                    namespace=namespace,
+                    job_name=job_name,
+                )
 
     def delete_secret(self, secret_name, namespace, job_name) -> None:
         # wait until job is done
@@ -295,7 +368,7 @@ class ActivationKubernetes:
         self, instance: models.ActivationInstance, status: ActivationStatus
     ) -> None:
         instance.status = status
-        instance.save()
+        instance.save(update_fields=["status"])
 
     def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()
@@ -350,7 +423,13 @@ class ActivationKubernetes:
                         raise K8sActivationException()
 
             except Exception as e:
-                raise K8sActivationException(f"Job {job_name} Failed: \n {e}")
+                activation = models.Activation.objects.get(
+                    name=activation_instance.name
+                )
+                if not activation.is_enabled:
+                    raise DeactivationException("deactivation called")
+
+                raise K8sActivationException(f"Pod {pod_name} Failed: \n {e}")
 
     def read_job_pod_log(
         self, pod_name, namespace, activation_instance_id

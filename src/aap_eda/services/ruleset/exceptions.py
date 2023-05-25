@@ -19,3 +19,7 @@ class ActivationException(Exception):
 
 class K8sActivationException(ActivationException):
     pass
+
+
+class DeactivationException(ActivationException):
+    pass
