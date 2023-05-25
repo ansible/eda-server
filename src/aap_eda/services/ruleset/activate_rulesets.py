@@ -92,6 +92,9 @@ class ActivateRulesets:
         ws_base_url: str,
         ssl_verify: str,
     ) -> models.ActivationInstance:
+        self.deployment_type = deployment_type
+        self.ws_base_url = ws_base_url
+        self.ssl_verify = ssl_verify
         try:
             instance = models.ActivationInstance.objects.create(
                 activation=activation,
@@ -140,18 +143,12 @@ class ActivateRulesets:
                 self._on_activate_complete(
                     activation,
                     instance,
-                    deployment_type,
-                    ws_base_url,
-                    ssl_verify,
                     activation_db_logger,
                 )
             elif str(instance.status) == ActivationStatus.FAILED.value:
                 self._on_activate_failure(
                     ActivationException("Activation failed"),
                     instance,
-                    deployment_type,
-                    ws_base_url,
-                    ssl_verify,
                     activation_db_logger,
                 )
         except DeactivationException:
@@ -163,9 +160,6 @@ class ActivateRulesets:
             self._on_activate_failure(
                 error,
                 instance,
-                deployment_type,
-                ws_base_url,
-                ssl_verify,
                 activation_db_logger,
             )
         finally:
@@ -225,9 +219,6 @@ class ActivateRulesets:
         self,
         activation: models.Activation,
         instance: models.ActivationInstance,
-        deployment_type: str,
-        ws_base_url: str,
-        ssl_verify: str,
         activation_db_logger: ActivationDbLogger,
     ):
         activation.failure_count = 0
@@ -240,9 +231,6 @@ class ActivateRulesets:
             self._restart_activation(
                 None,
                 activation,
-                deployment_type,
-                ws_base_url,
-                ssl_verify,
                 activation_db_logger,
             )
 
@@ -250,9 +238,6 @@ class ActivateRulesets:
         self,
         error: Exception,
         instance: models.ActivationInstance,
-        deployment_type: str,
-        ws_base_url: str,
-        ssl_verify: str,
         activation_db_logger: ActivationDbLogger,
     ):
         instance.status = ActivationStatus.FAILED
@@ -274,10 +259,9 @@ class ActivateRulesets:
             self._restart_activation(
                 error,
                 activation,
-                deployment_type,
-                ws_base_url,
-                ssl_verify,
                 activation_db_logger,
+                activation.failure_count + 1,
+                int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
             )
             activation.failure_count += 1
             activation.save(update_fields=["failure_count", "modified_at"])
@@ -290,10 +274,9 @@ class ActivateRulesets:
         self,
         error: Exception,
         activation: models.Activation,
-        deployment_type: str,
-        ws_base_url: str,
-        ssl_verify: str,
         activation_db_logger: ActivationDbLogger,
+        retry_count: int = 0,
+        max_retries: int = 0,
     ) -> None:
         from aap_eda.tasks.ruleset import enqueue_restart_task
 
@@ -301,7 +284,8 @@ class ActivateRulesets:
             seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
             msg = (
                 f"Activation {activation.name} failed: {str(error)}, but will "
-                f"retry in {seconds} seconds according to its restart policy"
+                f"retry ({retry_count}/{max_retries}) in {seconds} seconds "
+                "according to its restart policy"
             )
             logger.warning(msg)
         else:
@@ -316,9 +300,9 @@ class ActivateRulesets:
         enqueue_restart_task(
             seconds,
             activation.id,
-            deployment_type,
-            ws_base_url,
-            ssl_verify,
+            self.deployment_type,
+            self.ws_base_url,
+            self.ssl_verify,
         )
 
     def activate_in_local(
