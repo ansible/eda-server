@@ -129,6 +129,7 @@ def test_activation_podman_run_worker_mode(
         ]
     )
     client_mock.containers.run.return_value.wait.return_value = 0
+    client_mock.containers.run.return_value.id = "containerid"
 
     my_mock.return_value = client_mock
 
@@ -142,7 +143,7 @@ def test_activation_podman_run_worker_mode(
     podman.run_worker_mode(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
-        activation_instance_id=activation_instance.id,
+        activation_instance=activation_instance,
         heartbeat="5",
         ports=ports,
     )
@@ -177,7 +178,7 @@ def test_activation_podman_run_worker_mode(
 
     activation_db_logger.flush()
 
-    assert models.ActivationInstanceLog.objects.count() == 7
+    assert models.ActivationInstanceLog.objects.count() == 8
 
 
 @pytest.mark.django_db
@@ -221,7 +222,7 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
         podman.run_worker_mode(
             ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
             ws_ssl_verify="no",
-            activation_instance_id="1",
+            activation_instance=activation_instance,
             heartbeat="5",
             ports={"5000/tcp": 5000},
         )
@@ -243,6 +244,7 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
         ]
     )
     client_mock.containers.run.return_value.wait.return_value = 0
+    client_mock.containers.run.return_value.id = "containerid"
 
     activation_db_logger = ActivationDbLogger(activation_instance.id)
 
@@ -256,7 +258,7 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
             podman.run_worker_mode(
                 ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
                 ws_ssl_verify="no",
-                activation_instance_id=activation_instance.id,
+                activation_instance=activation_instance,
                 heartbeat="5",
                 ports={"5000/tcp": 5000},
             )
@@ -283,6 +285,7 @@ def test_activation_podman_with_existing_auth_json(
         ]
     )
     client_mock.containers.run.return_value.wait.return_value = 0
+    client_mock.containers.run.return_value.id = "containerid"
 
     activation_db_logger = ActivationDbLogger(activation_instance.id)
     old_key = "gobbledegook"
@@ -304,7 +307,7 @@ def test_activation_podman_with_existing_auth_json(
             podman.run_worker_mode(
                 ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
                 ws_ssl_verify="no",
-                activation_instance_id=activation_instance.id,
+                activation_instance=activation_instance,
                 heartbeat="5",
                 ports={"5000/tcp": 5000},
             )

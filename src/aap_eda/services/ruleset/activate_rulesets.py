@@ -27,6 +27,7 @@ from .activation_db_logger import ActivationDbLogger
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
 from .ansible_rulebook import AnsibleRulebookService
+from .deactivation_podman import DeactivationPodman
 from .exceptions import ActivationException, DeactivationException
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,7 @@ class ActivateRulesets:
             ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
             if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(ws_url, ssl_verify, instance.id)
+                self.activate_in_local(ws_url, ssl_verify, instance)
             elif dtype == DeploymentType.PODMAN:
                 self.activate_in_podman(
                     ws_url=ws_url,
@@ -138,10 +139,10 @@ class ActivateRulesets:
                     activation_instance=instance,
                     decision_environment=decision_environment,
                 )
+                instance.status = ActivationStatus.COMPLETED
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
-            instance.status = ActivationStatus.COMPLETED
         except DeactivationException:
             logger.info(f"Activation {activation.name} is disabled")
             instance.status = ActivationStatus.STOPPED
@@ -203,8 +204,9 @@ class ActivateRulesets:
                     f"{deployment_type} Not Implemented Yet"
                 )
             elif dtype == DeploymentType.PODMAN:
-                raise ActivationException(
-                    f"{deployment_type} Not Implemented Yet"
+                self.deactivate_in_podman(
+                    activation_instance=instance,
+                    activation_db_logger=activation_db_logger,
                 )
             elif dtype == DeploymentType.DOCKER:
                 raise ActivationException(
@@ -223,14 +225,14 @@ class ActivateRulesets:
             set_activation_status(instance, ActivationStatus.STOPPED)
 
         except Exception as exe:
-            logger.error(f"Activation error: {str(exe)}")
+            logger.exception(f"Activation error: {str(exe)}")
             activation_db_logger.write(f"Activation error: {str(exe)}")
 
     def activate_in_local(
         self,
         url: str,
         ssl_verify: str,
-        activation_instance_id: str,
+        activation_instance: models.ActivationInstance,
     ) -> None:
         ssh_agent = shutil.which("ssh-agent")
         ansible_rulebook = shutil.which("ansible-rulebook")
@@ -246,7 +248,7 @@ class ActivateRulesets:
             ansible_rulebook,
             url,
             ssl_verify,
-            activation_instance_id,
+            str(activation_instance.id),
             settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         )
 
@@ -257,7 +259,7 @@ class ActivateRulesets:
             activation_instance_log = models.ActivationInstanceLog(
                 line_number=line_number,
                 log=line,
-                activation_instance_id=int(activation_instance_id),
+                activation_instance_id=activation_instance.id,
             )
             activation_instance_logs.append(activation_instance_log)
 
@@ -267,6 +269,8 @@ class ActivateRulesets:
             activation_instance_logs
         )
         logger.info(f"{line_number} of activation instance log are created.")
+        activation_instance.status = ActivationStatus.COMPLETED
+        activation_instance.save()
 
     def activate_in_podman(
         self,
@@ -291,10 +295,23 @@ class ActivateRulesets:
         podman.run_worker_mode(
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
-            activation_instance_id=activation_instance.id,
+            activation_instance=activation_instance,
             heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
             ports=ports,
         )
+
+    def deactivate_in_podman(
+        self,
+        activation_instance: models.ActivationInstance,
+        activation_db_logger: ActivationDbLogger,
+    ) -> None:
+        if activation_instance.activation_pod_id is None:
+            return
+
+        podman = DeactivationPodman(
+            settings.PODMAN_SOCKET_URL, activation_db_logger
+        )
+        podman.deactivate(activation_instance)
 
     # TODO(hsong) implement later
     def activate_in_docker():

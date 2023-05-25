@@ -23,7 +23,7 @@ from podman import PodmanClient
 from podman.domain.containers import Container
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
-from podman.errors.exceptions import APIError
+from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -35,6 +35,21 @@ from .shared_settings import VALID_LOG_LEVELS
 logger = logging.getLogger(__name__)
 
 FLUSH_AT_END = -1
+GRACEFUL_TERM = 143
+
+CONTAINER_ERROR_CODES_MAP = {
+    0: "Normal Stopped",
+    1: "Application Error",
+    125: "Container Failed to Run",
+    126: "Command Invoke Error",
+    127: "File or Directory Not Found",
+    128: "Invalid Argument Used on Exit",
+    134: "Abnormal Termination (SIGABRT)",
+    137: "Immediate Termination (SIGKILL)",
+    139: "Segmentation Fault (SIGSEGV)",
+    143: "Graceful Termination (SIGTERM)",
+    255: "Exit Status Out of Range",
+}
 
 
 class ActivationPodman:
@@ -72,7 +87,7 @@ class ActivationPodman:
         self,
         ws_url: str,
         ws_ssl_verify: str,
-        activation_instance_id: str,
+        activation_instance: models.ActivationInstance,
         heartbeat: str,
         ports: dict,
     ) -> None:
@@ -87,7 +102,7 @@ class ActivationPodman:
                 "--websocket-address",
                 ws_url,
                 "--id",
-                str(activation_instance_id),
+                str(activation_instance.id),
                 "--heartbeat",
                 str(heartbeat),
             ]
@@ -99,7 +114,7 @@ class ActivationPodman:
 
             self.pod_args[
                 "name"
-            ] = f"eda-{activation_instance_id}-{uuid.uuid4()}"
+            ] = f"eda-{activation_instance.id}-{uuid.uuid4()}"
             if ports:
                 self.pod_args["ports"] = ports
             self._load_extra_args()
@@ -123,13 +138,17 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
-            self.set_activation_status(
-                activation_instance_id, ActivationStatus.RUNNING
-            )
-            self._save_logs(
-                container=container,
-                activation_instance_id=activation_instance_id,
-            )
+            activation_instance.status = ActivationStatus.RUNNING
+            activation_instance.activation_pod_id = container.id
+            activation_instance.save()
+
+            self._save_logs(container=container, instance=activation_instance)
+
+            if self.return_code == GRACEFUL_TERM:
+                activation_instance.status = ActivationStatus.STOPPED
+            else:
+                activation_instance.status = ActivationStatus.COMPLETED
+            activation_instance.save()
 
         except ContainerError:
             logger.exception("Container error")
@@ -140,9 +159,6 @@ class ActivationPodman:
         except APIError:
             logger.exception("Container run failed")
             raise
-        finally:
-            if container:
-                container.remove()
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
@@ -237,7 +253,7 @@ class ActivationPodman:
             raise
 
     def _save_logs(
-        self, container: Container, activation_instance_id: str
+        self, container: Container, instance: models.ActivationInstance
     ) -> None:
         lines_streamed = 0
         dkg = container.logs(
@@ -251,8 +267,21 @@ class ActivationPodman:
         except StopIteration:
             logger.info(f"log stream ended for {container.name}")
 
-        self.return_code = container.wait(condition="exited")
-        logger.info(f"return_code: {self.return_code}")
+        try:
+            self.return_code = container.wait(condition="exited")
+            logger.info(f"return_code: {self.return_code}")
+            self.activation_db_logger.write(
+                f"Container exit code: {self.return_code}"
+            )
+        except NotFound:
+            instance.refresh_from_db()
+            if (
+                instance.status == ActivationStatus.STOPPING
+                or instance.status == ActivationStatus.STOPPED
+            ):
+                logger.info("Container {container.name} has been removed.")
+            else:
+                raise
 
         # If we haven't streamed any lines, collect the logs
         # when the container ends.
@@ -261,16 +290,21 @@ class ActivationPodman:
             for line in container.logs():
                 self.activation_db_logger.write(line.decode("utf-8"))
 
-        self.activation_db_logger.write(
-            f"Container exit code: {self.return_code}"
-        )
         logger.info(
             f"{self.activation_db_logger.lines_written()}"
             " activation instance log entries created."
         )
 
-        if self.return_code > 0:
-            raise ActivationException(f"Activation failed in {container.name}")
+        message = CONTAINER_ERROR_CODES_MAP.get(
+            self.return_code, f"exit code {self.return_code}"
+        )
+        if self.return_code == 0 or self.return_code == GRACEFUL_TERM:
+            logger.info(f"Container {container.name} is {message}.")
+            self.activation_db_logger.write(
+                f"Container {container.name} is {message}.", True
+            )
+        else:
+            raise ActivationException(f"Activation failed: {message}")
 
     def _load_extra_args(self) -> None:
         if hasattr(settings, "PODMAN_MEM_LIMIT") and settings.PODMAN_MEM_LIMIT:
@@ -291,16 +325,3 @@ class ActivationPodman:
 
         for key, value in self.pod_args.items():
             logger.debug("Key %s Value %s", key, value)
-
-    def set_activation_status(
-        self, activation_instance_id: int, status: ActivationStatus
-    ) -> None:
-        instance = models.ActivationInstance.objects.get(
-            id=activation_instance_id
-        )
-        if not instance:
-            raise ActivationException(
-                (f"Activation instance {activation_instance_id} " "not found")
-            )
-        instance.status = status
-        instance.save()
