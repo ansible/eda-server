@@ -12,6 +12,7 @@ RUN DNF=dnf \
     python3-pip \
     libpq-devel \
     gcc \
+    gettext \
     git-core \
     java-17-openjdk-headless" \
     && $DNF -y install $INSTALL_PACKAGES \
