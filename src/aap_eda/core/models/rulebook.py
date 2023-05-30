@@ -79,6 +79,7 @@ class AuditRule(models.Model):
     status = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     fired_at = models.DateTimeField(null=False)
+    last_fired_at = models.DateTimeField(null=True)
     rule_uuid = models.UUIDField(null=True)
     ruleset_uuid = models.UUIDField(null=True)
     ruleset_name = models.TextField(null=True)

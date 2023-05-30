@@ -210,18 +210,16 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 ruleset_uuid=message.ruleset_uuid,
                 ruleset_name=message.ruleset,
                 fired_at=message.rule_run_at,
+                last_fired_at=message.rule_run_at,
                 job_instance_id=job_instance_id,
                 status=message.status,
             )
 
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
-        elif audit_rule.fired_at > datetime.strptime(
-            message.rule_run_at, DATETIME_FORMAT
+        elif audit_rule.last_fired_at < datetime.strptime(
+            message.run_at, DATETIME_FORMAT
         ):
-            logger.info(f"Ignore the fired audit rule {audit_rule.name}")
-            return
-        else:
-            audit_rule.fired_at = message.rule_run_at
+            audit_rule.last_fired_at = message.run_at
             audit_rule.status = message.status
             audit_rule.save()
 

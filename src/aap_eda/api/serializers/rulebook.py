@@ -202,6 +202,11 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         help_text="The fired timestamp of the rule",
     )
 
+    last_fired_at = serializers.DateTimeField(
+        required=True,
+        help_text="The fired timestamp of the rule",
+    )
+
     class Meta:
         model = models.AuditRule
         fields = [
@@ -211,6 +216,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
             "fired_at",
+            "last_fired_at",
             "rule_uuid",
             "ruleset_uuid",
             "ruleset_name",
@@ -240,6 +246,11 @@ class AuditRuleOutSerializer(serializers.Serializer):
     fired_at = serializers.DateTimeField(
         required=True,
         help_text="The fired timestamp of the rule",
+    )
+
+    last_fired_at = serializers.DateTimeField(
+        required=True,
+        help_text="The last fired timestamp of the rule",
     )
 
     definition = serializers.JSONField(

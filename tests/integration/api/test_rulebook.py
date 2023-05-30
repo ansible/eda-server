@@ -346,6 +346,7 @@ def test_list_audit_rules(client: APIClient, init_db):
         "status",
         "created_at",
         "fired_at",
+        "last_fired_at",
         "rule_uuid",
         "ruleset_uuid",
         "ruleset_name",
