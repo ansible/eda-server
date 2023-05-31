@@ -20,7 +20,6 @@ from aap_eda.api.exceptions import (
     InvalidWebsocketHost,
     InvalidWebsocketScheme,
     NoControllerToken,
-    TooManyControllerTokens,
 )
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
