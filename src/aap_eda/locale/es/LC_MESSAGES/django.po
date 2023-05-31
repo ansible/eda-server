@@ -29,9 +29,8 @@ msgstr "No se puede procesar."
 
 #: src/aap_eda/api/exceptions.py:56
 msgid "Not implemented."
-msgstr "No se ha aplicado."
+msgstr "No esta implementado."
 
 #: src/aap_eda/api/exceptions.py:62
 msgid "Forbidden."
 msgstr "Prohibido."
-
