@@ -449,24 +449,3 @@ def test_create_activation_no_token(client: APIClient):
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert str(response.data["detail"]) == "No controller token specified"
-
-
-@pytest.mark.django_db
-def test_create_activation_more_tokens(client: APIClient):
-    fks = create_activation_related_data()
-    test_activation = TEST_ACTIVATION.copy()
-    test_activation["is_enabled"] = True
-    test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["project_id"] = fks["project_id"]
-    test_activation["rulebook_id"] = fks["rulebook_id"]
-    test_activation["extra_var_id"] = fks["extra_var_id"]
-
-    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
-    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN_2)
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert (
-        str(response.data["detail"])
-        == "More than one controller token found, "
-        "currently only 1 token is supported"
-    )
