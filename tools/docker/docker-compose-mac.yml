@@ -1,0 +1,100 @@
+x-environment:
+  &common-env
+  - EDA_DB_HOST=postgres
+  - EDA_MQ_HOST=redis
+  - DJANGO_SETTINGS_MODULE=aap_eda.settings.default
+  - EDA_DB_PASSWORD=secret
+  - EDA_SECRET_KEY=secret
+  - EDA_ALLOWED_HOSTS=['*']
+  - EDA_DEPLOYMENT_TYPE=podman
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://host.containers.internal:8080}
+  - EDA_WEBSOCKET_SSL_VERIFY=no
+  - EDA_PODMAN_SOCKET_URL="unix:///run/podman/podman.sock"
+  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:?Please specify EDA_CONTROLLER_URL env}
+  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-yes}
+  - EDA_PODMAN_EXTRA_ARGS='@json {"network_mode":"host"}'
+
+services:
+  eda-ui:
+    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    ports:
+      - '8080:8080'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+  eda-api:
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage migrate
+        && aap-eda-manage create_initial_data
+        && scripts/create_superuser.sh
+        && aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - '8000:8000'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  eda-worker:
+    user: "${EDA_POD_USER_ID:-0}"
+    deploy:
+      replicas: ${EDA_NUM_WORKERS:-2}
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    security_opt:
+      - label=disable
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --with-scheduler
+      - --worker-class
+      - aap_eda.core.tasking.Worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: always
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+
+  postgres:
+    image: 'docker.io/library/postgres:13'
+    environment:
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: eda
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: 'docker.io/library/redis:7'
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: [ 'CMD', 'redis-cli', 'ping' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_data: {}
