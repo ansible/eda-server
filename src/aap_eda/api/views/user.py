@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import django.db.utils
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -24,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from aap_eda.api import serializers
-from aap_eda.api.exceptions import Conflict
+from aap_eda.api.exceptions import TooManyControllerTokens
 from aap_eda.core import models
 
 from .mixins import (
@@ -156,14 +155,17 @@ class CurrentUserAwxTokenViewSet(
 
     def perform_create(self, serializer):
         try:
+            tokens = models.AwxToken.objects.filter(
+                user_id=self.request.user.id
+            ).count()
+
+            if tokens > 0:
+                raise TooManyControllerTokens
+
             serializer.save(user=self.request.user)
-        except django.db.utils.IntegrityError:
-            name_exists = models.AwxToken.objects.filter(
-                user=self.request.user, name=serializer.validated_data["name"]
-            ).exists()
-            if name_exists:
-                raise Conflict("Token with this name already exists.")
-            raise Conflict
+
+        except TooManyControllerTokens as e:
+            raise TooManyControllerTokens(e)
 
 
 @extend_schema_view(

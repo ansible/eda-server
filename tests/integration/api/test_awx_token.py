@@ -67,21 +67,6 @@ def test_create_controller_token(client: APIClient, user: models.User):
         row = cursor.fetchone()
         assert row[0].startswith("$encrypted$fernet-256$")
 
-    response = client.post(
-        f"{api_url_v1}/users/me/awx-tokens/",
-        data={
-            "name": "Test token 2",
-            "description": "Token description",
-            "token": "test-token-value",
-        },
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    data = response.json()
-    assert data["name"] == "Test token 2"
-    assert data["description"] == "Token description"
-    assert data["user_id"] == user.id
-    assert "token" not in data
-
 
 @pytest.mark.django_db
 def test_create_token_missing_field(client: APIClient, user: models.User):
@@ -109,7 +94,7 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_create_token_duplicate_name(client: APIClient, user: models.User):
+def test_create_token_to_many_tokens(client: APIClient, user: models.User):
     models.AwxToken.objects.create(
         user=user, name="test-token", token="test-token-value"
     )
@@ -121,9 +106,10 @@ def test_create_token_duplicate_name(client: APIClient, user: models.User):
             "token": "test-token-value",
         },
     )
-    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert response.json() == {
-        "detail": "Token with this name already exists."
+        "detail": "Found an existing controller token, "
+        "currently only 1 token is supported"
     }
 
 

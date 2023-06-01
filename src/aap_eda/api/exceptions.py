@@ -29,6 +29,7 @@ __all__ = (
     "Conflict",
     "Unprocessable",
     "PermissionDenied",
+    "TooManyControllerTokens",
 )
 
 
@@ -70,7 +71,7 @@ class NoControllerToken(APIException):
 class TooManyControllerTokens(APIException):
     status_code = 422
     default_detail = (
-        "More than one controller token found, "
+        "Found an existing controller token, "
         "currently only 1 token is supported"
     )
 
