@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import django.db.utils
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -23,7 +24,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from aap_eda.api import serializers
-from aap_eda.api.exceptions import TooManyControllerTokens
+from aap_eda.api.exceptions import Conflict, TooManyControllerTokens
 from aap_eda.core import models
 
 from .mixins import (
@@ -164,6 +165,8 @@ class CurrentUserAwxTokenViewSet(
 
             serializer.save(user=self.request.user)
 
+        except django.db.utils.IntegrityError as ie:
+            raise Conflict(str(ie))
         except TooManyControllerTokens as e:
             raise TooManyControllerTokens(e)
 

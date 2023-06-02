@@ -20,6 +20,7 @@ from aap_eda.api.exceptions import (
     InvalidWebsocketHost,
     InvalidWebsocketScheme,
     NoControllerToken,
+    TooManyControllerTokens,
 )
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
@@ -130,6 +131,8 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         tokens = models.AwxToken.objects.filter(user_id=user.id).count()
         if tokens == 0:
             raise NoControllerToken()
+        elif tokens > 1:
+            raise TooManyControllerTokens()
 
         ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
         parsed_url = urllib.parse.urlparse(ws_url)
