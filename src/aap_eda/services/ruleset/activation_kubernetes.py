@@ -285,9 +285,12 @@ class ActivationKubernetes:
             time.sleep(10)
 
         logger.info(f"Create Job: {job_name}")
-        self.batch_api.create_namespaced_job(
-            namespace=namespace, body=job_spec, async_req=True
+        job_result = self.batch_api.create_namespaced_job(
+            namespace=namespace, body=job_spec
         )
+
+        logger.info(f"Job Info: {job_result}")
+
         w = watch.Watch()
 
         done = False
