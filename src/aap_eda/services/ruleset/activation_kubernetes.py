@@ -399,7 +399,11 @@ class ActivationKubernetes:
 
     def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()
-        pod_failed_reasons = ["InvalidImageName", "ImagePullBackOff"]
+        pod_failed_reasons = [
+            "InvalidImageName",
+            "ImagePullBackOff",
+            "ErrImagePull",
+        ]
 
         done = False
         while not done:
