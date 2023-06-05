@@ -399,6 +399,11 @@ class ActivationKubernetes:
 
     def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()
+        pod_failed_reasons = [
+            "InvalidImageName",
+            "ImagePullBackOff",
+            "ErrImagePull",
+        ]
 
         done = False
         while not done:
@@ -411,6 +416,24 @@ class ActivationKubernetes:
                     if event["object"].status.phase == "Pending":
                         pod_name = event["object"].metadata.name
                         logger.info(f"Pod {pod_name} - Pending")
+
+                        statuses = event["object"].status.container_statuses
+
+                        if statuses:
+                            for status in statuses:
+                                if status:
+                                    logger.info(f"CONT STATUS: {status}")
+
+                                    if status.state.waiting:
+                                        message = status.state.waiting.message
+                                        reason = status.state.waiting.reason
+                                        if reason in pod_failed_reasons:
+                                            self.delete_job(
+                                                activation_instance, namespace
+                                            )
+                                            raise K8sActivationException(
+                                                message
+                                            )
 
                     if event["object"].status.phase == "Running":
                         pod_name = event["object"].metadata.name
