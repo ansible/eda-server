@@ -158,6 +158,9 @@ class ActivationPodman:
         except APIError:
             logger.exception("Container run failed")
             raise
+        finally:
+            if container:
+                container.remove(force=True, v=True)
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
