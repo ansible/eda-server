@@ -83,10 +83,10 @@ class AuditRule(models.Model):
     ruleset_uuid = models.UUIDField(null=True)
     ruleset_name = models.TextField(null=True)
     activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE, null=True
+        "ActivationInstance", on_delete=models.SET_NULL, null=True
     )
     job_instance = models.ForeignKey(
-        "JobInstance", on_delete=models.CASCADE, null=True
+        "JobInstance", on_delete=models.SET_NULL, null=True
     )
     definition = models.JSONField(null=False, default=dict)
 
