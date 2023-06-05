@@ -411,7 +411,6 @@ class ActivateRulesets:
         namespace = ns_fileref.read()
         ns_fileref.close()
 
-        activation_name = activation.name
         activation_id = activation.pk
         job_name = f"activation-job-{activation_id}"
         pod_name = f"activation-pod-{activation_id}"
@@ -423,7 +422,7 @@ class ActivateRulesets:
             pull_policy=_pull_policy,
             url=ws_url,
             ssl_verify=ssl_verify,
-            activation_id=activation_instance.id,
+            activation_id=str(activation_id),
             ports=[
                 port
                 for _, port in find_ports(
@@ -450,7 +449,7 @@ class ActivateRulesets:
 
         job_spec = k8s.create_job(
             job_name=job_name,
-            activation_name=activation_name,
+            activation_id=str(activation_id),
             pod_template=pod_spec,
             ttl=30,
         )

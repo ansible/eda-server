@@ -201,14 +201,14 @@ class ActivationKubernetes:
 
     @staticmethod
     def create_job(
-        job_name, activation_name, pod_template, backoff_limit=0, ttl=0
+        job_name, activation_id, pod_template, backoff_limit=0, ttl=0
     ) -> client.V1Job:
         metadata = client.V1ObjectMeta(
             name=job_name,
             labels={
                 "job-name": job_name,
                 "app": "eda",
-                "activation-name": activation_name,
+                "activation-id": str(activation_id),
             },
         )
 
@@ -232,7 +232,8 @@ class ActivationKubernetes:
             instance_name = activation_instance.name
             activation_job = self.batch_api.list_namespaced_job(
                 namespace=namespace,
-                label_selector=f"activation-name={instance_name}",
+                label_selector="activation-id="
+                f"{activation_instance.activation.pk}",
                 timeout_seconds=0,
             )
 
