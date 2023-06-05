@@ -217,11 +217,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
-        elif audit_rule.fired_at > datetime.strptime(
-            message.rule_run_at, DATETIME_FORMAT
-        ):
-            logger.info(f"Ignore the fired audit rule {audit_rule.name}")
-            return
         else:
             audit_rule.fired_at = message.rule_run_at
             audit_rule.status = message.status
