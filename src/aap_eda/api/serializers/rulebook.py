@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from aap_eda.core import models
@@ -221,7 +222,61 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-class AuditRuleOutSerializer(serializers.Serializer):
+class AuditRuleDetailSerializer(serializers.Serializer):
+    id = serializers.IntegerField(
+        required=True,
+        help_text="ID of the fired rule",
+    )
+
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the fired rule",
+    )
+
+    description = serializers.CharField(
+        required=True,
+        help_text="Description of the fired rule",
+    )
+
+    status = serializers.CharField(
+        required=False,
+        help_text="Status of the fired rule",
+    )
+
+    activation_instance = serializers.SerializerMethodField()
+
+    ruleset_name = serializers.CharField(
+        required=False,
+        help_text="Name of the related ruleset",
+    )
+
+    created_at = serializers.DateTimeField(
+        required=True,
+        help_text="The created timestamp of the action",
+    )
+
+    fired_at = serializers.DateTimeField(
+        required=True,
+        help_text="The fired timestamp of the rule",
+    )
+
+    definition = serializers.JSONField(
+        required=False,
+        help_text="The action definition in the rule",
+    )
+
+    @extend_schema_field(
+        {"type": "dict", "example": {"id": "int", "name": "string"}}
+    )
+    def get_activation_instance(self, rule):
+        instance = rule.activation_instance
+        if instance:
+            return {"id": instance.id, "name": instance.name}
+        else:
+            return {"id": None, "name": "DELETED"}
+
+
+class AuditRuleListSerializer(serializers.Serializer):
     id = serializers.IntegerField(
         required=True,
         help_text="ID of the fired rule",
@@ -237,31 +292,22 @@ class AuditRuleOutSerializer(serializers.Serializer):
         help_text="Status of the fired rule",
     )
 
+    activation_instance = serializers.SerializerMethodField()
+
     fired_at = serializers.DateTimeField(
         required=True,
         help_text="The fired timestamp of the rule",
     )
 
-    definition = serializers.JSONField(
-        required=False,
-        help_text="The action definition in the rule",
+    @extend_schema_field(
+        {"type": "dict", "example": {"id": "int", "name": "string"}}
     )
-
-    created_at = serializers.DateTimeField(
-        required=True,
-        help_text="The created timestamp of the action",
-    )
-
-    activation_id = serializers.PrimaryKeyRelatedField(
-        required=True,
-        queryset=models.Activation.objects.all(),
-        help_text="ID of the related Activation",
-    )
-
-    activation_name = serializers.CharField(
-        required=True,
-        help_text="Name of the related Activation",
-    )
+    def get_activation_instance(self, rule):
+        instance = rule.activation_instance
+        if instance:
+            return {"id": instance.id, "name": instance.name}
+        else:
+            return {"id": None, "name": "DELETED"}
 
 
 class AuditActionSerializer(serializers.ModelSerializer):
