@@ -342,16 +342,9 @@ def test_list_audit_rules(client: APIClient, init_db):
     assert list(audit_rules[0]) == [
         "id",
         "name",
-        "description",
         "status",
-        "created_at",
+        "activation_instance",
         "fired_at",
-        "rule_uuid",
-        "ruleset_uuid",
-        "ruleset_name",
-        "activation_instance_id",
-        "job_instance_id",
-        "definition",
     ]
 
 
