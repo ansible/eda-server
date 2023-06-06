@@ -49,7 +49,7 @@ class ActivationKubernetes:
         pull_policy,
         url,
         ssl_verify,
-        activation_id,
+        activation_instance_id,
         ports,
         heartbeat,
     ) -> client.V1Container:
@@ -60,7 +60,7 @@ class ActivationKubernetes:
             "--websocket-ssl-verify",
             ssl_verify,
             "--id",
-            str(activation_id),
+            str(activation_instance_id),
             "--heartbeat",
             str(heartbeat),
         ]

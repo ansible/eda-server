@@ -422,7 +422,7 @@ class ActivateRulesets:
             pull_policy=_pull_policy,
             url=ws_url,
             ssl_verify=ssl_verify,
-            activation_id=str(activation_id),
+            activation_instance_id=activation_instance.id,
             ports=[
                 port
                 for _, port in find_ports(
