@@ -180,50 +180,44 @@ class RulesetViewSet(
         return self.get_paginated_response(serializer.data)
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        description="Get the fired rule by its id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.AuditRuleDetailSerializer,
+                description="Return the fired rule by its id.",
+            ),
+        },
+    ),
+    list=extend_schema(
+        description="List all fired rules",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.AuditRuleListSerializer,
+                description="Return a list of fired rules.",
+            ),
+        },
+    ),
+)
 class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.AuditRule.objects.all()
-    serializer_class = serializers.AuditRuleSerializer
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return serializers.AuditRuleDetailSerializer
+        elif self.action == "list":
+            return serializers.AuditRuleListSerializer
+        elif self.action == "actions":
+            return serializers.AuditActionSerializer
+        elif self.action == "events":
+            return serializers.AuditEventSerializer
+        return serializers.AuditRuleSerializer
+
     rbac_resource_type = ResourceType.AUDIT_RULE
     rbac_action = None
-
-    @extend_schema(
-        description="Get the fired rule by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.AuditRuleOutSerializer,
-                description="Return the fired rule by its id.",
-            ),
-        },
-    )
-    def retrieve(self, _request, pk=None):
-        audit_rule = get_object_or_404(models.AuditRule, pk=pk)
-        activation = audit_rule.activation_instance.activation
-
-        data = serializers.AuditRuleSerializer(audit_rule).data
-        data["activation_id"] = activation.id
-        data["activation_name"] = activation.name
-
-        return Response(data)
-
-    @extend_schema(
-        description="List all fired rules",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.AuditRuleSerializer,
-                description="Return a list of fired rules.",
-            ),
-        },
-    )
-    def list(self, _request):
-        audit_rules = models.AuditRule.objects.all()
-        results = self.filter_queryset(audit_rules)
-
-        results = self.paginate_queryset(results)
-        serializer = serializers.AuditRuleSerializer(results, many=True)
-
-        return self.get_paginated_response(serializer.data)
 
     @extend_schema(
         description="Action list of a fired rule by its id",
