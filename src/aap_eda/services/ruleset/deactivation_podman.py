@@ -53,23 +53,24 @@ class DeactivationPodman:
             )
             if self.client.containers.exists(container_id):
                 container = self.client.containers.get(container_id)
-                container.stop(ignore=True)
-                container.remove(force=True, v=True)
+                if container.status == "running":
+                    container.stop(ignore=True)
+                    container.remove(force=True, v=True)
 
-                message = f"Container {container_id} is removed."
-                logger.info(message)
-                self.activation_db_logger.write(message, True)
+                    message = f"Container {container_id} is removed."
+                    logger.info(message)
+                    self.activation_db_logger.write(message, True)
+
+                    activation_instance.activation_pod_id = None
+                    activation_instance.status = ActivationStatus.STOPPED
+                    activation_instance.save(
+                        update_fields=["status", "activation_pod_id"]
+                    )
             else:
                 logger.warning(f"Container {container_id} not found.")
                 self.activation_db_logger.write(
                     f"Container {container_id} not found.", True
                 )
-
-            activation_instance.activation_pod_id = None
-            activation_instance.status = ActivationStatus.STOPPED
-            activation_instance.save(
-                update_fields=["status", "activation_pod_id"]
-            )
         except APIError as e:
             logger.exception(
                 f"Failed to remove container: {container_id}; error: {str(e)}"
