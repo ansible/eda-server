@@ -49,7 +49,7 @@ def drop_permissions(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0022_reverse_role_users"),
+        ("core", "0001_initial"),
     ]
 
     operations = [migrations.RunPython(insert_permissions, drop_permissions)]
