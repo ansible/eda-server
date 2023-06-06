@@ -9,6 +9,7 @@ vars:
   PYTEST_CMD: "poetry run python -m pytest"
   MINIKUBE_CMD: "scripts/eda_kube.sh"
   SUSER_CMD: "scripts/create_superuser.sh"
+  PODMAN_CMD: "scripts/eda_podman.sh"
 
 tasks:
   default:
@@ -215,7 +216,7 @@ tasks:
   minikube:
     desc: "Run eda_kube.sh with specified CLI arguments."
     summary: |
-      Run eda.sh with specified CLI arguments.
+      Run eda_kube.sh with specified CLI arguments.
 
       Example:
         $ task minikube -- build
@@ -277,3 +278,41 @@ tasks:
       - task: minikube:clean
       - task: minikube:build
       - task: minikube:deploy
+
+  macpodman:
+    desc: "Run eda_podman.sh with specified CLI arguments."
+    summary: |
+      Run eda_podman.sh with specified CLI arguments.
+
+      Example:
+        $ task podman -- help
+    cmds:
+      - "{{.PODMAN_CMD}} {{.CLI_ARGS}}"
+
+  macpodman:start:
+    desc: "start podman machine"
+    cmds:
+      - task: macpodman
+        vars:
+          CLI_ARGS: start
+
+  macpodman:stop:
+    desc: "stop podman machine"
+    cmds:
+      - task: macpodman
+        vars:
+          CLI_ARGS: stop
+
+  macpodman:restart:
+    desc: "restart podman machine"
+    cmds:
+      - task: macpodman
+        vars:
+          CLI_ARGS: restart
+
+  macpodman:tunnel:
+    desc: "tunnel for podman when running on host with docker"
+    cmds:
+      - task: macpodman
+        vars:
+          CLI_ARGS: tunnel
