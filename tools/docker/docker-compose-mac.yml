@@ -25,6 +25,8 @@ services:
   eda-api:
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
+    security_opt:
+      - label=disable
     command:
       - /bin/bash
       - -c
@@ -45,6 +47,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-worker:
     user: "${EDA_POD_USER_ID:-0}"
