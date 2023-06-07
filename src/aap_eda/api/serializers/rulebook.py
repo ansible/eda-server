@@ -266,7 +266,14 @@ class AuditRuleDetailSerializer(serializers.Serializer):
     )
 
     @extend_schema_field(
-        {"type": "dict", "example": {"id": "int", "name": "string"}}
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer"},
+                "name": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string"},
+        }
     )
     def get_activation_instance(self, rule):
         instance = rule.activation_instance
@@ -300,7 +307,14 @@ class AuditRuleListSerializer(serializers.Serializer):
     )
 
     @extend_schema_field(
-        {"type": "dict", "example": {"id": "int", "name": "string"}}
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer"},
+                "name": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string"},
+        }
     )
     def get_activation_instance(self, rule):
         instance = rule.activation_instance
