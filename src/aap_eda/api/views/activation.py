@@ -428,7 +428,9 @@ class ActivationInstanceViewSet(
     @extend_schema(
         description="List all logs for the Activation Instance",
         responses={
-            status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer
+            status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(
+                many=True
+            )
         },
     )
     @action(detail=True, rbac_action=Action.READ)
