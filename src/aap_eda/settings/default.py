@@ -28,7 +28,12 @@ Common settings:
 The following values can be defined as well as environment variables
 with the prefix EDA_:
 
-* SECRET_KEY
+* SETTINGS_FILE - An path to file to load settings from
+    Default: /etc/eda/settings.yaml
+* SECRET_KEY - A Django secret key.
+* SECRET_KEY_FILE - A file path to load Django secret key from.
+    Example:
+      export SECRET_KEY_FILE=/etc/eda
 * DEBUG
 * ALLOWED_HOSTS - A list of allowed hostnames or
     a comma separated string.
@@ -53,14 +58,40 @@ Redis queue settings:
 * MQ_DB - Redis queue database (default: 0)
 """
 import dynaconf
+from django.core.exceptions import ImproperlyConfigured
 
-settings = dynaconf.Dynaconf(envvar_prefix="EDA")
+default_settings_file = "/etc/eda/settings.yaml"
+
+settings = dynaconf.Dynaconf(
+    envvar="EDA_SETTINGS_FILE",
+    envvar_prefix="EDA",
+    settings_file=default_settings_file,
+)
+
 
 # ---------------------------------------------------------
 # DJANGO SETTINGS
 # ---------------------------------------------------------
+def _get_secret_key() -> str:
+    secret_key = settings.get("SECRET_KEY")
+    secret_key_file = settings.get("SECRET_KEY_FILE")
+    if secret_key and secret_key_file:
+        raise ImproperlyConfigured(
+            'Settings parameters "SECRET_KEY" and "SECRET_KEY_FILE"'
+            " are mutually exclusive."
+        )
+    if secret_key:
+        return secret_key
+    if secret_key_file:
+        with open(secret_key_file) as fp:
+            return fp.read().strip()
+    raise ImproperlyConfigured(
+        'Either "SECRET_KEY" or "SECRET_KEY_FILE" settings'
+        " parameters must be set."
+    )
 
-SECRET_KEY = settings.get("SECRET_KEY")
+
+SECRET_KEY = _get_secret_key()
 
 DEBUG = settings.get("DEBUG", False)
 
