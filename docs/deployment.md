@@ -36,21 +36,12 @@ For further information please refer our [guidelines](development.md#Taskfile).
 git clone git@github.com:ansible/aap-eda.git
 ```
 
-#### Configure podman socket
-
-Eda-server needs to be able to communicate with the podman socket. To do so, you need to mount it in the worker pod. This can be done setting the environment variable `EDA_HOST_PODMAN_SOCKET_URL` pointing to the path of the podman socket in the host. For example:
-
-```shell
-export EDA_HOST_PODMAN_SOCKET_URL=$XDG_RUNTIME_DIR/podman/podman.sock
-```
-
 #### Configure AWX integration
 
-You might want to configure the AWX integration. To do so, you need to set the environment variables `EDA_CONTROLLER_URL`, `EDA_CONTROLLER_TOKEN` and `EDA_CONTROLLER_SSL_VERIFY`. For example:
+You might want to configure the AWX integration. To do so, you need to set the environment variables `EDA_CONTROLLER_URL` and `EDA_CONTROLLER_SSL_VERIFY`. For example:
 
 ```shell
   export EDA_CONTROLLER_URL=https://awx-example.com
-  export EDA_CONTROLLER_TOKEN=some-secret-token
   export EDA_CONTROLLER_SSL_VERIFY=yes
 ```
 
