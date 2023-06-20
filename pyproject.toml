@@ -42,6 +42,7 @@ pydantic = "*"
 cryptography = "*"
 kubernetes = "*"
 podman = ">=4.5"
+gunicorn = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
