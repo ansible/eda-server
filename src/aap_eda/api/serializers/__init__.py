@@ -49,7 +49,8 @@ from .project import (
 from .rulebook import (
     AuditActionSerializer,
     AuditEventSerializer,
-    AuditRuleOutSerializer,
+    AuditRuleDetailSerializer,
+    AuditRuleListSerializer,
     AuditRuleSerializer,
     RulebookRefSerializer,
     RulebookSerializer,
@@ -62,6 +63,7 @@ from .tasks import TaskRefSerializer, TaskSerializer
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
+    CurrentUserUpdateSerializer,
     UserCreateUpdateSerializer,
     UserDetailSerializer,
     UserListSerializer,
@@ -81,7 +83,8 @@ __all__ = (
     "AuditActionSerializer",
     "AuditEventSerializer",
     "AuditRuleSerializer",
-    "AuditRuleOutSerializer",
+    "AuditRuleDetailSerializer",
+    "AuditRuleListSerializer",
     "RulebookSerializer",
     "RulebookRefSerializer",
     "RulesetOutSerializer",
@@ -99,11 +102,13 @@ __all__ = (
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
     # users
+    "AwxTokenSerializer",
+    "AwxTokenCreateSerializer",
+    "CurrentUserUpdateSerializer",
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",
     "UserDetailSerializer",
-    "AwxTokenSerializer",
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",

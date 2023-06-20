@@ -6,23 +6,15 @@ x-environment:
   - EDA_DB_PASSWORD=secret
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
-  - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-api:8000}
+  - EDA_DEPLOYMENT_TYPE=podman
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://host.containers.internal:8080}
   - EDA_WEBSOCKET_SSL_VERIFY=no
-  - EDA_PODMAN_SOCKET_URL=tcp://podman:8888
-  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
-  - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
-  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
+  - EDA_PODMAN_SOCKET_URL="unix:///run/podman/podman.sock"
+  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:?Please specify EDA_CONTROLLER_URL env}
+  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-yes}
+  - EDA_PODMAN_EXTRA_ARGS='@json {"network_mode":"host"}'
 
 services:
-  podman:
-    user: "1000"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4.5}
-    privileged: true
-    command: podman system service --time=0 tcp://0.0.0.0:8888
-    ports:
-      - 8888:8888
-
   eda-ui:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     ports:
@@ -33,6 +25,8 @@ services:
   eda-api:
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
+    security_opt:
+      - label=disable
     command:
       - /bin/bash
       - -c
@@ -53,6 +47,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -60,6 +56,8 @@ services:
       replicas: ${EDA_NUM_WORKERS:-2}
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
+    security_opt:
+      - label=disable
     command:
       - aap-eda-manage
       - rqworker
@@ -73,7 +71,7 @@ services:
         condition: service_healthy
     restart: always
     volumes:
-      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
 
   postgres:
     image: 'docker.io/library/postgres:13'

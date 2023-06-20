@@ -134,6 +134,7 @@ class ActivationPodman:
             logger.info(
                 f"Created container: "
                 f"name: {container.name}, "
+                f"id: {container.id}, "
                 f"ports: {container.ports}, "
                 f"status: {container.status}, "
                 f"command: {args}"
@@ -159,8 +160,10 @@ class ActivationPodman:
             logger.exception("Container run failed")
             raise
         finally:
-            if container:
+            if container and self.client.containers.exists(container.id):
+                container_id = container.id
                 container.remove(force=True, v=True)
+                logger.info(f"Container {container_id} is cleaned up.")
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
@@ -267,7 +270,7 @@ class ActivationPodman:
                 self.activation_db_logger.write(line)
                 lines_streamed += 1
         except StopIteration:
-            logger.info(f"log stream ended for {container.name}")
+            logger.info(f"log stream ended for {container.id}")
 
         try:
             self.return_code = container.wait(condition="exited")
@@ -275,35 +278,35 @@ class ActivationPodman:
             self.activation_db_logger.write(
                 f"Container exit code: {self.return_code}"
             )
+
+            # If we haven't streamed any lines, collect the logs
+            # when the container ends.
+            # Seems to be differences between 4.1.1 and 4.5 of podman
+            if lines_streamed == 0:
+                for line in container.logs():
+                    self.activation_db_logger.write(line.decode("utf-8"))
+
+            logger.info(
+                f"{self.activation_db_logger.lines_written()}"
+                " activation instance log entries created."
+            )
         except NotFound:
             instance.refresh_from_db()
-            if (
-                instance.status == ActivationStatus.STOPPING
-                or instance.status == ActivationStatus.STOPPED
-            ):
-                logger.info("Container {container.name} has been removed.")
+            if instance.status == ActivationStatus.STOPPED.value:
+                logger.info(
+                    f"Container {container.id} was removed by deactivation."
+                )
+                self.return_code = GRACEFUL_TERM
             else:
                 raise
-
-        # If we haven't streamed any lines, collect the logs
-        # when the container ends.
-        # Seems to be differences between 4.1.1 and 4.5 of podman
-        if lines_streamed == 0:
-            for line in container.logs():
-                self.activation_db_logger.write(line.decode("utf-8"))
-
-        logger.info(
-            f"{self.activation_db_logger.lines_written()}"
-            " activation instance log entries created."
-        )
 
         message = CONTAINER_ERROR_CODES_MAP.get(
             self.return_code, f"exit code {self.return_code}"
         )
         if self.return_code == 0 or self.return_code == GRACEFUL_TERM:
-            logger.info(f"Container {container.name} is {message}.")
+            logger.info(f"Container {container.id} received {message}.")
             self.activation_db_logger.write(
-                f"Container {container.name} is {message}.", True
+                f"Container {container.id} received {message}.", True
             )
         else:
             raise ActivationException(f"Activation failed: {message}")

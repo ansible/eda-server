@@ -38,7 +38,7 @@ router.register("audit-events", views.AuditEventViewSet)
 router.register("users", views.UserViewSet)
 router.register(
     "users/me/awx-tokens",
-    views.CurrentUserAwxTokensViewSet,
+    views.CurrentUserAwxTokenViewSet,
     basename="controller-token",
 )
 router.register("credentials", views.CredentialViewSet)

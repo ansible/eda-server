@@ -38,7 +38,7 @@ class CurrentUserView(views.APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     @extend_schema(
-        operation_id="retrieve_current_user",
+        operation_id="get_current_user",
         description="Get current user.",
         request=None,
         responses={
@@ -52,6 +52,28 @@ class CurrentUserView(views.APIView):
         user = request.user
         serializer = serializers.UserDetailSerializer(user)
         return Response(data=serializer.data)
+
+    @extend_schema(
+        operation_id="update_current_user",
+        description="Update current user.",
+        request=serializers.CurrentUserUpdateSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Return current user.",
+                response=serializers.UserDetailSerializer,
+            )
+        },
+    )
+    def patch(self, request: Request, *args, **kwargs) -> Response:
+        user = request.user
+        serializer = serializers.CurrentUserUpdateSerializer(
+            user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        response_serializer = serializers.UserDetailSerializer(user)
+        return Response(response_serializer.data)
 
 
 @extend_schema_view(
@@ -109,7 +131,7 @@ class CurrentUserView(views.APIView):
         },
     ),
 )
-class CurrentUserAwxTokensViewSet(
+class CurrentUserAwxTokenViewSet(
     CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
