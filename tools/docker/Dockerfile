@@ -32,6 +32,7 @@ ENV POETRY_VERSION='1.4.0' \
 
 # Install poetry, create virtual environment
 RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
+    gunicorn \
     && python3 -m venv "$VIRTUAL_ENV" \
     && poetry config virtualenvs.create false
 
