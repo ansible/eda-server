@@ -63,6 +63,7 @@ from .tasks import TaskRefSerializer, TaskSerializer
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
+    CurrentUserUpdateSerializer,
     UserCreateUpdateSerializer,
     UserDetailSerializer,
     UserListSerializer,
@@ -101,11 +102,13 @@ __all__ = (
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
     # users
+    "AwxTokenSerializer",
+    "AwxTokenCreateSerializer",
+    "CurrentUserUpdateSerializer",
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",
     "UserDetailSerializer",
-    "AwxTokenSerializer",
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",

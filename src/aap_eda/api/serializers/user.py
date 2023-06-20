@@ -63,12 +63,25 @@ class UserListSerializer(serializers.Serializer):
     roles = RoleRefSerializer(read_only=True, many=True)
 
 
-class UserCreateUpdateSerializer(serializers.ModelSerializer):
+class UserUpdateSerializerBase(serializers.ModelSerializer):
     username = serializers.CharField(
         help_text="The user's log in name.",
     )
     password = serializers.CharField(write_only=True)
 
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        validated_data["password"] = make_password(password)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        if password:
+            validated_data["password"] = make_password(password)
+        return super().update(instance, validated_data)
+
+
+class UserCreateUpdateSerializer(UserUpdateSerializerBase):
     class Meta:
         model = models.User
         fields = [
@@ -80,18 +93,16 @@ class UserCreateUpdateSerializer(serializers.ModelSerializer):
             "roles",
         ]
 
-    def create(self, validated_data):
-        password = validated_data.pop("password")
-        validated_data["password"] = make_password(password)
-        return super(UserCreateUpdateSerializer, self).create(validated_data)
 
-    def update(self, instance, validated_data):
-        password = validated_data.pop("password", None)
-        if password:
-            validated_data["password"] = make_password(password)
-        return super(UserCreateUpdateSerializer, self).update(
-            instance, validated_data
-        )
+class CurrentUserUpdateSerializer(UserUpdateSerializerBase):
+    class Meta:
+        model = models.User
+        fields = [
+            "first_name",
+            "last_name",
+            "email",
+            "password",
+        ]
 
 
 class AwxTokenSerializer(serializers.ModelSerializer):
