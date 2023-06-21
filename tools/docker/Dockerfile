@@ -32,7 +32,6 @@ ENV POETRY_VERSION='1.4.0' \
 
 # Install poetry, create virtual environment
 RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
-    gunicorn \
     && python3 -m venv "$VIRTUAL_ENV" \
     && poetry config virtualenvs.create false
 
@@ -40,7 +39,8 @@ WORKDIR $SOURCES_DIR
 
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 COPY pyproject.toml poetry.lock $SOURCES_DIR/
-RUN poetry install -E all --no-root --no-cache
+RUN poetry install -E all --no-root --no-cache \
+    && python3 -m pip install gunicorn
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 
