@@ -356,7 +356,7 @@ def test_update_project_conflict(client: APIClient):
     # NOTE(cutwater): Should be 409 Conflict
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {
-        "name": ["project with this name already exists."]
+        "name": ["A project with this name already exists."]
     }
 
 
