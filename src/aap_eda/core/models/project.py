@@ -45,7 +45,11 @@ class Project(models.Model):
         FAILED = "failed"
         COMPLETED = "completed"
 
-    name = models.TextField(null=False, unique=True)
+    name = models.TextField(
+        null=False,
+        unique=True,
+        error_messages={"unique": "A project with this name already exists."},
+    )
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
     git_hash = models.TextField()
