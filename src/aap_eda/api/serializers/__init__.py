@@ -38,6 +38,7 @@ from .decision_environment import (
     DecisionEnvironmentSerializer,
 )
 from .project import (
+    ExtraVarCreateSerializer,
     ExtraVarRefSerializer,
     ExtraVarSerializer,
     PlaybookSerializer,
@@ -75,6 +76,7 @@ __all__ = (
     "LoginSerializer",
     # project
     "ExtraVarSerializer",
+    "ExtraVarCreateSerializer",
     "ExtraVarRefSerializer",
     "PlaybookSerializer",
     "ProjectSerializer",

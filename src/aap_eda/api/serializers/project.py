@@ -101,6 +101,17 @@ class ExtraVarSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class ExtraVarCreateSerializer(serializers.ModelSerializer):
+    extra_var = serializers.CharField(
+        required=True,
+        help_text="Content of the extra_var",
+    )
+
+    class Meta:
+        model = models.ExtraVar
+        fields = ["extra_var"]
+
+
 class ExtraVarRefSerializer(serializers.ModelSerializer):
     """Serializer for Extra Var reference."""
 
