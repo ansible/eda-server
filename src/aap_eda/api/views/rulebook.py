@@ -204,6 +204,8 @@ class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.AuditRule.objects.all()
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filterset_class = filters.AuditRuleFilter
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -225,14 +227,29 @@ class AuditRuleViewSet(
         responses={
             status.HTTP_200_OK: serializers.AuditActionSerializer(many=True)
         },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this rule audit.",  # noqa: E501
+            )
+        ],
     )
-    @action(detail=True, rbac_action=Action.READ)
-    def actions(self, _request, pk):
-        audit_rule = get_object_or_404(models.AuditRule, pk=pk)
+    @action(
+        detail=False,
+        queryset=models.AuditAction.objects.order_by("id"),
+        filterset_class=filters.AuditRuleActionFilter,
+        rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/actions",
+    )
+    def actions(self, _request, id):
+        audit_rule = get_object_or_404(models.AuditRule, id=id)
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
         )
+        audit_actions = self.filter_queryset(audit_actions)
 
         results = self.paginate_queryset(audit_actions)
         serializer = serializers.AuditActionSerializer(results, many=True)
@@ -245,14 +262,25 @@ class AuditRuleViewSet(
         responses={
             status.HTTP_200_OK: serializers.AuditEventSerializer(many=True)
         },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this Audit Rule.",  # noqa: E501
+            )
+        ],
     )
     @action(
-        detail=True,
+        detail=False,
+        queryset=models.AuditEvent.objects.order_by("id"),
+        filterset_class=filters.AuditRuleEventFilter,
         rbac_resource_type=ResourceType.AUDIT_EVENT,
         rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/events",
     )
-    def events(self, _request, pk):
-        audit_rule = get_object_or_404(models.AuditRule, pk=pk)
+    def events(self, _request, id):
+        audit_rule = get_object_or_404(models.AuditRule, id=id)
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
@@ -262,6 +290,7 @@ class AuditRuleViewSet(
         for audit_action in audit_actions:
             eqs = eqs.union(audit_action.audit_events.all())
 
+        eqs = self.filter_queryset(eqs)
         results = self.paginate_queryset(eqs)
         serializer = serializers.AuditEventSerializer(results, many=True)
 
@@ -293,6 +322,8 @@ class AuditEventViewSet(
 ):
     queryset = models.AuditEvent.objects.all()
     serializer_class = serializers.AuditEventSerializer
+    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filterset_class = filters.AuditRuleEventFilter
 
     rbac_resource_type = ResourceType.AUDIT_EVENT
 

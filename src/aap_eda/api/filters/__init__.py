@@ -16,7 +16,13 @@ from .activation import ActivationFilter, ActivationInstanceFilter
 from .credential import CredentialFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .project import ProjectFilter
-from .rulebook import RulebookFilter, RulesetFilter
+from .rulebook import (
+    AuditRuleActionFilter,
+    AuditRuleEventFilter,
+    AuditRuleFilter,
+    RulebookFilter,
+    RulesetFilter,
+)
 
 __all__ = (
     # project
@@ -24,6 +30,9 @@ __all__ = (
     # rulebook
     "RulebookFilter",
     "RulesetFilter",
+    "AuditRuleFilter",
+    "AuditRuleActionFilter",
+    "AuditRuleEventFilter",
     # credential
     "CredentialFilter",
     # decision_environment
