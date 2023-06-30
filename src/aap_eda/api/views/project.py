@@ -51,6 +51,7 @@ from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
     ),
     create=extend_schema(
         description="Create an extra_var",
+        request=serializers.ExtraVarCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.ExtraVarSerializer,
