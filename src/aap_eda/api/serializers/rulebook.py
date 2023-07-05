@@ -269,7 +269,7 @@ class AuditRuleDetailSerializer(serializers.Serializer):
         {
             "type": "object",
             "properties": {
-                "id": {"type": "integer"},
+                "id": {"type": "integer", "nullable": True},
                 "name": {"type": "string"},
             },
             "example": {"id": 0, "name": "string"},
@@ -310,7 +310,7 @@ class AuditRuleListSerializer(serializers.Serializer):
         {
             "type": "object",
             "properties": {
-                "id": {"type": "integer"},
+                "id": {"type": "integer", "nullable": True},
                 "name": {"type": "string"},
             },
             "example": {"id": 0, "name": "string"},
