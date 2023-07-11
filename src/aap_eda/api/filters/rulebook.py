@@ -72,7 +72,7 @@ class AuditRuleActionFilter(django_filters.FilterSet):
 
 
 class AuditRuleEventFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
+    source_name = django_filters.CharFilter(
         field_name="source_name",
         lookup_expr="istartswith",
         label="Filter by rule audit event source name.",
@@ -80,4 +80,4 @@ class AuditRuleEventFilter(django_filters.FilterSet):
 
     class Meta:
         model = models.AuditEvent
-        fields = ["name"]
+        fields = ["source_name"]
