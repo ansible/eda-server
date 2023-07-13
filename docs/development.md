@@ -152,7 +152,7 @@ pyproject.toml files. In case of conflict, a developer must manually execute eit
 ### Clone the repository
 
 ```shell
-git clone git@github.com:ansible/aap-eda.git
+git clone git@github.com:ansible/eda-server.git
 ```
 
 ### Install dependencies
