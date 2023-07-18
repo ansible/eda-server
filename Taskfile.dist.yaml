@@ -160,7 +160,7 @@ tasks:
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: run --rm api aap-eda-manage migrate
+          CLI_ARGS: run --rm eda-api aap-eda-manage migrate
 
   docker:down:
     desc: "Stop all services."
@@ -188,14 +188,14 @@ tasks:
       cmds:
         - task: docker
           vars:
-            CLI_ARGS: exec -it api aap-eda-manage shell
+            CLI_ARGS: exec -it eda-api aap-eda-manage shell
 
   docker:shell:worker:
     desc: "Run the management shell in worker container"
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: exec -it worker aap-eda-manage shell
+          CLI_ARGS: exec -it eda-worker aap-eda-manage shell
 
   create:superuser:
     desc: "create a superuser to use with EDA API."

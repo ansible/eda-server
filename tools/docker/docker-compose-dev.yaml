@@ -3,12 +3,32 @@ x-environment:
   - EDA_DB_HOST=postgres
   - EDA_MQ_HOST=redis
   - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
-  - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-local}
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://localhost:8000}
+  - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-api:8000}
   - EDA_WEBSOCKET_SSL_VERIFY=no
+  - EDA_PODMAN_SOCKET_URL=tcp://podman:8888
+  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
+  - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
+  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
 
 services:
-  api:
+  podman:
+    user: "1000"
+    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4.5}
+    privileged: true
+    command: podman system service --time=0 tcp://0.0.0.0:8888
+    ports:
+      - 8888:8888
+
+  eda-ui:
+    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    ports:
+      - '8080:8080'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+
+  eda-api:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     build:
       context: ../../
@@ -37,9 +57,9 @@ services:
     volumes:
       - '../../:/app/src:z'
 
-  worker:
+  eda-worker:
     deploy:
-      replicas: 1
+      replicas: ${EDA_NUM_WORKERS:-2}
     image: 'localhost/aap-eda-worker'
     build:
       context: ../../
@@ -59,14 +79,9 @@ services:
     environment:
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: eda
-    command: >
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c log_statement=${PG_LOG_STATEMENT:-none}
     ports:
       - '5432:5432'
     volumes:
-      - "./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:z"
-      - "./postgres/initdb.d:/docker-entrypoint-initdb.d:z"
-      - "./postgres/conf.d:/etc/postgresql/conf.d:z"
       - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
