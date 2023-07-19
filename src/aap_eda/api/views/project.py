@@ -110,6 +110,7 @@ class PlaybookViewSet(
     ),
     partial_update=extend_schema(
         description="Partial update of a project",
+        request=serializers.ProjectCreateRequestSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.ProjectSerializer,

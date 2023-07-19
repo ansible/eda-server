@@ -364,19 +364,29 @@ def test_update_project_conflict(client: APIClient):
 def test_partial_update_project(
     client: APIClient, check_permission_mock: mock.Mock
 ):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+
     project = models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
+    assert project.credential_id is None
+
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
-        data={"name": "test-project-01-updated"},
+        data={
+            "name": "test-project-01-updated",
+            "credential_id": credential.id,
+        },
     )
     assert response.status_code == status.HTTP_200_OK
 
     project = models.Project.objects.get(pk=project.id)
     assert project.name == "test-project-01-updated"
+    assert project.credential_id == credential.id
 
     assert_project_data(response.json(), project)
 

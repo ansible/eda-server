@@ -19,6 +19,8 @@ from aap_eda.core import models
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    credential_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = models.Project
         read_only_fields = [
