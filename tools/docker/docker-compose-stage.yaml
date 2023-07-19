@@ -54,6 +54,20 @@ services:
       timeout: 5s
       retries: 10
 
+  eda-scheduler:
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   eda-worker:
     user: "${EDA_POD_USER_ID:-0}"
     deploy:
@@ -63,7 +77,6 @@ services:
     command:
       - aap-eda-manage
       - rqworker
-      - --with-scheduler
       - --worker-class
       - aap_eda.core.tasking.Worker
     depends_on:
