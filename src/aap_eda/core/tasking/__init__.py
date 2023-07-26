@@ -16,8 +16,8 @@ from rq.serializers import JSONSerializer
 __all__ = [
     "Job",
     "Queue",
-    "Activation",
-    "Default",
+    "ActivationWorker",
+    "DefaultWorker",
     "enqueue",
     "job",
     "get_queue",
@@ -91,8 +91,8 @@ class Job(_Job):
         super().__init__(id, connection, serializer)
 
 
-class Default(_Worker):
-    """Custom worker class.
+class DefaultWorker(_Worker):
+    """Custom default worker class used for non-activation tasks.
 
     Uses JSONSerializer as a default one.
     """
@@ -100,7 +100,7 @@ class Default(_Worker):
     def __init__(
         self,
         queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = None,
+        name: Optional[str] = "default",
         default_result_ttl: int = DEFAULT_RESULT_TTL,
         connection: Optional[Connection] = None,
         exc_handler: Any = None,
@@ -139,8 +139,8 @@ class Default(_Worker):
         )
 
 
-class Activation(_Worker):
-    """Custom default class.
+class ActivationWorker(_Worker):
+    """Custom worker class used for activation related tasks.
 
     Uses JSONSerializer as a default one.
     """

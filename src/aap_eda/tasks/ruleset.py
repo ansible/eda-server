@@ -52,7 +52,7 @@ def activate_rulesets(
     )
 
 
-@job
+@job("default")
 def deactivate_rulesets(
     activation_instance_id: int,
     deployment_type: str,

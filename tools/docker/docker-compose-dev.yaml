@@ -62,8 +62,6 @@ services:
     build:
       context: ../../
       dockerfile: tools/docker/worker/Dockerfile
-      args:
-        - WORKER_CLASS: 'aap_eda.core.tasking.Default'
     environment: *common-env
     depends_on:
       redis:
@@ -81,8 +79,12 @@ services:
     build:
       context: ../../
       dockerfile: tools/docker/worker/Dockerfile
-      args:
-        - WORKER_CLASS: 'aap_eda.core.tasking.Activation'
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --with-scheduler
+      - --worker-class
+      - aap_eda.core.tasking.ActivationWorker
     environment: *common-env
     depends_on:
       redis:

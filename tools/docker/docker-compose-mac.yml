@@ -63,7 +63,7 @@ services:
       - rqworker
       - --with-scheduler
       - --worker-class
-      - aap_eda.core.tasking.Default
+      - aap_eda.core.tasking.DefaultWorker
     depends_on:
       redis:
         condition: service_healthy
@@ -86,7 +86,7 @@ services:
       - rqworker
       - --with-scheduler
       - --worker-class
-      - aap_eda.core.tasking.Activation
+      - aap_eda.core.tasking.ActivationWorker
     depends_on:
       redis:
         condition: service_healthy
