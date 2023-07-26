@@ -182,5 +182,5 @@ class GitExecutor:
             )
             logger.warning(message, e.returncode, e.cmd, e.stderr)
             if "Authentication failed" in e.stderr:
-                raise GitError(f"Authentication failed: {e}")
+                raise GitError("Authentication failed")
             raise GitError(str(e))
