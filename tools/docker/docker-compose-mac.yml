@@ -22,6 +22,7 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+
   eda-api:
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
@@ -61,7 +62,6 @@ services:
     command:
       - aap-eda-manage
       - rqworker
-      - --with-scheduler
       - --worker-class
       - aap_eda.core.tasking.Worker
     depends_on:
@@ -72,6 +72,20 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+
+  eda-scheduler:
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: 'docker.io/library/postgres:13'
