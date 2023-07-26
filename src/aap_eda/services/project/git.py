@@ -18,7 +18,7 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import IO, Final, Iterable, Optional
+from typing import IO, Final, Iterable, Optional, Union
 
 from aap_eda.core.models import Credential
 from aap_eda.core.types import StrPath
@@ -111,7 +111,12 @@ class GitRepository:
         :param _executor: Optional command executor.
         :return:
         """
+        if _executor is None:
+            _executor = GitExecutor()
+
         if credential:
+            passwd = credential.secret.get_secret_value()
+            _executor.ENVIRON["GIT_PASSWORD"] = passwd
             index = 0
             if url.startswith("https://"):
                 index = 8
@@ -119,11 +124,7 @@ class GitRepository:
                 index = 7
             if index > 0:
                 user = credential.username
-                passwd = credential.secret.get_secret_value()
-                url = f"{url[:index]}{user}:{passwd}@{url[index:]}"
-
-        if _executor is None:
-            _executor = GitExecutor()
+                url = f"{url[:index]}{user}:${{GIT_PASSWORD}}@{url[index:]}"
 
         cmd = ["clone", "--quiet"]
         if depth is not None:
@@ -138,13 +139,13 @@ class GitRepository:
 
 class GitExecutor:
     DEFAULT_TIMEOUT: Final = 30
-    DEFAULT_ENVIRON: Final = {
+    ENVIRON: dict = {
         "GIT_TERMINAL_PROMPT": "0",
     }
 
     def __call__(
         self,
-        args: Iterable[str],
+        args: Union[str, Iterable[str]],
         timeout: Optional[float] = None,
         cwd: Optional[StrPath] = None,
         stdout: Optional[IO] = None,
@@ -155,12 +156,16 @@ class GitExecutor:
 
         if timeout is None:
             timeout = self.DEFAULT_TIMEOUT
+
+        if isinstance(args, Iterable):
+            args = " ".join(args)
         try:
             return subprocess.run(
-                [GIT_COMMAND, *args],
+                f"{GIT_COMMAND} {args}",
+                shell=True,
                 check=True,
                 encoding="utf-8",
-                env=self.DEFAULT_ENVIRON,
+                env=self.ENVIRON,
                 stdout=stdout,
                 stderr=stderr,
                 timeout=timeout,
@@ -176,4 +181,6 @@ class GitExecutor:
                 "\n\tstderr: %s"
             )
             logger.warning(message, e.returncode, e.cmd, e.stderr)
+            if "Authentication failed" in e.stderr:
+                raise GitError(f"Authentication failed: {e}")
             raise GitError(str(e))
