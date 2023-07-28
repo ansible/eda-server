@@ -53,8 +53,6 @@ services:
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
-    deploy:
-      replicas: ${EDA_NUM_WORKERS:-1}
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     security_opt:
@@ -62,7 +60,6 @@ services:
     command:
       - aap-eda-manage
       - rqworker
-      - --with-scheduler
       - --worker-class
       - aap_eda.core.tasking.DefaultWorker
     depends_on:

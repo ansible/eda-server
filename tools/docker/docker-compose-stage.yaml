@@ -72,41 +72,42 @@ services:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-default-worker:
-    image: 'localhost/aap-eda-worker'
-    build:
-      context: ../../
-      dockerfile: tools/docker/worker/Dockerfile
+    user: "${EDA_POD_USER_ID:-0}"
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.DefaultWorker
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
     restart: always
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-activation-worker:
+    user: "${EDA_POD_USER_ID:-0}"
     deploy:
       replicas: ${EDA_NUM_WORKERS:-2}
-    image: 'localhost/aap-eda-worker'
-    build:
-      context: ../../
-      dockerfile: tools/docker/worker/Dockerfile
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
     command:
       - aap-eda-manage
       - rqworker
       - --worker-class
       - aap_eda.core.tasking.ActivationWorker
-    environment: *common-env
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
     restart: always
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
   postgres:
     image: 'docker.io/library/postgres:13'

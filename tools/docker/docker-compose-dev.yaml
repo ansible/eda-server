@@ -74,8 +74,8 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  default-worker:
-    image: 'localhost/aap-eda-worker'
+  eda-default-worker:
+    image: 'localhost/eda-default-worker'
     build:
       context: ../../
       dockerfile: tools/docker/worker/Dockerfile
@@ -89,10 +89,10 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  activation-worker:
+  eda-activation-worker:
     deploy:
       replicas: ${EDA_NUM_WORKERS:-2}
-    image: 'localhost/aap-eda-worker'
+    image: 'localhost/eda-activation-worker'
     build:
       context: ../../
       dockerfile: tools/docker/worker/Dockerfile
