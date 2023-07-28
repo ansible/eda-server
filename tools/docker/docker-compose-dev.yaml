@@ -76,6 +76,11 @@ services:
   eda-default-worker:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.DefaultWorker
     depends_on:
       redis:
         condition: service_healthy
