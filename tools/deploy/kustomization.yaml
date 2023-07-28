@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
 - ./eda-api
+- ./eda-scheduler
 - ./eda-worker
 - eda-ui
 - ./postgres
