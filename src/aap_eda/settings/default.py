@@ -246,15 +246,23 @@ if RQ_UNIX_SOCKET_PATH:
         "default": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
         },
+        "activation": {
+            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+        },
     }
 else:
     RQ_QUEUES = {
         "default": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-        }
+        },
+        "activation": {
+            "HOST": settings.get("MQ_HOST", "localhost"),
+            "PORT": settings.get("MQ_PORT", 6379),
+        },
     }
 RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
+RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = []

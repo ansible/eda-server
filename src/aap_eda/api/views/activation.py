@@ -175,7 +175,7 @@ class ActivationViewSet(
             activation_id=activation.id
         )
         for instance in instances:
-            deactivate_rulesets(instance, settings.DEPLOYMENT_TYPE)
+            deactivate_rulesets.delay(instance.id, settings.DEPLOYMENT_TYPE)
         super().perform_destroy(activation)
 
     @extend_schema(
@@ -291,8 +291,8 @@ class ActivationViewSet(
             ).first()
 
             if current_instance:
-                deactivate_rulesets(
-                    instance=current_instance,
+                deactivate_rulesets.delay(
+                    activation_instance_id=current_instance.id,
                     deployment_type=settings.DEPLOYMENT_TYPE,
                 )
 
@@ -321,8 +321,8 @@ class ActivationViewSet(
         ).first()
 
         if instance_running:
-            deactivate_rulesets(
-                instance=instance_running,
+            deactivate_rulesets.delay(
+                activation_instance_id=instance_running.id,
                 deployment_type=settings.DEPLOYMENT_TYPE,
             )
 
