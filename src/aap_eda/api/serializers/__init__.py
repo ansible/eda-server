@@ -46,6 +46,7 @@ from .project import (
     ProjectReadSerializer,
     ProjectRefSerializer,
     ProjectSerializer,
+    ProjectUpdateRequestSerializer,
 )
 from .rulebook import (
     AuditActionSerializer,
@@ -81,6 +82,7 @@ __all__ = (
     "PlaybookSerializer",
     "ProjectSerializer",
     "ProjectCreateRequestSerializer",
+    "ProjectUpdateRequestSerializer",
     "ProjectRefSerializer",
     "AuditActionSerializer",
     "AuditEventSerializer",
