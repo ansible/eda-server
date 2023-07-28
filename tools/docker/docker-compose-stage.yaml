@@ -30,6 +30,7 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+
   eda-api:
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
@@ -83,8 +84,6 @@ services:
       postgres:
         condition: service_healthy
     restart: always
-    volumes:
-      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-activation-worker:
     user: "${EDA_POD_USER_ID:-0}"
