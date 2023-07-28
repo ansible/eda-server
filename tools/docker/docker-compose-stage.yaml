@@ -67,9 +67,6 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    restart: always
-    volumes:
-      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
