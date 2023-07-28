@@ -54,18 +54,14 @@ services:
       timeout: 5s
       retries: 10
 
-  eda-default-worker:
-    user: "${EDA_POD_USER_ID:-0}"
-    deploy:
-      replicas: ${EDA_NUM_WORKERS:-1}
+  eda-scheduler:
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     command:
-      - aap-eda-manage
-      - rqworker
-      - --with-scheduler
-      - --worker-class
-      - aap_eda.core.tasking.DefaultWorker
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
     depends_on:
       redis:
         condition: service_healthy
@@ -75,26 +71,42 @@ services:
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
 
-  eda-activation-worker:
-    user: "${EDA_POD_USER_ID:-0}"
-    deploy:
-      replicas: ${EDA_NUM_WORKERS:-2}
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+  eda-default-worker:
+    image: 'localhost/aap-eda-worker'
+    build:
+      context: ../../
+      dockerfile: tools/docker/worker/Dockerfile
     environment: *common-env
-    command:
-      - aap-eda-manage
-      - rqworker
-      - --with-scheduler
-      - --worker-class
-      - aap_eda.core.tasking.ActivationWorker
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    restart: always
     volumes:
-      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/1000/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
+    restart: always
+
+  eda-activation-worker:
+    deploy:
+      replicas: ${EDA_NUM_WORKERS:-2}
+    image: 'localhost/aap-eda-worker'
+    build:
+      context: ../../
+      dockerfile: tools/docker/worker/Dockerfile
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.ActivationWorker
+    environment: *common-env
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
 
   postgres:
     image: 'docker.io/library/postgres:13'

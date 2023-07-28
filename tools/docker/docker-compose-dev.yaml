@@ -57,6 +57,23 @@ services:
     volumes:
       - '../../:/app/src:z'
 
+  eda-scheduler:
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
   default-worker:
     image: 'localhost/aap-eda-worker'
     build:
@@ -82,7 +99,6 @@ services:
     command:
       - aap-eda-manage
       - rqworker
-      - --with-scheduler
       - --worker-class
       - aap_eda.core.tasking.ActivationWorker
     environment: *common-env
