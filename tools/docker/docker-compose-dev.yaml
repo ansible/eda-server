@@ -70,9 +70,6 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-    restart: always
 
   eda-default-worker:
     image: 'localhost/eda-default-worker'
