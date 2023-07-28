@@ -11,7 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -27,7 +28,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 
-from .mixins import PartialUpdateOnlyModelMixin, ResponseSerializerMixin
+from .mixins import ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -108,16 +109,6 @@ class PlaybookViewSet(
             ),
         },
     ),
-    partial_update=extend_schema(
-        description="Partial update of a project",
-        request=serializers.ProjectCreateRequestSerializer,
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ProjectSerializer,
-                description="Update successful. Return an updated project.",
-            )
-        },
-    ),
     destroy=extend_schema(
         description="Delete a project by id",
         responses={
@@ -130,7 +121,6 @@ class PlaybookViewSet(
 )
 class ProjectViewSet(
     ResponseSerializerMixin,
-    PartialUpdateOnlyModelMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
@@ -192,6 +182,60 @@ class ProjectViewSet(
         )
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
+
+    @extend_schema(
+        description="Partial update of a project",
+        request=serializers.ProjectUpdateRequestSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.ProjectSerializer,
+                description="Update successful. Return an updated project.",
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                None,
+                description="Update failed with bad request.",
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None,
+                description="Update failed with integrity checking.",
+            ),
+        },
+    )
+    def partial_update(self, request, pk):
+        project = get_object_or_404(models.Project, pk=pk)
+        serializer = serializers.ProjectUpdateRequestSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        credential_id = request.data.get("credential_id")
+
+        # Validate credential_id if has meaningful value
+        if credential_id is not None and int(credential_id) > 0:
+            credential = models.Credential.objects.filter(
+                id=credential_id
+            ).first()
+            if not credential:
+                return Response(
+                    {"errors": f"Credential [{credential_id}] not found"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            credential_id = None  # for credential = 0
+
+        try:
+            project.credential_id = credential_id
+            project.name = request.data.get("name", project.name)
+            project.description = request.data.get(
+                "description", project.description
+            )
+            project.save()
+        except IntegrityError as e:
+            return Response(
+                {"errors": str(e)},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
         responses={status.HTTP_202_ACCEPTED: serializers.TaskRefSerializer}

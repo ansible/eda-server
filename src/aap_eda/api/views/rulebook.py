@@ -288,9 +288,10 @@ class AuditRuleViewSet(
 
         eqs = models.AuditEvent.objects.none()
         for audit_action in audit_actions:
-            eqs = eqs.union(audit_action.audit_events.all())
+            eqs = eqs.union(
+                self.filter_queryset(audit_action.audit_events.all())
+            )
 
-        eqs = self.filter_queryset(eqs)
         results = self.paginate_queryset(eqs)
         serializer = serializers.AuditEventSerializer(results, many=True)
 
