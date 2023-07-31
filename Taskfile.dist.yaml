@@ -45,12 +45,19 @@ tasks:
         vars:
           CLI_ARGS: scheduler
 
-  run:worker:
-    desc: "Run tasking worker locally"
+  run:worker:default:
+    desc: "Run default tasking worker locally"
     cmds:
       - task: manage
         vars:
-          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.Worker'
+          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.DefaultWorker'
+
+  run:worker:activation:
+    desc: "Run activaiton worker locally"
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.ActivationWorker'
 
   manage:
     desc: "Run django management command"

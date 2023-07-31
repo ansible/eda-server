@@ -27,7 +27,7 @@ from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 logger = logging.getLogger(__name__)
 
 
-@job
+@job("activation")
 def activate_rulesets(
     is_restart: bool,
     activation_id: int,
@@ -53,11 +53,12 @@ def activate_rulesets(
     )
 
 
-@job
+@job("default")
 def deactivate_rulesets(
-    instance: models.ActivationInstance,
+    activation_instance_id: int,
     deployment_type: str,
 ) -> None:
+    instance = models.ActivationInstance.objects.get(pk=activation_instance_id)
     logger.info(f"Task started: Deactivate Activation ({instance.id})")
 
     ActivateRulesets().deactivate(

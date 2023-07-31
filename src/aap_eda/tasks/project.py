@@ -21,7 +21,7 @@ from aap_eda.services.project import ProjectImportService
 logger = logging.getLogger(__name__)
 
 
-@job
+@job("default")
 def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
@@ -31,7 +31,7 @@ def import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@job
+@job("default")
 def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
 

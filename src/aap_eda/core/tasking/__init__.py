@@ -13,7 +13,15 @@ from rq.defaults import (
 from rq.job import Job as _Job
 from rq.serializers import JSONSerializer
 
-__all__ = ["Job", "Queue", "Worker", "enqueue", "job", "get_queue"]
+__all__ = [
+    "Job",
+    "Queue",
+    "ActivationWorker",
+    "DefaultWorker",
+    "enqueue",
+    "job",
+    "get_queue",
+]
 
 ErrorHandlerType = Callable[[_Job], None]
 
@@ -83,8 +91,8 @@ class Job(_Job):
         super().__init__(id, connection, serializer)
 
 
-class Worker(_Worker):
-    """Custom worker class.
+class DefaultWorker(_Worker):
+    """Custom default worker class used for non-activation tasks.
 
     Uses JSONSerializer as a default one.
     """
@@ -92,7 +100,7 @@ class Worker(_Worker):
     def __init__(
         self,
         queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = None,
+        name: Optional[str] = "default",
         default_result_ttl: int = DEFAULT_RESULT_TTL,
         connection: Optional[Connection] = None,
         exc_handler: Any = None,
@@ -115,6 +123,54 @@ class Worker(_Worker):
 
         super().__init__(
             queues,
+            name,
+            default_result_ttl,
+            connection,
+            exc_handler,
+            exception_handlers,
+            default_worker_ttl,
+            job_class,
+            queue_class,
+            log_job_description,
+            job_monitoring_interval,
+            disable_default_exception_handler,
+            prepare_for_work,
+            serializer,
+        )
+
+
+class ActivationWorker(_Worker):
+    """Custom worker class used for activation related tasks.
+
+    Uses JSONSerializer as a default one.
+    """
+
+    def __init__(
+        self,
+        queues: Iterable[Union[Queue, str]],
+        name: Optional[str] = "activation",
+        default_result_ttl: int = DEFAULT_RESULT_TTL,
+        connection: Optional[Connection] = None,
+        exc_handler: Any = None,
+        exception_handlers: _ErrorHandlersArgType = None,
+        default_worker_ttl: int = DEFAULT_WORKER_TTL,
+        job_class: Type[_Job] = None,
+        queue_class: Type[_Queue] = None,
+        log_job_description: bool = True,
+        job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
+        disable_default_exception_handler: bool = False,
+        prepare_for_work: bool = True,
+        serializer: Optional[SerializerProtocol] = None,
+    ):
+        if job_class is None:
+            job_class = Job
+        if queue_class is None:
+            queue_class = Queue
+        if serializer is None:
+            serializer = JSONSerializer
+
+        super().__init__(
+            [Queue(name="activation", connection=connection)],
             name,
             default_result_ttl,
             connection,
