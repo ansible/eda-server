@@ -130,14 +130,17 @@ def enqueue_restart_task(
     ssl_verify: str,
 ) -> None:
     time_at = timezone.now() + timedelta(seconds=seconds)
-    get_scheduler().enqueue_at(
+    logger.info(
+        "Enqueueing restart task for activation id: %s, at %s",
+        activation_id,
+        time_at,
+    )
+    get_scheduler(name="activation").enqueue_at(
         time_at,
         activate_rulesets,
-        args=(
-            True,
-            activation_id,
-            deployment_type,
-            ws_base_url,
-            ssl_verify,
-        ),
+        True,
+        activation_id,
+        deployment_type,
+        ws_base_url,
+        ssl_verify,
     )
