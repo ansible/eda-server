@@ -136,7 +136,10 @@ def add_cron_jobs(scheduler: Scheduler) -> None:
 
 
 class Command(rqscheduler.Command):
+    help = "Runs RQ scheduler with configured jobs."
+
     def handle(self, *args, **options) -> None:
+        logging.info("Initializing scheduler")
         scheduler = django_rq.get_scheduler()
         delete_scheduled_jobs(scheduler)
         add_startup_jobs(scheduler)
