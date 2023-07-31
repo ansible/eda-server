@@ -92,24 +92,36 @@ def delete_scheduled_jobs(scheduler: Scheduler):
         job.delete()
 
 
-def add_scheduled_jobs(scheduler: Scheduler) -> None:
-    """Schedule startup and periodic jobs."""
-    scheduled_job_lists = {
-        "startup_jobs": RQ_STARTUP_JOBS,
-        "periodic_jobs": RQ_PERIODIC_JOBS,
-    }
+def add_startup_jobs(scheduler: Scheduler) -> None:
+    if not RQ_STARTUP_JOBS:
+        logger.info("No scheduled jobs. Skipping.")
+        return
 
-    for name, job_list in scheduled_job_lists.items():
-        if not job_list:
-            logger.info("No %s configured. Skipping.", name)
-            continue
+    for entry in RQ_STARTUP_JOBS:
+        logger.info('Adding startup job "%s"', entry["func"])
+        scheduled_time = entry.pop("scheduled_time", None)
+        if scheduled_time is None:
+            scheduled_time = datetime.utcnow()
+        scheduler.enqueue_at(
+            scheduled_time=scheduled_time,
+            **entry,
+        )
 
-        for entry in job_list:
-            logger.info('Adding startup job "%s"', entry["func"])
-            scheduled_time = entry.pop("scheduled_time", None)
-            if scheduled_time is None:
-                scheduled_time = datetime.utcnow()
-            scheduler.enqueue_at(scheduled_time=scheduled_time, **entry)
+
+def add_periodic_jobs(scheduler: Scheduler) -> None:
+    if not RQ_PERIODIC_JOBS:
+        logger.info("No periodic jobs. Skipping.")
+        return
+
+    for entry in RQ_PERIODIC_JOBS:
+        logger.info('Adding periodic job "%s"', entry["func"])
+        scheduled_time = entry.pop("scheduled_time", None)
+        if scheduled_time is None:
+            scheduled_time = datetime.utcnow()
+        scheduler.schedule(
+            scheduled_time=scheduled_time,
+            **entry,
+        )
 
 
 def add_cron_jobs(scheduler: Scheduler) -> None:
@@ -124,12 +136,10 @@ def add_cron_jobs(scheduler: Scheduler) -> None:
 
 
 class Command(rqscheduler.Command):
-    help = "Runs RQ scheduler with configured jobs."
-
     def handle(self, *args, **options) -> None:
-        logging.info("Initializing scheduler")
         scheduler = django_rq.get_scheduler()
         delete_scheduled_jobs(scheduler)
-        add_scheduled_jobs(scheduler)
+        add_startup_jobs(scheduler)
+        add_periodic_jobs(scheduler)
         add_cron_jobs(scheduler)
         super().handle(*args, **options)
