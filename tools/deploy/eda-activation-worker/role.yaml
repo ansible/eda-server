@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   namespace: aap-eda
-  name: eda-default-job
+  name: eda-activation-job
 rules:
 - apiGroups: [""] # "" indicates the core API group
   resources: ["pods", "pods/log", "jobs", "secrets", "services"]

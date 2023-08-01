@@ -54,7 +54,7 @@ spec:
                   key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
           imagePullPolicy: Never
-          name: eda-activation-worker
+          name: eda-worker
           ports:
             - containerPort: 8000
           resources: {}
