@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-activation-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda
+      comp: activation-worker
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: eda
+        comp: activation-worker
+    spec:
+      serviceAccountName: eda-activation-sa
+      containers:
+        - args:
+            - /bin/bash
+            - -c
+            - aap-eda-manage rqworker --worker-class aap_eda.core.tasking.ActivationWorker
+          env:
+            - name: EDA_DATABASE_URL
+              value: postgresql+asyncpg://postgres:secret@postgres/eda
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_DB_PASSWORD
+              value: secret
+            - name: EDA_SECRET_KEY
+              value: secret
+            - name: EDA_MQ_HOST
+              value: eda-redis
+            - name: EDA_WEBSOCKET_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_WEBSOCKET_BASE_URL
+            - name: EDA_WEBSOCKET_SSL_VERIFY
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_WEBSOCKET_SSL_VERIFY
+            - name: EDA_CONTROLLER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_URL
+            - name: EDA_CONTROLLER_SSL_VERIFY
+              valueFrom:
+                configMapKeyRef:
+                  name: eda-env-properties
+                  key: EDA_CONTROLLER_SSL_VERIFY
+          image: aap-eda
+          imagePullPolicy: Never
+          name: eda-activation-worker
+          ports:
+            - containerPort: 8000
+          resources: {}
+#          volumeMounts:
+#            - mountPath: /app/src
+#              name: app-src
+      restartPolicy: Always
+#      volumes:
+#        - name: app-src
+#          persistentVolumeClaim:
+#            claimName: app-src
+status: {}
