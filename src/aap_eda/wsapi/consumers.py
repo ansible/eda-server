@@ -224,7 +224,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             activation = models.Activation.objects.get(
                 pk=activation_instance.activation_id
             )
-            if activation.ruleset_stats:
+            if message.ruleset in activation.ruleset_stats:
                 activation.ruleset_stats[message.ruleset][
                     "rulesTriggered"
                 ] += 1
