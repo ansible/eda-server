@@ -112,7 +112,7 @@ class AuditAction(models.Model):
 class AuditEvent(models.Model):
     class Meta:
         db_table = "core_audit_event"
-        ordering = ("-rule_fired_at", "-received_at")
+        ordering = ("-received_at", "-rule_fired_at")
 
     id = models.UUIDField(primary_key=True)
     source_name = models.TextField()

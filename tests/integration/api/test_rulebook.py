@@ -452,6 +452,7 @@ def test_list_events_from_audit_rule(client: APIClient, init_db):
 
     events = response.data["results"]
     assert len(events) == 4
+    assert events[0]["received_at"] > events[1]["received_at"]
 
 
 # ------------------------------------------
@@ -464,7 +465,7 @@ def test_list_audit_events(client: APIClient, init_db):
     audit_events = response.data["results"]
 
     assert len(audit_events) == 4
-    assert audit_events[0]["rule_fired_at"] > audit_events[1]["rule_fired_at"]
+    assert audit_events[0]["received_at"] > audit_events[1]["received_at"]
 
 
 @pytest.mark.django_db
@@ -655,21 +656,21 @@ def init_db():
         source_name="event-2",
         source_type="type-2",
         rule_fired_at="2023-03-23T01:36:36.835248Z",
-        received_at="2023-03-30T20:59:42.042148Z",
+        received_at="2023-03-30T20:59:43.042148Z",
     )
     audit_event_3 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
         source_name="event-3",
         source_type="type-3",
-        rule_fired_at="2023-03-23T03:58:36.835248Z",
-        received_at="2023-03-30T20:59:42.042148Z",
+        rule_fired_at="2023-03-23T01:28:36.835248Z",
+        received_at="2023-03-30T20:59:44.042148Z",
     )
     audit_event_4 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
-        source_name="event-2",
-        source_type="type-2",
-        rule_fired_at="2023-03-23T06:56:36.835248Z",
-        received_at="2023-03-30T20:59:42.042148Z",
+        source_name="event-4",
+        source_type="type-4",
+        rule_fired_at="2023-03-23T01:16:36.835248Z",
+        received_at="2023-03-30T20:59:45.042148Z",
     )
     audit_event_1.audit_actions.add(action_1)
     audit_event_1.audit_actions.add(action_2)
