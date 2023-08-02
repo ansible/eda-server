@@ -17,16 +17,17 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
+from django_rq import get_scheduler
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.core.tasking import get_queue, job
+from aap_eda.core.tasking import job
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 
 logger = logging.getLogger(__name__)
 
 
-@job
+@job("activation")
 def activate_rulesets(
     is_restart: bool,
     activation_id: int,
@@ -52,11 +53,12 @@ def activate_rulesets(
     )
 
 
-@job
+@job("default")
 def deactivate_rulesets(
-    instance: models.ActivationInstance,
+    activation_instance_id: int,
     deployment_type: str,
 ) -> None:
+    instance = models.ActivationInstance.objects.get(pk=activation_instance_id)
     logger.info(f"Task started: Deactivate Activation ({instance.id})")
 
     ActivateRulesets().deactivate(
@@ -127,16 +129,18 @@ def enqueue_restart_task(
     ws_base_url: str,
     ssl_verify: str,
 ) -> None:
-    queue = get_queue()
     time_at = timezone.now() + timedelta(seconds=seconds)
-    queue.enqueue_at(
+    logger.info(
+        "Enqueueing restart task for activation id: %s, at %s",
+        activation_id,
+        time_at,
+    )
+    get_scheduler(name="activation").enqueue_at(
         time_at,
         activate_rulesets,
-        args=(
-            True,
-            activation_id,
-            deployment_type,
-            ws_base_url,
-            ssl_verify,
-        ),
+        True,
+        activation_id,
+        deployment_type,
+        ws_base_url,
+        ssl_verify,
     )

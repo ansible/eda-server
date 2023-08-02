@@ -45,3 +45,39 @@ class RulesetFilter(django_filters.FilterSet):
     class Meta:
         model = models.Ruleset
         fields = ["name"]
+
+
+class AuditRuleFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by rule audit name.",
+    )
+
+    class Meta:
+        model = models.AuditRule
+        fields = ["name"]
+
+
+class AuditRuleActionFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by rule audit action name.",
+    )
+
+    class Meta:
+        model = models.AuditAction
+        fields = ["name"]
+
+
+class AuditRuleEventFilter(django_filters.FilterSet):
+    source_name = django_filters.CharFilter(
+        field_name="source_name",
+        lookup_expr="istartswith",
+        label="Filter by rule audit event source name.",
+    )
+
+    class Meta:
+        model = models.AuditEvent
+        fields = ["source_name"]

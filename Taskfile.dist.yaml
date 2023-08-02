@@ -38,12 +38,26 @@ tasks:
         vars:
           CLI_ARGS: shell
 
-  run:worker:
-    desc: "Run tasking worker locally"
+  run:scheduler:
+    desc: "Run tasking scheduler locally"
     cmds:
       - task: manage
         vars:
-          CLI_ARGS: rqworker --with-scheduler --worker-class 'aap_eda.core.tasking.Worker'
+          CLI_ARGS: scheduler
+
+  run:worker:default:
+    desc: "Run default tasking worker locally"
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.DefaultWorker'
+
+  run:worker:activation:
+    desc: "Run activaiton worker locally"
+    cmds:
+      - task: manage
+        vars:
+          CLI_ARGS: rqworker --worker-class 'aap_eda.core.tasking.ActivationWorker'
 
   manage:
     desc: "Run django management command"
@@ -160,7 +174,7 @@ tasks:
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: run --rm api aap-eda-manage migrate
+          CLI_ARGS: run --rm eda-api aap-eda-manage migrate
 
   docker:down:
     desc: "Stop all services."
@@ -188,14 +202,14 @@ tasks:
       cmds:
         - task: docker
           vars:
-            CLI_ARGS: exec -it api aap-eda-manage shell
+            CLI_ARGS: exec -it eda-api aap-eda-manage shell
 
   docker:shell:worker:
     desc: "Run the management shell in worker container"
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: exec -it worker aap-eda-manage shell
+          CLI_ARGS: exec -it eda-worker aap-eda-manage shell
 
   create:superuser:
     desc: "create a superuser to use with EDA API."

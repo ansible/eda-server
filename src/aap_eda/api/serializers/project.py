@@ -19,6 +19,8 @@ from aap_eda.core import models
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    credential_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = models.Project
         read_only_fields = [
@@ -40,6 +42,30 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
         fields = ["url", "name", "description", "credential_id"]
+
+
+class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Name of the project",
+    )
+    description = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Description of the project",
+    )
+    credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Credential id of the project",
+    )
+
+    class Meta:
+        model = models.Project
+        fields = ["name", "description", "credential_id"]
 
 
 class ProjectReadSerializer(serializers.ModelSerializer):

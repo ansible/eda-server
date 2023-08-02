@@ -28,7 +28,7 @@ def test_git_clone():
         name="name", username="me", secret="pass"
     )
     credential.refresh_from_db()
-    executor = mock.Mock()
+    executor = mock.MagicMock()
     repository = GitRepository.clone(
         "https://git.example.com/repo.git",
         "/path/to/repository",
@@ -39,7 +39,7 @@ def test_git_clone():
         [
             "clone",
             "--quiet",
-            "https://me:pass@git.example.com/repo.git",
+            "https://me:${GIT_PASSWORD}@git.example.com/repo.git",
             "/path/to/repository",
         ]
     )
@@ -88,13 +88,16 @@ def test_git_executor_call(run_mock: mock.Mock):
     executor = GitExecutor()
     executor(["clone", "https://git.example.com/repo.git", "/test/repo"])
     run_mock.assert_called_once_with(
-        [
-            shutil.which("git"),
-            "clone",
-            "https://git.example.com/repo.git",
-            "/test/repo",
-        ],
+        " ".join(
+            [
+                shutil.which("git"),
+                "clone",
+                "https://git.example.com/repo.git",
+                "/test/repo",
+            ]
+        ),
         check=True,
+        shell=True,
         encoding="utf-8",
         env={
             "GIT_TERMINAL_PROMPT": "0",
@@ -117,7 +120,7 @@ def test_git_executor_timeout(run_mock: mock.Mock):
 
     executor = GitExecutor()
     message = re.escape(
-        f"""Command '['{shutil.which("git")}', 'status']' """
+        f"""Command '{shutil.which("git")} status' """
         """timed out after 10 seconds"""
     )
     with pytest.raises(GitError, match=message):
@@ -135,7 +138,7 @@ def test_git_executor_error(run_mock: mock.Mock):
 
     executor = GitExecutor()
     message = re.escape(
-        f"""Command '['{shutil.which("git")}', 'status']'"""
+        f"""Command '{shutil.which("git")} status'"""
         " returned non-zero exit status 128."
     )
     with pytest.raises(GitError, match=message):

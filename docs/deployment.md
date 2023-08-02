@@ -33,7 +33,7 @@ For further information please refer our [guidelines](development.md#Taskfile).
 #### Clone the repository
 
 ```shell
-git clone git@github.com:ansible/aap-eda.git
+git clone git@github.com:ansible/eda-server.git
 ```
 
 #### Configure AWX integration
