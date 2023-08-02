@@ -374,6 +374,11 @@ class ActivationViewSet(
             activation_id=activation["id"]
         )
         activation["instances"] = activation_instances
+        activation["restarted_at"] = (
+            activation_instances.latest("started_at").started_at
+            if activation_instances
+            else None
+        )
 
         return activation
 
