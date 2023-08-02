@@ -290,7 +290,7 @@ class AuditRuleViewSet(
         for audit_action in audit_actions:
             eqs = eqs.union(
                 self.filter_queryset(audit_action.audit_events.all())
-            )
+            ).order_by("-received_at")
 
         results = self.paginate_queryset(eqs)
         serializer = serializers.AuditEventSerializer(results, many=True)

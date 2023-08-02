@@ -4,10 +4,11 @@ kind: Kustomization
 resources:
 - ./eda-api
 - ./eda-scheduler
-- ./eda-worker
+- ./eda-default-worker
 - eda-ui
 - ./postgres
 - ./redis
+- ./eda-activation-worker
 
 namespace: aap-eda
 

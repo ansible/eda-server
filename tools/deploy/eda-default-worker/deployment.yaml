@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: eda-worker
+  name: eda-default-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: eda
-      comp: worker
+      comp: default-worker
   strategy: {}
   template:
     metadata:
       labels:
         app: eda
-        comp: worker
+        comp: default-worker
     spec:
       serviceAccountName: eda-activation-sa
       containers:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage rqworker --worker-class aap_eda.core.tasking.Worker
+            - aap-eda-manage rqworker --worker-class aap_eda.core.tasking.DefaultWorker
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda
@@ -54,7 +54,7 @@ spec:
                   key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
           imagePullPolicy: Never
-          name: eda-worker
+          name: eda-default-worker
           ports:
             - containerPort: 8000
           resources: {}

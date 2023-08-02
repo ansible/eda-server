@@ -183,6 +183,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     )
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
+    restarted_at = serializers.DateTimeField(required=False, allow_null=True)
 
     class Meta:
         model = models.Activation
@@ -204,8 +205,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "restarted_at",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
     def to_representation(self, activation):
         decision_environment = (
@@ -250,4 +252,5 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "rules_fired_count": activation["rules_fired_count"],
             "created_at": activation["created_at"],
             "modified_at": activation["modified_at"],
+            "restarted_at": activation["restarted_at"],
         }
