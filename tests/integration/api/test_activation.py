@@ -211,6 +211,7 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     }
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
+    assert data["restarted_at"] is None
 
 
 @pytest.mark.django_db
@@ -334,6 +335,15 @@ def test_retrieve_activation(client: APIClient, with_project):
     assert data["extra_var"] == {
         "id": activation.extra_var.id,
     }
+    activation_instances = models.ActivationInstance.objects.filter(
+        activation_id=activation.id
+    )
+    if activation_instances:
+        assert data["restarted_at"] == activation_instances.latest(
+            "started_at"
+        ).started_at.strftime(DATETIME_FORMAT)
+    else:
+        assert data["restarted_at"] is None
 
 
 @pytest.mark.django_db

@@ -70,13 +70,17 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
 
   eda-default-worker:
-    image: 'localhost/eda-default-worker'
-    build:
-      context: ../../
-      dockerfile: tools/docker/worker/Dockerfile
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.DefaultWorker
     depends_on:
       redis:
         condition: service_healthy
@@ -89,10 +93,7 @@ services:
   eda-activation-worker:
     deploy:
       replicas: ${EDA_NUM_WORKERS:-2}
-    image: 'localhost/eda-activation-worker'
-    build:
-      context: ../../
-      dockerfile: tools/docker/worker/Dockerfile
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
     command:
       - aap-eda-manage
       - rqworker
