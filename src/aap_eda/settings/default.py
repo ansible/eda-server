@@ -267,6 +267,7 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = []
 RQ_CRON_JOBS = []
+RQ_SCHEDULER_JOB_INTERVAL = settings.get("SCHEDULER_JOB_INTERVAL", 5)
 
 # ---------------------------------------------------------
 # APPLICATION SETTINGS
