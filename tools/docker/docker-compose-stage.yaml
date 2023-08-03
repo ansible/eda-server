@@ -22,6 +22,8 @@ services:
     command: podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - 8888:8888
+    volumes:
+      - 'podman_data:/var/lib/containers/storage'
 
   eda-ui:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
@@ -132,3 +134,4 @@ services:
 
 volumes:
   postgres_data: {}
+  podman_data: {}
