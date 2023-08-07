@@ -204,7 +204,7 @@ class ProjectViewSet(
     def partial_update(self, request, pk):
         project = get_object_or_404(models.Project, pk=pk)
         serializer = serializers.ProjectUpdateRequestSerializer(
-            data=request.data, partial=True
+            instance=project, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
         credential_id = request.data.get("credential_id")
