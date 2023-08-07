@@ -336,7 +336,7 @@ def test_update_project_not_found(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_update_project_with_409(client: APIClient):
+def test_update_project_with_400(client: APIClient):
     credential = models.Credential.objects.create(
         name="credential", username="me", secret="sec"
     )
@@ -357,26 +357,21 @@ def test_update_project_with_409(client: APIClient):
         "git_hash": first.git_hash,
         "credential_id": first.credential_id,
     }
+    # test empty string validator
+    response = client.patch(
+        f"{api_url_v1}/projects/{first.id}/", data={"name": ""}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    # test unique name validator
     response = client.patch(f"{api_url_v1}/projects/{first.id}/", data=data)
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.data["errors"].startswith(
-        "duplicate key value violates unique constraint"
-    )
-
-
-@pytest.mark.django_db
-def test_update_project_with_400(client: APIClient):
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/acme/project-01",
-        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-    )
-    response = client.get(f"{api_url_v1}/projects/{project.id}/")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    # test non-existent dependent object reference
+    response = client.get(f"{api_url_v1}/projects/{first.id}/")
     data = {
         "name": "new project name",
         "credential_id": 2,
     }
-    response = client.patch(f"{api_url_v1}/projects/{project.id}/", data=data)
+    response = client.patch(f"{api_url_v1}/projects/{first.id}/", data=data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["errors"] == "Credential [2] not found"
 
