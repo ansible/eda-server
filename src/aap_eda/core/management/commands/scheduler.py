@@ -139,6 +139,10 @@ class Command(rqscheduler.Command):
     help = "Runs RQ scheduler with configured jobs."
 
     def handle(self, *args, **options) -> None:
+        # interval can be set through the command line
+        # but we want to manage it through settings
+        options["interval"] = settings.RQ_SCHEDULER_JOB_INTERVAL
+
         logging.info("Initializing scheduler")
         scheduler = django_rq.get_scheduler()
         delete_scheduled_jobs(scheduler)
