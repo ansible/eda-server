@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.credential import CredentialRefSerializer
 from aap_eda.core import models
@@ -47,9 +48,15 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         required=False,
-        allow_blank=True,
-        allow_null=True,
+        allow_blank=False,
+        allow_null=False,
         help_text="Name of the project",
+        validators=[
+            UniqueValidator(
+                queryset=models.Project.objects.all(),
+                message="Project with this name already exists.",
+            )
+        ],
     )
     description = serializers.CharField(
         required=False,
