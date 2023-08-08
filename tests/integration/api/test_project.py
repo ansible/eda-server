@@ -362,9 +362,11 @@ def test_update_project_with_400(client: APIClient):
         f"{api_url_v1}/projects/{first.id}/", data={"name": ""}
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["name"][0] == "This field may not be blank."
     # test unique name validator
     response = client.patch(f"{api_url_v1}/projects/{first.id}/", data=data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["name"][0] == "Project with this name already exists."
     # test non-existent dependent object reference
     response = client.get(f"{api_url_v1}/projects/{first.id}/")
     data = {
