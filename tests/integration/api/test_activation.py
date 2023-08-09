@@ -15,13 +15,16 @@ from typing import Any, Dict
 from unittest import mock
 
 import pytest
-from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.api import serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    Action,
+    ActivationStatus,
+    ResourceType,
+    RestartPolicy,
+)
 from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
@@ -250,26 +253,38 @@ def test_create_activation_bad_entity(client: APIClient):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+@pytest.mark.parametrize(
+    "dependent_object",
+    ["decision_environment", "project", "rulebook", "extra_var"],
+)
 @pytest.mark.django_db(transaction=True)
-def test_create_activation_unprocessible_entity(client: APIClient):
-    test_activation = {
-        "name": "test-activation",
-        "description": "test activation",
-        "is_enabled": True,
-        "decision_environment_id": 32,
-        "rulebook_id": 100,
-    }
+def test_create_activation_unprocessible_entity(
+    client: APIClient, dependent_object, check_permission_mock: mock.Mock
+):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
 
-    with mock.patch.object(
-        serializers.ActivationCreateSerializer,
-        "create",
-        mock.Mock(side_effect=IntegrityError),
-    ):
-        response = client.post(
-            f"{api_url_v1}/activations/",
-            data=test_activation,
-        )
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    response = client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **test_activation,
+            f"{dependent_object}_id": 0,
+        },
+    )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert (
+        response.data["detail"]
+        == f"{dependent_object.capitalize()} with ID=0 does not exist."
+    )
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.ACTIVATION, Action.CREATE
+    )
 
 
 @pytest.mark.django_db
