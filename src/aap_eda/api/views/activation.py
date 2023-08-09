@@ -32,9 +32,14 @@ from aap_eda.tasks.ruleset import activate_rulesets, deactivate_rulesets
 
 def handle_activation_create_conflict(activation):
     activation_dependent_objects = [
+        (
+            models.DecisionEnvironment,
+            "decision environment",
+            activation.get("decision_environment_id"),
+        ),
         (models.Project, "project", activation.get("project_id")),
         (models.Rulebook, "rulebook", activation.get("rulebook_id")),
-        (models.ExtraVar, "extra_var", activation.get("extra_var_id")),
+        (models.ExtraVar, "extra var", activation.get("extra_var_id")),
     ]
     for object_model, object_name, object_id in activation_dependent_objects:
         if object_id is None:

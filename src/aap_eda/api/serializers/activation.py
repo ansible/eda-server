@@ -14,6 +14,7 @@
 import urllib.parse
 
 from django.conf import settings
+from django.db import IntegrityError
 from rest_framework import serializers
 
 from aap_eda.api.exceptions import (
@@ -119,9 +120,12 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data, user):
         self._validate_pre_reqs(user)
-        rulebook = models.Rulebook.objects.get(
-            pk=validated_data["rulebook_id"]
-        )
+        try:
+            rulebook = models.Rulebook.objects.get(
+                pk=validated_data["rulebook_id"]
+            )
+        except models.Rulebook.DoesNotExist:
+            raise IntegrityError
         validated_data["user_id"] = user.id
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
