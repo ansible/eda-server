@@ -21,7 +21,12 @@ from rest_framework.test import APIClient
 
 from aap_eda.api import serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    Action,
+    ActivationStatus,
+    ResourceType,
+    RestartPolicy,
+)
 from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
@@ -256,7 +261,7 @@ def test_create_activation_bad_entity(client: APIClient):
 )
 @pytest.mark.django_db(transaction=True)
 def test_create_activation_unprocessible_entity(
-    client: APIClient, dependent_object
+    client: APIClient, dependent_object, check_permission_mock: mock.Mock
 ):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
@@ -281,6 +286,10 @@ def test_create_activation_unprocessible_entity(
     assert (
         response.data["detail"]
         == f"{dependent_object.capitalize()} with ID=0 does not exist."
+    )
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.ACTIVATION, Action.CREATE
     )
 
 
