@@ -15,11 +15,9 @@ from typing import Any, Dict
 from unittest import mock
 
 import pytest
-from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.api import serializers
 from aap_eda.core import models
 from aap_eda.core.enums import (
     Action,
@@ -270,18 +268,14 @@ def test_create_activation_unprocessible_entity(
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
-    with mock.patch.object(
-        serializers.ActivationCreateSerializer,
-        "create",
-        mock.Mock(side_effect=IntegrityError),
-    ):
-        response = client.post(
-            f"{api_url_v1}/activations/",
-            data={
-                **test_activation,
-                f"{dependent_object}_id": 0,
-            },
-        )
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    response = client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **test_activation,
+            f"{dependent_object}_id": 0,
+        },
+    )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert (
         response.data["detail"]
