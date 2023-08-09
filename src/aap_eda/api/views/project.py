@@ -238,7 +238,9 @@ class ProjectViewSet(
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
-        responses={status.HTTP_202_ACCEPTED: serializers.TaskRefSerializer}
+        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer},
+        request=None,
+        description="Sync a project",
     )
     @action(
         methods=["post"],
