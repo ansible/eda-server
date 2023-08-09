@@ -52,7 +52,7 @@ class Queue(_Queue):
     def __init__(
         self,
         name: str = "default",
-        default_timeout: Union[int, str, None] = None,
+        default_timeout: int = -1,
         connection: Optional[Connection] = None,
         is_async: bool = True,
         job_class: Optional[_Job] = None,
@@ -64,7 +64,7 @@ class Queue(_Queue):
 
         super().__init__(
             name=name,
-            default_timeout=-1,
+            default_timeout=default_timeout,
             connection=connection,
             is_async=is_async,
             job_class=job_class,
@@ -147,7 +147,6 @@ class ActivationWorker(_Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
         name: Optional[str] = "activation",
         default_result_ttl: int = DEFAULT_RESULT_TTL,
         connection: Optional[Connection] = None,

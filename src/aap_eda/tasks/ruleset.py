@@ -13,10 +13,9 @@
 #  limitations under the License.
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
-from django.utils import timezone
 from django_rq import get_scheduler
 
 from aap_eda.core import models
@@ -74,7 +73,7 @@ def monitor_activations() -> None:
     # 2. Restart (check latest instance):
     #    if status is unresponsive and updated_at has timeouted
     logger.info("Task started: monitor_activations")
-    now = timezone.now()
+    now = datetime.utcnow()
     running_statuses = [
         ActivationStatus.RUNNING.value,
         ActivationStatus.STARTING.value,
@@ -129,7 +128,7 @@ def enqueue_restart_task(
     ws_base_url: str,
     ssl_verify: str,
 ) -> None:
-    time_at = timezone.now() + timedelta(seconds=seconds)
+    time_at = datetime.utcnow() + timedelta(seconds=seconds)
     logger.info(
         "Enqueueing restart task for activation id: %s, at %s",
         activation_id,
