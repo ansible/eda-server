@@ -18,6 +18,7 @@ from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -421,32 +422,46 @@ class ActivationInstanceViewSet(
 
     @extend_schema(
         description="List all logs for the Activation Instance",
+        request=None,
         responses={
             status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(
                 many=True
             )
         },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this Activation Instance.",  # noqa: E501
+            )
+        ],
     )
-    @action(detail=True, rbac_action=Action.READ)
-    def logs(self, request, pk):
+    @action(
+        detail=False,
+        queryset=models.ActivationInstanceLog.objects.order_by("id"),
+        filterset_class=filters.ActivationInstanceLogFilter,
+        rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/logs",
+    )
+    def logs(self, request, id):
         instance_exists = models.ActivationInstance.objects.filter(
-            pk=pk
+            pk=id
         ).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
-                detail=f"Activation Instance with ID={pk} does not exist.",
+                detail=f"Activation Instance with ID={id} does not exist.",
             )
 
         activation_instance_logs = models.ActivationInstanceLog.objects.filter(
-            activation_instance_id=pk
+            activation_instance_id=id
         ).order_by("id")
-
-        activation_instance_logs = self.paginate_queryset(
+        activation_instance_logs = self.filter_queryset(
             activation_instance_logs
         )
-
+        results = self.paginate_queryset(activation_instance_logs)
         serializer = serializers.ActivationInstanceLogSerializer(
-            activation_instance_logs, many=True
+            results, many=True
         )
         return self.get_paginated_response(serializer.data)

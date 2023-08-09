@@ -12,7 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation import ActivationFilter, ActivationInstanceFilter
+from .activation import (
+    ActivationFilter,
+    ActivationInstanceFilter,
+    ActivationInstanceLogFilter,
+)
 from .credential import CredentialFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .project import ProjectFilter
@@ -40,4 +44,5 @@ __all__ = (
     # activation instance
     "ActivationInstanceFilter",
     "ActivationFilter",
+    "ActivationInstanceLogFilter",
 )

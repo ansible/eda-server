@@ -161,6 +161,24 @@ def test_retrieve_activation_instance_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
+def test_delete_activation_instance(client: APIClient):
+    activation = prepare_init_data()
+    instance = models.ActivationInstance.objects.create(
+        name="activation-instance",
+        activation=activation,
+    )
+
+    response = client.delete(
+        f"{api_url_v1}/activation-instances/{instance.id}/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    assert (
+        models.ActivationInstance.objects.filter(pk=instance.id).count() == 0
+    )
+
+
+@pytest.mark.django_db
 def test_list_logs_from_activation_instance(client: APIClient):
     activation = prepare_init_data()
     instance = models.ActivationInstance.objects.create(
@@ -200,21 +218,54 @@ def test_list_logs_from_activation_instance(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_activation_instance(client: APIClient):
+def test_list_activation_instance_logs_filter(client: APIClient):
     activation = prepare_init_data()
     instance = models.ActivationInstance.objects.create(
-        name="activation-instance",
+        name="test-activation-instance",
         activation=activation,
     )
 
-    response = client.delete(
-        f"{api_url_v1}/activation-instances/{instance.id}/"
+    instance_logs = models.ActivationInstanceLog.objects.bulk_create(
+        [
+            models.ActivationInstanceLog(
+                log="activation-instance-log-1",
+                line_number=1,
+                activation_instance=instance,
+            ),
+            models.ActivationInstanceLog(
+                log="activation-instance-log-2",
+                line_number=2,
+                activation_instance=instance,
+            ),
+        ]
     )
-    assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert (
-        models.ActivationInstance.objects.filter(pk=instance.id).count() == 0
+    filter_log = "log-1"
+    response = client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?log={filter_log}"
     )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["log"] == instance_logs[0].log
+
+
+@pytest.mark.django_db
+def test_list_activation_instance_logs_filter_non_existent(client: APIClient):
+    activation = prepare_init_data()
+    instance = models.ActivationInstance.objects.create(
+        name="test-activation-instance",
+        activation=activation,
+    )
+
+    filter_log = "doesn't exist"
+    response = client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}"
+        f"/logs/?log={filter_log}"
+    )
+    data = response.json()["results"]
+    assert response.status_code == status.HTTP_200_OK
+    assert data == []
 
 
 def assert_activation_instance_data(

@@ -44,3 +44,15 @@ class ActivationInstanceFilter(django_filters.FilterSet):
     class Meta:
         model = models.ActivationInstance
         fields = ["name", "status"]
+
+
+class ActivationInstanceLogFilter(django_filters.FilterSet):
+    log = django_filters.CharFilter(
+        field_name="log",
+        lookup_expr="icontains",
+        label="Filter by activation instance log.",
+    )
+
+    class Meta:
+        model = models.ActivationInstanceLog
+        fields = ["log"]
