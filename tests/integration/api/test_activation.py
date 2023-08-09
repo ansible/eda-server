@@ -250,8 +250,14 @@ def test_create_activation_bad_entity(client: APIClient):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+@pytest.mark.parametrize(
+    "dependent_object",
+    ["decision_environment", "project", "rulebook", "extra_var"],
+)
 @pytest.mark.django_db(transaction=True)
-def test_create_activation_unprocessible_entity(client: APIClient):
+def test_create_activation_unprocessible_entity(
+    client: APIClient, dependent_object
+):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
@@ -259,7 +265,6 @@ def test_create_activation_unprocessible_entity(client: APIClient):
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
-    # test with non-existent decision environment
     with mock.patch.object(
         serializers.ActivationCreateSerializer,
         "create",
@@ -269,59 +274,14 @@ def test_create_activation_unprocessible_entity(client: APIClient):
             f"{api_url_v1}/activations/",
             data={
                 **test_activation,
-                "decision_environment_id": 0,
+                f"{dependent_object}_id": 0,
             },
         )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert (
         response.data["detail"]
-        == "Decision environment with ID=0 does not exist."
+        == f"{dependent_object.capitalize()} with ID=0 does not exist."
     )
-    # test with non-existent rulebook
-    with mock.patch.object(
-        serializers.ActivationCreateSerializer,
-        "create",
-        mock.Mock(side_effect=IntegrityError),
-    ):
-        response = client.post(
-            f"{api_url_v1}/activations/",
-            data={
-                **test_activation,
-                "rulebook_id": 0,
-            },
-        )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert response.data["detail"] == "Rulebook with ID=0 does not exist."
-    # test with non-existent project
-    with mock.patch.object(
-        serializers.ActivationCreateSerializer,
-        "create",
-        mock.Mock(side_effect=IntegrityError),
-    ):
-        response = client.post(
-            f"{api_url_v1}/activations/",
-            data={
-                **test_activation,
-                "project_id": 0,
-            },
-        )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert response.data["detail"] == "Project with ID=0 does not exist."
-    # test with non-existent extra_var
-    with mock.patch.object(
-        serializers.ActivationCreateSerializer,
-        "create",
-        mock.Mock(side_effect=IntegrityError),
-    ):
-        response = client.post(
-            f"{api_url_v1}/activations/",
-            data={
-                **test_activation,
-                "extra_var_id": 0,
-            },
-        )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert response.data["detail"] == "Extra var with ID=0 does not exist."
 
 
 @pytest.mark.django_db
