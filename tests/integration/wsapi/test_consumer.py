@@ -275,6 +275,43 @@ async def test_handle_actions():
 
 
 @pytest.mark.django_db(transaction=True)
+async def test_rule_status_with_multiple_failed_actions():
+    activation_instance_id = await _prepare_db_data()
+    job_instance = await _prepare_job_instance()
+
+    communicator = WebsocketCommunicator(
+        AnsibleRulebookConsumer.as_asgi(), "ws/"
+    )
+    connected, _ = await communicator.connect()
+    assert connected
+
+    action1 = create_action_payload(
+        DUMMY_UUID,
+        activation_instance_id,
+        job_instance.uuid,
+        DUMMY_UUID,
+        "2023-03-29T15:00:17.260803Z",
+    )
+    action2 = create_action_payload(
+        DUMMY_UUID2,
+        activation_instance_id,
+        job_instance.uuid,
+        DUMMY_UUID,
+        "2023-03-29T15:00:17.260803Z",
+        "failed",
+    )
+    await communicator.send_json_to(action1)
+    await communicator.send_json_to(action2)
+    await communicator.disconnect()
+
+    assert (await get_audit_action_count()) == 2
+    assert (await get_audit_rule_count()) == 1
+
+    rule = await get_first_audit_rule()
+    assert rule.status == "failed"
+
+
+@pytest.mark.django_db(transaction=True)
 async def test_handle_heartbeat():
     communicator = await _prepare_websocket_connection()
     activation_instance_id = await _prepare_db_data()
@@ -334,6 +371,11 @@ def get_audit_event_count():
 @database_sync_to_async
 def get_audit_action_count():
     return models.AuditAction.objects.count()
+
+
+@database_sync_to_async
+def get_first_audit_rule():
+    return models.AuditRule.objects.first()
 
 
 @database_sync_to_async
@@ -489,6 +531,7 @@ def create_action_payload(
     job_instance_uuid,
     rule_uuid,
     rule_run_at,
+    action_status="successful",
 ):
     return {
         "type": "Action",
@@ -526,4 +569,5 @@ def create_action_payload(
                 "i": 3,
             },
         },
+        "status": action_status,
     }
