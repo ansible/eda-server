@@ -411,6 +411,89 @@ def test_disable_activation(delay_mock: mock.Mock, client: APIClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
+@pytest.mark.django_db
+def test_list_activation_instances(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    instances = models.ActivationInstance.objects.bulk_create(
+        [
+            models.ActivationInstance(
+                name="test-activation-instance-1",
+                activation=activation,
+            ),
+            models.ActivationInstance(
+                name="test-activation-instance-1",
+                activation=activation,
+            ),
+        ]
+    )
+    response = client.get(
+        f"{api_url_v1}/activations/{activation.id}/instances/"
+    )
+    data = response.data["results"]
+    assert response.status_code == status.HTTP_200_OK
+    assert len(data) == len(instances)
+    assert data[0]["name"] == instances[0].name
+    assert data[1]["name"] == instances[1].name
+
+
+@pytest.mark.django_db
+def test_list_activation_instances_filter_name(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    instances = models.ActivationInstance.objects.bulk_create(
+        [
+            models.ActivationInstance(
+                name="activation-instance-1",
+                activation=activation,
+            ),
+            models.ActivationInstance(
+                name="test-activation-instance-2",
+                activation=activation,
+            ),
+        ]
+    )
+
+    filter_name = "activation"
+    response = client.get(
+        f"{api_url_v1}/activations/{activation.id}"
+        f"/instances/?name={filter_name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == instances[0].name
+
+
+@pytest.mark.django_db
+def test_list_activation_instances_filter_status(client: APIClient):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    instances = models.ActivationInstance.objects.bulk_create(
+        [
+            models.ActivationInstance(
+                name="activation-instance-1",
+                status="completed",
+                activation=activation,
+            ),
+            models.ActivationInstance(
+                name="test-activation-instance-2",
+                status="failed",
+                activation=activation,
+            ),
+        ]
+    )
+
+    filter_status = "failed"
+    response = client.get(
+        f"{api_url_v1}/activations/{activation.id}"
+        f"/instances/?status={filter_status}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == instances[1].name
+    assert response.data["results"][0]["status"] == filter_status
+
+
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
