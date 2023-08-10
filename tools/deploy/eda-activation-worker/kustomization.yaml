@@ -6,9 +6,6 @@ commonLabels:
 
 resources:
 - deployment.yaml
-- service-account.yaml
-- role-binding.yaml
-- role.yaml
 
 images:
 - name: aap-eda
