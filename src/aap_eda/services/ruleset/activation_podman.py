@@ -92,6 +92,9 @@ class ActivationPodman:
         heartbeat: str,
         ports: dict,
     ) -> None:
+        activation_instance.activation.status = ActivationStatus.RUNNING
+        activation_instance.activation.save()
+
         container = None
         try:
             """Run ansible-rulebook in worker mode."""
@@ -162,8 +165,11 @@ class ActivationPodman:
         finally:
             if container and self.client.containers.exists(container.id):
                 container_id = container.id
-                container.remove(force=True, v=True)
-                logger.info(f"Container {container_id} is cleaned up.")
+                try:
+                    container.remove(force=True, v=True)
+                    logger.info(f"Container {container_id} is cleaned up.")
+                except NotFound:
+                    logger.info(f"Container {container_id} not found.")
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:

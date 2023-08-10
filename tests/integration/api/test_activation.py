@@ -235,7 +235,7 @@ def test_create_activation_disabled(client: APIClient):
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
-    assert data["status"] == ActivationStatus.STOPPED.value
+    assert data["status"] == ActivationStatus.PENDING.value
     assert not data["instances"]
 
 
@@ -399,7 +399,8 @@ def test_enable_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_disable_activation(client: APIClient):
+@mock.patch("aap_eda.tasks.ruleset.deactivate.delay")
+def test_disable_activation(delay_mock: mock.Mock, client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 

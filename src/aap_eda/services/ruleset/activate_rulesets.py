@@ -74,13 +74,6 @@ def find_ports(rulebook_text: str):
     return found_ports
 
 
-def set_activation_status(
-    instance: models.ActivationInstance, status: ActivationStatus
-) -> None:
-    instance.status = status
-    instance.save(update_fields=["status"])
-
-
 class ActivateRulesets:
     def __init__(self, cwd: Optional[str] = None):
         self.service = AnsibleRulebookService(cwd)
@@ -135,7 +128,6 @@ class ActivateRulesets:
                     activation_instance=instance,
                     decision_environment=activation.decision_environment,
                 )
-                instance.status = ActivationStatus.COMPLETED
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
@@ -151,12 +143,17 @@ class ActivateRulesets:
                     instance,
                     activation_db_logger,
                 )
+            elif str(instance.status) == ActivationStatus.STOPPED.value:
+                activation.status = ActivationStatus.STOPPED
+                activation.save(update_fields=["status"])
+
         except DeactivationException:
             msg = f"Activation {activation.name} is disabled"
-            instance.status = ActivationStatus.STOPPED
+            activation.status = instance.status = ActivationStatus.STOPPED
             logger.error(msg)
             activation_db_logger.write(msg)
         except Exception as error:
+            logger.exception(f"Exception: {str(error)}")
             self._on_activate_failure(
                 error,
                 instance,
@@ -169,6 +166,10 @@ class ActivateRulesets:
             instance.updated_at = now
             instance.save(update_fields=["status", "ended_at", "updated_at"])
             instance.refresh_from_db()
+
+            activation.save(update_fields=["status"])
+            activation.refresh_from_db()
+
         return instance
 
     def deactivate(
@@ -177,7 +178,9 @@ class ActivateRulesets:
         deployment_type: str,
     ) -> None:
         try:
-            set_activation_status(instance, ActivationStatus.STOPPING)
+            instance.status = ActivationStatus.STOPPING
+            instance.save(update_fields=["status"])
+
             activation_db_logger = ActivationDbLogger(instance.id)
             try:
                 dtype = DeploymentType(deployment_type)
@@ -209,7 +212,11 @@ class ActivateRulesets:
             logger.info(
                 f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
             )
-            set_activation_status(instance, ActivationStatus.STOPPED)
+            instance.activation.status = (
+                instance.status
+            ) = ActivationStatus.STOPPED
+            instance.save(update_fields=["status"])
+            instance.activation.save(update_fields=["status"])
 
         except Exception as exe:
             logger.exception(f"Activation error: {str(exe)}")
@@ -222,7 +229,9 @@ class ActivateRulesets:
         activation_db_logger: ActivationDbLogger,
     ):
         activation.failure_count = 0
-        activation.save(update_fields=["failure_count", "modified_at"])
+        activation.status = ActivationStatus.COMPLETED
+        activation.current_job_id = None
+        activation.save()
         activation.refresh_from_db()
         restart_policy = (
             activation.restart_policy == RestartPolicy.ALWAYS.value
@@ -242,6 +251,9 @@ class ActivateRulesets:
     ):
         instance.status = ActivationStatus.FAILED
         activation = instance.activation
+        activation.status = ActivationStatus.FAILED
+        activation.current_job_id = None
+        activation.save()
         activation.refresh_from_db()
         restart_policy = (
             activation.restart_policy == RestartPolicy.ALWAYS.value
@@ -415,6 +427,9 @@ class ActivateRulesets:
         job_name = f"activation-job-{activation_id}"
         pod_name = f"activation-pod-{activation_id}"
 
+        activation.status = ActivationStatus.RUNNING
+        activation.save(update_fields=["status"])
+
         # build out container,pod,job specs
         container_spec = k8s.create_container(
             image=decision_environment.image_url,
@@ -469,6 +484,8 @@ class ActivateRulesets:
             activation_instance=activation_instance,
             secret_name=secret_name,
         )
+        activation_instance.activation.status = ActivationStatus.RUNNING
+        activation_instance.activation.save(update_fields=["status"])
 
     def deactivate_in_k8s(self, activation_instance) -> None:
         k8s = ActivationKubernetes()

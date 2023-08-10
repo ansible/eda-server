@@ -78,6 +78,7 @@ class ActivationStatus(DjangoEnum):
     FAILED = "failed"
     STOPPING = "stopping"
     STOPPED = "stopped"
+    DELETING = "deleting"
     COMPLETED = "completed"
     UNRESPONSIVE = "unresponsive"
 
