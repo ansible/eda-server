@@ -147,6 +147,7 @@ class ActivationWorker(_Worker):
 
     def __init__(
         self,
+        queues: Iterable[Union[Queue, str]],
         name: Optional[str] = "activation",
         default_result_ttl: int = DEFAULT_RESULT_TTL,
         connection: Optional[Connection] = None,
