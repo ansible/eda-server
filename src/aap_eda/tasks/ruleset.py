@@ -36,7 +36,14 @@ def activate_rulesets(
     ws_base_url: str,
     ssl_verify: str,
 ) -> None:
-    activation = models.Activation.objects.get(pk=activation_id)
+    activation = models.Activation.objects.filter(id=activation_id).first()
+    if (
+        not activation
+        or str(activation.status) == ActivationStatus.DELETING.value
+    ):
+        logger.info(f"Activation id: {activation_id} is deleted")
+        return
+
     if is_restart:
         activation.restart_count += 1
         activation.save(update_fields=["restart_count", "modified_at"])
@@ -62,6 +69,7 @@ def activate_rulesets(
 @job("default")
 def deactivate(
     activation_id: int,
+    is_delete: bool = False,
 ):
     activation = models.Activation.objects.get(id=activation_id)
     logger.info(f"Task started: Deactivate Activation ({activation.name})")
@@ -107,9 +115,13 @@ def deactivate(
             deployment_type=settings.DEPLOYMENT_TYPE,
         )
 
-    activation.current_job_id = None
-    activation.status = ActivationStatus.STOPPED
-    activation.save()
+    if is_delete:
+        logger.info(f"Activation {activation.name} is deleted")
+        activation.delete()
+    else:
+        activation.current_job_id = None
+        activation.status = ActivationStatus.STOPPED
+        activation.save()
 
 
 @job("default")

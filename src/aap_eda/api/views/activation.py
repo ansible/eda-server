@@ -175,12 +175,11 @@ class ActivationViewSet(
         return self.get_paginated_response(serializer.data)
 
     def perform_destroy(self, activation):
-        instances = models.ActivationInstance.objects.filter(
-            activation_id=activation.id
-        )
-        for instance in instances:
-            deactivate_rulesets.delay(instance.id, settings.DEPLOYMENT_TYPE)
-        super().perform_destroy(activation)
+        activation.status = ActivationStatus.DELETING
+        activation.save(update_fields=["status"])
+        logger.info(f"Now deleting {activation.name} ...")
+
+        deactivate.delay(activation_id=activation.id, is_delete=True)
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -249,6 +248,7 @@ class ActivationViewSet(
         if activation.status in [
             ActivationStatus.STARTING,
             ActivationStatus.STOPPING,
+            ActivationStatus.DELETING,
             ActivationStatus.PENDING,
             ActivationStatus.RUNNING,
             ActivationStatus.UNRESPONSIVE,
@@ -296,6 +296,9 @@ class ActivationViewSet(
     def disable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
 
+        if str(activation.status) == ActivationStatus.DELETING.value:
+            return Response(status=status.HTTP_409_CONFLICT)
+
         if activation.is_enabled:
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
@@ -320,6 +323,10 @@ class ActivationViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
+
+        if str(activation.status) == ActivationStatus.DELETING.value:
+            return Response(status=status.HTTP_409_CONFLICT)
+
         if not activation.is_enabled:
             raise api_exc.HttpForbidden(
                 detail="Activation is disabled and cannot be run."
