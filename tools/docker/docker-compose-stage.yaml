@@ -73,6 +73,8 @@ services:
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
+    deploy:
+      replicas: ${EDA_DEFAULT_WORKERS:-1}
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     command:
@@ -90,7 +92,7 @@ services:
   eda-activation-worker:
     user: "${EDA_POD_USER_ID:-0}"
     deploy:
-      replicas: ${EDA_NUM_WORKERS:-2}
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     command:

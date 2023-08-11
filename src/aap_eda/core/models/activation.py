@@ -50,6 +50,11 @@ class Activation(models.Model):
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
     )
+    status = models.TextField(
+        choices=ActivationStatus.choices(),
+        default=ActivationStatus.PENDING,
+    )
+    current_job_id = models.TextField(null=True)
     restart_count = models.IntegerField(default=0)
     failure_count = models.IntegerField(default=0)  # internal, since last good
     is_valid = models.BooleanField(default=False)  # internal, passed first run

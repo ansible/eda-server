@@ -76,6 +76,8 @@ services:
       - '../../:/app/src:z'
 
   eda-default-worker:
+    deploy:
+      replicas: ${EDA_DEFAULT_WORKERS:-1}
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
     command:
@@ -94,7 +96,7 @@ services:
 
   eda-activation-worker:
     deploy:
-      replicas: ${EDA_NUM_WORKERS:-2}
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     command:
       - aap-eda-manage
