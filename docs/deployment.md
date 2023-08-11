@@ -1,9 +1,20 @@
 # Deployments
 
-This document describes how to deploy the EDA-Controller.
-Currently there are two ways to deploy the EDA-Controller: using docker-compose or using minikube.
+This document describes how to deploy the EDA-Controller (AKA eda-server).
+Currently there are three supported ways to deploy the EDA-Controller:
+
+* Using the eda-server-operator for k8s/ocp (recommended one)
+* Using docker-compose
+* Using minikube
 
 If you are looking for a development environment, please refer to the [development](development.md) document.
+
+## Eda-server-operator
+
+The recommended way to deploy the EDA-Controller is using the eda-server-operator.
+This operator is available in the [eda-server-operator repository](https://github.com/ansible/eda-server-operator)
+
+Look at the [eda-server-operator documentation](https://github.com/ansible/eda-server-operator#readme) for more information.
 
 ## Docker Compose
 
