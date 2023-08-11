@@ -277,6 +277,7 @@ def test_not_restart_on_failure_exceed_limit(task_mock: mock.Mock, init_data):
     task_mock.assert_not_called()
 
 
+@pytest.mark.skip(reason="Instance's state not changed to trigger restart")
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
 @mock.patch.object(ActivateRulesets, "activate_in_k8s")

@@ -32,7 +32,6 @@ from aap_eda.api.serializers.project import (
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH
 
 
@@ -46,6 +45,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "is_enabled",
+            "status",
             "decision_environment_id",
             "project_id",
             "rulebook_id",
@@ -68,9 +68,6 @@ class ActivationSerializer(serializers.ModelSerializer):
 class ActivationListSerializer(serializers.ModelSerializer):
     """Serializer for listing the Activation model objects."""
 
-    status = serializers.ChoiceField(
-        choices=[x.value for x in ActivationStatus]
-    )
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
 
@@ -182,9 +179,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer()
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
-    status = serializers.ChoiceField(
-        choices=[x.value for x in ActivationStatus]
-    )
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)

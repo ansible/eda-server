@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+
 from django.conf import settings
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
@@ -27,7 +29,13 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
-from aap_eda.tasks.ruleset import activate_rulesets, deactivate_rulesets
+from aap_eda.tasks.ruleset import (
+    activate_rulesets,
+    deactivate,
+    deactivate_rulesets,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def handle_activation_create_conflict(activation):
@@ -102,7 +110,6 @@ class ActivationViewSet(
         activation = self._get_activation_dependent_objects(
             response_serializer.data
         )
-        activation["status"] = ActivationStatus.STARTING.value
         activation["rules_count"] = 0
         activation["rules_fired_count"] = 0
 
@@ -126,9 +133,6 @@ class ActivationViewSet(
     def retrieve(self, request, pk: int):
         response = super().retrieve(request, pk)
         activation = self._get_activation_dependent_objects(response.data)
-        activation["status"] = self._status_from_instances(
-            activation, activation["instances"]
-        )
         (
             activation["rules_count"],
             activation["rules_fired_count"],
@@ -158,12 +162,6 @@ class ActivationViewSet(
             activations = response.data["results"]
 
         for activation in activations:
-            activation_instances = models.ActivationInstance.objects.filter(
-                activation_id=activation["id"]
-            )
-            activation["status"] = self._status_from_instances(
-                activation, activation_instances
-            )
             (
                 activation["rules_count"],
                 activation["rules_fired_count"],
@@ -236,34 +234,39 @@ class ActivationViewSet(
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-        current_instance = models.ActivationInstance.objects.filter(
-            activation_id=pk,
-            status__in=[
-                ActivationStatus.STARTING,
-                ActivationStatus.STOPPING,
-                ActivationStatus.PENDING,
-                ActivationStatus.RUNNING,
-                ActivationStatus.UNRESPONSIVE,
-            ],
-        ).first()
-
-        # return activation is in a state that can not be started
-        if current_instance:
+        if activation.status in [
+            ActivationStatus.STARTING,
+            ActivationStatus.STOPPING,
+            ActivationStatus.PENDING,
+            ActivationStatus.RUNNING,
+            ActivationStatus.UNRESPONSIVE,
+        ]:
             return Response(status=status.HTTP_409_CONFLICT)
+
+        logger.info(f"Now enabling {activation.name} ...")
 
         activation.is_enabled = True
         activation.failure_count = 0
+        activation.status = ActivationStatus.PENDING
         activation.save(
-            update_fields=["is_enabled", "failure_count", "modified_at"]
+            update_fields=[
+                "is_enabled",
+                "failure_count",
+                "status",
+                "modified_at",
+            ]
         )
 
-        activate_rulesets.delay(
+        job = activate_rulesets.delay(
             is_restart=False,
             activation_id=pk,
             deployment_type=settings.DEPLOYMENT_TYPE,
             ws_base_url=settings.WEBSOCKET_BASE_URL,
             ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         )
+
+        activation.current_job_id = job.id
+        activation.save(update_fields=["current_job_id"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -282,24 +285,13 @@ class ActivationViewSet(
         activation = get_object_or_404(models.Activation, pk=pk)
 
         if activation.is_enabled:
+            activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
-            activation.save(update_fields=["is_enabled", "modified_at"])
+            activation.save(
+                update_fields=["is_enabled", "status", "modified_at"]
+            )
 
-            current_instance = models.ActivationInstance.objects.filter(
-                activation_id=pk,
-                status__in=[
-                    ActivationStatus.STARTING,
-                    ActivationStatus.PENDING,
-                    ActivationStatus.RUNNING,
-                    ActivationStatus.UNRESPONSIVE,
-                ],
-            ).first()
-
-            if current_instance:
-                deactivate_rulesets.delay(
-                    activation_instance_id=current_instance.id,
-                    deployment_type=settings.DEPLOYMENT_TYPE,
-                )
+            deactivate.delay(activation.id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -343,14 +335,6 @@ class ActivationViewSet(
         activation.save(update_fields=["restart_count", "modified_at"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def _status_from_instances(self, activation, activation_instances):
-        if activation_instances:
-            return activation_instances.latest("started_at").status
-        elif activation["is_enabled"]:
-            return ActivationStatus.FAILED.value
-        else:
-            return ActivationStatus.STOPPED.value
 
     def _get_activation_dependent_objects(self, activation):
         activation["project"] = (
