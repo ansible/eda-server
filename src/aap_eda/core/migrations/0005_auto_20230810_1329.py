@@ -5,6 +5,53 @@ from django.db import migrations, models
 import aap_eda.core.enums
 
 
+def update_activation_status(apps, schema_editor):
+    Activation = apps.get_model("core", "Activation")  # noqa: N806
+    ActivationInstance = apps.get_model(  # noqa: N806
+        "core", "ActivationInstance"
+    )
+
+    for activation in Activation.objects.all():
+        instance = (
+            ActivationInstance.objects.filter(activation_id=activation.id)
+            .order_by("-id")
+            .first()
+        )
+        if instance:
+            activation.status = instance.status
+            activation.save(update_fields=["status"])
+
+
+def backward_activation_status(apps, schema_editor):
+    migrations.RemoveField(
+        model_name="activation",
+        name="current_job_id",
+    )
+
+    migrations.RemoveField(
+        model_name="activation",
+        name="status",
+    )
+
+    migrations.AlterField(
+        model_name="activationinstance",
+        name="status",
+        field=models.TextField(
+            choices=[
+                ("starting", "starting"),
+                ("running", "running"),
+                ("pending", "pending"),
+                ("failed", "failed"),
+                ("stopping", "stopping"),
+                ("stopped", "stopped"),
+                ("completed", "completed"),
+                ("unresponsive", "unresponsive"),
+            ],
+            default=aap_eda.core.enums.ActivationStatus["PENDING"],
+        ),
+    )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0004_alter_auditevent_options"),
@@ -51,5 +98,8 @@ class Migration(migrations.Migration):
                 ],
                 default=aap_eda.core.enums.ActivationStatus["PENDING"],
             ),
+        ),
+        migrations.RunPython(
+            update_activation_status, backward_activation_status
         ),
     ]
