@@ -20,7 +20,7 @@ from aap_eda.core import models
 class ActivationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
-        lookup_expr="istartswith",
+        lookup_expr="icontains",
         label="Filter by activation name.",
     )
 
@@ -32,7 +32,7 @@ class ActivationFilter(django_filters.FilterSet):
 class ActivationInstanceFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
-        lookup_expr="istartswith",
+        lookup_expr="icontains",
         label="Filter by activation instance name.",
     )
     status = django_filters.CharFilter(

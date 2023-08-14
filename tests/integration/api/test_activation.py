@@ -454,7 +454,7 @@ def test_list_activation_instances_filter_name(client: APIClient):
         ]
     )
 
-    filter_name = "activation"
+    filter_name = "instance-1"
     response = client.get(
         f"{api_url_v1}/activations/{activation.id}"
         f"/instances/?name={filter_name}"
