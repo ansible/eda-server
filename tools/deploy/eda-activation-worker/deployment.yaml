@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: eda-activation-worker
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: eda
@@ -15,7 +15,7 @@ spec:
         app: eda
         comp: activation-worker
     spec:
-      serviceAccountName: eda-activation-sa
+      serviceAccountName: eda-default-sa
       containers:
         - args:
             - /bin/bash
@@ -54,7 +54,7 @@ spec:
                   key: EDA_CONTROLLER_SSL_VERIFY
           image: aap-eda
           imagePullPolicy: Never
-          name: eda-worker
+          name: eda-activation-worker
           ports:
             - containerPort: 8000
           resources: {}
