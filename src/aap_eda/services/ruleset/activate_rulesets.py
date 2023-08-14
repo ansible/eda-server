@@ -231,7 +231,9 @@ class ActivateRulesets:
         activation.failure_count = 0
         activation.status = ActivationStatus.COMPLETED
         activation.current_job_id = None
-        activation.save()
+        activation.save(
+            update_fields=["failure_count", "status", "current_job_id"]
+        )
         activation.refresh_from_db()
         restart_policy = (
             activation.restart_policy == RestartPolicy.ALWAYS.value
@@ -253,7 +255,7 @@ class ActivateRulesets:
         activation = instance.activation
         activation.status = ActivationStatus.FAILED
         activation.current_job_id = None
-        activation.save()
+        activation.save(update_fields=["status", "current_job_id"])
         activation.refresh_from_db()
         restart_policy = (
             activation.restart_policy == RestartPolicy.ALWAYS.value
@@ -359,7 +361,7 @@ class ActivateRulesets:
         )
         logger.info(f"{line_number} of activation instance log are created.")
         activation_instance.status = ActivationStatus.COMPLETED
-        activation_instance.save()
+        activation_instance.save(update_fields=["status"])
 
     def activate_in_podman(
         self,

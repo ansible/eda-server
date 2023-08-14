@@ -87,7 +87,7 @@ def use_dummy_socket_url(settings):
 
 
 @pytest.fixture()
-def init_data():
+def init_data(get_activation_stats):
     decision_environment = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
@@ -119,6 +119,7 @@ def init_data():
         rulebook_rulesets=TEST_RULESETS,
         extra_var=extra_var,
         user=user,
+        ruleset_stats=get_activation_stats,
     )
 
     return InitData(
@@ -130,11 +131,22 @@ def init_data():
     )
 
 
+@pytest.fixture
+def get_activation_stats():
+    return {
+        "Ruleset 1 Test": {
+            "ruleSetName": "Ruleset 1 Test",
+            "numberOfRules": 5,
+            "rulesTriggered": 10,
+        }
+    }
+
+
 @pytest.mark.django_db
 @mock.patch("subprocess.run")
 @mock.patch("shutil.which")
 def test_rulesets_activate_local(
-    which_mock: mock.Mock, run_mock: mock.Mock, init_data
+    which_mock: mock.Mock, run_mock: mock.Mock, init_data, get_activation_stats
 ):
     which_mock.return_value = "/bin/cmd"
     out = "test_output_line_1\ntest_output_line_2"
@@ -151,6 +163,11 @@ def test_rulesets_activate_local(
         deployment_type="local",
         ws_base_url="ws://localhost:8000",
         ssl_verify="no",
+    )
+
+    activation = models.Activation.objects.first()
+    assert _get_rules_count(activation.ruleset_stats) == _get_rules_count(
+        get_activation_stats
     )
 
     assert models.ActivationInstanceLog.objects.count() == 2
@@ -182,7 +199,7 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock, init_data):
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
 def test_rulesets_activate_with_podman(
-    my_mock: mock.Mock, logger_mock: mock.Mock, init_data
+    my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats
 ):
     pod_mock = mock.Mock()
     my_mock.return_value = pod_mock
@@ -206,6 +223,10 @@ def test_rulesets_activate_with_podman(
     )
     assert models.ActivationInstance.objects.count() == 1
     instance = models.ActivationInstance.objects.first()
+    activation = models.Activation.objects.get(pk=instance.activation.id)
+    assert _get_rules_count(activation.ruleset_stats) == _get_rules_count(
+        get_activation_stats
+    )
 
     my_mock.assert_called_once_with(
         init_data.decision_environment, "unix://socket_url", log_mock
@@ -302,3 +323,13 @@ def test_restart_on_completed(
         "ws://localhost:8000",
         "no",
     )
+
+
+def _get_rules_count(ruleset_stats):
+    rules_count = 0
+    rules_fired_count = 0
+    for ruleset_stat in ruleset_stats.values():
+        rules_count += ruleset_stat["numberOfRules"]
+        rules_fired_count += ruleset_stat["rulesTriggered"]
+
+    return rules_count, rules_fired_count
