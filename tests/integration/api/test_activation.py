@@ -151,8 +151,9 @@ def create_activation(fks: dict):
 
 def create_multiple_activations(fks: dict):
     activation_names = ["test-activation", "filter-test-activation"]
+    statuses = [ActivationStatus.COMPLETED, ActivationStatus.FAILED]
     activations = []
-    for name in activation_names:
+    for name, _status in zip(activation_names, statuses):
         activation_data = {
             "name": name,
             "description": "test activation",
@@ -162,6 +163,7 @@ def create_multiple_activations(fks: dict):
             "rulebook_id": fks["project_id"],
             "extra_var_id": fks["project_id"],
             "user_id": fks["user_id"],
+            "status": _status,
             "restart_policy": RestartPolicy.ON_FAILURE.value,
             "restart_count": 0,
         }
@@ -320,6 +322,18 @@ def test_list_activations_filter_name_none_exist(client: APIClient):
     response = client.get(f"{api_url_v1}/activations/?name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["results"] == []
+
+
+@pytest.mark.django_db
+def test_list_activations_filter_status(client: APIClient):
+    filter_status = "failed"
+    fks = create_activation_related_data()
+    activations = create_multiple_activations(fks)
+
+    response = client.get(f"{api_url_v1}/activations/?status={filter_status}")
+    assert response.status_code == status.HTTP_200_OK
+    response_data = response.data["results"]
+    assert_activation_base_data(response_data[0], activations[1])
 
 
 @pytest.mark.django_db

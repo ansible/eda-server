@@ -23,10 +23,15 @@ class ActivationFilter(django_filters.FilterSet):
         lookup_expr="icontains",
         label="Filter by activation name.",
     )
+    status = django_filters.CharFilter(
+        field_name="status",
+        lookup_expr="istartswith",
+        label="Filter by activation status.",
+    )
 
     class Meta:
         model = models.Activation
-        fields = ["name"]
+        fields = ["name", "status"]
 
 
 class ActivationInstanceFilter(django_filters.FilterSet):
