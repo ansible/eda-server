@@ -74,6 +74,29 @@ def find_ports(rulebook_text: str):
     return found_ports
 
 
+def save_activation_and_instance(
+    instance: models.ActivationInstance, update_fields: list
+):
+    """Save instance and update the linked activation's status accordingly."""
+    instance.activation.status = instance.status
+    running_states = [
+        ActivationStatus.PENDING.value,
+        ActivationStatus.STARTING.value,
+        ActivationStatus.RUNNING.value,
+        ActivationStatus.UNRESPONSIVE.value,
+    ]
+    activation_fields = ["status", "modified_at"]
+    if str(instance.status) not in running_states:
+        instance.activation.current_job_id = None
+        activation_fields.append("current_job_id")
+    if str(instance.status) == ActivationStatus.COMPLETED.value:
+        instance.activation.failure_count = 0
+        activation_fields.append("failure_count")
+
+    instance.save(update_fields=update_fields)
+    instance.activation.save(update_fields=activation_fields)
+
+
 class ActivateRulesets:
     def __init__(self, cwd: Optional[str] = None):
         self.service = AnsibleRulebookService(cwd)
@@ -94,6 +117,8 @@ class ActivateRulesets:
                 name=activation.name,
                 status=ActivationStatus.STARTING,
             )
+            instance.activation.status = ActivationStatus.STARTING
+            instance.activation.save(update_fields=["status"])
 
             activation_db_logger = ActivationDbLogger(instance.id)
 
@@ -124,7 +149,6 @@ class ActivateRulesets:
                 self.activate_in_k8s(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
-                    activation=activation,
                     activation_instance=instance,
                     decision_environment=activation.decision_environment,
                 )
@@ -133,7 +157,6 @@ class ActivateRulesets:
 
             if str(instance.status) == ActivationStatus.COMPLETED.value:
                 self._on_activate_complete(
-                    activation,
                     instance,
                     activation_db_logger,
                 )
@@ -143,13 +166,10 @@ class ActivateRulesets:
                     instance,
                     activation_db_logger,
                 )
-            elif str(instance.status) == ActivationStatus.STOPPED.value:
-                activation.status = ActivationStatus.STOPPED
-                activation.save(update_fields=["status"])
 
         except DeactivationException:
             msg = f"Activation {activation.name} is disabled"
-            activation.status = instance.status = ActivationStatus.STOPPED
+            instance.status = ActivationStatus.STOPPED
             logger.error(msg)
             activation_db_logger.write(msg)
         except Exception as error:
@@ -164,10 +184,10 @@ class ActivateRulesets:
             now = timezone.now()
             instance.ended_at = now
             instance.updated_at = now
-            instance.save(update_fields=["status", "ended_at", "updated_at"])
+            save_activation_and_instance(
+                instance, ["status", "ended_at", "updated_at"]
+            )
             instance.refresh_from_db()
-
-            activation.save(update_fields=["status"])
             activation.refresh_from_db()
 
         return instance
@@ -179,7 +199,7 @@ class ActivateRulesets:
     ) -> None:
         try:
             instance.status = ActivationStatus.STOPPING
-            instance.save(update_fields=["status"])
+            save_activation_and_instance(instance, ["status"])
 
             activation_db_logger = ActivationDbLogger(instance.id)
             try:
@@ -212,11 +232,8 @@ class ActivateRulesets:
             logger.info(
                 f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
             )
-            instance.activation.status = (
-                instance.status
-            ) = ActivationStatus.STOPPED
-            instance.save(update_fields=["status"])
-            instance.activation.save(update_fields=["status"])
+            instance.status = ActivationStatus.STOPPED
+            save_activation_and_instance(instance, ["status"])
 
         except Exception as exe:
             logger.exception(f"Activation error: {str(exe)}")
@@ -224,24 +241,16 @@ class ActivateRulesets:
 
     def _on_activate_complete(
         self,
-        activation: models.Activation,
         instance: models.ActivationInstance,
         activation_db_logger: ActivationDbLogger,
     ):
-        activation.failure_count = 0
-        activation.status = ActivationStatus.COMPLETED
-        activation.current_job_id = None
-        activation.save(
-            update_fields=["failure_count", "status", "current_job_id"]
-        )
-        activation.refresh_from_db()
         restart_policy = (
-            activation.restart_policy == RestartPolicy.ALWAYS.value
+            instance.activation.restart_policy == RestartPolicy.ALWAYS.value
         )
-        if activation.is_enabled and restart_policy:
+        if instance.activation.is_enabled and restart_policy:
             self._restart_activation(
                 None,
-                activation,
+                instance.activation,
                 activation_db_logger,
             )
 
@@ -251,12 +260,8 @@ class ActivateRulesets:
         instance: models.ActivationInstance,
         activation_db_logger: ActivationDbLogger,
     ):
-        instance.status = ActivationStatus.FAILED
         activation = instance.activation
-        activation.status = ActivationStatus.FAILED
-        activation.current_job_id = None
-        activation.save(update_fields=["status", "current_job_id"])
-        activation.refresh_from_db()
+        instance.status = ActivationStatus.FAILED
         restart_policy = (
             activation.restart_policy == RestartPolicy.ALWAYS.value
             or activation.restart_policy == RestartPolicy.ON_FAILURE.value
@@ -412,10 +417,10 @@ class ActivateRulesets:
         self,
         ws_url: str,
         ssl_verify: str,
-        activation: models.Activation,
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
     ) -> None:
+        activation = activation_instance.activation
         k8s = ActivationKubernetes()
         _pull_policy = "Always"
 
@@ -428,9 +433,6 @@ class ActivateRulesets:
         activation_id = activation.pk
         job_name = f"activation-job-{activation_id}"
         pod_name = f"activation-pod-{activation_id}"
-
-        activation.status = ActivationStatus.RUNNING
-        activation.save(update_fields=["status"])
 
         # build out container,pod,job specs
         container_spec = k8s.create_container(
@@ -487,7 +489,7 @@ class ActivateRulesets:
             secret_name=secret_name,
         )
         activation_instance.activation.status = ActivationStatus.RUNNING
-        activation_instance.activation.save(update_fields=["status"])
+        save_activation_and_instance(activation_instance, ["status"])
 
     def deactivate_in_k8s(self, activation_instance) -> None:
         k8s = ActivationKubernetes()
