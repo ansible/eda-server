@@ -186,31 +186,42 @@ class ActivationViewSet(
         description="List all instances for the Activation",
         request=None,
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ActivationInstanceSerializer(many=True),
-                description="Return a list of Activation Instances.",
+            status.HTTP_200_OK: serializers.ActivationInstanceSerializer(
+                many=True
             ),
         },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this rulebook.",  # noqa: E501
+            )
+        ],
     )
     @action(
-        detail=True,
+        detail=False,
+        queryset=models.ActivationInstance.objects.order_by("id"),
+        filterset_class=filters.ActivationInstanceFilter,
         rbac_resource_type=ResourceType.ACTIVATION_INSTANCE,
         rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/instances",
     )
-    def instances(self, request, pk):
-        activation_exists = models.Activation.objects.filter(id=pk).exists()
+    def instances(self, request, id):
+        activation_exists = models.Activation.objects.filter(id=id).exists()
         if not activation_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
-                detail=f"Activation with ID={pk} does not exist.",
+                detail=f"Activation with ID={id} does not exist.",
             )
 
         activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=pk
+            activation_id=id
         )
-        activation_instances = self.paginate_queryset(activation_instances)
+        filtered_instances = self.filter_queryset(activation_instances)
+        result = self.paginate_queryset(filtered_instances)
         serializer = serializers.ActivationInstanceSerializer(
-            activation_instances, many=True
+            result, many=True
         )
         return self.get_paginated_response(serializer.data)
 
