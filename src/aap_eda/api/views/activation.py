@@ -23,7 +23,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import mixins, status, viewsets
+from rest_framework import exceptions, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -296,8 +296,7 @@ class ActivationViewSet(
     def disable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
 
-        if str(activation.status) == ActivationStatus.DELETING.value:
-            return Response(status=status.HTTP_409_CONFLICT)
+        self._check_deleting(activation)
 
         if activation.is_enabled:
             activation.status = ActivationStatus.STOPPING
@@ -324,8 +323,7 @@ class ActivationViewSet(
     def restart(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
 
-        if str(activation.status) == ActivationStatus.DELETING.value:
-            return Response(status=status.HTTP_409_CONFLICT)
+        self._check_deleting(activation)
 
         if not activation.is_enabled:
             raise api_exc.HttpForbidden(
@@ -398,6 +396,12 @@ class ActivationViewSet(
             rules_fired_count += ruleset_stat["rulesTriggered"]
 
         return rules_count, rules_fired_count
+
+    def _check_deleting(self, activation):
+        if str(activation.status) == ActivationStatus.DELETING.value:
+            raise exceptions.APIException(
+                detail="Object is being deleted", code=409
+            )
 
 
 @extend_schema_view(

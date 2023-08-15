@@ -44,22 +44,21 @@ def activate_rulesets(
         logger.info(f"Activation id: {activation_id} is deleted")
         return
 
+    # TODO(hsong): move this to views
     if is_restart:
         activation.restart_count += 1
         activation.save(update_fields=["restart_count", "modified_at"])
     logger.info(f"Task started: Activate rulesets ({activation.name})")
 
     if activation.is_enabled:
-        instance = ActivateRulesets().activate(
+        ActivateRulesets().activate(
             activation,
             deployment_type,
             ws_base_url,
             ssl_verify,
         )
 
-        logger.info(
-            f"Task finished: Rulesets ({activation.name}) {instance.status=}."
-        )
+        logger.info(f"Task finished: Rulesets ({activation.name}).")
     else:
         logger.info(
             f"Task finished: Rulesets ({activation.name}) has been disabled."

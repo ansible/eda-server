@@ -16,8 +16,11 @@ import logging
 from typing import Union
 
 from django.conf import settings
+from django.db import IntegrityError
 
 from aap_eda.core import models
+
+from .exceptions import ActivationRecordNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +62,15 @@ class ActivationDbLogger:
             self.flush()
 
     def flush(self) -> None:
-        if self.activation_instance_log_buffer:
-            models.ActivationInstanceLog.objects.bulk_create(
-                self.activation_instance_log_buffer
+        try:
+            if self.activation_instance_log_buffer:
+                models.ActivationInstanceLog.objects.bulk_create(
+                    self.activation_instance_log_buffer
+                )
+        except IntegrityError:
+            message = (
+                f"Instance id: {self.activation_instance_id} is not present."
             )
+            raise ActivationRecordNotFound(message)
+
         self.activation_instance_log_buffer = []

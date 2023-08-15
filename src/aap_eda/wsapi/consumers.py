@@ -7,6 +7,7 @@ from enum import Enum
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
+from django.db import IntegrityError
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -80,22 +81,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         msg_type = MessageType(data.get("type"))
 
-        if msg_type == MessageType.WORKER:
-            await self.handle_workers(WorkerMessage.parse_obj(data))
-        elif msg_type == MessageType.JOB:
-            await self.handle_jobs(JobMessage.parse_obj(data))
-        # AnsibleEvent messages are no longer sent by ansible-rulebook
-        # TODO: remove later if no need to keep
-        elif msg_type == MessageType.ANSIBLE_EVENT:
-            await self.handle_events(AnsibleEventMessage.parse_obj(data))
-        elif msg_type == MessageType.ACTION:
-            await self.handle_actions(ActionMessage.parse_obj(data))
-        elif msg_type == MessageType.SHUTDOWN:
-            logger.info("Websocket connection is closed.")
-        elif msg_type == MessageType.SESSION_STATS:
-            await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
-        else:
-            logger.warning(f"Unsupported message received: {data}")
+        try:
+            if msg_type == MessageType.WORKER:
+                await self.handle_workers(WorkerMessage.parse_obj(data))
+            elif msg_type == MessageType.JOB:
+                await self.handle_jobs(JobMessage.parse_obj(data))
+            # AnsibleEvent messages are no longer sent by ansible-rulebook
+            # TODO: remove later if no need to keep
+            elif msg_type == MessageType.ANSIBLE_EVENT:
+                await self.handle_events(AnsibleEventMessage.parse_obj(data))
+            elif msg_type == MessageType.ACTION:
+                await self.handle_actions(ActionMessage.parse_obj(data))
+            elif msg_type == MessageType.SHUTDOWN:
+                logger.info("Websocket connection is closed.")
+            elif msg_type == MessageType.SESSION_STATS:
+                await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
+            else:
+                logger.warning(f"Unsupported message received: {data}")
+        except IntegrityError as e:
+            logger.error(f"{str(e)}")
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
@@ -137,16 +141,24 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
         logger.info(f"Start to handle heartbeat: {message}")
-        instance = models.ActivationInstance.objects.get(
-            pk=message.activation_id
-        )
-        instance.status = ActivationStatus.RUNNING
-        instance.updated_at = message.reported_at
-        instance.save()
 
-        activation = models.Activation.objects.get(pk=instance.activation.id)
-        activation.ruleset_stats[message.stats["ruleSetName"]] = message.stats
-        activation.save()
+        instance = models.ActivationInstance.objects.filter(
+            id=message.activation_id
+        ).first()
+
+        if instance:
+            instance.status = ActivationStatus.RUNNING
+            instance.updated_at = message.reported_at
+            instance.save(update_fields=["status", "updated_at"])
+
+            instance.activation.ruleset_stats[
+                message.stats["ruleSetName"]
+            ] = message.stats
+            instance.activation.save(update_fields=["ruleset_stats"])
+        else:
+            logger.warning(
+                f"Activation instance {message.activation_id} is not present."
+            )
 
     @database_sync_to_async
     def insert_event_related_data(self, message: AnsibleEventMessage) -> None:
