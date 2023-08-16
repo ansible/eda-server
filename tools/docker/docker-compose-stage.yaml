@@ -13,6 +13,8 @@ x-environment:
   - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
   - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
   - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
+  - EDA_PROTOCOL=http
+  - EDA_HOST=eda-api:8000
 
 services:
   podman:
@@ -27,6 +29,7 @@ services:
 
   eda-ui:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    environment: *common-env
     ports:
       - '8080:8080'
     depends_on:
