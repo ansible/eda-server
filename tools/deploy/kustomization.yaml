@@ -5,7 +5,7 @@ resources:
 - ./eda-api
 - ./eda-scheduler
 - ./eda-default-worker
-- eda-ui
+- ./eda-ui
 - ./postgres
 - ./redis
 - ./eda-activation-worker
