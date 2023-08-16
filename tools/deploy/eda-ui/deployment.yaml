@@ -15,7 +15,12 @@ spec:
         comp: ui
     spec:
       containers:
-      - name: eda-ui
+      - env:
+          - name: EDA_PROTOCOL
+            value: http
+          - name: EDA_HOST
+            value: eda-api:8000
+        name: eda-ui
         imagePullPolicy: Never
         image: eda-ui
         ports:
