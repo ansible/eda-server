@@ -75,7 +75,6 @@ class AuditRule(models.Model):
         ordering = ("-fired_at",)
 
     name = models.TextField(null=False)
-    description = models.TextField()
     status = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     fired_at = models.DateTimeField(null=False)
@@ -88,7 +87,6 @@ class AuditRule(models.Model):
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.SET_NULL, null=True
     )
-    definition = models.JSONField(null=False, default=dict)
 
 
 class AuditAction(models.Model):

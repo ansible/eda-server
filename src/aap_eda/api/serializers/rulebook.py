@@ -183,11 +183,6 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         help_text="Name of the fired rule",
     )
 
-    description = serializers.CharField(
-        required=False,
-        help_text="Description of the fired rule",
-    )
-
     status = serializers.CharField(
         required=False,
         help_text="Status of the fired rule",
@@ -233,11 +228,6 @@ class AuditRuleDetailSerializer(serializers.Serializer):
         help_text="Name of the fired rule",
     )
 
-    description = serializers.CharField(
-        required=True,
-        help_text="Description of the fired rule",
-    )
-
     status = serializers.CharField(
         required=False,
         help_text="Status of the fired rule",
@@ -258,11 +248,6 @@ class AuditRuleDetailSerializer(serializers.Serializer):
     fired_at = serializers.DateTimeField(
         required=True,
         help_text="The fired timestamp of the rule",
-    )
-
-    definition = serializers.JSONField(
-        required=False,
-        help_text="The action definition in the rule",
     )
 
     @extend_schema_field(
