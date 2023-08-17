@@ -216,6 +216,7 @@ async def test_handle_actions_multiple_firing():
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
+        _matching_events(),
     )
     payload2 = create_action_payload(
         DUMMY_UUID2,
@@ -223,6 +224,7 @@ async def test_handle_actions_multiple_firing():
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:27.260803Z",
+        _matching_events(),
     )
     await communicator.send_json_to(payload1)
     await communicator.send_json_to(payload2)
@@ -251,6 +253,7 @@ async def test_handle_actions():
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
+        _matching_events(),
     )
     await communicator.send_json_to(payload)
     await communicator.disconnect()
@@ -262,16 +265,20 @@ async def test_handle_actions():
     event1, event2 = await get_audit_events()
 
     event1_data = payload["matching_events"]["m_1"]
-    meta = event1_data.pop("meta")
-    assert str(event1.id) == meta["uuid"]
-    assert event1.payload == event1_data
-    assert event1.source_name == meta["source"]["name"]
-    assert event1.source_type == meta["source"]["type"]
-
     event2_data = payload["matching_events"]["m_0"]
-    meta = event2_data.pop("meta")
-    assert str(event2.id) == meta["uuid"]
-    assert event2.payload == event2_data
+    for event in [event1, event2]:
+        if event1_data["meta"]["uuid"] == str(event.id):
+            data = event1_data.copy()
+        elif event2_data["meta"]["uuid"] == str(event.id):
+            data = event2_data.copy()
+        else:
+            data = None
+
+        assert data is not None
+        meta = data.pop("meta")
+        assert event.payload == data
+        assert event.source_name == meta["source"]["name"]
+        assert event.source_type == meta["source"]["type"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -291,6 +298,7 @@ async def test_rule_status_with_multiple_failed_actions():
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
+        _matching_events(),
     )
     action2 = create_action_payload(
         DUMMY_UUID2,
@@ -298,6 +306,7 @@ async def test_rule_status_with_multiple_failed_actions():
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
+        _matching_events(),
         "failed",
     )
     await communicator.send_json_to(action1)
@@ -350,6 +359,47 @@ async def test_handle_heartbeat():
     ) == payload["reported_at"]
 
 
+@pytest.mark.django_db(transaction=True)
+async def test_multiple_rules_for_one_event():
+    activation_instance_id = await _prepare_db_data()
+    job_instance = await _prepare_job_instance()
+
+    communicator = WebsocketCommunicator(
+        AnsibleRulebookConsumer.as_asgi(), "ws/"
+    )
+    connected, _ = await communicator.connect()
+    assert connected
+    matching_events = _matching_events()
+
+    action1 = create_action_payload(
+        str(uuid.uuid4()),
+        activation_instance_id,
+        job_instance.uuid,
+        str(uuid.uuid4()),
+        "2023-03-29T15:00:17.260803Z",
+        matching_events,
+    )
+    action2 = create_action_payload(
+        str(uuid.uuid4()),
+        activation_instance_id,
+        job_instance.uuid,
+        str(uuid.uuid4()),
+        "2023-03-29T15:00:17.260803Z",
+        matching_events,
+    )
+
+    await communicator.send_json_to(action1)
+    await communicator.send_json_to(action2)
+    await communicator.disconnect()
+
+    assert (await get_audit_action_count()) == 2
+    assert (await get_audit_rule_count()) == 2
+    assert (await get_audit_event_count()) == 2
+
+    for event in await get_audit_events():
+        assert await get_audit_event_action_count(event) == 2
+
+
 @database_sync_to_async
 def get_activation_instance(instance_id):
     return models.ActivationInstance.objects.get(pk=instance_id)
@@ -371,6 +421,11 @@ def get_audit_event_count():
 @database_sync_to_async
 def get_audit_action_count():
     return models.AuditAction.objects.count()
+
+
+@database_sync_to_async
+def get_audit_event_action_count(event):
+    return event.audit_actions.count()
 
 
 @database_sync_to_async
@@ -531,6 +586,7 @@ def create_action_payload(
     job_instance_uuid,
     rule_uuid,
     rule_run_at,
+    matching_events,
     action_status="successful",
 ):
     return {
@@ -545,29 +601,27 @@ def create_action_payload(
         "rule_uuid": rule_uuid,
         "run_at": "2023-03-29T15:00:17.260803Z",
         "rule_run_at": rule_run_at,
-        "matching_events": {
-            "m_1": {
-                "meta": {
-                    "received_at": "2023-03-29T15:00:17.260803Z",
-                    "source": {
-                        "name": "my test source",
-                        "type": "ansible.eda.range",
-                    },
-                    "uuid": str(uuid.uuid4()),
-                },
-                "i": 7,
-            },
-            "m_0": {
-                "meta": {
-                    "received_at": "2023-03-29T15:00:17.248686Z",
-                    "source": {
-                        "name": "my test source",
-                        "type": "ansible.eda.range",
-                    },
-                    "uuid": str(uuid.uuid4()),
-                },
-                "i": 3,
-            },
-        },
+        "matching_events": matching_events,
         "status": action_status,
+    }
+
+
+def _matching_events():
+    return {
+        "m_1": _create_event(7, str(uuid.uuid4())),
+        "m_0": _create_event(3, str(uuid.uuid4())),
+    }
+
+
+def _create_event(data, uuid):
+    return {
+        "meta": {
+            "received_at": "2023-03-29T15:00:17.260803Z",
+            "source": {
+                "name": "my test source",
+                "type": "ansible.eda.range",
+            },
+            "uuid": uuid,
+        },
+        "i": data,
     }
