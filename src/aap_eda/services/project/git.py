@@ -99,7 +99,7 @@ class GitRepository:
         *,
         credential: Optional[Credential] = None,
         depth: Optional[int] = None,
-        verify_ssl: Optional[bool] = True,
+        verify_ssl: bool = True,
         _executor: Optional[GitExecutor] = None,
     ) -> GitRepository:
         """
