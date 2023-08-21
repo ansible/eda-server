@@ -26,10 +26,12 @@
 
 from django.db import models
 
+from .eda_model_mixin import EDAModelMixin
+
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(models.Model):
+class Project(EDAModelMixin, models.Model):
     class Meta:
         db_table = "core_project"
         constraints = [

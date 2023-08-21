@@ -14,7 +14,6 @@
 
 import yaml
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -85,7 +84,7 @@ class RulebookViewSet(
         url_path="(?P<id>[^/.]+)/rulesets",
     )
     def rulesets(self, request, id):
-        rulebook = get_object_or_404(models.Rulebook, id=id)
+        rulebook = models.Rulebook.object_or_404(pk=id)
         rulesets = models.Ruleset.objects.filter(rulebook=rulebook)
 
         rulesets = self.filter_queryset(rulesets)
@@ -107,7 +106,7 @@ class RulebookViewSet(
     )
     @action(detail=True, rbac_action=Action.READ)
     def json(self, request, pk):
-        rulebook = get_object_or_404(models.Rulebook, pk=pk)
+        rulebook = models.Rulebook.object_or_404(pk=pk)
         data = serializers.RulebookSerializer(rulebook).data
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
@@ -135,7 +134,7 @@ class RulesetViewSet(
         },
     )
     def retrieve(self, request, pk=None):
-        ruleset = get_object_or_404(models.Ruleset, pk=pk)
+        ruleset = models.Ruleset.object_or_404(pk=pk)
         ruleset_data = serializers.RulesetSerializer(ruleset).data
         data = build_ruleset_out_data(ruleset_data)
 
@@ -171,7 +170,7 @@ class RulesetViewSet(
     )
     @action(detail=True, rbac_action=Action.READ)
     def rules(self, _request, pk):
-        ruleset = get_object_or_404(models.Ruleset, pk=pk)
+        ruleset = models.Ruleset.object_or_404(pk=pk)
         rules = models.Rule.objects.filter(ruleset=ruleset).order_by("id")
 
         results = self.paginate_queryset(rules)
@@ -244,7 +243,7 @@ class AuditRuleViewSet(
         url_path="(?P<id>[^/.]+)/actions",
     )
     def actions(self, _request, id):
-        audit_rule = get_object_or_404(models.AuditRule, id=id)
+        audit_rule = models.AuditRule.object_or_404(pk=id)
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
@@ -280,7 +279,7 @@ class AuditRuleViewSet(
         url_path="(?P<id>[^/.]+)/events",
     )
     def events(self, _request, id):
-        audit_rule = get_object_or_404(models.AuditRule, id=id)
+        audit_rule = models.AuditRule.object_or_404(pk=id)
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
@@ -347,7 +346,7 @@ class RuleViewSet(
         },
     )
     def retrieve(self, _request, pk=None):
-        rule = get_object_or_404(models.Rule, pk=pk)
+        rule = models.Rule.object_or_404(pk=pk)
         data = self._build_rule_out_data(rule)
 
         return Response(data)

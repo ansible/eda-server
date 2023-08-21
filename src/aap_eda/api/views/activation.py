@@ -15,7 +15,6 @@ import logging
 
 from django.conf import settings
 from django.db import IntegrityError
-from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -239,7 +238,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = models.Activation.object_or_404(pk=pk)
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -290,7 +289,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = models.Activation.object_or_404(pk=pk)
 
         self._check_deleting(activation)
 
@@ -317,7 +316,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = models.Activation.object_or_404(pk=pk)
 
         self._check_deleting(activation)
 

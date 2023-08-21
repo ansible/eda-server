@@ -14,6 +14,8 @@
 
 from django.db import models
 
+from .eda_model_mixin import EDAModelMixin
+
 __all__ = (
     "Rulebook",
     "Ruleset",
@@ -22,7 +24,7 @@ __all__ = (
 )
 
 
-class Rulebook(models.Model):
+class Rulebook(EDAModelMixin, models.Model):
     class Meta:
         db_table = "core_rulebook"
         unique_together = ["project_id", "name"]
@@ -41,7 +43,7 @@ class Rulebook(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
-class Ruleset(models.Model):
+class Ruleset(EDAModelMixin, models.Model):
     class Meta:
         db_table = "core_ruleset"
         unique_together = ["rulebook_id", "name"]
@@ -55,7 +57,7 @@ class Ruleset(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
-class Rule(models.Model):
+class Rule(EDAModelMixin, models.Model):
     class Meta:
         db_table = "core_rule"
         unique_together = ["ruleset", "name"]
@@ -65,7 +67,7 @@ class Rule(models.Model):
     action = models.JSONField(default=dict, null=False)
 
 
-class AuditRule(models.Model):
+class AuditRule(EDAModelMixin, models.Model):
     class Meta:
         db_table = "core_audit_rule"
         indexes = [

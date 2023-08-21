@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from django.db import IntegrityError, transaction
-from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -175,7 +174,7 @@ class ProjectViewSet(
         },
     )
     def partial_update(self, request, pk):
-        project = get_object_or_404(models.Project, pk=pk)
+        project = models.Project.object_or_404(pk=pk)
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )
