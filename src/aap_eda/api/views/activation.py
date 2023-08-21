@@ -293,13 +293,7 @@ class ActivationViewSet(
 
         self._check_deleting(activation)
 
-        if activation.is_enabled:
-            activation.status = ActivationStatus.STOPPING
-            activation.is_enabled = False
-            activation.save(
-                update_fields=["is_enabled", "status", "modified_at"]
-            )
-
+        if activation.stop():
             deactivate.delay(activation.id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)

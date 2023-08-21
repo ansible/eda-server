@@ -72,6 +72,16 @@ class Activation(EDAModelMixin, models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
+    def stop(self):
+        if not self.is_enabled:
+            return False
+
+        self.status = ActivationStatus.STOPPING
+        self.is_enabled = False
+        self.save(update_fields=["is_enabled", "status", "modified_at"])
+
+        return True
+
 
 class ActivationInstance(models.Model):
     class Meta:
