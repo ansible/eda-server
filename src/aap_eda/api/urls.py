@@ -24,7 +24,6 @@ from . import views
 
 router = routers.SimpleRouter()
 router.register("extra-vars", views.ExtraVarViewSet)
-router.register("playbooks", views.PlaybookViewSet)
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
 router.register("rulesets", views.RulesetViewSet)

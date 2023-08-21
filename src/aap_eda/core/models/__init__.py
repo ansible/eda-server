@@ -24,7 +24,7 @@ from .job import (
     JobInstanceEvent,
     JobInstanceHost,
 )
-from .project import ExtraVar, Playbook, Project
+from .project import ExtraVar, Project
 from .rulebook import (
     AuditAction,
     AuditEvent,
@@ -49,7 +49,6 @@ __all__ = [
     "JobInstanceHost",
     "JobInstance",
     "Job",
-    "Playbook",
     "Project",
     "Permission",
     "Role",

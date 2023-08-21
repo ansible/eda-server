@@ -73,33 +73,6 @@ class ExtraVarViewSet(
 
 
 @extend_schema_view(
-    retrieve=extend_schema(
-        description="Get the playbook by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.PlaybookSerializer,
-                description="Return the playbook by its id.",
-            ),
-        },
-    ),
-    list=extend_schema(
-        description="List all playbooks",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.PlaybookSerializer,
-                description="Return a list of playbooks.",
-            ),
-        },
-    ),
-)
-class PlaybookViewSet(
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.Playbook.objects.all().order_by("id")
-    serializer_class = serializers.PlaybookSerializer
-
-
-@extend_schema_view(
     list=extend_schema(
         description="List all projects",
         responses={
