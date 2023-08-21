@@ -261,10 +261,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                         received_at=meta.get("received_at"),
                         rule_fired_at=message.rule_run_at,
                     )
-                    audit_event.audit_actions.add(audit_action),
-                    audit_event.save()
-
                     logger.info(f"Audit event [{audit_event.id}] is created.")
+
+                audit_event.audit_actions.add(audit_action)
+                audit_event.save()
 
     @database_sync_to_async
     def insert_job_related_data(
