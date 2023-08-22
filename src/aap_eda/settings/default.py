@@ -37,8 +37,8 @@ with the prefix EDA_:
 * DEBUG
 * ALLOWED_HOSTS - A list of allowed hostnames or
     a comma separated string.
-    Ex: export EDA_ALLOWED_HOSTS = "localhost,127.0.0.1"
-    Ex: export EDA_ALLOWED_HOSTS = '["localhost", "127.0.0.1"]'
+    Ex: export EDA_ALLOWED_HOSTS="localhost,127.0.0.1"
+    Ex: export EDA_ALLOWED_HOSTS='["localhost", "127.0.0.1"]'
 * SESSION_COOKIE_AGE - Session cookie expiration time
 
 Database settings:
