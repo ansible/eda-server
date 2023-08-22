@@ -18,6 +18,7 @@ import logging
 import time
 
 from django.conf import settings
+from django.db import DatabaseError, IntegrityError
 from django.utils import timezone
 from kubernetes import client, config, watch
 from kubernetes.client import exceptions
@@ -25,6 +26,7 @@ from kubernetes.client import exceptions
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.ruleset.exceptions import (
+    ActivationRecordNotFound,
     DeactivationException,
     K8sActivationException,
 )
@@ -400,16 +402,22 @@ class ActivationKubernetes:
     def set_activation_status(
         self, instance: models.ActivationInstance, status: ActivationStatus
     ) -> None:
-        instance.status = status
-        instance.updated_at = timezone.now()
-        instance.save(update_fields=["status", "updated_at"])
+        try:
+            instance.status = status
+            instance.updated_at = timezone.now()
+            instance.save(update_fields=["status", "updated_at"])
 
-        if (
-            status == ActivationStatus.RUNNING
-            and not instance.activation.is_valid
-        ):
-            instance.activation.is_valid = True
-            instance.activation.save(update_fields=["is_valid", "modified_at"])
+            if (
+                status == ActivationStatus.RUNNING
+                and not instance.activation.is_valid
+            ):
+                instance.activation.is_valid = True
+                instance.activation.save(
+                    update_fields=["is_valid", "modified_at"]
+                )
+        except (IntegrityError, DatabaseError):
+            message = f"Activation instance {instance.id} is not present."
+            raise ActivationRecordNotFound(message)
 
     def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
         w = watch.Watch()
@@ -499,14 +507,9 @@ class ActivationKubernetes:
                             status=ActivationStatus.STOPPED,
                         )
                         done = True
-
+            except ActivationRecordNotFound as e:
+                logger.error(e)
             except Exception as e:
-                activation = models.Activation.objects.get(
-                    name=activation_instance.name
-                )
-                if not activation.is_enabled:
-                    raise DeactivationException("deactivation called")
-
                 raise K8sActivationException(f"Pod {pod_name} Failed: \n {e}")
 
     def read_job_pod_log(
@@ -548,6 +551,11 @@ class ActivationKubernetes:
                     raise K8sActivationException(
                         f"Failed to read pod logs: \n {e}"
                     )
+            except (IntegrityError, DatabaseError):
+                message = (
+                    f"Instance [id: {activation_instance_id}] is not present."
+                )
+                raise ActivationRecordNotFound(message)
             except Exception as e:
                 raise K8sActivationException(
                     f"Failed to read pod logs: \n {e}"

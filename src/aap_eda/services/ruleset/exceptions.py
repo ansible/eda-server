@@ -23,3 +23,7 @@ class K8sActivationException(ActivationException):
 
 class DeactivationException(ActivationException):
     pass
+
+
+class ActivationRecordNotFound(ActivationException):
+    pass

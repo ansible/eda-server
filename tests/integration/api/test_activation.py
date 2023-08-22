@@ -382,7 +382,8 @@ def test_retrieve_activation_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_activation(client: APIClient):
+@mock.patch("aap_eda.tasks.ruleset.deactivate.delay")
+def test_delete_activation(delete_mock: mock.Mock, client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 

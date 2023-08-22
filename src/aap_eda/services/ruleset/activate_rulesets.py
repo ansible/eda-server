@@ -18,6 +18,7 @@ from typing import Optional
 
 import yaml
 from django.conf import settings
+from django.db.utils import DatabaseError, IntegrityError
 from django.utils import timezone
 
 from aap_eda.core import models
@@ -28,7 +29,11 @@ from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
 from .ansible_rulebook import AnsibleRulebookService
 from .deactivation_podman import DeactivationPodman
-from .exceptions import ActivationException, DeactivationException
+from .exceptions import (
+    ActivationException,
+    ActivationRecordNotFound,
+    DeactivationException,
+)
 
 logger = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -75,26 +80,35 @@ def find_ports(rulebook_text: str):
 
 
 def save_activation_and_instance(
-    instance: models.ActivationInstance, update_fields: list
+    instance: models.ActivationInstance,
+    update_fields: list,
 ):
-    """Save instance and update the linked activation's status accordingly."""
-    instance.activation.status = instance.status
-    running_states = [
-        ActivationStatus.PENDING.value,
-        ActivationStatus.STARTING.value,
-        ActivationStatus.RUNNING.value,
-        ActivationStatus.UNRESPONSIVE.value,
-    ]
-    activation_fields = ["status", "modified_at"]
-    if str(instance.status) not in running_states:
-        instance.activation.current_job_id = None
-        activation_fields.append("current_job_id")
-    if str(instance.status) == ActivationStatus.COMPLETED.value:
-        instance.activation.failure_count = 0
-        activation_fields.append("failure_count")
+    try:
+        """
+        Save instance and update the linked activation's
+        status accordingly.
+        """
+        instance.activation.status = instance.status
+        running_states = [
+            ActivationStatus.PENDING.value,
+            ActivationStatus.STARTING.value,
+            ActivationStatus.RUNNING.value,
+            ActivationStatus.UNRESPONSIVE.value,
+        ]
+        activation_fields = ["status", "modified_at"]
+        if str(instance.status) not in running_states:
+            instance.activation.current_job_id = None
+            activation_fields.append("current_job_id")
+        if str(instance.status) == ActivationStatus.COMPLETED.value:
+            instance.activation.failure_count = 0
+            activation_fields.append("failure_count")
 
-    instance.save(update_fields=update_fields)
-    instance.activation.save(update_fields=activation_fields)
+        instance.save(update_fields=update_fields)
+        instance.activation.save(update_fields=activation_fields)
+    except (IntegrityError, DatabaseError):
+        message = f"Failed to update instance [id: {instance.id}]"
+        logger.error(message)
+        raise ActivationRecordNotFound(message)
 
 
 class ActivateRulesets:
@@ -107,24 +121,34 @@ class ActivateRulesets:
         deployment_type: str,
         ws_base_url: str,
         ssl_verify: str,
-    ) -> models.ActivationInstance:
+    ) -> None:
         self.deployment_type = deployment_type
         self.ws_base_url = ws_base_url
         self.ssl_verify = ssl_verify
         try:
-            instance = models.ActivationInstance.objects.create(
-                activation=activation,
-                name=activation.name,
-                status=ActivationStatus.STARTING,
-            )
-            instance.activation.status = ActivationStatus.STARTING
-            instance.activation.save(update_fields=["status"])
+            try:
+                instance = models.ActivationInstance.objects.create(
+                    activation=activation,
+                    name=activation.name,
+                    status=ActivationStatus.STARTING,
+                )
+                instance.activation.status = ActivationStatus.STARTING
+                instance.activation.save(update_fields=["status"])
+            except IntegrityError:
+                raise ActivationRecordNotFound(
+                    f"Activation {activation.name} has been deleted."
+                )
 
             activation_db_logger = ActivationDbLogger(instance.id)
 
             try:
                 dtype = DeploymentType(deployment_type)
             except ValueError:
+                instance.status = ActivationStatus.FAILED
+                save_activation_and_instance(
+                    instance=instance,
+                    update_fields=["status", "ended_at", "updated_at"],
+                )
                 raise ActivationException(
                     f"Invalid deployment type: {deployment_type}"
                 )
@@ -143,7 +167,6 @@ class ActivateRulesets:
                 )
             elif dtype == DeploymentType.DOCKER:
                 self.activate_in_docker()
-
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.activate_in_k8s(
@@ -167,11 +190,17 @@ class ActivateRulesets:
                     activation_db_logger,
                 )
 
-        except DeactivationException:
-            msg = f"Activation {activation.name} is disabled"
-            instance.status = ActivationStatus.STOPPED
-            logger.error(msg)
-            activation_db_logger.write(msg)
+            activation_db_logger.flush()
+
+            now = timezone.now()
+            instance.ended_at = now
+            instance.updated_at = now
+            save_activation_and_instance(
+                instance=instance,
+                update_fields=["status", "ended_at", "updated_at"],
+            )
+        except (DeactivationException, ActivationRecordNotFound) as error:
+            logger.error(error)
         except Exception as error:
             logger.exception(f"Exception: {str(error)}")
             self._on_activate_failure(
@@ -179,18 +208,6 @@ class ActivateRulesets:
                 instance,
                 activation_db_logger,
             )
-        finally:
-            activation_db_logger.flush()
-            now = timezone.now()
-            instance.ended_at = now
-            instance.updated_at = now
-            save_activation_and_instance(
-                instance, ["status", "ended_at", "updated_at"]
-            )
-            instance.refresh_from_db()
-            activation.refresh_from_db()
-
-        return instance
 
     def deactivate(
         self,
@@ -260,34 +277,39 @@ class ActivateRulesets:
         instance: models.ActivationInstance,
         activation_db_logger: ActivationDbLogger,
     ):
-        activation = instance.activation
-        instance.status = ActivationStatus.FAILED
-        restart_policy = (
-            activation.restart_policy == RestartPolicy.ALWAYS.value
-            or activation.restart_policy == RestartPolicy.ON_FAILURE.value
-        )
-        restart_limit = activation.failure_count < int(
-            settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
-        )
-        if (
-            activation.is_enabled
-            and activation.is_valid
-            and restart_policy
-            and restart_limit
-        ):
-            self._restart_activation(
-                error,
-                activation,
-                activation_db_logger,
-                activation.failure_count + 1,
-                int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+        try:
+            activation = instance.activation
+            instance.status = ActivationStatus.FAILED
+            restart_policy = (
+                activation.restart_policy == RestartPolicy.ALWAYS.value
+                or activation.restart_policy == RestartPolicy.ON_FAILURE.value
             )
-            activation.failure_count += 1
-            activation.save(update_fields=["failure_count", "modified_at"])
-        else:
-            msg = f"Activation {activation.name} failed: {str(error)}"
-            logger.error(msg)
-            activation_db_logger.write(msg)
+            restart_limit = activation.failure_count < int(
+                settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+            )
+            if (
+                activation.is_enabled
+                and activation.is_valid
+                and restart_policy
+                and restart_limit
+            ):
+                self._restart_activation(
+                    error,
+                    activation,
+                    activation_db_logger,
+                    activation.failure_count + 1,
+                    int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+                )
+                activation.failure_count += 1
+                activation.save(update_fields=["failure_count", "modified_at"])
+            else:
+                msg = f"Activation {activation.name} failed: {str(error)}"
+                logger.error(msg)
+                activation_db_logger.write(msg)
+        except (IntegrityError, DatabaseError):
+            message = f"Failed to update instance [id: {instance.id}]"
+            logger.error(message)
+            raise ActivationRecordNotFound(message)
 
     def _restart_activation(
         self,
