@@ -13,7 +13,7 @@ x-environment:
   - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:?Please specify EDA_CONTROLLER_URL env}
   - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-yes}
   - EDA_PROTOCOL=http
-  - EDA_HOST=eda-api:8000
+  - EDA_HOST=${EDA_HOST:-eda-api:8000}
 
 
 services:
