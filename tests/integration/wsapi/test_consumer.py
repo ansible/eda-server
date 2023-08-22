@@ -1,7 +1,9 @@
 import uuid
+from typing import Generator
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.utils import timezone
@@ -9,6 +11,8 @@ from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
+
+TIMEOUT = 5
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -43,9 +47,9 @@ DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_ansible_rulebook_consumer():
-    communicator = await _prepare_websocket_connection()
-
+async def test_ansible_rulebook_consumer(
+    ws_communicator: WebsocketCommunicator,
+):
     test_payloads = [
         {"handle_workers": {"type": "Worker", "activation_id": "1"}},
         {
@@ -84,29 +88,26 @@ async def test_ansible_rulebook_consumer():
     for payload in test_payloads:
         for key, value in payload.items():
             with patch.object(AnsibleRulebookConsumer, key) as mocker:
-                await communicator.send_json_to(value)
-                response = await communicator.receive_json_from()
+                await ws_communicator.send_json_to(value)
+                response = await ws_communicator.receive_json_from()
 
                 mocker.assert_called_once()
 
     assert response["type"] == "Hello"
 
-    await communicator.disconnect()
-
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_workers():
+async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     activation_instance_with_extra_var = await _prepare_db_data()
     activation_instance_without_extra_var = (
         await _prepare_acitvation_instance_without_extra_var()
     )
-    communicator = await _prepare_websocket_connection()
 
     payload = {
         "type": "Worker",
         "activation_id": activation_instance_with_extra_var,
     }
-    await communicator.send_json_to(payload)
+    await ws_communicator.send_json_to(payload)
 
     for type in [
         "Hello",
@@ -115,14 +116,14 @@ async def test_handle_workers():
         "ControllerInfo",
         "EndOfResponse",
     ]:
-        response = await communicator.receive_json_from()
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
 
     payload = {
         "type": "Worker",
         "activation_id": activation_instance_without_extra_var,
     }
-    await communicator.send_json_to(payload)
+    await ws_communicator.send_json_to(payload)
 
     for type in [
         "Hello",
@@ -130,16 +131,19 @@ async def test_handle_workers():
         "ControllerInfo",
         "EndOfResponse",
     ]:
-        response = await communicator.receive_json_from()
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
-
-    await communicator.disconnect()
 
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_validation_errors():
+    communicator = WebsocketCommunicator(
+        AnsibleRulebookConsumer.as_asgi(), "ws/"
+    )
+    connected, _ = await communicator.connect(timeout=3)
+    assert connected
+
     activation_instance_id = await _prepare_db_data()
-    communicator = await _prepare_websocket_connection()
 
     payload = {
         "type": "Worker",
@@ -148,13 +152,12 @@ async def test_handle_workers_with_validation_errors():
 
     with pytest.raises(ValidationError):
         await communicator.send_json_to(payload)
-        await communicator.disconnect()
+        await communicator.wait()
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_jobs():
+async def test_handle_jobs(ws_communicator: WebsocketCommunicator):
     activation_instance_id = await _prepare_db_data()
-    communicator = await _prepare_websocket_connection()
 
     assert (await get_job_instance_count()) == 0
     assert (await get_activation_instance_job_instance_count()) == 0
@@ -170,16 +173,15 @@ async def test_handle_jobs():
         "action": "run_playbook",
     }
 
-    await communicator.send_json_to(payload)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
 
     assert (await get_job_instance_count()) == 1
     assert (await get_activation_instance_job_instance_count()) == 1
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_events():
-    communicator = await _prepare_websocket_connection()
+async def test_handle_events(ws_communicator: WebsocketCommunicator):
     job_instance = await _prepare_job_instance()
 
     assert (await get_job_instance_event_count()) == 0
@@ -192,22 +194,18 @@ async def test_handle_events():
             "stdout": "the playbook is completed",
         },
     }
-    await communicator.send_json_to(payload)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
 
     assert (await get_job_instance_event_count()) == 1
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_actions_multiple_firing():
+async def test_handle_actions_multiple_firing(
+    ws_communicator: WebsocketCommunicator,
+):
     activation_instance_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
-
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
-    connected, _ = await communicator.connect()
-    assert connected
 
     assert (await get_audit_rule_count()) == 0
     payload1 = create_action_payload(
@@ -226,9 +224,9 @@ async def test_handle_actions_multiple_firing():
         "2023-03-29T15:00:27.260803Z",
         _matching_events(),
     )
-    await communicator.send_json_to(payload1)
-    await communicator.send_json_to(payload2)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(payload1)
+    await ws_communicator.send_json_to(payload2)
+    await ws_communicator.wait()
 
     assert (await get_audit_rule_count()) == 2
     assert (await get_audit_action_count()) == 2
@@ -236,15 +234,9 @@ async def test_handle_actions_multiple_firing():
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_actions():
+async def test_handle_actions(ws_communicator: WebsocketCommunicator):
     activation_instance_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
-
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
-    connected, _ = await communicator.connect()
-    assert connected
 
     assert (await get_audit_rule_count()) == 0
     payload = create_action_payload(
@@ -255,8 +247,8 @@ async def test_handle_actions():
         "2023-03-29T15:00:17.260803Z",
         _matching_events(),
     )
-    await communicator.send_json_to(payload)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
 
     assert (await get_audit_rule_count()) == 1
     assert (await get_audit_action_count()) == 1
@@ -282,15 +274,11 @@ async def test_handle_actions():
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_rule_status_with_multiple_failed_actions():
+async def test_rule_status_with_multiple_failed_actions(
+    ws_communicator: WebsocketCommunicator,
+):
     activation_instance_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
-
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
-    connected, _ = await communicator.connect()
-    assert connected
 
     action1 = create_action_payload(
         DUMMY_UUID,
@@ -309,9 +297,9 @@ async def test_rule_status_with_multiple_failed_actions():
         _matching_events(),
         "failed",
     )
-    await communicator.send_json_to(action1)
-    await communicator.send_json_to(action2)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(action1)
+    await ws_communicator.send_json_to(action2)
+    await ws_communicator.wait()
 
     assert (await get_audit_action_count()) == 2
     assert (await get_audit_rule_count()) == 1
@@ -321,11 +309,8 @@ async def test_rule_status_with_multiple_failed_actions():
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_heartbeat():
-    communicator = await _prepare_websocket_connection()
+async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
     activation_instance_id = await _prepare_db_data()
-    connected, _ = await communicator.connect()
-    assert connected
     activation_instance = await get_activation_instance(activation_instance_id)
 
     payload = {
@@ -349,8 +334,9 @@ async def test_handle_heartbeat():
         "reported_at": timezone.now().strftime(DATETIME_FORMAT),
     }
 
-    await communicator.send_json_to(payload)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
+
     updated_activation_instance = await get_activation_instance(
         activation_instance_id
     )
@@ -360,15 +346,12 @@ async def test_handle_heartbeat():
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_multiple_rules_for_one_event():
+async def test_multiple_rules_for_one_event(
+    ws_communicator: WebsocketCommunicator,
+):
     activation_instance_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
-    connected, _ = await communicator.connect()
-    assert connected
     matching_events = _matching_events()
 
     action1 = create_action_payload(
@@ -388,9 +371,9 @@ async def test_multiple_rules_for_one_event():
         matching_events,
     )
 
-    await communicator.send_json_to(action1)
-    await communicator.send_json_to(action2)
-    await communicator.disconnect()
+    await ws_communicator.send_json_to(action1)
+    await ws_communicator.send_json_to(action2)
+    await ws_communicator.wait()
 
     assert (await get_audit_action_count()) == 2
     assert (await get_audit_rule_count()) == 2
@@ -570,14 +553,16 @@ def _prepare_job_instance():
     return job_instance
 
 
-async def _prepare_websocket_connection() -> WebsocketCommunicator:
+@pytest_asyncio.fixture(scope="function")
+async def ws_communicator() -> Generator[WebsocketCommunicator, None, None]:
     communicator = WebsocketCommunicator(
         AnsibleRulebookConsumer.as_asgi(), "ws/"
     )
     connected, _ = await communicator.connect()
     assert connected
 
-    return communicator
+    yield communicator
+    await communicator.disconnect()
 
 
 def create_action_payload(
