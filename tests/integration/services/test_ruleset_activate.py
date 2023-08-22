@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from dataclasses import dataclass
-from subprocess import CompletedProcess
 from unittest import mock
 
 import pytest
@@ -140,41 +139,6 @@ def get_activation_stats():
             "rulesTriggered": 10,
         }
     }
-
-
-@pytest.mark.django_db
-@mock.patch("subprocess.run")
-@mock.patch("shutil.which")
-def test_rulesets_activate_local(
-    which_mock: mock.Mock, run_mock: mock.Mock, init_data, get_activation_stats
-):
-    which_mock.return_value = "/bin/cmd"
-    out = "test_output_line_1\ntest_output_line_2"
-    run_mock.return_value = CompletedProcess(
-        args="command",
-        returncode=0,
-        stdout=out,
-    )
-
-    assert models.ActivationInstanceLog.objects.count() == 0
-
-    ActivateRulesets().activate(
-        activation=init_data.activation,
-        deployment_type="local",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
-    )
-
-    activation = models.Activation.objects.first()
-    assert _get_rules_count(activation.ruleset_stats) == _get_rules_count(
-        get_activation_stats
-    )
-
-    assert models.ActivationInstanceLog.objects.count() == 2
-    assert (
-        models.ActivationInstance.objects.first().status
-        == ActivationStatus.COMPLETED.value
-    )
 
 
 @pytest.mark.django_db

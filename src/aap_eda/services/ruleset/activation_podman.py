@@ -19,6 +19,7 @@ import os
 import uuid
 
 from django.conf import settings
+from django.db import DatabaseError, IntegrityError
 from django.utils import timezone
 from podman import PodmanClient
 from podman.domain.containers import Container
@@ -30,7 +31,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
 from .activation_db_logger import ActivationDbLogger
-from .exceptions import ActivationException
+from .exceptions import ActivationException, ActivationRecordNotFound
 from .shared_settings import VALID_LOG_LEVELS
 
 logger = logging.getLogger(__name__)
@@ -92,11 +93,12 @@ class ActivationPodman:
         heartbeat: str,
         ports: dict,
     ) -> None:
-        activation_instance.activation.status = ActivationStatus.RUNNING
-        activation_instance.activation.save()
-
         container = None
         try:
+            models.Activation.objects.filter(
+                id=activation_instance.activation.id
+            ).update(status=ActivationStatus.RUNNING)
+
             """Run ansible-rulebook in worker mode."""
             args = [
                 "ansible-rulebook",
@@ -143,7 +145,21 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
-            self._save_running_status(activation_instance, container.id)
+            models.ActivationInstance.objects.filter(
+                id=activation_instance.id
+            ).update(
+                status=ActivationStatus.RUNNING,
+                updated_at=timezone.now(),
+                activation_pod_id=container.id,
+            )
+            models.Activation.objects.filter(
+                id=activation_instance.activation.id,
+                is_valid=False,
+            ).update(
+                status=ActivationStatus.RUNNING,
+                is_valid=True,
+                modified_at=timezone.now(),
+            )
 
             self._save_logs(container=container, instance=activation_instance)
 
@@ -151,8 +167,9 @@ class ActivationPodman:
                 activation_instance.status = ActivationStatus.STOPPED
             else:
                 activation_instance.status = ActivationStatus.COMPLETED
-            activation_instance.save()
-
+            activation_instance.save(update_fields={"status"})
+        except ActivationException as e:
+            logger.error(e)
         except ContainerError:
             logger.exception("Container error")
             raise
@@ -162,6 +179,11 @@ class ActivationPodman:
         except APIError:
             logger.exception("Container run failed")
             raise
+        except (IntegrityError, DatabaseError):
+            message = (
+                f"Activation instance {activation_instance.id} is not present."
+            )
+            raise ActivationRecordNotFound(message)
         finally:
             if container and self.client.containers.exists(container.id):
                 container_id = container.id
@@ -242,11 +264,11 @@ class ActivationPodman:
             logger.debug("Will not use auth file")
 
     def _pull_image(self) -> Image:
-        credential = self.decision_environment.credential
-        self.activation_db_logger.write(
-            f"Pulling image {self.decision_environment.image_url}", True
-        )
         try:
+            credential = self.decision_environment.credential
+            self.activation_db_logger.write(
+                f"Pulling image {self.decision_environment.image_url}", True
+            )
             kwargs = {}
             if credential:
                 kwargs["auth_config"] = {
@@ -296,15 +318,23 @@ class ActivationPodman:
                 f"{self.activation_db_logger.lines_written()}"
                 " activation instance log entries created."
             )
-        except NotFound:
-            instance.refresh_from_db()
+        except NotFound as e:
+            try:
+                instance.refresh_from_db()
+            except models.ActivationInstance.DoesNotExist:
+                raise ActivationRecordNotFound(
+                    f"Instance {instance.id} is not present"
+                )
+
             if instance.status == ActivationStatus.STOPPED.value:
                 logger.info(
                     f"Container {container.id} was removed by deactivation."
                 )
                 self.return_code = GRACEFUL_TERM
             else:
-                raise
+                instance.status = ActivationStatus.FAILED
+                instance.save(update_fields=["status"])
+                raise ActivationException(str(e))
 
         message = CONTAINER_ERROR_CODES_MAP.get(
             self.return_code, f"exit code {self.return_code}"
@@ -315,6 +345,8 @@ class ActivationPodman:
                 f"Container {container.id} received {message}.", True
             )
         else:
+            instance.status = ActivationStatus.FAILED
+            instance.save(update_fields=["status"])
             raise ActivationException(f"Activation failed: {message}")
 
     def _load_extra_args(self) -> None:
@@ -336,17 +368,3 @@ class ActivationPodman:
 
         for key, value in self.pod_args.items():
             logger.debug("Key %s Value %s", key, value)
-
-    def _save_running_status(
-        self, instance: models.ActivationInstance, container_id: str
-    ) -> None:
-        instance.status = ActivationStatus.RUNNING
-        instance.updated_at = timezone.now()
-        instance.activation_pod_id = container_id
-        instance.save(
-            update_fields=["status", "activation_pod_id", "updated_at"]
-        )
-
-        if not instance.activation.is_valid:
-            instance.activation.is_valid = True
-            instance.activation.save(update_fields=["is_valid", "modified_at"])

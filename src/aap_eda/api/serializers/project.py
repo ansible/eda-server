@@ -152,25 +152,3 @@ class ExtraVarRefSerializer(serializers.ModelSerializer):
         model = models.ExtraVar
         fields = ["id"]
         read_only_fields = ["id"]
-
-
-class PlaybookSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the playbook",
-    )
-
-    playbook = serializers.CharField(
-        required=True,
-        help_text="Content of the playbook",
-    )
-
-    class Meta:
-        model = models.Playbook
-        fields = [
-            "id",
-            "name",
-            "playbook",
-            "project_id",
-        ]
-        read_only_fields = ["id"]

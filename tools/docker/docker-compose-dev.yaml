@@ -12,7 +12,7 @@ x-environment:
   - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
   - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
   - EDA_PROTOCOL=http
-  - EDA_HOST=eda-api:8000
+  - EDA_HOST=${EDA_HOST:-eda-api:8000}
 
 services:
   podman:
