@@ -13,9 +13,5 @@
 #  limitations under the License.
 
 from .activate_rulesets import ActivateRulesets
-from .ansible_rulebook import AnsibleRulebookService
 
-__all__ = (
-    "ActivateRulesets",
-    "AnsibleRulebookService",
-)
+__all__ = ("ActivateRulesets",)

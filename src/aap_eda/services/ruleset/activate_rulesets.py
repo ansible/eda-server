@@ -12,9 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-import shutil
 from enum import Enum
-from typing import Optional
 
 import yaml
 from django.conf import settings
@@ -27,7 +25,6 @@ from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from .activation_db_logger import ActivationDbLogger
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
-from .ansible_rulebook import AnsibleRulebookService
 from .deactivation_podman import DeactivationPodman
 from .exceptions import (
     ActivationException,
@@ -40,8 +37,6 @@ ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
 
 
 class DeploymentType(Enum):
-    LOCAL = "local"
-    DOCKER = "docker"
     PODMAN = "podman"
     K8S = "k8s"
 
@@ -112,9 +107,6 @@ def save_activation_and_instance(
 
 
 class ActivateRulesets:
-    def __init__(self, cwd: Optional[str] = None):
-        self.service = AnsibleRulebookService(cwd)
-
     def activate(
         self,
         activation: models.Activation,
@@ -155,9 +147,7 @@ class ActivateRulesets:
 
             ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
-            if dtype == DeploymentType.LOCAL:
-                self.activate_in_local(ws_url, ssl_verify, instance)
-            elif dtype == DeploymentType.PODMAN:
+            if dtype == DeploymentType.PODMAN:
                 self.activate_in_podman(
                     ws_url=ws_url,
                     ssl_verify=ssl_verify,
@@ -165,8 +155,6 @@ class ActivateRulesets:
                     decision_environment=activation.decision_environment,
                     activation_db_logger=activation_db_logger,
                 )
-            elif dtype == DeploymentType.DOCKER:
-                self.activate_in_docker()
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.activate_in_k8s(
@@ -226,20 +214,11 @@ class ActivateRulesets:
                     f"Invalid deployment type: {deployment_type}"
                 )
 
-            if dtype == DeploymentType.LOCAL:
-                raise ActivationException(
-                    f"{deployment_type} Not Implemented Yet"
-                )
-            elif dtype == DeploymentType.PODMAN:
+            if dtype == DeploymentType.PODMAN:
                 self.deactivate_in_podman(
                     activation_instance=instance,
                     activation_db_logger=activation_db_logger,
                 )
-            elif dtype == DeploymentType.DOCKER:
-                raise ActivationException(
-                    f"{deployment_type} Not Implemented Yet"
-                )
-
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.deactivate_in_k8s(activation_instance=instance)
@@ -346,50 +325,6 @@ class ActivateRulesets:
             self.ssl_verify,
         )
 
-    def activate_in_local(
-        self,
-        url: str,
-        ssl_verify: str,
-        activation_instance: models.ActivationInstance,
-    ) -> None:
-        ssh_agent = shutil.which("ssh-agent")
-        ansible_rulebook = shutil.which("ansible-rulebook")
-
-        if ansible_rulebook is None:
-            raise ActivationException("command ansible-rulebook not found")
-
-        if ssh_agent is None:
-            raise ActivationException("command ssh-agent not found")
-
-        proc = self.service.run_worker_mode(
-            ssh_agent,
-            ansible_rulebook,
-            url,
-            ssl_verify,
-            str(activation_instance.id),
-            settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-        )
-
-        line_number = 0
-
-        activation_instance_logs = []
-        for line in proc.stdout.splitlines():
-            activation_instance_log = models.ActivationInstanceLog(
-                line_number=line_number,
-                log=line,
-                activation_instance_id=activation_instance.id,
-            )
-            activation_instance_logs.append(activation_instance_log)
-
-            line_number += 1
-
-        models.ActivationInstanceLog.objects.bulk_create(
-            activation_instance_logs
-        )
-        logger.info(f"{line_number} of activation instance log are created.")
-        activation_instance.status = ActivationStatus.COMPLETED
-        activation_instance.save(update_fields=["status"])
-
     def activate_in_podman(
         self,
         ws_url: str,
@@ -430,10 +365,6 @@ class ActivateRulesets:
             settings.PODMAN_SOCKET_URL, activation_db_logger
         )
         podman.deactivate(activation_instance)
-
-    # TODO(hsong) implement later
-    def activate_in_docker():
-        pass
 
     def activate_in_k8s(
         self,
