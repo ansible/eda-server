@@ -75,15 +75,6 @@ class Project(models.Model):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
-class Playbook(models.Model):
-    class Meta:
-        db_table = "core_playbook"
-
-    name = models.TextField(unique=True)
-    playbook = models.TextField()
-    project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
-
-
 class ExtraVar(models.Model):
     class Meta:
         db_table = "core_extra_var"
@@ -95,6 +86,5 @@ class ExtraVar(models.Model):
 
 __all__ = [
     "ExtraVar",
-    "Playbook",
     "Project",
 ]

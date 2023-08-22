@@ -47,7 +47,6 @@ class ResourceType(DjangoEnum):
     PROJECT = "project"
     INVENTORY = "inventory"
     EXTRA_VAR = "extra_var"
-    PLAYBOOK = "playbook"
     RULEBOOK = "rulebook"
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
