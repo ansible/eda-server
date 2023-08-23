@@ -44,6 +44,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
                 url="https://git.example.com/acme/project-02",
                 description="Project description.",
                 git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+                verify_ssl=False,
                 import_state=models.Project.ImportState.COMPLETED,
                 import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
             ),
@@ -167,38 +168,53 @@ def test_create_project(
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
 
-    response = client.post(
-        f"{api_url_v1}/projects/",
-        data={
+    bodies = [
+        {
             "name": "test-project-01",
             "url": "https://git.example.com/acme/project-01",
         },
-    )
+        {
+            "name": "test-project-02",
+            "url": "https://git.example.com/acme/project-02",
+            "verify_ssl": False,
+        },
+    ]
 
-    assert response.status_code == status.HTTP_201_CREATED
+    for body in bodies:
+        response = client.post(
+            f"{api_url_v1}/projects/",
+            data=body,
+        )
 
-    data = response.json()
+        assert response.status_code == status.HTTP_201_CREATED
 
-    try:
-        project = models.Project.objects.get(pk=data["id"])
-    except models.Project.DoesNotExist:
-        raise AssertionError("Project doesn't exist in the database")
+        data = response.json()
 
-    # Check that project was created with valid data
-    assert project.name == "test-project-01"
-    assert project.url == "https://git.example.com/acme/project-01"
-    assert project.import_state == "pending"
-    assert str(project.import_task_id) == job_id
+        try:
+            project = models.Project.objects.get(pk=data["id"])
+        except models.Project.DoesNotExist:
+            raise AssertionError("Project doesn't exist in the database")
 
-    # Check that response returned the valid representation of the project
-    assert_project_data(data, project)
+        # Check that project was created with valid data
+        assert project.name == body["name"]
+        assert project.url == body["url"]
+        assert (
+            project.verify_ssl is body["verify_ssl"]
+            if "verify_ssl" in body
+            else True
+        )
+        assert project.import_state == "pending"
+        assert str(project.import_task_id) == job_id
 
-    # Check that import task job was created
-    import_project_task.delay.assert_called_once_with(project_id=project.id)
+        # Check that response returned the valid representation of the project
+        assert_project_data(data, project)
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.CREATE
-    )
+        # Check that import task job was created
+        import_project_task.delay.assert_called_with(project_id=project.id)
+
+        check_permission_mock.assert_called_with(
+            mock.ANY, mock.ANY, ResourceType.PROJECT, Action.CREATE
+        )
 
 
 @pytest.mark.django_db
@@ -392,12 +408,14 @@ def test_partial_update_project(
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
     assert project.credential_id is None
+    assert project.verify_ssl is True
 
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
         data={
             "name": "test-project-01-updated",
             "credential_id": credential.id,
+            "verify_ssl": False,
         },
     )
     assert response.status_code == status.HTTP_200_OK
@@ -405,6 +423,7 @@ def test_partial_update_project(
     project = models.Project.objects.get(pk=project.id)
     assert project.name == "test-project-01-updated"
     assert project.credential_id == credential.id
+    assert project.verify_ssl is False
 
     assert_project_data(response.json(), project)
 
@@ -444,9 +463,11 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 def assert_project_data(data: Dict[str, Any], project: models.Project):
     credential_id = project.credential.id if project.credential else None
+    verify_ssl = project.verify_ssl if project.verify_ssl is not None else True
 
     project_to_data = model_to_data_common(project)
     project_to_data["credential_id"] = credential_id
+    project_to_data["verify_ssl"] = verify_ssl
 
     assert data == project_to_data
 
@@ -464,9 +485,11 @@ def assert_project_data_details(data: Dict[str, Any], project: models.Project):
         if credential
         else None
     )
+    verify_ssl = project.verify_ssl if project.verify_ssl is not None else True
 
     project_to_data = model_to_data_common(project)
     project_to_data["credential"] = credential_data
+    project_to_data["verify_ssl"] = verify_ssl
 
     assert data == project_to_data
 

@@ -34,7 +34,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         ]
-        fields = ["name", "description", "credential_id", *read_only_fields]
+        fields = [
+            "name",
+            "description",
+            "credential_id",
+            "verify_ssl",
+            *read_only_fields,
+        ]
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
@@ -42,7 +48,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Project
-        fields = ["url", "name", "description", "credential_id"]
+        fields = ["url", "name", "description", "credential_id", "verify_ssl"]
 
 
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
@@ -69,10 +75,14 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Credential id of the project",
     )
+    verify_ssl = serializers.BooleanField(
+        required=False,
+        help_text="Indicates if SSL verification is enabled",
+    )
 
     class Meta:
         model = models.Project
-        fields = ["name", "description", "credential_id"]
+        fields = ["name", "description", "credential_id", "verify_ssl"]
 
 
 class ProjectReadSerializer(serializers.ModelSerializer):
@@ -92,7 +102,13 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         ]
-        fields = ["name", "description", "credential", *read_only_fields]
+        fields = [
+            "name",
+            "description",
+            "credential",
+            "verify_ssl",
+            *read_only_fields,
+        ]
 
     def to_representation(self, project):
         credential = (
@@ -106,6 +122,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "description": project["description"],
             "url": project["url"],
             "git_hash": project["git_hash"],
+            "verify_ssl": project["verify_ssl"],
             "credential": credential,
             "import_state": project["import_state"],
             "import_error": project["import_error"],

@@ -201,6 +201,9 @@ class ProjectViewSet(
             project.description = request.data.get(
                 "description", project.description
             )
+            project.verify_ssl = request.data.get(
+                "verify_ssl", project.verify_ssl
+            )
             project.save()
         except IntegrityError as e:
             return Response(

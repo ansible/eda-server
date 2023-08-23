@@ -86,7 +86,11 @@ class ProjectImportService:
             repo_dir = os.path.join(tempdir, "src")
 
             repo = self._git_cls.clone(
-                project.url, repo_dir, credential=project.credential, depth=1
+                project.url,
+                repo_dir,
+                credential=project.credential,
+                depth=1,
+                verify_ssl=project.verify_ssl,
             )
             project.git_hash = repo.rev_parse("HEAD")
 
@@ -98,7 +102,11 @@ class ProjectImportService:
             repo_dir = os.path.join(tempdir, "src")
 
             repo = self._git_cls.clone(
-                project.url, repo_dir, credential=project.credential, depth=1
+                project.url,
+                repo_dir,
+                credential=project.credential,
+                depth=1,
+                verify_ssl=project.verify_ssl,
             )
             git_hash = repo.rev_parse("HEAD")
 
