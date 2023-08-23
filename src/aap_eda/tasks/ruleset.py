@@ -30,11 +30,7 @@ logger = logging.getLogger(__name__)
 
 @job("activation")
 def activate_rulesets(
-    is_restart: bool,
-    activation_id: int,
-    deployment_type: str,
-    ws_base_url: str,
-    ssl_verify: str,
+    is_restart: bool, activation_id: int, deployment_type: str
 ) -> None:
     activation = models.Activation.objects.filter(id=activation_id).first()
     if (
@@ -54,8 +50,6 @@ def activate_rulesets(
         ActivateRulesets().activate(
             activation,
             deployment_type,
-            ws_base_url,
-            ssl_verify,
         )
 
         logger.info(f"Task finished: Rulesets ({activation.name}).")
@@ -194,13 +188,7 @@ def monitor_activations() -> None:
     """
 
 
-def enqueue_restart_task(
-    seconds: int,
-    activation_id: int,
-    deployment_type: str,
-    ws_base_url: str,
-    ssl_verify: str,
-) -> None:
+def enqueue_restart_task(seconds: int, activation_id: int) -> None:
     time_at = datetime.utcnow() + timedelta(seconds=seconds)
     logger.info(
         "Enqueueing restart task for activation id: %s, at %s",
@@ -212,7 +200,5 @@ def enqueue_restart_task(
         activate_rulesets,
         True,
         activation_id,
-        deployment_type,
-        ws_base_url,
-        ssl_verify,
+        settings.DEPLOYMENT_TYPE,
     )
