@@ -19,7 +19,10 @@ from django.conf import settings
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
-from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
+from aap_eda.services.ruleset.activate_rulesets import (
+    ACTIVATION_PATH,
+    ActivateRulesets,
+)
 
 TEST_ACTIVATION = {
     "name": "test-activation",
@@ -147,10 +150,7 @@ def test_rulesets_activate_with_errors(run_mock: mock.Mock, init_data):
     assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation=init_data.activation,
-        deployment_type="bad_type",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
+        activation=init_data.activation, deployment_type="bad_type"
     )
 
     assert (
@@ -180,10 +180,7 @@ def test_rulesets_activate_with_podman(
     assert models.ActivationInstance.objects.count() == 0
 
     ActivateRulesets().activate(
-        activation=init_data.activation,
-        deployment_type="podman",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
+        activation=init_data.activation, deployment_type="podman"
     )
     assert models.ActivationInstance.objects.count() == 1
     instance = models.ActivationInstance.objects.first()
@@ -196,8 +193,8 @@ def test_rulesets_activate_with_podman(
         init_data.decision_environment, "unix://socket_url", log_mock
     )
     pod_mock.run_worker_mode.assert_called_once_with(
-        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-        ws_ssl_verify="no",
+        ws_url=f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}",
+        ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         activation_instance=instance,
         heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
         ports={"5000/tcp": 5000},
@@ -213,17 +210,10 @@ def test_restart_on_failure(task_mock: mock.Mock, init_data):
     activation.save()
 
     ActivateRulesets().activate(
-        activation=activation,
-        deployment_type="bad_type",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
+        activation=activation, deployment_type="bad_type"
     )
     task_mock.assert_called_once_with(
-        settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
-        activation.id,
-        "bad_type",
-        "ws://localhost:8000",
-        "no",
+        settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE, activation.id
     )
 
 
@@ -236,10 +226,7 @@ def test_not_restart_on_failure_invalid(task_mock: mock.Mock, init_data):
     activation.save()
 
     ActivateRulesets().activate(
-        activation=init_data.activation,
-        deployment_type="bad_type",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
+        activation=init_data.activation, deployment_type="bad_type"
     )
     task_mock.assert_not_called()
 
@@ -254,10 +241,7 @@ def test_not_restart_on_failure_exceed_limit(task_mock: mock.Mock, init_data):
     activation.save()
 
     ActivateRulesets().activate(
-        activation=init_data.activation,
-        deployment_type="bad_type",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
+        activation=init_data.activation, deployment_type="bad_type"
     )
     task_mock.assert_not_called()
 
@@ -274,18 +258,9 @@ def test_restart_on_completed(
     activation.is_valid = True
     activation.save()
 
-    ActivateRulesets().activate(
-        activation=activation,
-        deployment_type="k8s",
-        ws_base_url="ws://localhost:8000",
-        ssl_verify="no",
-    )
+    ActivateRulesets().activate(activation=activation, deployment_type="k8s")
     task_mock.assert_called_once_with(
-        settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
-        activation.id,
-        "k8s",
-        "ws://localhost:8000",
-        "no",
+        settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE, activation.id
     )
 
 

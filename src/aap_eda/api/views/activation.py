@@ -119,8 +119,6 @@ class ActivationViewSet(
                 is_restart=False,
                 activation_id=response.id,
                 deployment_type=settings.DEPLOYMENT_TYPE,
-                ws_base_url=settings.WEBSOCKET_BASE_URL,
-                ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
             )
 
         return Response(
@@ -273,8 +271,6 @@ class ActivationViewSet(
             is_restart=False,
             activation_id=pk,
             deployment_type=settings.DEPLOYMENT_TYPE,
-            ws_base_url=settings.WEBSOCKET_BASE_URL,
-            ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         )
 
         activation.current_job_id = job.id
@@ -344,8 +340,6 @@ class ActivationViewSet(
             is_restart=False,  # increment restart_count here instead of by task # noqa: E501
             activation_id=pk,
             deployment_type=settings.DEPLOYMENT_TYPE,
-            ws_base_url=settings.WEBSOCKET_BASE_URL,
-            ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         )
 
         activation.restart_count += 1
