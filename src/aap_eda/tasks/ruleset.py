@@ -63,10 +63,7 @@ def activate(activation_id: int, requester: str = "User") -> None:
 
     ActivateRulesets().activate(activation)
 
-    activation.refresh_from_db()
-    logger.info(
-        f"Task finished: activation {activation.name}" f" {activation.status}."
-    )
+    logger.info(f"Activation {activation.name} is done.")
 
 
 @job("default")

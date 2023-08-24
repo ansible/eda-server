@@ -35,6 +35,8 @@ from .shared_settings import VALID_LOG_LEVELS
 
 logger = logging.getLogger(__name__)
 
+GRACEFUL_TERM = 143
+
 
 class ActivationKubernetes:
     def __init__(self):
@@ -248,28 +250,31 @@ class ActivationKubernetes:
                 timeout_seconds=0,
             )
 
-            activation_job_name = activation_job.items[0].metadata.name
-            status = self.batch_api.delete_namespaced_job(
-                name=activation_job_name,
-                namespace=namespace,
-                propagation_policy="Background",
-            )
+            if activation_job.items and activation_job.items[0].metadata:
+                activation_job_name = activation_job.items[0].metadata.name
+                status = self.batch_api.delete_namespaced_job(
+                    name=activation_job_name,
+                    namespace=namespace,
+                    propagation_policy="Background",
+                )
 
-            self.delete_services(
-                namespace=namespace,
-                job_name=activation_job_name,
-            )
+                self.delete_services(
+                    namespace=namespace,
+                    job_name=activation_job_name,
+                )
 
-            secret_name = (
-                f"activation-secret-{activation_instance.activation.id}"
-            )
-            self.delete_secret(
-                secret_name=secret_name,
-                namespace=namespace,
-            )
+                secret_name = (
+                    f"activation-secret-{activation_instance.activation.id}"
+                )
+                self.delete_secret(
+                    secret_name=secret_name,
+                    namespace=namespace,
+                )
 
-            if status.status == "Failure":
-                raise K8sActivationException(f"{status}")
+                if status.status == "Failure":
+                    raise K8sActivationException(f"{status}")
+            else:
+                logger.info(f"Job for : {instance_name} has been removed")
 
         except Exception as e:
             raise K8sActivationException(
@@ -341,6 +346,13 @@ class ActivationKubernetes:
                         raise K8sActivationException()
 
             except DeactivationException:
+                self.set_activation_status(
+                    instance=activation_instance,
+                    status=ActivationStatus.STOPPED,
+                )
+                raise
+            except ActivationRecordNotFound as e:
+                logger.error(e)
                 raise
             except Exception as e:
                 raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
@@ -407,14 +419,14 @@ class ActivationKubernetes:
             instance.updated_at = timezone.now()
             instance.save(update_fields=["status", "updated_at"])
 
-            if (
-                status == ActivationStatus.RUNNING
-                and not instance.activation.is_valid
-            ):
-                instance.activation.is_valid = True
-                instance.activation.save(
-                    update_fields=["is_valid", "modified_at"]
-                )
+            update_fields = ["status", "modified_at"]
+            activation = instance.activation
+            activation.refresh_from_db()
+            activation.status = status
+            if status == ActivationStatus.RUNNING and not activation.is_valid:
+                activation.is_valid = True
+                update_fields.append("is_valid")
+            activation.save(update_fields=update_fields)
         except (IntegrityError, DatabaseError):
             message = f"Activation instance {instance.id} is not present."
             raise ActivationRecordNotFound(message)
@@ -441,43 +453,44 @@ class ActivationKubernetes:
 
                         statuses = event["object"].status.container_statuses
 
-                        if statuses:
-                            for status in statuses:
-                                if status:
-                                    logger.info(f"CONT STATUS: {status}")
+                        if statuses and statuses[0]:
+                            logger.info(f"CONT STATUS: {statuses[0]}")
 
-                                    if status.state.waiting:
-                                        message = status.state.waiting.message
-                                        reason = status.state.waiting.reason
-                                        if reason in pod_failed_reasons:
-                                            self.delete_job(
-                                                activation_instance, namespace
-                                            )
-                                            self.set_activation_status(
-                                                instance=activation_instance,
-                                                status=ActivationStatus.FAILED,
-                                            )
-                                            raise K8sActivationException(
-                                                message
-                                            )
+                            if statuses[0].state.waiting:
+                                message = statuses[0].state.waiting.message
+                                reason = statuses[0].state.waiting.reason
+                                if reason in pod_failed_reasons:
+                                    self.delete_job(
+                                        activation_instance, namespace
+                                    )
+                                    self.set_activation_status(
+                                        instance=activation_instance,
+                                        status=ActivationStatus.FAILED,
+                                    )
+                                    raise K8sActivationException(message)
 
                     if event["object"].status.phase == "Running":
                         pod_name = event["object"].metadata.name
                         logger.info(f"Pod {pod_name} - Running")
+
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.RUNNING,
+                        )
                         self.read_job_pod_log(
                             pod_name=pod_name,
                             namespace=namespace,
                             activation_instance_id=activation_instance.id,
-                        )
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.RUNNING,
                         )
 
                     if event["object"].status.phase == "Succeeded":
                         pod_name = event["object"].metadata.name
                         logger.info(f"Pod {pod_name} - Succeeded")
 
+                        self.set_activation_status(
+                            instance=activation_instance,
+                            status=ActivationStatus.COMPLETED,
+                        )
                         self.read_job_pod_log(
                             pod_name=pod_name,
                             namespace=namespace,
@@ -485,10 +498,6 @@ class ActivationKubernetes:
                         )
                         w.stop()
 
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.COMPLETED,
-                        )
                         done = True
 
                     if event["object"].status.phase == "Failed":
@@ -502,13 +511,32 @@ class ActivationKubernetes:
                         )
                         w.stop()
 
-                        self.set_activation_status(
-                            instance=activation_instance,
-                            status=ActivationStatus.STOPPED,
-                        )
+                        statuses = event["object"].status.container_statuses
+                        if statuses and statuses[0]:
+                            exit_code = statuses[0].state.terminated.exit_code
+                            reason = statuses[0].state.terminated.reason
+                            if exit_code == GRACEFUL_TERM:
+                                # The stopped status is set in except block
+                                raise DeactivationException(
+                                    f"Container exited with code {exit_code}"
+                                )
+                            else:
+                                self.set_activation_status(
+                                    instance=activation_instance,
+                                    status=ActivationStatus.FAILED,
+                                )
+                                raise K8sActivationException(
+                                    f"Container failed: {reason} with "
+                                    f"exit code {exit_code}"
+                                )
+
                         done = True
-            except ActivationRecordNotFound as e:
-                logger.error(e)
+            except (
+                DeactivationException,
+                ActivationRecordNotFound,
+                K8sActivationException,
+            ):
+                raise
             except Exception as e:
                 raise K8sActivationException(
                     f"Pod {pod_name} failed with error {e}"
@@ -529,9 +557,6 @@ class ActivationKubernetes:
                     namespace=namespace,
                     pretty=True,
                 ):
-                    # log info to worker log
-                    logger.info(line)
-
                     # log info to DB
                     activation_instance_log = models.ActivationInstanceLog(
                         line_number=line_number,
@@ -545,10 +570,9 @@ class ActivationKubernetes:
                 done = True
             except exceptions.ApiException as e:
                 if e.status == 404:  # Not Found
-                    logger.warning(
+                    raise DeactivationException(
                         f"Failed to read logs of unavailable pod {pod_name}"
                     )
-                    done = True
                 else:
                     raise K8sActivationException(
                         f"Failed to read pod logs: \n {e}"
