@@ -99,6 +99,7 @@ class GitRepository:
         *,
         credential: Optional[Credential] = None,
         depth: Optional[int] = None,
+        verify_ssl: bool = True,
         _executor: Optional[GitExecutor] = None,
     ) -> GitRepository:
         """
@@ -108,6 +109,7 @@ class GitRepository:
         :param path: The directory to clone into.
         :param depth: If set, creates a shallow clone with a history truncated
             to the specified number of commits.
+        :param verify_ssl: Indicates if SSL verification is enabled.
         :param _executor: Optional command executor.
         :return:
         """
@@ -125,6 +127,9 @@ class GitRepository:
             if index > 0:
                 user = credential.username
                 url = f"{url[:index]}{user}:${{GIT_PASSWORD}}@{url[index:]}"
+
+        if not verify_ssl:
+            _executor.ENVIRON["GIT_SSL_NO_VERIFY"] = "true"
 
         cmd = ["clone", "--quiet"]
         if depth is not None:

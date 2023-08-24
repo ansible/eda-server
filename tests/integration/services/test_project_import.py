@@ -75,31 +75,43 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
     git_mock.clone.side_effect = clone_project
 
-    project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
+    projects = models.Project.objects.bulk_create(
+        [
+            models.Project(
+                name="test-project-01",
+                url="https://git.example.com/repo01.git",
+            ),
+            models.Project(
+                name="test-project-02",
+                url="https://git.example.com/repo02.git",
+                verify_ssl=False,
+            ),
+        ]
     )
 
-    service = ProjectImportService(git_cls=git_mock)
-    service.import_project(project)
+    for project in projects:
+        service = ProjectImportService(git_cls=git_mock)
+        service.import_project(project)
 
-    git_mock.clone.assert_called_once_with(
-        "https://git.example.com/repo.git",
-        os.path.join(service_tempdir_patch.last_name, "src"),
-        credential=None,
-        depth=1,
-    )
+        git_mock.clone.assert_called_with(
+            project.url,
+            os.path.join(service_tempdir_patch.last_name, "src"),
+            credential=None,
+            depth=1,
+            verify_ssl=project.verify_ssl,
+        )
 
-    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    assert project.import_state == models.Project.ImportState.COMPLETED
+        assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+        assert project.import_state == models.Project.ImportState.COMPLETED
 
-    rulebooks = list(project.rulebook_set.order_by("name"))
-    assert len(rulebooks) == 2
+        rulebooks = list(project.rulebook_set.order_by("name"))
+        assert len(rulebooks) == 2
 
-    with open(DATA_DIR / "project-01-import.json") as fp:
-        expected_rulebooks = json.load(fp)
+        with open(DATA_DIR / "project-01-import.json") as fp:
+            expected_rulebooks = json.load(fp)
 
-    for rulebook, expected in zip(rulebooks, expected_rulebooks):
-        assert_rulebook_is_valid(rulebook, expected)
+        for rulebook, expected in zip(rulebooks, expected_rulebooks):
+            assert_rulebook_is_valid(rulebook, expected)
 
 
 @pytest.mark.django_db

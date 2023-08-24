@@ -53,6 +53,7 @@ class Project(models.Model):
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
     git_hash = models.TextField()
+    verify_ssl = models.BooleanField(default=True)
     credential = models.ForeignKey(
         "Credential",
         blank=True,

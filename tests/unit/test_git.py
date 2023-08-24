@@ -28,7 +28,7 @@ def test_git_clone():
         name="name", username="me", secret="pass"
     )
     credential.refresh_from_db()
-    executor = mock.MagicMock()
+    executor = mock.MagicMock(ENVIRON={})
     repository = GitRepository.clone(
         "https://git.example.com/repo.git",
         "/path/to/repository",
@@ -43,8 +43,28 @@ def test_git_clone():
             "/path/to/repository",
         ]
     )
+    assert "GIT_SSL_NO_VERIFY" not in executor.ENVIRON
     assert isinstance(repository, GitRepository)
     assert repository.root == "/path/to/repository"
+
+
+def test_git_clone_without_ssl_verification():
+    executor = mock.MagicMock(ENVIRON={})
+    _ = GitRepository.clone(
+        "https://git.example.com/repo.git",
+        "/path/to/repository",
+        verify_ssl=False,
+        _executor=executor,
+    )
+    executor.assert_called_once_with(
+        [
+            "clone",
+            "--quiet",
+            "https://git.example.com/repo.git",
+            "/path/to/repository",
+        ]
+    )
+    assert executor.ENVIRON["GIT_SSL_NO_VERIFY"] == "true"
 
 
 def test_git_shallow_clone():
