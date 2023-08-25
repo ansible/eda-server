@@ -29,9 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 @job("activation")
-def activate_rulesets(
-    is_restart: bool, activation_id: int, deployment_type: str
-) -> None:
+def activate_rulesets(is_restart: bool, activation_id: int) -> None:
     activation = models.Activation.objects.filter(id=activation_id).first()
     if (
         not activation
@@ -47,10 +45,7 @@ def activate_rulesets(
     logger.info(f"Task started: Activate rulesets ({activation.name})")
 
     if activation.is_enabled:
-        ActivateRulesets().activate(
-            activation,
-            deployment_type,
-        )
+        ActivateRulesets().activate(activation)
 
         logger.info(f"Task finished: Rulesets ({activation.name}).")
     else:
@@ -60,10 +55,7 @@ def activate_rulesets(
 
 
 @job("default")
-def deactivate(
-    activation_id: int,
-    is_delete: bool = False,
-):
+def deactivate(activation_id: int, is_delete: bool = False) -> None:
     activation = models.Activation.objects.get(id=activation_id)
     logger.info(f"Task started: Deactivate Activation ({activation.name})")
 
@@ -103,10 +95,7 @@ def deactivate(
             flush=True,
         )
 
-        ActivateRulesets().deactivate(
-            instance=current_instance,
-            deployment_type=settings.DEPLOYMENT_TYPE,
-        )
+        ActivateRulesets().deactivate(instance=current_instance)
 
     if is_delete:
         logger.info(f"Activation {activation.name} is deleted")
@@ -118,19 +107,13 @@ def deactivate(
 
 
 @job("default")
-def deactivate_rulesets(
-    activation_instance_id: int,
-    deployment_type: str,
-) -> None:
+def deactivate_rulesets(activation_instance_id: int) -> None:
     instance = models.ActivationInstance.objects.get(pk=activation_instance_id)
     logger.info(
         f"Task started: Deactivate Activation Instance ({instance.id})"
     )
 
-    ActivateRulesets().deactivate(
-        instance,
-        deployment_type,
-    )
+    ActivateRulesets().deactivate(instance)
 
 
 # This is job will be scheduled by a scheduler which currently is unavailable
@@ -200,5 +183,4 @@ def enqueue_restart_task(seconds: int, activation_id: int) -> None:
         activate_rulesets,
         True,
         activation_id,
-        settings.DEPLOYMENT_TYPE,
     )

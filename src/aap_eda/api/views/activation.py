@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 
-from django.conf import settings
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
@@ -118,7 +117,6 @@ class ActivationViewSet(
             activate_rulesets.delay(
                 is_restart=False,
                 activation_id=response.id,
-                deployment_type=settings.DEPLOYMENT_TYPE,
             )
 
         return Response(
@@ -270,7 +268,6 @@ class ActivationViewSet(
         job = activate_rulesets.delay(
             is_restart=False,
             activation_id=pk,
-            deployment_type=settings.DEPLOYMENT_TYPE,
         )
 
         activation.current_job_id = job.id
@@ -333,13 +330,11 @@ class ActivationViewSet(
         if instance_running:
             deactivate_rulesets.delay(
                 activation_instance_id=instance_running.id,
-                deployment_type=settings.DEPLOYMENT_TYPE,
             )
 
         activate_rulesets.delay(
             is_restart=False,  # increment restart_count here instead of by task # noqa: E501
             activation_id=pk,
-            deployment_type=settings.DEPLOYMENT_TYPE,
         )
 
         activation.restart_count += 1
