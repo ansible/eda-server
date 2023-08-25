@@ -107,12 +107,10 @@ def save_activation_and_instance(
 
 
 class ActivateRulesets:
-    def activate(
-        self, activation: models.Activation, deployment_type: str
-    ) -> models.ActivationInstance:
-        self.deployment_type = deployment_type
-        self.ws_base_url = settings.WEBSOCKET_BASE_URL
-        self.ssl_verify = settings.WEBSOCKET_SSL_VERIFY
+    def activate(self, activation: models.Activation) -> None:
+        deployment_type = settings.DEPLOYMENT_TYPE
+        ws_base_url = settings.WEBSOCKET_BASE_URL
+        ssl_verify = settings.WEBSOCKET_SSL_VERIFY
         try:
             try:
                 instance = models.ActivationInstance.objects.create(
@@ -141,12 +139,12 @@ class ActivateRulesets:
                     f"Invalid deployment type: {deployment_type}"
                 )
 
-            ws_url = f"{self.ws_base_url}{ACTIVATION_PATH}"
+            ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
             if dtype == DeploymentType.PODMAN:
                 self.activate_in_podman(
                     ws_url=ws_url,
-                    ssl_verify=self.ssl_verify,
+                    ssl_verify=ssl_verify,
                     activation_instance=instance,
                     decision_environment=activation.decision_environment,
                     activation_db_logger=activation_db_logger,
@@ -155,7 +153,7 @@ class ActivateRulesets:
                 logger.info(f"Activation DeploymentType: {dtype}")
                 self.activate_in_k8s(
                     ws_url=ws_url,
-                    ssl_verify=self.ssl_verify,
+                    ssl_verify=ssl_verify,
                     activation_instance=instance,
                     decision_environment=activation.decision_environment,
                 )
@@ -196,9 +194,9 @@ class ActivateRulesets:
     def deactivate(
         self,
         instance: models.ActivationInstance,
-        deployment_type: str,
     ) -> None:
         try:
+            deployment_type = settings.DEPLOYMENT_TYPE
             instance.status = ActivationStatus.STOPPING
             save_activation_and_instance(instance, ["status"])
 

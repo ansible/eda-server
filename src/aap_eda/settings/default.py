@@ -346,7 +346,7 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 # DEPLOYMENT SETTINGS
 # ---------------------------------------------------------
 
-DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "local")
+DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)

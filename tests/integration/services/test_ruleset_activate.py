@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
 from dataclasses import dataclass
 from unittest import mock
 
@@ -18,7 +19,7 @@ import pytest
 from django.conf import settings
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import RestartPolicy
 from aap_eda.services.ruleset.activate_rulesets import (
     ACTIVATION_PATH,
     ActivateRulesets,
@@ -145,23 +146,9 @@ def get_activation_stats():
 
 
 @pytest.mark.django_db
-@mock.patch("subprocess.run")
-def test_rulesets_activate_with_errors(run_mock: mock.Mock, init_data):
-    assert models.ActivationInstance.objects.count() == 0
-
-    ActivateRulesets().activate(
-        activation=init_data.activation, deployment_type="bad_type"
-    )
-
-    assert (
-        models.ActivationInstance.objects.first().status
-        == ActivationStatus.FAILED.value
-    )
-
-
-@pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "podman"})
 def test_rulesets_activate_with_podman(
     my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats
 ):
@@ -179,9 +166,7 @@ def test_rulesets_activate_with_podman(
 
     assert models.ActivationInstance.objects.count() == 0
 
-    ActivateRulesets().activate(
-        activation=init_data.activation, deployment_type="podman"
-    )
+    ActivateRulesets().activate(activation=init_data.activation)
     assert models.ActivationInstance.objects.count() == 1
     instance = models.ActivationInstance.objects.first()
     activation = models.Activation.objects.get(pk=instance.activation.id)
@@ -203,15 +188,14 @@ def test_rulesets_activate_with_podman(
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "bad_type"})
 def test_restart_on_failure(task_mock: mock.Mock, init_data):
     activation = init_data.activation
     activation.restart_policy = RestartPolicy.ON_FAILURE.value
     activation.is_valid = True
     activation.save()
 
-    ActivateRulesets().activate(
-        activation=activation, deployment_type="bad_type"
-    )
+    ActivateRulesets().activate(activation=activation)
     task_mock.assert_called_once_with(
         settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE, activation.id
     )
@@ -219,20 +203,20 @@ def test_restart_on_failure(task_mock: mock.Mock, init_data):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "bad_type"})
 def test_not_restart_on_failure_invalid(task_mock: mock.Mock, init_data):
     activation = init_data.activation
     activation.restart_policy = RestartPolicy.ON_FAILURE.value
     activation.is_valid = False
     activation.save()
 
-    ActivateRulesets().activate(
-        activation=init_data.activation, deployment_type="bad_type"
-    )
+    ActivateRulesets().activate(activation=init_data.activation)
     task_mock.assert_not_called()
 
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "bad_type"})
 def test_not_restart_on_failure_exceed_limit(task_mock: mock.Mock, init_data):
     activation = init_data.activation
     activation.restart_policy = RestartPolicy.ON_FAILURE.value
@@ -240,9 +224,7 @@ def test_not_restart_on_failure_exceed_limit(task_mock: mock.Mock, init_data):
     activation.failure_count = settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE + 1
     activation.save()
 
-    ActivateRulesets().activate(
-        activation=init_data.activation, deployment_type="bad_type"
-    )
+    ActivateRulesets().activate(activation=init_data.activation)
     task_mock.assert_not_called()
 
 
@@ -250,6 +232,7 @@ def test_not_restart_on_failure_exceed_limit(task_mock: mock.Mock, init_data):
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.enqueue_restart_task")
 @mock.patch.object(ActivateRulesets, "activate_in_k8s")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "k8s"})
 def test_restart_on_completed(
     podman_mock: mock.Mock, task_mock: mock.Mock, init_data
 ):
@@ -258,7 +241,7 @@ def test_restart_on_completed(
     activation.is_valid = True
     activation.save()
 
-    ActivateRulesets().activate(activation=activation, deployment_type="k8s")
+    ActivateRulesets().activate(activation=activation)
     task_mock.assert_called_once_with(
         settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE, activation.id
     )
