@@ -72,7 +72,37 @@ class Activation(EDAModelMixin, models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
-    def stop(self):
+    def destroying(self) -> None:
+        self.status = ActivationStatus.DELETING
+        self.save(update_fields=["status"])
+
+    def pending(self) -> None:
+        self.is_enabled = True
+        self.failure_count = 0
+        self.status = ActivationStatus.PENDING
+        self.save(
+            update_fields=[
+                "is_enabled",
+                "failure_count",
+                "status",
+                "modified_at",
+            ]
+        )
+
+    def running(self) -> None:
+        self.status = ActivationStatus.RUNNING
+        self.save(update_fields=["status"])
+
+    def starting(self) -> None:
+        self.status = ActivationStatus.STARTING
+        self.save(update_fields=["status"])
+
+    def stopped(self) -> None:
+        self.current_job_id = None
+        self.status = ActivationStatus.STOPPED
+        self.save()
+
+    def stopping(self) -> bool:
         if not self.is_enabled:
             return False
 
@@ -98,6 +128,32 @@ class ActivationInstance(models.Model):
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
     activation_pod_id = models.TextField(null=True)
+
+    def failed(self) -> None:
+        self.status = ActivationStatus.FAILED
+        self.save_with_activation(
+            update_fields=["status", "ended_at", "updated_at"],
+        )
+
+    def save_with_activation(self, update_fields: list) -> None:
+        """Save self and update the linked activation's status accordingly."""
+        self.activation.status = self.status
+        running_states = [
+            ActivationStatus.PENDING.value,
+            ActivationStatus.STARTING.value,
+            ActivationStatus.RUNNING.value,
+            ActivationStatus.UNRESPONSIVE.value,
+        ]
+        activation_fields = ["status", "modified_at"]
+        if str(self.status) not in running_states:
+            self.activation.current_job_id = None
+            activation_fields.append("current_job_id")
+        if str(self.status) == ActivationStatus.COMPLETED.value:
+            self.activation.failure_count = 0
+            activation_fields.append("failure_count")
+
+        self.save(update_fields=update_fields)
+        self.activation.save(update_fields=activation_fields)
 
 
 class ActivationInstanceLog(models.Model):

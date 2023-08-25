@@ -74,38 +74,6 @@ def find_ports(rulebook_text: str):
     return found_ports
 
 
-def save_activation_and_instance(
-    instance: models.ActivationInstance,
-    update_fields: list,
-):
-    try:
-        """
-        Save instance and update the linked activation's
-        status accordingly.
-        """
-        instance.activation.status = instance.status
-        running_states = [
-            ActivationStatus.PENDING.value,
-            ActivationStatus.STARTING.value,
-            ActivationStatus.RUNNING.value,
-            ActivationStatus.UNRESPONSIVE.value,
-        ]
-        activation_fields = ["status", "modified_at"]
-        if str(instance.status) not in running_states:
-            instance.activation.current_job_id = None
-            activation_fields.append("current_job_id")
-        if str(instance.status) == ActivationStatus.COMPLETED.value:
-            instance.activation.failure_count = 0
-            activation_fields.append("failure_count")
-
-        instance.save(update_fields=update_fields)
-        instance.activation.save(update_fields=activation_fields)
-    except (IntegrityError, DatabaseError):
-        message = f"Failed to update instance [id: {instance.id}]"
-        logger.error(message)
-        raise ActivationRecordNotFound(message)
-
-
 class ActivateRulesets:
     def activate(
         self, activation: models.Activation, deployment_type: str
@@ -120,8 +88,7 @@ class ActivateRulesets:
                     name=activation.name,
                     status=ActivationStatus.STARTING,
                 )
-                instance.activation.status = ActivationStatus.STARTING
-                instance.activation.save(update_fields=["status"])
+                instance.activation.starting()
             except IntegrityError:
                 raise ActivationRecordNotFound(
                     f"Activation {activation.name} has been deleted."
@@ -133,7 +100,7 @@ class ActivateRulesets:
                 dtype = DeploymentType(deployment_type)
             except ValueError:
                 instance.status = ActivationStatus.FAILED
-                save_activation_and_instance(
+                self._save_activation_and_instance(
                     instance=instance,
                     update_fields=["status", "ended_at", "updated_at"],
                 )
@@ -179,7 +146,7 @@ class ActivateRulesets:
             now = timezone.now()
             instance.ended_at = now
             instance.updated_at = now
-            save_activation_and_instance(
+            self._save_activation_and_instance(
                 instance=instance,
                 update_fields=["status", "ended_at", "updated_at"],
             )
@@ -200,7 +167,7 @@ class ActivateRulesets:
     ) -> None:
         try:
             instance.status = ActivationStatus.STOPPING
-            save_activation_and_instance(instance, ["status"])
+            self._save_activation_and_instance(instance, ["status"])
 
             activation_db_logger = ActivationDbLogger(instance.id)
             try:
@@ -225,7 +192,7 @@ class ActivateRulesets:
                 f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
             )
             instance.status = ActivationStatus.STOPPED
-            save_activation_and_instance(instance, ["status"])
+            self._save_activation_and_instance(instance, ["status"])
 
         except Exception as exe:
             logger.exception(f"Activation error: {str(exe)}")
@@ -431,8 +398,8 @@ class ActivateRulesets:
             activation_instance=activation_instance,
             secret_name=secret_name,
         )
-        activation_instance.activation.status = ActivationStatus.RUNNING
-        save_activation_and_instance(activation_instance, ["status"])
+        activation_instance.activation.running()
+        self._save_activation_and_instance(activation_instance, ["status"])
 
     def deactivate_in_k8s(self, activation_instance) -> None:
         k8s = ActivationKubernetes()
@@ -446,3 +413,15 @@ class ActivateRulesets:
         logger.debug(f"namespace: {namespace}")
         logger.debug(f"activation_name: {activation_instance.name}")
         k8s.delete_job(activation_instance, namespace)
+
+    def _save_activation_and_instance(
+        self,
+        instance: models.ActivationInstance,
+        update_fields: list,
+    ):
+        try:
+            instance.save_with_activation(update_fields)
+        except (IntegrityError, DatabaseError):
+            message = f"Failed to update instance [id: {instance.id}]"
+            logger.error(message)
+            raise ActivationRecordNotFound(message)

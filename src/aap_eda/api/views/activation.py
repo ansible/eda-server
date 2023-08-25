@@ -172,8 +172,7 @@ class ActivationViewSet(
         return self.get_paginated_response(serializer.data)
 
     def perform_destroy(self, activation):
-        activation.status = ActivationStatus.DELETING
-        activation.save(update_fields=["status"])
+        activation.destroying()
         logger.info(f"Now deleting {activation.name} ...")
 
         deactivate.delay(activation_id=activation.id, is_delete=True)
@@ -254,17 +253,7 @@ class ActivationViewSet(
 
         logger.info(f"Now enabling {activation.name} ...")
 
-        activation.is_enabled = True
-        activation.failure_count = 0
-        activation.status = ActivationStatus.PENDING
-        activation.save(
-            update_fields=[
-                "is_enabled",
-                "failure_count",
-                "status",
-                "modified_at",
-            ]
-        )
+        activation.pending()
 
         job = activate_rulesets.delay(
             is_restart=False,
@@ -293,7 +282,7 @@ class ActivationViewSet(
 
         self._check_deleting(activation)
 
-        if activation.stop():
+        if activation.stopping():
             deactivate.delay(activation.id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -112,9 +112,7 @@ def deactivate(
         logger.info(f"Activation {activation.name} is deleted")
         activation.delete()
     else:
-        activation.current_job_id = None
-        activation.status = ActivationStatus.STOPPED
-        activation.save()
+        activation.stopped()
 
 
 @job("default")
