@@ -32,6 +32,10 @@ class User(AbstractUser):
     roles = models.ManyToManyField("Role", related_name="users")
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
+    def get_awx_tokens(self):
+        """Return all AWX tokens for the user."""
+        return AwxToken.objects.filter(user=self)
+
 
 class AwxToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)

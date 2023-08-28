@@ -126,6 +126,14 @@ class ActivateRulesets:
 
             activation_db_logger = ActivationDbLogger(instance.id)
 
+            if not activation.user.get_awx_tokens().exists():
+                instance.status = ActivationStatus.FAILED
+                save_activation_and_instance(
+                    instance=instance,
+                    update_fields=["status", "ended_at", "updated_at"],
+                )
+                raise ActivationException("No AWX token found")
+
             try:
                 dtype = DeploymentType(deployment_type)
             except ValueError:
@@ -277,7 +285,7 @@ class ActivateRulesets:
             else:
                 msg = f"Activation {activation.name} failed: {str(error)}"
                 logger.error(msg)
-                activation_db_logger.write(msg)
+                activation_db_logger.write(msg, flush=True)
         except (IntegrityError, DatabaseError):
             message = f"Failed to update instance [id: {instance.id}]"
             logger.error(message)
@@ -309,7 +317,7 @@ class ActivateRulesets:
             )
             logger.info(msg)
 
-        activation_db_logger.write(msg)
+        activation_db_logger.write(msg, flush=True)
         enqueue_restart_task(seconds, activation.id)
 
     def activate_in_podman(

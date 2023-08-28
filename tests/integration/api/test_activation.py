@@ -581,7 +581,10 @@ def test_create_activation_no_token(client: APIClient):
 
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert str(response.data["detail"]) == "No controller token specified"
+    assert (
+        str(response.data["detail"])
+        == "No controller token configured for the current user"
+    )
 
 
 @pytest.mark.django_db

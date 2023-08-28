@@ -131,10 +131,10 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def _validate_pre_reqs(self, user):
-        tokens = models.AwxToken.objects.filter(user_id=user.id).count()
-        if tokens == 0:
+        num_tokens = user.get_awx_tokens().count()
+        if num_tokens == 0:
             raise NoControllerToken()
-        elif tokens > 1:
+        elif num_tokens > 1:
             raise TooManyControllerTokens()
 
         ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"

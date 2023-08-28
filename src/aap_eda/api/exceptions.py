@@ -64,7 +64,7 @@ class HttpForbidden(APIException):
 
 class NoControllerToken(APIException):
     status_code = 422
-    default_detail = "No controller token specified"
+    default_detail = "No controller token configured for the current user"
 
 
 class TooManyControllerTokens(APIException):
