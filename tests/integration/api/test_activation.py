@@ -175,7 +175,7 @@ def create_multiple_activations(fks: dict):
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.activate_rulesets")
+@mock.patch("aap_eda.tasks.ruleset.activate")
 def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     job = mock.Mock()
     activate_rulesets.delay.return_value = job
@@ -392,7 +392,8 @@ def test_delete_activation(delete_mock: mock.Mock, client: APIClient):
 
 
 @pytest.mark.django_db
-def test_restart_activation(client: APIClient):
+@mock.patch("aap_eda.tasks.ruleset.restart.delay")
+def test_restart_activation(restart_mock: mock.Mock, client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 

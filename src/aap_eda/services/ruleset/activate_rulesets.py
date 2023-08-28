@@ -118,8 +118,6 @@ class ActivateRulesets:
                     name=activation.name,
                     status=ActivationStatus.STARTING,
                 )
-                instance.activation.status = ActivationStatus.STARTING
-                instance.activation.save(update_fields=["status"])
             except IntegrityError:
                 raise ActivationRecordNotFound(
                     f"Activation {activation.name} has been deleted."
