@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.utils import timezone
@@ -11,6 +12,7 @@ from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
+from aap_eda.wsapi.exceptions import AwxTokenNotFound
 
 TIMEOUT = 5
 
@@ -153,6 +155,31 @@ async def test_handle_workers_with_validation_errors():
     with pytest.raises(ValidationError):
         await communicator.send_json_to(payload)
         await communicator.wait()
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_without_awx_token():
+    communicator = WebsocketCommunicator(
+        AnsibleRulebookConsumer.as_asgi(), "ws/"
+    )
+    connected, _ = await communicator.connect(timeout=3)
+    assert connected
+
+    activation_instance_id = await _prepare_db_data()
+
+    await sync_to_async(models.AwxToken.objects.all().delete)()
+
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_id,
+    }
+    await communicator.send_json_to(payload)
+    await communicator.receive_json_from(timeout=TIMEOUT)
+    with pytest.raises(AwxTokenNotFound):
+        await communicator.receive_json_from(timeout=TIMEOUT)
+
+    loglines = await get_activation_instance_logs(activation_instance_id)
+    assert any("AWX token not found" in logline for logline in loglines)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -434,6 +461,15 @@ def get_activation_instance_job_instance_count():
 @database_sync_to_async
 def get_job_instance_event_count():
     return models.JobInstanceEvent.objects.count()
+
+
+@database_sync_to_async
+def get_activation_instance_logs(instance_id):
+    instance = models.ActivationInstance.objects.get(pk=instance_id)
+    logs = models.ActivationInstanceLog.objects.filter(
+        activation_instance=instance
+    ).order_by("line_number")
+    return [item.log for item in logs]
 
 
 @database_sync_to_async

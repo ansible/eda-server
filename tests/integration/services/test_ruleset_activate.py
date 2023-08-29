@@ -19,7 +19,7 @@ import pytest
 from django.conf import settings
 
 from aap_eda.core import models
-from aap_eda.core.enums import RestartPolicy
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.ruleset.activate_rulesets import (
     ACTIVATION_PATH,
     ActivateRulesets,
@@ -263,3 +263,20 @@ def _get_rules_count(ruleset_stats):
         rules_fired_count += ruleset_stat["rulesTriggered"]
 
     return rules_count, rules_fired_count
+
+
+@pytest.mark.django_db
+def test_rulesets_activate_no_awx_token(init_data):
+    init_data.awx_token.delete()
+    ActivateRulesets().activate(activation=init_data.activation)
+    assert models.ActivationInstance.objects.count() == 1
+
+    instance = models.ActivationInstance.objects.first()
+    assert instance.activation.status == ActivationStatus.FAILED.value
+    assert instance.status == ActivationStatus.FAILED.value
+
+    loglines = models.ActivationInstanceLog.objects.filter(
+        activation_instance=instance
+    )
+    assert loglines.count() == 1
+    assert "No AWX token found" in loglines.first().log
