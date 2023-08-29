@@ -82,6 +82,7 @@ class InitData:
     project: models.Project
     rulebook: models.Rulebook
     extra_var: models.ExtraVar
+    awx_token: models.AwxToken
 
 
 @pytest.fixture(autouse=True)
@@ -116,6 +117,12 @@ def init_data(get_activation_stats):
         email="luke.skywalker@example.com",
         password="secret",
     )
+    awx_token = models.AwxToken.objects.create(
+        name="test-awx-token",
+        token="dummy-token",
+        user=user,
+    )
+
     activation = models.Activation.objects.create(
         decision_environment=decision_environment,
         project=project,
@@ -131,6 +138,7 @@ def init_data(get_activation_stats):
         project=project,
         rulebook=rulebook,
         extra_var=extra_var,
+        awx_token=awx_token,
     )
 
 
