@@ -113,10 +113,30 @@ class ActivateRulesets:
         ssl_verify = settings.WEBSOCKET_SSL_VERIFY
         try:
             try:
+                project_hash = None
+                if activation.rulebook and activation.rulebook.project:
+                    project_hash = models.Project.objects.get(
+                        pk=activation.rulebook.project.id
+                    ).git_hash
+                else:
+                    activation_instances = (
+                        models.ActivationInstance.objects.filter(
+                            activation_id=activation.id
+                        )
+                    )
+                    last_instance = (
+                        activation_instances.latest("started_at")
+                        if activation_instances
+                        else None
+                    )
+                    project_hash = (
+                        last_instance.git_hash if last_instance else None
+                    )
                 instance = models.ActivationInstance.objects.create(
                     activation=activation,
                     name=activation.name,
                     status=ActivationStatus.STARTING,
+                    git_hash=project_hash,
                 )
             except IntegrityError:
                 raise ActivationRecordNotFound(

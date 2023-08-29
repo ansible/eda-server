@@ -51,8 +51,10 @@ TEST_AWX_TOKEN_2 = {
     "token": "abc123xyx",
 }
 
+PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
+
 TEST_PROJECT = {
-    "git_hash": "684f62df18ce5f8d5c428e53203b9b975426eed0",
+    "git_hash": PROJECT_GIT_HASH,
     "name": "test-project-01",
     "url": "https://git.example.com/acme/project-01",
     "description": "test project",
@@ -436,10 +438,12 @@ def test_list_activation_instances(client: APIClient):
             models.ActivationInstance(
                 name="test-activation-instance-1",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
             models.ActivationInstance(
                 name="test-activation-instance-1",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
         ]
     )
@@ -451,6 +455,9 @@ def test_list_activation_instances(client: APIClient):
     assert len(data) == len(instances)
     assert data[0]["name"] == instances[0].name
     assert data[1]["name"] == instances[1].name
+    assert (
+        data[0]["git_hash"] == instances[0].git_hash == instances[1].git_hash
+    )
 
 
 @pytest.mark.django_db

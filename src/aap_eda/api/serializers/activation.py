@@ -153,6 +153,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "status",
+            "git_hash",
             "activation_id",
             "started_at",
             "ended_at",
@@ -179,6 +180,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer()
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
+    git_hash = serializers.CharField(required=False, allow_null=True)
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
@@ -192,6 +194,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "is_enabled",
             "decision_environment",
             "status",
+            "git_hash",
             "project",
             "rulebook",
             "extra_var",
@@ -237,6 +240,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "is_enabled": activation["is_enabled"],
             "decision_environment": decision_environment,
             "status": activation["status"],
+            "git_hash": activation["git_hash"],
             "project": project,
             "rulebook": rulebook,
             "extra_var": extra_var,
