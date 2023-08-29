@@ -48,6 +48,7 @@ rq-scheduler = "^0.10"
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
+pytest-mock = "*"
 requests = { version="*", python="<4.0" }
 
 [tool.poetry.group.lint.dependencies]
