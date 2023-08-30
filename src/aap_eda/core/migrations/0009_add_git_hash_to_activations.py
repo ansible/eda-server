@@ -3,6 +3,17 @@
 from django.db import migrations, models
 
 
+def add_git_hash_to_activation(apps, schema_editor):
+    Activation = apps.get_model("core", "Activation")  # noqa: N806
+
+    for activation in Activation.objects.all():
+        git_hash = "project deleted"
+        if activation.rulebook and activation.rulebook.project:
+            git_hash = activation.rulebook.project.git_hash
+        activation.git_hash = git_hash
+        activation.save(update_fields=["git_hash"])
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0008_project_verify_ssl"),
@@ -19,4 +30,5 @@ class Migration(migrations.Migration):
             name="git_hash",
             field=models.TextField(default=""),
         ),
+        migrations.RunPython(add_git_hash_to_activation),
     ]
