@@ -117,6 +117,7 @@ class ActivateRulesets:
                     activation=activation,
                     name=activation.name,
                     status=ActivationStatus.STARTING,
+                    git_hash=activation.git_hash,
                 )
             except IntegrityError:
                 raise ActivationRecordNotFound(

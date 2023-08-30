@@ -120,7 +120,7 @@ class ProjectImportService:
 
             project.git_hash = git_hash
 
-            self._sync_rulebooks(project, repo_dir)
+            self._sync_rulebooks(project, repo_dir, git_hash)
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
@@ -129,7 +129,9 @@ class ProjectImportService:
         for rulebook in self._find_rulebooks(repo):
             self._import_rulebook(project, rulebook)
 
-    def _sync_rulebooks(self, project: models.Project, repo: StrPath):
+    def _sync_rulebooks(
+        self, project: models.Project, repo: StrPath, git_hash: str
+    ):
         # TODO(cutwater): The sync must take into account
         #  not rulebook name, but path.
         #  Must be fixed in https://github.com/ansible/aap-eda/pull/139
@@ -141,7 +143,7 @@ class ProjectImportService:
             if rulebook is None:
                 self._import_rulebook(project, rulebook_info)
             else:
-                self._sync_rulebook(rulebook, rulebook_info)
+                self._sync_rulebook(rulebook, rulebook_info, git_hash)
         models.Rulebook.objects.filter(
             pk__in=[obj.id for obj in existing_rulebooks.values()]
         ).delete()
@@ -161,15 +163,20 @@ class ProjectImportService:
         self,
         rulebook: models.Rulebook,
         rulebook_info: RulebookInfo,
+        git_hash: str,
     ):
         if rulebook.rulesets == rulebook_info.raw_content:
+            models.Activation.objects.filter(rulebook=rulebook).update(
+                git_hash=git_hash,
+            )
             return
         rulebook.rulesets = rulebook_info.raw_content
         rulebook.save()
         rulebook.ruleset_set.clear()
         insert_rulebook_related_data(rulebook, rulebook_info.content)
         models.Activation.objects.filter(rulebook=rulebook).update(
-            rulebook_rulesets=rulebook.rulesets
+            rulebook_rulesets=rulebook.rulesets,
+            git_hash=git_hash,
         )
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:

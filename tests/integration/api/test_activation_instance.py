@@ -59,6 +59,8 @@ TEST_RULESETS_SAMPLE = """
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
+PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
+
 
 @dataclass
 class InitData:
@@ -77,10 +79,12 @@ def test_list_activation_instances(client: APIClient):
             models.ActivationInstance(
                 name="test-activation-instance-1",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
             models.ActivationInstance(
                 name="test-activation-instance-1",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
         ]
     )
@@ -97,10 +101,12 @@ def test_list_activation_instances_filter_name(client: APIClient):
             models.ActivationInstance(
                 name="activation-instance-1",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
             models.ActivationInstance(
                 name="test-activation-instance-2",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
         ]
     )
@@ -123,11 +129,13 @@ def test_list_activation_instances_filter_status(client: APIClient):
                 name="activation-instance-1",
                 status="completed",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
             models.ActivationInstance(
                 name="test-activation-instance-2",
                 status="failed",
                 activation=activation,
+                git_hash=PROJECT_GIT_HASH,
             ),
         ]
     )
@@ -275,6 +283,7 @@ def assert_activation_instance_data(
         "id": instance.id,
         "name": instance.name,
         "status": str(instance.status),
+        "git_hash": instance.git_hash,
         "activation_id": instance.activation.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
