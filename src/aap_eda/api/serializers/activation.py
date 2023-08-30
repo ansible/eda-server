@@ -46,6 +46,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "description",
             "is_enabled",
             "status",
+            "git_hash",
             "decision_environment_id",
             "project_id",
             "rulebook_id",
@@ -126,6 +127,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["user_id"] = user.id
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
+        validated_data["git_hash"] = rulebook.project.git_hash
         return super().create(validated_data)
 
     def _validate_pre_reqs(self, user):
@@ -180,7 +182,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer()
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
-    git_hash = serializers.CharField(required=False, allow_null=True)
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)

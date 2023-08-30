@@ -163,13 +163,17 @@ class ProjectImportService:
         rulebook_info: RulebookInfo,
     ):
         if rulebook.rulesets == rulebook_info.raw_content:
+            models.Activation.objects.filter(rulebook=rulebook).update(
+                git_hash=rulebook.project.git_hash,
+            )
             return
         rulebook.rulesets = rulebook_info.raw_content
         rulebook.save()
         rulebook.ruleset_set.clear()
         insert_rulebook_related_data(rulebook, rulebook_info.content)
         models.Activation.objects.filter(rulebook=rulebook).update(
-            rulebook_rulesets=rulebook.rulesets
+            rulebook_rulesets=rulebook.rulesets,
+            git_hash=rulebook.project.git_hash,
         )
 
     def _find_rulebooks(self, repo: StrPath) -> Iterator[RulebookInfo]:

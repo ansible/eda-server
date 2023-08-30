@@ -123,6 +123,7 @@ def create_activation_related_data(with_project=True):
             name=TEST_RULEBOOK["name"],
             rulesets=TEST_RULESETS,
             description=TEST_RULEBOOK["description"],
+            project_id=project_id,
         ).pk
         if with_project
         else None

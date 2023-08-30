@@ -360,11 +360,6 @@ class ActivationViewSet(
             if activation_instances
             else None
         )
-        activation["git_hash"] = (
-            activation_instances.latest("started_at").git_hash
-            if activation_instances
-            else None
-        )
 
         return activation
 

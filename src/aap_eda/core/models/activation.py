@@ -34,6 +34,7 @@ class Activation(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
+    git_hash = models.TextField(null=False, default="")
     decision_environment = models.ForeignKey(
         "DecisionEnvironment", on_delete=models.SET_NULL, null=True
     )
@@ -82,7 +83,7 @@ class ActivationInstance(models.Model):
         choices=ActivationStatus.choices(),
         default=ActivationStatus.PENDING,
     )
-    git_hash = models.TextField(null=True)
+    git_hash = models.TextField(null=False, default="")
     activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     updated_at = models.DateTimeField(null=True)
