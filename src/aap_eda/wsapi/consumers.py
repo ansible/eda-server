@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from enum import Enum
 
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
@@ -11,9 +12,10 @@ from django.db import IntegrityError
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.exceptions import AwxTokenNotFound
+from aap_eda.core.utils.awx_token import get_awx_token
 from aap_eda.services.ruleset.activate_rulesets import ActivationDbLogger
 
-from .exceptions import AwxTokenNotFound
 from .messages import (
     ActionMessage,
     AnsibleEventMessage,
@@ -105,16 +107,19 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     async def handle_workers(self, message: WorkerMessage):
         # AWX token must be present before continue
+        user_id = await get_user_id_from_instance_id(message.activation_id)
         try:
-            awx_token = await self.get_awx_token(message)
-        except AwxTokenNotFound as exc:
+            awx_token = await sync_to_async(get_awx_token)(user_id=user_id)
+        except AwxTokenNotFound:
             logger.error("Worker can not continue, AwxToken not found.")
-            fail_msg = f"ERROR: Activation instance failed: {exc}"
+            fail_msg = (
+                "ERROR: Activation instance failed: AWX token not found."
+            )
 
             # TODO(aizquierdo): This should not be placed in the
             # activation_logger, but in the activation_instance
             # https://issues.redhat.com/browse/AAP-15495
-            await self.write_instance_log(message.activation_id, fail_msg)
+            await write_instance_log(message.activation_id, fail_msg)
             raise
 
         logger.info(f"Start to handle workers: {message}")
@@ -336,30 +341,50 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         return activation.rulebook_rulesets, extra_var
 
-    @database_sync_to_async
-    def get_awx_token(self, message):
-        # query for activation
-        activation_instance = models.ActivationInstance.objects.get(
-            id=message.activation_id
-        )
-        # check/get AWX token
-        awx_token = models.AwxToken.objects.filter(
-            user_id=activation_instance.activation.user_id
-        ).first()
-        if not awx_token:
-            raise AwxTokenNotFound("AWX token not found.")
 
-        return awx_token.token.get_secret_value()
+@database_sync_to_async
+def get_user_id_from_instance_id(
+    activation_instance_id: int,
+) -> models.ActivationInstance:
+    """
+    Retrieve the user ID associated with the given activation instance ID.
 
-    @database_sync_to_async
-    def write_instance_log(self, instance_id: int, msg: str) -> None:
-        instance = models.ActivationInstance.objects.filter(
-            id=instance_id
-        ).first()
-        if not instance:
-            logger.warning(
-                f"Activation instance {instance_id} is not present."
-            )
-            return
-        activation_logger = ActivationDbLogger(instance_id)
-        activation_logger.write(msg, flush=True)
+    Args:
+        activation_instance_id (int): The ID of the activation instance.
+
+    Returns:
+        int: The user ID associated with the activation instance.
+
+    Raises:
+        models.ActivationInstance.DoesNotExist: If the activation
+        instance with the given ID does not exist.
+
+    """
+    activation_instance = models.ActivationInstance.objects.get(
+        id=activation_instance_id
+    )
+    return activation_instance.activation.user_id
+
+
+@database_sync_to_async
+def write_instance_log(instance_id: int, msg: str) -> None:
+    """
+    Asynchronously write a log message for a specific activation instance.
+
+    Args:
+        instance_id (int): The ID of the activation instance.
+        msg (str): The log message to be written.
+
+    Returns:
+        None: This function does not return a value.
+
+    Raises:
+        None: This function does not raise any exceptions directly.
+
+    """
+    instance = models.ActivationInstance.objects.filter(id=instance_id).first()
+    if not instance:
+        logger.warning(f"Activation instance {instance_id} is not present.")
+        return
+    activation_logger = ActivationDbLogger(instance_id)
+    activation_logger.write(msg, flush=True)

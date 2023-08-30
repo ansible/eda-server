@@ -11,8 +11,8 @@ from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import models
+from aap_eda.core.exceptions import AwxTokenNotFound
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
-from aap_eda.wsapi.exceptions import AwxTokenNotFound
 
 TIMEOUT = 5
 
