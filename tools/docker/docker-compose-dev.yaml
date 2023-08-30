@@ -118,14 +118,14 @@ services:
     restart: always
 
   postgres:
-    image: 'docker.io/library/postgres:13'
+    image: 'quay.io/sclorg/postgresql-13-c8s:latest'
     environment:
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: eda
+      POSTGRESQL_PASSWORD: secret
+      POSTGRESQL_DATABASE: eda
     ports:
       - '5432:5432'
     volumes:
-      - 'postgres_data:/var/lib/postgresql/data'
+      - 'postgres_data:/var/lib/pgsql/data'
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
