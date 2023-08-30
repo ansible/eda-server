@@ -29,11 +29,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
-from aap_eda.tasks.ruleset import (
-    activate_rulesets,
-    deactivate,
-    deactivate_rulesets,
-)
+from aap_eda.tasks.ruleset import activate, deactivate, restart
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +110,7 @@ class ActivationViewSet(
         activation["rules_fired_count"] = 0
 
         if response.is_enabled:
-            activate_rulesets.delay(
-                is_restart=False,
-                activation_id=response.id,
-            )
+            activate.delay(activation_id=response.id)
 
         return Response(
             serializers.ActivationReadSerializer(activation).data,
@@ -175,7 +168,11 @@ class ActivationViewSet(
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
 
-        deactivate.delay(activation_id=activation.id, is_delete=True)
+        deactivate.delay(
+            activation_id=activation.id,
+            requester=activation.user.username,
+            delete=True,
+        )
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -265,10 +262,7 @@ class ActivationViewSet(
             ]
         )
 
-        job = activate_rulesets.delay(
-            is_restart=False,
-            activation_id=pk,
-        )
+        job = activate.delay(activation_id=pk)
 
         activation.current_job_id = job.id
         activation.save(update_fields=["current_job_id"])
@@ -298,7 +292,9 @@ class ActivationViewSet(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
 
-            deactivate.delay(activation.id)
+            deactivate.delay(
+                activation_id=activation.id, requester=activation.user.username
+            )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -323,18 +319,8 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
-        instance_running = models.ActivationInstance.objects.filter(
-            activation_id=pk, status=ActivationStatus.RUNNING
-        ).first()
-
-        if instance_running:
-            deactivate_rulesets.delay(
-                activation_instance_id=instance_running.id,
-            )
-
-        activate_rulesets.delay(
-            is_restart=False,  # increment restart_count here instead of by task # noqa: E501
-            activation_id=pk,
+        restart.delay(
+            activation_id=activation.id, requester=activation.user.username
         )
 
         activation.restart_count += 1
