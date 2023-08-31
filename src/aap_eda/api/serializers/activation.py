@@ -32,7 +32,7 @@ from aap_eda.api.serializers.project import (
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models
-from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH
+from aap_eda.services.ruleset.ruleset_handler import ACTIVATION_PATH
 
 
 class ActivationSerializer(serializers.ModelSerializer):

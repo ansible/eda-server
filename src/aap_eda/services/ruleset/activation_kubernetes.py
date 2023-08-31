@@ -17,7 +17,6 @@ import json
 import logging
 import time
 
-from django.conf import settings
 from django.db import DatabaseError
 from django.utils import timezone
 from kubernetes import client, config, watch
@@ -31,7 +30,7 @@ from aap_eda.services.ruleset.exceptions import (
     K8sActivationException,
 )
 
-from .shared_settings import VALID_LOG_LEVELS
+from .rulebook_cmd import RulebookCmd
 
 logger = logging.getLogger(__name__)
 
@@ -52,35 +51,21 @@ class ActivationKubernetes:
         image,
         name,
         pull_policy,
-        url,
-        ssl_verify,
         activation_instance_id,
         ports,
         heartbeat,
     ) -> client.V1Container:
-        args = [
-            "--worker",
-            "--websocket-address",
-            url,
-            "--websocket-ssl-verify",
-            ssl_verify,
-            "--id",
-            str(activation_instance_id),
-            "--heartbeat",
-            str(heartbeat),
-        ]
-        if (
-            settings.ANSIBLE_RULEBOOK_LOG_LEVEL
-            and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
-        ):
-            args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
+        cmd = RulebookCmd(
+            instance_id=activation_instance_id,
+            heartbeat=heartbeat,
+        )
 
         container = client.V1Container(
             image=image,
             name=name,
             image_pull_policy=pull_policy,
             env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
-            args=args,
+            args=str(cmd),
             ports=[
                 client.V1ContainerPort(container_port=port) for port in ports
             ],

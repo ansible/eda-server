@@ -23,11 +23,8 @@ from rq.job import Job
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job, job_from_queue, unique_enqueue
-from aap_eda.services.ruleset.activate_rulesets import (
-    ActivateRulesets,
-    save_activation_and_instance,
-)
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
+from aap_eda.services.ruleset.ruleset_manager import RulesetManager
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +64,7 @@ def _activate(activation_id: int, requester: str = "User") -> None:
             activation.restart_count += 1
             activation.save(update_fields=["restart_count", "modified_at"])
 
-    ActivateRulesets().activate(activation)
+    RulesetManager().activate(activation)
 
     logger.info(f"Activation {activation.name} is done.")
 
@@ -199,7 +196,7 @@ def _perform_deactivate(
             flush=True,
         )
 
-        ActivateRulesets().deactivate(
+        RulesetManager().deactivate(
             instance=instance, final_status=final_status
         )
 
@@ -232,7 +229,9 @@ def _detect_unresponsive(now: timezone.datetime) -> None:
     ):
         instance.status = ActivationStatus.UNRESPONSIVE
         instance.updated_at = now
-        save_activation_and_instance(instance, ["status", "updated_at"])
+        RulesetManager().save_activation_and_instance(
+            instance, ["status", "updated_at"]
+        )
 
 
 def _stop_unresponsive(now: timezone.datetime) -> None:

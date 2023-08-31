@@ -33,7 +33,7 @@ from aap_eda.services.exceptions import PodmanImagePullError
 
 from .activation_db_logger import ActivationDbLogger
 from .exceptions import ActivationException, ActivationRecordNotFound
-from .shared_settings import VALID_LOG_LEVELS
+from .rulebook_cmd import RulebookCmd
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +88,6 @@ class ActivationPodman:
 
     def run_worker_mode(
         self,
-        ws_url: str,
-        ws_ssl_verify: str,
         activation_instance: models.ActivationInstance,
         heartbeat: int,
         ports: dict,
@@ -97,23 +95,10 @@ class ActivationPodman:
         container = None
         try:
             """Run ansible-rulebook in worker mode."""
-            args = [
-                "ansible-rulebook",
-                "--worker",
-                "--websocket-ssl-verify",
-                ws_ssl_verify,
-                "--websocket-address",
-                ws_url,
-                "--id",
-                str(activation_instance.id),
-                "--heartbeat",
-                str(heartbeat),
-            ]
-            if (
-                settings.ANSIBLE_RULEBOOK_LOG_LEVEL
-                and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
-            ):
-                args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
+            cmd = RulebookCmd(
+                instance_id=activation_instance.id,
+                heartbeat=heartbeat,
+            )
 
             self.pod_args[
                 "name"
@@ -122,10 +107,10 @@ class ActivationPodman:
                 self.pod_args["ports"] = ports
             self._load_extra_args()
             self.activation_db_logger.write("Starting Container", True)
-            self.activation_db_logger.write(f"Container args {args}", True)
+            self.activation_db_logger.write(f"Container args {str(cmd)}", True)
             container = self.client.containers.run(
                 image=self.decision_environment.image_url,
-                command=args,
+                command=cmd.to_list(),
                 stdout=True,
                 stderr=True,
                 remove=True,
@@ -139,7 +124,7 @@ class ActivationPodman:
                 f"id: {container.id}, "
                 f"ports: {container.ports}, "
                 f"status: {container.status}, "
-                f"command: {args}"
+                f"command: {str(cmd)}"
             )
 
             now = timezone.now()

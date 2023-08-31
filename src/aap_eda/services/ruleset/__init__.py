@@ -12,6 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activate_rulesets import ActivateRulesets
+from .k8s_ruleset_handler import K8SRulesetHandler
+from .podman_ruleset_handler import PodmanRulesetHandler
+from .ruleset_handler import RulesetHandler
+from .ruleset_manager import RulesetManager
 
-__all__ = ("ActivateRulesets",)
+__all__ = (
+    "RulesetHandler",
+    "RulesetManager",
+    "K8SRulesetHandler",
+    "PodmanRulesetHandler",
+)

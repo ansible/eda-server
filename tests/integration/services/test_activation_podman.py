@@ -25,6 +25,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 from aap_eda.services.ruleset.activation_podman import ActivationPodman
+from aap_eda.services.ruleset.ruleset_handler import ACTIVATION_PATH
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
@@ -141,8 +142,6 @@ def test_activation_podman_run_worker_mode(
     assert models.ActivationInstanceLog.objects.count() == 2
 
     podman.run_worker_mode(
-        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-        ws_ssl_verify="no",
         activation_instance=activation_instance,
         heartbeat=5,
         ports=ports,
@@ -154,9 +153,9 @@ def test_activation_podman_run_worker_mode(
             "ansible-rulebook",
             "--worker",
             "--websocket-ssl-verify",
-            "no",
+            settings.WEBSOCKET_SSL_VERIFY,
             "--websocket-address",
-            "ws://localhost:8000/api/eda/ws/ansible-rulebook",
+            f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}",
             "--id",
             str(activation_instance.id),
             "--heartbeat",
@@ -220,8 +219,6 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
         exceptions.APIError, match="bind: address already in use"
     ):
         podman.run_worker_mode(
-            ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-            ws_ssl_verify="no",
             activation_instance=activation_instance,
             heartbeat=5,
             ports={"5000/tcp": 5000},
@@ -256,8 +253,6 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
                 decision_environment, None, activation_db_logger
             )
             podman.run_worker_mode(
-                ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-                ws_ssl_verify="no",
                 activation_instance=activation_instance,
                 heartbeat=5,
                 ports={"5000/tcp": 5000},
@@ -305,8 +300,6 @@ def test_activation_podman_with_existing_auth_json(
                 decision_environment, None, activation_db_logger
             )
             podman.run_worker_mode(
-                ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-                ws_ssl_verify="no",
                 activation_instance=activation_instance,
                 heartbeat=5,
                 ports={"5000/tcp": 5000},

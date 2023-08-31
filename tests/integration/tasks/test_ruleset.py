@@ -25,7 +25,7 @@ from aap_eda.core.enums import (
     ActivationStatus,
     RestartPolicy,
 )
-from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
+from aap_eda.services.ruleset.ruleset_manager import RulesetManager
 from aap_eda.tasks.ruleset import (
     _activate,
     _monitor_activations,
@@ -116,7 +116,7 @@ def test_normal_activate(info_mock: mock.Mock, init_data):
     )
     msg2 = f"Activation {activation.name} is done."
 
-    with mock.patch.object(ActivateRulesets, "activate"):
+    with mock.patch.object(RulesetManager, "activate"):
         _activate(activation.id, activation.user.username)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
@@ -134,7 +134,7 @@ def test_not_enabled_activate(info_mock: mock.Mock, init_data):
     msg1 = f"Activating activation id: {activation.id} requested by User"
     msg2 = f"Activation id: {activation.id} is disabled"
 
-    with mock.patch.object(ActivateRulesets, "activate"):
+    with mock.patch.object(RulesetManager, "activate"):
         _activate(activation.id)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
@@ -152,7 +152,7 @@ def test_with_deleting_activate(info_mock: mock.Mock, init_data):
     msg1 = f"Activating activation id: {activation.id} requested by User"
     msg2 = f"Activation id: {activation.id} is deleted"
 
-    with mock.patch.object(ActivateRulesets, "activate"):
+    with mock.patch.object(RulesetManager, "activate"):
         _activate(activation.id)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
