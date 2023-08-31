@@ -18,17 +18,21 @@ spec:
     spec:
       containers:
         - env:
-            - name: POSTGRES_DB
+            - name: POSTGRESQL_DATABASE
               value: eda
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRESQL_USER
+              value: eda
+            - name: POSTGRESQL_PASSWORD
               value: secret
-          image: docker.io/library/postgres:13
+            - name: POSTGRESQL_ADMIN_PASSWORD
+              value: secret
+          image: quay.io/sclorg/postgresql-13-c8s:latest
           name: postgres
           ports:
             - containerPort: 5432
           resources: {}
           volumeMounts:
-            - mountPath: /var/lib/postgresql/data
+            - mountPath: /var/lib/pgsql/data
               name: postgres-data
       restartPolicy: Always
       volumes:

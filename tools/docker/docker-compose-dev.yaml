@@ -120,7 +120,9 @@ services:
   postgres:
     image: 'quay.io/sclorg/postgresql-13-c8s:latest'
     environment:
+      POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
+      POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
     ports:
       - '5432:5432'
@@ -134,7 +136,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'docker.io/library/redis:7'
+    image: 'quay.io/sclorg/redis-6-c9s:latest'
     ports:
       - '6379:6379'
     healthcheck:
