@@ -308,9 +308,9 @@ class ActivateRulesets:
         if error:
             seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
             msg = (
-                f"Activation {activation.name} failed: {str(error)}, but will "
+                f"Activation {activation.name} failed: {str(error)}, "
                 f"retry ({retry_count}/{max_retries}) in {seconds} seconds "
-                "according to its restart policy"
+                "according to the activation's restart policy."
             )
             logger.warning(msg)
         else:
