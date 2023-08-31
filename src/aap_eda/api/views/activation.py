@@ -41,7 +41,6 @@ def handle_activation_create_conflict(activation):
             "decision_environment",
             activation.get("decision_environment_id"),
         ),
-        (models.Project, "project", activation.get("project_id")),
         (models.Rulebook, "rulebook", activation.get("rulebook_id")),
         (models.ExtraVar, "extra_var", activation.get("extra_var_id")),
     ]

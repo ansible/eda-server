@@ -98,7 +98,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
-    project_id = serializers.IntegerField(required=False, allow_null=True)
     rulebook_id = serializers.IntegerField()
     extra_var_id = serializers.IntegerField(required=False, allow_null=True)
     decision_environment_id = serializers.IntegerField()
@@ -110,7 +109,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "description",
             "is_enabled",
             "decision_environment_id",
-            "project_id",
             "rulebook_id",
             "extra_var_id",
             "restart_policy",
@@ -128,6 +126,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
+        validated_data["project_id"] = rulebook.project.id
         return super().create(validated_data)
 
     def _validate_pre_reqs(self, user):
