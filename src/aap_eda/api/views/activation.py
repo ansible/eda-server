@@ -414,7 +414,7 @@ class ActivationInstanceViewSet(
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
-    rbac_resource_type = "activation_instance"
+    rbac_resource_type = ResourceType.ACTIVATION_INSTANCE
     rbac_action = None
 
     @extend_schema(

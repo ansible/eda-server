@@ -23,6 +23,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
+from aap_eda.core.enums import ResourceType
 
 from .mixins import (
     CreateModelMixin,
@@ -82,7 +83,7 @@ class DecisionEnvironmentViewSet(
     queryset = models.DecisionEnvironment.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.DecisionEnvironmentFilter
-    rbac_resource_type = "decision_environment"
+    rbac_resource_type = ResourceType.DECISION_ENVIRONMENT
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:
