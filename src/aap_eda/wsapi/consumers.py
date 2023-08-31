@@ -151,10 +151,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             instance.updated_at = message.reported_at
             instance.save(update_fields=["status", "updated_at"])
 
-            instance.activation.ruleset_stats[
+            activation = instance.activation
+            activation.status = ActivationStatus.RUNNING
+            activation.status_updated_at = message.reported_at
+            activation.ruleset_stats[
                 message.stats["ruleSetName"]
             ] = message.stats
-            instance.activation.save(update_fields=["ruleset_stats"])
+            activation.save(
+                update_fields=["status", "status_updated_at", "ruleset_stats"]
+            )
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."

@@ -48,9 +48,7 @@ class DeactivationPodman:
     ) -> None:
         container_id = activation_instance.activation_pod_id
         try:
-            self.activation_db_logger.write(
-                "Activation being stopped at user request", True
-            )
+            self.activation_db_logger.write("Activation being stopped", True)
             if self.client.containers.exists(container_id):
                 container = self.client.containers.get(container_id)
                 if container.status == "running":
