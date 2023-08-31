@@ -186,7 +186,6 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
@@ -228,7 +227,6 @@ def test_create_activation_disabled(client: APIClient):
     test_activation = TEST_ACTIVATION.copy()
     test_activation["is_enabled"] = False
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
@@ -260,7 +258,7 @@ def test_create_activation_bad_entity(client: APIClient):
 
 @pytest.mark.parametrize(
     "dependent_object",
-    ["decision_environment", "project", "rulebook", "extra_var"],
+    ["decision_environment", "rulebook", "extra_var"],
 )
 @pytest.mark.django_db(transaction=True)
 def test_create_activation_unprocessible_entity(
@@ -269,7 +267,6 @@ def test_create_activation_unprocessible_entity(
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
@@ -575,7 +572,6 @@ def test_create_activation_no_token(client: APIClient):
     test_activation = TEST_ACTIVATION.copy()
     test_activation["is_enabled"] = True
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
@@ -590,7 +586,6 @@ def test_create_activation_more_tokens(client: APIClient):
     test_activation = TEST_ACTIVATION.copy()
     test_activation["is_enabled"] = True
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
