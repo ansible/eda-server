@@ -510,7 +510,9 @@ class ActivationKubernetes:
             except ActivationRecordNotFound as e:
                 logger.error(e)
             except Exception as e:
-                raise K8sActivationException(f"Pod {pod_name} Failed: \n {e}")
+                raise K8sActivationException(
+                    f"Pod {pod_name} failed with error {e}"
+                )
 
     def read_job_pod_log(
         self, pod_name, namespace, activation_instance_id
