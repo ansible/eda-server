@@ -141,11 +141,6 @@ class ActivationViewSet(
         },
     )
     def list(self, request):
-        # TODO: No need to call monitor when a scheduler is in place
-        from aap_eda.tasks.ruleset import monitor_activations
-
-        monitor_activations()
-
         response = super().list(request)
         activations = []
         if response and response.data:

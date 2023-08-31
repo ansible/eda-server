@@ -84,6 +84,7 @@ def save_activation_and_instance(
         status accordingly.
         """
         instance.activation.status = instance.status
+        instance.activation.status_updated_at = timezone.now()
         running_states = [
             ActivationStatus.PENDING.value,
             ActivationStatus.STARTING.value,
@@ -160,12 +161,12 @@ class ActivateRulesets:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
             if str(instance.status) == ActivationStatus.COMPLETED.value:
-                self._on_activate_complete(
+                self._log_activate_complete(
                     instance,
                     activation_db_logger,
                 )
             elif str(instance.status) == ActivationStatus.FAILED.value:
-                self._on_activate_failure(
+                self._log_activate_failure(
                     ActivationException("Activation failed"),
                     instance,
                     activation_db_logger,
@@ -184,7 +185,7 @@ class ActivateRulesets:
             logger.error(error)
         except Exception as error:
             logger.exception(f"Exception: {str(error)}")
-            self._on_activate_failure(
+            self._log_activate_failure(
                 error,
                 instance,
                 activation_db_logger,
@@ -193,6 +194,7 @@ class ActivateRulesets:
     def deactivate(
         self,
         instance: models.ActivationInstance,
+        final_status: ActivationStatus,
     ) -> None:
         try:
             deployment_type = settings.DEPLOYMENT_TYPE
@@ -221,14 +223,14 @@ class ActivateRulesets:
             logger.info(
                 f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
             )
-            instance.status = ActivationStatus.STOPPED
+            instance.status = final_status
             save_activation_and_instance(instance, ["status"])
 
         except Exception as exe:
             logger.exception(f"Activation error: {str(exe)}")
             activation_db_logger.write(f"Activation error: {str(exe)}")
 
-    def _on_activate_complete(
+    def _log_activate_complete(
         self,
         instance: models.ActivationInstance,
         activation_db_logger: ActivationDbLogger,
@@ -237,13 +239,13 @@ class ActivateRulesets:
             instance.activation.restart_policy == RestartPolicy.ALWAYS.value
         )
         if instance.activation.is_enabled and restart_policy:
-            self._restart_activation(
+            self._log_restart_activation(
                 None,
                 instance.activation,
                 activation_db_logger,
             )
 
-    def _on_activate_failure(
+    def _log_activate_failure(
         self,
         error: Exception,
         instance: models.ActivationInstance,
@@ -265,7 +267,7 @@ class ActivateRulesets:
                 and restart_policy
                 and restart_limit
             ):
-                self._restart_activation(
+                self._log_restart_activation(
                     error,
                     activation,
                     activation_db_logger,
@@ -275,7 +277,19 @@ class ActivateRulesets:
                 activation.failure_count += 1
                 activation.save(update_fields=["failure_count", "modified_at"])
             else:
-                msg = f"Activation {activation.name} failed: {str(error)}"
+                more_reason = "unknown"
+                if not restart_limit:
+                    more_reason = (
+                        "it has exceeds the maximum number of restarts"
+                    )
+                elif not restart_policy:
+                    more_reason = "the restart policy is never"
+                elif not activation.is_valid:
+                    more_reason = "it is not restartable"
+                msg = (
+                    f"Activation {activation.name} failed: {str(error)}. "
+                    f"Will not restart because {more_reason}"
+                )
                 logger.error(msg)
                 activation_db_logger.write(msg)
         except (IntegrityError, DatabaseError):
@@ -283,7 +297,7 @@ class ActivateRulesets:
             logger.error(message)
             raise ActivationRecordNotFound(message)
 
-    def _restart_activation(
+    def _log_restart_activation(
         self,
         error: Exception,
         activation: models.Activation,
@@ -291,8 +305,6 @@ class ActivateRulesets:
         retry_count: int = 0,
         max_retries: int = 0,
     ) -> None:
-        from aap_eda.tasks.ruleset import enqueue_restart_task
-
         if error:
             seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
             msg = (
@@ -310,7 +322,6 @@ class ActivateRulesets:
             logger.info(msg)
 
         activation_db_logger.write(msg)
-        enqueue_restart_task(seconds, activation.id)
 
     def activate_in_podman(
         self,

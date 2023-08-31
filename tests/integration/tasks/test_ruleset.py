@@ -20,7 +20,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 from aap_eda.tasks.ruleset import (
     activate,
@@ -54,15 +54,19 @@ def init_data():
     now = timezone.now()
     instance1 = models.ActivationInstance.objects.create(
         activation=activation,
-        status=ActivationStatus.COMPLETED.value,
+        status=ActivationStatus.COMPLETED,
         updated_at=now
-        - timedelta(int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS) + 1),
+        - timedelta(
+            seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS) + 1
+        ),
     )
     instance2 = models.ActivationInstance.objects.create(
         activation=activation,
-        status=ActivationStatus.RUNNING.value,
+        status=ActivationStatus.RUNNING,
         updated_at=now
-        - timedelta(int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS) + 1),
+        - timedelta(
+            seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS) + 1
+        ),
     )
 
     return InitData(
@@ -71,6 +75,31 @@ def init_data():
         instance1=instance1,
         instance2=instance2,
     )
+
+
+@pytest.fixture()
+def init_activation():
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+    activation = models.Activation.objects.create(
+        name="test",
+        user=user,
+        is_enabled=True,
+        is_valid=True,
+        failure_count=1,
+        status=ActivationStatus.FAILED,
+        status_updated_at=timezone.now()
+        - timedelta(
+            seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE) + 1
+        ),
+    )
+
+    return activation
 
 
 @pytest.mark.django_db
@@ -186,29 +215,89 @@ def test_restart(delay_mock: mock.Mock, info_mock: mock.Mock, init_data):
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.activate.delay")
-def test_monitor_activations_to_unknown(delay_mock: mock.Mock, init_data):
+@mock.patch("aap_eda.tasks.ruleset.deactivate")
+def test_monitor_activations_to_unresponsive(
+    deactivate_mock: mock.Mock, init_data
+):
     monitor_activations()
     init_data.instance1.refresh_from_db()
     init_data.instance2.refresh_from_db()
 
     assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE.value
     assert init_data.instance1.status == ActivationStatus.COMPLETED.value
-    delay_mock.assert_not_called()
+    deactivate_mock.assert_called_once_with(
+        activation_id=init_data.activation.id,
+        requester="SCHEDULER",
+        delete=False,
+    )
 
 
-@pytest.mark.skip(reason="do not proceed restart at this moment")
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.activate_rulesets.delay")
-def test_monitor_activations_restart(delay_mock: mock.Mock, init_data):
-    init_data.instance2.status = ActivationStatus.UNRESPONSIVE.value
-    init_data.instance2.save()
+@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+def test_monitor_activations_restart_completed(
+    activate_mock: mock.Mock, init_activation
+):
+    init_activation.restart_policy = RestartPolicy.ALWAYS
+    init_activation.status = ActivationStatus.COMPLETED
+    init_activation.status_updated_at = timezone.now() - timedelta(
+        seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE) + 1
+    )
+    init_activation.save()
     monitor_activations()
 
-    delay_mock.assert_called_once_with(
-        is_restart=True,
-        activation_id=init_data.activation.id,
-        deployment_type=settings.DEPLOYMENT_TYPE,
-        ws_base_url=settings.WEBSOCKET_BASE_URL,
-        ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+    activate_mock.assert_called_once_with(
+        activation_id=init_activation.id,
+        requester="SCHEDULER",
     )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+def test_monitor_activations_restart_failed(
+    activate_mock: mock.Mock, init_activation
+):
+    monitor_activations()
+
+    activate_mock.assert_called_once_with(
+        activation_id=init_activation.id, requester="SCHEDULER"
+    )
+
+
+@pytest.mark.parametrize(
+    "activation_attrs",
+    [
+        {"restart_policy": RestartPolicy.NEVER},
+        {"is_valid": False},
+        {
+            "failure_count": int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE)
+            + 1
+        },
+        {
+            "status_updated_at": timezone.now()
+            - timedelta(
+                seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
+                - 60
+            )
+        },
+        {
+            "restart_policy": RestartPolicy.ALWAYS,
+            "status": ActivationStatus.COMPLETED,
+            "status_updated_at": timezone.now()
+            - timedelta(
+                seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
+                - 60
+            ),
+        },
+    ],
+)
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+def test_monitor_activations_not_restart(
+    activate_mock: mock.Mock, init_activation, activation_attrs
+):
+    for key in activation_attrs:
+        setattr(init_activation, key, activation_attrs[key])
+    init_activation.save()
+    monitor_activations()
+
+    activate_mock.assert_not_called()

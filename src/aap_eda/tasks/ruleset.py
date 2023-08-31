@@ -13,17 +13,20 @@
 #  limitations under the License.
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django_rq import get_scheduler
+from django.utils import timezone
 from rq.job import JobStatus
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job
-from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
+from aap_eda.services.ruleset.activate_rulesets import (
+    ActivateRulesets,
+    save_activation_and_instance,
+)
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 
 logger = logging.getLogger(__name__)
@@ -71,7 +74,9 @@ def activate(activation_id: int, requester: str = "User") -> None:
 
 @job("default")
 def deactivate(
-    activation_id: int, requester: str = "User", delete: bool = False
+    activation_id: int,
+    requester: str = "User",
+    delete: bool = False,
 ) -> None:
     logger.info(
         f"Disabling activation id: {activation_id} requested by {requester}"
@@ -98,15 +103,22 @@ def deactivate(
             )
             return
 
-        _perform_deactivate(activation)
+        final_status = (
+            ActivationStatus.FAILED
+            if requester == "SCHEDULER"
+            else ActivationStatus.STOPPED
+        )
+        _perform_deactivate(activation, final_status)
 
         if delete:
             logger.info(f"Activation {activation.name} is deleted")
             activation.delete()
         else:
             activation.current_job_id = None
-            activation.status = ActivationStatus.STOPPED
-            activation.save()
+            activation.status = final_status
+            activation.save(
+                update_fields=["current_job_id", "status", "modified_at"]
+            )
 
 
 @job("default")
@@ -149,7 +161,9 @@ def restart(activation_id: int, requester: str = "User") -> None:
         activate.delay(activation_id, requester)
 
 
-def _perform_deactivate(activation: models.Activation) -> None:
+def _perform_deactivate(
+    activation: models.Activation, final_status: ActivationStatus
+) -> None:
     logger.info(f"Task started: Deactivate Activation ({activation.name})")
 
     # clear the job from rq if it's pending/running
@@ -190,17 +204,22 @@ def _perform_deactivate(activation: models.Activation) -> None:
             flush=True,
         )
 
-        ActivateRulesets().deactivate(instance=instance)
+        ActivateRulesets().deactivate(
+            instance=instance, final_status=final_status
+        )
 
 
-# This is job will be scheduled by a scheduler which currently is unavailable
+# Started by the scheduler, executed by the default worker
 def monitor_activations() -> None:
-    # 1. Set status = unresponsive (all instances):
-    #    if status in [running, starting] and updated_at has timeouted
-    # 2. Restart (check latest instance):
-    #    if status is unresponsive and updated_at has timeouted
     logger.info("Task started: monitor_activations")
-    now = datetime.utcnow()
+    now = timezone.now()
+    _detect_unresponsive(now)
+    _stop_unresponsive(now)
+    _start_completed(now)
+    _start_failed(now)
+
+
+def _detect_unresponsive(now: timezone.datetime) -> None:
     running_statuses = [
         ActivationStatus.RUNNING.value,
         ActivationStatus.STARTING.value,
@@ -208,55 +227,69 @@ def monitor_activations() -> None:
     cutoff_time = now - timedelta(
         seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS)
     )
-    models.ActivationInstance.objects.filter(
+    for instance in models.ActivationInstance.objects.filter(
         status__in=running_statuses, updated_at__lt=cutoff_time
-    ).update(status=ActivationStatus.UNRESPONSIVE.value, updated_at=now)
+    ):
+        instance.status = ActivationStatus.UNRESPONSIVE
+        instance.updated_at = now
+        save_activation_and_instance(instance, ["status", "updated_at"])
 
-    # TODO: Temporarily disable the restart logic until a proper worker can
-    # pick up the job
-    """
+
+def _stop_unresponsive(now: timezone.datetime) -> None:
+    for activation in models.Activation.objects.filter(
+        status=ActivationStatus.UNRESPONSIVE.value,
+    ):
+        logger.info(
+            f"Deactivate activation {activation.name} due to lost heartbeat"
+        )
+        deactivate(
+            activation_id=activation.id,
+            requester="SCHEDULER",
+            delete=False,
+        )
+
+
+def _start_completed(now: timezone.datetime):
+    cutoff_time = now - timedelta(
+        seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
+    )
+    for activation in models.Activation.objects.filter(
+        is_enabled=True,
+        status=ActivationStatus.COMPLETED.value,
+        restart_policy=RestartPolicy.ALWAYS.value,
+        status_updated_at__lt=cutoff_time,
+    ):
+        logger.info(
+            f"Restart activation {activation.name} according to its restart"
+            " policy."
+        )
+        activate.delay(
+            activation_id=activation.id,
+            requester="SCHEDULER",
+        )
+
+
+def _start_failed(now: timezone.datetime):
+    cutoff_time = now - timedelta(
+        seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
+    )
     restart_policies = [
         RestartPolicy.ALWAYS.value,
         RestartPolicy.ON_FAILURE.value,
     ]
     for activation in models.Activation.objects.filter(
-        is_enabled=True, restart_policy__in=restart_policies
+        is_enabled=True,
+        is_valid=True,
+        status=ActivationStatus.FAILED.value,
+        restart_policy__in=restart_policies,
+        failure_count__lt=int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+        status_updated_at__lt=cutoff_time,
     ):
-        instance = (
-            models.ActivationInstance.objects.filter(activation=activation)
-            .order_by("-started_at")
-            .first()
+        logger.info(
+            f"Restart activation {activation.name} according to its restart"
+            " policy."
         )
-        if (
-            instance
-            and instance.status == ActivationStatus.UNRESPONSIVE.value
-            and now - instance.updated_at
-            > timedelta(seconds=int(settings.RULEBOOK_LIVENESS_CHECK_SECONDS))
-        ):
-            logger.info(f"Now is {now}, updated_at {instance.updated_at}")
-            logger.info(
-                f"Lost heartbeat for activation {activation.name})."
-                " Restart now according to its restart policy."
-            )
-            activate_rulesets.delay(
-                is_restart=True,
-                activation_id=activation.id,
-                deployment_type=settings.DEPLOYMENT_TYPE,
-                ws_base_url=settings.WEBSOCKET_BASE_URL,
-                ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
-            )
-    """
-
-
-def enqueue_restart_task(seconds: int, activation_id: int) -> None:
-    time_at = datetime.utcnow() + timedelta(seconds=seconds)
-    logger.info(
-        "Enqueueing restart task for activation id: %s, at %s",
-        activation_id,
-        time_at,
-    )
-    get_scheduler(name="activation").enqueue_at(
-        time_at,
-        activate,
-        activation_id,
-    )
+        activate.delay(
+            activation_id=activation.id,
+            requester="SCHEDULER",
+        )
