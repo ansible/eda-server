@@ -114,7 +114,7 @@ def test_normal_activate(info_mock: mock.Mock, init_data):
         f"Activating activation id: {activation.id} requested"
         f" by {activation.user.username}"
     )
-    msg2 = f"Task finished: activation {activation.name} starting."
+    msg2 = f"Activation {activation.name} is done."
 
     with mock.patch.object(ActivateRulesets, "activate"):
         activate(activation.id, activation.user.username)

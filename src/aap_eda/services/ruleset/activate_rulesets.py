@@ -382,8 +382,8 @@ class ActivateRulesets:
         ns_fileref.close()
 
         activation_id = activation.pk
-        job_name = f"activation-job-{activation_id}"
-        pod_name = f"activation-pod-{activation_id}"
+        job_name = f"activation-job-{activation_id}-{activation_instance.id}"
+        pod_name = f"activation-pod-{activation_id}-{activation_instance.id}"
 
         # build out container,pod,job specs
         container_spec = k8s.create_container(
@@ -439,8 +439,6 @@ class ActivateRulesets:
             activation_instance=activation_instance,
             secret_name=secret_name,
         )
-        activation_instance.activation.status = ActivationStatus.RUNNING
-        save_activation_and_instance(activation_instance, ["status"])
 
     def deactivate_in_k8s(self, activation_instance) -> None:
         k8s = ActivationKubernetes()

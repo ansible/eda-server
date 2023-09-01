@@ -109,7 +109,9 @@ class ActivationViewSet(
         activation["rules_fired_count"] = 0
 
         if response.is_enabled:
-            activate.delay(activation_id=response.id)
+            job = activate.delay(activation_id=response.id)
+            response.current_job_id = job.id
+            response.save(update_fields=["current_job_id"])
 
         return Response(
             serializers.ActivationReadSerializer(activation).data,
