@@ -351,9 +351,14 @@ class ActivationViewSet(
             activation_id=activation["id"]
         )
         activation["instances"] = activation_instances
+
+        # restart_count can be zero even if there are more than one instance
+        # because it is incremented only when the activation
+        # is restarted automatically
         activation["restarted_at"] = (
             activation_instances.latest("started_at").started_at
-            if activation_instances
+            if len(activation_instances) > 1
+            and activation["restart_count"] > 0
             else None
         )
 
