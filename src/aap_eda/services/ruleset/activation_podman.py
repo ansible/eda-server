@@ -318,23 +318,9 @@ class ActivationPodman:
                 f"{self.activation_db_logger.lines_written()}"
                 " activation instance log entries created."
             )
-        except NotFound as e:
-            try:
-                instance.refresh_from_db()
-            except models.ActivationInstance.DoesNotExist:
-                raise ActivationRecordNotFound(
-                    f"Instance {instance.id} is not present"
-                )
-
-            if instance.status == ActivationStatus.STOPPED.value:
-                logger.info(
-                    f"Container {container.id} was removed by deactivation."
-                )
-                self.return_code = GRACEFUL_TERM
-            else:
-                instance.status = ActivationStatus.FAILED
-                instance.save(update_fields=["status"])
-                raise ActivationException(str(e))
+        except NotFound:
+            self.return_code = GRACEFUL_TERM
+            logger.info(f"Container {container.id} was removed.")
 
         message = CONTAINER_ERROR_CODES_MAP.get(
             self.return_code, f"exit code {self.return_code}"
