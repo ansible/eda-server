@@ -139,7 +139,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
             ActivationStatus.FAILED.value,
             ActivationStatus.STOPPED.value,
         ]:
-            _perform_deactivate(activation)
+            _perform_deactivate(activation, ActivationStatus.STOPPED)
 
         activation.refresh_from_db()
         if str(activation.status) in [
