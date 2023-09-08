@@ -155,7 +155,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
         activation.status = ActivationStatus.PENDING
         activation.save(update_fields=["status", "modified_at"])
 
-        activate.delay(activation_id, requester)
+        _schedule_activate(activation, requester)
 
 
 def _perform_deactivate(
@@ -260,10 +260,7 @@ def _start_completed(now: timezone.datetime):
             f"Restart activation {activation.name} according to its restart"
             " policy."
         )
-        activate.delay(
-            activation_id=activation.id,
-            requester="SCHEDULER",
-        )
+        _schedule_activate(activation, "SCHEDULER")
 
 
 def _start_failed(now: timezone.datetime):
@@ -286,7 +283,13 @@ def _start_failed(now: timezone.datetime):
             f"Restart activation {activation.name} according to its restart"
             " policy."
         )
-        activate.delay(
-            activation_id=activation.id,
-            requester="SCHEDULER",
-        )
+        _schedule_activate(activation, "SCHEDULER")
+
+
+def _schedule_activate(activation: models.Activation, requester: str) -> None:
+    job = activate.delay(
+        activation_id=activation.id,
+        requester=requester,
+    )
+    activation.current_job_id = job.id
+    activation.save(update_fields=["current_job_id"])
