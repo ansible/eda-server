@@ -23,9 +23,9 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 from aap_eda.tasks.ruleset import (
-    activate,
+    _activate,
+    _monitor_activations,
     deactivate,
-    monitor_activations,
     restart,
 )
 
@@ -117,7 +117,7 @@ def test_normal_activate(info_mock: mock.Mock, init_data):
     msg2 = f"Activation {activation.name} is done."
 
     with mock.patch.object(ActivateRulesets, "activate"):
-        activate(activation.id, activation.user.username)
+        _activate(activation.id, activation.user.username)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
 
@@ -135,7 +135,7 @@ def test_not_enabled_activate(info_mock: mock.Mock, init_data):
     msg2 = f"Activation id: {activation.id} is disabled"
 
     with mock.patch.object(ActivateRulesets, "activate"):
-        activate(activation.id)
+        _activate(activation.id)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
 
@@ -153,7 +153,7 @@ def test_with_deleting_activate(info_mock: mock.Mock, init_data):
     msg2 = f"Activation id: {activation.id} is deleted"
 
     with mock.patch.object(ActivateRulesets, "activate"):
-        activate(activation.id)
+        _activate(activation.id)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
 
@@ -197,7 +197,7 @@ def test_deactivate_with_delete(info_mock: mock.Mock, init_data):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.logger.info")
-@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+@mock.patch("aap_eda.tasks.ruleset.activate")
 def test_restart(delay_mock: mock.Mock, info_mock: mock.Mock, init_data):
     job = mock.Mock()
     job.id = "jid"
@@ -224,7 +224,7 @@ def test_restart(delay_mock: mock.Mock, info_mock: mock.Mock, init_data):
 def test_monitor_activations_to_unresponsive(
     deactivate_mock: mock.Mock, init_data
 ):
-    monitor_activations()
+    _monitor_activations()
     init_data.instance1.refresh_from_db()
     init_data.instance2.refresh_from_db()
 
@@ -238,7 +238,7 @@ def test_monitor_activations_to_unresponsive(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+@mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_completed(
     activate_mock: mock.Mock, init_activation
 ):
@@ -251,7 +251,7 @@ def test_monitor_activations_restart_completed(
         seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE) + 1
     )
     init_activation.save()
-    monitor_activations()
+    _monitor_activations()
 
     activate_mock.assert_called_once_with(
         activation_id=init_activation.id,
@@ -262,14 +262,14 @@ def test_monitor_activations_restart_completed(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+@mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_failed(
     activate_mock: mock.Mock, init_activation
 ):
     job = mock.Mock()
     job.id = "jid"
     activate_mock.return_value = job
-    monitor_activations()
+    _monitor_activations()
 
     activate_mock.assert_called_once_with(
         activation_id=init_activation.id, requester="SCHEDULER"
@@ -306,13 +306,13 @@ def test_monitor_activations_restart_failed(
     ],
 )
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.activate.delay")
+@mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_not_restart(
     activate_mock: mock.Mock, init_activation, activation_attrs
 ):
     for key in activation_attrs:
         setattr(init_activation, key, activation_attrs[key])
     init_activation.save()
-    monitor_activations()
+    _monitor_activations()
 
     activate_mock.assert_not_called()
