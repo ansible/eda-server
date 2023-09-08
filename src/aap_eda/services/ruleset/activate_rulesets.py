@@ -101,7 +101,7 @@ def save_activation_and_instance(
 
         instance.save(update_fields=update_fields)
         instance.activation.save(update_fields=activation_fields)
-    except (IntegrityError, DatabaseError):
+    except DatabaseError:
         message = f"Failed to update instance [id: {instance.id}]"
         logger.error(message)
         raise ActivationRecordNotFound(message)
@@ -160,6 +160,7 @@ class ActivateRulesets:
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
+            instance.refresh_from_db()
             if str(instance.status) == ActivationStatus.COMPLETED.value:
                 self._log_activate_complete(
                     instance,
@@ -278,7 +279,9 @@ class ActivateRulesets:
                 activation.save(update_fields=["failure_count", "modified_at"])
             else:
                 more_reason = "unknown"
-                if not restart_limit:
+                if not activation.is_enabled:
+                    more_reason = "activation is disabled"
+                elif not restart_limit:
                     more_reason = (
                         "it has exceeds the maximum number of restarts"
                     )
@@ -292,7 +295,7 @@ class ActivateRulesets:
                 )
                 logger.error(msg)
                 activation_db_logger.write(msg)
-        except (IntegrityError, DatabaseError):
+        except DatabaseError:
             message = f"Failed to update instance [id: {instance.id}]"
             logger.error(message)
             raise ActivationRecordNotFound(message)
