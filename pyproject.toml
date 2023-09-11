@@ -49,6 +49,7 @@ pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
 requests = { version="*", python="<4.0" }
+pytest-cov = "^4.1.0"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"

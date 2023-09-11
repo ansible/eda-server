@@ -85,4 +85,14 @@ jobs:
         run: poetry run /usr/bin/env aap-eda-manage makemigrations --dry-run --check
 
       - name: Run tests
-        run: poetry run python -m pytest
+        run: poetry run python -m pytest -vv --cov=./ --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          env_vars: OS,PYTHON
+          fail_ci_if_error: false
+          files: ./coverage.xml
+          flags: "unit-int-tests"
+          name: codecov-umbrella
+          verbose: true
