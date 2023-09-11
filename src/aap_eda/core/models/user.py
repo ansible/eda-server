@@ -20,7 +20,7 @@ from aap_eda.core.utils.crypto.fields import EncryptedTextField
 from .mixins import ModifiedAtUpdaterMixin
 
 
-class User(AbstractUser):
+class User(ModifiedAtUpdaterMixin, AbstractUser):
     """Custom user model.
 
     If you’re starting a new project, it’s highly recommended to set up a

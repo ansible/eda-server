@@ -1,3 +1,4 @@
+from django.core.exceptions import FieldDoesNotExist
 from django.utils import timezone
 
 
@@ -10,12 +11,15 @@ class ModifiedAtUpdaterMixin:
     """
 
     def save(self, *args, **kwargs):
-        for field in self._meta.fields:
-            if (
-                field.name == "modified_at"
-                and hasattr(field, "auto_now")
-                and field.auto_now
-                and kwargs.get("update_fields", [])
-            ):
-                self.modified_at = timezone.now()
+        try:
+            field = self._meta.get_field("modified_at")
+        except FieldDoesNotExist:
+            field = None
+        if (
+            field is not None
+            and hasattr(field, "auto_now")
+            and field.auto_now
+            and kwargs.get("update_fields", [])
+        ):
+            self.modified_at = timezone.now()
         super().save(*args, **kwargs)
