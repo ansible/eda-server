@@ -57,6 +57,12 @@ jobs:
         working-directory: ${{ env.EDA_QA_PATH }}
         run: pytest
 
+      - name: Print EDA logs
+        if: always()
+        working-directory: tools/docker
+        run: |
+          docker-compose -p eda -f docker-compose-stage.yaml logs
+
       - name: Notify to slack if failure
         if: ${{ failure() }}
         uses: rtCamp/action-slack-notify@v2
