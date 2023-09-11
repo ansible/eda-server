@@ -158,7 +158,6 @@ class ActivationPodman:
                     "status",
                     "status_updated_at",
                     "is_valid",
-                    "modified_at",
                 ]
             )
 

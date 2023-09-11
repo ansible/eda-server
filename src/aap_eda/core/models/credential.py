@@ -17,10 +17,12 @@ from django.db import models
 from aap_eda.core.enums import CredentialType
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
+from .mixins import ModifiedAtUpdaterMixin
+
 __all__ = ("Credential",)
 
 
-class Credential(models.Model):
+class Credential(ModifiedAtUpdaterMixin, models.Model):
     class Meta:
         db_table = "core_credential"
         constraints = [

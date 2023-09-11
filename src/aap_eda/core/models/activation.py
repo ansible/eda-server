@@ -16,6 +16,7 @@ from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
+from .mixins import ModifiedAtUpdaterMixin
 from .user import User
 
 __all__ = (
@@ -25,7 +26,7 @@ __all__ = (
 )
 
 
-class Activation(models.Model):
+class Activation(ModifiedAtUpdaterMixin, models.Model):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]

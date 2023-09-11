@@ -14,6 +14,8 @@
 
 from django.db import models
 
+from .mixins import ModifiedAtUpdaterMixin
+
 __all__ = (
     "Rulebook",
     "Ruleset",
@@ -22,7 +24,7 @@ __all__ = (
 )
 
 
-class Rulebook(models.Model):
+class Rulebook(ModifiedAtUpdaterMixin, models.Model):
     class Meta:
         db_table = "core_rulebook"
         unique_together = ["project_id", "name"]
@@ -41,7 +43,7 @@ class Rulebook(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
-class Ruleset(models.Model):
+class Ruleset(ModifiedAtUpdaterMixin, models.Model):
     class Meta:
         db_table = "core_ruleset"
         unique_together = ["rulebook_id", "name"]

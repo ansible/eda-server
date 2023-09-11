@@ -26,10 +26,12 @@
 
 from django.db import models
 
+from .mixins import ModifiedAtUpdaterMixin
+
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(models.Model):
+class Project(ModifiedAtUpdaterMixin, models.Model):
     class Meta:
         db_table = "core_project"
         constraints = [

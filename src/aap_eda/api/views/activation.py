@@ -254,7 +254,6 @@ class ActivationViewSet(
                 "is_enabled",
                 "failure_count",
                 "status",
-                "modified_at",
             ]
         )
 
@@ -284,9 +283,7 @@ class ActivationViewSet(
         if activation.is_enabled:
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
-            activation.save(
-                update_fields=["is_enabled", "status", "modified_at"]
-            )
+            activation.save(update_fields=["is_enabled", "status"])
 
             deactivate.delay(
                 activation_id=activation.id, requester=activation.user.username
@@ -320,7 +317,7 @@ class ActivationViewSet(
         )
 
         activation.restart_count += 1
-        activation.save(update_fields=["restart_count", "modified_at"])
+        activation.save(update_fields=["restart_count"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

@@ -68,7 +68,7 @@ def _activate(activation_id: int, requester: str = "User") -> None:
         # Note: expect scheduler to set requester as "SCHEDULER"
         if requester == "SCHEDULER":
             activation.restart_count += 1
-            activation.save(update_fields=["restart_count", "modified_at"])
+            activation.save(update_fields=["restart_count"])
 
     ActivateRulesets().activate(activation)
 
@@ -119,9 +119,7 @@ def deactivate(
         else:
             activation.current_job_id = None
             activation.status = final_status
-            activation.save(
-                update_fields=["current_job_id", "status", "modified_at"]
-            )
+            activation.save(update_fields=["current_job_id", "status"])
 
 
 @job("default")
@@ -159,7 +157,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
             return
 
         activation.status = ActivationStatus.PENDING
-        activation.save(update_fields=["status", "modified_at"])
+        activation.save(update_fields=["status"])
 
         _schedule_activate(activation, requester)
 

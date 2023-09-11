@@ -91,7 +91,7 @@ def save_activation_and_instance(
             ActivationStatus.RUNNING.value,
             ActivationStatus.UNRESPONSIVE.value,
         ]
-        activation_fields = ["status", "modified_at"]
+        activation_fields = ["status"]
         if str(instance.status) not in running_states:
             instance.activation.current_job_id = None
             activation_fields.append("current_job_id")
@@ -291,7 +291,7 @@ class ActivateRulesets:
                     settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
                 )
                 activation.failure_count += 1
-                activation.save(update_fields=["failure_count", "modified_at"])
+                activation.save(update_fields=["failure_count"])
             else:
                 more_reason = "unknown"
                 if not activation.is_enabled:

@@ -17,6 +17,8 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
+from .mixins import ModifiedAtUpdaterMixin
+
 
 class User(AbstractUser):
     """Custom user model.
@@ -33,7 +35,7 @@ class User(AbstractUser):
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
 
-class AwxToken(models.Model):
+class AwxToken(ModifiedAtUpdaterMixin, models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     name = models.TextField(null=False, blank=False)
     description = models.TextField(null=False, blank=True, default="")

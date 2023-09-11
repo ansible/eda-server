@@ -14,10 +14,12 @@
 
 from django.db import models
 
+from .mixins import ModifiedAtUpdaterMixin
+
 __all__ = ("DecisionEnvironment",)
 
 
-class DecisionEnvironment(models.Model):
+class DecisionEnvironment(ModifiedAtUpdaterMixin, models.Model):
     class Meta:
         db_table = "core_decision_environment"
         constraints = [

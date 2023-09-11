@@ -420,7 +420,7 @@ class ActivationKubernetes:
             instance.updated_at = now
             instance.save(update_fields=["status", "updated_at"])
 
-            update_fields = ["status", "modified_at", "status_updated_at"]
+            update_fields = ["status", "status_updated_at"]
             activation = instance.activation
             activation.refresh_from_db()
             activation.status = status
