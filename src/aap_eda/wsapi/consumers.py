@@ -7,7 +7,7 @@ from enum import Enum
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import DatabaseError
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -98,8 +98,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
             else:
                 logger.warning(f"Unsupported message received: {data}")
-        except IntegrityError as e:
-            logger.error(f"{str(e)}")
+        except DatabaseError as err:
+            logger.error(f"Failed to parse {data} due to DB error: {err}")
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
