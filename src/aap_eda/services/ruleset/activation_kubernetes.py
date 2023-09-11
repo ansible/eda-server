@@ -18,7 +18,7 @@ import logging
 import time
 
 from django.conf import settings
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError
 from django.utils import timezone
 from kubernetes import client, config, watch
 from kubernetes.client import exceptions
@@ -415,19 +415,21 @@ class ActivationKubernetes:
         self, instance: models.ActivationInstance, status: ActivationStatus
     ) -> None:
         try:
+            now = timezone.now()
             instance.status = status
-            instance.updated_at = timezone.now()
+            instance.updated_at = now
             instance.save(update_fields=["status", "updated_at"])
 
-            update_fields = ["status", "modified_at"]
+            update_fields = ["status", "modified_at", "status_updated_at"]
             activation = instance.activation
             activation.refresh_from_db()
             activation.status = status
+            activation.status_updated_at = now
             if status == ActivationStatus.RUNNING and not activation.is_valid:
                 activation.is_valid = True
                 update_fields.append("is_valid")
             activation.save(update_fields=update_fields)
-        except (IntegrityError, DatabaseError):
+        except DatabaseError:
             message = f"Activation instance {instance.id} is not present."
             raise ActivationRecordNotFound(message)
 
@@ -577,7 +579,7 @@ class ActivationKubernetes:
                     raise K8sActivationException(
                         f"Failed to read pod logs: \n {e}"
                     )
-            except (IntegrityError, DatabaseError):
+            except DatabaseError:
                 message = (
                     f"Instance [id: {activation_instance_id}] is not present."
                 )

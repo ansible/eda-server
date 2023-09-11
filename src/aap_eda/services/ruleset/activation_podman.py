@@ -19,7 +19,7 @@ import os
 import uuid
 
 from django.conf import settings
-from django.db import DatabaseError, IntegrityError
+from django.db import DatabaseError
 from django.utils import timezone
 from podman import PodmanClient
 from podman.domain.containers import Container
@@ -95,10 +95,6 @@ class ActivationPodman:
     ) -> None:
         container = None
         try:
-            models.Activation.objects.filter(
-                id=activation_instance.activation.id
-            ).update(status=ActivationStatus.RUNNING)
-
             """Run ansible-rulebook in worker mode."""
             args = [
                 "ansible-rulebook",
@@ -145,20 +141,25 @@ class ActivationPodman:
                 f"command: {args}"
             )
 
-            models.ActivationInstance.objects.filter(
-                id=activation_instance.id
-            ).update(
-                status=ActivationStatus.RUNNING,
-                updated_at=timezone.now(),
-                activation_pod_id=container.id,
+            now = timezone.now()
+            activation_instance.status = ActivationStatus.RUNNING
+            activation_instance.updated_at = now
+            activation_instance.activation_pod_id = container.id
+            activation_instance.save(
+                update_fields=["status", "updated_at", "activation_pod_id"]
             )
-            models.Activation.objects.filter(
-                id=activation_instance.activation.id,
-                is_valid=False,
-            ).update(
-                status=ActivationStatus.RUNNING,
-                is_valid=True,
-                modified_at=timezone.now(),
+
+            activation = activation_instance.activation
+            activation.status = ActivationStatus.RUNNING
+            activation.is_valid = True
+            activation.status_updated_at = now
+            activation.save(
+                update_fields=[
+                    "status",
+                    "status_updated_at",
+                    "is_valid",
+                    "modified_at",
+                ]
             )
 
             self._save_logs(container=container, instance=activation_instance)
@@ -179,7 +180,7 @@ class ActivationPodman:
         except APIError:
             logger.exception("Container run failed")
             raise
-        except (IntegrityError, DatabaseError):
+        except DatabaseError:
             message = (
                 f"Activation instance {activation_instance.id} is not present."
             )
