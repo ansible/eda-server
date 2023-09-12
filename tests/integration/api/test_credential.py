@@ -108,3 +108,21 @@ def test_delete_credential(client: APIClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.Credential.objects.filter(pk=obj.id).count() == 0
+
+
+@pytest.mark.django_db
+def test_credential_decrypt_failure(client: APIClient, settings):
+    settings.SECRET_KEY = "a-secret-key"
+    models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+
+    response = client.get(f"{api_url_v1}/credentials/")
+    assert response.status_code == status.HTTP_200_OK
+
+    settings.SECRET_KEY = "a-different-secret-key"
+    response = client.get(f"{api_url_v1}/credentials/")
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    data = response.json()
+    assert data["details"].startswith("Credential decryption failed")
