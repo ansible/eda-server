@@ -173,24 +173,24 @@ class ActivateRulesets:
                     activation_db_logger,
                 )
 
-            activation_db_logger.flush()
-
-            now = timezone.now()
-            instance.ended_at = now
-            instance.updated_at = now
-            save_activation_and_instance(
-                instance=instance,
-                update_fields=["status", "ended_at", "updated_at"],
-            )
-        except (DeactivationException, ActivationRecordNotFound) as error:
+            self._final_update(instance, activation_db_logger)
+        except (
+            DeactivationException,
+            ActivationRecordNotFound,
+            models.ActivationInstance.DoesNotExist,
+        ) as error:
             logger.error(error)
         except Exception as error:
             logger.exception(f"Exception: {str(error)}")
-            self._log_activate_failure(
-                error,
-                instance,
-                activation_db_logger,
-            )
+            try:
+                self._log_activate_failure(
+                    error,
+                    instance,
+                    activation_db_logger,
+                )
+                self._final_update(instance, activation_db_logger)
+            except ActivationRecordNotFound as error:
+                logger.error(error)
 
     def deactivate(
         self,
@@ -230,6 +230,20 @@ class ActivateRulesets:
         except Exception as exe:
             logger.exception(f"Activation error: {str(exe)}")
             activation_db_logger.write(f"Activation error: {str(exe)}")
+
+    def _final_update(
+        self,
+        instance: models.ActivationInstance,
+        activation_db_logger: ActivationDbLogger,
+    ):
+        activation_db_logger.flush()
+        now = timezone.now()
+        instance.ended_at = now
+        instance.updated_at = now
+        save_activation_and_instance(
+            instance=instance,
+            update_fields=["status", "ended_at", "updated_at"],
+        )
 
     def _log_activate_complete(
         self,
