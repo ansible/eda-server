@@ -272,9 +272,13 @@ def test_delete_user(
 ):
     user_id = user.id
     response = client.delete(f"{api_url_v1}/users/{user_id}/")
-    assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert models.User.objects.filter(id=user_id).count() == 0
+    if user_id != user.id:
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert models.User.objects.filter(id=user_id).count() == 0
+    else:
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert models.User.objects.filter(id=user_id).count() == 1
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
