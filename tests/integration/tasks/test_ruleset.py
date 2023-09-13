@@ -56,17 +56,13 @@ def init_data():
         activation=activation,
         status=ActivationStatus.COMPLETED,
         updated_at=now
-        - timedelta(
-            seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS) + 1
-        ),
+        - timedelta(seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS + 1),
     )
     instance2 = models.ActivationInstance.objects.create(
         activation=activation,
         status=ActivationStatus.RUNNING,
         updated_at=now
-        - timedelta(
-            seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS) + 1
-        ),
+        - timedelta(seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS + 1),
     )
 
     return InitData(
@@ -95,7 +91,7 @@ def init_activation():
         status=ActivationStatus.FAILED,
         status_updated_at=timezone.now()
         - timedelta(
-            seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE) + 1
+            seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE + 1
         ),
     )
 
@@ -248,7 +244,7 @@ def test_monitor_activations_restart_completed(
     init_activation.restart_policy = RestartPolicy.ALWAYS
     init_activation.status = ActivationStatus.COMPLETED
     init_activation.status_updated_at = timezone.now() - timedelta(
-        seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE) + 1
+        seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE + 1
     )
     init_activation.save()
     _monitor_activations()
@@ -283,15 +279,11 @@ def test_monitor_activations_restart_failed(
     [
         {"restart_policy": RestartPolicy.NEVER},
         {"is_valid": False},
-        {
-            "failure_count": int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE)
-            + 1
-        },
+        {"failure_count": settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE + 1},
         {
             "status_updated_at": timezone.now()
             - timedelta(
-                seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
-                - 60
+                seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE - 60
             )
         },
         {
@@ -299,8 +291,7 @@ def test_monitor_activations_restart_failed(
             "status": ActivationStatus.COMPLETED,
             "status_updated_at": timezone.now()
             - timedelta(
-                seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
-                - 60
+                seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE - 60
             ),
         },
     ],

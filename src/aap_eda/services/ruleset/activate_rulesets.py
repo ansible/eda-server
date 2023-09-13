@@ -273,8 +273,9 @@ class ActivateRulesets:
                 activation.restart_policy == RestartPolicy.ALWAYS.value
                 or activation.restart_policy == RestartPolicy.ON_FAILURE.value
             )
-            restart_limit = activation.failure_count < int(
-                settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+            restart_limit = (
+                activation.failure_count
+                < settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
             )
             if (
                 activation.is_enabled
@@ -287,7 +288,7 @@ class ActivateRulesets:
                     activation,
                     activation_db_logger,
                     activation.failure_count + 1,
-                    int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+                    settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
                 )
                 activation.failure_count += 1
                 activation.save(update_fields=["failure_count", "modified_at"])
@@ -323,7 +324,7 @@ class ActivateRulesets:
         max_retries: int = 0,
     ) -> None:
         if error:
-            seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
+            seconds = settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
             msg = (
                 f"Activation {activation.name} failed: {str(error)}, "
                 f"retry ({retry_count}/{max_retries}) in {seconds} seconds "
@@ -331,7 +332,7 @@ class ActivateRulesets:
             )
             logger.warning(msg)
         else:
-            seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
+            seconds = settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
             msg = (
                 f"Activation {activation.name} completed successfully. Will "
                 f"restart in {seconds} seconds according to its restart policy"
@@ -364,7 +365,7 @@ class ActivateRulesets:
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
             activation_instance=activation_instance,
-            heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             ports=ports,
         )
 
@@ -416,7 +417,7 @@ class ActivateRulesets:
                     activation_instance.activation.rulebook_rulesets
                 )
             ],
-            heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         )
 
         secret_name = None
