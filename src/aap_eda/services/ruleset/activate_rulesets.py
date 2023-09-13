@@ -160,7 +160,6 @@ class ActivateRulesets:
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
-            instance.refresh_from_db()
             if str(instance.status) == ActivationStatus.COMPLETED.value:
                 self._log_activate_complete(
                     instance,
