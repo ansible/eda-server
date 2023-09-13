@@ -86,6 +86,8 @@ services:
       - --worker-class
       - aap_eda.core.tasking.DefaultWorker
     depends_on:
+      eda-api:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
@@ -104,6 +106,8 @@ services:
       - --worker-class
       - aap_eda.core.tasking.ActivationWorker
     depends_on:
+      eda-api:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
@@ -111,7 +115,7 @@ services:
     restart: always
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c8s:latest'
+    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
