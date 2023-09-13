@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - env: []
-          image: docker.io/library/redis:7
+          image: quay.io/sclorg/redis-6-c9s:latest
           name: redis
           ports:
             - containerPort: 6379
