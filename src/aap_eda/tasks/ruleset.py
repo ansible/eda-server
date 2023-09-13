@@ -222,7 +222,7 @@ def _detect_unresponsive(now: timezone.datetime) -> None:
         ActivationStatus.STARTING.value,
     ]
     cutoff_time = now - timedelta(
-        seconds=int(settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS)
+        seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS
     )
     for instance in models.ActivationInstance.objects.filter(
         status__in=running_statuses, updated_at__lt=cutoff_time
@@ -248,7 +248,7 @@ def _stop_unresponsive(now: timezone.datetime) -> None:
 
 def _start_completed(now: timezone.datetime):
     cutoff_time = now - timedelta(
-        seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
+        seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
     )
     for activation in models.Activation.objects.filter(
         is_enabled=True,
@@ -265,7 +265,7 @@ def _start_completed(now: timezone.datetime):
 
 def _start_failed(now: timezone.datetime):
     cutoff_time = now - timedelta(
-        seconds=int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
+        seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
     )
     restart_policies = [
         RestartPolicy.ALWAYS.value,
@@ -276,7 +276,7 @@ def _start_failed(now: timezone.datetime):
         is_valid=True,
         status=ActivationStatus.FAILED.value,
         restart_policy__in=restart_policies,
-        failure_count__lt=int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+        failure_count__lt=settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
         status_updated_at__lt=cutoff_time,
     ):
         logger.info(
