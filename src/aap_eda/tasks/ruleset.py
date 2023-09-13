@@ -18,11 +18,11 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from rq.job import JobStatus
+from rq.job import Job
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
-from aap_eda.core.tasking import get_queue, job
+from aap_eda.core.tasking import get_queue, job, job_from_queue, unique_enqueue
 from aap_eda.services.ruleset.activate_rulesets import (
     ActivateRulesets,
     save_activation_and_instance,
@@ -32,8 +32,14 @@ from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 logger = logging.getLogger(__name__)
 
 
-@job("activation")
-def activate(activation_id: int, requester: str = "User") -> None:
+def activate(activation_id: int, requester: str = "User") -> Job:
+    job_id = f"activation-{activation_id}"
+    return unique_enqueue(
+        "activation", job_id, _activate, activation_id, requester
+    )
+
+
+def _activate(activation_id: int, requester: str = "User") -> None:
     logger.info(
         f"Activating activation id: {activation_id} requested "
         f"by {requester}"
@@ -168,13 +174,8 @@ def _perform_deactivate(
 
     if job_id:
         queue = get_queue(name="activation")
-        job = queue.fetch_job(job_id)
-        if job and job.get_status(refresh=True) in [
-            JobStatus.QUEUED,
-            JobStatus.STARTED,
-            JobStatus.DEFERRED,
-            JobStatus.SCHEDULED,
-        ]:
+        if job_from_queue(queue, job_id):
+            job = queue.fetch_job(job_id)
             job.cancel()
             logger.info(
                 f"The job: {job.id} for activation: {activation.name}"
@@ -208,6 +209,11 @@ def _perform_deactivate(
 
 # Started by the scheduler, executed by the default worker
 def monitor_activations() -> None:
+    job_id = "monitor_activations"
+    unique_enqueue("default", job_id, _monitor_activations, at_front=True)
+
+
+def _monitor_activations() -> None:
     logger.info("Task started: monitor_activations")
     now = timezone.now()
     _detect_unresponsive(now)
@@ -287,7 +293,7 @@ def _start_failed(now: timezone.datetime):
 
 
 def _schedule_activate(activation: models.Activation, requester: str) -> None:
-    job = activate.delay(
+    job = activate(
         activation_id=activation.id,
         requester=requester,
     )

@@ -1,6 +1,7 @@
 """Tools for running background tasks."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
 from django_rq import enqueue, get_queue, job
@@ -10,7 +11,7 @@ from rq.defaults import (
     DEFAULT_RESULT_TTL,
     DEFAULT_WORKER_TTL,
 )
-from rq.job import Job as _Job
+from rq.job import Job as _Job, JobStatus
 from rq.serializers import JSONSerializer
 
 __all__ = [
@@ -21,7 +22,11 @@ __all__ = [
     "enqueue",
     "job",
     "get_queue",
+    "unique_enqueue",
+    "job_from_queue",
 ]
+
+logger = logging.getLogger(__name__)
 
 ErrorHandlerType = Callable[[_Job], None]
 
@@ -185,3 +190,29 @@ class ActivationWorker(_Worker):
             prepare_for_work,
             serializer,
         )
+
+
+def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
+    queue = get_queue(queue_name)
+    job = job_from_queue(queue, job_id)
+    if job:
+        logger.info(
+            f"Skip enqueing job: {job_id} because it is already enqueued"
+        )
+        return job
+    else:
+        kwargs["job_id"] = job_id
+        return queue.enqueue(*args, **kwargs)
+
+
+def job_from_queue(queue: Queue, job_id: str) -> Optional[Job]:
+    """Return queue job if it not canceled or finished else None."""
+    job = queue.fetch_job(job_id)
+    if job and job.get_status(refresh=True) in [
+        JobStatus.QUEUED,
+        JobStatus.STARTED,
+        JobStatus.DEFERRED,
+        JobStatus.SCHEDULED,
+    ]:
+        return job
+    return None
