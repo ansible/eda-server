@@ -181,7 +181,7 @@ def test_rulesets_activate_with_podman(
         ws_url=f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}",
         ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         activation_instance=instance,
-        heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+        heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         ports={"5000/tcp": 5000},
     )
 
