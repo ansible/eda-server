@@ -180,7 +180,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         required=False, allow_null=True
     )
     project = ProjectRefSerializer(required=False, allow_null=True)
-    rulebook = RulebookRefSerializer()
+    rulebook = RulebookRefSerializer(required=False, allow_null=True)
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
     rules_count = serializers.IntegerField()
