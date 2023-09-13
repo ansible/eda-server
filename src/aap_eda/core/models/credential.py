@@ -34,7 +34,7 @@ class Credential(models.Model):
     description = models.TextField(default="", blank=True, null=False)
     credential_type = models.TextField(
         choices=CredentialType.choices(),
-        default=CredentialType.REGISTRY,
+        default=str(CredentialType.REGISTRY),
     )
     username = models.TextField(null=True)
     secret = EncryptedTextField(null=True)

@@ -224,8 +224,8 @@ def test_monitor_activations_to_unresponsive(
     init_data.instance1.refresh_from_db()
     init_data.instance2.refresh_from_db()
 
-    assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE.value
-    assert init_data.instance1.status == ActivationStatus.COMPLETED.value
+    assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE
+    assert init_data.instance1.status == ActivationStatus.COMPLETED
     deactivate_mock.assert_called_once_with(
         activation_id=init_data.activation.id,
         requester="SCHEDULER",
@@ -241,7 +241,7 @@ def test_monitor_activations_restart_completed(
     job = mock.Mock()
     job.id = "jid"
     activate_mock.return_value = job
-    init_activation.restart_policy = RestartPolicy.ALWAYS
+    init_activation.restart_policy = str(RestartPolicy.ALWAYS)
     init_activation.status = ActivationStatus.COMPLETED
     init_activation.status_updated_at = timezone.now() - timedelta(
         seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE + 1
@@ -277,7 +277,7 @@ def test_monitor_activations_restart_failed(
 @pytest.mark.parametrize(
     "activation_attrs",
     [
-        {"restart_policy": RestartPolicy.NEVER},
+        {"restart_policy": str(RestartPolicy.NEVER)},
         {"is_valid": False},
         {"failure_count": settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE + 1},
         {
@@ -287,7 +287,7 @@ def test_monitor_activations_restart_failed(
             )
         },
         {
-            "restart_policy": RestartPolicy.ALWAYS,
+            "restart_policy": str(RestartPolicy.ALWAYS),
             "status": ActivationStatus.COMPLETED,
             "status_updated_at": timezone.now()
             - timedelta(

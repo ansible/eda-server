@@ -24,6 +24,18 @@ class DjangoEnum(Enum):
     def values(cls):
         return tuple(e.value for e in cls)
 
+    def __eq__(self, other):
+        # Raise an exception if the comparand is neither our type nor a string.
+        # If it is a string instantiate from our class using the string which
+        # will fail if it's not valid for the class.
+        if not isinstance(other, type(self)):
+            if not isinstance(other, str):
+                raise Exception(
+                    f"comparand type {type(other)} is not supported"
+                )
+            other = type(self)(other)
+        return str(self) == str(other)
+
     def __str__(self):
         return str(self.value)
 

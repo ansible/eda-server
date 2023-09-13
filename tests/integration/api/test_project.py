@@ -479,7 +479,7 @@ def assert_project_data_details(data: Dict[str, Any], project: models.Project):
             "id": credential.id,
             "name": credential.name,
             "description": credential.description,
-            "credential_type": credential.credential_type.value,
+            "credential_type": str(credential.credential_type),
             "username": credential.username,
         }
         if credential

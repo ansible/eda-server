@@ -21,7 +21,7 @@ def test_list_credentials(client: APIClient):
         "name": "credential1",
         "description": "",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": str(CredentialType.REGISTRY),
         "id": obj.id,
     }
 
@@ -44,7 +44,7 @@ def test_create_credential(client: APIClient):
         "name": "credential1",
         "description": "desc here",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": str(CredentialType.REGISTRY),
         "id": id_,
     }
     obj = models.Credential.objects.filter(pk=id_).first()
@@ -66,7 +66,7 @@ def test_retrieve_credential(client: APIClient):
         "name": "credential1",
         "description": "",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": str(CredentialType.REGISTRY),
         "id": obj.id,
     }
 
@@ -92,7 +92,7 @@ def test_partial_update_credential(client: APIClient):
         "name": "credential1",
         "description": "",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": str(CredentialType.REGISTRY),
         "id": obj.id,
     }
     updated_obj = models.Credential.objects.filter(pk=obj.id).first()

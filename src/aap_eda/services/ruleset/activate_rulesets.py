@@ -86,16 +86,16 @@ def save_activation_and_instance(
         instance.activation.status = instance.status
         instance.activation.status_updated_at = timezone.now()
         running_states = [
-            ActivationStatus.PENDING.value,
-            ActivationStatus.STARTING.value,
-            ActivationStatus.RUNNING.value,
-            ActivationStatus.UNRESPONSIVE.value,
+            ActivationStatus.PENDING,
+            ActivationStatus.STARTING,
+            ActivationStatus.RUNNING,
+            ActivationStatus.UNRESPONSIVE,
         ]
         activation_fields = ["status", "modified_at"]
-        if str(instance.status) not in running_states:
+        if instance.status not in running_states:
             instance.activation.current_job_id = None
             activation_fields.append("current_job_id")
-        if str(instance.status) == ActivationStatus.COMPLETED.value:
+        if instance.status == ActivationStatus.COMPLETED:
             instance.activation.failure_count = 0
             activation_fields.append("failure_count")
 
@@ -161,12 +161,12 @@ class ActivateRulesets:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
             instance.refresh_from_db()
-            if str(instance.status) == ActivationStatus.COMPLETED.value:
+            if instance.status == ActivationStatus.COMPLETED:
                 self._log_activate_complete(
                     instance,
                     activation_db_logger,
                 )
-            elif str(instance.status) == ActivationStatus.FAILED.value:
+            elif instance.status == ActivationStatus.FAILED:
                 self._log_activate_failure(
                     ActivationException("Activation failed"),
                     instance,
@@ -251,7 +251,7 @@ class ActivateRulesets:
         activation_db_logger: ActivationDbLogger,
     ):
         restart_policy = (
-            instance.activation.restart_policy == RestartPolicy.ALWAYS.value
+            instance.activation.restart_policy == RestartPolicy.ALWAYS
         )
         if instance.activation.is_enabled and restart_policy:
             self._log_restart_activation(
@@ -270,8 +270,8 @@ class ActivateRulesets:
             activation = instance.activation
             instance.status = ActivationStatus.FAILED
             restart_policy = (
-                activation.restart_policy == RestartPolicy.ALWAYS.value
-                or activation.restart_policy == RestartPolicy.ON_FAILURE.value
+                activation.restart_policy == RestartPolicy.ALWAYS
+                or activation.restart_policy == RestartPolicy.ON_FAILURE
             )
             restart_limit = (
                 activation.failure_count
