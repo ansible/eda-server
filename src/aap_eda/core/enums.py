@@ -30,7 +30,7 @@ class DjangoEnum(Enum):
         # will fail if it's not valid for the class.
         if not isinstance(other, type(self)):
             if not isinstance(other, str):
-                raise Exception(
+                raise TypeError(
                     f"comparand type {type(other)} is not supported"
                 )
             other = type(self)(other)
