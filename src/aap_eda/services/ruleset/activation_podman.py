@@ -90,7 +90,7 @@ class ActivationPodman:
         ws_url: str,
         ws_ssl_verify: str,
         activation_instance: models.ActivationInstance,
-        heartbeat: str,
+        heartbeat: int,
         ports: dict,
     ) -> None:
         container = None

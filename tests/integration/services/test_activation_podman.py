@@ -144,7 +144,7 @@ def test_activation_podman_run_worker_mode(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
         activation_instance=activation_instance,
-        heartbeat="5",
+        heartbeat=5,
         ports=ports,
     )
 
@@ -223,7 +223,7 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
             ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
             ws_ssl_verify="no",
             activation_instance=activation_instance,
-            heartbeat="5",
+            heartbeat=5,
             ports={"5000/tcp": 5000},
         )
 
@@ -259,7 +259,7 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
                 ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
                 ws_ssl_verify="no",
                 activation_instance=activation_instance,
-                heartbeat="5",
+                heartbeat=5,
                 ports={"5000/tcp": 5000},
             )
             with open(os.path.join(containers_dir, "auth.json")) as f:
@@ -308,7 +308,7 @@ def test_activation_podman_with_existing_auth_json(
                 ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
                 ws_ssl_verify="no",
                 activation_instance=activation_instance,
-                heartbeat="5",
+                heartbeat=5,
                 ports={"5000/tcp": 5000},
             )
             with open(os.path.join(containers_dir, "auth.json")) as f:

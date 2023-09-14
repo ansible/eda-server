@@ -68,6 +68,8 @@ services:
       - --worker-class
       - aap_eda.core.tasking.DefaultWorker
     depends_on:
+      eda-api:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
@@ -90,6 +92,8 @@ services:
       - --worker-class
       - aap_eda.core.tasking.ActivationWorker
     depends_on:
+      eda-api:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
@@ -113,23 +117,25 @@ services:
         condition: service_healthy
 
   postgres:
-    image: 'docker.io/library/postgres:13'
+    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
     environment:
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: eda
+      POSTGRESQL_USER: eda
+      POSTGRESQL_PASSWORD: secret
+      POSTGRESQL_ADMIN_PASSWORD: secret
+      POSTGRESQL_DATABASE: eda
     ports:
       - '5432:5432'
+    volumes:
+      - 'postgres_data:/var/lib/pgsql/data'
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
       timeout: 5s
       retries: 3
       start_period: 5s
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: 'docker.io/library/redis:7'
+    image: 'quay.io/sclorg/redis-6-c9s:latest'
     ports:
       - '6379:6379'
     healthcheck:
