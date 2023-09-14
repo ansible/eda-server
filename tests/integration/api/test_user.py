@@ -43,6 +43,17 @@ def user() -> models.User:
 
 
 @pytest.fixture
+def user2() -> models.User:
+    return models.User.objects.create_user(
+        username="leia.organa",
+        first_name="Leia",
+        last_name="Organa",
+        email="leia.organa@example.com",
+        password="secret",
+    )
+
+
+@pytest.fixture
 def client(base_client: APIClient, user: models.User) -> APIClient:
     client = base_client
     client.login(username=user.username, password="secret")
@@ -267,18 +278,31 @@ def test_partial_update_user(
 @pytest.mark.django_db
 def test_delete_user(
     client: APIClient,
+    user2: models.User,
+    check_permission_mock: mock.Mock,
+):
+    user_id = user2.id
+    response = client.delete(f"{api_url_v1}/users/{user_id}/")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    assert models.User.objects.filter(id=user_id).count() == 0
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
+    )
+
+
+@pytest.mark.django_db
+def test_delete_user_not_allowed(
+    client: APIClient,
     user: models.User,
     check_permission_mock: mock.Mock,
 ):
     user_id = user.id
     response = client.delete(f"{api_url_v1}/users/{user_id}/")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    if user_id != user.id:
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert models.User.objects.filter(id=user_id).count() == 0
-    else:
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert models.User.objects.filter(id=user_id).count() == 1
+    assert models.User.objects.filter(id=user_id).count() == 1
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
