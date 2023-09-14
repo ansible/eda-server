@@ -49,11 +49,11 @@ class Activation(models.Model):
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
-        default=str(RestartPolicy.ON_FAILURE),
+        default=RestartPolicy.ON_FAILURE,
     )
     status = models.TextField(
         choices=ActivationStatus.choices(),
-        default=str(ActivationStatus.PENDING),
+        default=ActivationStatus.PENDING,
     )
     current_job_id = models.TextField(null=True)
     restart_count = models.IntegerField(default=0)
@@ -82,7 +82,7 @@ class ActivationInstance(models.Model):
     name = models.TextField(null=False, default="")
     status = models.TextField(
         choices=ActivationStatus.choices(),
-        default=str(ActivationStatus.PENDING),
+        default=ActivationStatus.PENDING,
     )
     git_hash = models.TextField(null=False, default="")
     activation = models.ForeignKey("Activation", on_delete=models.CASCADE)

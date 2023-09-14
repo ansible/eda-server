@@ -92,7 +92,7 @@ def deactivate(
             logger.warning(f"Activation {activation_id} is deleted.")
             return
 
-        if str(activation.status) in [
+        if activation.status in [
             ActivationStatus.COMPLETED,
             ActivationStatus.FAILED,
             ActivationStatus.STOPPED,
@@ -137,7 +137,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
             logger.warning(f"Activation {activation_id} is deleted.")
             return
 
-        if str(activation.status) not in [
+        if activation.status not in [
             ActivationStatus.COMPLETED,
             ActivationStatus.FAILED,
             ActivationStatus.STOPPED,
@@ -145,7 +145,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
             _perform_deactivate(activation, ActivationStatus.STOPPED)
 
         activation.refresh_from_db()
-        if str(activation.status) in [
+        if activation.status in [
             ActivationStatus.STOPPING,
             ActivationStatus.DELETING,
         ]:
@@ -237,7 +237,7 @@ def _detect_unresponsive(now: timezone.datetime) -> None:
 
 def _stop_unresponsive(now: timezone.datetime) -> None:
     for activation in models.Activation.objects.filter(
-        status=str(ActivationStatus.UNRESPONSIVE),
+        status=ActivationStatus.UNRESPONSIVE,
     ):
         logger.info(
             f"Deactivate activation {activation.name} due to lost heartbeat"
@@ -255,8 +255,8 @@ def _start_completed(now: timezone.datetime):
     )
     for activation in models.Activation.objects.filter(
         is_enabled=True,
-        status=str(ActivationStatus.COMPLETED),
-        restart_policy=str(RestartPolicy.ALWAYS),
+        status=ActivationStatus.COMPLETED,
+        restart_policy=RestartPolicy.ALWAYS,
         status_updated_at__lt=cutoff_time,
     ):
         logger.info(
@@ -277,7 +277,7 @@ def _start_failed(now: timezone.datetime):
     for activation in models.Activation.objects.filter(
         is_enabled=True,
         is_valid=True,
-        status=str(ActivationStatus.FAILED),
+        status=ActivationStatus.FAILED,
         restart_policy__in=restart_policies,
         failure_count__lt=settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
         status_updated_at__lt=cutoff_time,

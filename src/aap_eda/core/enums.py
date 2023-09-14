@@ -12,10 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from enum import Enum
+from enum import StrEnum
 
 
-class DjangoEnum(Enum):
+class DjangoStrEnum(StrEnum):
     @classmethod
     def choices(cls):
         return tuple((e.value, e.value) for e in cls)
@@ -24,32 +24,17 @@ class DjangoEnum(Enum):
     def values(cls):
         return tuple(e.value for e in cls)
 
-    def __eq__(self, other):
-        # Raise an exception if the comparand is neither our type nor a string.
-        # If it is a string instantiate from our class using the string which
-        # will fail if it's not valid for the class.
-        if not isinstance(other, type(self)):
-            if not isinstance(other, str):
-                raise TypeError(
-                    f"comparand type {type(other)} is not supported"
-                )
-            other = type(self)(other)
-        return str(self) == str(other)
-
-    def __str__(self):
-        return str(self.value)
-
 
 # =======================================================================
 
 
-class RestartPolicy(DjangoEnum):
+class RestartPolicy(DjangoStrEnum):
     ALWAYS = "always"
     ON_FAILURE = "on-failure"
     NEVER = "never"
 
 
-class ResourceType(DjangoEnum):
+class ResourceType(DjangoStrEnum):
     ACTIVATION = "activation"
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
@@ -65,7 +50,7 @@ class ResourceType(DjangoEnum):
     CREDENTIAL = "credential"
 
 
-class Action(DjangoEnum):
+class Action(DjangoStrEnum):
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -75,14 +60,14 @@ class Action(DjangoEnum):
     RESTART = "restart"
 
 
-class InventorySource(DjangoEnum):
+class InventorySource(DjangoStrEnum):
     PROJECT = "project"
     COLLECTION = "collection"
     USER_DEFINED = "user_defined"
     EXECUTION_ENV = "execution_env"
 
 
-class ActivationStatus(DjangoEnum):
+class ActivationStatus(DjangoStrEnum):
     STARTING = "starting"
     RUNNING = "running"
     PENDING = "pending"
@@ -94,7 +79,7 @@ class ActivationStatus(DjangoEnum):
     UNRESPONSIVE = "unresponsive"
 
 
-class CredentialType(DjangoEnum):
+class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"

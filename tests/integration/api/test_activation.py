@@ -35,7 +35,7 @@ TEST_ACTIVATION = {
     "project_id": 1,
     "rulebook_id": 1,
     "extra_var_id": 1,
-    "restart_policy": str(RestartPolicy.ON_FAILURE),
+    "restart_policy": RestartPolicy.ON_FAILURE,
     "restart_count": 0,
 }
 
@@ -167,7 +167,7 @@ def create_multiple_activations(fks: dict):
             "extra_var_id": fks["project_id"],
             "user_id": fks["user_id"],
             "status": _status,
-            "restart_policy": str(RestartPolicy.ON_FAILURE),
+            "restart_policy": RestartPolicy.ON_FAILURE,
             "restart_count": 0,
         }
         activation = models.Activation(**activation_data)
