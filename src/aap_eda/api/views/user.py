@@ -212,6 +212,10 @@ class CurrentUserAwxTokenViewSet(
                 None,
                 description="The user has been deleted successful.",
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None,
+                description="Deleting your own account is not permitted.",
+            ),
         },
     ),
 )
@@ -236,3 +240,12 @@ class UserViewSet(
 
     def get_response_serializer_class(self):
         return serializers.UserDetailSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance == request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
