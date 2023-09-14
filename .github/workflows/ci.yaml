@@ -54,10 +54,12 @@ jobs:
       EDA_DB_PASSWORD: 'secret'
     services:
       postgres:
-        image: 'postgres:13'
+        image: 'quay.io/sclorg/postgresql-13-c9s:latest'
         env:
-          POSTGRES_DB: 'eda'
-          POSTGRES_PASSWORD: 'secret'
+          POSTGRESQL_USER: eda
+          POSTGRESQL_PASSWORD: secret
+          POSTGRESQL_ADMIN_PASSWORD: secret
+          POSTGRESQL_DATABASE: eda
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -65,6 +67,15 @@ jobs:
           --health-retries 5
         ports:
           - '5432:5432'
+      redis: # Add this section for Redis
+        image: 'quay.io/sclorg/redis-6-c9s:latest'
+        ports:
+          - '6379:6379'
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v3
