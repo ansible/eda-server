@@ -12,10 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from enum import StrEnum
+from enum import Enum
 
 
-class DjangoStrEnum(StrEnum):
+class DjangoStrEnum(str, Enum):
     @classmethod
     def choices(cls):
         return tuple((e.value, e.value) for e in cls)
@@ -23,6 +23,9 @@ class DjangoStrEnum(StrEnum):
     @classmethod
     def values(cls):
         return tuple(e.value for e in cls)
+
+    def __str__(self):
+        return str(self.value)
 
 
 # =======================================================================
