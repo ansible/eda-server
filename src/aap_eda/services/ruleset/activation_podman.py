@@ -29,6 +29,7 @@ from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.exceptions import PodmanImagePullError
 
 from .activation_db_logger import ActivationDbLogger
 from .exceptions import ActivationException, ActivationRecordNotFound
@@ -266,6 +267,7 @@ class ActivationPodman:
 
     def _pull_image(self) -> Image:
         try:
+            image_url = self.decision_environment.image_url
             credential = self.decision_environment.credential
             self.activation_db_logger.write(
                 f"Pulling image {self.decision_environment.image_url}", True
@@ -277,9 +279,17 @@ class ActivationPodman:
                     "password": credential.secret.get_secret_value(),
                 }
                 self._write_auth_json()
-            return self.client.images.pull(
-                self.decision_environment.image_url, **kwargs
-            )
+            image = self.client.images.pull(image_url, **kwargs)
+
+            # https://github.com/containers/podman-py/issues/301
+            if not image.id:
+                msg = (
+                    f"Image {image_url} pull failed. The image url "
+                    "or the credentials may be incorrect."
+                )
+                logger.exception(msg)
+                raise PodmanImagePullError(msg)
+
         except ImageNotFound:
             logger.exception(
                 f"Image {self.decision_environment.image_url} not found"
