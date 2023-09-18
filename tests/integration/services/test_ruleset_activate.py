@@ -17,6 +17,7 @@ from unittest import mock
 
 import pytest
 from django.conf import settings
+from podman.errors import ImageNotFound
 
 from aap_eda.core import models
 from aap_eda.services.ruleset.activate_rulesets import (
@@ -180,7 +181,7 @@ def test_rulesets_activate_with_podman(
         ws_url=f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}",
         ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
         activation_instance=instance,
-        heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+        heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         ports={"5000/tcp": 5000},
     )
 
@@ -193,3 +194,26 @@ def _get_rules_count(ruleset_stats):
         rules_fired_count += ruleset_stat["rulesTriggered"]
 
     return rules_count, rules_fired_count
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
+@mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "podman"})
+def test_rulesets_activate_with_exception(
+    my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats
+):
+    def image_not_found():
+        raise ImageNotFound()
+
+    pod_mock = mock.Mock()
+    my_mock.return_value = pod_mock
+    log_mock = mock.Mock()
+    logger_mock.return_value = log_mock
+
+    pod_mock.run_worker_mode.side_effect = image_not_found
+
+    ActivateRulesets().activate(activation=init_data.activation)
+
+    init_data.activation.refresh_from_db()
+    assert init_data.activation.status == "failed"

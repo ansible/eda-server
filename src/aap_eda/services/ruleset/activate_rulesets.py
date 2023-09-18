@@ -173,24 +173,24 @@ class ActivateRulesets:
                     activation_db_logger,
                 )
 
-            activation_db_logger.flush()
-
-            now = timezone.now()
-            instance.ended_at = now
-            instance.updated_at = now
-            save_activation_and_instance(
-                instance=instance,
-                update_fields=["status", "ended_at", "updated_at"],
-            )
-        except (DeactivationException, ActivationRecordNotFound) as error:
+            self._final_update(instance, activation_db_logger)
+        except (
+            DeactivationException,
+            ActivationRecordNotFound,
+            models.ActivationInstance.DoesNotExist,
+        ) as error:
             logger.error(error)
         except Exception as error:
             logger.exception(f"Exception: {str(error)}")
-            self._log_activate_failure(
-                error,
-                instance,
-                activation_db_logger,
-            )
+            try:
+                self._log_activate_failure(
+                    error,
+                    instance,
+                    activation_db_logger,
+                )
+                self._final_update(instance, activation_db_logger)
+            except ActivationRecordNotFound as error:
+                logger.error(error)
 
     def deactivate(
         self,
@@ -231,6 +231,20 @@ class ActivateRulesets:
             logger.exception(f"Activation error: {str(exe)}")
             activation_db_logger.write(f"Activation error: {str(exe)}")
 
+    def _final_update(
+        self,
+        instance: models.ActivationInstance,
+        activation_db_logger: ActivationDbLogger,
+    ):
+        activation_db_logger.flush()
+        now = timezone.now()
+        instance.ended_at = now
+        instance.updated_at = now
+        save_activation_and_instance(
+            instance=instance,
+            update_fields=["status", "ended_at", "updated_at"],
+        )
+
     def _log_activate_complete(
         self,
         instance: models.ActivationInstance,
@@ -259,8 +273,9 @@ class ActivateRulesets:
                 activation.restart_policy == RestartPolicy.ALWAYS.value
                 or activation.restart_policy == RestartPolicy.ON_FAILURE.value
             )
-            restart_limit = activation.failure_count < int(
-                settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+            restart_limit = (
+                activation.failure_count
+                < settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
             )
             if (
                 activation.is_enabled
@@ -273,7 +288,7 @@ class ActivateRulesets:
                     activation,
                     activation_db_logger,
                     activation.failure_count + 1,
-                    int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+                    settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
                 )
                 activation.failure_count += 1
                 activation.save(update_fields=["failure_count", "modified_at"])
@@ -309,7 +324,7 @@ class ActivateRulesets:
         max_retries: int = 0,
     ) -> None:
         if error:
-            seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
+            seconds = settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
             msg = (
                 f"Activation {activation.name} failed: {str(error)}, "
                 f"retry ({retry_count}/{max_retries}) in {seconds} seconds "
@@ -317,7 +332,7 @@ class ActivateRulesets:
             )
             logger.warning(msg)
         else:
-            seconds = int(settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
+            seconds = settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
             msg = (
                 f"Activation {activation.name} completed successfully. Will "
                 f"restart in {seconds} seconds according to its restart policy"
@@ -350,7 +365,7 @@ class ActivateRulesets:
             ws_url=ws_url,
             ws_ssl_verify=ssl_verify,
             activation_instance=activation_instance,
-            heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             ports=ports,
         )
 
@@ -402,7 +417,7 @@ class ActivateRulesets:
                     activation_instance.activation.rulebook_rulesets
                 )
             ],
-            heartbeat=str(settings.RULEBOOK_LIVENESS_CHECK_SECONDS),
+            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         )
 
         secret_name = None
