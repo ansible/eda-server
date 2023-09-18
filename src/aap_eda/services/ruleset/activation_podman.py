@@ -287,7 +287,7 @@ class ActivationPodman:
                     f"Image {image_url} pull failed. The image url "
                     "or the credentials may be incorrect."
                 )
-                logger.exception(msg)
+                logger.error(msg)
                 raise PodmanImagePullError(msg)
 
         except ImageNotFound:
