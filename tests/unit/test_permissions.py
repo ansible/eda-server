@@ -35,7 +35,7 @@ def test_regular_view_zeroconf():
     permission = RoleBasedPermission()
     with pytest.raises(ImproperlyConfigured) as exc_info:
         assert permission.has_permission(request, view)
-    assert exc_info.match(r"Cannot determine resource type for view ")
+        assert exc_info.match(r"Cannot determine resource type for view ")
 
 
 @pytest.mark.parametrize(
@@ -64,9 +64,9 @@ def test_view_set_zeroconf(view_action, rbac_action):
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-    check_method.assert_called_once_with(
-        request.user, ResourceType.USER, rbac_action
-    )
+        check_method.assert_called_once_with(
+            request.user, ResourceType.USER, rbac_action
+        )
 
 
 def test_view_set_unknown_resource_type():
@@ -81,9 +81,9 @@ def test_view_set_unknown_resource_type():
     permission = RoleBasedPermission()
     with pytest.raises(ImproperlyConfigured) as exc_info:
         permission.has_permission(request, view)
-    exc_info.match(
-        "Cannot resolve basename into permission resource type for view "
-    )
+        exc_info.match(
+            "Cannot resolve basename into permission resource type for view "
+        )
 
 
 def test_view_set_unknown_action():
@@ -98,9 +98,9 @@ def test_view_set_unknown_action():
     permission = RoleBasedPermission()
     with pytest.raises(ImproperlyConfigured) as exc_info:
         permission.has_permission(request, view)
-    exc_info.match(
-        "Cannot resolve view action into permission action for view "
-    )
+        exc_info.match(
+            "Cannot resolve view action into permission action for view "
+        )
 
 
 def test_view_set_override_resource_type():
@@ -119,9 +119,9 @@ def test_view_set_override_resource_type():
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-    check_method.assert_called_once_with(
-        request.user, ResourceType.USER, Action.READ
-    )
+        check_method.assert_called_once_with(
+            request.user, ResourceType.USER, Action.READ
+        )
 
 
 def test_view_set_override_action():
@@ -140,9 +140,9 @@ def test_view_set_override_action():
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-    check_method.assert_called_once_with(
-        request.user, ResourceType.USER, Action.READ
-    )
+        check_method.assert_called_once_with(
+            request.user, ResourceType.USER, Action.READ
+        )
 
 
 def test_view_set_override_resource_type_and_action():
@@ -162,9 +162,9 @@ def test_view_set_override_resource_type_and_action():
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-    check_method.assert_called_once_with(
-        request.user, ResourceType.USER, Action.READ
-    )
+        check_method.assert_called_once_with(
+            request.user, ResourceType.USER, Action.READ
+        )
 
 
 def test_view_set_override_get_permission():
@@ -186,7 +186,7 @@ def test_view_set_override_get_permission():
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-    get_rbac_permission.assert_called_once_with()
-    check_method.assert_called_once_with(
-        request.user, ResourceType.USER, Action.READ
-    )
+        get_rbac_permission.assert_called_once_with()
+        check_method.assert_called_once_with(
+            request.user, ResourceType.USER, Action.READ
+        )
