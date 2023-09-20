@@ -15,7 +15,7 @@
 from enum import Enum
 
 
-class DjangoEnum(Enum):
+class DjangoStrEnum(str, Enum):
     @classmethod
     def choices(cls):
         return tuple((e.value, e.value) for e in cls)
@@ -31,13 +31,13 @@ class DjangoEnum(Enum):
 # =======================================================================
 
 
-class RestartPolicy(DjangoEnum):
+class RestartPolicy(DjangoStrEnum):
     ALWAYS = "always"
     ON_FAILURE = "on-failure"
     NEVER = "never"
 
 
-class ResourceType(DjangoEnum):
+class ResourceType(DjangoStrEnum):
     ACTIVATION = "activation"
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
@@ -53,7 +53,7 @@ class ResourceType(DjangoEnum):
     CREDENTIAL = "credential"
 
 
-class Action(DjangoEnum):
+class Action(DjangoStrEnum):
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -63,14 +63,14 @@ class Action(DjangoEnum):
     RESTART = "restart"
 
 
-class InventorySource(DjangoEnum):
+class InventorySource(DjangoStrEnum):
     PROJECT = "project"
     COLLECTION = "collection"
     USER_DEFINED = "user_defined"
     EXECUTION_ENV = "execution_env"
 
 
-class ActivationStatus(DjangoEnum):
+class ActivationStatus(DjangoStrEnum):
     STARTING = "starting"
     RUNNING = "running"
     PENDING = "pending"
@@ -82,7 +82,7 @@ class ActivationStatus(DjangoEnum):
     UNRESPONSIVE = "unresponsive"
 
 
-class CredentialType(DjangoEnum):
+class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
