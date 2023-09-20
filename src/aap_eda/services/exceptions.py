@@ -1,0 +1,2 @@
+class PodmanImagePullError(Exception):
+    pass
