@@ -224,8 +224,8 @@ def test_monitor_activations_to_unresponsive(
     init_data.instance1.refresh_from_db()
     init_data.instance2.refresh_from_db()
 
-    assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE.value
-    assert init_data.instance1.status == ActivationStatus.COMPLETED.value
+    assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE
+    assert init_data.instance1.status == ActivationStatus.COMPLETED
     deactivate_mock.assert_called_once_with(
         activation_id=init_data.activation.id,
         requester="SCHEDULER",

@@ -51,10 +51,7 @@ def _activate(activation_id: int, requester: str = "User") -> None:
             .filter(id=activation_id)
             .first()
         )
-        if (
-            not activation
-            or str(activation.status) == ActivationStatus.DELETING.value
-        ):
+        if not activation or activation.status == ActivationStatus.DELETING:
             logger.info(f"Activation id: {activation_id} is deleted")
             return
 
@@ -95,10 +92,10 @@ def deactivate(
             logger.warning(f"Activation {activation_id} is deleted.")
             return
 
-        if str(activation.status) in [
-            ActivationStatus.COMPLETED.value,
-            ActivationStatus.FAILED.value,
-            ActivationStatus.STOPPED.value,
+        if activation.status in [
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+            ActivationStatus.STOPPED,
         ]:
             logger.warning(
                 f"Cannot deactivate the activation {activation.name} when its "
@@ -140,17 +137,17 @@ def restart(activation_id: int, requester: str = "User") -> None:
             logger.warning(f"Activation {activation_id} is deleted.")
             return
 
-        if str(activation.status) not in [
-            ActivationStatus.COMPLETED.value,
-            ActivationStatus.FAILED.value,
-            ActivationStatus.STOPPED.value,
+        if activation.status not in [
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+            ActivationStatus.STOPPED,
         ]:
             _perform_deactivate(activation, ActivationStatus.STOPPED)
 
         activation.refresh_from_db()
-        if str(activation.status) in [
-            ActivationStatus.STOPPING.value,
-            ActivationStatus.DELETING.value,
+        if activation.status in [
+            ActivationStatus.STOPPING,
+            ActivationStatus.DELETING,
         ]:
             logger.warning(
                 f"Cannot restart the activation {activation.name} when its "
@@ -224,8 +221,8 @@ def _monitor_activations() -> None:
 
 def _detect_unresponsive(now: timezone.datetime) -> None:
     running_statuses = [
-        ActivationStatus.RUNNING.value,
-        ActivationStatus.STARTING.value,
+        ActivationStatus.RUNNING,
+        ActivationStatus.STARTING,
     ]
     cutoff_time = now - timedelta(
         seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS
@@ -240,7 +237,7 @@ def _detect_unresponsive(now: timezone.datetime) -> None:
 
 def _stop_unresponsive(now: timezone.datetime) -> None:
     for activation in models.Activation.objects.filter(
-        status=ActivationStatus.UNRESPONSIVE.value,
+        status=ActivationStatus.UNRESPONSIVE,
     ):
         logger.info(
             f"Deactivate activation {activation.name} due to lost heartbeat"
@@ -258,8 +255,8 @@ def _start_completed(now: timezone.datetime):
     )
     for activation in models.Activation.objects.filter(
         is_enabled=True,
-        status=ActivationStatus.COMPLETED.value,
-        restart_policy=RestartPolicy.ALWAYS.value,
+        status=ActivationStatus.COMPLETED,
+        restart_policy=RestartPolicy.ALWAYS,
         status_updated_at__lt=cutoff_time,
     ):
         logger.info(
@@ -274,13 +271,13 @@ def _start_failed(now: timezone.datetime):
         seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
     )
     restart_policies = [
-        RestartPolicy.ALWAYS.value,
-        RestartPolicy.ON_FAILURE.value,
+        RestartPolicy.ALWAYS,
+        RestartPolicy.ON_FAILURE,
     ]
     for activation in models.Activation.objects.filter(
         is_enabled=True,
         is_valid=True,
-        status=ActivationStatus.FAILED.value,
+        status=ActivationStatus.FAILED,
         restart_policy__in=restart_policies,
         failure_count__lt=settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
         status_updated_at__lt=cutoff_time,
