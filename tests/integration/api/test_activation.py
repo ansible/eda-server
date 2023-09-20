@@ -411,9 +411,38 @@ def test_enable_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.post(f"{api_url_v1}/activations/{activation.id}/enable/")
+    for state in [
+        ActivationStatus.STARTING,
+        ActivationStatus.STOPPING,
+        ActivationStatus.DELETING,
+        ActivationStatus.RUNNING,
+        ActivationStatus.UNRESPONSIVE,
+    ]:
+        activation.is_enabled = False
+        activation.status = state
+        activation.save(update_fields=["is_enabled", "status"])
 
-    assert response.status_code == status.HTTP_204_NO_CONTENT
+        response = client.post(
+            f"{api_url_v1}/activations/{activation.id}/enable/"
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+
+    for state in [
+        ActivationStatus.COMPLETED,
+        ActivationStatus.PENDING,
+        ActivationStatus.STOPPED,
+        ActivationStatus.FAILED,
+    ]:
+        activation.is_enabled = False
+        activation.status = state
+        activation.save(update_fields=["is_enabled", "status"])
+
+        response = client.post(
+            f"{api_url_v1}/activations/{activation.id}/enable/"
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
