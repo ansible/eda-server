@@ -238,7 +238,6 @@ class ActivationViewSet(
             ActivationStatus.STARTING,
             ActivationStatus.STOPPING,
             ActivationStatus.DELETING,
-            ActivationStatus.PENDING,
             ActivationStatus.RUNNING,
             ActivationStatus.UNRESPONSIVE,
         ]:
