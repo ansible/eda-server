@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+
+from cryptography import fernet
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -19,6 +22,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
@@ -28,6 +32,8 @@ from .mixins import (
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
@@ -90,6 +96,19 @@ class CredentialViewSet(
     queryset = models.Credential.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialFilter
+
+    def handle_exception(self, exc):
+        if isinstance(exc, fernet.InvalidToken):
+            return Response(
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                data={
+                    "details": (
+                        "Credential decryption failed"
+                        "; contact your system administrator"
+                    )
+                },
+            )
+        return super().handle_exception(exc)
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:

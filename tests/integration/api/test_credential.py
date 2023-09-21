@@ -21,7 +21,7 @@ def test_list_credentials(client: APIClient):
         "name": "credential1",
         "description": "",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
     }
 
@@ -44,7 +44,7 @@ def test_create_credential(client: APIClient):
         "name": "credential1",
         "description": "desc here",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": CredentialType.REGISTRY,
         "id": id_,
     }
     obj = models.Credential.objects.filter(pk=id_).first()
@@ -66,7 +66,7 @@ def test_retrieve_credential(client: APIClient):
         "name": "credential1",
         "description": "",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
     }
 
@@ -92,7 +92,7 @@ def test_partial_update_credential(client: APIClient):
         "name": "credential1",
         "description": "",
         "username": "me",
-        "credential_type": CredentialType.REGISTRY.value,
+        "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
     }
     updated_obj = models.Credential.objects.filter(pk=obj.id).first()
@@ -108,3 +108,21 @@ def test_delete_credential(client: APIClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.Credential.objects.filter(pk=obj.id).count() == 0
+
+
+@pytest.mark.django_db
+def test_credential_decrypt_failure(client: APIClient, settings):
+    settings.SECRET_KEY = "a-secret-key"
+    models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+
+    response = client.get(f"{api_url_v1}/credentials/")
+    assert response.status_code == status.HTTP_200_OK
+
+    settings.SECRET_KEY = "a-different-secret-key"
+    response = client.get(f"{api_url_v1}/credentials/")
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    data = response.json()
+    assert data["details"].startswith("Credential decryption failed")

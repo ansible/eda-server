@@ -35,7 +35,7 @@ TEST_ACTIVATION = {
     "project_id": 1,
     "rulebook_id": 1,
     "extra_var_id": 1,
-    "restart_policy": RestartPolicy.ON_FAILURE.value,
+    "restart_policy": RestartPolicy.ON_FAILURE,
     "restart_count": 0,
 }
 
@@ -167,7 +167,7 @@ def create_multiple_activations(fks: dict):
             "extra_var_id": fks["project_id"],
             "user_id": fks["user_id"],
             "status": _status,
-            "restart_policy": RestartPolicy.ON_FAILURE.value,
+            "restart_policy": RestartPolicy.ON_FAILURE,
             "restart_count": 0,
         }
         activation = models.Activation(**activation_data)
@@ -240,7 +240,7 @@ def test_create_activation_disabled(client: APIClient):
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
-    assert data["status"] == ActivationStatus.PENDING.value
+    assert data["status"] == ActivationStatus.PENDING
     assert not data["instances"]
 
 
@@ -411,9 +411,38 @@ def test_enable_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.post(f"{api_url_v1}/activations/{activation.id}/enable/")
+    for state in [
+        ActivationStatus.STARTING,
+        ActivationStatus.STOPPING,
+        ActivationStatus.DELETING,
+        ActivationStatus.RUNNING,
+        ActivationStatus.UNRESPONSIVE,
+    ]:
+        activation.is_enabled = False
+        activation.status = state
+        activation.save(update_fields=["is_enabled", "status"])
 
-    assert response.status_code == status.HTTP_204_NO_CONTENT
+        response = client.post(
+            f"{api_url_v1}/activations/{activation.id}/enable/"
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+
+    for state in [
+        ActivationStatus.COMPLETED,
+        ActivationStatus.PENDING,
+        ActivationStatus.STOPPED,
+        ActivationStatus.FAILED,
+    ]:
+        activation.is_enabled = False
+        activation.status = state
+        activation.save(update_fields=["is_enabled", "status"])
+
+        response = client.post(
+            f"{api_url_v1}/activations/{activation.id}/enable/"
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
