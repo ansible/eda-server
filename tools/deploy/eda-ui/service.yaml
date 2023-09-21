@@ -4,9 +4,9 @@ metadata:
   name: eda-ui
 spec:
   ports:
-    - name: "8080"
-      port: 8080
-      targetPort: 8080
+    - name: "8443"
+      port: 8443
+      targetPort: 443
   selector:
     app: eda
     comp: ui

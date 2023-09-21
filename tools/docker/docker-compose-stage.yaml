@@ -32,7 +32,7 @@ services:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     environment: *common-env
     ports:
-      - '8080:8080'
+      - '8443:8080'
     depends_on:
       eda-api:
         condition: service_healthy

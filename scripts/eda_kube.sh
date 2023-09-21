@@ -228,7 +228,7 @@ case ${CMD} in
   "clean") clean-deployment "${VERSION}";;
   "deploy") deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api 8000 ;;
-  "port-forward-ui") port-forward-ui 8080 ;;
+  "port-forward-ui") port-forward-ui 8443 ;;
   "port-forward-pg") port-forward-pg 5432 ;;
   "eda-logs") get-eda-logs ;;
   "help") usage ;;

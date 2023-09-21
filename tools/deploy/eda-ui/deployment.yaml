@@ -26,5 +26,5 @@ spec:
           imagePullPolicy: Never
           image: eda-ui
           ports:
-            - containerPort: 8080
+            - containerPort: 443
 status: {}

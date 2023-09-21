@@ -122,4 +122,4 @@ Minikube is the recommended method for macOS users
 
 **Note**: For fedora, the binary may be `go-task`.
 
-You can now access the UI at <http://localhost:8080/eda/> using the above credentials.
+You can now access the UI at <https://localhost:8443/> using the above credentials.
