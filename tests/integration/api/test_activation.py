@@ -37,6 +37,7 @@ TEST_ACTIVATION = {
     "extra_var_id": 1,
     "restart_policy": RestartPolicy.ON_FAILURE,
     "restart_count": 0,
+    "status_message": "",
 }
 
 TEST_AWX_TOKEN = {
@@ -568,6 +569,7 @@ def assert_activation_base_data(
     assert data["modified_at"] == activation.modified_at.strftime(
         DATETIME_FORMAT
     )
+    assert data["status_message"] == activation.status_message
 
 
 def assert_activation_related_object_fks(

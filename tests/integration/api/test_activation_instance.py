@@ -287,6 +287,7 @@ def assert_activation_instance_data(
         "activation_id": instance.activation.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
+        "status_message": None,
     }
 
 
