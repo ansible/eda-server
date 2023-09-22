@@ -7,7 +7,7 @@ x-environment:
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
   - EDA_DEPLOYMENT_TYPE=podman
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://host.containers.internal:8080}
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-wss://host.containers.internal:8443}
   - EDA_WEBSOCKET_SSL_VERIFY=no
   - EDA_PODMAN_SOCKET_URL="unix:///run/podman/podman.sock"
   - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:?Please specify EDA_CONTROLLER_URL env}
@@ -21,7 +21,7 @@ services:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     environment: *common-env
     ports:
-      - '8080:8080'
+      - '8443:443'
     depends_on:
       eda-api:
         condition: service_healthy
