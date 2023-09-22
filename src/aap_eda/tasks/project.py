@@ -15,13 +15,14 @@
 import logging
 
 from aap_eda.core import models
-from aap_eda.core.tasking import job
+from aap_eda.core.tasking import get_queue, job, unique_enqueue
 from aap_eda.services.project import ProjectImportService
 
 logger = logging.getLogger(__name__)
+PROJECT_TASKS_QUEUE = "default"
 
 
-@job("default")
+@job(PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
@@ -31,7 +32,7 @@ def import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@job("default")
+@job(PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
 
@@ -39,3 +40,49 @@ def sync_project(project_id: int):
     ProjectImportService().sync_project(project)
 
     logger.info(f"Task complete: Sync project ( project_id={project.id} )")
+
+
+# Started by the scheduler, unique concurrent execution on default queue
+def monitor_project_tasks():
+    job_id = "monitor_project_tasks"
+    unique_enqueue(PROJECT_TASKS_QUEUE, job_id, _monitor_project_tasks)
+
+
+def _monitor_project_tasks() -> None:
+    """Handle project tasks that are stuck.
+
+    Check if there are projects in PENDING state that doesn't have
+    any related job in the queue. If there are any, put them back
+    to the queue.
+    """
+    logger.info("Task started: Monitor project tasks")
+
+    queue = get_queue(PROJECT_TASKS_QUEUE)
+
+    # Filter projects that doesn't have any related job
+    pending_projects = models.Project.objects.filter(
+        import_state=models.Project.ImportState.PENDING
+    )
+    missing_projects = []
+    for project in pending_projects:
+        job = queue.fetch_job(str(project.import_task_id))
+        if job is None:
+            missing_projects.append(project)
+
+    # Sync or import missing projects
+    # based on the git_hash field
+    for project in missing_projects:
+        logger.info(
+            "monitor_project_tasks: "
+            f"Project {project.name} is missing a job"
+            " in the queue. Adding it back."
+        )
+        if project.git_hash:
+            job = sync_project.delay(project.id)
+        else:
+            job = import_project.delay(project.id)
+
+        project.import_task_id = job.id
+        project.save(update_fields=["import_task_id", "modified_at"])
+
+    logger.info("Task complete: Monitor project tasks")
