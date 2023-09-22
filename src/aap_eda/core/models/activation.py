@@ -72,6 +72,7 @@ class Activation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     status_updated_at = models.DateTimeField(null=True)
+    status_message = models.TextField(null=True, default=None)
 
 
 class ActivationInstance(models.Model):
@@ -90,6 +91,7 @@ class ActivationInstance(models.Model):
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
     activation_pod_id = models.TextField(null=True)
+    status_message = models.TextField(null=True, default=None)
 
 
 class ActivationInstanceLog(models.Model):

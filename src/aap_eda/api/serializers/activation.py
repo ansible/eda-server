@@ -58,6 +58,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "current_job_id",
             "created_at",
             "modified_at",
+            "status_message",
         ]
         read_only_fields = [
             "id",
@@ -93,6 +94,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "status_message",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -157,6 +159,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "name",
             "status",
             "git_hash",
+            "status_message",
             "activation_id",
             "started_at",
             "ended_at",
@@ -210,6 +213,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "restarted_at",
+            "status_message",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -259,4 +263,5 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "created_at": activation["created_at"],
             "modified_at": activation["modified_at"],
             "restarted_at": activation["restarted_at"],
+            "status_message": activation["status_message"],
         }
