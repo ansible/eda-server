@@ -190,7 +190,7 @@ port-forward() {
 port-forward-ui() {
   local _local_port=${1}
   local _svc_name=eda-ui
-  local _svc_port=8443
+  local _svc_port=8080
 
   log-debug "port-forward ${_svc_name} ${_local_port} ${_svc_port}"
   port-forward "${_svc_name}" "${_local_port}" "${_svc_port}"
@@ -228,7 +228,7 @@ case ${CMD} in
   "clean") clean-deployment "${VERSION}";;
   "deploy") deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api 8000 ;;
-  "port-forward-ui") port-forward-ui 8443 ;;
+  "port-forward-ui") port-forward-ui 8080 ;;
   "port-forward-pg") port-forward-pg 5432 ;;
   "eda-logs") get-eda-logs ;;
   "help") usage ;;
