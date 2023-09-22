@@ -101,6 +101,15 @@ ALLOWED_HOSTS = (
     if isinstance(ALLOWED_HOSTS, str)
     else ALLOWED_HOSTS
 )
+# A list or a comma separated string of allowed origins for CSRF protection
+# in the form of [scheme://]host[:port]. Supports wildcards.
+# More info: https://docs.djangoproject.com/en/4.2/ref/settings/#csrf-trusted-origins  # noqa: E501
+CSRF_TRUSTED_ORIGINS = settings.get("CSRF_TRUSTED_ORIGINS", [])
+CSRF_TRUSTED_ORIGINS = (
+    CSRF_TRUSTED_ORIGINS.split(",")
+    if isinstance(CSRF_TRUSTED_ORIGINS, str)
+    else CSRF_TRUSTED_ORIGINS
+)
 
 # Session settings
 SESSION_COOKIE_AGE = settings.get("SESSION_COOKIE_AGE", 1800)
