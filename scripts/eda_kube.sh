@@ -190,7 +190,7 @@ port-forward() {
 port-forward-ui() {
   local _local_port=${1}
   local _svc_name=eda-ui
-  local _svc_port=8080
+  local _svc_port=8443
 
   log-debug "port-forward ${_svc_name} ${_local_port} ${_svc_port}"
   port-forward "${_svc_name}" "${_local_port}" "${_svc_port}"
