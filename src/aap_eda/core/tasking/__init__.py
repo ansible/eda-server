@@ -193,6 +193,11 @@ class ActivationWorker(_Worker):
 
 
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
+    """Enqueue a new job if it is not already enqueued.
+
+    Detects if a job with the same id is already enqueued and if it is
+    it will return it instead of enqueuing a new one.
+    """
     queue = get_queue(queue_name)
     job = job_from_queue(queue, job_id)
     if job:
@@ -202,6 +207,7 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
         return job
     else:
         kwargs["job_id"] = job_id
+        logger.info(f"Enqueing unique job: {job_id}")
         return queue.enqueue(*args, **kwargs)
 
 

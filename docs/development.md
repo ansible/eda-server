@@ -285,6 +285,8 @@ task docker -- up -d api
 
 ### Running tests
 
+To run tests locally, you need to have a running instance of postgresql and redis.
+
 Run all tests:
 
 ```
