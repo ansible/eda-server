@@ -169,7 +169,7 @@ class ActivationPodman:
                 activation_instance.status = ActivationStatus.STOPPED
             else:
                 activation_instance.status = ActivationStatus.COMPLETED
-            activation_instance.save(update_fields={"status"})
+            activation_instance.save(update_fields=["status"])
         except ActivationException as e:
             logger.error(e)
         except ContainerError:
