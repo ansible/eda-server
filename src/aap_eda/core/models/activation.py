@@ -14,7 +14,16 @@
 
 from django.db import models
 
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ACTIVATION_STATUS_MESSAGE_MAP,
+    ActivationStatus,
+    RestartPolicy,
+)
+from aap_eda.core.exceptions import (
+    StatusRequiredError,
+    UnknownStatusError,
+    UpdateFieldsRequiredError,
+)
 
 from .user import User
 
@@ -74,6 +83,57 @@ class Activation(models.Model):
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
 
+    def save(self, *args, **kwargs):
+        # when creating
+        if self._state.adding:
+            if self.status_message is None:
+                self._set_status_message()
+        else:
+            if not bool(kwargs) or "update_fields" not in kwargs:
+                raise UpdateFieldsRequiredError(
+                    "update_fields is required to use when saving "
+                    "due to race conditions"
+                )
+            else:
+                if "status" in kwargs["update_fields"]:
+                    self._is_valid_status()
+
+            if (
+                "status_message" in kwargs["update_fields"]
+                and "status" not in kwargs["update_fields"]
+            ):
+                raise StatusRequiredError(
+                    "status_message cannot be set by itself, "
+                    "it requires status and status_message together"
+                )
+            # when updating without status_message
+            elif (
+                "status" in kwargs["update_fields"]
+                and "status_message" not in kwargs["update_fields"]
+            ):
+                self._set_status_message()
+                kwargs["update_fields"].append("status_message")
+
+        super().save(*args, **kwargs)
+
+    def _set_status_message(self):
+        self.status_message = self._get_default_status_message()
+
+        if self.status == ActivationStatus.PENDING and not self.is_enabled:
+            self.status_message = "Activation is marked as disabled"
+
+    def _get_default_status_message(self):
+        try:
+            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
+        except KeyError:
+            raise UnknownStatusError(f"Status [{self.status}] is invalid")
+
+    def _is_valid_status(self):
+        try:
+            ActivationStatus(self.status)
+        except ValueError as error:
+            raise UnknownStatusError(error)
+
 
 class ActivationInstance(models.Model):
     class Meta:
@@ -92,6 +152,51 @@ class ActivationInstance(models.Model):
     ended_at = models.DateTimeField(null=True)
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
+
+    def save(self, *args, **kwargs):
+        # when creating
+        if self._state.adding:
+            if self.status_message is None:
+                self.status_message = self._get_default_status_message()
+        else:
+            if not bool(kwargs) or "update_fields" not in kwargs:
+                raise UpdateFieldsRequiredError(
+                    "update_fields is required to use when saving "
+                    "due to race conditions"
+                )
+            else:
+                if "status" in kwargs["update_fields"]:
+                    self._is_valid_status()
+
+            if (
+                "status_message" in kwargs["update_fields"]
+                and "status" not in kwargs["update_fields"]
+            ):
+                raise StatusRequiredError(
+                    "status_message cannot be set by itself, "
+                    "it requires status and status_message together"
+                )
+            # when updating without status_message
+            elif (
+                "status" in kwargs["update_fields"]
+                and "status_message" not in kwargs["update_fields"]
+            ):
+                self.status_message = self._get_default_status_message()
+                kwargs["update_fields"].append("status_message")
+
+        super().save(*args, **kwargs)
+
+    def _get_default_status_message(self):
+        try:
+            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
+        except KeyError:
+            raise UnknownStatusError(f"Status [{self.status}] is invalid")
+
+    def _is_valid_status(self):
+        try:
+            ActivationStatus(self.status)
+        except ValueError as error:
+            raise UnknownStatusError(error)
 
 
 class ActivationInstanceLog(models.Model):
