@@ -43,7 +43,6 @@ cryptography = "*"
 kubernetes = "*"
 podman = ">=4.5"
 rq-scheduler = "^0.10"
-pytest-redis = "^3.0.2"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
@@ -51,6 +50,7 @@ pytest-django = "*"
 pytest-asyncio = "*"
 requests = { version="*", python="<4.0" }
 pytest-cov = "^4.1.0"
+pytest-redis = "^3.0.2"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"

@@ -80,6 +80,7 @@ class ActivationStatus(DjangoStrEnum):
     DELETING = "deleting"
     COMPLETED = "completed"
     UNRESPONSIVE = "unresponsive"
+    ERROR = "error"
 
 
 class CredentialType(DjangoStrEnum):
