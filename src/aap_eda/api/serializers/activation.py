@@ -11,18 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import urllib.parse
-
-from django.conf import settings
-from django.db import IntegrityError
 from rest_framework import serializers
 
-from aap_eda.api.exceptions import (
-    InvalidWebsocketHost,
-    InvalidWebsocketScheme,
-    NoControllerToken,
-    TooManyControllerTokens,
-)
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -32,7 +22,7 @@ from aap_eda.api.serializers.project import (
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models
-from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH
+from aap_eda.services.validation import validate_activation_creation
 
 
 class ActivationSerializer(serializers.ModelSerializer):
@@ -119,34 +109,24 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data, user):
-        self._validate_pre_reqs(user)
-        try:
-            rulebook = models.Rulebook.objects.get(
-                pk=validated_data["rulebook_id"]
-            )
-        except models.Rulebook.DoesNotExist:
-            raise IntegrityError
+        rulebook_id = validated_data["rulebook_id"]
+        decision_environment_id = validated_data["decision_environment_id"]
+        extra_var_id = validated_data.get("extra_var_id")
+
+        validate_activation_creation(
+            decision_environment_id=decision_environment_id,
+            rulebook_id=rulebook_id,
+            user_id=user.id,
+            extra_var_id=extra_var_id,
+        )
+
+        rulebook = models.Rulebook.objects.get(id=rulebook_id)
         validated_data["user_id"] = user.id
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
         return super().create(validated_data)
-
-    def _validate_pre_reqs(self, user):
-        tokens = models.AwxToken.objects.filter(user_id=user.id).count()
-        if tokens == 0:
-            raise NoControllerToken()
-        elif tokens > 1:
-            raise TooManyControllerTokens()
-
-        ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
-        parsed_url = urllib.parse.urlparse(ws_url)
-
-        if parsed_url.scheme not in ["ws", "wss"]:
-            raise InvalidWebsocketScheme()
-        if not parsed_url.hostname:
-            raise InvalidWebsocketHost()
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):

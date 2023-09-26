@@ -300,7 +300,7 @@ def test_create_activation_unprocessible_entity(
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     assert (
         response.data["detail"]
-        == f"{dependent_object.capitalize()} with ID=0 does not exist."
+        == f"{dependent_object} matching query does not exist"
     )
 
     check_permission_mock.assert_called_once_with(

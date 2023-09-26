@@ -196,9 +196,15 @@ def test_deactivate_with_delete(info_mock: mock.Mock, init_data):
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=True)
 @mock.patch("aap_eda.tasks.ruleset.logger.info")
 @mock.patch("aap_eda.tasks.ruleset.activate")
-def test_restart(delay_mock: mock.Mock, info_mock: mock.Mock, init_data):
+def test_restart(
+    delay_mock: mock.Mock,
+    info_mock: mock.Mock,
+    validate_mock: mock.Mock,
+    init_data,
+):
     job = mock.Mock()
     job.id = "jid"
     delay_mock.return_value = job
@@ -238,9 +244,10 @@ def test_monitor_activations_to_unresponsive(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=True)
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_completed(
-    activate_mock: mock.Mock, init_activation
+    activate_mock: mock.Mock, validate_mock: mock.Mock, init_activation
 ):
     job = mock.Mock()
     job.id = "jid"
@@ -268,9 +275,10 @@ def test_monitor_activations_restart_completed(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=True)
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_failed(
-    activate_mock: mock.Mock, init_activation
+    activate_mock: mock.Mock, validate_mock: mock.Mock, init_activation
 ):
     job = mock.Mock()
     job.id = "jid"

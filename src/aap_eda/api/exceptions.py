@@ -60,31 +60,3 @@ class Forbidden(APIException):
     status_code = status.HTTP_403_FORBIDDEN
     default_code = "forbidden"
     default_detail = _("Forbidden.")
-
-
-class NoControllerToken(APIException):
-    status_code = 422
-    default_detail = "No controller token specified"
-
-
-class TooManyControllerTokens(APIException):
-    status_code = 422
-    default_detail = (
-        "More than one controller token found, "
-        "currently only 1 token is supported"
-    )
-
-
-class InvalidWebsocketScheme(APIException):
-    status_code = 422
-    default_detail = (
-        "Connection Error: Invalid WebSocket URL scheme. "
-        "Scheme should be either 'ws' or 'wss'."
-    )
-
-
-class InvalidWebsocketHost(APIException):
-    status_code = 422
-    default_detail = (
-        "Connection Error: WebSocket URL must have a valid host address."
-    )

@@ -28,6 +28,7 @@ from aap_eda.services.ruleset.activate_rulesets import (
     save_activation_and_instance,
 )
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
+from aap_eda.services.validation import validate_activation
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +264,7 @@ def _start_completed(now: timezone.datetime):
             f"Restart activation {activation.name} according to its restart"
             " policy."
         )
+
         _schedule_activate(activation, "SCHEDULER")
 
 
@@ -290,6 +292,13 @@ def _start_failed(now: timezone.datetime):
 
 
 def _schedule_activate(activation: models.Activation, requester: str) -> None:
+    if not validate_activation(activation.id):
+        logger.info(
+            f"Activation {activation.name} failed to restart due to its"
+            " invalid state"
+        )
+        return
+
     job = activate(
         activation_id=activation.id,
         requester=requester,

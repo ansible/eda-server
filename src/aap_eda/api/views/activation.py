@@ -13,7 +13,7 @@
 #  limitations under the License.
 import logging
 
-from django.db import IntegrityError
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -29,31 +29,10 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
+from aap_eda.services.validation import validate_activation
 from aap_eda.tasks.ruleset import activate, deactivate, restart
 
 logger = logging.getLogger(__name__)
-
-
-def handle_activation_create_conflict(activation):
-    activation_dependent_objects = [
-        (
-            models.DecisionEnvironment,
-            "decision_environment",
-            activation.get("decision_environment_id"),
-        ),
-        (models.Rulebook, "rulebook", activation.get("rulebook_id")),
-        (models.ExtraVar, "extra_var", activation.get("extra_var_id")),
-    ]
-    for object_model, object_name, object_id in activation_dependent_objects:
-        if object_id is None:
-            continue
-        object_exists = object_model.objects.filter(pk=object_id).exists()
-        if not object_exists:
-            raise api_exc.Unprocessable(
-                detail=f"{object_name.capitalize()} with ID={object_id}"
-                " does not exist.",
-            )
-    raise api_exc.Unprocessable(detail="Integrity error.")
 
 
 @extend_schema_view(
@@ -87,7 +66,10 @@ class ActivationViewSet(
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
         responses={
-            status.HTTP_201_CREATED: serializers.ActivationReadSerializer
+            status.HTTP_201_CREATED: serializers.ActivationReadSerializer,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: OpenApiResponse(
+                description="Invalid data to create activation."
+            ),
         },
     )
     def create(self, request):
@@ -98,8 +80,8 @@ class ActivationViewSet(
             response = serializer.create(
                 serializer.validated_data, request.user
             )
-        except IntegrityError:
-            handle_activation_create_conflict(serializer.validated_data)
+        except ValidationError as err:
+            raise api_exc.Unprocessable(err.message)
 
         response_serializer = serializers.ActivationSerializer(response)
         activation = self._get_activation_dependent_objects(
@@ -231,6 +213,10 @@ class ActivationViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
+
+        if not validate_activation(activation.id):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -313,6 +299,9 @@ class ActivationViewSet(
             raise api_exc.Forbidden(
                 detail="Activation is disabled and cannot be run."
             )
+
+        if not validate_activation(activation.id):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         restart.delay(
             activation_id=activation.id, requester=activation.user.username
