@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import django.db.utils
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -23,7 +24,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from aap_eda.api import serializers
+from aap_eda.api import filters, serializers
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
@@ -227,6 +228,8 @@ class UserViewSet(
     mixins.DestroyModelMixin,
 ):
     queryset = models.User.objects.order_by("id")
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = filters.UserFilter
 
     def get_serializer_class(self):
         if self.action == "list":
