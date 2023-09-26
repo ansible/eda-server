@@ -309,6 +309,57 @@ def test_delete_user_not_allowed(
     )
 
 
+@pytest.mark.django_db
+def test_list_users_filter_username(
+    client: APIClient,
+    user: models.User,
+    user2: models.User,
+    init_db,
+    check_permission_mock: mock.Mock,
+):
+    response = client.get(f"{api_url_v1}/users/?username=luke.skywalker")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+
+    assert len(results) == 1
+    assert results[0] == {
+        "id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "is_superuser": user.is_superuser,
+        "roles": [
+            {
+                "id": str(init_db.role.id),
+                "name": init_db.role.name,
+            }
+        ],
+    }
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
+    )
+
+
+@pytest.mark.django_db
+def test_list_users_filter_username_non_exist(
+    client: APIClient,
+    user: models.User,
+    user2: models.User,
+    init_db,
+    check_permission_mock: mock.Mock,
+):
+    response = client.get(f"{api_url_v1}/users/?username=test")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+
+    assert len(results) == 0
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
+    )
+
+
 def init_role():
     roles = models.Role.objects.create(
         id=uuid.uuid4(),

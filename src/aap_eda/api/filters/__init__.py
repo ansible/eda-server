@@ -27,6 +27,7 @@ from .rulebook import (
     RulebookFilter,
     RulesetFilter,
 )
+from .user import UserFilter
 
 __all__ = (
     # project
@@ -45,4 +46,6 @@ __all__ = (
     "ActivationInstanceFilter",
     "ActivationFilter",
     "ActivationInstanceLogFilter",
+    # user
+    "UserFilter",
 )
