@@ -74,8 +74,6 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
-        await self.send(text_data=json.dumps({"type": "Hello"}))
-
         data = json.loads(text_data)
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
 
@@ -100,6 +98,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 logger.warning(f"Unsupported message received: {data}")
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
+
+        if msg_type != MessageType.SHUTDOWN:
+            await self.send(text_data=json.dumps({"type": "Hello"}))
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
