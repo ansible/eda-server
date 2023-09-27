@@ -116,7 +116,7 @@ class DecisionEnvironmentViewSet(
     )
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        force_delete = request.GET.get("force")
+        force_delete = request.query_params.get("force", False)
 
         activations = models.Activation.objects.filter(
             decision_environment_id=instance.id
