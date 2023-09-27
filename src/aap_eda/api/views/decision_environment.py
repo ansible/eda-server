@@ -14,6 +14,7 @@
 
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -113,20 +114,27 @@ class DecisionEnvironmentViewSet(
     @extend_schema(
         description="Delete a decision environment by id",
         responses=status.HTTP_204_NO_CONTENT,
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force deletion if there are dependent objects",
+                required=False,
+                type=bool,
+            )
+        ],
     )
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        force_delete = request.query_params.get("force", False)
+        force_delete = request.query_params.get("force", "false").lower()
 
-        activations = models.Activation.objects.filter(
+        activations_exist = models.Activation.objects.filter(
             decision_environment_id=instance.id
-        ).values_list("name", flat=True)
+        ).exists()
 
-        if activations and not force_delete:
+        if activations_exist and force_delete not in ["true", "1", "yes"]:
             raise api_exc.Conflict(
-                "Decision Environment cannot be deleted; "
-                "it is being used by the following Activations: "
-                f"{list(activations)}. If you want to force delete, "
+                "Decision Environment is being used by Activations "
+                "and cannot be deleted. If you want to force delete, "
                 "please add /?force=True query param."
             )
 
