@@ -158,6 +158,43 @@ def test_retrieve_role(client: APIClient, init_db):
     }
 
 
+@pytest.mark.django_db
+def test_list_role_filter_name(client: APIClient, init_db):
+    test_role_name = init_db.role.name
+    response = client.get(f"{api_url_v1}/roles/?name={test_role_name}")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+
+    assert len(results) == 1
+    assert results[0] == {
+        "id": str(init_db.role.id),
+        "name": init_db.role.name,
+        "description": init_db.role.description,
+        "permissions": [
+            {
+                "resource_type": "activation_instance",
+                "action": ["read", "delete"],
+            },
+            {
+                "resource_type": "user",
+                "action": ["create", "read", "update", "delete"],
+            },
+        ],
+        "created_at": init_db.role.created_at.strftime(DATETIME_FORMAT),
+        "modified_at": init_db.role.modified_at.strftime(DATETIME_FORMAT),
+    }
+
+
+@pytest.mark.django_db
+def test_list_role_filter_name_non_exist(client: APIClient, init_db):
+    test_role_name = init_db.role.name
+    response = client.get(f"{api_url_v1}/roles/?name=nonexist")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+
+    assert len(results) == 0
+
+
 def init_role():
     roles = models.Role.objects.create(
         id=uuid.uuid4(),

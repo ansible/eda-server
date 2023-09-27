@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -26,7 +27,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from aap_eda.api import exceptions, serializers
+from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers import LoginSerializer
 from aap_eda.core import models
 from aap_eda.services.auth import display_permissions
@@ -116,6 +117,8 @@ class RoleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.Role.objects.order_by("id")
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = filters.RoleFilter
 
     def get_serializer_class(self):
         if self.action == "list":
