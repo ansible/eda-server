@@ -170,24 +170,11 @@ def test_list_role_filter_name(client: APIClient, init_db):
         "id": str(init_db.role.id),
         "name": init_db.role.name,
         "description": init_db.role.description,
-        "permissions": [
-            {
-                "resource_type": "activation_instance",
-                "action": ["read", "delete"],
-            },
-            {
-                "resource_type": "user",
-                "action": ["create", "read", "update", "delete"],
-            },
-        ],
-        "created_at": init_db.role.created_at.strftime(DATETIME_FORMAT),
-        "modified_at": init_db.role.modified_at.strftime(DATETIME_FORMAT),
     }
 
 
 @pytest.mark.django_db
 def test_list_role_filter_name_non_exist(client: APIClient, init_db):
-    test_role_name = init_db.role.name
     response = client.get(f"{api_url_v1}/roles/?name=nonexist")
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
