@@ -17,6 +17,7 @@ import logging
 from cryptography import fernet
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -24,7 +25,7 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import exceptions, filters, serializers
 from aap_eda.core import models
 
 from .mixins import (
@@ -82,6 +83,14 @@ logger = logging.getLogger(__name__)
                 None, description="Delete successful."
             )
         },
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force deletion if there are dependent objects",
+                required=False,
+                type=bool,
+            )
+        ],
     ),
 )
 class CredentialViewSet(
@@ -117,3 +126,25 @@ class CredentialViewSet(
 
     def get_response_serializer_class(self):
         return serializers.CredentialSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        force = request.query_params.get("force", "false").lower() in [
+            "true",
+            "1",
+            "yes",
+        ]
+        credential = self.get_object()
+
+        # If the credential is in use and the 'force' flag
+        # is not True, raise a PermissionDenied exception
+        is_used = models.Activation.objects.filter(
+            decision_environment__credential=credential
+        ).exists()
+
+        if is_used and not force:
+            raise exceptions.Forbidden(
+                "Credential is being used by Activations "
+                "and cannot be deleted. If you want to force delete, "
+                "please add /?force=true query param."
+            )
+        return super().destroy(request, *args, **kwargs)
