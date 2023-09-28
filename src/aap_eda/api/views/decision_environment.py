@@ -14,6 +14,7 @@
 
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -21,7 +22,7 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 
@@ -59,14 +60,6 @@ from .mixins import (
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.DecisionEnvironmentSerializer,
                 description="Update successful. Return an updated decision environment.",  # noqa: E501
-            )
-        },
-    ),
-    destroy=extend_schema(
-        description="Delete a decision environment by id",
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                None, description="Delete successful."
             )
         },
     ),
@@ -117,3 +110,33 @@ class DecisionEnvironmentViewSet(
                 decision_environment.data
             ).data
         )
+
+    @extend_schema(
+        description="Delete a decision environment by id",
+        responses=status.HTTP_204_NO_CONTENT,
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force deletion if there are dependent objects",
+                required=False,
+                type=bool,
+            )
+        ],
+    )
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        force_delete = request.query_params.get("force", "false").lower()
+
+        activations_exist = models.Activation.objects.filter(
+            decision_environment_id=instance.id
+        ).exists()
+
+        if activations_exist and force_delete not in ["true", "1", "yes"]:
+            raise api_exc.Conflict(
+                "Decision Environment is being used by Activations "
+                "and cannot be deleted. If you want to force delete, "
+                "please add /?force=True query param."
+            )
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)

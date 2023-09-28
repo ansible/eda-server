@@ -340,6 +340,25 @@ def test_list_activations_filter_status(client: APIClient):
 
 
 @pytest.mark.django_db
+def test_list_activations_filter_decision_environment_id(client: APIClient):
+    fks = create_activation_related_data()
+    activations = create_multiple_activations(fks)
+    de_id = fks["decision_environment_id"]
+
+    response = client.get(
+        f"{api_url_v1}/activations/?decision_environment_id={de_id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == len(activations)
+
+    response = client.get(
+        f"{api_url_v1}/activations/?decision_environment_id=0"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("with_project", [True, False])
 def test_retrieve_activation(client: APIClient, with_project):
     fks = create_activation_related_data(with_project)
