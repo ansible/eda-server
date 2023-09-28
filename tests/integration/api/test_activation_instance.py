@@ -20,6 +20,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -287,7 +288,7 @@ def assert_activation_instance_data(
         "activation_id": instance.activation.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
-        "status_message": None,
+        "status_message": ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
     }
 
 
