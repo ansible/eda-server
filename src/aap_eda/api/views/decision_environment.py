@@ -132,7 +132,7 @@ class DecisionEnvironmentViewSet(
         ).exists()
 
         if activations_exist and force_delete not in ["true", "1", "yes"]:
-            raise api_exc.Conflict(
+            raise api_exc.Forbidden(
                 "Decision Environment is being used by Activations "
                 "and cannot be deleted. If you want to force delete, "
                 "please add /?force=True query param."
