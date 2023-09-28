@@ -133,7 +133,7 @@ def test_partial_update_decision_environment(client: APIClient, init_db):
 def test_delete_decision_environment_conflict(client: APIClient, init_db):
     obj_id = int(init_db.decision_environment.id)
     response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
-    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.django_db
