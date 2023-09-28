@@ -310,7 +310,7 @@ class ActivationViewSet(
         self._check_deleting(activation)
 
         if not activation.is_enabled:
-            raise api_exc.HttpForbidden(
+            raise api_exc.Forbidden(
                 detail="Activation is disabled and cannot be run."
             )
 
