@@ -20,6 +20,7 @@ from django.conf import settings
 from podman.errors import ImageNotFound
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.ruleset.activate_rulesets import (
     ACTIVATION_PATH,
     ActivateRulesets,
@@ -166,7 +167,9 @@ def test_rulesets_activate_with_podman(
 
     assert models.ActivationInstance.objects.count() == 0
 
-    ActivateRulesets().activate(activation=init_data.activation)
+    ActivateRulesets().activate(
+        activation=init_data.activation, reconnect=False
+    )
     assert models.ActivationInstance.objects.count() == 1
     instance = models.ActivationInstance.objects.first()
     activation = models.Activation.objects.get(pk=instance.activation.id)
@@ -183,6 +186,7 @@ def test_rulesets_activate_with_podman(
         activation_instance=instance,
         heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         ports={"5000/tcp": 5000},
+        reconnect=False,
     )
 
 
@@ -213,7 +217,44 @@ def test_rulesets_activate_with_exception(
 
     pod_mock.run_worker_mode.side_effect = image_not_found
 
-    ActivateRulesets().activate(activation=init_data.activation)
+    ActivateRulesets().activate(
+        activation=init_data.activation, reconnect=False
+    )
 
     init_data.activation.refresh_from_db()
     assert init_data.activation.status == "failed"
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
+@mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
+@mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "podman"})
+def test_rulesets_reconnect_with_podman(
+    my_mock: mock.Mock, logger_mock: mock.Mock, init_data
+):
+    pod_mock = mock.Mock()
+    my_mock.return_value = pod_mock
+    log_mock = mock.Mock()
+    logger_mock.return_value = log_mock
+
+    instance = models.ActivationInstance.objects.create(
+        activation=init_data.activation,
+        status=ActivationStatus.RUNNING,
+    )
+
+    ActivateRulesets().activate(
+        activation=init_data.activation, reconnect=True
+    )
+    assert models.ActivationInstance.objects.count() == 1
+
+    my_mock.assert_called_once_with(
+        init_data.decision_environment, "unix://socket_url", log_mock
+    )
+    pod_mock.run_worker_mode.assert_called_once_with(
+        ws_url=f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}",
+        ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+        activation_instance=instance,
+        heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
+        ports={"5000/tcp": 5000},
+        reconnect=True,
+    )

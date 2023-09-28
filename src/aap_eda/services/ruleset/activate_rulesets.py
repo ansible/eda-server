@@ -85,16 +85,7 @@ def save_activation_and_instance(
         """
         instance.activation.status = instance.status
         instance.activation.status_updated_at = timezone.now()
-        running_states = [
-            ActivationStatus.PENDING,
-            ActivationStatus.STARTING,
-            ActivationStatus.RUNNING,
-            ActivationStatus.UNRESPONSIVE,
-        ]
         activation_fields = ["status", "modified_at"]
-        if instance.status not in running_states:
-            instance.activation.current_job_id = None
-            activation_fields.append("current_job_id")
         if instance.status == ActivationStatus.COMPLETED:
             instance.activation.failure_count = 0
             activation_fields.append("failure_count")
@@ -108,22 +99,41 @@ def save_activation_and_instance(
 
 
 class ActivateRulesets:
-    def activate(self, activation: models.Activation) -> None:
+    def activate(self, activation: models.Activation, reconnect: bool) -> None:
         deployment_type = settings.DEPLOYMENT_TYPE
         ws_base_url = settings.WEBSOCKET_BASE_URL
         ssl_verify = settings.WEBSOCKET_SSL_VERIFY
         try:
-            try:
-                instance = models.ActivationInstance.objects.create(
-                    activation=activation,
-                    name=activation.name,
-                    status=ActivationStatus.STARTING,
-                    git_hash=activation.git_hash,
-                )
-            except IntegrityError:
-                raise ActivationRecordNotFound(
-                    f"Activation {activation.name} has been deleted."
-                )
+            if reconnect:
+                running_statuses = [
+                    ActivationStatus.RUNNING.value,
+                    ActivationStatus.STARTING.value,
+                ]
+                instance = models.ActivationInstance.objects.filter(
+                    activation=activation, status__in=running_statuses
+                ).first()
+                if not instance:
+                    logger.info(
+                        f"No instance of Activation {activation.name} is "
+                        "in running state"
+                    )
+                    return
+            else:
+                try:
+                    instance = models.ActivationInstance.objects.create(
+                        activation=activation,
+                        name=activation.name,
+                        status=ActivationStatus.STARTING,
+                        git_hash=activation.git_hash,
+                    )
+                except IntegrityError:
+                    if not models.Activation.objects.filter(
+                        id=activation.id
+                    ).exists():
+                        raise ActivationRecordNotFound(
+                            f"Activation {activation.name} has been deleted."
+                        )
+                    raise
 
             activation_db_logger = ActivationDbLogger(instance.id)
 
@@ -148,6 +158,7 @@ class ActivateRulesets:
                     activation_instance=instance,
                     decision_environment=activation.decision_environment,
                     activation_db_logger=activation_db_logger,
+                    reconnect=reconnect,
                 )
             elif dtype == DeploymentType.K8S:
                 logger.info(f"Activation DeploymentType: {dtype}")
@@ -156,6 +167,7 @@ class ActivateRulesets:
                     ssl_verify=ssl_verify,
                     activation_instance=instance,
                     decision_environment=activation.decision_environment,
+                    reconnect=reconnect,
                 )
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
@@ -348,6 +360,7 @@ class ActivateRulesets:
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
         activation_db_logger: ActivationDbLogger,
+        reconnect: bool,
     ) -> None:
         podman = ActivationPodman(
             decision_environment,
@@ -367,6 +380,7 @@ class ActivateRulesets:
             activation_instance=activation_instance,
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             ports=ports,
+            reconnect=reconnect,
         )
 
     def deactivate_in_podman(
@@ -388,6 +402,7 @@ class ActivateRulesets:
         ssl_verify: str,
         activation_instance: models.ActivationInstance,
         decision_environment: models.DecisionEnvironment,
+        reconnect: bool,
     ) -> None:
         activation = activation_instance.activation
         k8s = ActivationKubernetes()
@@ -402,52 +417,54 @@ class ActivateRulesets:
         activation_id = activation.pk
         job_name = f"activation-job-{activation_id}-{activation_instance.id}"
         pod_name = f"activation-pod-{activation_id}-{activation_instance.id}"
-
-        # build out container,pod,job specs
-        container_spec = k8s.create_container(
-            image=decision_environment.image_url,
-            name=pod_name,
-            pull_policy=_pull_policy,
-            url=ws_url,
-            ssl_verify=ssl_verify,
-            activation_instance_id=activation_instance.id,
-            ports=[
-                port
-                for _, port in find_ports(
-                    activation_instance.activation.rulebook_rulesets
-                )
-            ],
-            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-        )
-
         secret_name = None
-        if decision_environment.credential:
-            secret_name = f"activation-secret-{activation_id}"
-            k8s.create_secret(
+        job_spec = None
+
+        if not reconnect:
+            # build out container,pod,job specs
+            container_spec = k8s.create_container(
+                image=decision_environment.image_url,
+                name=pod_name,
+                pull_policy=_pull_policy,
+                url=ws_url,
+                ssl_verify=ssl_verify,
+                activation_instance_id=activation_instance.id,
+                ports=[
+                    port
+                    for _, port in find_ports(
+                        activation_instance.activation.rulebook_rulesets
+                    )
+                ],
+                heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
+            )
+
+            if decision_environment.credential:
+                secret_name = f"activation-secret-{activation_id}"
+                k8s.create_secret(
+                    secret_name=secret_name,
+                    namespace=namespace,
+                    decision_environment=decision_environment,
+                )
+
+            pod_spec = k8s.create_pod_template(
+                pod_name=pod_name,
+                container=container_spec,
                 secret_name=secret_name,
-                namespace=namespace,
-                decision_environment=decision_environment,
             )
 
-        pod_spec = k8s.create_pod_template(
-            pod_name=pod_name,
-            container=container_spec,
-            secret_name=secret_name,
-        )
-
-        job_spec = k8s.create_job(
-            job_name=job_name,
-            activation_id=str(activation_id),
-            pod_template=pod_spec,
-            ttl=30,
-        )
-
-        for _, port in find_ports(
-            activation_instance.activation.rulebook_rulesets
-        ):
-            k8s.create_service(
-                namespace=namespace, job_name=job_name, port=port
+            job_spec = k8s.create_job(
+                job_name=job_name,
+                activation_id=str(activation_id),
+                pod_template=pod_spec,
+                ttl=30,
             )
+
+            for _, port in find_ports(
+                activation_instance.activation.rulebook_rulesets
+            ):
+                k8s.create_service(
+                    namespace=namespace, job_name=job_name, port=port
+                )
 
         # execute job
         k8s.run_activation_job(
@@ -456,6 +473,7 @@ class ActivateRulesets:
             namespace=namespace,
             activation_instance=activation_instance,
             secret_name=secret_name,
+            reconnect=reconnect,
         )
 
     def deactivate_in_k8s(self, activation_instance) -> None:

@@ -109,9 +109,7 @@ class ActivationViewSet(
         activation["rules_fired_count"] = 0
 
         if response.is_enabled:
-            job = activate(activation_id=response.id)
-            response.current_job_id = job.id
-            response.save(update_fields=["current_job_id"])
+            activate(activation_id=response.id)
 
         return Response(
             serializers.ActivationReadSerializer(activation).data,
@@ -257,10 +255,7 @@ class ActivationViewSet(
             ]
         )
 
-        job = activate(activation_id=pk)
-
-        activation.current_job_id = job.id
-        activation.save(update_fields=["current_job_id"])
+        activate(activation_id=pk)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

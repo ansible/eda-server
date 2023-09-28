@@ -29,6 +29,7 @@ from aap_eda.services.ruleset.exceptions import (
     ActivationRecordNotFound,
     DeactivationException,
     K8sActivationException,
+    ReconnectContainerNotFound,
 )
 
 from .shared_settings import VALID_LOG_LEVELS
@@ -46,6 +47,7 @@ class ActivationKubernetes:
         self.batch_api = client.BatchV1Api()
         self.client_api = client.CoreV1Api()
         self.network_api = client.NetworkingV1Api()
+        self.new_log = True
 
     @staticmethod
     def create_container(
@@ -288,27 +290,35 @@ class ActivationKubernetes:
         namespace,
         activation_instance,
         secret_name,
+        reconnect,
     ) -> None:
-        # wait until old job instance has completely shut down.
-        done = False
-        while not done:
-            if_job_exists = self.batch_api.list_namespaced_job(
-                namespace=namespace,
-                label_selector=f"job-name={job_name}",
-                timeout_seconds=0,
+        if reconnect:
+            job_list = self.batch_api.list_namespaced_job(
+                namespace=namespace, label_selector=f"job-name={job_name}"
+            )
+            if not job_list.items:
+                raise ReconnectContainerNotFound(f"Job {job_name} not found")
+        else:
+            # wait until old job instance has completely shut down.
+            done = False
+            while not done:
+                job_list = self.batch_api.list_namespaced_job(
+                    namespace=namespace,
+                    label_selector=f"job-name={job_name}",
+                    timeout_seconds=0,
+                )
+
+                if not job_list.items:
+                    break
+
+                time.sleep(10)
+
+            logger.info(f"Create Job: {job_name}")
+            job_result = self.batch_api.create_namespaced_job(
+                namespace=namespace, body=job_spec
             )
 
-            if not if_job_exists.items:
-                break
-
-            time.sleep(10)
-
-        logger.info(f"Create Job: {job_name}")
-        job_result = self.batch_api.create_namespaced_job(
-            namespace=namespace, body=job_spec
-        )
-
-        logger.info(f"Job Info: {job_result}")
+            logger.info(f"Job Info: {job_result}")
 
         w = watch.Watch()
 
@@ -335,6 +345,7 @@ class ActivationKubernetes:
                             job_name=job_name,
                             namespace=namespace,
                             activation_instance=activation_instance,
+                            reconnect=reconnect,
                         )
 
                         done = True
@@ -393,6 +404,7 @@ class ActivationKubernetes:
             else:
                 raise
 
+    # TODO: this method is never used. Delete or refactor
     def log_job_to_db(self, log, activation_instance_id) -> None:
         line_number = 0
         activation_instance_logs = []
@@ -433,7 +445,15 @@ class ActivationKubernetes:
             message = f"Activation instance {instance.id} is not present."
             raise ActivationRecordNotFound(message)
 
-    def watch_job_pod(self, job_name, namespace, activation_instance) -> None:
+    def watch_job_pod(
+        self,
+        job_name: str,
+        namespace: str,
+        activation_instance: models.ActivationInstance,
+        reconnect: bool,
+    ) -> None:
+        self.new_log = False if reconnect else True
+
         w = watch.Watch()
         pod_failed_reasons = [
             "InvalidImageName",
@@ -560,13 +580,7 @@ class ActivationKubernetes:
                     pretty=True,
                 ):
                     # log info to DB
-                    activation_instance_log = models.ActivationInstanceLog(
-                        line_number=line_number,
-                        log=line,
-                        activation_instance_id=activation_instance_id,
-                    )
-                    activation_instance_log.save()
-
+                    self._append_log(line, line_number, activation_instance_id)
                     line_number += 1
 
                 done = True
@@ -588,3 +602,20 @@ class ActivationKubernetes:
                 raise K8sActivationException(
                     f"Failed to read pod logs: \n {e}"
                 )
+
+    def _append_log(self, log: str, line_number: int, instance_id: int):
+        if not self.new_log:
+            # TODO: may need better algorithm to detect existing log
+            if models.ActivationInstanceLog.objects.filter(
+                activation_instance_id=instance_id, log=log
+            ).exists():
+                return
+            else:
+                self.new_log = True
+
+        activation_instance_log = models.ActivationInstanceLog(
+            line_number=line_number,
+            log=log,
+            activation_instance_id=instance_id,
+        )
+        activation_instance_log.save()

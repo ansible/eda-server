@@ -18,7 +18,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from rq.job import Job
+from rq.worker import Worker, WorkerStatus
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
@@ -32,17 +32,29 @@ from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 logger = logging.getLogger(__name__)
 
 
-def activate(activation_id: int, requester: str = "User") -> Job:
-    job_id = f"activation-{activation_id}"
-    return unique_enqueue(
-        "activation", job_id, _activate, activation_id, requester
+def activate(
+    activation_id: int, requester: str = "User", reconnect: bool = False
+) -> None:
+    job_id = _activation_job_id(activation_id)
+    unique_enqueue(
+        "activation", job_id, _activate, activation_id, requester, reconnect
     )
 
 
-def _activate(activation_id: int, requester: str = "User") -> None:
+def _activation_job_id(activation_id: int) -> str:
+    return f"activation-{activation_id}"
+
+
+def _activate(
+    activation_id: int, requester: str = "User", reconnect: bool = False
+) -> None:
+    action = "Reconnecting" if reconnect else "Activating"
     logger.info(
-        f"Activating activation id: {activation_id} requested "
-        f"by {requester}"
+        f"{action} activation id: {activation_id} requested " f"by {requester}"
+    )
+
+    job = job_from_queue(
+        get_queue("activation"), _activation_job_id(activation_id)
     )
 
     with transaction.atomic():
@@ -59,15 +71,20 @@ def _activate(activation_id: int, requester: str = "User") -> None:
             logger.info(f"Activation id: {activation_id} is disabled")
             return
 
-        activation.status = ActivationStatus.STARTING
-        activation.save(update_fields=["status"])
+        activation.worker_name = job.worker_name
+        update_fields = ["worker_name", "modified_at"]
+        if not reconnect:
+            activation.status = ActivationStatus.STARTING
+            update_fields.append("status")
 
-        # Note: expect scheduler to set requester as "SCHEDULER"
-        if requester == "SCHEDULER":
-            activation.restart_count += 1
-            activation.save(update_fields=["restart_count", "modified_at"])
+            # Note: expect scheduler to set requester as "SCHEDULER"
+            if requester == "SCHEDULER":
+                activation.restart_count += 1
+                update_fields.append("restart_count")
 
-    ActivateRulesets().activate(activation)
+        activation.save(update_fields=update_fields)
+
+    ActivateRulesets().activate(activation, reconnect)
 
     logger.info(f"Activation {activation.name} is done.")
 
@@ -114,11 +131,8 @@ def deactivate(
             logger.info(f"Activation {activation.name} is deleted")
             activation.delete()
         else:
-            activation.current_job_id = None
             activation.status = final_status
-            activation.save(
-                update_fields=["current_job_id", "status", "modified_at"]
-            )
+            activation.save(update_fields=["status", "modified_at"])
 
 
 @job("default")
@@ -158,7 +172,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
         activation.status = ActivationStatus.PENDING
         activation.save(update_fields=["status", "modified_at"])
 
-        _schedule_activate(activation, requester)
+        activate(activation.id, requester)
 
 
 def _perform_deactivate(
@@ -167,12 +181,12 @@ def _perform_deactivate(
     logger.info(f"Task started: Deactivate Activation ({activation.name})")
 
     # clear the job from rq if it's pending/running
-    job_id = activation.current_job_id
+    job_id = _activation_job_id(activation.id)
 
     if job_id:
         queue = get_queue(name="activation")
-        if job_from_queue(queue, job_id):
-            job = queue.fetch_job(job_id)
+        job = job_from_queue(queue, job_id)
+        if job:
             job.cancel()
             logger.info(
                 f"The job: {job.id} for activation: {activation.name}"
@@ -213,13 +227,16 @@ def monitor_activations() -> None:
 def _monitor_activations() -> None:
     logger.info("Task started: monitor_activations")
     now = timezone.now()
-    _detect_unresponsive(now)
+    activations_in_reconnecting = _reconnect_activations()
+    _detect_unresponsive(now, activations_in_reconnecting)
     _stop_unresponsive(now)
     _start_completed(now)
     _start_failed(now)
 
 
-def _detect_unresponsive(now: timezone.datetime) -> None:
+def _detect_unresponsive(
+    now: timezone.datetime, activations_in_reconnecting: list[int]
+) -> None:
     running_statuses = [
         ActivationStatus.RUNNING,
         ActivationStatus.STARTING,
@@ -229,7 +246,7 @@ def _detect_unresponsive(now: timezone.datetime) -> None:
     )
     for instance in models.ActivationInstance.objects.filter(
         status__in=running_statuses, updated_at__lt=cutoff_time
-    ):
+    ).exclude(activation__in=activations_in_reconnecting):
         instance.status = ActivationStatus.UNRESPONSIVE
         instance.updated_at = now
         save_activation_and_instance(instance, ["status", "updated_at"])
@@ -263,7 +280,7 @@ def _start_completed(now: timezone.datetime):
             f"Restart activation {activation.name} according to its restart"
             " policy."
         )
-        _schedule_activate(activation, "SCHEDULER")
+        activate(activation.id, "SCHEDULER")
 
 
 def _start_failed(now: timezone.datetime):
@@ -286,13 +303,49 @@ def _start_failed(now: timezone.datetime):
             f"Restart activation {activation.name} according to its restart"
             " policy."
         )
-        _schedule_activate(activation, "SCHEDULER")
+        activate(activation.id, "SCHEDULER")
 
 
-def _schedule_activate(activation: models.Activation, requester: str) -> None:
-    job = activate(
-        activation_id=activation.id,
-        requester=requester,
-    )
-    activation.current_job_id = job.id
-    activation.save(update_fields=["current_job_id"])
+def _reconnect_activations() -> list[int]:
+    """Reconnect activations monitored by already dead workers to live ones.
+
+    Return list of ids of reconnecting activations
+    """
+    running_statuses = [
+        ActivationStatus.RUNNING,
+        ActivationStatus.STARTING,
+    ]
+    reconnecting_activations = []
+    for activation in models.Activation.objects.filter(
+        status__in=running_statuses
+    ):
+        if not _is_worker_alive(activation.worker_name):
+            logger.info(
+                f"The activation worker for actvation_id {activation.id} is "
+                "dead. Will find another worker to reconnect to the instance"
+            )
+            job_id = _activation_job_id(activation.id)
+            job = job_from_queue(get_queue(name="activation"), job_id)
+            if job:
+                job.cancel()
+            activate(
+                activation_id=activation.id,
+                requester="SCHEDULER",
+                reconnect=True,
+            )
+            reconnecting_activations.append(activation.id)
+    return reconnecting_activations
+
+
+def _is_worker_alive(worker_name: str) -> bool:
+    for worker in _get_activation_workers():
+        if worker.name == worker_name:
+            return (
+                worker.get_state() == WorkerStatus.BUSY
+                or worker.get_state() == WorkerStatus.IDLE
+            )
+    return False
+
+
+def _get_activation_workers() -> list[Worker]:
+    return Worker.all(queue=get_queue("activation"))

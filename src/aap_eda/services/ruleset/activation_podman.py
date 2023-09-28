@@ -32,7 +32,11 @@ from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.exceptions import PodmanImagePullError
 
 from .activation_db_logger import ActivationDbLogger
-from .exceptions import ActivationException, ActivationRecordNotFound
+from .exceptions import (
+    ActivationException,
+    ActivationRecordNotFound,
+    ReconnectContainerNotFound,
+)
 from .shared_settings import VALID_LOG_LEVELS
 
 logger = logging.getLogger(__name__)
@@ -93,75 +97,24 @@ class ActivationPodman:
         activation_instance: models.ActivationInstance,
         heartbeat: int,
         ports: dict,
+        reconnect: bool,
     ) -> None:
         container = None
         try:
-            """Run ansible-rulebook in worker mode."""
-            args = [
-                "ansible-rulebook",
-                "--worker",
-                "--websocket-ssl-verify",
-                ws_ssl_verify,
-                "--websocket-address",
-                ws_url,
-                "--id",
-                str(activation_instance.id),
-                "--heartbeat",
-                str(heartbeat),
-            ]
-            if (
-                settings.ANSIBLE_RULEBOOK_LOG_LEVEL
-                and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
-            ):
-                args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
-
-            self.pod_args[
-                "name"
-            ] = f"eda-{activation_instance.id}-{uuid.uuid4()}"
-            if ports:
-                self.pod_args["ports"] = ports
-            self._load_extra_args()
-            self.activation_db_logger.write("Starting Container", True)
-            self.activation_db_logger.write(f"Container args {args}", True)
-            container = self.client.containers.run(
-                image=self.decision_environment.image_url,
-                command=args,
-                stdout=True,
-                stderr=True,
-                remove=True,
-                detach=True,
-                **self.pod_args,
-            )
-
-            logger.info(
-                f"Created container: "
-                f"name: {container.name}, "
-                f"id: {container.id}, "
-                f"ports: {container.ports}, "
-                f"status: {container.status}, "
-                f"command: {args}"
-            )
-
-            now = timezone.now()
-            activation_instance.status = ActivationStatus.RUNNING
-            activation_instance.updated_at = now
-            activation_instance.activation_pod_id = container.id
-            activation_instance.save(
-                update_fields=["status", "updated_at", "activation_pod_id"]
-            )
-
-            activation = activation_instance.activation
-            activation.status = ActivationStatus.RUNNING
-            activation.is_valid = True
-            activation.status_updated_at = now
-            activation.save(
-                update_fields=[
-                    "status",
-                    "status_updated_at",
-                    "is_valid",
-                    "modified_at",
-                ]
-            )
+            if reconnect:
+                self.new_log = False
+                container = self._fetch_container_for_reconnect(
+                    activation_instance
+                )
+            else:
+                self.new_log = True
+                container = self._create_container(
+                    ws_url,
+                    ws_ssl_verify,
+                    activation_instance,
+                    heartbeat,
+                    ports,
+                )
 
             self._save_logs(container=container, instance=activation_instance)
 
@@ -170,6 +123,9 @@ class ActivationPodman:
             else:
                 activation_instance.status = ActivationStatus.COMPLETED
             activation_instance.save(update_fields=["status"])
+        except ReconnectContainerNotFound:
+            logger.exception("Reconnect container not found")
+            raise
         except ActivationException as e:
             logger.error(e)
         except ContainerError:
@@ -194,6 +150,98 @@ class ActivationPodman:
                     logger.info(f"Container {container_id} is cleaned up.")
                 except NotFound:
                     logger.info(f"Container {container_id} not found.")
+
+    def _create_container(
+        self,
+        ws_url: str,
+        ws_ssl_verify: str,
+        activation_instance: models.ActivationInstance,
+        heartbeat: int,
+        ports: dict,
+    ) -> Container:
+        """Run ansible-rulebook in worker mode."""
+        args = [
+            "ansible-rulebook",
+            "--worker",
+            "--websocket-ssl-verify",
+            ws_ssl_verify,
+            "--websocket-address",
+            ws_url,
+            "--id",
+            str(activation_instance.id),
+            "--heartbeat",
+            str(heartbeat),
+        ]
+        if (
+            settings.ANSIBLE_RULEBOOK_LOG_LEVEL
+            and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
+        ):
+            args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
+
+        self.pod_args["name"] = f"eda-{activation_instance.id}-{uuid.uuid4()}"
+        if ports:
+            self.pod_args["ports"] = ports
+        self._load_extra_args()
+        self.activation_db_logger.write("Starting Container", True)
+        self.activation_db_logger.write(f"Container args {args}", True)
+        container = self.client.containers.run(
+            image=self.decision_environment.image_url,
+            command=args,
+            stdout=True,
+            stderr=True,
+            remove=True,
+            detach=True,
+            **self.pod_args,
+        )
+
+        logger.info(
+            f"Created container: "
+            f"name: {container.name}, "
+            f"id: {container.id}, "
+            f"ports: {container.ports}, "
+            f"status: {container.status}, "
+            f"command: {args}"
+        )
+
+        now = timezone.now()
+        activation_instance.status = ActivationStatus.RUNNING
+        activation_instance.updated_at = now
+        activation_instance.activation_pod_id = container.id
+        activation_instance.save(
+            update_fields=["status", "updated_at", "activation_pod_id"]
+        )
+
+        activation = activation_instance.activation
+        activation.status = ActivationStatus.RUNNING
+        activation.is_valid = True
+        activation.status_updated_at = now
+        activation.save(
+            update_fields=[
+                "status",
+                "status_updated_at",
+                "is_valid",
+                "modified_at",
+            ]
+        )
+        return container
+
+    def _fetch_container_for_reconnect(
+        self, activation_instance: models.ActivationInstance
+    ) -> Container:
+        containers = self.client.containers.list(
+            all=True, filters={"id": activation_instance.activation_pod_id}
+        )
+        if not containers:
+            raise ReconnectContainerNotFound(
+                f"Container {activation_instance.activation_pod_id} not found"
+            )
+        container = containers[0]
+        if container.attrs["State"] != "running":
+            raise ReconnectContainerNotFound(
+                f"Container {activation_instance.activation_pod_id} not in "
+                "running state"
+            )
+        return container
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
@@ -306,7 +354,7 @@ class ActivationPodman:
         try:
             while True:
                 line = next(dkg).decode("utf-8")
-                self.activation_db_logger.write(line)
+                self._append_log(line, instance)
                 lines_streamed += 1
         except StopIteration:
             logger.info(f"log stream ended for {container.id}")
@@ -323,7 +371,7 @@ class ActivationPodman:
             # Seems to be differences between 4.1.1 and 4.5 of podman
             if lines_streamed == 0:
                 for line in container.logs():
-                    self.activation_db_logger.write(line.decode("utf-8"))
+                    self._append_log(line.decode("utf-8"), instance)
 
             logger.info(
                 f"{self.activation_db_logger.lines_written()}"
@@ -345,6 +393,17 @@ class ActivationPodman:
             instance.status = ActivationStatus.FAILED
             instance.save(update_fields=["status"])
             raise ActivationException(f"Activation failed: {message}")
+
+    def _append_log(self, log: str, instance: models.ActivationInstance):
+        if not self.new_log:
+            # TODO: may need better algorithm to detect existing log
+            if models.ActivationInstanceLog.objects.filter(
+                activation_instance=instance, log=log
+            ).exists():
+                return
+            else:
+                self.new_log = True
+        self.activation_db_logger.write(log)
 
     def _load_extra_args(self) -> None:
         if hasattr(settings, "PODMAN_MEM_LIMIT") and settings.PODMAN_MEM_LIMIT:

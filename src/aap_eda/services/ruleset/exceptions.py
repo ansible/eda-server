@@ -17,6 +17,10 @@ class ActivationException(Exception):
     pass
 
 
+class ReconnectContainerNotFound(ActivationException):
+    pass
+
+
 class K8sActivationException(ActivationException):
     pass
 

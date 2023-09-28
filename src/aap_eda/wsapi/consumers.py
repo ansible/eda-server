@@ -10,7 +10,6 @@ from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
 
 from .messages import (
     ActionMessage,
@@ -148,19 +147,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         ).first()
 
         if instance:
-            instance.status = ActivationStatus.RUNNING
             instance.updated_at = message.reported_at
-            instance.save(update_fields=["status", "updated_at"])
+            instance.save(update_fields=["updated_at"])
 
             activation = instance.activation
-            activation.status = ActivationStatus.RUNNING
-            activation.status_updated_at = message.reported_at
             activation.ruleset_stats[
                 message.stats["ruleSetName"]
             ] = message.stats
-            activation.save(
-                update_fields=["status", "status_updated_at", "ruleset_stats"]
-            )
+            activation.save(update_fields=["ruleset_stats"])
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."

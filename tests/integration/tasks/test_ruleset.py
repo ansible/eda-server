@@ -54,6 +54,7 @@ def init_data():
     activation = models.Activation.objects.create(
         name="test",
         user=user,
+        status=ActivationStatus.RUNNING,
     )
     now = timezone.now()
     instance1 = models.ActivationInstance.objects.create(
@@ -104,7 +105,11 @@ def init_activation():
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.logger.info")
-def test_normal_activate(info_mock: mock.Mock, init_data):
+@mock.patch("aap_eda.tasks.ruleset.job_from_queue")
+def test_normal_activate(job_mock: mock.Mock, info_mock: mock.Mock, init_data):
+    job = mock.Mock(worker_name="mocked-name")
+    job_mock.return_value = job
+
     activation = models.Activation.objects.create(
         name="test-activate",
         user=init_data.user,
@@ -120,6 +125,8 @@ def test_normal_activate(info_mock: mock.Mock, init_data):
         _activate(activation.id, activation.user.username)
 
     info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
+    activation.refresh_from_db()
+    assert activation.worker_name == job.worker_name
 
 
 @pytest.mark.django_db
@@ -199,9 +206,6 @@ def test_deactivate_with_delete(info_mock: mock.Mock, init_data):
 @mock.patch("aap_eda.tasks.ruleset.logger.info")
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_restart(delay_mock: mock.Mock, info_mock: mock.Mock, init_data):
-    job = mock.Mock()
-    job.id = "jid"
-    delay_mock.return_value = job
     activation = models.Activation.objects.create(
         name="test-activate",
         user=init_data.user,
@@ -216,14 +220,15 @@ def test_restart(delay_mock: mock.Mock, info_mock: mock.Mock, init_data):
 
     info_mock.assert_called_once_with(msg)
     activation.refresh_from_db()
-    assert activation.current_job_id == "jid"
 
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.deactivate")
+@mock.patch("aap_eda.tasks.ruleset._is_worker_alive")
 def test_monitor_activations_to_unresponsive(
-    deactivate_mock: mock.Mock, init_data
+    alive_mock: mock.Mock, deactivate_mock: mock.Mock, init_data
 ):
+    alive_mock.return_value = True
     _monitor_activations()
     init_data.instance1.refresh_from_db()
     init_data.instance2.refresh_from_db()
@@ -238,13 +243,40 @@ def test_monitor_activations_to_unresponsive(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.tasks.ruleset.deactivate")
+@mock.patch("aap_eda.tasks.ruleset.activate")
+@mock.patch("aap_eda.tasks.ruleset._get_activation_workers")
+def test_monitor_activations_dead_worker(
+    workers_mock: mock.Mock,
+    activate_mock: mock.Mock,
+    deactivate_mock: mock.Mock,
+    init_data,
+):
+    init_data.activation.worker_name = "old_name"
+    init_data.activation.save(update_fields=["worker_name"])
+
+    worker_mock = mock.Mock(name="new_name")
+    workers_mock.return_value = [worker_mock]
+
+    _monitor_activations()
+    init_data.instance1.refresh_from_db()
+    init_data.instance2.refresh_from_db()
+
+    assert init_data.instance2.status == ActivationStatus.RUNNING
+    assert init_data.instance1.status == ActivationStatus.COMPLETED
+    deactivate_mock.assert_not_called()
+    activate_mock.assert_called_once_with(
+        activation_id=init_data.activation.id,
+        requester="SCHEDULER",
+        reconnect=True,
+    )
+
+
+@pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_completed(
     activate_mock: mock.Mock, init_activation
 ):
-    job = mock.Mock()
-    job.id = "jid"
-    activate_mock.return_value = job
     init_activation.restart_policy = RestartPolicy.ALWAYS
     init_activation.status = ActivationStatus.COMPLETED
     init_activation.status_updated_at = timezone.now() - timedelta(
@@ -256,11 +288,10 @@ def test_monitor_activations_restart_completed(
     _monitor_activations()
 
     activate_mock.assert_called_once_with(
-        activation_id=init_activation.id,
-        requester="SCHEDULER",
+        init_activation.id,
+        "SCHEDULER",
     )
     init_activation.refresh_from_db()
-    assert init_activation.current_job_id == "jid"
     assert (
         init_activation.status_message
         == ACTIVATION_STATUS_MESSAGE_MAP[init_activation.status]
@@ -272,16 +303,9 @@ def test_monitor_activations_restart_completed(
 def test_monitor_activations_restart_failed(
     activate_mock: mock.Mock, init_activation
 ):
-    job = mock.Mock()
-    job.id = "jid"
-    activate_mock.return_value = job
     _monitor_activations()
 
-    activate_mock.assert_called_once_with(
-        activation_id=init_activation.id, requester="SCHEDULER"
-    )
-    init_activation.refresh_from_db()
-    assert init_activation.current_job_id == "jid"
+    activate_mock.assert_called_once_with(init_activation.id, "SCHEDULER")
 
 
 @pytest.mark.parametrize(

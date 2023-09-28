@@ -146,6 +146,7 @@ def test_activation_podman_run_worker_mode(
         activation_instance=activation_instance,
         heartbeat=5,
         ports=ports,
+        reconnect=False,
     )
 
     client_mock.containers.run.assert_called_once_with(
@@ -225,6 +226,7 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
             activation_instance=activation_instance,
             heartbeat=5,
             ports={"5000/tcp": 5000},
+            reconnect=False,
         )
 
 
@@ -261,6 +263,7 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
                 activation_instance=activation_instance,
                 heartbeat=5,
                 ports={"5000/tcp": 5000},
+                reconnect=False,
             )
             with open(os.path.join(containers_dir, "auth.json")) as f:
                 auth_dict = json.load(f)
@@ -310,6 +313,7 @@ def test_activation_podman_with_existing_auth_json(
                 activation_instance=activation_instance,
                 heartbeat=5,
                 ports={"5000/tcp": 5000},
+                reconnect=False,
             )
             with open(os.path.join(containers_dir, "auth.json")) as f:
                 auth_dict = json.load(f)

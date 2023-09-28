@@ -191,10 +191,6 @@ def create_multiple_activations(fks: dict):
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
-    job = mock.Mock()
-    job.id = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
-    activate_rulesets.return_value = job
-
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
@@ -231,7 +227,6 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
     assert data["restarted_at"] is None
-    assert activation.current_job_id == job.id
     assert activation.status == ActivationStatus.PENDING
     assert (
         activation.status_message
