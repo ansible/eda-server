@@ -87,3 +87,17 @@ class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
+
+
+ACTIVATION_STATUS_MESSAGE_MAP = {
+    ActivationStatus.PENDING: "Wait for a worker to be available to start activation",  # noqa: E501
+    ActivationStatus.STARTING: "Worker is starting activation",
+    ActivationStatus.RUNNING: "Container running activation",
+    ActivationStatus.STOPPING: "Activation is being disabled",
+    ActivationStatus.DELETING: "Activation is being deleted",
+    ActivationStatus.COMPLETED: "Activation has completed",
+    ActivationStatus.FAILED: "Activation has failed",
+    ActivationStatus.STOPPED: "Activation has stopped",
+    ActivationStatus.UNRESPONSIVE: "Activation is not responsive",
+    ActivationStatus.ERROR: "Activation is in an error state",
+}

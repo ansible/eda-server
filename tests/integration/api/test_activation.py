@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import (
+    ACTIVATION_STATUS_MESSAGE_MAP,
     Action,
     ActivationStatus,
     ResourceType,
@@ -231,6 +232,11 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     assert activation.rulebook_rulesets == TEST_RULESETS
     assert data["restarted_at"] is None
     assert activation.current_job_id == job.id
+    assert activation.status == ActivationStatus.PENDING
+    assert (
+        activation.status_message
+        == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    )
 
 
 @pytest.mark.django_db
@@ -250,7 +256,8 @@ def test_create_activation_disabled(client: APIClient):
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
-    assert data["status"] == ActivationStatus.PENDING
+    assert activation.status == ActivationStatus.PENDING
+    assert activation.status_message == "Activation is marked as disabled"
     assert not data["instances"]
 
 
@@ -475,6 +482,10 @@ def test_enable_activation(client: APIClient):
         )
 
         assert response.status_code == status.HTTP_409_CONFLICT
+        assert (
+            activation.status_message
+            == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+        )
 
     for state in [
         ActivationStatus.COMPLETED,
@@ -490,7 +501,12 @@ def test_enable_activation(client: APIClient):
             f"{api_url_v1}/activations/{activation.id}/enable/"
         )
 
+        activation.refresh_from_db()
         assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert (
+            activation.status_message
+            == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+        )
 
 
 @pytest.mark.django_db
