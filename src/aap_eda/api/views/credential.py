@@ -98,7 +98,6 @@ class CredentialViewSet(
     CreateModelMixin,
     PartialUpdateOnlyModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
@@ -147,4 +146,5 @@ class CredentialViewSet(
                 "and cannot be deleted. If you want to force delete, "
                 "please add /?force=true query param."
             )
-        return super().destroy(request, *args, **kwargs)
+        self.perform_destroy(credential)
+        return Response(status=status.HTTP_204_NO_CONTENT)
