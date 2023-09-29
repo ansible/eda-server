@@ -387,7 +387,7 @@ def test_list_activations_filter_credential_id(client: APIClient) -> None:
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
 
-    url = f"{api_url_v1}/activations/?credential_id=2"
+    url = f"{api_url_v1}/activations/?credential_id=31415"
     response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
