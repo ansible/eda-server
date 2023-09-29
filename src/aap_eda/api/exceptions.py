@@ -60,3 +60,18 @@ class Forbidden(APIException):
     status_code = status.HTTP_403_FORBIDDEN
     default_code = "forbidden"
     default_detail = _("Forbidden.")
+
+
+class InvalidWebsocketScheme(APIException):
+    status_code = 422
+    default_detail = (
+        "Connection Error: Invalid WebSocket URL scheme. "
+        "Scheme should be either 'ws' or 'wss'."
+    )
+
+
+class InvalidWebsocketHost(APIException):
+    status_code = 422
+    default_detail = (
+        "Connection Error: WebSocket URL must have a valid host address."
+    )

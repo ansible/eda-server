@@ -11,8 +11,12 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import urllib.parse
+
+from django.conf import settings
 from rest_framework import serializers
 
+from aap_eda.api.exceptions import InvalidWebsocketHost, InvalidWebsocketScheme
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -22,6 +26,7 @@ from aap_eda.api.serializers.project import (
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models
+from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH
 from aap_eda.services.validation import validate_activation_creation
 
 
@@ -109,6 +114,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data, user):
+        self._validate_pre_reqs(user)
         rulebook_id = validated_data["rulebook_id"]
         decision_environment_id = validated_data["decision_environment_id"]
         extra_var_id = validated_data.get("extra_var_id")
@@ -127,6 +133,15 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
         return super().create(validated_data)
+
+    def _validate_pre_reqs(self, user):
+        ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
+        parsed_url = urllib.parse.urlparse(ws_url)
+
+        if parsed_url.scheme not in ["ws", "wss"]:
+            raise InvalidWebsocketScheme()
+        if not parsed_url.hostname:
+            raise InvalidWebsocketHost()
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):

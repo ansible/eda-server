@@ -12,16 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-import urllib.parse
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +33,13 @@ def validate_activation(activation_id: int) -> bool:
 
         try:
             _validate_awx_token(activation.user.id)
+
             if activation.decision_environment:
                 _validate_decision_environment(
                     activation.decision_environment.id
                 )
+            else:
+                raise ValidationError(_("No decision_environment specified"))
 
             if activation.rulebook:
                 _validate_rulebook(activation.rulebook.id)
@@ -48,7 +48,7 @@ def validate_activation(activation_id: int) -> bool:
                 _validate_extra_var(activation.extra_var.id)
         except ValidationError as err:
             activation.status = ActivationStatus.ERROR
-            activation.status_message = str(err)
+            activation.status_message = err.message
             activation.save(update_fields=["status", "status_message"])
 
             logger.error(err)
@@ -65,9 +65,9 @@ def validate_activation_creation(
 ) -> None:
     _validate_awx_token(user_id)
     _validate_decision_environment(decision_environment_id)
-    _validate_extra_var(extra_var_id)
+    if not extra_var_id:
+        _validate_extra_var(extra_var_id)
     _validate_rulebook(rulebook_id)
-    _validate_websocket()
 
 
 def _validate_awx_token(user_id) -> None:
@@ -79,26 +79,6 @@ def _validate_awx_token(user_id) -> None:
             _(
                 "More than one controller token found, "
                 "currently only 1 token is supported"
-            )
-        )
-
-
-def _validate_websocket() -> None:
-    ws_url = f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}"
-    parsed_url = urllib.parse.urlparse(ws_url)
-
-    if parsed_url.scheme not in ["ws", "wss"]:
-        raise ValidationError(
-            _(
-                "Connection Error: Invalid WebSocket URL scheme. "
-                "Scheme should be either 'ws' or 'wss'."
-            )
-        )
-    if not parsed_url.hostname:
-        raise ValidationError(
-            _(
-                "Connection Error: WebSocket URL must have a valid "
-                "host address."
             )
         )
 

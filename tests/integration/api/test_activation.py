@@ -462,6 +462,23 @@ def test_restart_activation(restart_mock: mock.Mock, client: APIClient):
 
 
 @pytest.mark.django_db
+@mock.patch(
+    "aap_eda.api.views.activation.validate_activation", return_value=False
+)
+def test_restart_with_invalid_activation(
+    validate_mock: mock.Mock, client: APIClient
+):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    response = client.post(
+        f"{api_url_v1}/activations/{activation.id}/restart/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
 def test_enable_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
@@ -507,6 +524,21 @@ def test_enable_activation(client: APIClient):
             activation.status_message
             == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
         )
+
+
+@pytest.mark.django_db
+@mock.patch(
+    "aap_eda.api.views.activation.validate_activation", return_value=False
+)
+def test_enable_with_invalid_activation(
+    validate_mock: mock.Mock, client: APIClient
+):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    response = client.post(f"{api_url_v1}/activations/{activation.id}/enable/")
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.django_db
