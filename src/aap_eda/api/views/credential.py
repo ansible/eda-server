@@ -98,6 +98,7 @@ class CredentialViewSet(
     CreateModelMixin,
     PartialUpdateOnlyModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
