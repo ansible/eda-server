@@ -1,0 +1,37 @@
+from unittest import mock
+
+import pytest
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from tests.integration.constants import api_url_v1
+
+
+class FallbackException(Exception):
+    pass
+
+
+def raise_exception():
+    raise FallbackException
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.tasks.list_jobs", new=raise_exception)
+def test_debug_unexpected_exception(client: APIClient, settings):
+    settings.DEBUG = True
+    try:
+        client.get(f"{api_url_v1}/tasks/")
+        raise Exception
+    except FallbackException:
+        pass
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.tasks.list_jobs", new=raise_exception)
+def test_non_debug_unexpected_exception(client: APIClient, settings):
+    settings.DEBUG = False
+    response = client.get(f"{api_url_v1}/tasks/")
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    data = response.json()
+    assert data["detail"].startswith("Unexpected server error")

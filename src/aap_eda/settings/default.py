@@ -238,6 +238,7 @@ REST_FRAMEWORK = {
         "aap_eda.api.permissions.RoleBasedPermission",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
 
 # ---------------------------------------------------------

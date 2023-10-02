@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.exceptions import (
@@ -20,6 +21,8 @@ from rest_framework.exceptions import (
     NotFound,
     PermissionDenied,
 )
+from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
 __all__ = (
     "AuthenticationFailed",
@@ -29,7 +32,24 @@ __all__ = (
     "Conflict",
     "Unprocessable",
     "PermissionDenied",
+    "api_fallback_handler",
 )
+
+
+def api_fallback_handler(exc, context):
+    response = exception_handler(exc, context)
+    if (response is None) and (not settings.DEBUG):
+        response = Response(
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            data={
+                "detail": (
+                    "Unexpected server error"
+                    "; contact your system administrator"
+                )
+            },
+        )
+        response["context"] = context
+    return response
 
 
 class BadRequest(APIException):
