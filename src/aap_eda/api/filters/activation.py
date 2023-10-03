@@ -33,10 +33,15 @@ class ActivationFilter(django_filters.FilterSet):
         lookup_expr="exact",
         label="Filter by Decision Environment ID.",
     )
+    credential_id = django_filters.NumberFilter(
+        field_name="decision_environment__credential_id",
+        lookup_expr="exact",
+        label="Filter by Credential ID.",
+    )
 
     class Meta:
         model = models.Activation
-        fields = ["name", "status", "decision_environment_id"]
+        fields = ["name", "status", "decision_environment_id", "credential_id"]
 
 
 class ActivationInstanceFilter(django_filters.FilterSet):

@@ -105,10 +105,18 @@ def create_activation_related_data(with_project=True):
         token=TEST_AWX_TOKEN["token"],
         user=user,
     )
+    credential_id = models.Credential.objects.create(
+        name="test-credential",
+        description="test credential",
+        credential_type="Container Registry",
+        username="dummy-user",
+        secret="dummy-password",
+    ).pk
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
         description=TEST_DECISION_ENV["description"],
+        credential_id=credential_id,
     ).pk
     project_id = (
         models.Project.objects.create(
@@ -138,6 +146,7 @@ def create_activation_related_data(with_project=True):
         "project_id": project_id,
         "rulebook_id": rulebook_id,
         "extra_var_id": extra_var_id,
+        "credential_id": credential_id,
     }
 
 
@@ -361,6 +370,25 @@ def test_list_activations_filter_decision_environment_id(client: APIClient):
     response = client.get(
         f"{api_url_v1}/activations/?decision_environment_id=0"
     )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_activations_filter_credential_id(client: APIClient) -> None:
+    """Test filtering by credential_id."""
+    # TODO(alex): Refactor the presetup, it should be fixtures
+    fks = create_activation_related_data()
+    create_activation(fks)
+    credential_id = fks["credential_id"]
+
+    url = f"{api_url_v1}/activations/?credential_id={credential_id}"
+    response = client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+    url = f"{api_url_v1}/activations/?credential_id=31415"
+    response = client.get(url)
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
 
