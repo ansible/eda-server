@@ -4,6 +4,10 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
+from tests.integration.api.test_activation import (
+    create_activation,
+    create_activation_related_data,
+)
 from tests.integration.constants import api_url_v1
 
 
@@ -108,6 +112,34 @@ def test_delete_credential(client: APIClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.Credential.objects.filter(pk=obj.id).count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_credential_not_exist(client: APIClient):
+    response = client.delete(f"{api_url_v1}/credentials/42/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_delete_credential_used_by_activation(client: APIClient):
+    # TODO(alex) presetup should be a reusable fixture
+    activation_dependencies = create_activation_related_data()
+    create_activation(activation_dependencies)
+    credential_id = activation_dependencies["credential_id"]
+    response = client.delete(f"{api_url_v1}/credentials/{credential_id}/")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_delete_credential_used_by_activation_forced(client: APIClient):
+    # TODO(alex) presetup should be a reusable fixture
+    activation_dependencies = create_activation_related_data()
+    create_activation(activation_dependencies)
+    credential_id = activation_dependencies["credential_id"]
+    response = client.delete(
+        f"{api_url_v1}/credentials/{credential_id}/?force=true",
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
