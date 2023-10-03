@@ -189,5 +189,5 @@ class GitExecutor:
             if "Authentication failed" in e.stderr:
                 raise GitError("Authentication failed")
             if "could not read Username" in e.stderr:
-                raise GitError("Authentication failed")
+                raise GitError("Credentials not provided")
             raise GitError(str(e))
