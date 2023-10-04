@@ -117,6 +117,9 @@ class DecisionEnvironmentViewSet(
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None, description="Delete successful."
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Decision Environment in use by Activations."
+            ),
         },
         parameters=[
             OpenApiParameter(
