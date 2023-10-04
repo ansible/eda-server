@@ -188,4 +188,6 @@ class GitExecutor:
             logger.warning(message, e.returncode, e.cmd, e.stderr)
             if "Authentication failed" in e.stderr:
                 raise GitError("Authentication failed")
+            if "could not read Username" in e.stderr:
+                raise GitError("Credentials not provided")
             raise GitError(str(e))
