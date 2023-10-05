@@ -14,6 +14,7 @@ env:
 
 jobs:
   api-e2e-tests:
+    if: github.repository == 'ansible/eda-server'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
