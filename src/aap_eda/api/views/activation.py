@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 
-from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -27,9 +26,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api.serializers.activation import (
+    is_activation_valid,
+    parse_validation_errors,
+)
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
-from aap_eda.services.validation import validate_activation
 from aap_eda.tasks.ruleset import activate, deactivate, restart
 
 logger = logging.getLogger(__name__)
@@ -67,28 +69,24 @@ class ActivationViewSet(
         request=serializers.ActivationCreateSerializer,
         responses={
             status.HTTP_201_CREATED: serializers.ActivationReadSerializer,
-            status.HTTP_422_UNPROCESSABLE_ENTITY: OpenApiResponse(
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
                 description="Invalid data to create activation."
             ),
         },
     )
     def create(self, request):
-        serializer = serializers.ActivationCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            response = serializer.create(
-                serializer.validated_data, request.user
-            )
-        except ValidationError as err:
-            raise api_exc.Unprocessable(err.message)
-
-        response_serializer = serializers.ActivationSerializer(response)
-        activation = self._get_activation_dependent_objects(
-            response_serializer.data
+        context = {"request": request}
+        serializer = serializers.ActivationCreateSerializer(
+            data=request.data, context=context
         )
-        activation["rules_count"] = 0
-        activation["rules_fired_count"] = 0
+        valid = serializer.is_valid()
+        if not valid:
+            error = parse_validation_errors(serializer.errors)
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        response = serializer.create(serializer.validated_data)
 
         if response.is_enabled:
             job = activate(activation_id=response.id)
@@ -96,7 +94,7 @@ class ActivationViewSet(
             response.save(update_fields=["current_job_id"])
 
         return Response(
-            serializers.ActivationReadSerializer(activation).data,
+            serializers.ActivationReadSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -104,13 +102,7 @@ class ActivationViewSet(
         responses={status.HTTP_200_OK: serializers.ActivationReadSerializer},
     )
     def retrieve(self, request, pk: int):
-        response = super().retrieve(request, pk)
-        activation = self._get_activation_dependent_objects(response.data)
-        (
-            activation["rules_count"],
-            activation["rules_fired_count"],
-        ) = self._get_rules_count(activation["ruleset_stats"])
-
+        activation = get_object_or_404(models.Activation, pk=pk)
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
@@ -124,22 +116,15 @@ class ActivationViewSet(
         },
     )
     def list(self, request):
-        response = super().list(request)
-        activations = []
-        if response and response.data:
-            activations = response.data["results"]
-
-        for activation in activations:
-            (
-                activation["rules_count"],
-                activation["rules_fired_count"],
-            ) = self._get_rules_count(activation["ruleset_stats"])
+        activations = models.Activation.objects.all()
+        activations = self.filter_queryset(activations)
 
         serializer = serializers.ActivationListSerializer(
             activations, many=True
         )
+        result = self.paginate_queryset(serializer.data)
 
-        return self.get_paginated_response(serializer.data)
+        return self.get_paginated_response(result)
 
     def perform_destroy(self, activation):
         activation.status = ActivationStatus.DELETING
@@ -203,6 +188,10 @@ class ActivationViewSet(
                 None,
                 description="Activation has been enabled.",
             ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                None,
+                description="Activation not enabled.",
+            ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 None,
                 description="Activation not enabled do to current activation "
@@ -213,9 +202,6 @@ class ActivationViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
         activation = get_object_or_404(models.Activation, pk=pk)
-
-        if not validate_activation(activation.id):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -228,6 +214,17 @@ class ActivationViewSet(
             ActivationStatus.UNRESPONSIVE,
         ]:
             return Response(status=status.HTTP_409_CONFLICT)
+
+        valid, error = is_activation_valid(activation)
+        if not valid:
+            activation.status = ActivationStatus.ERROR
+            activation.status_message = error
+            activation.save(update_fields=["status", "status_message"])
+            logger.error(f"Failed to enable {activation.name}: {error}")
+
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         logger.info(f"Now enabling {activation.name} ...")
 
@@ -287,6 +284,10 @@ class ActivationViewSet(
                 None,
                 description="Activation restart was successful.",
             ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                None,
+                description="Activation not enabled.",
+            ),
         },
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
@@ -300,8 +301,16 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
-        if not validate_activation(activation.id):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+        valid, error = is_activation_valid(activation)
+        if not valid:
+            activation.status = ActivationStatus.ERROR
+            activation.status_message = error
+            activation.save(update_fields=["status", "status_message"])
+            logger.error(f"Failed to restart {activation.name}: {error}")
+
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         restart.delay(
             activation_id=activation.id, requester=activation.user.username
@@ -311,55 +320,6 @@ class ActivationViewSet(
         activation.save(update_fields=["restart_count", "modified_at"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def _get_activation_dependent_objects(self, activation):
-        activation["project"] = (
-            models.Project.objects.get(pk=activation["project_id"])
-            if activation["project_id"]
-            else None
-        )
-        activation["decision_environment"] = (
-            models.DecisionEnvironment.objects.get(
-                pk=activation["decision_environment_id"]
-            )
-            if activation["decision_environment_id"]
-            else None
-        )
-        activation["rulebook"] = (
-            models.Rulebook.objects.get(pk=activation["rulebook_id"])
-            if activation["rulebook_id"]
-            else None
-        )
-        activation["extra_var"] = (
-            models.ExtraVar.objects.get(pk=activation["extra_var_id"])
-            if activation["extra_var_id"]
-            else None
-        )
-        activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=activation["id"]
-        )
-        activation["instances"] = activation_instances
-
-        # restart_count can be zero even if there are more than one instance
-        # because it is incremented only when the activation
-        # is restarted automatically
-        activation["restarted_at"] = (
-            activation_instances.latest("started_at").started_at
-            if len(activation_instances) > 1
-            and activation["restart_count"] > 0
-            else None
-        )
-
-        return activation
-
-    def _get_rules_count(self, ruleset_stats):
-        rules_count = 0
-        rules_fired_count = 0
-        for ruleset_stat in ruleset_stats.values():
-            rules_count += ruleset_stat["numberOfRules"]
-            rules_fired_count += ruleset_stat["rulesTriggered"]
-
-        return rules_count, rules_fired_count
 
     def _check_deleting(self, activation):
         if activation.status == ActivationStatus.DELETING:

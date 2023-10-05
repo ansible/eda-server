@@ -196,13 +196,15 @@ def test_deactivate_with_delete(info_mock: mock.Mock, init_data):
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=True)
 @mock.patch("aap_eda.tasks.ruleset.logger.info")
+@mock.patch(
+    "aap_eda.tasks.ruleset.is_activation_valid", return_value=(True, "")
+)
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_restart(
     delay_mock: mock.Mock,
+    valid_mock: mock.Mock,
     info_mock: mock.Mock,
-    validate_mock: mock.Mock,
     init_data,
 ):
     job = mock.Mock()
@@ -244,10 +246,12 @@ def test_monitor_activations_to_unresponsive(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=True)
+@mock.patch(
+    "aap_eda.tasks.ruleset.is_activation_valid", return_value=(True, "")
+)
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_completed(
-    activate_mock: mock.Mock, validate_mock: mock.Mock, init_activation
+    activate_mock: mock.Mock, valid_mock: mock.Mock, init_activation
 ):
     job = mock.Mock()
     job.id = "jid"
@@ -275,10 +279,39 @@ def test_monitor_activations_restart_completed(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=True)
+@mock.patch(
+    "aap_eda.tasks.ruleset.is_activation_valid",
+    return_value=(False, "{Error: Validation failed}"),
+)
+@mock.patch("aap_eda.tasks.ruleset.activate")
+def test_monitor_activations_when_validation_failed(
+    activate_mock: mock.Mock, valid_mock: mock.Mock, init_activation
+):
+    job = mock.Mock()
+    job.id = "jid"
+    activate_mock.return_value = job
+    init_activation.restart_policy = RestartPolicy.ALWAYS
+    init_activation.status = ActivationStatus.COMPLETED
+    init_activation.status_updated_at = timezone.now() - timedelta(
+        seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE + 1
+    )
+    init_activation.save(
+        update_fields=["status", "status_updated_at", "restart_policy"]
+    )
+    _monitor_activations()
+
+    init_activation.refresh_from_db()
+    assert init_activation.status == ActivationStatus.ERROR
+    assert init_activation.status_message == "{Error: Validation failed}"
+
+
+@pytest.mark.django_db
+@mock.patch(
+    "aap_eda.tasks.ruleset.is_activation_valid", return_value=(True, "")
+)
 @mock.patch("aap_eda.tasks.ruleset.activate")
 def test_monitor_activations_restart_failed(
-    activate_mock: mock.Mock, validate_mock: mock.Mock, init_activation
+    activate_mock: mock.Mock, valid_mock: mock.Mock, init_activation
 ):
     job = mock.Mock()
     job.id = "jid"
@@ -293,13 +326,11 @@ def test_monitor_activations_restart_failed(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.ruleset.validate_activation", return_value=False)
 @mock.patch("aap_eda.tasks.ruleset.activate")
 @mock.patch("aap_eda.tasks.ruleset.logger.info")
 def test_monitor_activations_with_invalid_activation(
     info_mock: mock.Mock,
     activate_mock: mock.Mock,
-    validate_mock: mock.Mock,
     init_activation,
 ):
     job = mock.Mock()
@@ -309,10 +340,7 @@ def test_monitor_activations_with_invalid_activation(
 
     msg1 = "Task started: monitor_activations"
     msg2 = "Restart activation test according to its restart policy."
-    msg3 = "Activation test failed to restart due to its invalid state"
-    info_mock.assert_has_calls(
-        [mock.call(msg1), mock.call(msg2), mock.call(msg3)]
-    )
+    info_mock.assert_has_calls([mock.call(msg1), mock.call(msg2)])
 
 
 @pytest.mark.parametrize(

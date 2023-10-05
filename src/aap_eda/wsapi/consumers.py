@@ -97,8 +97,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 logger.warning(f"Unsupported message received: {data}")
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
-        except InvalidActivationError as err:
-            logger.error(err)
 
         if msg_type != MessageType.SHUTDOWN:
             await self.send(text_data=json.dumps({"type": "Hello"}))
@@ -313,11 +311,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation = models.Activation.objects.get(
             id=activation_instance.activation_id
         )
-
-        if not validate_activation(activation.id):
-            raise InvalidActivationError(
-                f"Activation {activation.name} is invalid"
-            )
 
         if activation.extra_var_id:
             extra_var = models.ExtraVar.objects.filter(

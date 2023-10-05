@@ -23,7 +23,3 @@ class StatusRequiredError(Exception):
 
 class UnknownStatusError(Exception):
     pass
-
-
-class InvalidActivationError(Exception):
-    pass

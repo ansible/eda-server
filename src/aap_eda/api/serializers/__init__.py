@@ -19,6 +19,7 @@ from .activation import (
     ActivationListSerializer,
     ActivationReadSerializer,
     ActivationSerializer,
+    PostActivationSerializer,
 )
 from .auth import (
     LoginSerializer,
@@ -103,6 +104,7 @@ __all__ = (
     "ActivationReadSerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
+    "PostActivationSerializer",
     # users
     "AwxTokenSerializer",
     "AwxTokenCreateSerializer",
