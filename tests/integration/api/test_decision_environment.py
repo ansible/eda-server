@@ -90,7 +90,7 @@ def test_retrieve_decision_environment(client: APIClient, init_db):
             "id": credential.id,
             "name": credential.name,
             "description": credential.description,
-            "credential_type": credential.credential_type.value,
+            "credential_type": credential.credential_type,
             "username": credential.username,
         },
     }
@@ -130,10 +130,34 @@ def test_partial_update_decision_environment(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_delete_decision_environment(client: APIClient, init_db):
+def test_delete_decision_environment_forbidden(client: APIClient, init_db):
+    obj_id = int(init_db.decision_environment.id)
+    response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_delete_decision_environment_success(client: APIClient, init_db):
     obj_id = int(init_db.decision_environment.id)
     activation_id = int(init_db.activation.id)
+    models.Activation.objects.filter(id=activation_id).delete()
+
     response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    assert (
+        models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
+    )
+
+
+@pytest.mark.django_db
+def test_delete_decision_environment_force(client: APIClient, init_db):
+    obj_id = int(init_db.decision_environment.id)
+    activation_id = int(init_db.activation.id)
+
+    response = client.delete(
+        f"{api_url_v1}/decision-environments/{obj_id}/?force=True"
+    )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert (

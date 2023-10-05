@@ -238,7 +238,6 @@ class ActivationViewSet(
             ActivationStatus.STARTING,
             ActivationStatus.STOPPING,
             ActivationStatus.DELETING,
-            ActivationStatus.PENDING,
             ActivationStatus.RUNNING,
             ActivationStatus.UNRESPONSIVE,
         ]:
@@ -311,7 +310,7 @@ class ActivationViewSet(
         self._check_deleting(activation)
 
         if not activation.is_enabled:
-            raise api_exc.HttpForbidden(
+            raise api_exc.Forbidden(
                 detail="Activation is disabled and cannot be run."
             )
 
@@ -374,7 +373,7 @@ class ActivationViewSet(
         return rules_count, rules_fired_count
 
     def _check_deleting(self, activation):
-        if str(activation.status) == ActivationStatus.DELETING.value:
+        if activation.status == ActivationStatus.DELETING:
             raise exceptions.APIException(
                 detail="Object is being deleted", code=409
             )

@@ -110,11 +110,11 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     await ws_communicator.send_json_to(payload)
 
     for type in [
-        "Hello",
         "ExtraVars",
         "Rulebook",
         "ControllerInfo",
         "EndOfResponse",
+        "Hello",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
@@ -126,10 +126,10 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     await ws_communicator.send_json_to(payload)
 
     for type in [
-        "Hello",
         "Rulebook",
         "ControllerInfo",
         "EndOfResponse",
+        "Hello",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type

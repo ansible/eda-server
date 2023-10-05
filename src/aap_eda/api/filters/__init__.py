@@ -20,6 +20,7 @@ from .activation import (
 from .credential import CredentialFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .project import ProjectFilter
+from .role import RoleFilter
 from .rulebook import (
     AuditRuleActionFilter,
     AuditRuleEventFilter,
@@ -27,6 +28,7 @@ from .rulebook import (
     RulebookFilter,
     RulesetFilter,
 )
+from .user import UserFilter
 
 __all__ = (
     # project
@@ -45,4 +47,8 @@ __all__ = (
     "ActivationInstanceFilter",
     "ActivationFilter",
     "ActivationInstanceLogFilter",
+    # user
+    "UserFilter",
+    # role
+    "RoleFilter",
 )

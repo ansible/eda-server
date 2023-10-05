@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import (
+    ACTIVATION_STATUS_MESSAGE_MAP,
     Action,
     ActivationStatus,
     ResourceType,
@@ -35,8 +36,9 @@ TEST_ACTIVATION = {
     "project_id": 1,
     "rulebook_id": 1,
     "extra_var_id": 1,
-    "restart_policy": RestartPolicy.ON_FAILURE.value,
+    "restart_policy": RestartPolicy.ON_FAILURE,
     "restart_count": 0,
+    "status_message": "",
 }
 
 TEST_AWX_TOKEN = {
@@ -103,10 +105,18 @@ def create_activation_related_data(with_project=True):
         token=TEST_AWX_TOKEN["token"],
         user=user,
     )
+    credential_id = models.Credential.objects.create(
+        name="test-credential",
+        description="test credential",
+        credential_type="Container Registry",
+        username="dummy-user",
+        secret="dummy-password",
+    ).pk
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
         description=TEST_DECISION_ENV["description"],
+        credential_id=credential_id,
     ).pk
     project_id = (
         models.Project.objects.create(
@@ -136,6 +146,7 @@ def create_activation_related_data(with_project=True):
         "project_id": project_id,
         "rulebook_id": rulebook_id,
         "extra_var_id": extra_var_id,
+        "credential_id": credential_id,
     }
 
 
@@ -167,7 +178,7 @@ def create_multiple_activations(fks: dict):
             "extra_var_id": fks["project_id"],
             "user_id": fks["user_id"],
             "status": _status,
-            "restart_policy": RestartPolicy.ON_FAILURE.value,
+            "restart_policy": RestartPolicy.ON_FAILURE,
             "restart_count": 0,
         }
         activation = models.Activation(**activation_data)
@@ -221,6 +232,11 @@ def test_create_activation(activate_rulesets: mock.Mock, client: APIClient):
     assert activation.rulebook_rulesets == TEST_RULESETS
     assert data["restarted_at"] is None
     assert activation.current_job_id == job.id
+    assert activation.status == ActivationStatus.PENDING
+    assert (
+        activation.status_message
+        == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    )
 
 
 @pytest.mark.django_db
@@ -240,7 +256,8 @@ def test_create_activation_disabled(client: APIClient):
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
-    assert data["status"] == ActivationStatus.PENDING.value
+    assert activation.status == ActivationStatus.PENDING
+    assert activation.status_message == "Activation is marked as disabled"
     assert not data["instances"]
 
 
@@ -339,6 +356,44 @@ def test_list_activations_filter_status(client: APIClient):
 
 
 @pytest.mark.django_db
+def test_list_activations_filter_decision_environment_id(client: APIClient):
+    fks = create_activation_related_data()
+    activations = create_multiple_activations(fks)
+    de_id = fks["decision_environment_id"]
+
+    response = client.get(
+        f"{api_url_v1}/activations/?decision_environment_id={de_id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == len(activations)
+
+    response = client.get(
+        f"{api_url_v1}/activations/?decision_environment_id=0"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_activations_filter_credential_id(client: APIClient) -> None:
+    """Test filtering by credential_id."""
+    # TODO(alex): Refactor the presetup, it should be fixtures
+    fks = create_activation_related_data()
+    create_activation(fks)
+    credential_id = fks["credential_id"]
+
+    url = f"{api_url_v1}/activations/?credential_id={credential_id}"
+    response = client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+    url = f"{api_url_v1}/activations/?credential_id=31415"
+    response = client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("with_project", [True, False])
 def test_retrieve_activation(client: APIClient, with_project):
     fks = create_activation_related_data(with_project)
@@ -411,9 +466,47 @@ def test_enable_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
 
-    response = client.post(f"{api_url_v1}/activations/{activation.id}/enable/")
+    for state in [
+        ActivationStatus.STARTING,
+        ActivationStatus.STOPPING,
+        ActivationStatus.DELETING,
+        ActivationStatus.RUNNING,
+        ActivationStatus.UNRESPONSIVE,
+    ]:
+        activation.is_enabled = False
+        activation.status = state
+        activation.save(update_fields=["is_enabled", "status"])
 
-    assert response.status_code == status.HTTP_204_NO_CONTENT
+        response = client.post(
+            f"{api_url_v1}/activations/{activation.id}/enable/"
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert (
+            activation.status_message
+            == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+        )
+
+    for state in [
+        ActivationStatus.COMPLETED,
+        ActivationStatus.PENDING,
+        ActivationStatus.STOPPED,
+        ActivationStatus.FAILED,
+    ]:
+        activation.is_enabled = False
+        activation.status = state
+        activation.save(update_fields=["is_enabled", "status"])
+
+        response = client.post(
+            f"{api_url_v1}/activations/{activation.id}/enable/"
+        )
+
+        activation.refresh_from_db()
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert (
+            activation.status_message
+            == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+        )
 
 
 @pytest.mark.django_db
@@ -539,6 +632,7 @@ def assert_activation_base_data(
     assert data["modified_at"] == activation.modified_at.strftime(
         DATETIME_FORMAT
     )
+    assert data["status_message"] == activation.status_message
 
 
 def assert_activation_related_object_fks(

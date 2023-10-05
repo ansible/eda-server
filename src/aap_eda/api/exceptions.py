@@ -50,13 +50,13 @@ class Unprocessable(APIException):
     default_detail = _("Unprocessable.")
 
 
-class HttpNotImplemented(APIException):
+class NotImplemented(APIException):
     status_code = status.HTTP_501_NOT_IMPLEMENTED
     default_code = "not_implemented"
     default_detail = _("Not implemented.")
 
 
-class HttpForbidden(APIException):
+class Forbidden(APIException):
     status_code = status.HTTP_403_FORBIDDEN
     default_code = "forbidden"
     default_detail = _("Forbidden.")

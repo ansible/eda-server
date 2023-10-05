@@ -13,6 +13,7 @@ x-environment:
   - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
   - EDA_PROTOCOL=http
   - EDA_HOST=${EDA_HOST:-eda-api:8000}
+  - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
 
 services:
   podman:
@@ -29,7 +30,7 @@ services:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     environment: *common-env
     ports:
-      - '8080:8080'
+      - '8443:443'
     depends_on:
       eda-api:
         condition: service_healthy

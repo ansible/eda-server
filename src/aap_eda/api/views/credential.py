@@ -12,15 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+
+from cryptography import fernet
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import exceptions, filters, serializers
 from aap_eda.core import models
 
 from .mixins import (
@@ -28,6 +33,8 @@ from .mixins import (
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
@@ -76,6 +83,14 @@ from .mixins import (
                 None, description="Delete successful."
             )
         },
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force deletion if there are dependent objects",
+                required=False,
+                type=bool,
+            )
+        ],
     ),
 )
 class CredentialViewSet(
@@ -91,6 +106,19 @@ class CredentialViewSet(
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialFilter
 
+    def handle_exception(self, exc):
+        if isinstance(exc, fernet.InvalidToken):
+            return Response(
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                data={
+                    "details": (
+                        "Credential decryption failed"
+                        "; contact your system administrator"
+                    )
+                },
+            )
+        return super().handle_exception(exc)
+
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:
             return serializers.CredentialCreateSerializer
@@ -98,3 +126,26 @@ class CredentialViewSet(
 
     def get_response_serializer_class(self):
         return serializers.CredentialSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        force = request.query_params.get("force", "false").lower() in [
+            "true",
+            "1",
+            "yes",
+        ]
+        credential = self.get_object()
+
+        # If the credential is in use and the 'force' flag
+        # is not True, raise a PermissionDenied exception
+        is_used = models.Activation.objects.filter(
+            decision_environment__credential=credential
+        ).exists()
+
+        if is_used and not force:
+            raise exceptions.Forbidden(
+                "Credential is being used by Activations "
+                "and cannot be deleted. If you want to force delete, "
+                "please add /?force=true query param."
+            )
+        self.perform_destroy(credential)
+        return Response(status=status.HTTP_204_NO_CONTENT)

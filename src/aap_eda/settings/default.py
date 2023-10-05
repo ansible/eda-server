@@ -101,6 +101,15 @@ ALLOWED_HOSTS = (
     if isinstance(ALLOWED_HOSTS, str)
     else ALLOWED_HOSTS
 )
+# A list or a comma separated string of allowed origins for CSRF protection
+# in the form of [scheme://]host[:port]. Supports wildcards.
+# More info: https://docs.djangoproject.com/en/4.2/ref/settings/#csrf-trusted-origins  # noqa: E501
+CSRF_TRUSTED_ORIGINS = settings.get("CSRF_TRUSTED_ORIGINS", [])
+CSRF_TRUSTED_ORIGINS = (
+    CSRF_TRUSTED_ORIGINS.split(",")
+    if isinstance(CSRF_TRUSTED_ORIGINS, str)
+    else CSRF_TRUSTED_ORIGINS
+)
 
 # Session settings
 SESSION_COOKIE_AGE = settings.get("SESSION_COOKIE_AGE", 1800)
@@ -268,7 +277,8 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {"func": "aap_eda.tasks.ruleset.monitor_activations", "interval": 60}
+    {"func": "aap_eda.tasks.ruleset.monitor_activations", "interval": 60},
+    {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
 RQ_SCHEDULER_JOB_INTERVAL = settings.get("SCHEDULER_JOB_INTERVAL", 5)

@@ -20,7 +20,11 @@ from django.conf import settings
 from django.utils import timezone
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ACTIVATION_STATUS_MESSAGE_MAP,
+    ActivationStatus,
+    RestartPolicy,
+)
 from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets
 from aap_eda.tasks.ruleset import (
     _activate,
@@ -224,8 +228,8 @@ def test_monitor_activations_to_unresponsive(
     init_data.instance1.refresh_from_db()
     init_data.instance2.refresh_from_db()
 
-    assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE.value
-    assert init_data.instance1.status == ActivationStatus.COMPLETED.value
+    assert init_data.instance2.status == ActivationStatus.UNRESPONSIVE
+    assert init_data.instance1.status == ActivationStatus.COMPLETED
     deactivate_mock.assert_called_once_with(
         activation_id=init_data.activation.id,
         requester="SCHEDULER",
@@ -246,7 +250,9 @@ def test_monitor_activations_restart_completed(
     init_activation.status_updated_at = timezone.now() - timedelta(
         seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE + 1
     )
-    init_activation.save()
+    init_activation.save(
+        update_fields=["status", "status_updated_at", "restart_policy"]
+    )
     _monitor_activations()
 
     activate_mock.assert_called_once_with(
@@ -255,6 +261,10 @@ def test_monitor_activations_restart_completed(
     )
     init_activation.refresh_from_db()
     assert init_activation.current_job_id == "jid"
+    assert (
+        init_activation.status_message
+        == ACTIVATION_STATUS_MESSAGE_MAP[init_activation.status]
+    )
 
 
 @pytest.mark.django_db
@@ -277,13 +287,10 @@ def test_monitor_activations_restart_failed(
 @pytest.mark.parametrize(
     "activation_attrs",
     [
-        {"restart_policy": RestartPolicy.NEVER},
-        {"is_valid": False},
-        {"failure_count": settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE + 1},
         {
             "status_updated_at": timezone.now()
             - timedelta(
-                seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE - 60
+                seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE - 75
             )
         },
         {
@@ -291,9 +298,12 @@ def test_monitor_activations_restart_failed(
             "status": ActivationStatus.COMPLETED,
             "status_updated_at": timezone.now()
             - timedelta(
-                seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE - 60
+                seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE - 75
             ),
         },
+        {"restart_policy": RestartPolicy.NEVER},
+        {"is_valid": False},
+        {"failure_count": settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE + 1},
     ],
 )
 @pytest.mark.django_db
@@ -301,9 +311,15 @@ def test_monitor_activations_restart_failed(
 def test_monitor_activations_not_restart(
     activate_mock: mock.Mock, init_activation, activation_attrs
 ):
+    job = mock.Mock()
+    job.id = "jid"
+    activate_mock.return_value = job
+
+    update_fields = []
     for key in activation_attrs:
         setattr(init_activation, key, activation_attrs[key])
-    init_activation.save()
+        update_fields.append(key)
+    init_activation.save(update_fields=update_fields)
     _monitor_activations()
 
     activate_mock.assert_not_called()
