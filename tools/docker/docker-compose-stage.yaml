@@ -7,7 +7,7 @@ x-environment:
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
   - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-api:8000}
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-ws:8000}
   - EDA_WEBSOCKET_SSL_VERIFY=no
   - EDA_PODMAN_SOCKET_URL=tcp://podman:8888
   - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
@@ -47,7 +47,8 @@ services:
         aap-eda-manage migrate
         && aap-eda-manage create_initial_data
         && scripts/create_superuser.sh
-        && aap-eda-manage runserver 0.0.0.0:8000
+        && gunicorn -b 0.0.0.0:8000
+        -w ${EDA_API_WORKERS:-4} aap_eda.wsgi
     ports:
       - '8000:8000'
     depends_on:
@@ -60,6 +61,20 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+
+  eda-ws:
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
+    ports:
+      - '8001:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
 
   eda-scheduler:
     image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
