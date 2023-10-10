@@ -183,8 +183,8 @@ port-forward() {
   local _local_port=${2}
   local _svc_port=${3}
 
-  log-info "kubectl port-forward svc/${_svc_name} ${_local_port}:${_svc_port}"
-  kubectl port-forward "svc/${_svc_name}" "${_local_port}":"${_svc_port}"
+  log-info "kubectl port-forward svc/${_svc_name} ${_local_port}:${_svc_port} -n ${NAMESPACE}"
+  kubectl port-forward "svc/${_svc_name}" "${_local_port}":"${_svc_port}" -n "${NAMESPACE}"
 }
 
 port-forward-ui() {
