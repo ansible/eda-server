@@ -24,7 +24,7 @@ services:
     ports:
       - 8888:8888
     volumes:
-      - 'podman_data:/var/lib/containers/storage'
+      - 'podman_data:/home/podman/.local/share/containers/storage'
 
   eda-ui:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
