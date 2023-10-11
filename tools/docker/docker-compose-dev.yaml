@@ -22,8 +22,6 @@ services:
     privileged: true
     command: >-
       chown -R podman /home/podman/.local/share/containers/storage
-    ports:
-      - 8888:8888
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
 
