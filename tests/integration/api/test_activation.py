@@ -18,6 +18,10 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.serializers.activation import (
+    get_rules_count,
+    is_activation_valid,
+)
 from aap_eda.core import models
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
@@ -277,10 +281,16 @@ def test_create_activation_bad_entity(client: APIClient):
 
 @pytest.mark.parametrize(
     "dependent_object",
-    ["decision_environment", "rulebook", "extra_var"],
+    [
+        {
+            "decision_environment": "DecisionEnvironment with id 0 does not exist"  # noqa: E501
+        },
+        {"rulebook": "Rulebook with id 0 does not exist"},
+        {"extra_var": "ExtraVar with id 0 does not exist"},
+    ],
 )
 @pytest.mark.django_db(transaction=True)
-def test_create_activation_unprocessible_entity(
+def test_create_activation_with_bad_entity(
     client: APIClient, dependent_object, check_permission_mock: mock.Mock
 ):
     fks = create_activation_related_data()
@@ -290,18 +300,17 @@ def test_create_activation_unprocessible_entity(
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
     client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
-    response = client.post(
-        f"{api_url_v1}/activations/",
-        data={
-            **test_activation,
-            f"{dependent_object}_id": 0,
-        },
-    )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert (
-        response.data["detail"]
-        == f"{dependent_object.capitalize()} with ID=0 does not exist."
-    )
+    for key in dependent_object:
+        response = client.post(
+            f"{api_url_v1}/activations/",
+            data={
+                **test_activation,
+                f"{key}_id": 0,
+            },
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        error = f"'{key}_id': '{dependent_object[key]}'"
+        assert str(response.data["errors"]) == "{%s}" % error
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.ACTIVATION, Action.CREATE
@@ -462,6 +471,85 @@ def test_restart_activation(restart_mock: mock.Mock, client: APIClient):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("action", ["restart", "enable"])
+def test_restart_activation_with_invalid_tokens(client: APIClient, action):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    if action == "enable":
+        activation.is_enabled = False
+        activation.save(update_fields=["is_enabled"])
+
+    models.AwxToken.objects.create(
+        name="new_token_name",
+        token="new_token",
+        user_id=fks["user_id"],
+    )
+
+    response = client.post(
+        f"{api_url_v1}/activations/{activation.id}/{action}/"
+    )
+
+    error_message = (
+        "{'errors': 'More than one controller token found, "
+        "currently only 1 token is supported'}"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["errors"] == error_message
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert activation.status_message == error_message
+
+    models.AwxToken.objects.filter(user_id=fks["user_id"]).delete()
+
+    response = client.post(
+        f"{api_url_v1}/activations/{activation.id}/{action}/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.data["errors"]
+        == "{'errors': 'No controller token specified'}"
+    )
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert (
+        activation.status_message
+        == "{'errors': 'No controller token specified'}"
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["restart", "enable"])
+def test_restart_activation_without_de(client: APIClient, action):
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+    if action == "enable":
+        activation.is_enabled = False
+        activation.save(update_fields=["is_enabled"])
+
+    models.DecisionEnvironment.objects.filter(
+        id=fks["decision_environment_id"]
+    ).delete()
+    response = client.post(
+        f"{api_url_v1}/activations/{activation.id}/{action}/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.data["errors"]
+        == "{'decision_environment_id': 'This field may not be null.'}"
+    )
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert (
+        activation.status_message
+        == "{'decision_environment_id': 'This field may not be null.'}"
+    )
+
+
+@pytest.mark.django_db
 def test_enable_activation(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
@@ -616,7 +704,7 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 def assert_activation_base_data(
     data: Dict[str, Any], activation: models.Activation
 ):
-    rules_count, rules_fired_count = _get_rules_count(activation.ruleset_stats)
+    rules_count, rules_fired_count = get_rules_count(activation.ruleset_stats)
     assert data["id"] == activation.id
     assert data["name"] == activation.name
     assert data["description"] == activation.description
@@ -626,12 +714,8 @@ def assert_activation_base_data(
     assert data["rulebook_name"] == activation.rulebook_name
     assert data["rules_count"] == rules_count
     assert data["rules_fired_count"] == rules_fired_count
-    assert data["created_at"] == activation.created_at.strftime(
-        DATETIME_FORMAT
-    )
-    assert data["modified_at"] == activation.modified_at.strftime(
-        DATETIME_FORMAT
-    )
+    assert data["created_at"] == activation.created_at
+    assert data["modified_at"] == activation.modified_at
     assert data["status_message"] == activation.status_message
 
 
@@ -652,14 +736,53 @@ def assert_activation_related_object_fks(
     )
 
 
-def _get_rules_count(ruleset_stats):
-    rules_count = 0
-    rules_fired_count = 0
-    for ruleset_stat in ruleset_stats.values():
-        rules_count += ruleset_stat["numberOfRules"]
-        rules_fired_count += ruleset_stat["rulesTriggered"]
+def test_get_rules_count():
+    ruleset_stats = {
+        "Basic short": {
+            "end": "2023-10-05T21:27:16.045381451Z",
+            "start": "2023-10-05T21:27:10.656365198Z",
+            "ruleSetName": "Basic short",
+            "eventsMatched": 1,
+            "lastClockTime": "2023-10-05T21:27:15.957Z",
+            "lastRuleFired": "Run JT at 8",
+            "numberOfRules": 1,
+            "asyncResponses": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 10,
+            "lastRuleFiredAt": "2023-10-05T21:27:14.957Z",
+        }
+    }
 
-    return rules_count, rules_fired_count
+    rules_count, rules_fired_count = get_rules_count(ruleset_stats)
+    assert rules_count == 1
+    assert rules_fired_count == 1
+
+    stats = {
+        "Basic short": {
+            "end": "2023-10-05T21:27:16.045381451Z",
+            "start": "2023-10-05T21:27:10.656365198Z",
+            "ruleSetName": "Basic short",
+            "eventsMatched": 1,
+            "lastClockTime": "2023-10-05T21:27:15.957Z",
+            "lastRuleFired": "Run JT at 8",
+            "asyncResponses": 0,
+        }
+    }
+
+    rules_count, rules_fired_count = get_rules_count(stats)
+    assert rules_count == 0
+    assert rules_fired_count == 0
+
+
+@pytest.mark.django_db
+def test_is_activation_valid():
+    fks = create_activation_related_data()
+    activation = create_activation(fks)
+
+    valid, error = is_activation_valid(activation)
+
+    assert valid is True
+    assert error == "{}"  # noqa P103
 
 
 @pytest.mark.django_db
@@ -672,8 +795,11 @@ def test_create_activation_no_token(client: APIClient):
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert str(response.data["detail"]) == "No controller token specified"
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        str(response.data["errors"])
+        == "{'errors': 'No controller token specified'}"
+    )
 
 
 @pytest.mark.django_db
@@ -688,9 +814,9 @@ def test_create_activation_more_tokens(client: APIClient):
     client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
     client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN_2)
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        str(response.data["detail"])
-        == "More than one controller token found, "
-        "currently only 1 token is supported"
+        str(response.data["errors"])
+        == "{'errors': 'More than one controller token found, "
+        "currently only 1 token is supported'}"
     )

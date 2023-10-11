@@ -62,19 +62,6 @@ class Forbidden(APIException):
     default_detail = _("Forbidden.")
 
 
-class NoControllerToken(APIException):
-    status_code = 422
-    default_detail = "No controller token specified"
-
-
-class TooManyControllerTokens(APIException):
-    status_code = 422
-    default_detail = (
-        "More than one controller token found, "
-        "currently only 1 token is supported"
-    )
-
-
 class InvalidWebsocketScheme(APIException):
     status_code = 422
     default_detail = (

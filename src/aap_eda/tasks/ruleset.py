@@ -20,6 +20,7 @@ from django.db import transaction
 from django.utils import timezone
 from rq.job import Job
 
+from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job, job_from_queue, unique_enqueue
@@ -290,6 +291,16 @@ def _start_failed(now: timezone.datetime):
 
 
 def _schedule_activate(activation: models.Activation, requester: str) -> None:
+    valid, error = is_activation_valid(activation)
+
+    if not valid:
+        activation.status = ActivationStatus.ERROR
+        activation.status_message = error
+        activation.save(update_fields=["status", "status_message"])
+        logger.error(f"Failed to restart {activation.name}: {error}")
+
+        return
+
     job = activate(
         activation_id=activation.id,
         requester=requester,
