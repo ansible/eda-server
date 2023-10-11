@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from django.db import models
+import typing as tp
 
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
@@ -134,6 +135,22 @@ class Activation(models.Model):
         except ValueError as error:
             raise UnknownStatusError(error)
 
+    def update_status(
+        self, status: ActivationStatus, status_message: tp.Optional[str] = None
+    ) -> None:
+        self.status = status
+        self.status_updated_at = models.functions.Now()
+        if status_message:
+            self.status_message = status_message
+        self.save(
+            update_fields=[
+                "status",
+                "status_updated_at",
+                "status_message",
+                "modified_at",
+            ]
+        )
+
 
 class ActivationInstance(models.Model):
     class Meta:
@@ -197,6 +214,21 @@ class ActivationInstance(models.Model):
             ActivationStatus(self.status)
         except ValueError as error:
             raise UnknownStatusError(error)
+
+    def update_status(
+        self, status: ActivationStatus, status_message: tp.Optional[str] = None
+    ) -> None:
+        self.status = status
+        self.updated_at = models.functions.Now()
+        if status_message:
+            self.status_message = status_message
+        self.save(
+            update_fields=[
+                "status",
+                "status_message",
+                "updated_at",
+            ]
+        )
 
 
 class ActivationInstanceLog(models.Model):
