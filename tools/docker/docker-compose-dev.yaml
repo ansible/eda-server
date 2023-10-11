@@ -16,15 +16,30 @@ x-environment:
   - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
 
 services:
-  podman:
-    user: "1000"
+  podman-pre-setup:
+    user: "0"
     image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
     privileged: true
-    command: podman system service --time=0 tcp://0.0.0.0:8888
+    command: >-
+      chown -R podman /home/podman/.local/share/containers/storage
     ports:
       - 8888:8888
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
+
+  podman:
+    user: "1000"
+    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    privileged: true
+    command: >-
+      podman system service --time=0 tcp://0.0.0.0:8888
+    ports:
+      - 8888:8888
+    volumes:
+      - 'podman_data:/home/podman/.local/share/containers/storage'
+    depends_on:
+     - podman-pre-setup
+
 
   eda-ui:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
