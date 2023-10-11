@@ -13,25 +13,22 @@ def new_container_engine():
     if settings.DEPLOYMENT_TYPE == "podman":
         return PodmanEngine()
     if settings.DEPLOYMENT_TYPE == "k8s":
-        return K8sActivation()
+        return K8sEngine()
     raise exceptions.InvalidDeploymentTypeError("Wrong deployment type")
 
 
 class ActivationManager:
-    @abstractmethod
     def __init__(self, db_instance: models.Activation,
                  container_engine: ContainerEngine = new_container_engine()):
         self.db_instance = db_instance
-        self.status = self._get_status()
         self.container_engine = container_engine
 
-    @abstractmethod
     def _set_status():
-        ...
+        pass
 
 
     def _get_status(self):
-        db_status =
+        db_status = None
         pod_state = self.container_engine.get_status()
         if db_status == pod_state:
             return ActivationStatus()
@@ -43,7 +40,7 @@ class ActivationManager:
         self.db_instance.last_instance.container_id = container.get_id()
 
     def restart(self):
-        ...
+        pass
 
     def monitor(self):
         self.restart()
@@ -51,11 +48,11 @@ class ActivationManager:
     def update_logs(self):
         pass
 
-class ContainerEngine:
+class ContainerEngine(ABC):
     """Abstract interface to connect to the deployment backend."""
 
     @abstractmethod
-    def __init__(self, db_instance: models.Activation):
+    def __init__(self):
         ...
 
     @abstractmethod
@@ -82,15 +79,10 @@ class ContainerEngine:
     def get_status(self) -> ContainerStatus():
         ...
 
-    @property
-    @abstractmethod
-    def db_instance(self):
-        ...
-
 
 class PodmanEngine(ContainerEngine):
     def __init__(self, client = get_podman_client()):
-        self.log_agent = PodmanLogAgent(service=self)
+        self.log_agent = PodmanLogAgent(engine=self)
 
     def start(self):
         pass
@@ -107,6 +99,8 @@ class PodmanEngine(ContainerEngine):
     def get_status(self):
         pass
 
+    def get_container(name_or_id: str) -> Container:
+        pass
 
 class K8sEngine(ContainerEngine):
     def start(self):
