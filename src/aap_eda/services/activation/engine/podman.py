@@ -28,96 +28,45 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.exceptions import PodmanImagePullError
 from aap_eda.services.ruleset.exceptions import ActivationException
+from .common import ContainerEngine, ContainerRequest, LogHandler
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AnsibleRulebookCmdLine:
-    ws_url: str
-    ws_ssl_verify: str
-    heartbeat: int
-    id: str
-    log_level: str  # -v or -vv or None
+def get_podman_client():
+    """podman client factory"""
+    podman_url = settings.PODMAN_SOCKET_URL
+    if podman_url:
+        return PodmanClient(base_url=podman_url)
 
-    def to_args(self) -> dict:
-        args = [
-            "ansible-rulebook",
-            "--worker",
-            "--websocket-ssl-verify",
-            self.ws_ssl_verify,
-            "--websocket-address",
-            self.ws_url,
-            "--id",
-            self.id,
-            "--heartbeat",
-            str(self.heartbeat),
-        ]
-        if self.log_level:
-            args.append(self.log_level)
-
-        return args
+    if os.getuid() == 0:
+        podman_url = "unix:///run/podman/podman.sock"
+    else:
+        xdg_runtime_dir = os.getenv(
+            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
+        )
+        podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
+    logger.info(f"Using podman socket: {podman_url}")
+    return PodmanClient(base_url=podman_url)
 
 
-@dataclass
-class Credential:
-    username: str
-
-    def get_password() -> str:
-        pass
-
-    def get_token() -> str:
-        pass
-
-
-@dataclass
-class ContainerRequest:
-    name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
-    image_url: str  # quay.io/ansible/ansible-rulebook:main
-    credential: Credential
-    ports: dict
-    cmdline: AnsibleRulebookCmdLine
-    mem_limit: str
-    mounts: dict
-    env_vars: dict
-    extra_args: dict
-
-
-class LogHandler:
-    @abstractmethod
-    def write(self, line: str, flush: bool) -> None:
-        pass
-
-    @abstractmethod
-    def get_log_read_at(self) -> datetime:
-        pass
-
-    @abstractmethod
-    def set_log_read_at(self, dt):
-        pass
-
-    @abstractmethod
-    def flush() -> None:
-        pass
-
-
-class Engine:
+class Engine(ContainerEngine):
     def __init__(
         self,
-        request: ContainerRequest,
-        podman_url: str,
         log_handler: LogHandler,
+        client: PodmanClient = get_podman_client(),
     ) -> None:
         self.log_handler = log_handler
-
-        if podman_url:
-            self.podman_url = podman_url
-        else:
-            self._default_podman_url()
-        logger.info(f"Using podman socket: {self.podman_url}")
-
-        self.client = PodmanClient(base_url=self.podman_url)
+        self.client = client
         logger.debug(self.client.version())
+
+    def stop(self, container_id: str) -> None:
+        if self.client.containers.exists(container_id):
+            container = self.client.containers.get(container_id)
+            container.stop(ignore=True)
+            self.update_logs(container_id)
+            self._cleanup(container_id)
 
     def start(self, request: ContainerRequest) -> str:
         if not request.image_url:
@@ -178,9 +127,9 @@ class Engine:
         else:
             raise ActivationException(f"Container id {container_id} not found")
 
-    def fetch_logs(self, container_id: str) -> None:
+    def update_logs(self, container_id: str) -> None:
         try:
-            if self.log_handlerlog_handler.get_log_read_at():
+            if self.log_handler.get_log_read_at():
                 since = int(self.log_handler.get_log_read_at().timestamp()) + 1
             else:
                 start_dt = "2000-01-01T00:00:00-00:00"
@@ -229,15 +178,6 @@ class Engine:
                 logger.info(f"Container {container_id} is cleaned up.")
             except NotFound:
                 logger.info(f"Container {container_id} not found.")
-
-    def _default_podman_url(self) -> None:
-        if os.getuid() == 0:
-            self.podman_url = "unix:///run/podman/podman.sock"
-        else:
-            xdg_runtime_dir = os.getenv(
-                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-            )
-            self.podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
 
     def _login(self, request) -> None:
         credential = request.credential
