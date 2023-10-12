@@ -45,7 +45,7 @@ def test_monitor_project_tasks_import(
         url="https://git.example.com/acme/project-01",
         import_state=models.Project.ImportState.PENDING,
     )
-    default_queue.enqueue(monitor_project_tasks)
+    default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
     worker = DefaultWorker(
         [default_queue], connection=default_queue.connection
@@ -76,7 +76,7 @@ def test_monitor_project_tasks_sync(
         import_state=models.Project.ImportState.PENDING,
         git_hash="dummy-hash",
     )
-    default_queue.enqueue(monitor_project_tasks)
+    default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
     worker = DefaultWorker(
         [default_queue], connection=default_queue.connection

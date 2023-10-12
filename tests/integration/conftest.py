@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import pytest
+from django.conf import settings
 from pytest_redis import factories
 
 from aap_eda.core.tasking import Queue
@@ -27,5 +28,15 @@ redis_external = factories.redisdb("redis_nooproc")
 
 
 @pytest.fixture
-def default_queue(redis_external) -> Queue:
-    return Queue("default", connection=redis_external)
+def test_queue_name():
+    # Use a separately named copy of the default queue to prevent
+    # cross-environment issues.  Using the eda-server default queue results in
+    # tasks run by tests to execute within eda-server context, if the
+    # eda-server default worker is running, rather than the test context.
+    settings.RQ_QUEUES["test-default"] = settings.RQ_QUEUES["default"]
+    return "test-default"
+
+
+@pytest.fixture
+def default_queue(test_queue_name, redis_external) -> Queue:
+    return Queue(test_queue_name, connection=redis_external)
