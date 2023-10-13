@@ -12,8 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from django.db import models
 import typing as tp
+
+from django.db import models
 
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
@@ -83,6 +84,7 @@ class Activation(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
+    latest_instance = models.IntegerField(null=True, default=None)
 
     def save(self, *args, **kwargs):
         # when creating
@@ -169,6 +171,7 @@ class ActivationInstance(models.Model):
     ended_at = models.DateTimeField(null=True)
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
+    log_read_at = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
         # when creating
