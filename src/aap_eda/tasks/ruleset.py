@@ -24,6 +24,7 @@ from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job, job_from_queue, unique_enqueue
+from aap_eda.services.activation.manager import ActivationManager
 from aap_eda.services.ruleset.activate_rulesets import (
     ActivateRulesets,
     save_activation_and_instance,
@@ -60,17 +61,20 @@ def _activate(activation_id: int, requester: str = "User") -> None:
             logger.info(f"Activation id: {activation_id} is disabled")
             return
 
-        activation.status = ActivationStatus.STARTING
-        activation.save(update_fields=["status"])
+        # activation.status = ActivationStatus.STARTING  # noqa: E800
+        # activation.save(update_fields=["status"]) # noqa: E800
 
         # Note: expect scheduler to set requester as "SCHEDULER"
         if requester == "SCHEDULER":
             activation.restart_count += 1
             activation.save(update_fields=["restart_count", "modified_at"])
 
-    ActivateRulesets().activate(activation)
+    ActivationManager(activation).start()
 
-    logger.info(f"Activation {activation.name} is done.")
+
+# ActivateRulesets().activate(activation) # noqa: E800
+
+# logger.info(f"Activation {activation.name} is done.") # noqa: E800
 
 
 @job("default")
@@ -213,11 +217,20 @@ def monitor_activations() -> None:
 
 def _monitor_activations() -> None:
     logger.info("Task started: monitor_activations")
+    _monitor()
     now = timezone.now()
     _detect_unresponsive(now)
     _stop_unresponsive(now)
     _start_completed(now)
     _start_failed(now)
+
+
+def _monitor() -> None:
+    running_statuses = [ActivationStatus.RUNNING]
+    for instance in models.ActivationInstance.objects.filter(
+        status__in=running_statuses
+    ):
+        ActivationManager(instance.activation).monitor()
 
 
 def _detect_unresponsive(now: timezone.datetime) -> None:
@@ -243,11 +256,12 @@ def _stop_unresponsive(now: timezone.datetime) -> None:
         logger.info(
             f"Deactivate activation {activation.name} due to lost heartbeat"
         )
-        deactivate(
-            activation_id=activation.id,
-            requester="SCHEDULER",
-            delete=False,
-        )
+        ActivationManager(activation).stop()
+        # deactivate( # noqa: E800
+        #    activation_id=activation.id, # noqa: E800
+        #    requester="SCHEDULER", # noqa: E800
+        #    delete=False, # noqa: E800
+        # ) # noqa: E800
 
 
 def _start_completed(now: timezone.datetime):
