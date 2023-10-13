@@ -1,36 +1,25 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Union
 
 
-class ContainerEngine(ABC):
-    """Abstract interface to connect to the deployment backend."""
+class LogHandler(ABC):
+    @abstractmethod
+    def write(self, lines: Union[list[str], str], flush: bool) -> None:
+        pass
 
     @abstractmethod
-    def __init__(
-        self,
-    ):
-        ...
+    def get_log_read_at(self) -> datetime:
+        pass
 
     @abstractmethod
-    def get_status(container_id: str) -> str:
-        ...
+    def set_log_read_at(self, dt: datetime):
+        pass
 
     @abstractmethod
-    def start(self, ContainerRequest) -> str:
-        ...
-
-    @abstractmethod
-    def stop(self, container_id: str):
-        ...
-
-    @abstractmethod
-    def restart(self, container_id: str):
-        ...
-
-    @abstractmethod
-    def update_logs(self, container_id: str):
-        ...
+    def flush(self) -> None:
+        pass
 
 
 # TODO: use pydantic
@@ -65,12 +54,7 @@ class AnsibleRulebookCmdLine:
 @dataclass
 class Credential:
     username: str
-
-    def get_password() -> str:
-        pass
-
-    def get_token() -> str:
-        pass
+    secret: str
 
 
 # TODO: use pydantic
@@ -78,28 +62,37 @@ class Credential:
 class ContainerRequest:
     name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
     image_url: str  # quay.io/ansible/ansible-rulebook:main
-    credential: Credential
-    ports: dict
     cmdline: AnsibleRulebookCmdLine
-    mem_limit: str
-    mounts: dict
-    env_vars: dict
-    extra_args: dict
+    credential: Credential = None
+    ports: dict = None
+
+    mem_limit: str = None
+    mounts: dict = None
+    env_vars: dict = None
+    extra_args: dict = None
 
 
-class LogHandler(ABC):
-    @abstractmethod
-    def write(self, line: str, flush: bool) -> None:
-        pass
-
-    @abstractmethod
-    def get_log_read_at(self) -> datetime:
-        pass
+class ContainerEngine(ABC):
+    """Abstract interface to connect to the deployment backend."""
 
     @abstractmethod
-    def set_log_read_at(self, dt):
-        pass
+    def __init__(
+        self,
+    ):
+        ...
 
     @abstractmethod
-    def flush() -> None:
-        pass
+    def get_status(self, container_id: str) -> str:
+        ...
+
+    @abstractmethod
+    def start(self, request: ContainerRequest, logger: LogHandler) -> str:
+        ...
+
+    @abstractmethod
+    def stop(self, container_id: str, logger: LogHandler):
+        ...
+
+    @abstractmethod
+    def update_logs(self, container_id: str, logger: LogHandler):
+        ...

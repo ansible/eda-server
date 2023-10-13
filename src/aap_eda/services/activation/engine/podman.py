@@ -16,10 +16,9 @@ import base64
 import json
 import logging
 import os
-from abc import abstractmethod
-from dataclasses import dataclass
 from datetime import datetime
 
+from django.conf import settings
 from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
@@ -28,14 +27,14 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.exceptions import PodmanImagePullError
 from aap_eda.services.ruleset.exceptions import ActivationException
+
 from .common import ContainerEngine, ContainerRequest, LogHandler
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
 def get_podman_client():
-    """podman client factory"""
+    """Podman client factory."""
     podman_url = settings.PODMAN_SOCKET_URL
     if podman_url:
         return PodmanClient(base_url=podman_url)
@@ -54,11 +53,12 @@ def get_podman_client():
 class Engine(ContainerEngine):
     def __init__(
         self,
-        log_handler: LogHandler,
-        client: PodmanClient = get_podman_client(),
+        client=None,
     ) -> None:
-        self.log_handler = log_handler
-        self.client = client
+        if client:
+            self.client = client
+        else:
+            self.client = get_podman_client()
         logger.debug(self.client.version())
 
     def stop(self, container_id: str) -> None:
@@ -68,19 +68,24 @@ class Engine(ContainerEngine):
             self.update_logs(container_id)
             self._cleanup(container_id)
 
-    def start(self, request: ContainerRequest) -> str:
+    def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         if not request.image_url:
             raise ActivationException("Missing image url")
 
         try:
             self._set_auth_json_file()
             self._login(request)
-            self.log_handler.write(f"Puling image {request.image_url}", True)
-            self.image = self._pull_image(request)
-            self.log_handler.write("Starting Container", True)
-            command = (request.cmdline.to_args(),)
-            self.log_handler.write(f"Container args {command}", True)
-
+            logger.info(f"Image URL is {request.image_url}")
+            self._pull_image(request, log_handler)
+            log_handler.write("Starting Container", True)
+            command = request.cmdline.to_args()
+            log_handler.write(f"Container args {command}", True)
+            pod_args = self._load_pod_args(request)
+            logger.info(
+                "Creating container: "
+                f"command: {command}"
+                f"pod_args: {pod_args}"
+            )
             container = self.client.containers.run(
                 image=request.image_url,
                 command=command,
@@ -88,7 +93,7 @@ class Engine(ContainerEngine):
                 stderr=True,
                 remove=True,
                 detach=True,
-                **self._load_pod_args(request),
+                **pod_args,
             )
 
             logger.info(
@@ -98,6 +103,7 @@ class Engine(ContainerEngine):
                 f"ports: {container.ports}, "
                 f"status: {container.status}, "
                 f"command: {command}"
+                f"pod_args: {pod_args}"
             )
 
             return str(container.id)
@@ -117,20 +123,20 @@ class Engine(ContainerEngine):
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             if container.status == "exited":
-                exit_code = container.wait(condition="exited")
+                exit_code = container.attrs.get("State").get("ExitCode")
                 if exit_code == 0:
-                    ActivationStatus.COMPLETED
+                    return ActivationStatus.COMPLETED
                 else:
-                    ActivationStatus.FAILED
+                    return ActivationStatus.FAILED
             elif container.status == "running":
                 return ActivationStatus.RUNNING
         else:
             raise ActivationException(f"Container id {container_id} not found")
 
-    def update_logs(self, container_id: str) -> None:
+    def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
-            if self.log_handler.get_log_read_at():
-                since = int(self.log_handler.get_log_read_at().timestamp()) + 1
+            if log_handler.get_log_read_at():
+                since = int(log_handler.get_log_read_at().timestamp()) + 1
             else:
                 start_dt = "2000-01-01T00:00:00-00:00"
                 since = (
@@ -151,18 +157,16 @@ class Engine(ContainerEngine):
                     for log in container.logs(**log_args):
                         log = log.decode("utf-8")
                         dt = log.split()[0]
-                        self.log_handler.write(log)
+                        log_handler.write(log)
 
                     if dt:
                         since = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S%z")
 
-                    self.log_handler.flush()
-                    self.log_handler.set_log_read_at(dt)
+                    log_handler.flush()
+                    log_handler.set_log_read_at(dt)
             else:
                 logger.warning(f"Container {container_id} not found.")
-                self.log_handler.write(
-                    f"Container {container_id} not found.", True
-                )
+                log_handler.write(f"Container {container_id} not found.", True)
         except APIError as e:
             logger.exception(
                 "Failed to fetch container logs: "
@@ -186,9 +190,6 @@ class Engine(ContainerEngine):
 
         try:
             registry = request.image_url.split("/")[0]
-            self.log_handler.write(
-                f"Attempting to login to registry: {registry}", True
-            )
             self.client.login(
                 username=credential.username,
                 password=credential.get_password(),
@@ -240,9 +241,12 @@ class Engine(ContainerEngine):
             self.auth_file = None
             logger.debug("Will not use auth file")
 
-    def _pull_image(self, request) -> Image:
+    def _pull_image(
+        self, request: ContainerRequest, log_handler: LogHandler
+    ) -> Image:
         try:
-            self.log_handler.write(f"Pulling image {request.image_url}", True)
+            log_handler.write(f"Pulling image {request.image_url}", True)
+            logger.info(f"Pulling image : {request.image_url}")
             kwargs = {}
             if request.credential:
                 kwargs["auth_config"] = {
@@ -260,7 +264,8 @@ class Engine(ContainerEngine):
                 )
                 logger.error(msg)
                 raise PodmanImagePullError(msg)
-
+            logger.info("Downloaded image")
+            return image
         except ImageNotFound:
             logger.exception(f"Image {request.image_url} not found")
             raise
@@ -286,4 +291,5 @@ class Engine(ContainerEngine):
         for key, value in pod_args.items():
             logger.debug("Key %s Value %s", key, value)
 
+        logger.info(pod_args)
         return pod_args
