@@ -2,6 +2,7 @@ from django.conf import settings
 
 import aap_eda.services.exceptions as exceptions
 
+from .kubernetes import Engine as KubernetesEngine
 from .podman import Engine as PodmanEngine
 
 
@@ -12,5 +13,5 @@ def new_container_engine():
     if settings.DEPLOYMENT_TYPE == "podman":
         return PodmanEngine()
     if settings.DEPLOYMENT_TYPE == "k8s":
-        raise NotImplementedError
+        return KubernetesEngine()
     raise exceptions.InvalidDeploymentTypeError("Wrong deployment type")

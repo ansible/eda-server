@@ -31,9 +31,11 @@ class AnsibleRulebookCmdLine:
     id: str
     log_level: str  # -v or -vv or None
 
-    def to_args(self) -> dict:
+    def command(self) -> str:
+        return "ansible-rulebook"
+
+    def get_args(self) -> list[str]:
         args = [
-            "ansible-rulebook",
             "--worker",
             "--websocket-ssl-verify",
             self.ws_ssl_verify,
@@ -47,6 +49,11 @@ class AnsibleRulebookCmdLine:
         if self.log_level:
             args.append(self.log_level)
 
+        return args
+
+    def command_and_args(self) -> list[str]:
+        args = self.get_args()
+        args.insert(0, self.command())
         return args
 
 
@@ -63,9 +70,11 @@ class ContainerRequest:
     name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
     image_url: str  # quay.io/ansible/ansible-rulebook:main
     cmdline: AnsibleRulebookCmdLine
+    id: str
+    parent_id: str
     credential: Credential = None
     ports: dict = None
-
+    pull_policy: str = "Always"  # Defaults to Always for K8S
     mem_limit: str = None
     mounts: dict = None
     env_vars: dict = None

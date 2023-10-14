@@ -30,7 +30,7 @@ from aap_eda.services.ruleset.exceptions import ActivationException
 
 from .common import ContainerEngine, ContainerRequest, LogHandler
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 def get_podman_client():
@@ -46,7 +46,7 @@ def get_podman_client():
             "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
         )
         podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
-    logger.info(f"Using podman socket: {podman_url}")
+    LOGGER.info(f"Using podman socket: {podman_url}")
     return PodmanClient(base_url=podman_url)
 
 
@@ -59,7 +59,7 @@ class Engine(ContainerEngine):
             self.client = client
         else:
             self.client = get_podman_client()
-        logger.debug(self.client.version())
+        LOGGER.debug(self.client.version())
 
     def stop(self, container_id: str) -> None:
         if self.client.containers.exists(container_id):
@@ -75,13 +75,13 @@ class Engine(ContainerEngine):
         try:
             self._set_auth_json_file()
             self._login(request)
-            logger.info(f"Image URL is {request.image_url}")
+            LOGGER.info(f"Image URL is {request.image_url}")
             self._pull_image(request, log_handler)
             log_handler.write("Starting Container", True)
-            command = request.cmdline.to_args()
+            command = request.cmdline.command_and_args()
             log_handler.write(f"Container args {command}", True)
             pod_args = self._load_pod_args(request)
-            logger.info(
+            LOGGER.info(
                 "Creating container: "
                 f"command: {command}"
                 f"pod_args: {pod_args}"
@@ -96,7 +96,7 @@ class Engine(ContainerEngine):
                 **pod_args,
             )
 
-            logger.info(
+            LOGGER.info(
                 f"Created container: "
                 f"name: {container.name}, "
                 f"id: {container.id}, "
@@ -108,15 +108,15 @@ class Engine(ContainerEngine):
 
             return str(container.id)
         except ActivationException as e:
-            logger.error(e)
+            LOGGER.error(e)
         except ContainerError:
-            logger.exception("Container error")
+            LOGGER.exception("Container error")
             raise
         except ImageNotFound:
-            logger.exception("Image not found")
+            LOGGER.exception("Image not found")
             raise
         except APIError:
-            logger.exception("Container run failed")
+            LOGGER.exception("Container run failed")
             raise
 
     def get_status(self, container_id: str) -> ActivationStatus:
@@ -165,10 +165,10 @@ class Engine(ContainerEngine):
                     log_handler.flush()
                     log_handler.set_log_read_at(dt)
             else:
-                logger.warning(f"Container {container_id} not found.")
+                LOGGER.warning(f"Container {container_id} not found.")
                 log_handler.write(f"Container {container_id} not found.", True)
         except APIError as e:
-            logger.exception(
+            LOGGER.exception(
                 "Failed to fetch container logs: "
                 f"{container_id}; error: {str(e)}"
             )
@@ -179,9 +179,9 @@ class Engine(ContainerEngine):
             container = self.client.containers.get(container_id)
             try:
                 container.remove(force=True, v=True)
-                logger.info(f"Container {container_id} is cleaned up.")
+                LOGGER.info(f"Container {container_id} is cleaned up.")
             except NotFound:
-                logger.info(f"Container {container_id} not found.")
+                LOGGER.info(f"Container {container_id} not found.")
 
     def _login(self, request) -> None:
         credential = request.credential
@@ -196,16 +196,16 @@ class Engine(ContainerEngine):
                 registry=registry,
             )
 
-            logger.debug(
+            LOGGER.debug(
                 f"{credential.username} login succeeded to {registry}"
             )
         except APIError:
-            logger.exception("Login failed")
+            LOGGER.exception("Login failed")
             raise
 
     def _write_auth_json(self, request) -> None:
         if not self.auth_file:
-            logger.debug("No auth file to create")
+            LOGGER.debug("No auth file to create")
             return
 
         auth_dict = {}
@@ -236,17 +236,17 @@ class Engine(ContainerEngine):
         dir_name = os.path.dirname(auth_file)
         if os.path.exists(dir_name):
             self.auth_file = auth_file
-            logger.debug("Will use auth file %s", auth_file)
+            LOGGER.debug("Will use auth file %s", auth_file)
         else:
             self.auth_file = None
-            logger.debug("Will not use auth file")
+            LOGGER.debug("Will not use auth file")
 
     def _pull_image(
         self, request: ContainerRequest, log_handler: LogHandler
     ) -> Image:
         try:
             log_handler.write(f"Pulling image {request.image_url}", True)
-            logger.info(f"Pulling image : {request.image_url}")
+            LOGGER.info(f"Pulling image : {request.image_url}")
             kwargs = {}
             if request.credential:
                 kwargs["auth_config"] = {
@@ -262,12 +262,12 @@ class Engine(ContainerEngine):
                     f"Image {request.image_url} pull failed. The image url "
                     "or the credentials may be incorrect."
                 )
-                logger.error(msg)
+                LOGGER.error(msg)
                 raise PodmanImagePullError(msg)
-            logger.info("Downloaded image")
+            LOGGER.info("Downloaded image")
             return image
         except ImageNotFound:
-            logger.exception(f"Image {request.image_url} not found")
+            LOGGER.exception(f"Image {request.image_url} not found")
             raise
 
     def _load_pod_args(self, request) -> dict:
@@ -289,7 +289,7 @@ class Engine(ContainerEngine):
                 pod_args[key] = value
 
         for key, value in pod_args.items():
-            logger.debug("Key %s Value %s", key, value)
+            LOGGER.debug("Key %s Value %s", key, value)
 
-        logger.info(pod_args)
+        LOGGER.info(pod_args)
         return pod_args
