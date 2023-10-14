@@ -209,6 +209,8 @@ class ActivationManager:
             cmdline=self._build_cmdline(),
             name=f"eda-{self.activation_instance.id}-{uuid.uuid4()}",
             image_url=self.db_instance.decision_environment.image_url,
+            parent_id=self.db_instance.id,
+            id=self.activation_instance.id,
         )
 
     def _build_credential(self) -> Credential:
