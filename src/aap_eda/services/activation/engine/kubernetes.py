@@ -76,6 +76,7 @@ class Engine(ContainerEngine):
         # Previous Version
         self.job_name = f"activation-job-{request.parent_id}-{request.id}"
         self.pod_name = f"activation-pod-{request.parent_id}-{request.id}"
+        self.secret_name = f"activation-secret-{request.parent_id}"
         # Should we switch to new format
         # self.job_name = f"activation-job-" #noqa: E800
         # f"{request.id}-{uuid.uuid4()}" #noqa: E800
@@ -504,7 +505,7 @@ class Engine(ContainerEngine):
             type="kubernetes.io/dockerconfigjson",
         )
 
-        self.client.coreapi.create_namespaced_secret(
+        self.client.core_api.create_namespaced_secret(
             namespace=self.namespace,
             body=secret,
         )
@@ -513,14 +514,14 @@ class Engine(ContainerEngine):
 
     def _delete_secret(self) -> None:
         try:
-            result = self.client.batch_api.list_namespaced_secret(
+            result = self.client.core_api.list_namespaced_secret(
                 namespace=self.namespace,
-                name=self.secret_name,
+                field_selector=f"metadata.name={self.secret_name}",
             )
             if not result.items:
                 return
 
-            result = self.client_api.delete_namespaced_secret(
+            result = self.client.core_api.delete_namespaced_secret(
                 name=self.secret_name,
                 namespace=self.namespace,
             )

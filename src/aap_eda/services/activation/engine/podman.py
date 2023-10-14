@@ -192,7 +192,7 @@ class Engine(ContainerEngine):
             registry = request.image_url.split("/")[0]
             self.client.login(
                 username=credential.username,
-                password=credential.get_password(),
+                password=credential.secret,
                 registry=registry,
             )
 
@@ -224,7 +224,7 @@ class Engine(ContainerEngine):
             json.dump(auth_dict, f, indent=6)
 
     def _create_auth_key(self, credential) -> dict:
-        data = f"{credential.username}:{credential.get_password()}"
+        data = f"{credential.username}:{credential.secret}"
         encoded_data = data.encode("ascii")
         return {"auth": base64.b64encode(encoded_data).decode("ascii")}
 
@@ -251,9 +251,9 @@ class Engine(ContainerEngine):
             if request.credential:
                 kwargs["auth_config"] = {
                     "username": request.credential.username,
-                    "password": request.credential.get_password(),
+                    "password": request.credential.secret,
                 }
-                self._write_auth_json()
+                self._write_auth_json(request)
             image = self.client.images.pull(request.image_url, **kwargs)
 
             # https://github.com/containers/podman-py/issues/301
