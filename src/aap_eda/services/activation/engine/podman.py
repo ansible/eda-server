@@ -57,6 +57,7 @@ def get_podman_client():
 class Engine(ContainerEngine):
     def __init__(
         self,
+        _activation_id: str,
         client=None,
     ) -> None:
         if client:
