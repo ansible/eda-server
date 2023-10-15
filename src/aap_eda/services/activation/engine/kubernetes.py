@@ -59,6 +59,7 @@ def get_k8s_client():
 class Engine(ContainerEngine):
     def __init__(
         self,
+        activation_id: str,
         client=None,
     ) -> None:
         if client:
@@ -66,6 +67,7 @@ class Engine(ContainerEngine):
         else:
             self.client = get_k8s_client()
         self._set_namespace()
+        self.secret_name = f"activation-secret-{activation_id}"
 
     def stop(self, job_name: str) -> None:
         self.job_name = job_name
@@ -77,7 +79,7 @@ class Engine(ContainerEngine):
         # Previous Version
         self.job_name = f"activation-job-{request.parent_id}-{request.id}"
         self.pod_name = f"activation-pod-{request.parent_id}-{request.id}"
-        self.secret_name = f"activation-secret-{request.parent_id}"
+
         # Should we switch to new format
         # self.job_name = f"activation-job-" #noqa: E800
         # f"{request.id}-{uuid.uuid4()}" #noqa: E800
@@ -316,6 +318,8 @@ class Engine(ContainerEngine):
         return job_result
 
     def _delete_job(self) -> None:
+        LOGGER.info("Not deleting for now")
+        return
         try:
             activation_job = self.client.batch_api.list_namespaced_job(
                 namespace=self.namespace,

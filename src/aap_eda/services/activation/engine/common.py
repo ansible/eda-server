@@ -85,9 +85,7 @@ class ContainerEngine(ABC):
     """Abstract interface to connect to the deployment backend."""
 
     @abstractmethod
-    def __init__(
-        self,
-    ):
+    def __init__(self, activation_id: str):
         ...
 
     @abstractmethod

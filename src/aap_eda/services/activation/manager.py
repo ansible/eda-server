@@ -70,7 +70,7 @@ class ActivationManager:
         if container_engine:
             self.container_engine = container_engine
         else:
-            self.container_engine = new_container_engine()
+            self.container_engine = new_container_engine(db_instance.id)
 
     @run_with_lock
     def _check_start_requirements(self):
