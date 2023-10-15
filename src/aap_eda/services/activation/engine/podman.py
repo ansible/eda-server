@@ -25,8 +25,10 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.exceptions import PodmanImagePullError
-from aap_eda.services.ruleset.exceptions import ActivationException
+from aap_eda.services.activation.exceptions import (
+    ActivationException,
+    PodmanImagePullError,
+)
 
 from .common import ContainerEngine, ContainerRequest, LogHandler
 
