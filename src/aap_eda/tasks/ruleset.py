@@ -25,7 +25,6 @@ from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job, job_from_queue, unique_enqueue
 from aap_eda.services.activation.manager import ActivationManager
 from aap_eda.services.ruleset.activate_rulesets import (
-    ActivateRulesets,
     save_activation_and_instance,
 )
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
@@ -203,9 +202,11 @@ def _perform_deactivate(
             flush=True,
         )
 
-        ActivateRulesets().deactivate(
-            instance=instance, final_status=final_status
-        )
+        # ActivateRulesets().deactivate( # noqa: E800
+        #    instance=instance, final_status=final_status # noqa: E800
+        # ) # noqa: E800
+
+        ActivationManager(instance.activation).stop()
 
 
 # Started by the scheduler, executed by the default worker
