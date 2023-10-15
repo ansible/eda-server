@@ -20,11 +20,7 @@ from aap_eda.services.activation.engine.common import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
 from .engine.factory import new_container_engine
-from .exceptions import (
-    ActivationException,
-    ActivationPodNotFound,
-    ActivationRecordNotFound,
-)
+from .exceptions import ActivationException, ActivationRecordNotFound
 
 LOGGER = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -155,10 +151,17 @@ class ActivationManager:
             LOGGER.info(f"Current status is {status}")
             if status in [ActivationStatus.COMPLETED, ActivationStatus.FAILED]:
                 self._set_status(status, None)
-            elif status == ActivationStatus.RUNNING:
                 self.update_logs()
-        except ActivationPodNotFound:
-            self._set_status(ActivationStatus.FAILED, None)
+                log_handler = DBLogger(self.activation_instance.id)
+                self.container_engine.cleanup(
+                    self.activation_instance.activation_pod_id, log_handler
+                )
+            elif status == ActivationStatus.RUNNING:
+                LOGGER.info("Updating logs")
+                self.update_logs()
+        except ActivationException as e:
+            self._set_status(ActivationStatus.FAILED, None, "f{e}")
+            LOGGER.error(f"Monitor Failed {e}")
 
     def stop(self):
         # TODO: Get the Activation Instance from Activation
