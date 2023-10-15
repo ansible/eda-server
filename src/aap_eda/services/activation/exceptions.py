@@ -33,5 +33,9 @@ class ActivationPodNotFound(ActivationException):
     pass
 
 
-class PodmanImagePullError(ActivationException):
+class ActivationImagePullError(ActivationException):
+    pass
+
+
+class ActivationImageNotFound(ActivationException):
     pass

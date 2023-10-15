@@ -27,7 +27,9 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.exceptions import (
     ActivationException,
-    PodmanImagePullError,
+    ActivationImageNotFound,
+    ActivationImagePullError,
+    ActivationPodNotFound,
 )
 
 from .common import ContainerEngine, ContainerRequest, LogHandler
@@ -111,15 +113,20 @@ class Engine(ContainerEngine):
             return str(container.id)
         except ActivationException as e:
             LOGGER.error(e)
-        except ContainerError:
-            LOGGER.exception("Container error")
+            log_handler.write(f"Activation Exception {e}", True)
             raise
-        except ImageNotFound:
-            LOGGER.exception("Image not found")
-            raise
-        except APIError:
-            LOGGER.exception("Container run failed")
-            raise
+        except ContainerError as e:
+            LOGGER.error(f"Container Error {e}")
+            log_handler.write(f"Container Error {e}", True)
+            raise ActivationException(f"Container Error {e}")
+        except ImageNotFound as e:
+            LOGGER.error(f"Image not found {e}")
+            log_handler.write(f"Image not found {e}", True)
+            raise ActivationImageNotFound(f"Image not found {e}")
+        except APIError as e:
+            LOGGER.error(f"API error {e}")
+            log_handler.write(f"API error {e}", True)
+            raise ActivationException(f"API Error {e}")
 
     def get_status(self, container_id: str) -> ActivationStatus:
         if self.client.containers.exists(container_id):
@@ -133,7 +140,9 @@ class Engine(ContainerEngine):
             elif container.status == "running":
                 return ActivationStatus.RUNNING
         else:
-            raise ActivationException(f"Container id {container_id} not found")
+            raise ActivationPodNotFound(
+                f"Container id {container_id} not found"
+            )
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
@@ -265,7 +274,7 @@ class Engine(ContainerEngine):
                     "or the credentials may be incorrect."
                 )
                 LOGGER.error(msg)
-                raise PodmanImagePullError(msg)
+                raise ActivationImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound:
