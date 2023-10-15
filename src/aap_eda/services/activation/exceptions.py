@@ -27,3 +27,11 @@ class DeactivationException(ActivationException):
 
 class ActivationRecordNotFound(ActivationException):
     pass
+
+
+class ActivationPodNotFound(ActivationException):
+    pass
+
+
+class PodmanImagePullError(ActivationException):
+    pass

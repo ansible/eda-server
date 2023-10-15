@@ -24,8 +24,9 @@ from kubernetes import client as k8sclient, config, watch
 from kubernetes.client.rest import ApiException
 
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.ruleset.exceptions import (
+from aap_eda.services.activation.exceptions import (
     ActivationException,
+    ActivationPodNotFound,
     DeactivationException,
     K8sActivationException,
 )
@@ -81,40 +82,43 @@ class Engine(ContainerEngine):
         # self.job_name = f"activation-job-" #noqa: E800
         # f"{request.id}-{uuid.uuid4()}" #noqa: E800
         try:
-            LOGGER.info("Creating job")
-            log_handler.write("Creating Job", True)
-            log_handler.write(f"Image URL is {request.image_url}")
+            log_handler.write("Creating Job")
+            log_handler.write(f"Image URL is {request.image_url}", True)
             self._create_job(request)
             LOGGER.info("Waiting for pod to start")
             self._wait_for_pod_to_start()
             if request.ports:
                 for port in request.port:
                     self._create_service(port)
-
+            LOGGER.info("Job is running")
+            log_handler.write("Job is running")
             return self.job_name
         except ActivationException as e:
+            LOGGER.error("Failed to start job, doing cleanup")
             LOGGER.error(e)
             self._cleanup()
             raise
 
     def get_status(self, job_name) -> ActivationStatus:
         status = ActivationStatus.FAILED
+        LOGGER.info(f"in get_status for {job_name}")
         pod = self._get_job_pod(job_name)
+
         container_status = pod.status.container_statuses[0]
-        LOGGER.debug(pod.status.phase)
-        LOGGER.debug(pod.metadata.name)
         if container_status.state.running:
             status = ActivationStatus.RUNNING
         elif container_status.state.terminated:
             exit_code = container_status.state.terminated.exit_code
             if exit_code in SUCCESSFUL_EXIT_CODES:
                 status = ActivationStatus.COMPLETED
+                LOGGER.info("Pod has successfully exited")
             else:
                 status = ActivationStatus.FAILED
                 LOGGER.info(
                     f"Pod exited with {exit_code}, reason "
                     f"{container_status.state.terminated.reason}"
                 )
+        LOGGER.info(f"get_status {job_name} current status {status}")
         return status
 
     def update_logs(self, job_name: str, log_handler: LogHandler) -> None:
@@ -168,7 +172,9 @@ class Engine(ContainerEngine):
             namespace=self.namespace, label_selector=job_label
         )
         if not result.items:
-            raise ActivationException(f"Pod with label {job_label} not found")
+            raise ActivationPodNotFound(
+                f"Pod with label {job_label} not found"
+            )
         return result.items[0]
 
     def _create_container(
@@ -343,6 +349,7 @@ class Engine(ContainerEngine):
             "ErrImagePull",
         ]
         status = ActivationStatus.PENDING
+        LOGGER.info("Waiting for pod to start")
         while True:
             try:
                 for event in watcher.stream(
@@ -410,6 +417,7 @@ class Engine(ContainerEngine):
                 )
             finally:
                 watcher.stop()
+            LOGGER.info("Pod has started")
             return status
 
     def _set_namespace(self):
@@ -430,11 +438,13 @@ class Engine(ContainerEngine):
             )
 
             if result.items:
+                LOGGER.info("Job exists")
                 break
             time.sleep(10)
 
         watcher = watch.Watch()
         while True:
+            LOGGER.info("Still waiting for job to start")
             try:
                 for event in watcher.stream(
                     self.client.batch_api.list_namespaced_job,
@@ -456,11 +466,9 @@ class Engine(ContainerEngine):
 
                     if o.status.failed:
                         LOGGER.info(f"Job {obj_name}: Failed")
-                        raise K8sActivationException()
+                        raise K8sActivationException(f"Job {obj_name}: Failed")
 
-            except DeactivationException:
-                raise
-            except Exception as e:
+            except ApiException as e:
                 raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
             finally:
                 watcher.stop()
