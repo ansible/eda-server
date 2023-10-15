@@ -20,7 +20,7 @@ from aap_eda.services.activation.engine.common import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
 from .engine.factory import new_container_engine
-from .exceptions import ActivationRecordNotFound
+from .exceptions import ActivationPodNotFound, ActivationRecordNotFound
 
 LOGGER = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -130,7 +130,7 @@ class ActivationManager:
         # start a container
         container_id = self.container_engine.start(request, log_handler)
         # update status
-        self._set_running_state(container_id)
+        self._set_status(ActivationStatus.RUNNING, container_id)
 
         # update logs
         self.container_engine.update_logs(container_id, log_handler)
@@ -140,31 +140,18 @@ class ActivationManager:
         self.start()
 
     def monitor(self):
-        self._set_activation_instance()
-        self.update_logs()
-        status = self.container_engine.get_status(
-            self.activation_instance.activation_pod_id
-        )
-        if status in [ActivationStatus.COMPLETED, ActivationStatus.FAILED]:
-            now = timezone.now()
-            self.activation_instance.status = status
-            self.activation_instance.updated_at = now
-            self.activation_instance.activation_pod_id = None
-            self.activation_instance.save(
-                update_fields=["status", "updated_at", "activation_pod_id"]
+        try:
+            self._set_activation_instance()
+            status = self.container_engine.get_status(
+                self.activation_instance.activation_pod_id
             )
-
-            self.db_instance.status = status
-            self.db_instance.is_valid = True
-            self.db_instance.status_updated_at = now
-            self.db_instance.save(
-                update_fields=[
-                    "status",
-                    "status_updated_at",
-                    "is_valid",
-                    "modified_at",
-                ]
-            )
+            LOGGER.info(f"Current status is {status}")
+            if status in [ActivationStatus.COMPLETED, ActivationStatus.FAILED]:
+                self._set_status(status, None)
+            elif status == ActivationStatus.RUNNING:
+                self.update_logs()
+        except ActivationPodNotFound:
+            self._set_status(ActivationStatus.FAILED, None)
 
     def stop(self):
         # TODO: Get the Activation Instance from Activation
@@ -231,16 +218,16 @@ class ActivationManager:
             id=str(self.activation_instance.id),
         )
 
-    def _set_running_state(self, container_id: str):
+    def _set_status(self, status: ActivationStatus, container_id: str):
         now = timezone.now()
-        self.activation_instance.status = ActivationStatus.RUNNING
+        self.activation_instance.status = status
         self.activation_instance.updated_at = now
         self.activation_instance.activation_pod_id = container_id
         self.activation_instance.save(
             update_fields=["status", "updated_at", "activation_pod_id"]
         )
 
-        self.db_instance.status = ActivationStatus.RUNNING
+        self.db_instance.status = status
         self.db_instance.is_valid = True
         self.db_instance.status_updated_at = now
         self.db_instance.save(
