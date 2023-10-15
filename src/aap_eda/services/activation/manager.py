@@ -150,12 +150,12 @@ class ActivationManager:
             )
             LOGGER.info(f"Current status is {status}")
             if status in [ActivationStatus.COMPLETED, ActivationStatus.FAILED]:
-                self._set_status(status, None)
                 self.update_logs()
                 log_handler = DBLogger(self.activation_instance.id)
                 self.container_engine.cleanup(
                     self.activation_instance.activation_pod_id, log_handler
                 )
+                self._set_status(status, None)
             elif status == ActivationStatus.RUNNING:
                 LOGGER.info("Updating logs")
                 self.update_logs()
