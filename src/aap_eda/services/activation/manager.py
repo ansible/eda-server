@@ -20,7 +20,11 @@ from aap_eda.services.activation.engine.common import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
 from .engine.factory import new_container_engine
-from .exceptions import ActivationPodNotFound, ActivationRecordNotFound
+from .exceptions import (
+    ActivationException,
+    ActivationPodNotFound,
+    ActivationRecordNotFound,
+)
 
 LOGGER = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -120,20 +124,23 @@ class ActivationManager:
             raise ActivationStartError(
                 "The Activation instance does not exist."
             )
-        # create an activation instance
-        self._create_activation_instance()
-        # TODO: The log handler needs the activation instance id
-        log_handler = DBLogger(self.activation_instance.id)
+        try:
+            # create an activation instance
+            self._create_activation_instance()
+            # TODO: The log handler needs the activation instance id
+            log_handler = DBLogger(self.activation_instance.id)
 
-        # build a container request
-        request = self._build_container_request()
-        # start a container
-        container_id = self.container_engine.start(request, log_handler)
-        # update status
-        self._set_status(ActivationStatus.RUNNING, container_id)
+            # build a container request
+            request = self._build_container_request()
+            # start a container
+            container_id = self.container_engine.start(request, log_handler)
+            # update status
+            self._set_status(ActivationStatus.RUNNING, container_id)
 
-        # update logs
-        self.container_engine.update_logs(container_id, log_handler)
+            # update logs
+            self.container_engine.update_logs(container_id, log_handler)
+        except ActivationException as e:
+            self._set_status(ActivationStatus.ERROR, None, f"{e}")
 
     def restart(self):
         self.stop()
@@ -218,26 +225,35 @@ class ActivationManager:
             id=str(self.activation_instance.id),
         )
 
-    def _set_status(self, status: ActivationStatus, container_id: str):
+    def _set_status(
+        self, status: ActivationStatus, container_id: str, msg: str = None
+    ):
         now = timezone.now()
         self.activation_instance.status = status
         self.activation_instance.updated_at = now
         self.activation_instance.activation_pod_id = container_id
-        self.activation_instance.save(
-            update_fields=["status", "updated_at", "activation_pod_id"]
-        )
+        update_fields = ["status", "updated_at", "activation_pod_id"]
+
+        if msg:
+            self.activation_instance.status_message = msg
+            update_fields.append("status_message")
+
+        self.activation_instance.save(update_fields=update_fields)
 
         self.db_instance.status = status
         self.db_instance.is_valid = True
         self.db_instance.status_updated_at = now
-        self.db_instance.save(
-            update_fields=[
-                "status",
-                "status_updated_at",
-                "is_valid",
-                "modified_at",
-            ]
-        )
+        update_fields = [
+            "status",
+            "status_updated_at",
+            "is_valid",
+            "modified_at",
+        ]
+        if msg:
+            self.db_instance.status_message = msg
+            update_fields.append("status_message")
+
+        self.db_instance.save(update_fields=update_fields)
 
     def _set_activation_instance(self):
         self.activation_instance = models.ActivationInstance.objects.get(
