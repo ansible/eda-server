@@ -66,12 +66,12 @@ class Engine(ContainerEngine):
             self.client = get_podman_client()
         LOGGER.debug(self.client.version())
 
-    def stop(self, container_id: str) -> None:
+    def stop(self, container_id: str, log_handler: LogHandler) -> None:
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             container.stop(ignore=True)
             self.update_logs(container_id)
-            self._cleanup(container_id)
+            self.cleanup(container_id, log_handler)
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         if not request.image_url:
@@ -186,7 +186,7 @@ class Engine(ContainerEngine):
             )
             raise
 
-    def _cleanup(self, container_id):
+    def cleanup(self, container_id: str, _log_handler: LogHandler):
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             try:

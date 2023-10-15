@@ -35,6 +35,7 @@ from .common import ContainerEngine, ContainerRequest, LogHandler
 
 LOGGER = logging.getLogger(__name__)
 SUCCESSFUL_EXIT_CODES = [0, 143]
+KEEP_JOBS_FOR_SECONDS = 300
 
 
 @dataclass
@@ -122,6 +123,12 @@ class Engine(ContainerEngine):
                 )
         LOGGER.info(f"get_status {job_name} current status {status}")
         return status
+
+    def cleanup(self, job_name: str, log_handler: LogHandler):
+        self.job_name = job_name
+        self._delete_secret()
+        self._delete_services()
+        self._delete_job()
 
     def update_logs(self, job_name: str, log_handler: LogHandler) -> None:
         try:
@@ -286,7 +293,10 @@ class Engine(ContainerEngine):
             LOGGER.info(f"Service {service_name} is deleted")
 
     def _create_job(
-        self, request: ContainerRequest, backoff_limit=0, ttl=0
+        self,
+        request: ContainerRequest,
+        backoff_limit=0,
+        ttl=KEEP_JOBS_FOR_SECONDS,
     ) -> k8sclient.V1Job:
         pod_template = self._create_pod_template(request)
 
@@ -476,11 +486,6 @@ class Engine(ContainerEngine):
                 raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
             finally:
                 watcher.stop()
-
-    def _cleanup(self):
-        self._delete_secret()
-        self._delete_services()
-        self._delete_job()
 
     def _create_secret(
         self,
