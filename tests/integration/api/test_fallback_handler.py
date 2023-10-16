@@ -11,23 +11,27 @@ class FallbackException(Exception):
     pass
 
 
-def raise_exception():
+def raise_exception(self, request):
     raise FallbackException
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.tasks.list_jobs", new=raise_exception)
+@mock.patch(
+    "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
+)
 def test_debug_unexpected_exception(client: APIClient, settings):
     settings.DEBUG = True
     with pytest.raises(FallbackException):
-        client.get(f"{api_url_v1}/tasks/")
+        client.get(f"{api_url_v1}/projects/")
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.tasks.list_jobs", new=raise_exception)
+@mock.patch(
+    "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
+)
 def test_non_debug_unexpected_exception(client: APIClient, settings):
     settings.DEBUG = False
-    response = client.get(f"{api_url_v1}/tasks/")
+    response = client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     data = response.json()
