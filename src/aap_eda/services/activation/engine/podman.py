@@ -88,7 +88,7 @@ class Engine(ContainerEngine):
             pod_args = self._load_pod_args(request)
             LOGGER.info(
                 "Creating container: "
-                f"command: {command}"
+                f"command: {command}, "
                 f"pod_args: {pod_args}"
             )
             container = self.client.containers.run(
@@ -107,7 +107,7 @@ class Engine(ContainerEngine):
                 f"id: {container.id}, "
                 f"ports: {container.ports}, "
                 f"status: {container.status}, "
-                f"command: {command}"
+                f"command: {command}, "
                 f"pod_args: {pod_args}"
             )
 
@@ -194,6 +194,13 @@ class Engine(ContainerEngine):
                 LOGGER.info(f"Container {container_id} is cleaned up.")
             except NotFound:
                 LOGGER.info(f"Container {container_id} not found.")
+
+    def get_ports(self, found_ports: list[tuple]) -> dict:
+        ports = {}
+        for _, port in found_ports:
+            ports[f"{port}/tcp"] = port
+
+        return ports
 
     def _login(self, request) -> None:
         credential = request.credential
