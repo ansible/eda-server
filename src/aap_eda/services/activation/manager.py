@@ -20,6 +20,7 @@ from aap_eda.services.activation.engine.common import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
 from .engine.factory import new_container_engine
+from .engine.ports import find_ports
 from .exceptions import ActivationException, ActivationRecordNotFound
 
 LOGGER = logging.getLogger(__name__)
@@ -206,6 +207,7 @@ class ActivationManager:
             cmdline=self._build_cmdline(),
             name=f"eda-{self.activation_instance.id}-{uuid.uuid4()}",
             image_url=self.db_instance.decision_environment.image_url,
+            ports=self._find_ports(),
             parent_id=self.db_instance.id,
             id=self.activation_instance.id,
         )
@@ -262,3 +264,8 @@ class ActivationManager:
         self.activation_instance = models.ActivationInstance.objects.get(
             pk=self.db_instance.latest_instance
         )
+
+    def _find_ports(self):
+        found_ports = find_ports(self.db_instance.rulebook_rulesets)
+
+        return self.container_engine.get_ports(found_ports)
