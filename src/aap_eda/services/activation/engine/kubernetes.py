@@ -91,7 +91,7 @@ class Engine(ContainerEngine):
             LOGGER.info("Waiting for pod to start")
             self._wait_for_pod_to_start()
             if request.ports:
-                for port in request.port:
+                for port in request.ports:
                     self._create_service(port)
             LOGGER.info("Job is running")
             log_handler.write("Job is running")
@@ -123,6 +123,9 @@ class Engine(ContainerEngine):
                 )
         LOGGER.info(f"get_status {job_name} current status {status}")
         return status
+
+    def get_ports(self, found_ports: list[tuple]) -> list[int]:
+        return [port for _, port in found_ports]
 
     def cleanup(self, job_name: str, log_handler: LogHandler):
         self.job_name = job_name
