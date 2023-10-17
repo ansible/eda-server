@@ -117,7 +117,7 @@ class DecisionEnvironmentViewSet(
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None, description="Delete successful."
             ),
-            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+            status.HTTP_409_CONFLICT: OpenApiResponse(
                 None, description="Decision Environment in use by Activations."
             ),
         },
@@ -139,7 +139,7 @@ class DecisionEnvironmentViewSet(
         ).exists()
 
         if activations_exist and force_delete not in ["true", "1", "yes"]:
-            raise api_exc.Forbidden(
+            raise api_exc.Conflict(
                 "Decision Environment is being used by Activations "
                 "and cannot be deleted. If you want to force delete, "
                 "please add /?force=True query param."
