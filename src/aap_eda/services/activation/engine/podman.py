@@ -174,8 +174,8 @@ class Engine(ContainerEngine):
                     if dt:
                         since = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S%z")
 
-                    log_handler.flush()
-                    log_handler.set_log_read_at(dt)
+                        log_handler.flush()
+                        log_handler.set_log_read_at(since)
             else:
                 LOGGER.warning(f"Container {container_id} not found.")
                 log_handler.write(f"Container {container_id} not found.", True)
