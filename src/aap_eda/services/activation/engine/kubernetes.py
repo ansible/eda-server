@@ -156,10 +156,10 @@ class Engine(ContainerEngine):
 
                 log = self.client.core_api.read_namespaced_pod_log(**log_args)
                 timestamp = None
+
                 for line in log.splitlines():
-                    timestamp = line.split()[0]
-                    LOGGER.debug(line)
-                    log_handler.write(line)
+                    timestamp, content = line.split(' ', 1)
+                    log_handler.write(content)
 
                 if timestamp:
                     sans_nano = timestamp.split(".")[0]
