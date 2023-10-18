@@ -107,7 +107,3 @@ class ContainerEngine(ABC):
     @abstractmethod
     def cleanup(self, container_id: str, logger: LogHandler):
         ...
-
-    @abstractmethod
-    def get_ports(self, found_ports: list[tuple]):
-        ...
