@@ -70,7 +70,7 @@ class Engine(ContainerEngine):
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             container.stop(ignore=True)
-            self.update_logs(container_id)
+            self.update_logs(container_id, log_handler)
             self.cleanup(container_id, log_handler)
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
