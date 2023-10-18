@@ -70,10 +70,8 @@ class Engine(ContainerEngine):
         self._set_namespace()
         self.secret_name = f"activation-secret-{activation_id}"
 
-    def stop(self, job_name: str) -> None:
-        self.job_name = job_name
-        self._delete_job()
-        self._cleanup()
+    def stop(self, container_id: str, log_handler: LogHandler) -> None:
+        self.cleanup(container_id, log_handler)
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version
@@ -91,15 +89,19 @@ class Engine(ContainerEngine):
             LOGGER.info("Waiting for pod to start")
             self._wait_for_pod_to_start()
             if request.ports:
-                for port in request.ports:
+                for port in self._get_ports(request.ports):
                     self._create_service(port)
             LOGGER.info("Job is running")
             log_handler.write("Job is running")
             return self.job_name
-        except ActivationException as e:
+        except (
+            ActivationException,
+            DeactivationException,
+            K8sActivationException,
+        ) as e:
             LOGGER.error("Failed to start job, doing cleanup")
             LOGGER.error(e)
-            self._cleanup()
+            self.cleanup(self.job_name, log_handler)
             raise
 
     def get_status(self, job_name) -> ActivationStatus:
@@ -124,7 +126,7 @@ class Engine(ContainerEngine):
         LOGGER.info(f"get_status {job_name} current status {status}")
         return status
 
-    def get_ports(self, found_ports: list[tuple]) -> list[int]:
+    def _get_ports(self, found_ports: dict) -> list:
         return [port for _, port in found_ports]
 
     def cleanup(self, job_name: str, log_handler: LogHandler):
@@ -195,10 +197,9 @@ class Engine(ContainerEngine):
     ) -> k8sclient.V1Container:
         ports = []
         if request.ports:
-            # TODO: Is ports a dict or an array???
             ports = [
                 k8sclient.V1ContainerPort(container_port=port)
-                for port in request.ports
+                for port in self._get_ports(request.ports)
             ]
         container = k8sclient.V1Container(
             image=request.image_url,
@@ -281,7 +282,7 @@ class Engine(ContainerEngine):
             LOGGER.info(f"Service already exists: {service_name}")
 
     def _delete_services(self) -> None:
-        services = self.client.core_api_api.list_namespaced_service(
+        services = self.client.core_api.list_namespaced_service(
             namespace=self.namespace,
             label_selector=f"job-name={self.job_name}",
         )
@@ -289,7 +290,7 @@ class Engine(ContainerEngine):
         for svc in services.items:
             service_name = svc.metadata.name
 
-            self.client.core_api_api.delete_namespaced_service(
+            self.client.core_api.delete_namespaced_service(
                 name=service_name,
                 namespace=self.namespace,
             )
@@ -331,12 +332,10 @@ class Engine(ContainerEngine):
         return job_result
 
     def _delete_job(self) -> None:
-        LOGGER.info("Not deleting for now")
-        return
         try:
             activation_job = self.client.batch_api.list_namespaced_job(
                 namespace=self.namespace,
-                label_selector="job_name=" f"{self.job_name}",
+                label_selector=f"job-name={self.job_name}",
                 timeout_seconds=0,
             )
 
@@ -350,10 +349,10 @@ class Engine(ContainerEngine):
 
                 if result.status == "Failure":
                     raise K8sActivationException(f"{result}")
-                self._cleanup()
+            else:
                 LOGGER.info(f"Job for : {self.job_name} has been removed")
 
-        except Exception as e:
+        except ApiException as e:
             raise K8sActivationException(
                 f"Stop of {self.job_name} Failed: \n {e}"
             )
@@ -387,7 +386,7 @@ class Engine(ContainerEngine):
                                 message = statuses[0].state.waiting.message
                                 reason = statuses[0].state.waiting.reason
                                 if reason in pod_failed_reasons:
-                                    self._delete_job()
+                                    # self._delete_job()  move to the caller
                                     status = ActivationStatus.ERROR
                                     raise K8sActivationException(message)
 

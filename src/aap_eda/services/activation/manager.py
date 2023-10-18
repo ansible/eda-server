@@ -207,7 +207,7 @@ class ActivationManager:
             cmdline=self._build_cmdline(),
             name=f"eda-{self.activation_instance.id}-{uuid.uuid4()}",
             image_url=self.db_instance.decision_environment.image_url,
-            ports=self._find_ports(),
+            ports=find_ports(self.db_instance.rulebook_rulesets),
             parent_id=self.db_instance.id,
             id=self.activation_instance.id,
         )
@@ -264,8 +264,3 @@ class ActivationManager:
         self.activation_instance = models.ActivationInstance.objects.get(
             pk=self.db_instance.latest_instance
         )
-
-    def _find_ports(self):
-        found_ports = find_ports(self.db_instance.rulebook_rulesets)
-
-        return self.container_engine.get_ports(found_ports)

@@ -195,7 +195,7 @@ class Engine(ContainerEngine):
             except NotFound:
                 LOGGER.info(f"Container {container_id} not found.")
 
-    def get_ports(self, found_ports: list[tuple]) -> dict:
+    def _get_ports(self, found_ports: dict) -> dict:
         ports = {}
         for _, port in found_ports:
             ports[f"{port}/tcp"] = port
@@ -292,7 +292,7 @@ class Engine(ContainerEngine):
     def _load_pod_args(self, request) -> dict:
         pod_args = {"name": request.name}
         if request.ports:
-            pod_args["ports"] = request.ports
+            pod_args["ports"] = self._get_ports(request.ports)
 
         if request.mem_limit:
             pod_args["mem_limit"] = request.mem_limit
