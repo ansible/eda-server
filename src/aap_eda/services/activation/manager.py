@@ -1,3 +1,19 @@
+#  Copyright 2023 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+"""Module for Activation Manager."""
+
+import contextlib
 import logging
 import typing as tp
 import uuid
@@ -9,8 +25,10 @@ from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 
-import aap_eda.core.models as models
+from aap_eda.api.serializers.activation import is_activation_valid
+from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
@@ -21,14 +39,9 @@ from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
 from .engine.factory import new_container_engine
 from .engine.ports import find_ports
-from .exceptions import ActivationException, ActivationRecordNotFound
 
 LOGGER = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
-
-
-class ActivationStartError(Exception):
-    pass
 
 
 class HasDbInstance(tp.Protocol):
@@ -36,6 +49,8 @@ class HasDbInstance(tp.Protocol):
 
 
 def run_with_lock(func: tp.Callable) -> tp.Callable:
+    """Run a method with a lock on the database instance."""
+
     @wraps(func)
     def _run_with_lock(self: HasDbInstance, *args, **kwargs):
         with transaction.atomic():
@@ -58,11 +73,27 @@ def run_with_lock(func: tp.Callable) -> tp.Callable:
 
 
 class ActivationManager:
+    """Activation Manager manages the lifecycle of an activation.
+
+    The Activation Manager is responsible for starting, stopping, restarting
+    and monitoring an activation. It has a reference to the database instance
+    and the container engine. It is also responsible for updating the status
+    of the activation. It has mechanisms to prevent race conditions when
+    updating the DB but only one instance of the manager for a given
+    activation should be running at a time by async workers.
+    """
+
     def __init__(
         self,
         db_instance: models.Activation,
         container_engine: ContainerEngine = None,
     ):
+        """Initialize the Activation Manager.
+
+        Args:
+            db_instance: The database instance of the activation.
+            container_engine: The container engine to use.
+        """
         self.db_instance = db_instance
         if container_engine:
             self.container_engine = container_engine
@@ -70,41 +101,145 @@ class ActivationManager:
             self.container_engine = new_container_engine(db_instance.id)
 
     @run_with_lock
-    def _check_start_requirements(self):
+    def _set_activation_status(
+        self,
+        status: ActivationStatus,
+        status_message: tp.Optional[str] = None,
+    ):
+        """Set the status from the manager with locking."""
+        if status_message:
+            self.db_instance.update_status(status, status_message)
+        else:
+            self.db_instance.update_status(status)
+
+    @run_with_lock
+    def _check_start_prerequirements(self):
+        """Check if the activation can be started."""
+
         disallowed_statuses = [
             ActivationStatus.STARTING,
             ActivationStatus.DELETING,
         ]
         self.db_instance.refresh_from_db
-        if self.db_instance.status in disallowed_statuses:
-            msg = f"Activation {self.db_instance.id} is in "
-            "f{self.db_instance.status} state, can not be started"
-            LOGGER.warning(msg)
-            raise ActivationStartError(msg)
+
         if self.db_instance.is_enabled is False:
             msg = f"Activation {self.db_instance.id} is disabled. "
-            "Can not be started"
+            "Can not be started."
             LOGGER.warning(msg)
-            raise ActivationStartError(msg)
+            raise exceptions.ActivationStartError(msg)
 
-        # call is_valid_activation from
-        # https://github.com/ansible/eda-server/pull/424
-        # TODO: Enable once the PR is merged
-        is_valid = True
-        error = None
-        # TODO: is_valid, error = is_activation_valid(self.db_instance)
-        if is_valid is False:
-            msg = f"Activation {self.db_instance.id} is not valid. "
-            f"Error: {error}"
+        if self.db_instance.status in disallowed_statuses:
+            msg = f"Activation {self.db_instance.id} is in "
+            "f{self.db_instance.status} state, can not be started."
+            LOGGER.warning(msg)
+            raise exceptions.ActivationStartError(msg)
+
+        # serializator checks (dependent activation objects)
+        is_valid, error = is_activation_valid(self.db_instance)
+        if not is_valid:
+            msg = f"Activation {self.db_instance.id} can not be started. "
+            f"Reason: {error}"
             LOGGER.error(msg)
             self.db_instance.update_status(
-                status=ActivationStatus.ERROR, status_message=msg
+                status=ActivationStatus.ERROR,
+                status_message=msg,
             )
-            raise ActivationStartError(msg)
+            raise exceptions.ActivationStartError(msg)
 
+    def _start_activation_instance(self):
+        self._set_activation_status(ActivationStatus.STARTING)
+
+        # TODO(alex): long try block, we should be more specific
+        try:
+            LOGGER.info(
+                "Creating a new activation instance for "
+                f"activation: {self.db_instance.id}",
+            )
+            self._create_activation_instance()
+            self.db_instance.refresh_from_db()
+            activation_instance: models.ActivationInstance = (
+                self.db_instance.latest_instance
+            )
+            activation_instance.update_status(ActivationStatus.STARTING)
+            log_handler = DBLogger(self.activation_instance.id)
+
+            LOGGER.info(
+                "Starting container for activation instance: "
+                f"{activation_instance.id}",
+            )
+            container_request = self._build_container_request()
+            container_id = self.container_engine.start(
+                container_request,
+                log_handler,
+            )
+
+            # update status
+            self._set_activation_status(ActivationStatus.RUNNING)
+            activation_instance.update_status(ActivationStatus.RUNNING)
+            activation_instance.activation_pod_id = container_id
+            activation_instance.save(update_fields=["activation_pod_id"])
+
+            # update logs
+            LOGGER.info(
+                "Container start successful. "
+                "updating logs for activation instance: "
+                f"{activation_instance.id}",
+            )
+            self.container_engine.update_logs(container_id, log_handler)
+
+        # note(alex): we may need to catch explicit exceptions
+        # ActivationImagePullError might need to be handled differently
+        # because it can be an error network and we might want to retry
+        # so, activation should be in FAILED state to be handled by the monitor
+        except exceptions.ActivationException as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to start. "
+                f"Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            self._set_activation_status(ActivationStatus.ERROR, msg)
+            raise exceptions.ActivationStartError(msg) from exc
+
+    def _is_already_running(self) -> bool:
         if self.db_instance.status == ActivationStatus.RUNNING:
-            # check if the container is running
-            pass
+            container_status = None
+            latest_instance: tp.Optional[
+                models.ActivationInstance
+            ] = self.db_instance.latest_instance
+
+            if not latest_instance:
+                # how we want to handle this case?
+                # for now we raise an error and let the monitor correct it
+                msg = f"Activation {self.db_instance.id} has not instances."
+                raise exceptions.ActivationStartError(msg)
+
+            if not latest_instance.activation_pod_id:
+                # how we want to handle this case?
+                # for now we raise an error and let the monitor correct it
+                msg = f"Activation {self.db_instance.id} has not pod id."
+                raise exceptions.ActivationStartError(msg)
+
+            with contextlib.suppress(exceptions.ActivationPodNotFound):
+                container_status = self.container_engine.get_status(
+                    container_id=latest_instance.activation_pod_id,
+                )
+
+            if latest_instance.status == ActivationStatus.RUNNING and (
+                container_status is not None
+                and container_status == ActivationStatus.RUNNING
+            ):
+                return True
+
+            if latest_instance.status == ActivationStatus.RUNNING and (
+                container_status is not None
+                and container_status != ActivationStatus.RUNNING
+            ):
+                return False
+
+            if latest_instance.status != ActivationStatus.RUNNING:
+                return False
+
+        return False
 
     def start(self):
         """Start an activation.
@@ -113,31 +248,21 @@ class ActivationManager:
         otherwise raise ActivationStartError.
         Starts the activation in an idepotent way.
         """
-        # Check for the right statuses
-        # It may need to be encapsulated in a private method
+        msg = f"Requested to start activation {self.db_instance.id}, starting."
+        LOGGER.info(msg)
+
         try:
-            self._check_start_requirements()
+            self._check_start_prerequirements()
         except ObjectDoesNotExist:
-            raise ActivationStartError(
-                "The Activation instance does not exist."
+            raise exceptions.ActivationStartError(
+                "The Activation does not exist."
             )
-        try:
-            # create an activation instance
-            self._create_activation_instance()
-            # TODO: The log handler needs the activation instance id
-            log_handler = DBLogger(self.activation_instance.id)
 
-            # build a container request
-            request = self._build_container_request()
-            # start a container
-            container_id = self.container_engine.start(request, log_handler)
-            # update status
-            self._set_status(ActivationStatus.RUNNING, container_id)
-
-            # update logs
-            self.container_engine.update_logs(container_id, log_handler)
-        except ActivationException as e:
-            self._set_status(ActivationStatus.ERROR, None, f"{e}")
+        if self._is_already_running():
+            msg = f"Activation {self.db_instance.id} is already running."
+            LOGGER.info(msg)
+            return
+        self._start_activation_instance()
 
     def restart(self):
         self.stop()
@@ -197,7 +322,7 @@ class ActivationManager:
                 ]
             )
         except IntegrityError:
-            raise ActivationRecordNotFound(
+            raise exceptions.ActivationRecordNotFound(
                 f"Activation {self.db_instance.name} has been deleted."
             )
 
@@ -230,7 +355,10 @@ class ActivationManager:
             id=str(self.activation_instance.id),
         )
 
-    def _set_status(
+    # TODO: we should access the activation instance from the db_instance.latest_instance
+    # activation.status and activation_instance.status not always are the same,
+    # I think it is better if we manage them separately
+    def _set_activation_instance_status(
         self, status: ActivationStatus, container_id: str, msg: str = None
     ):
         now = timezone.now()
