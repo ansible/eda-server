@@ -127,7 +127,7 @@ def test_delete_credential_used_by_activation(client: APIClient):
     create_activation(activation_dependencies)
     credential_id = activation_dependencies["credential_id"]
     response = client.delete(f"{api_url_v1}/credentials/{credential_id}/")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db
