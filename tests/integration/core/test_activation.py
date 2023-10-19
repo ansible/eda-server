@@ -113,3 +113,31 @@ def test_activation_save(init_data):
     activation.refresh_from_db()
     assert activation.status == ActivationStatus.ERROR
     assert activation.status_message == error_message
+
+
+@pytest.mark.django_db
+def test_activation_latest_instance_field(init_data):
+    """
+    Test that the latest_instance field is updated when a new instance is created
+    """
+    activation = init_data
+    assert activation.latest_instance is None
+
+    first_instance = models.ActivationInstance.objects.create(
+        activation=activation,
+        name="instance",
+        status=ActivationStatus.PENDING,
+    )
+    assert activation.latest_instance == first_instance
+
+    second_instance = models.ActivationInstance.objects.create(
+        activation=activation,
+        name="instance",
+        status=ActivationStatus.PENDING,
+    )
+    assert activation.latest_instance == second_instance
+
+    # ensure latest instance is returned when a previous instance is updated
+    first_instance.status = ActivationStatus.COMPLETED
+    first_instance.save(update_fields=["status"])
+    assert activation.latest_instance == second_instance
