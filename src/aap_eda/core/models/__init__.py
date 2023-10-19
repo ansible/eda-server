@@ -25,6 +25,7 @@ from .job import (
     JobInstanceHost,
 )
 from .project import ExtraVar, Project
+from .queue import ActivationRequestQueue
 from .rulebook import (
     AuditAction,
     AuditEvent,
@@ -59,4 +60,5 @@ __all__ = [
     "AwxToken",
     "Credential",
     "DecisionEnvironment",
+    "ActivationRequestQueue",
 ]
