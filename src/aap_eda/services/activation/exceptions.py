@@ -17,6 +17,10 @@ class ActivationException(Exception):
     pass
 
 
+class ActivationStartError(Exception):
+    pass
+
+
 class K8sActivationException(ActivationException):
     pass
 
