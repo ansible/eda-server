@@ -142,7 +142,7 @@ class CredentialViewSet(
         ).exists()
 
         if is_used and not force:
-            raise exceptions.Forbidden(
+            raise exceptions.Conflict(
                 "Credential is being used by Activations "
                 "and cannot be deleted. If you want to force delete, "
                 "please add /?force=true query param."

@@ -42,13 +42,14 @@ def sync_project(project_id: int):
     logger.info(f"Task complete: Sync project ( project_id={project.id} )")
 
 
-# Started by the scheduler, unique concurrent execution on default queue
-def monitor_project_tasks():
+# Started by the scheduler, unique concurrent execution on specified queue;
+# default is the default queue
+def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
     job_id = "monitor_project_tasks"
-    unique_enqueue(PROJECT_TASKS_QUEUE, job_id, _monitor_project_tasks)
+    unique_enqueue(queue_name, job_id, _monitor_project_tasks, queue_name)
 
 
-def _monitor_project_tasks() -> None:
+def _monitor_project_tasks(queue_name: str) -> None:
     """Handle project tasks that are stuck.
 
     Check if there are projects in PENDING state that doesn't have
@@ -57,7 +58,7 @@ def _monitor_project_tasks() -> None:
     """
     logger.info("Task started: Monitor project tasks")
 
-    queue = get_queue(PROJECT_TASKS_QUEUE)
+    queue = get_queue(queue_name)
 
     # Filter projects that doesn't have any related job
     pending_projects = models.Project.objects.filter(
