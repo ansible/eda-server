@@ -129,6 +129,7 @@ class Engine(ContainerEngine):
             log_handler.write(f"API error {e}", True)
             raise ActivationException(f"API Error {e}")
 
+    # note(alex): the signature of this method is different from the interface
     def get_status(self, container_id: str) -> ActivationStatus:
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)

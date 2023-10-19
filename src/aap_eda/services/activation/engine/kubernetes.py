@@ -104,6 +104,7 @@ class Engine(ContainerEngine):
             self.cleanup(self.job_name, log_handler)
             raise
 
+    # note(alex): the signature of this method is different from the interface
     def get_status(self, job_name) -> ActivationStatus:
         status = ActivationStatus.FAILED
         LOGGER.info(f"in get_status for {job_name}")
