@@ -130,10 +130,10 @@ def test_partial_update_decision_environment(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_delete_decision_environment_forbidden(client: APIClient, init_db):
+def test_delete_decision_environment_conflict(client: APIClient, init_db):
     obj_id = int(init_db.decision_environment.id)
     response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db

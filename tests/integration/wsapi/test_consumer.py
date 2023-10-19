@@ -465,6 +465,11 @@ def _prepare_db_data():
     )
 
     models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_test_name_1",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
@@ -473,6 +478,7 @@ def _prepare_db_data():
         rulebook=rulebook,
         project=project,
         user=user,
+        decision_environment=decision_environment,
     )
 
     activation_instance, _ = models.ActivationInstance.objects.get_or_create(
@@ -524,6 +530,11 @@ def _prepare_acitvation_instance_without_extra_var():
     )
 
     models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_test_name_2",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
 
     activation = models.Activation.objects.create(
         name="test-activation-no-extra_var",
@@ -531,6 +542,7 @@ def _prepare_acitvation_instance_without_extra_var():
         rulebook=rulebook,
         project=project,
         user=user,
+        decision_environment=decision_environment,
     )
 
     activation_instance = models.ActivationInstance.objects.create(
