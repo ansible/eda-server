@@ -84,7 +84,13 @@ class Activation(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
-    latest_instance = models.IntegerField(null=True, default=None)
+    latest_instance = models.OneToOneField(
+        "ActivationInstance",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     def save(self, *args, **kwargs):
         # when creating
@@ -178,6 +184,9 @@ class ActivationInstance(models.Model):
         if self._state.adding:
             if self.status_message is None:
                 self.status_message = self._get_default_status_message()
+
+                # populate latest_instance of activation at creation
+                self.activation.latest_instance = self
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
@@ -205,6 +214,7 @@ class ActivationInstance(models.Model):
                 kwargs["update_fields"].append("status_message")
 
         super().save(*args, **kwargs)
+        self.activation.save(update_fields=["latest_instance"])
 
     def _get_default_status_message(self):
         try:
