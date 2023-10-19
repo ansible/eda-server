@@ -101,3 +101,10 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.UNRESPONSIVE: "Activation is not responsive",
     ActivationStatus.ERROR: "Activation is in an error state",
 }
+
+
+class ActivationRequest(DjangoStrEnum):
+    START = "start"
+    STOP = "stop"
+    RESTART = "restart"
+    DELETE = "delete"
