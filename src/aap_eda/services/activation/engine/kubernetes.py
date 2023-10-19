@@ -159,7 +159,7 @@ class Engine(ContainerEngine):
                 timestamp = None
 
                 for line in log.splitlines():
-                    timestamp, content = line.split(' ', 1)
+                    timestamp, content = line.split(" ", 1)
                     log_handler.write(content)
 
                 if timestamp:
