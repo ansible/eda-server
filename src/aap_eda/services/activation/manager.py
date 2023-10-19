@@ -190,12 +190,6 @@ class ActivationManager:
                     git_hash=self.db_instance.git_hash,
                 )
             )
-            self.db_instance.latest_instance = self.activation_instance.id
-            self.db_instance.save(
-                update_fields=[
-                    "latest_instance",
-                ]
-            )
         except IntegrityError:
             raise ActivationRecordNotFound(
                 f"Activation {self.db_instance.name} has been deleted."
