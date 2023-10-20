@@ -19,6 +19,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from dateutil import parser
 
 from kubernetes import client as k8sclient, config, watch
 from kubernetes.client.rest import ApiException
@@ -151,9 +152,12 @@ class Engine(ContainerEngine):
                 }
 
                 if log_handler.get_log_read_at():
-                    log_args["since_seconds"] = int(time.time()) - int(
-                        log_handler.get_log_read_at().timestamp()
+                    current_dt = datetime.fromtimestamp(
+                        time.time_ns() / 1e9, timezone.utc
                     )
+                    log_args["since_seconds"] = (
+                        current_dt - log_handler.get_log_read_at()
+                    ).seconds
 
                 log = self.client.core_api.read_namespaced_pod_log(**log_args)
                 timestamp = None
@@ -163,11 +167,7 @@ class Engine(ContainerEngine):
                     log_handler.write(content)
 
                 if timestamp:
-                    sans_nano = timestamp.split(".")[0]
-                    # TODO: This works only on python 3.11
-                    dt = datetime.fromisoformat(sans_nano).replace(
-                        tzinfo=timezone.utc
-                    )
+                    dt = parser.parse(timestamp)
                     log_handler.flush()
                     log_handler.set_log_read_at(dt)
             else:
