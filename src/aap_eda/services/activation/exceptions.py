@@ -21,6 +21,18 @@ class ActivationStartError(Exception):
     pass
 
 
+class ActivationStopError(Exception):
+    pass
+
+
+class ActivationInstanceNotFound(ActivationException):
+    pass
+
+
+class ActivationInstancePodIdNotFound(ActivationException):
+    pass
+
+
 class K8sActivationException(ActivationException):
     pass
 
