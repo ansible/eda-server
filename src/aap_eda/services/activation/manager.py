@@ -100,6 +100,11 @@ class ActivationManager:
         else:
             self.container_engine = new_container_engine(db_instance.id)
 
+    @property
+    def latest_instance(self) -> tp.Optional[models.ActivationInstance]:
+        """Return the latest instance of the activation."""
+        return self.db_instance.latest_instance
+
     @run_with_lock
     def _set_activation_status(
         self,
@@ -107,10 +112,44 @@ class ActivationManager:
         status_message: tp.Optional[str] = None,
     ):
         """Set the status from the manager with locking."""
+        kwargs = {"status": status}
         if status_message:
-            self.db_instance.update_status(status, status_message)
-        else:
-            self.db_instance.update_status(status)
+            kwargs["status_message"] = status_message
+        self.db_instance.update_status(**kwargs)
+
+    @run_with_lock
+    def _set_activation_instance_status(
+        self,
+        status: ActivationStatus,
+        status_message: tp.Optional[str] = None,
+    ):
+        """Set the status from the manager with locking."""
+        kwargs = {"status": status}
+        if status_message:
+            kwargs["status_message"] = status_message
+        self.activation_instance.update_status(**kwargs)
+
+    @run_with_lock
+    def _check_stop_prerequirements(self):
+        """Check if the activation can be stopped."""
+
+        disallowed_statuses = [
+            ActivationStatus.STOPPING,
+            ActivationStatus.DELETING,
+        ]
+        self.db_instance.refresh_from_db
+
+        if self.db_instance.is_enabled is False:
+            msg = f"Activation {self.db_instance.id} is disabled. "
+            f"Can not be stopped."
+            LOGGER.warning(msg)
+            raise exceptions.ActivationStopError(msg)
+
+        if self.db_instance.status in disallowed_statuses:
+            msg = f"Activation {self.db_instance.id} is in "
+            f"{self.db_instance.status} state, can not be stopped."
+            LOGGER.warning(msg)
+            raise exceptions.ActivationStopError(msg)
 
     @run_with_lock
     def _check_start_prerequirements(self):
@@ -146,6 +185,20 @@ class ActivationManager:
             )
             raise exceptions.ActivationStartError(msg)
 
+    def _check_latest_instance(self):
+        """Check if the activation has a latest instance and pod id."""
+        if not self.latest_instance:
+            # how we want to handle this case?
+            # for now we raise an error and let the monitor correct it
+            msg = f"Activation {self.db_instance.id} has not instances."
+            raise exceptions.ActivationInstanceNotFound(msg)
+
+        if not self.latest_instance.activation_pod_id:
+            # how we want to handle this case?
+            # for now we raise an error and let the monitor correct it
+            msg = f"Activation {self.db_instance.id} has not pod id."
+            raise exceptions.ActivationInstancePodIdNotFound(msg)
+
     def _start_activation_instance(self):
         self._set_activation_status(ActivationStatus.STARTING)
 
@@ -157,15 +210,12 @@ class ActivationManager:
             )
             self._create_activation_instance()
             self.db_instance.refresh_from_db()
-            activation_instance: models.ActivationInstance = (
-                self.db_instance.latest_instance
-            )
-            activation_instance.update_status(ActivationStatus.STARTING)
+            self.activation_instance.update_status(ActivationStatus.STARTING)
             log_handler = DBLogger(self.activation_instance.id)
 
             LOGGER.info(
                 "Starting container for activation instance: "
-                f"{activation_instance.id}",
+                f"{self.activation_instance.id}",
             )
             container_request = self._build_container_request()
             container_id = self.container_engine.start(
@@ -175,15 +225,15 @@ class ActivationManager:
 
             # update status
             self._set_activation_status(ActivationStatus.RUNNING)
-            activation_instance.update_status(ActivationStatus.RUNNING)
-            activation_instance.activation_pod_id = container_id
-            activation_instance.save(update_fields=["activation_pod_id"])
+            self.activation_instance.update_status(ActivationStatus.RUNNING)
+            self.activation_instance.activation_pod_id = container_id
+            self.activation_instance.save(update_fields=["activation_pod_id"])
 
             # update logs
             LOGGER.info(
                 "Container start successful. "
                 "updating logs for activation instance: "
-                f"{activation_instance.id}",
+                f"{self.activation_instance.id}",
             )
             self.container_engine.update_logs(container_id, log_handler)
 
@@ -200,46 +250,53 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-    def _is_already_running(self) -> bool:
-        if self.db_instance.status == ActivationStatus.RUNNING:
+    def _stop_latest_instance(self):
+        # TODO: Catch exceptions from the engine as well as start method does
+        self._set_activation_status(ActivationStatus.STOPPING)
+        self._set_activation_instance_status(ActivationStatus.STOPPING)
+        latest_instance = self.db_instance.latest_instance
+
+        log_handler = DBLogger(latest_instance.id)
+        self.container_engine.stop(
+            latest_instance.activation_pod_id,
+            log_handler,
+        )
+        self._set_activation_status(ActivationStatus.STOPPED)
+        self._set_activation_instance_status(ActivationStatus.STOPPED)
+
+    def _is_in_status(self, status: ActivationStatus) -> bool:
+        """Check if the activation is in a given status."""
+        if self.db_instance.status == status:
+            self._check_latest_instance()
+
             container_status = None
-            latest_instance: tp.Optional[
-                models.ActivationInstance
-            ] = self.db_instance.latest_instance
-
-            if not latest_instance:
-                # how we want to handle this case?
-                # for now we raise an error and let the monitor correct it
-                msg = f"Activation {self.db_instance.id} has not instances."
-                raise exceptions.ActivationStartError(msg)
-
-            if not latest_instance.activation_pod_id:
-                # how we want to handle this case?
-                # for now we raise an error and let the monitor correct it
-                msg = f"Activation {self.db_instance.id} has not pod id."
-                raise exceptions.ActivationStartError(msg)
+            latest_instance = self.latest_instance
 
             with contextlib.suppress(exceptions.ActivationPodNotFound):
                 container_status = self.container_engine.get_status(
                     container_id=latest_instance.activation_pod_id,
                 )
 
-            if latest_instance.status == ActivationStatus.RUNNING and (
-                container_status is not None
-                and container_status == ActivationStatus.RUNNING
+            if latest_instance.status == status and (
+                container_status is not None and container_status == status
             ):
                 return True
 
-            if latest_instance.status == ActivationStatus.RUNNING and (
-                container_status is not None
-                and container_status != ActivationStatus.RUNNING
+            if latest_instance.status == status and (
+                container_status is not None and container_status != status
             ):
                 return False
 
-            if latest_instance.status != ActivationStatus.RUNNING:
+            if latest_instance.status != status:
                 return False
 
         return False
+
+    def _is_already_running(self) -> bool:
+        return self._is_in_status(ActivationStatus.RUNNING)
+
+    def _is_already_stopped(self) -> bool:
+        return self._is_in_status(ActivationStatus.STOPPED)
 
     def start(self):
         """Start an activation.
@@ -257,12 +314,38 @@ class ActivationManager:
             raise exceptions.ActivationStartError(
                 "The Activation does not exist."
             )
-
-        if self._is_already_running():
-            msg = f"Activation {self.db_instance.id} is already running."
-            LOGGER.info(msg)
-            return
+        try:
+            self._check_latest_instance()
+            if self._is_already_running():
+                msg = f"Activation {self.db_instance.id} is already running."
+                LOGGER.info(msg)
+                return
+        except (
+            exceptions.ActivationInstanceNotFound,
+            exceptions.ActivationInstancePodIdNotFound,
+        ) as exc:
+            raise exceptions.ActivationStartError(str(exc)) from None
         self._start_activation_instance()
+
+    def stop(self):
+        try:
+            self._check_stop_prerequirements()
+        except ObjectDoesNotExist:
+            raise exceptions.ActivationStartError(
+                "The Activation does not exist."
+            )
+        try:
+            self._check_latest_instance()
+            if self._is_already_stopped():
+                msg = f"Activation {self.db_instance.id} is already stopped."
+                LOGGER.info(msg)
+                return
+        except (
+            exceptions.ActivationInstanceNotFound,
+            exceptions.ActivationInstancePodIdNotFound,
+        ) as exc:
+            raise exceptions.ActivationStopError(str(exc)) from None
+        self._stop_latest_instance()
 
     def restart(self):
         self.stop()
@@ -285,17 +368,9 @@ class ActivationManager:
             elif status == ActivationStatus.RUNNING:
                 LOGGER.info("Updating logs")
                 self.update_logs()
-        except ActivationException as e:
+        except exceptions.ActivationException as e:
             self._set_status(ActivationStatus.FAILED, None, "f{e}")
             LOGGER.error(f"Monitor Failed {e}")
-
-    def stop(self):
-        # TODO: Get the Activation Instance from Activation
-        self._set_activation_instance()
-        log_handler = DBLogger(self.activation_instance.id)
-        self.container_engine.stop(
-            self.activation_instance.activation_pod_id, log_handler
-        )
 
     def update_logs(self):
         # TODO: Get the Activation Instance from Activation
@@ -347,42 +422,4 @@ class ActivationManager:
             ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             id=str(self.activation_instance.id),
-        )
-
-    # TODO: we should access the activation instance from the db_instance.latest_instance
-    # activation.status and activation_instance.status not always are the same,
-    # I think it is better if we manage them separately
-    def _set_activation_instance_status(
-        self, status: ActivationStatus, container_id: str, msg: str = None
-    ):
-        now = timezone.now()
-        self.activation_instance.status = status
-        self.activation_instance.updated_at = now
-        self.activation_instance.activation_pod_id = container_id
-        update_fields = ["status", "updated_at", "activation_pod_id"]
-
-        if msg:
-            self.activation_instance.status_message = msg
-            update_fields.append("status_message")
-
-        self.activation_instance.save(update_fields=update_fields)
-
-        self.db_instance.status = status
-        self.db_instance.is_valid = True
-        self.db_instance.status_updated_at = now
-        update_fields = [
-            "status",
-            "status_updated_at",
-            "is_valid",
-            "modified_at",
-        ]
-        if msg:
-            self.db_instance.status_message = msg
-            update_fields.append("status_message")
-
-        self.db_instance.save(update_fields=update_fields)
-
-    def _set_activation_instance(self):
-        self.activation_instance = models.ActivationInstance.objects.get(
-            pk=self.db_instance.latest_instance
         )
