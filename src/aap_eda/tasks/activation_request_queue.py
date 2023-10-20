@@ -23,9 +23,10 @@ def push(activation_id: int, request: ActivationRequest) -> None:
 
 
 def peek_all(activation_id: int) -> list[ActivationRequestQueue]:
-    return ActivationRequestQueue.objects.filter(
+    requests = ActivationRequestQueue.objects.filter(
         activation_id=activation_id
     ).all()
+    return _arbitrate(requests)
 
 
 def pop_until(activation_id: int, queue_id: int) -> None:
@@ -39,3 +40,50 @@ def list_activations() -> list[int]:
         "activation_id"
     )
     return [obj.activation_id for obj in objs]
+
+
+def _arbitrate(
+    requests: list[ActivationRequestQueue],
+) -> list[ActivationRequestQueue]:
+    if len(requests) < 2:
+        return requests
+
+    ref_request = None
+    qualified_requests = []
+    starts = [ActivationRequest.START, ActivationRequest.RESTART]
+    for request in requests:
+        if not ref_request:
+            ref_request = request
+            continue
+
+        # nothing can be done after delete
+        # or dedup
+        if (
+            ref_request.request == ActivationRequest.DELETE
+            or request.request == ref_request.request
+        ):
+            request.delete()
+            continue
+
+        if (
+            request.request == ActivationRequest.STOP
+            or request.request == ActivationRequest.DELETE
+        ):
+            while qualified_requests:
+                qualified = qualified_requests.pop()
+                qualified.delete()
+            ref_request.delete()
+            ref_request = request
+            continue
+
+        if request.request in starts and ref_request.request in starts:
+            request.delete()
+            continue
+
+        qualified_requests.append(ref_request)
+        ref_request = request
+
+    if ref_request:
+        qualified_requests.append(ref_request)
+
+    return qualified_requests
