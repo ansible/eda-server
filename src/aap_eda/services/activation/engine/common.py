@@ -97,13 +97,13 @@ class ContainerEngine(ABC):
         ...
 
     @abstractmethod
-    def stop(self, container_id: str, logger: LogHandler):
+    def stop(self, container_id: str, logger: LogHandler) -> None:
         ...
 
     @abstractmethod
-    def update_logs(self, container_id: str, logger: LogHandler):
+    def update_logs(self, container_id: str, logger: LogHandler) -> None:
         ...
 
     @abstractmethod
-    def cleanup(self, container_id: str, logger: LogHandler):
+    def cleanup(self, container_id: str, logger: LogHandler) -> None:
         ...
