@@ -20,7 +20,7 @@ from aap_eda.core.enums import ActivationRequest
 
 
 @pytest.fixture()
-def init_activations():
+def activations():
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -42,19 +42,79 @@ def init_activations():
 
 
 @pytest.mark.django_db
-def test_queue(init_activations):
-    queue.push(init_activations[0].id, ActivationRequest.START)
-    queue.push(init_activations[1].id, ActivationRequest.STOP)
-    queue.push(init_activations[0].id, ActivationRequest.DELETE)
-    queue.push(init_activations[0].id, ActivationRequest.RESTART)
+def test_queue(activations):
+    queue.push(activations[0].id, ActivationRequest.STOP)
+    queue.push(activations[1].id, ActivationRequest.DELETE)
+    queue.push(activations[0].id, ActivationRequest.START)
+    queue.push(activations[0].id, ActivationRequest.RESTART)
     assert models.ActivationRequestQueue.objects.count() == 4
     assert queue.list_activations() == [
-        init_activations[0].id,
-        init_activations[1].id,
+        activations[0].id,
+        activations[1].id,
     ]
 
-    requests = queue.peek_all(init_activations[0].id)
+    requests = queue.peek_all(activations[0].id)
     assert len(requests) == 3
 
-    queue.pop_until(init_activations[0].id, requests[1].id)
-    assert len(queue.peek_all(init_activations[0].id)) == 1
+    queue.pop_until(activations[0].id, requests[1].id)
+    assert len(queue.peek_all(activations[0].id)) == 1
+
+
+@pytest.mark.parametrize(
+    "requests",
+    [
+        {
+            "queued": [ActivationRequest.START],
+            "dequeued": [ActivationRequest.START],
+        },
+        {"queued": [], "dequeued": []},
+        {
+            "queued": [
+                ActivationRequest.START,
+                ActivationRequest.STOP,
+                ActivationRequest.STOP,
+                ActivationRequest.DELETE,
+            ],
+            "dequeued": [ActivationRequest.DELETE],
+        },
+        {
+            "queued": [
+                ActivationRequest.DELETE,
+                ActivationRequest.STOP,
+                ActivationRequest.STOP,
+                ActivationRequest.START,
+            ],
+            "dequeued": [ActivationRequest.DELETE],
+        },
+        {
+            "queued": [
+                ActivationRequest.RESTART,
+                ActivationRequest.STOP,
+                ActivationRequest.START,
+            ],
+            "dequeued": [
+                ActivationRequest.STOP,
+                ActivationRequest.START,
+            ],
+        },
+        {
+            "queued": [
+                ActivationRequest.RESTART,
+                ActivationRequest.START,
+            ],
+            "dequeued": [
+                ActivationRequest.RESTART,
+            ],
+        },
+    ],
+)
+@pytest.mark.django_db
+def test_arbitrate(activations, requests):
+    for request in requests["queued"]:
+        queue.push(activations[0].id, request)
+    dequeued = queue.peek_all(activations[0].id)
+    dequeued_requests = [entry.request for entry in dequeued]
+    assert dequeued_requests == requests["dequeued"]
+    assert models.ActivationRequestQueue.objects.count() == len(
+        requests["dequeued"]
+    )
