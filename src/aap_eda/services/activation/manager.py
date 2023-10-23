@@ -106,6 +106,12 @@ class ActivationManager:
         return self.db_instance.latest_instance
 
     @run_with_lock
+    def _set_activation_pod_id(self, pod_id: tp.Optional[str]) -> None:
+        """Set the pod id of the activation instance."""
+        self.latest_instance.activation_pod_id = pod_id
+        self.latest_instance.save(update_fields=["activation_pod_id"])
+
+    @run_with_lock
     def _set_activation_status(
         self,
         status: ActivationStatus,
@@ -127,7 +133,7 @@ class ActivationManager:
         kwargs = {"status": status}
         if status_message:
             kwargs["status_message"] = status_message
-        self.activation_instance.update_status(**kwargs)
+        self.latest_instance.update_status(**kwargs)
 
     @run_with_lock
     def _check_stop_prerequirements(self):
@@ -179,10 +185,7 @@ class ActivationManager:
             msg = f"Activation {self.db_instance.id} can not be started. "
             f"Reason: {error}"
             LOGGER.error(msg)
-            self.db_instance.update_status(
-                status=ActivationStatus.ERROR,
-                status_message=msg,
-            )
+            self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg)
 
     def _check_latest_instance(self):
@@ -210,12 +213,12 @@ class ActivationManager:
             )
             self._create_activation_instance()
             self.db_instance.refresh_from_db()
-            self.activation_instance.update_status(ActivationStatus.STARTING)
-            log_handler = DBLogger(self.activation_instance.id)
+            self._set_activation_instance_status(ActivationStatus.STARTING)
+            log_handler = DBLogger(self.latest_instance.id)
 
             LOGGER.info(
                 "Starting container for activation instance: "
-                f"{self.activation_instance.id}",
+                f"{self.latest_instance.id}",
             )
             container_request = self._build_container_request()
             container_id = self.container_engine.start(
@@ -225,15 +228,14 @@ class ActivationManager:
 
             # update status
             self._set_activation_status(ActivationStatus.RUNNING)
-            self.activation_instance.update_status(ActivationStatus.RUNNING)
-            self.activation_instance.activation_pod_id = container_id
-            self.activation_instance.save(update_fields=["activation_pod_id"])
+            self._set_activation_instance_status(ActivationStatus.RUNNING)
+            self._set_activation_pod_id(pod_id=container_id)
 
             # update logs
             LOGGER.info(
                 "Container start successful. "
                 "updating logs for activation instance: "
-                f"{self.activation_instance.id}",
+                f"{self.latest_instance.id}",
             )
             self.container_engine.update_logs(container_id, log_handler)
 
@@ -263,6 +265,7 @@ class ActivationManager:
         )
         self._set_activation_status(ActivationStatus.STOPPED)
         self._set_activation_instance_status(ActivationStatus.STOPPED)
+        self._set_activation_pod_id(pod_id=None)
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
         """Check if the activation is in a given status."""
@@ -355,14 +358,14 @@ class ActivationManager:
         try:
             self._set_activation_instance()
             status = self.container_engine.get_status(
-                self.activation_instance.activation_pod_id
+                self.latest_instance.activation_pod_id
             )
             LOGGER.info(f"Current status is {status}")
             if status in [ActivationStatus.COMPLETED, ActivationStatus.FAILED]:
                 self.update_logs()
-                log_handler = DBLogger(self.activation_instance.id)
+                log_handler = DBLogger(self.latest_instance.id)
                 self.container_engine.cleanup(
-                    self.activation_instance.activation_pod_id, log_handler
+                    self.latest_instance.activation_pod_id, log_handler
                 )
                 self._set_status(status, None)
             elif status == ActivationStatus.RUNNING:
@@ -375,20 +378,18 @@ class ActivationManager:
     def update_logs(self):
         # TODO: Get the Activation Instance from Activation
         self._set_activation_instance()
-        log_handler = DBLogger(self.activation_instance.id)
+        log_handler = DBLogger(self.latest_instance.id)
         self.container_engine.update_logs(
-            self.activation_instance.activation_pod_id, log_handler
+            self.latest_instance.activation_pod_id, log_handler
         )
 
     def _create_activation_instance(self):
         try:
-            self.activation_instance = (
-                models.ActivationInstance.objects.create(
-                    activation=self.db_instance,
-                    name=self.db_instance.name,
-                    status=ActivationStatus.STARTING,
-                    git_hash=self.db_instance.git_hash,
-                )
+            models.ActivationInstance.objects.create(
+                activation=self.db_instance,
+                name=self.db_instance.name,
+                status=ActivationStatus.STARTING,
+                git_hash=self.db_instance.git_hash,
             )
         except IntegrityError:
             raise exceptions.ActivationRecordNotFound(
@@ -399,11 +400,11 @@ class ActivationManager:
         return ContainerRequest(
             credential=self._build_credential(),
             cmdline=self._build_cmdline(),
-            name=f"eda-{self.activation_instance.id}-{uuid.uuid4()}",
+            name=f"eda-{self.latest_instance.id}-{uuid.uuid4()}",
             image_url=self.db_instance.decision_environment.image_url,
             ports=find_ports(self.db_instance.rulebook_rulesets),
             parent_id=self.db_instance.id,
-            id=self.activation_instance.id,
+            id=self.latest_instance.id,
         )
 
     def _build_credential(self) -> Credential:
@@ -421,5 +422,5 @@ class ActivationManager:
             log_level=settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-            id=str(self.activation_instance.id),
+            id=str(self.latest_instance.id),
         )
