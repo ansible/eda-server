@@ -106,6 +106,12 @@ class ActivationManager:
         return self.db_instance.latest_instance
 
     @run_with_lock
+    def _set_activation_pod_id(self, pod_id: tp.Optional[str]) -> None:
+        """Set the pod id of the activation instance."""
+        self.latest_instance.activation_pod_id = pod_id
+        self.latest_instance.save(update_fields=["activation_pod_id"])
+
+    @run_with_lock
     def _set_activation_status(
         self,
         status: ActivationStatus,
@@ -263,6 +269,7 @@ class ActivationManager:
         )
         self._set_activation_status(ActivationStatus.STOPPED)
         self._set_activation_instance_status(ActivationStatus.STOPPED)
+        self._set_activation_pod_id(pod_id=None)
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
         """Check if the activation is in a given status."""
