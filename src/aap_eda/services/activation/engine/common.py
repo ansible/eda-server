@@ -121,12 +121,12 @@ class ContainerEngine(ABC):
             raise exceptions.ContainerStartError(e) from e
 
     @abstractmethod
-    def stop(self, container_id: str, logger: LogHandler) -> None:
+    def cleanup(self, container_id: str, logger: LogHandler) -> None:
         try:
             # Implementation
             ...
         except Exception as e:
-            raise exceptions.ContainerStopError(e) from e
+            raise exceptions.ContainerCleanupError(e) from e
 
     @abstractmethod
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:

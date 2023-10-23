@@ -13,7 +13,7 @@ class ContainerImagePullError(ContainerEngineError):
     """Raised when a container fails to pull image."""
 
 
-class ContainerStopError(ContainerEngineError):
+class ContainerCleanupError(ContainerEngineError):
     """Raised when a container fails to stop."""
 
 
