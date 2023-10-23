@@ -71,9 +71,6 @@ class Engine(ContainerEngine):
         self._set_namespace()
         self.secret_name = f"activation-secret-{activation_id}"
 
-    def stop(self, container_id: str, log_handler: LogHandler) -> None:
-        self._cleanup(container_id, log_handler)
-
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version
         # Previous Version
@@ -132,8 +129,9 @@ class Engine(ContainerEngine):
     def _get_ports(self, found_ports: dict) -> list:
         return [port for _, port in found_ports]
 
-    def _cleanup(self, job_name: str, log_handler: LogHandler):
-        self.job_name = job_name
+    def cleanup(self, container_id: str, log_handler: LogHandler):
+        self.job_name = container_id
+        # TODO: update logs
         self._delete_secret()
         self._delete_services()
         self._delete_job()

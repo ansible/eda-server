@@ -61,7 +61,7 @@ class Engine(ContainerEngine):
             self.client = get_podman_client()
         LOGGER.debug(self.client.version())
 
-    def stop(self, container_id: str, log_handler: LogHandler) -> None:
+    def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             container.stop(ignore=True)
@@ -70,7 +70,7 @@ class Engine(ContainerEngine):
                 self._cleanup(container_id, log_handler)
             except APIError as e:
                 LOGGER.exception(f"Failed to cleanup container {container_id}")
-                raise exceptions.ContainerStopError(
+                raise exceptions.ContainerCleanupError(
                     f"Failed to cleanup container {container_id}"
                 ) from e
 
