@@ -129,7 +129,7 @@ class ContainerEngine(ABC):
             raise exceptions.ContainerStopError(e) from e
 
     @abstractmethod
-    def update_logs(self, container_id: str, logger: LogHandler) -> None:
+    def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
             # Implementation
             ...
