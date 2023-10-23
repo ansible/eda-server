@@ -72,7 +72,7 @@ class Engine(ContainerEngine):
         self.secret_name = f"activation-secret-{activation_id}"
 
     def stop(self, container_id: str, log_handler: LogHandler) -> None:
-        self.cleanup(container_id, log_handler)
+        self._cleanup(container_id, log_handler)
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version
@@ -102,13 +102,14 @@ class Engine(ContainerEngine):
         ) as e:
             LOGGER.error("Failed to start job, doing cleanup")
             LOGGER.error(e)
-            self.cleanup(self.job_name, log_handler)
+            self._cleanup(self.job_name, log_handler)
             raise
 
     # note(alex): the signature of this method is different from the interface
     def get_status(self, job_name) -> ActivationStatus:
         status = ActivationStatus.FAILED
         LOGGER.info(f"in get_status for {job_name}")
+        # TODO: catch kubernetes exception and raise custom exception
         pod = self._get_job_pod(job_name)
 
         container_status = pod.status.container_statuses[0]
@@ -131,7 +132,7 @@ class Engine(ContainerEngine):
     def _get_ports(self, found_ports: dict) -> list:
         return [port for _, port in found_ports]
 
-    def cleanup(self, job_name: str, log_handler: LogHandler):
+    def _cleanup(self, job_name: str, log_handler: LogHandler):
         self.job_name = job_name
         self._delete_secret()
         self._delete_services()
@@ -253,6 +254,7 @@ class Engine(ContainerEngine):
         # only create the service if it does not already exist
         service_name = f"{self.job_name}-{port}"
 
+        # TODO: catch kubernetes exception and raise custom exception
         service = self.client.core_api.list_namespaced_service(
             namespace=self.namespace,
             field_selector=f"metadata.name={service_name}",
@@ -325,6 +327,7 @@ class Engine(ContainerEngine):
         )
 
         LOGGER.info(f"{job_spec}")
+        # TODO: catch kubernetes exception and raise custom exception
         job_result = self.client.batch_api.create_namespaced_job(
             namespace=self.namespace, body=job_spec
         )

@@ -16,8 +16,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Union
-
+from aap_eda.core.enums import ActivationStatus
 from pydantic import BaseModel
+import aap_eda.services.activation.engine.exceptions as exceptions
 
 
 class LogHandler(ABC):
@@ -80,6 +81,8 @@ class ContainerRequest(BaseModel):
     name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
     image_url: str  # quay.io/ansible/ansible-rulebook:main
     cmdline: AnsibleRulebookCmdLine
+    # TODO: id and parent_id are instance and activation ids
+    # should be renamed to avoid confusion
     id: str
     parent_id: str
     credential: Credential = None
@@ -99,21 +102,40 @@ class ContainerEngine(ABC):
         ...
 
     @abstractmethod
-    def get_status(self, container_id: str) -> str:
-        ...
+    def get_status(self, container_id: str) -> ActivationStatus:
+        try:
+            # Implementation
+            ...
+        except Exception as e:
+            raise exceptions.ContainerNotFoundError(e) from e
 
     @abstractmethod
     def start(self, request: ContainerRequest, logger: LogHandler) -> str:
-        ...
+        # It returns the container id
+        try:
+            # Implementation
+            ...
+        except Exception as e:
+            raise exceptions.ContainerStartError(e) from e
 
     @abstractmethod
     def stop(self, container_id: str, logger: LogHandler) -> None:
-        ...
+        try:
+            # Implementation
+            ...
+        except SpeficicImagePullError as e:
+            raise exceptions.ContainerImagePullError(e) from e
+        except Exception as e:
+            raise exceptions.ContainerStopError(e) from e
 
     @abstractmethod
     def update_logs(self, container_id: str, logger: LogHandler) -> None:
-        ...
+        try:
+            # Implementation
+            ...
+        except Exception as e:
+            raise exceptions.ContainerUpdateLogsError(e) from e
 
-    @abstractmethod
-    def cleanup(self, container_id: str, logger: LogHandler) -> None:
-        ...
+
+class SpeficicImagePullError(Exception):
+    """Placeholder for the interface to raise specific image pull errors."""
