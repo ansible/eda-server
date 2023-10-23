@@ -23,12 +23,12 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.utils import IntegrityError
-from django.utils import timezone
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation import exceptions
+from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
@@ -240,10 +240,10 @@ class ActivationManager:
             self.container_engine.update_logs(container_id, log_handler)
 
         # note(alex): we may need to catch explicit exceptions
-        # ActivationImagePullError might need to be handled differently
+        # ContainerImagePullError might need to be handled differently
         # because it can be an error network and we might want to retry
         # so, activation should be in FAILED state to be handled by the monitor
-        except exceptions.ActivationException as exc:
+        except engine_exceptions.ContainerEngineError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: {exc}"
@@ -275,7 +275,7 @@ class ActivationManager:
             container_status = None
             latest_instance = self.latest_instance
 
-            with contextlib.suppress(exceptions.ActivationPodNotFound):
+            with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
                 container_status = self.container_engine.get_status(
                     container_id=latest_instance.activation_pod_id,
                 )
