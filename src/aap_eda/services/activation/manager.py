@@ -259,7 +259,7 @@ class ActivationManager:
         latest_instance = self.db_instance.latest_instance
 
         log_handler = DBLogger(latest_instance.id)
-        self.container_engine.stop(
+        self.container_engine.cleanup(
             latest_instance.activation_pod_id,
             log_handler,
         )
@@ -379,12 +379,13 @@ class ActivationManager:
             if container_status in [
                 ActivationStatus.COMPLETED,
                 ActivationStatus.FAILED,
+                ActivationStatus.STOPPED,
             ]:
                 # TODO: it should be the cleanup method
                 # stop is implicit in the cleanup method
                 # stop is not clear that it performs a cleanup
                 # but there is not any stop without cleanup
-                self.container_engine.stop(
+                self.container_engine.cleanup(
                     self.latest_instance.activation_pod_id,
                     log_handler,
                 )
