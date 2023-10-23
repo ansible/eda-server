@@ -138,9 +138,9 @@ class Engine(ContainerEngine):
         self._delete_services()
         self._delete_job()
 
-    def update_logs(self, job_name: str, log_handler: LogHandler) -> None:
+    def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
-            pod = self._get_job_pod(job_name)
+            pod = self._get_job_pod(container_id)
             container_status = pod.status.container_statuses[0]
             if (
                 container_status.state.running
@@ -172,13 +172,13 @@ class Engine(ContainerEngine):
                     log_handler.flush()
                     log_handler.set_log_read_at(dt)
             else:
-                LOGGER.warning(f"Pod with label {job_name} not found.")
+                LOGGER.warning(f"Pod with label {container_id} not found.")
                 log_handler.write(
-                    f"Pod with label {job_name} not found.", True
+                    f"Pod with label {container_id} not found.", True
                 )
         except ApiException as e:
             LOGGER.exception(
-                "Failed to fetch pod logs: " f"{job_name}; error: {str(e)}"
+                "Failed to fetch pod logs: " f"{container_id}; error: {str(e)}"
             )
             raise
 

@@ -25,6 +25,10 @@ class ActivationStopError(Exception):
     pass
 
 
+class ActivationMonitorError(Exception):
+    pass
+
+
 class ActivationInstanceNotFound(ActivationException):
     pass
 
