@@ -25,13 +25,8 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.activation.exceptions import (
-    ActivationException,
-    ActivationImageNotFound,
-    ActivationImagePullError,
-    ActivationPodNotFound,
-)
 
+from . import exceptions
 from .common import ContainerEngine, ContainerRequest, LogHandler
 
 LOGGER = logging.getLogger(__name__)
@@ -71,11 +66,17 @@ class Engine(ContainerEngine):
             container = self.client.containers.get(container_id)
             container.stop(ignore=True)
             self.update_logs(container_id, log_handler)
-            self.cleanup(container_id, log_handler)
+            try:
+                self._cleanup(container_id, log_handler)
+            except APIError as e:
+                LOGGER.exception(f"Failed to cleanup container {container_id}")
+                raise exceptions.ContainerStopError(
+                    f"Failed to cleanup container {container_id}"
+                ) from e
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         if not request.image_url:
-            raise ActivationException("Missing image url")
+            raise exceptions.ContainerStartError("Missing image url")
 
         try:
             self._set_auth_json_file()
@@ -112,22 +113,15 @@ class Engine(ContainerEngine):
             )
 
             return str(container.id)
-        except ActivationException as e:
-            LOGGER.error(e)
-            log_handler.write(f"Activation Exception {e}", True)
-            raise
-        except ContainerError as e:
-            LOGGER.error(f"Container Error {e}")
-            log_handler.write(f"Container Error {e}", True)
-            raise ActivationException(f"Container Error {e}")
-        except ImageNotFound as e:
-            LOGGER.error(f"Image not found {e}")
-            log_handler.write(f"Image not found {e}", True)
-            raise ActivationImageNotFound(f"Image not found {e}")
-        except APIError as e:
-            LOGGER.error(f"API error {e}")
-            log_handler.write(f"API error {e}", True)
-            raise ActivationException(f"API Error {e}")
+        except (
+            ContainerError,
+            ImageNotFound,
+            APIError,
+        ) as e:
+            error_message = f"Container Start Error: {e}"
+            LOGGER.error(error_message)
+            log_handler.write(error_message, flush=True)
+            raise exceptions.ContainerStartError(error_message) from e
 
     # note(alex): the signature of this method is different from the interface
     def get_status(self, container_id: str) -> ActivationStatus:
@@ -142,7 +136,7 @@ class Engine(ContainerEngine):
             elif container.status == "running":
                 return ActivationStatus.RUNNING
         else:
-            raise ActivationPodNotFound(
+            raise exceptions.ContainerNotFoundError(
                 f"Container id {container_id} not found"
             )
 
@@ -181,13 +175,14 @@ class Engine(ContainerEngine):
                 LOGGER.warning(f"Container {container_id} not found.")
                 log_handler.write(f"Container {container_id} not found.", True)
         except APIError as e:
-            LOGGER.exception(
+            msg = (
                 "Failed to fetch container logs: "
-                f"{container_id}; error: {str(e)}"
+                "{container_id}; error: {str(e)}"
             )
-            raise
+            LOGGER.exception(msg)
+            raise exceptions.ContainerUpdateLogsError(msg) from e
 
-    def cleanup(self, container_id: str, _log_handler: LogHandler):
+    def _cleanup(self, container_id: str, _log_handler: LogHandler):
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             try:
@@ -283,7 +278,7 @@ class Engine(ContainerEngine):
                     "or the credentials may be incorrect."
                 )
                 LOGGER.error(msg)
-                raise ActivationImagePullError(msg)
+                raise exceptions.ContainerImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound:
