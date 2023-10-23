@@ -115,6 +115,8 @@ class ContainerEngine(ABC):
         try:
             # Implementation
             ...
+        except SpeficicImagePullError as e:
+            raise exceptions.ContainerImagePullError(e) from e
         except Exception as e:
             raise exceptions.ContainerStartError(e) from e
 
@@ -123,8 +125,6 @@ class ContainerEngine(ABC):
         try:
             # Implementation
             ...
-        except SpeficicImagePullError as e:
-            raise exceptions.ContainerImagePullError(e) from e
         except Exception as e:
             raise exceptions.ContainerStopError(e) from e
 
