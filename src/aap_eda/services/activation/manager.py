@@ -354,32 +354,67 @@ class ActivationManager:
         self.start()
 
     def monitor(self):
+        # TODO: we should check if the db_instance is good
+        LOGGER.info(f"Monitoring activation id: {self.db_instance.id}")
         try:
-            self._set_activation_instance()
-            status = self.container_engine.get_status(
+            self._check_latest_instance()
+        except (
+            exceptions.ActivationInstanceNotFound,
+            exceptions.ActivationInstancePodIdNotFound,
+        ) as e:
+            LOGGER.error(f"Monitor operation Failed: {e}")
+            raise exceptions.ActivationMonitorError(f"{e}")
+
+        log_handler = DBLogger(self.latest_instance.id)
+        # TODO: long try block, we should be more specific
+        try:
+            container_status = self.container_engine.get_status(
                 self.latest_instance.activation_pod_id
             )
-            LOGGER.info(f"Current status is {status}")
-            if status in [ActivationStatus.COMPLETED, ActivationStatus.FAILED]:
-                self.update_logs()
-                log_handler = DBLogger(self.latest_instance.id)
-                self.container_engine.cleanup(
-                    self.latest_instance.activation_pod_id, log_handler
+            LOGGER.info(
+                f"Current status of instance {self.latest_instance.id} "
+                f"is {container_status}",
+            )
+            # TODO: implement restart policy logic
+            if container_status in [
+                ActivationStatus.COMPLETED,
+                ActivationStatus.FAILED,
+            ]:
+                # TODO: it should be the cleanup method
+                # stop is implicit in the cleanup method
+                # stop is not clear that it performs a cleanup
+                # but there is not any stop without cleanup
+                self.container_engine.stop(
+                    self.latest_instance.activation_pod_id,
+                    log_handler,
                 )
-                self._set_status(status, None)
-            elif status == ActivationStatus.RUNNING:
-                LOGGER.info("Updating logs")
-                self.update_logs()
-        except exceptions.ActivationException as e:
+                self._set_activation_status(container_status)
+                self._set_activation_instance_status(container_status)
+                self._set_activation_pod_id(pod_id=None)
+            elif container_status == ActivationStatus.RUNNING:
+                LOGGER.info(
+                    "Updating logs of activation instance "
+                    f"{self.latest_instance.id}",
+                )
+                # TODO: catch exceptions
+                self.container_engine.update_logs(
+                    self.latest_instance.activation_pod_id,
+                    log_handler,
+                )
+        except engine_exceptions.ContainerEngineError as e:
+            # TODO: ensure we handle all the exceptions
+            # and we set the status correctly
             self._set_status(ActivationStatus.FAILED, None, "f{e}")
-            LOGGER.error(f"Monitor Failed {e}")
+            LOGGER.error(f"Monitor operation Failed {e}")
 
     def update_logs(self):
-        # TODO: Get the Activation Instance from Activation
-        self._set_activation_instance()
+        """Update the logs of the latest instance of the activation."""
         log_handler = DBLogger(self.latest_instance.id)
+        # TODO: check latest instance
+        # TODO: catch exceptions from the engine
         self.container_engine.update_logs(
-            self.latest_instance.activation_pod_id, log_handler
+            container_id=self.latest_instance.activation_pod_id,
+            log_handler=log_handler,
         )
 
     def _create_activation_instance(self):
