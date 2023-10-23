@@ -318,7 +318,6 @@ class ActivationManager:
                 "The Activation does not exist."
             )
         try:
-            self._check_latest_instance()
             if self._is_already_running():
                 msg = f"Activation {self.db_instance.id} is already running."
                 LOGGER.info(msg)
