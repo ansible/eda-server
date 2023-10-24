@@ -5,6 +5,10 @@ class ContainerEngineError(Exception):
     """Base class for exceptions in this module."""
 
 
+class ContainerEngineInitError(ContainerEngineError):
+    """Raised when an engine fails to initialize."""
+
+
 class ContainerStartError(ContainerEngineError):
     """Raised when a container fails to start."""
 
