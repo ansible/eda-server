@@ -13,17 +13,19 @@
 #  limitations under the License.
 
 
+import typing as tp
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Union
-from aap_eda.core.enums import ActivationStatus
+
 from pydantic import BaseModel
+
 import aap_eda.services.activation.engine.exceptions as exceptions
+from aap_eda.core.enums import ActivationStatus
 
 
 class LogHandler(ABC):
     @abstractmethod
-    def write(self, lines: Union[list[str], str], flush: bool) -> None:
+    def write(self, lines: tp.Union[list[str], str], flush: bool) -> None:
         pass
 
     @abstractmethod
@@ -81,17 +83,15 @@ class ContainerRequest(BaseModel):
     name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
     image_url: str  # quay.io/ansible/ansible-rulebook:main
     cmdline: AnsibleRulebookCmdLine
-    # TODO: id and parent_id are instance and activation ids
-    # should be renamed to avoid confusion
-    id: str
-    parent_id: str
-    credential: Credential = None
-    ports: dict = None
+    activation_instance_id: str
+    activation_id: str
+    credential: tp.Optional[Credential] = None
+    ports: tp.Optional[dict] = None
     pull_policy: str = "Always"  # Defaults to Always for K8S
-    mem_limit: str = None
-    mounts: dict = None
-    env_vars: dict = None
-    extra_args: dict = None
+    mem_limit: tp.Optional[str] = None
+    mounts: tp.Optional[dict] = None
+    env_vars: tp.Optional[dict] = None
+    extra_args: tp.Optional[dict] = None
 
 
 class ContainerEngine(ABC):
