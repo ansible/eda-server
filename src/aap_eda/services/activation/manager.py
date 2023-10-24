@@ -105,11 +105,23 @@ class ActivationManager:
         """Return the latest instance of the activation."""
         return self.db_instance.latest_instance
 
-    @run_with_lock
     def _set_activation_pod_id(self, pod_id: tp.Optional[str]) -> None:
         """Set the pod id of the activation instance."""
+        # TODO: implement db locking?
         self.latest_instance.activation_pod_id = pod_id
         self.latest_instance.save(update_fields=["activation_pod_id"])
+
+    def _set_activation_instance_status(
+        self,
+        status: ActivationStatus,
+        status_message: tp.Optional[str] = None,
+    ):
+        """Set the status of the activation instance from the manager."""
+        # TODO: implement db locking?
+        kwargs = {"status": status}
+        if status_message:
+            kwargs["status_message"] = status_message
+        self.latest_instance.update_status(**kwargs)
 
     @run_with_lock
     def _set_activation_status(
@@ -122,18 +134,6 @@ class ActivationManager:
         if status_message:
             kwargs["status_message"] = status_message
         self.db_instance.update_status(**kwargs)
-
-    @run_with_lock
-    def _set_activation_instance_status(
-        self,
-        status: ActivationStatus,
-        status_message: tp.Optional[str] = None,
-    ):
-        """Set the status from the manager with locking."""
-        kwargs = {"status": status}
-        if status_message:
-            kwargs["status_message"] = status_message
-        self.latest_instance.update_status(**kwargs)
 
     @run_with_lock
     def _check_stop_prerequirements(self):
@@ -438,11 +438,11 @@ class ActivationManager:
             name=f"eda-{self.latest_instance.id}-{uuid.uuid4()}",
             image_url=self.db_instance.decision_environment.image_url,
             ports=find_ports(self.db_instance.rulebook_rulesets),
-            parent_id=self.db_instance.id,
-            id=self.latest_instance.id,
+            activation_id=self.db_instance.id,
+            activation_instance_id=self.latest_instance.id,
         )
 
-    def _build_credential(self) -> Credential:
+    def _build_credential(self) -> tp.Optional[Credential]:
         credential = self.db_instance.decision_environment.credential
         if credential:
             return Credential(
