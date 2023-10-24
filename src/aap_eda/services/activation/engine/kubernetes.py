@@ -74,8 +74,14 @@ class Engine(ContainerEngine):
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version
         # Previous Version
-        self.job_name = f"activation-job-{request.parent_id}-{request.id}"
-        self.pod_name = f"activation-pod-{request.parent_id}-{request.id}"
+        self.job_name = (
+            f"activation-job-{request.activation_id}"
+            f"-{request.activation_instance_id}"
+        )
+        self.pod_name = (
+            f"activation-pod-{request.activation_id}"
+            f"-{request.activation_instance_id}"
+        )
 
         # Should we switch to new format
         # self.job_name = f"activation-job-" #noqa: E800
