@@ -17,24 +17,28 @@ class ActivationException(Exception):
     pass
 
 
-class ActivationStartError(Exception):
-    pass
+class ActivationManagerError(Exception):
+    """Base class for exceptions for the ActivationManager."""
 
 
-class ActivationStopError(Exception):
-    pass
+class ActivationStartError(ActivationManagerError):
+    """Exception raised when an activation fails to start."""
 
 
-class ActivationMonitorError(Exception):
-    pass
+class ActivationStopError(ActivationManagerError):
+    """Exception raised when an activation fails to stop."""
 
 
-class ActivationInstanceNotFound(ActivationException):
-    pass
+class ActivationMonitorError(ActivationManagerError):
+    """Exception raised when an activation fails to monitor."""
 
 
-class ActivationInstancePodIdNotFound(ActivationException):
-    pass
+class ActivationInstanceNotFound(ActivationManagerError):
+    """Exception raised when an activation instance is not found."""
+
+
+class ActivationInstancePodIdNotFound(ActivationManagerError):
+    """Exception raised when an activation instance pod id is not found."""
 
 
 class K8sActivationException(ActivationException):
