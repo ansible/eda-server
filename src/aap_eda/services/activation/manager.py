@@ -160,16 +160,9 @@ class ActivationManager:
         """Check if the activation can be stopped."""
 
         disallowed_statuses = [
-            ActivationStatus.STOPPING,
             ActivationStatus.DELETING,
         ]
         self.db_instance.refresh_from_db
-
-        if self.db_instance.is_enabled is False:
-            msg = f"Activation {self.db_instance.id} is disabled. "
-            f"Can not be stopped."
-            LOGGER.warning(msg)
-            raise exceptions.ActivationStopError(msg)
 
         if self.db_instance.status in disallowed_statuses:
             msg = f"Activation {self.db_instance.id} is in "
@@ -640,6 +633,7 @@ class ActivationManager:
         ) as exc:
             raise exceptions.ActivationStartError(str(exc)) from None
 
+        # TODO: ensure previous instance status before starting a new one
         self._start_activation_instance()
         if is_restart:
             self._increase_restart_count()
@@ -652,6 +646,10 @@ class ActivationManager:
             raise exceptions.ActivationStartError(
                 "The Activation does not exist."
             )
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Stopping activation.",
+        )
         try:
             self._check_latest_instance()
             if self._is_already_stopped():
@@ -675,12 +673,23 @@ class ActivationManager:
             # Alex: Not sure if we want to change the status here.
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStopError(msg) from exc
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Activation stopped.",
+        )
 
     def restart(self):
         """User requested restart."""
-
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Restarting activation.",
+        )
         self.stop()
         self.start(is_restart=True)
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Activation restarted",
+        )
 
     def monitor(self):
         """Monitor the activation.
@@ -698,7 +707,10 @@ class ActivationManager:
         Restart policy may be moved to a separate class. We may need dependency
         injection if in the future we need to apply different policies.
         """
-        LOGGER.info(f"Monitoring activation id: {self.db_instance.id}")
+        LOGGER.info(
+            "Activation manager monitoring "
+            f"activation id: {self.db_instance.id}",
+        )
 
         # Ensure that the activation exists
         try:
