@@ -19,8 +19,8 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from dateutil import parser
 
+from dateutil import parser
 from kubernetes import client as k8sclient, config, watch
 from kubernetes.client.rest import ApiException
 
