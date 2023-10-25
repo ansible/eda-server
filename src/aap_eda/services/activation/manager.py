@@ -17,16 +17,18 @@ import contextlib
 import logging
 import typing as tp
 import uuid
+from datetime import timedelta
 from functools import wraps
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.utils import IntegrityError
+from django.utils import timezone
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
@@ -86,7 +88,7 @@ class ActivationManager:
     def __init__(
         self,
         db_instance: models.Activation,
-        container_engine: ContainerEngine = None,
+        container_engine: tp.Optional[ContainerEngine] = None,
     ):
         """Initialize the Activation Manager.
 
@@ -111,7 +113,7 @@ class ActivationManager:
         self.latest_instance.activation_pod_id = pod_id
         self.latest_instance.save(update_fields=["activation_pod_id"])
 
-    def _set_activation_instance_status(
+    def _set_latest_instance_status(
         self,
         status: ActivationStatus,
         status_message: tp.Optional[str] = None,
@@ -124,19 +126,37 @@ class ActivationManager:
         self.latest_instance.update_status(**kwargs)
 
     @run_with_lock
+    def _increase_failure_count(self):
+        """Increase the failure count of the activation."""
+        self.db_instance.failure_count += 1
+        self.db_instance.save(update_fields=["failure_count", "modified_at"])
+
+    @run_with_lock
+    def _reset_failure_count(self):
+        """Reset the failure count of the activation."""
+        self.db_instance.failure_count = 0
+        self.db_instance.save(update_fields=["failure_count", "modified_at"])
+
+    @run_with_lock
+    def _increase_restart_count(self):
+        """Increase the restart count of the activation."""
+        self.db_instance.restart_count += 1
+        self.db_instance.save(update_fields=["restart_count", "modified_at"])
+
+    @run_with_lock
     def _set_activation_status(
         self,
         status: ActivationStatus,
         status_message: tp.Optional[str] = None,
-    ):
-        """Set the status from the manager with locking."""
+    ) -> None:
+        """Set the status from the manager."""
         kwargs = {"status": status}
         if status_message:
             kwargs["status_message"] = status_message
         self.db_instance.update_status(**kwargs)
 
     @run_with_lock
-    def _check_stop_prerequirements(self):
+    def _check_stop_prerequirements(self) -> None:
         """Check if the activation can be stopped."""
 
         disallowed_statuses = [
@@ -158,7 +178,7 @@ class ActivationManager:
             raise exceptions.ActivationStopError(msg)
 
     @run_with_lock
-    def _check_start_prerequirements(self):
+    def _check_start_prerequirements(self) -> None:
         """Check if the activation can be started."""
 
         disallowed_statuses = [
@@ -188,7 +208,7 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg)
 
-    def _check_latest_instance(self):
+    def _check_latest_instance(self) -> None:
         """Check if the activation has a latest instance and pod id."""
         if not self.latest_instance:
             # how we want to handle this case?
@@ -203,6 +223,11 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _start_activation_instance(self):
+        """Start a new activation instance.
+
+        Update the status of the activation, latest instance, logs,
+        counters and pod id.
+        """
         self._set_activation_status(ActivationStatus.STARTING)
 
         # TODO(alex): long try block, we should be more specific
@@ -213,7 +238,7 @@ class ActivationManager:
             )
             self._create_activation_instance()
             self.db_instance.refresh_from_db()
-            self._set_activation_instance_status(ActivationStatus.STARTING)
+            self._set_latest_instance_status(ActivationStatus.STARTING)
             log_handler = DBLogger(self.latest_instance.id)
 
             LOGGER.info(
@@ -228,8 +253,9 @@ class ActivationManager:
 
             # update status
             self._set_activation_status(ActivationStatus.RUNNING)
-            self._set_activation_instance_status(ActivationStatus.RUNNING)
+            self._set_latest_instance_status(ActivationStatus.RUNNING)
             self._set_activation_pod_id(pod_id=container_id)
+            self._reset_failure_count()
 
             # update logs
             LOGGER.info(
@@ -252,10 +278,11 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-    def _stop_latest_instance(self):
+    def _cleanup(self):
+        """Cleanup the latest instance of the activation."""
         # TODO: Catch exceptions from the engine as well as start method does
         self._set_activation_status(ActivationStatus.STOPPING)
-        self._set_activation_instance_status(ActivationStatus.STOPPING)
+        self._set_latest_instance_status(ActivationStatus.STOPPING)
         latest_instance = self.db_instance.latest_instance
 
         log_handler = DBLogger(latest_instance.id)
@@ -263,9 +290,6 @@ class ActivationManager:
             latest_instance.activation_pod_id,
             log_handler,
         )
-        self._set_activation_status(ActivationStatus.STOPPED)
-        self._set_activation_instance_status(ActivationStatus.STOPPED)
-        self._set_activation_pod_id(pod_id=None)
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
         """Check if the activation is in a given status."""
@@ -301,9 +325,297 @@ class ActivationManager:
     def _is_already_stopped(self) -> bool:
         return self._is_in_status(ActivationStatus.STOPPED)
 
-    def start(self):
+    def _is_unresponsive(self) -> bool:
+        if self.db_instance.status in [
+            ActivationStatus.RUNNING,
+            ActivationStatus.STARTING,
+        ]:
+            cutoff_time = timezone.now() - timedelta(
+                seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS,
+            )
+            return self.latest_instance.updated_at < cutoff_time
+        return False
+
+    def _unresponsive_policy(self):
+        """Apply the unresponsive restart policy."""
+        LOGGER.info(
+            "Monitor operation: unresponsive mode called for "
+            f"activation id: {self.activation_id}"
+        )
+        if self.db_instance.restart_policy == RestartPolicy.NEVER:
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}.",
+            )
+            user_msg = (
+                "Activation is unresponsive. "
+                "Liveness check for ansible rulebook timed out. "
+            )
+            self._fail_instance(user_msg)
+            self._set_activation_status(
+                ActivationStatus.FAILED,
+                user_msg,
+            )
+
+        else:
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}.",
+            )
+            user_msg = (
+                "Activation instance is unresponsive. "
+                "Liveness check for ansible rulebook timed out. "
+                "Restart policy is applied."
+            )
+
+            self._fail_instance(msg=user_msg)
+            try:
+                self.start(is_restart=True)
+            except exceptions.ActivationStartError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to start. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+
+    def _missing_container_policy(self):
+        msg = "Missing container for running activation."
+        try:
+            self._fail_instance(msg)
+        except engine_exceptions.ContainerCleanupError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to cleanup. "
+                f"Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            # Alex: Not sure if we want to change the status here.
+            self._set_activation_status(ActivationStatus.ERROR, msg)
+            raise exceptions.ActivationMonitorError(msg) from exc
+
+        if self.db_instance.restart_policy == RestartPolicy.NEVER:
+            msg += " Restart policy not applicable."
+            self._set_activation_status(
+                ActivationStatus.FAILED,
+                msg,
+            )
+        else:
+            try:
+                self.start(is_restart=True)
+            except exceptions.ActivationStartError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to start. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+
+    def _completed_policy(self):
+        """Apply the completed restart policy.
+
+        Completed containers are only restart with ALWAYS policy.+
+        """
+        LOGGER.info(
+            "Monitor operation: completed mode called for "
+            f"activation id: {self.activation_id}",
+        )
+
+        if self.db_instance.restart_policy == RestartPolicy.ALWAYS:
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}.",
+            )
+            user_msg = (
+                "Activation completed successfully. Restart policy is applied."
+            )
+            self._set_latest_instance_status(
+                ActivationStatus.COMPLETED,
+                user_msg,
+            )
+            try:
+                self._cleanup()
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to cleanup. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                # Alex: Not sure if we want to set ERROR here.
+                self._error_instance(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+            # TODO: schedule activation based on
+            # ACTIVATION_RESTART_SECONDS_ON_COMPLETE
+            # We should have a status like "pending restart"
+            try:
+                self.start()
+            except exceptions.ActivationStartError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to start. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+        else:
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}. "
+                "No restart policy is applied.",
+            )
+            user_msg = (
+                "Activation completed successfully. "
+                "No restart policy is applied."
+            )
+            self._set_latest_instance_status(
+                ActivationStatus.COMPLETED,
+                user_msg,
+            )
+            try:
+                self._cleanup()
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to cleanup. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                # Alex: Not sure if we want to set ERROR here.
+                self._error_instance(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+
+            user_msg = "Activation completed successfully."
+            self._set_activation_status(
+                ActivationStatus.COMPLETED,
+                user_msg,
+            )
+
+    def _failed_policy(self):
+        """Apply the failed restart policy."""
+        LOGGER.info(
+            "Monitor operation: failed mode called for "
+            f"activation id: {self.activation_id}",
+        )
+
+        # No restart if the restart policy is NEVER
+        if self.db_instance.restart_policy == RestartPolicy.NEVER:
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}.",
+            )
+            user_msg = "Activation failed. Restart policy is not applicable."
+            try:
+                self._fail_instance(user_msg)
+                self._set_activation_status(
+                    ActivationStatus.FAILED,
+                    user_msg,
+                )
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to cleanup. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                # Alex: Not sure if we want to change the status here.
+                self._error_instance(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+
+        # No restart if it has reached the maximum number of restarts
+        elif (
+            self.db_instance.failure_count
+            >= settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+        ):
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}. ",
+                "Has reached the maximum number of restarts. ",
+            )
+            user_msg = (
+                "Activation failed. "
+                "Has reached the maximum number of restarts. "
+                "Restart policy is not applicable."
+            )
+            try:
+                self._fail_instance(user_msg)
+                self._set_activation_status(
+                    ActivationStatus.FAILED,
+                    user_msg,
+                )
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to cleanup. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                # Alex: Not sure if we want to change the status here.
+                self._error_instance(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+        # Restart
+        else:
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}.",
+            )
+            user_msg = "Activation failed. Restart policy is applied."
+            try:
+                self._fail_instance(user_msg)
+            except engine_exceptions.ContainerCleanupError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to cleanup. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                # Alex: Not sure if we want to change the status here.
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                self._set_latest_instance_status(
+                    ActivationStatus.ERROR,
+                    msg,
+                )
+                raise exceptions.ActivationMonitorError(msg) from exc
+            try:
+                # TODO: schedule activation based on ACTIVATION_RESTART_SECONDS_ON_FAILURE
+                self.start(is_restart=True)
+            except exceptions.ActivationStartError as exc:
+                msg = (
+                    f"Activation {self.db_instance.id} failed to start. "
+                    f"Reason: {exc}"
+                )
+                LOGGER.error(msg)
+                self._set_activation_status(ActivationStatus.ERROR, msg)
+                raise exceptions.ActivationMonitorError(msg) from exc
+
+    def _fail_instance(self, msg: tp.Optional[str] = None):
+        """Fail the latest activation instance."""
+        kwargs = {}
+        if msg:
+            kwargs["status_message"] = msg
+        self._cleanup()
+        self._set_latest_instance_status(ActivationStatus.FAILED, **kwargs)
+        self._set_activation_pod_id(pod_id=None)
+        self._increase_failure_count()
+
+    def _error_instance(self, msg: tp.Optional[str] = None):
+        """Error the latest activation instance."""
+        kwargs = {}
+        if msg:
+            kwargs["status_message"] = msg
+        self._cleanup()
+        self._set_latest_instance_status(ActivationStatus.ERROR, **kwargs)
+        self._set_activation_pod_id(pod_id=None)
+
+    def _stop_instance(self):
+        """Stop the latest activation instance."""
+        self._cleanup()
+        self._set_latest_instance_status(ActivationStatus.STOPPED)
+        self._set_activation_pod_id(pod_id=None)
+
+    def start(self, is_restart: bool = False):
         """Start an activation.
 
+        Called by the user or by the monitor when the restart policy is applied.
         Ensure that the activation meets all the requirements to start,
         otherwise raise ActivationStartError.
         Starts the activation in an idepotent way.
@@ -327,9 +639,13 @@ class ActivationManager:
             exceptions.ActivationInstancePodIdNotFound,
         ) as exc:
             raise exceptions.ActivationStartError(str(exc)) from None
+
         self._start_activation_instance()
+        if is_restart:
+            self._increase_restart_count()
 
     def stop(self):
+        """User requested stop."""
         try:
             self._check_stop_prerequirements()
         except ObjectDoesNotExist:
@@ -347,15 +663,56 @@ class ActivationManager:
             exceptions.ActivationInstancePodIdNotFound,
         ) as exc:
             raise exceptions.ActivationStopError(str(exc)) from None
-        self._stop_latest_instance()
+        try:
+            self._stop_instance()
+            self._set_activation_status(ActivationStatus.STOPPED)
+        except engine_exceptions.ContainerEngineError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to cleanup. "
+                f"Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            # Alex: Not sure if we want to change the status here.
+            self._set_activation_status(ActivationStatus.ERROR, msg)
+            raise exceptions.ActivationStopError(msg) from exc
 
     def restart(self):
+        """User requested restart."""
+
         self.stop()
-        self.start()
+        self.start(is_restart=True)
 
     def monitor(self):
-        # TODO: we should check if the db_instance is good
+        """Monitor the activation.
+
+        This method is intended to be run by an async worker triggered by
+        the monitor scheduler. It is responsible for monitoring the activation
+        and the latest activation instance. It checks the status of the
+        container and ensures that the status of the activation and activation
+        instance are consistent with the status of the container.
+
+        Applies the restart policy if the container is in a restartable state.
+        Updates the logs of the activation instance.
+
+        TODO(alex): This method could be refactored.
+        Restart policy may be moved to a separate class. We may need dependency
+        injection if in the future we need to apply different policies.
+        """
         LOGGER.info(f"Monitoring activation id: {self.db_instance.id}")
+
+        # Ensure that the activation exists
+        try:
+            self.db_instance.refresh_from_db()
+        except ObjectDoesNotExist:
+            LOGGER.error(
+                f"Monitor operation Failed: Activation {self.db_instance.id} "
+                "does not exist.",
+            )
+            raise exceptions.ActivationMonitorError(
+                f"Activation {self.db_instance.id} does not exist."
+            )
+
+        # Ensure that the activation instance exists
         try:
             self._check_latest_instance()
         except (
@@ -365,48 +722,90 @@ class ActivationManager:
             LOGGER.error(f"Monitor operation Failed: {e}")
             raise exceptions.ActivationMonitorError(f"{e}")
 
-        log_handler = DBLogger(self.latest_instance.id)
-        # TODO: long try block, we should be more specific
-        try:
-            container_status = self.container_engine.get_status(
-                self.latest_instance.activation_pod_id
+        # Disabled activations should be stopped
+        if not self.db_instance.is_enabled:
+            LOGGER.info(
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                "Activation is disabled. "
+                "Applicable stop policy will be applied.",
+            )
+            self.stop()
+            return
+
+        if self.db_instance.status != ActivationStatus.RUNNING:
+            msg = (
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                "Activation is not running. "
+                "Nothing to do."
+            )
+            LOGGER.info(msg)
+            return
+
+        # Detect unresponsive activation instance
+        # TODO: we should decrease the default timeout/livecheck
+        # in the future might be configurable per activation
+        if self._is_unresponsive():
+            msg = (
+                "Activation is unresponsive. "
+                "Liveness check for ansible rulebook timed out. "
+                "Applicable restart policy will be applied."
             )
             LOGGER.info(
-                f"Current status of instance {self.latest_instance.id} "
-                f"is {container_status}",
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                f"{msg}",
             )
-            # TODO: implement restart policy logic
-            if container_status in [
-                ActivationStatus.COMPLETED,
-                ActivationStatus.FAILED,
-                ActivationStatus.STOPPED,
-            ]:
-                # TODO: it should be the cleanup method
-                # stop is implicit in the cleanup method
-                # stop is not clear that it performs a cleanup
-                # but there is not any stop without cleanup
-                self.container_engine.cleanup(
-                    self.latest_instance.activation_pod_id,
-                    log_handler,
-                )
-                self._set_activation_status(container_status)
-                self._set_activation_instance_status(container_status)
-                self._set_activation_pod_id(pod_id=None)
-            elif container_status == ActivationStatus.RUNNING:
-                LOGGER.info(
-                    "Updating logs of activation instance "
-                    f"{self.latest_instance.id}",
-                )
-                # TODO: catch exceptions
-                self.container_engine.update_logs(
-                    self.latest_instance.activation_pod_id,
-                    log_handler,
-                )
-        except engine_exceptions.ContainerEngineError as e:
-            # TODO: ensure we handle all the exceptions
-            # and we set the status correctly
-            self._set_status(ActivationStatus.FAILED, None, "f{e}")
-            LOGGER.error(f"Monitor operation Failed {e}")
+            self._unresponsive_policy()
+            return
+
+        # get the status of the container
+        container_status = None
+        with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
+            container_status = self.container_engine.get_status(
+                container_id=self.latest_instance.activation_pod_id,
+            )
+
+        # Activations in running status must have a container
+        # This case prevents cases when the container is externally deleted
+        if container_status is None:
+            self._missing_container_policy()
+            return
+
+        LOGGER.info(
+            "Monitor operation: Current status of the instance for "
+            f"the activation id {self.db_instance.id}"
+            f"is {container_status}",
+        )
+
+        # TODO: container status maybe should use its own dataclass
+        if container_status == ActivationStatus.COMPLETED:  # RC == 0
+            self._completed_policy()
+            return
+        if container_status == ActivationStatus.FAILED:  # RC != 0
+            self._failed_policy()
+            return
+
+        if container_status == ActivationStatus.RUNNING:
+            msg = (
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                "Container is running. "
+                "Updating logs."
+            )
+            self.update_logs()
+            return
+
+        # we don't expect an error status for the container
+        if container_status == ActivationStatus.ERROR:
+            raise exceptions.ActivationMonitorError(
+                f"Container {self.latest_instance.activation_pod_id} "
+                "is in an error state."
+            )
+
+        # we don't expect stopping status for the container
+        if container_status == ActivationStatus.STOPPED:
+            raise exceptions.ActivationMonitorError(
+                f"Container {self.latest_instance.activation_pod_id} "
+                "is in an stopped state.",
+            )
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
