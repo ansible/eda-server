@@ -79,6 +79,8 @@ class ActivationStatus(DjangoStrEnum):
     STOPPED = "stopped"
     DELETING = "deleting"
     COMPLETED = "completed"
+    # TODO: unresponsive status is no longer necessary
+    # monitor task will handle it
     UNRESPONSIVE = "unresponsive"
     ERROR = "error"
 
