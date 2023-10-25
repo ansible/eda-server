@@ -85,9 +85,8 @@ def monitor_activations() -> None:
         unique_enqueue("activation", job_id, _manage, activation_id)
 
     # monitor running instances
-    running_statuses = [ActivationStatus.RUNNING, ActivationStatus.STARTING]
-    for instance in models.ActivationInstance.objects.filter(
-        status__in=running_statuses
+    for instance in models.Activation.objects.filter(
+        status=ActivationStatus.RUNNING
     ):
         job_id = _manage_activation_job_id(instance.activation_id)
         unique_enqueue("activation", job_id, _manage, instance.activation_id)

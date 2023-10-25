@@ -32,7 +32,12 @@ from aap_eda.api.serializers.activation import (
 )
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
-from aap_eda.tasks.ruleset import activate, deactivate, restart
+from aap_eda.tasks.orchestrator import (
+    delete_activation,
+    restart_activation,
+    start_activation,
+    stop_activation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +94,7 @@ class ActivationViewSet(
         response = serializer.create(serializer.validated_data)
 
         if response.is_enabled:
-            job = activate(activation_id=response.id)
-            response.current_job_id = job.id
-            response.save(update_fields=["current_job_id"])
+            start_activation(activation_id=response.id)
 
         return Response(
             serializers.ActivationReadSerializer(response).data,
@@ -130,12 +133,7 @@ class ActivationViewSet(
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
-
-        deactivate.delay(
-            activation_id=activation.id,
-            requester=activation.user.username,
-            delete=True,
-        )
+        delete_activation(activation_id=activation.id)
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -239,11 +237,7 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
-
-        job = activate(activation_id=pk)
-
-        activation.current_job_id = job.id
-        activation.save(update_fields=["current_job_id"])
+        start_activation(activation_id=pk)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -269,10 +263,7 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
-
-            deactivate.delay(
-                activation_id=activation.id, requester=activation.user.username
-            )
+            stop_activation(activation_id=activation.id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -312,9 +303,7 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        restart.delay(
-            activation_id=activation.id, requester=activation.user.username
-        )
+        restart_activation(activation_id=activation.id)
 
         activation.restart_count += 1
         activation.save(update_fields=["restart_count", "modified_at"])
