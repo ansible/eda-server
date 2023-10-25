@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
-from django_rq import enqueue, get_queue, job
+from django_rq import enqueue, get_queue, get_scheduler, job
 from rq import Connection, Queue as _Queue, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
@@ -190,6 +191,14 @@ class ActivationWorker(_Worker):
             prepare_for_work,
             serializer,
         )
+
+
+def enqueue_delay(queue_name: str, delay: int, *args, **kwargs) -> Job:
+    """Enqueue a job to run after specific seconds."""
+    scheduler = get_scheduler(name=queue_name)
+    return scheduler.enqueue_at(
+        datetime.utcnow() + timedelta(seconds=delay), *args, **kwargs
+    )
 
 
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
