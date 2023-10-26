@@ -318,7 +318,7 @@ class ActivationManager:
         """Apply the unresponsive restart policy."""
         LOGGER.info(
             "Monitor operation: unresponsive mode called for "
-            f"activation id: {self.activation_id}"
+            f"activation id: {self.db_instance.id}"
         )
         if self.db_instance.restart_policy == RestartPolicy.NEVER:
             LOGGER.info(
@@ -397,7 +397,7 @@ class ActivationManager:
         """
         LOGGER.info(
             "Monitor operation: completed mode called for "
-            f"activation id: {self.activation_id}",
+            f"activation id: {self.db_instance.id}",
         )
 
         if self.db_instance.restart_policy == RestartPolicy.ALWAYS:
@@ -473,7 +473,7 @@ class ActivationManager:
         """Apply the failed restart policy."""
         LOGGER.info(
             "Monitor operation: failed mode called for "
-            f"activation id: {self.activation_id}",
+            f"activation id: {self.db_instance.id}",
         )
 
         # No restart if the restart policy is NEVER
@@ -793,7 +793,7 @@ class ActivationManager:
 
         LOGGER.info(
             "Monitor operation: Current status of the instance for "
-            f"the activation id {self.db_instance.id}"
+            f"the activation id {self.db_instance.id} "
             f"is {container_status}",
         )
 

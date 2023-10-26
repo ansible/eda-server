@@ -154,7 +154,8 @@ class Engine(ContainerEngine):
                     f"Pod exited with {exit_code}, reason "
                     f"{container_status.state.terminated.reason}"
                 )
-        LOGGER.info(f"get_status {container_id} current status {status}")
+
+        LOGGER.info(f"Job {container_id} status: {status}")
         return status
 
     def _get_ports(self, found_ports: dict) -> list:
