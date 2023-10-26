@@ -156,21 +156,6 @@ class ActivationManager:
         self.db_instance.update_status(**kwargs)
 
     @run_with_lock
-    def _check_stop_prerequirements(self) -> None:
-        """Check if the activation can be stopped."""
-
-        disallowed_statuses = [
-            ActivationStatus.DELETING,
-        ]
-        self.db_instance.refresh_from_db
-
-        if self.db_instance.status in disallowed_statuses:
-            msg = f"Activation {self.db_instance.id} is in "
-            f"{self.db_instance.status} state, can not be stopped."
-            LOGGER.warning(msg)
-            raise exceptions.ActivationStopError(msg)
-
-    @run_with_lock
     def _check_start_prerequirements(self) -> None:
         """Check if the activation can be started."""
 
@@ -252,7 +237,7 @@ class ActivationManager:
 
             # update logs
             LOGGER.info(
-                "Container start successful. "
+                "Container start successful, "
                 "updating logs for activation instance: "
                 f"{self.latest_instance.id}",
             )
@@ -641,8 +626,12 @@ class ActivationManager:
     def stop(self):
         """User requested stop."""
         try:
-            self._check_stop_prerequirements()
+            self.db_instance.refresh_from_db()
         except ObjectDoesNotExist:
+            LOGGER.error(
+                f"Stop operation Failed: Activation {self.db_instance.id} "
+                "does not exist.",
+            )
             raise exceptions.ActivationStartError(
                 "The Activation does not exist."
             )
@@ -655,12 +644,19 @@ class ActivationManager:
             if self._is_already_stopped():
                 msg = f"Activation {self.db_instance.id} is already stopped."
                 LOGGER.info(msg)
+                self._set_activation_status(ActivationStatus.STOPPED)
                 return
         except (
             exceptions.ActivationInstanceNotFound,
             exceptions.ActivationInstancePodIdNotFound,
-        ) as exc:
-            raise exceptions.ActivationStopError(str(exc)) from None
+        ):
+            LOGGER.info(
+                f"Stop operation activation id: {self.db_instance.id} "
+                "No instance or pod id found.",
+            )
+            self._set_activation_status(ActivationStatus.STOPPED)
+            return
+
         try:
             self._stop_instance()
             self._set_activation_status(ActivationStatus.STOPPED)
@@ -689,6 +685,19 @@ class ActivationManager:
         LOGGER.info(
             f"Activation manager activation id: {self.db_instance.id} "
             "Activation restarted",
+        )
+
+    def delete(self):
+        """User requested delete."""
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Deleting activation.",
+        )
+        self.stop()
+        self.db_instance.delete()
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Activation deleted.",
         )
 
     def monitor(self):
@@ -788,6 +797,7 @@ class ActivationManager:
             f"is {container_status}",
         )
 
+        self.update_logs()
         # TODO: container status maybe should use its own dataclass
         if container_status == ActivationStatus.COMPLETED:  # RC == 0
             self._completed_policy()
@@ -802,7 +812,6 @@ class ActivationManager:
                 "Container is running. "
                 "Updating logs."
             )
-            self.update_logs()
             return
 
         # we don't expect an error status for the container
