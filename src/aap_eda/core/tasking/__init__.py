@@ -119,12 +119,9 @@ class DefaultWorker(_Worker):
         prepare_for_work: bool = True,
         serializer: Optional[SerializerProtocol] = None,
     ):
-        if job_class is None:
-            job_class = Job
-        if queue_class is None:
-            queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
+        job_class = Job
+        queue_class = Queue
+        serializer = JSONSerializer
 
         super().__init__(
             queues,
@@ -167,12 +164,9 @@ class ActivationWorker(_Worker):
         prepare_for_work: bool = True,
         serializer: Optional[SerializerProtocol] = None,
     ):
-        if job_class is None:
-            job_class = Job
-        if queue_class is None:
-            queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
+        job_class = Job
+        queue_class = Queue
+        serializer = JSONSerializer
 
         super().__init__(
             [Queue(name="activation", connection=connection)],
