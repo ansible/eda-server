@@ -255,9 +255,11 @@ if RQ_UNIX_SOCKET_PATH:
     RQ_QUEUES = {
         "default": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+            "DEFAULT_TIMEOUT": -1,
         },
         "activation": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+            "DEFAULT_TIMEOUT": -1,
         },
     }
 else:
