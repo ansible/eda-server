@@ -237,7 +237,7 @@ class ActivationManager:
 
             # update logs
             LOGGER.info(
-                "Container start successful. "
+                "Container start successful, "
                 "updating logs for activation instance: "
                 f"{self.latest_instance.id}",
             )
@@ -797,6 +797,7 @@ class ActivationManager:
             f"is {container_status}",
         )
 
+        self.update_logs()
         # TODO: container status maybe should use its own dataclass
         if container_status == ActivationStatus.COMPLETED:  # RC == 0
             self._completed_policy()
@@ -811,7 +812,6 @@ class ActivationManager:
                 "Container is running. "
                 "Updating logs."
             )
-            self.update_logs()
             return
 
         # we don't expect an error status for the container
