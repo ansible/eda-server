@@ -21,8 +21,9 @@ from django.db import IntegrityError
 
 from aap_eda.core import models
 from aap_eda.services.activation.engine.common import LogHandler
-
-from .exceptions import ActivationRecordNotFound
+from aap_eda.services.activation.engine.exceptions import (
+    ContainerUpdateLogsError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,9 @@ class DBLogger(LogHandler):
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
             self.incremental_flush = False
-            logger.info("Log flush setting: end")
         else:
             self.flush_after = int(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER)
             self.incremental_flush = True
-            logger.info(f"Log flush setting: {self.flush_after}")
 
     def lines_written(self) -> int:
         return self.line_number
@@ -73,19 +72,26 @@ class DBLogger(LogHandler):
             message = (
                 f"Instance id: {self.activation_instance_id} is not present."
             )
-            raise ActivationRecordNotFound(message)
+            raise ContainerUpdateLogsError(message)
 
         self.activation_instance_log_buffer = []
 
     def get_log_read_at(self) -> datetime:
-        activation_instance = models.ActivationInstance.objects.get(
-            pk=self.activation_instance_id
-        )
-        return activation_instance.log_read_at
+        try:
+            activation_instance = models.ActivationInstance.objects.get(
+                pk=self.activation_instance_id
+            )
+
+            return activation_instance.log_read_at
+        except IntegrityError as e:
+            raise ContainerUpdateLogsError(str(e))
 
     def set_log_read_at(self, dt: datetime) -> None:
-        activation_instance = models.ActivationInstance.objects.get(
-            pk=self.activation_instance_id
-        )
-        activation_instance.log_read_at = dt
-        activation_instance.save(update_fields=["log_read_at"])
+        try:
+            activation_instance = models.ActivationInstance.objects.get(
+                pk=self.activation_instance_id
+            )
+            activation_instance.log_read_at = dt
+            activation_instance.save(update_fields=["log_read_at"])
+        except IntegrityError as e:
+            raise ContainerUpdateLogsError(str(e))
