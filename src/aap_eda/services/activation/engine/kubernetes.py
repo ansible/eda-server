@@ -23,12 +23,19 @@ from datetime import datetime, timezone
 from dateutil import parser
 from kubernetes import client as k8sclient, config, watch
 from kubernetes.client.rest import ApiException
+from kubernetes.config.config_exception import ConfigException
 
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.activation.engine.exceptions import (
+    ContainerCleanupError,
+    ContainerEngineInitError,
+    ContainerNotFoundError,
+    ContainerStartError,
+    ContainerUpdateLogsError,
+)
 from aap_eda.services.activation.exceptions import (
-    ActivationException,
-    ActivationPodNotFound,
-    DeactivationException,
+    ActivationImageNotFound,
+    ActivationImagePullError,
     K8sActivationException,
 )
 
@@ -37,6 +44,16 @@ from .common import ContainerEngine, ContainerRequest, LogHandler
 LOGGER = logging.getLogger(__name__)
 SUCCESSFUL_EXIT_CODES = [0, 143]
 KEEP_JOBS_FOR_SECONDS = 300
+
+INVALID_IMAGE_NAME = "InvalidImageName"
+IMAGE_PULL_BACK_OFF = "ImagePullBackOff"
+IMAGE_PULL_ERROR = "ErrImagePull"
+
+POD_FAILED_REASONS = [
+    INVALID_IMAGE_NAME,
+    IMAGE_PULL_BACK_OFF,
+    IMAGE_PULL_ERROR,
+]
 
 
 @dataclass
@@ -49,13 +66,16 @@ class Client:
 def get_k8s_client():
     """K8S client factory."""
     # Setup kubernetes api client
-    config.load_incluster_config()
+    try:
+        config.load_incluster_config()
 
-    return Client(
-        batch_api=k8sclient.BatchV1Api(),
-        core_api=k8sclient.CoreV1Api(),
-        network_api=k8sclient.NetworkingV1Api(),
-    )
+        return Client(
+            batch_api=k8sclient.BatchV1Api(),
+            core_api=k8sclient.CoreV1Api(),
+            network_api=k8sclient.NetworkingV1Api(),
+        )
+    except ConfigException as e:
+        raise ContainerEngineInitError(str(e))
 
 
 class Engine(ContainerEngine):
@@ -89,37 +109,42 @@ class Engine(ContainerEngine):
         try:
             log_handler.write("Creating Job")
             log_handler.write(f"Image URL is {request.image_url}", True)
-            self._create_job(request)
+            self._create_job(request, log_handler)
             LOGGER.info("Waiting for pod to start")
-            self._wait_for_pod_to_start()
+            self._wait_for_pod_to_start(log_handler)
             if request.ports:
                 for port in self._get_ports(request.ports):
                     self._create_service(port)
-            LOGGER.info("Job is running")
-            log_handler.write("Job is running")
+            LOGGER.info(f"Job {self.job_name} is running")
+            log_handler.write(f"Job {self.job_name} is running")
             return self.job_name
         except (
-            ActivationException,
-            DeactivationException,
+            ContainerStartError,
+            ContainerUpdateLogsError,
+            ActivationImageNotFound,
+            ActivationImagePullError,
             K8sActivationException,
         ) as e:
-            LOGGER.error("Failed to start job, doing cleanup")
+            LOGGER.error(f"Failed to start job {self.job_name}, doing cleanup")
             LOGGER.error(e)
-            self._cleanup(self.job_name, log_handler)
+            log_handler.write(
+                f"Failed to start job {self.job_name}, doing cleanup.", True
+            )
+            log_handler.write(f"{e}", True)
+            self.cleanup(self.job_name, log_handler)
             raise
 
     # note(alex): the signature of this method is different from the interface
-    def get_status(self, job_name) -> ActivationStatus:
-        status = ActivationStatus.FAILED
-        LOGGER.info(f"in get_status for {job_name}")
-        # TODO: catch kubernetes exception and raise custom exception
-        pod = self._get_job_pod(job_name)
+    def get_status(self, container_id: str) -> ActivationStatus:
+        # status = ActivationStatus.FAILED
+        pod = self._get_job_pod(container_id)
 
         container_status = pod.status.container_statuses[0]
         if container_status.state.running:
             status = ActivationStatus.RUNNING
         elif container_status.state.terminated:
             exit_code = container_status.state.terminated.exit_code
+            # should change 143 to ActivationStatus.STOPPED?
             if exit_code in SUCCESSFUL_EXIT_CODES:
                 status = ActivationStatus.COMPLETED
                 LOGGER.info("Pod has successfully exited")
@@ -129,7 +154,7 @@ class Engine(ContainerEngine):
                     f"Pod exited with {exit_code}, reason "
                     f"{container_status.state.terminated.reason}"
                 )
-        LOGGER.info(f"get_status {job_name} current status {status}")
+        LOGGER.info(f"get_status {container_id} current status {status}")
         return status
 
     def _get_ports(self, found_ports: dict) -> list:
@@ -138,9 +163,10 @@ class Engine(ContainerEngine):
     def cleanup(self, container_id: str, log_handler: LogHandler):
         self.job_name = container_id
         # TODO: update logs
-        self._delete_secret()
-        self._delete_services()
-        self._delete_job()
+        self._delete_secret(log_handler)
+        self._delete_services(log_handler)
+        self._delete_job(log_handler)
+        log_handler.write(f"Job {container_id} is cleaned up.", True)
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
@@ -164,6 +190,10 @@ class Engine(ContainerEngine):
                         current_dt - log_handler.get_log_read_at()
                     ).seconds
 
+                since = log_args.get("since_seconds")
+                if since and since == 0:
+                    return
+
                 log = self.client.core_api.read_namespaced_pod_log(**log_args)
                 timestamp = None
 
@@ -184,22 +214,27 @@ class Engine(ContainerEngine):
             LOGGER.exception(
                 "Failed to fetch pod logs: " f"{container_id}; error: {str(e)}"
             )
-            raise
+            raise ContainerUpdateLogsError(str(e))
 
-    def _get_job_pod(self, job_name) -> k8sclient.V1PodList:
+    def _get_job_pod(self, job_name) -> k8sclient.V1Pod:
         job_label = f"job-name={job_name}"
-        result = self.client.core_api.list_namespaced_pod(
-            namespace=self.namespace, label_selector=job_label
-        )
-        if not result.items:
-            raise ActivationPodNotFound(
-                f"Pod with label {job_label} not found"
+        try:
+            result = self.client.core_api.list_namespaced_pod(
+                namespace=self.namespace, label_selector=job_label
             )
-        return result.items[0]
+            if not result.items:
+                raise ContainerNotFoundError(
+                    f"Pod with label {job_label} not found"
+                )
+            return result.items[0]
+        except ApiException as e:
+            LOGGER.error(f"API Exception {e}")
+            raise ContainerNotFoundError(str(e))
 
-    def _create_container(
+    def _create_container_spec(
         self,
         request: ContainerRequest,
+        log_handler: LogHandler,
     ) -> k8sclient.V1Container:
         ports = []
         if request.ports:
@@ -222,14 +257,19 @@ class Engine(ContainerEngine):
             f"image: {container.image} "
             f"args: {container.args}"
         )
+
+        log_handler.write(f"Container args {container.args}", True)
+
         return container
 
-    def _create_pod_template(
-        self, request: ContainerRequest
+    def _create_pod_template_spec(
+        self,
+        request: ContainerRequest,
+        log_handler: LogHandler,
     ) -> k8sclient.V1PodTemplateSpec:
-        container = self._create_container(request)
+        container = self._create_container_spec(request, log_handler)
         if request.credential:
-            self._create_secret(request)
+            self._create_secret(request, log_handler)
             spec = k8sclient.V1PodSpec(
                 restart_policy="Never",
                 containers=[container],
@@ -251,65 +291,73 @@ class Engine(ContainerEngine):
         )
 
         LOGGER.info(f"Created Pod template: {self.pod_name}")
-        LOGGER.info(f"{pod_template}")
         return pod_template
 
     def _create_service(self, port):
         # only create the service if it does not already exist
         service_name = f"{self.job_name}-{port}"
 
-        # TODO: catch kubernetes exception and raise custom exception
-        service = self.client.core_api.list_namespaced_service(
-            namespace=self.namespace,
-            field_selector=f"metadata.name={service_name}",
-        )
-
-        if not service.items:
-            service_template = k8sclient.V1Service(
-                spec=k8sclient.V1ServiceSpec(
-                    selector={"app": "eda", "job-name": self.job_name},
-                    ports=[
-                        k8sclient.V1ServicePort(
-                            protocol="TCP", port=port, target_port=port
-                        )
-                    ],
-                ),
-                metadata=k8sclient.V1ObjectMeta(
-                    name=f"{service_name}",
-                    labels={"app": "eda", "job-name": self.job_name},
-                    namespace=self.namespace,
-                ),
-            )
-
-            self.client.core_api.create_namespaced_service(
-                self.namespace, service_template
-            )
-            LOGGER.info(f"Created Service: {service_name}")
-        else:
-            LOGGER.info(f"Service already exists: {service_name}")
-
-    def _delete_services(self) -> None:
-        services = self.client.core_api.list_namespaced_service(
-            namespace=self.namespace,
-            label_selector=f"job-name={self.job_name}",
-        )
-
-        for svc in services.items:
-            service_name = svc.metadata.name
-
-            self.client.core_api.delete_namespaced_service(
-                name=service_name,
+        try:
+            service = self.client.core_api.list_namespaced_service(
                 namespace=self.namespace,
+                field_selector=f"metadata.name={service_name}",
             )
-            LOGGER.info(f"Service {service_name} is deleted")
+
+            if not service.items:
+                service_template = k8sclient.V1Service(
+                    spec=k8sclient.V1ServiceSpec(
+                        selector={"app": "eda", "job-name": self.job_name},
+                        ports=[
+                            k8sclient.V1ServicePort(
+                                protocol="TCP", port=port, target_port=port
+                            )
+                        ],
+                    ),
+                    metadata=k8sclient.V1ObjectMeta(
+                        name=f"{service_name}",
+                        labels={"app": "eda", "job-name": self.job_name},
+                        namespace=self.namespace,
+                    ),
+                )
+
+                self.client.core_api.create_namespaced_service(
+                    self.namespace, service_template
+                )
+                LOGGER.info(f"Created Service: {service_name}")
+            else:
+                LOGGER.info(f"Service already exists: {service_name}")
+        except ApiException as e:
+            LOGGER.error(f"API Exception {e}")
+            raise ContainerStartError(str(e))
+
+    def _delete_services(self, log_handler: LogHandler) -> None:
+        try:
+            services = self.client.core_api.list_namespaced_service(
+                namespace=self.namespace,
+                label_selector=f"job-name={self.job_name}",
+            )
+
+            for svc in services.items:
+                service_name = svc.metadata.name
+
+                self.client.core_api.delete_namespaced_service(
+                    name=service_name,
+                    namespace=self.namespace,
+                )
+                LOGGER.info(f"Service {service_name} is deleted")
+                log_handler.write(f"Service {service_name} is deleted.", True)
+        except ApiException as e:
+            LOGGER.error(f"API Exception {e}")
+            raise ContainerCleanupError(str(e))
 
     def _create_job(
         self,
         request: ContainerRequest,
+        log_handler: LogHandler,
         backoff_limit=0,
         ttl=KEEP_JOBS_FOR_SECONDS,
     ) -> k8sclient.V1Job:
-        pod_template = self._create_pod_template(request)
+        pod_template = self._create_pod_template_spec(request, log_handler)
 
         metadata = k8sclient.V1ObjectMeta(
             name=self.job_name,
@@ -330,16 +378,18 @@ class Engine(ContainerEngine):
             ),
         )
 
-        LOGGER.info(f"{job_spec}")
-        # TODO: catch kubernetes exception and raise custom exception
-        job_result = self.client.batch_api.create_namespaced_job(
-            namespace=self.namespace, body=job_spec
-        )
-        LOGGER.info(f"Submitted Job template: {self.job_name},")
+        try:
+            job_result = self.client.batch_api.create_namespaced_job(
+                namespace=self.namespace, body=job_spec
+            )
+            LOGGER.info(f"Submitted Job template: {self.job_name},")
+        except ApiException as e:
+            LOGGER.error(f"API Exception {e}")
+            raise ContainerStartError(str(e))
 
         return job_result
 
-    def _delete_job(self) -> None:
+    def _delete_job(self, log_handler: LogHandler) -> None:
         try:
             activation_job = self.client.batch_api.list_namespaced_job(
                 namespace=self.namespace,
@@ -356,153 +406,97 @@ class Engine(ContainerEngine):
                 )
 
                 if result.status == "Failure":
-                    raise K8sActivationException(f"{result}")
+                    raise ContainerCleanupError(f"{result}")
             else:
-                LOGGER.info(f"Job for : {self.job_name} has been removed")
+                LOGGER.info(f"Job for {self.job_name} has been removed")
+                log_handler.write(
+                    f"Job for {self.job_name} has been removed.", True
+                )
 
         except ApiException as e:
-            raise K8sActivationException(
+            raise ContainerCleanupError(
                 f"Stop of {self.job_name} Failed: \n {e}"
             )
 
-    def _wait_for_pod_to_start(self) -> ActivationStatus:
+    def _wait_for_pod_to_start(self, log_handler: LogHandler) -> None:
         watcher = watch.Watch()
-        pod_failed_reasons = [
-            "InvalidImageName",
-            "ImagePullBackOff",
-            "ErrImagePull",
-        ]
-        status = ActivationStatus.PENDING
         LOGGER.info("Waiting for pod to start")
-        while True:
-            try:
-                for event in watcher.stream(
-                    self.client.core_api.list_namespaced_pod,
-                    namespace=self.namespace,
-                    label_selector=f"job-name={self.job_name}",
-                ):
-                    if event["object"].status.phase == "Pending":
-                        pod_name = event["object"].metadata.name
-                        LOGGER.info(f"Pod {pod_name} - Pending")
-
-                        statuses = event["object"].status.container_statuses
-
-                        if statuses and statuses[0]:
-                            LOGGER.info(f"CONT STATUS: {statuses[0]}")
-
-                            if statuses[0].state.waiting:
-                                message = statuses[0].state.waiting.message
-                                reason = statuses[0].state.waiting.reason
-                                if reason in pod_failed_reasons:
-                                    # self._delete_job()  move to the caller
-                                    status = ActivationStatus.ERROR
-                                    raise K8sActivationException(message)
-
-                    if event["object"].status.phase == "Running":
-                        pod_name = event["object"].metadata.name
-                        LOGGER.info(f"Pod {pod_name} - Running")
-                        status = ActivationStatus.RUNNING
-                        break
-
-                    if event["object"].status.phase == "Succeeded":
-                        pod_name = event["object"].metadata.name
-                        LOGGER.info(f"Pod {pod_name} - Succeeded")
-                        status = ActivationStatus.COMPLETED
-                        break
-
-                    if event["object"].status.phase == "Failed":
-                        pod_name = event["object"].metadata.name
-                        LOGGER.info(f"Pod {pod_name} - Failed")
-
-                        statuses = event["object"].status.container_statuses
-                        if statuses and statuses[0]:
-                            exit_code = statuses[0].state.terminated.exit_code
-                            reason = statuses[0].state.terminated.reason
-                            if exit_code in SUCCESSFUL_EXIT_CODES:
-                                raise DeactivationException(
-                                    f"Container exited with code {exit_code}"
-                                )
-                            else:
-                                status = (ActivationStatus.FAILED,)
-                                raise K8sActivationException(
-                                    f"Container failed: {reason} with "
-                                    f"exit code {exit_code}"
-                                )
-                        break
-
-            except (
-                DeactivationException,
-                K8sActivationException,
-            ):
-                raise
-            except ApiException as e:
-                raise K8sActivationException(
-                    f"Pod {self.pod_name} failed with error {e}"
-                )
-            finally:
-                watcher.stop()
-            LOGGER.info("Pod has started")
-            return status
-
-    def _set_namespace(self):
-        ns_fileref = open(
-            "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
-        )
-        self.namespace = ns_fileref.read()
-        LOGGER.info(f"Namespace is {self.namespace}")
-        ns_fileref.close()
-
-    def _wait_for_job_to_start(self) -> None:
-        # Wait for job to be created
-        while True:
-            result = self.client.batch_api.list_namespaced_job(
+        try:
+            for event in watcher.stream(
+                self.client.core_api.list_namespaced_pod,
                 namespace=self.namespace,
                 label_selector=f"job-name={self.job_name}",
-                timeout_seconds=30,
+            ):
+                pod_name = event["object"].metadata.name
+                pod_phase = event["object"].status.phase
+                LOGGER.info(f"Pod {pod_name} - {pod_phase}")
+
+                if pod_phase == "Pending":
+                    statuses = event["object"].status.container_statuses
+
+                    if statuses and statuses[0]:
+                        if statuses[0].state.waiting:
+                            message = statuses[0].state.waiting.message
+                            reason = statuses[0].state.waiting.reason
+
+                            if reason in POD_FAILED_REASONS:
+                                error_msg = f"Failed to pull image: {message}"
+                                LOGGER.error(error_msg)
+                                log_handler.write(error_msg, True)
+
+                                if reason == INVALID_IMAGE_NAME:
+                                    raise ActivationImageNotFound(message)
+                                else:
+                                    # What's the difference between ActivationImagePullError
+                                    # and ContainerImagePullError? which one should be used?
+                                    raise ActivationImagePullError(message)
+
+                if pod_phase == "Failed" or pod_phase == "Succeeded":
+                    statuses = event["object"].status.container_statuses
+                    if statuses and statuses[0]:
+                        exit_code = statuses[0].state.terminated.exit_code
+                        reason = statuses[0].state.terminated.reason
+                        if exit_code not in SUCCESSFUL_EXIT_CODES:
+                            error_msg = (
+                                f"Pod {pod_name} failed with "
+                                f"exit code {exit_code}"
+                            )
+                            LOGGER.error(error_msg)
+                            log_handler.write(error_msg, True)
+                    break
+
+                if pod_phase == "Running":
+                    break
+        except ApiException as e:
+            raise ContainerStartError(
+                f"Pod {self.pod_name} failed with error {e}"
             )
+        finally:
+            watcher.stop()
 
-            if result.items:
-                LOGGER.info("Job exists")
-                break
-            time.sleep(10)
+            LOGGER.info(f"Pod {self.pod_name} has started")
 
-        watcher = watch.Watch()
-        while True:
-            LOGGER.info("Still waiting for job to start")
-            try:
-                for event in watcher.stream(
-                    self.client.batch_api.list_namespaced_job,
-                    namespace=self.namespace,
-                    label_selector=f"job-name={self.job_name}",
-                    timeout_seconds=0,
-                ):
-                    o = event["object"]
-                    obj_name = o.metadata.name
+    def _set_namespace(self):
+        namespace_file = (
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+        )
+        try:
+            with open(namespace_file, "r") as namespace_ref:
+                self.namespace = namespace_ref.read()
 
-                    if o.status.succeeded:
-                        LOGGER.info(f"Job {obj_name}: Succeeded")
-                        break
-
-                    if o.status.active:
-                        LOGGER.info(f"Job {obj_name}: Active")
-                        self._wait_for_pod_to_start()
-                        break
-
-                    if o.status.failed:
-                        LOGGER.info(f"Job {obj_name}: Failed")
-                        raise K8sActivationException(f"Job {obj_name}: Failed")
-
-            except ApiException as e:
-                raise K8sActivationException(f"Job {obj_name} Failed: \n {e}")
-            finally:
-                watcher.stop()
+            LOGGER.info(f"Namespace is {self.namespace}")
+        except FileNotFoundError:
+            message = f"Namespace file {namespace_file} does not exist."
+            LOGGER.error(message)
+            raise ContainerEngineInitError(message)
 
     def _create_secret(
         self,
         request: ContainerRequest,
+        log_handler: LogHandler,
     ) -> None:
         # Cleanup the secret before create it
-        self._delete_secret()
+        self._delete_secret(log_handler)
 
         server = request.image_url.split("/")[0]
         cred_payload = {
@@ -532,14 +526,18 @@ class Engine(ContainerEngine):
             type="kubernetes.io/dockerconfigjson",
         )
 
-        self.client.core_api.create_namespaced_secret(
-            namespace=self.namespace,
-            body=secret,
-        )
+        try:
+            self.client.core_api.create_namespaced_secret(
+                namespace=self.namespace,
+                body=secret,
+            )
 
-        LOGGER.info(f"Created secret: name: {self.secret_name}")
+            LOGGER.info(f"Created secret: name: {self.secret_name}")
+        except ApiException as e:
+            LOGGER.error(f"API Exception {e}")
+            raise ContainerStartError(str(e))
 
-    def _delete_secret(self) -> None:
+    def _delete_secret(self, log_handler: LogHandler) -> None:
         try:
             result = self.client.core_api.list_namespaced_secret(
                 namespace=self.namespace,
@@ -555,12 +553,17 @@ class Engine(ContainerEngine):
 
             if result.status == "Success":
                 LOGGER.info(f"Secret {self.secret_name} is deleted")
+                log_handler.write(
+                    f"Secret {self.secret_name} is deleted.", True
+                )
             else:
-                LOGGER.error(
+                message = (
                     f"Failed to delete secret {self.secret_name}: ",
                     f"status: {result.status}",
                     f"reason: {result.reason}",
                 )
+                LOGGER.error(message)
+                log_handler.write(message, True)
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise
+            raise ContainerCleanupError(str(e))
