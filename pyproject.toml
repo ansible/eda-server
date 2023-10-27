@@ -12,9 +12,7 @@ version = "0.1.0"
 description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
-packages = [
-    {include = "aap_eda", from = "src"}
-]
+packages = [{ include = "aap_eda", from = "src" }]
 
 [tool.poetry.scripts]
 aap-eda-manage = 'aap_eda.manage:main'
@@ -48,7 +46,7 @@ rq-scheduler = "^0.10"
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
-requests = { version="*", python="<4.0" }
+requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-redis = "^3.0.2"
 
@@ -56,7 +54,7 @@ pytest-redis = "^3.0.2"
 flake8 = "*"
 isort = "*"
 black = "*"
-flake8-broken-line = { version="*", python="<4.0" }
+flake8-broken-line = { version = "*", python = "<4.0" }
 flake8-string-format = "*"
 # This is an experimental linter.
 ruff = "*"
@@ -67,7 +65,7 @@ flake8-bugbear = "*"
 flake8-comprehensions = "*"
 flake8-debugger = "*"
 flake8-docstrings = "*"
-flake8-eradicate = { version="*", python="<4.0" }
+flake8-eradicate = { version = "*", python = "<4.0" }
 flake8-print = "*"
 
 # -------------------------------------
@@ -75,24 +73,24 @@ flake8-print = "*"
 # -------------------------------------
 
 [tool.black]
-line-length = 79
+line-length = 120
 target-version = ["py39", "py310"]
 
 [tool.isort]
 profile = "black"
 combine_as_imports = true
-line_length = 79
+line_length = 120
 
 [tool.ruff]
-line-length = 79
+line-length = 120
 select = [
     "E",
     "F",
-    "D",        # flake8-docstrings
-    "TID",      # flake8-tidy-imports
+    "D",   # flake8-docstrings
+    "TID", # flake8-tidy-imports
 ]
 extend-ignore = [
-    "D1",       #  Missing docstrings errors
+    "D1", #  Missing docstrings errors
 ]
 
 [tool.ruff.per-file-ignores]
