@@ -163,25 +163,31 @@ class ActivationManager:
             ActivationStatus.STARTING,
             ActivationStatus.DELETING,
         ]
-        self.db_instance.refresh_from_db
+        self.db_instance.refresh_from_db()
 
-        if self.db_instance.is_enabled is False:
-            msg = f"Activation {self.db_instance.id} is disabled. "
-            "Can not be started."
+        if not self.db_instance.is_enabled:
+            msg = (
+                f"Activation {self.db_instance.id} is disabled. "
+                "Can not be started."
+            )
             LOGGER.warning(msg)
             raise exceptions.ActivationStartError(msg)
 
         if self.db_instance.status in disallowed_statuses:
-            msg = f"Activation {self.db_instance.id} is in "
-            "f{self.db_instance.status} state, can not be started."
+            msg = (
+                f"Activation {self.db_instance.id} is in "
+                "f{self.db_instance.status} state, can not be started."
+            )
             LOGGER.warning(msg)
             raise exceptions.ActivationStartError(msg)
 
         # serializator checks (dependent activation objects)
         is_valid, error = is_activation_valid(self.db_instance)
         if not is_valid:
-            msg = f"Activation {self.db_instance.id} can not be started. "
-            f"Reason: {error}"
+            msg = (
+                f"Activation {self.db_instance.id} can not be started. "
+                f"Reason: {error}"
+            )
             LOGGER.error(msg)
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg)
@@ -301,7 +307,12 @@ class ActivationManager:
         return self._is_in_status(ActivationStatus.RUNNING)
 
     def _is_already_stopped(self) -> bool:
-        return self._is_in_status(ActivationStatus.STOPPED)
+        return (
+            self._is_in_status(ActivationStatus.STOPPED)
+            or self._is_in_status(ActivationStatus.COMPLETED)
+            or self._is_in_status(ActivationStatus.FAILED)
+            or self._is_in_status(ActivationStatus.ERROR)
+        )
 
     def _is_unresponsive(self) -> bool:
         if self.db_instance.status in [
@@ -412,18 +423,6 @@ class ActivationManager:
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-            try:
-                self._cleanup()
-            except engine_exceptions.ContainerCleanupError as exc:
-                msg = (
-                    f"Activation {self.db_instance.id} failed to cleanup. "
-                    f"Reason: {exc}"
-                )
-                LOGGER.error(msg)
-                # Alex: Not sure if we want to set ERROR here.
-                self._error_instance(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
-                raise exceptions.ActivationMonitorError(msg) from exc
             # TODO: schedule activation based on
             # ACTIVATION_RESTART_SECONDS_ON_COMPLETE
             # We should have a status like "pending restart"
@@ -450,18 +449,6 @@ class ActivationManager:
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-            try:
-                self._cleanup()
-            except engine_exceptions.ContainerCleanupError as exc:
-                msg = (
-                    f"Activation {self.db_instance.id} failed to cleanup. "
-                    f"Reason: {exc}"
-                )
-                LOGGER.error(msg)
-                # Alex: Not sure if we want to set ERROR here.
-                self._error_instance(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
-                raise exceptions.ActivationMonitorError(msg) from exc
 
             user_msg = "Activation completed successfully."
             self._set_activation_status(
@@ -507,7 +494,7 @@ class ActivationManager:
         ):
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
-                f"Restart policy is set to {self.db_instance.restart_policy}. ",
+                f"Restart policy is set to {self.db_instance.restart_policy}. "
                 "Has reached the maximum number of restarts. ",
             )
             user_msg = (
@@ -644,7 +631,6 @@ class ActivationManager:
             if self._is_already_stopped():
                 msg = f"Activation {self.db_instance.id} is already stopped."
                 LOGGER.info(msg)
-                self._set_activation_status(ActivationStatus.STOPPED)
                 return
         except (
             exceptions.ActivationInstanceNotFound,
@@ -654,7 +640,6 @@ class ActivationManager:
                 f"Stop operation activation id: {self.db_instance.id} "
                 "No instance or pod id found.",
             )
-            self._set_activation_status(ActivationStatus.STOPPED)
             return
 
         try:
