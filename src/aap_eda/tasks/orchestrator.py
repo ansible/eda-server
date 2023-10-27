@@ -46,7 +46,7 @@ def _manage(activation_id: int):
             elif request.request == ActivationRequest.RESTART:
                 manager.restart()
             elif request.request == ActivationRequest.DELETE:
-                pass  # manager.delete()
+                manager.delete()
             pop_until(activation_id, request.id)
         has_user_requests = True
         pending_requests = peek_all(activation_id)
@@ -66,7 +66,7 @@ def start_activation(activation_id: int):
 
 
 def stop_activation(activation_id: int):
-    _make_user_request(activation_id, ActivationRequest.START)
+    _make_user_request(activation_id, ActivationRequest.STOP)
 
 
 def delete_activation(activation_id: int):
