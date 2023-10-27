@@ -25,11 +25,7 @@ from kubernetes.client import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.ruleset.exceptions import (
-    ActivationRecordNotFound,
-    DeactivationException,
-    K8sActivationException,
-)
+from aap_eda.services.ruleset.exceptions import ActivationRecordNotFound, DeactivationException, K8sActivationException
 
 from .shared_settings import VALID_LOG_LEVELS
 
@@ -69,10 +65,7 @@ class ActivationKubernetes:
             "--heartbeat",
             str(heartbeat),
         ]
-        if (
-            settings.ANSIBLE_RULEBOOK_LOG_LEVEL
-            and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
-        ):
+        if settings.ANSIBLE_RULEBOOK_LOG_LEVEL and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS:
             args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
 
         container = client.V1Container(
@@ -81,16 +74,12 @@ class ActivationKubernetes:
             image_pull_policy=pull_policy,
             env=[client.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
             args=args,
-            ports=[
-                client.V1ContainerPort(container_port=port) for port in ports
-            ],
+            ports=[client.V1ContainerPort(container_port=port) for port in ports],
             command=["ansible-rulebook"],
         )
 
         logger.info(
-            f"Created container: name: {container.name}, "
-            f"image: {container.image} "
-            f"args: {container.args}"
+            f"Created container: name: {container.name}, " f"image: {container.image} " f"args: {container.args}"
         )
 
         return container
@@ -115,11 +104,7 @@ class ActivationKubernetes:
             }
         }
 
-        data = {
-            ".dockerconfigjson": base64.b64encode(
-                json.dumps(cred_payload).encode()
-            ).decode()
-        }
+        data = {".dockerconfigjson": base64.b64encode(json.dumps(cred_payload).encode()).decode()}
 
         secret = client.V1Secret(
             api_version="v1",
@@ -141,21 +126,15 @@ class ActivationKubernetes:
         logger.info(f"Created secret: name: {secret_name}")
 
     @staticmethod
-    def create_pod_template(
-        pod_name, container, secret_name
-    ) -> client.V1PodTemplateSpec:
+    def create_pod_template(pod_name, container, secret_name) -> client.V1PodTemplateSpec:
         if secret_name:
             spec = client.V1PodSpec(
                 restart_policy="Never",
                 containers=[container],
-                image_pull_secrets=[
-                    client.V1LocalObjectReference(secret_name)
-                ],
+                image_pull_secrets=[client.V1LocalObjectReference(secret_name)],
             )
         else:
-            spec = client.V1PodSpec(
-                restart_policy="Never", containers=[container]
-            )
+            spec = client.V1PodSpec(restart_policy="Never", containers=[container])
 
         pod_template = client.V1PodTemplateSpec(
             spec=spec,
@@ -178,11 +157,7 @@ class ActivationKubernetes:
             service_template = client.V1Service(
                 spec=client.V1ServiceSpec(
                     selector={"app": "eda", "job-name": job_name},
-                    ports=[
-                        client.V1ServicePort(
-                            protocol="TCP", port=port, target_port=port
-                        )
-                    ],
+                    ports=[client.V1ServicePort(protocol="TCP", port=port, target_port=port)],
                 ),
                 metadata=client.V1ObjectMeta(
                     name=f"{service_name}",
@@ -191,17 +166,13 @@ class ActivationKubernetes:
                 ),
             )
 
-            self.client_api.create_namespaced_service(
-                namespace, service_template
-            )
+            self.client_api.create_namespaced_service(namespace, service_template)
             logger.info(f"Created Service: {service_name}")
         else:
             logger.info(f"Service already exists: {service_name}")
 
     def delete_services(self, namespace, job_name) -> None:
-        services = self.client_api.list_namespaced_service(
-            namespace=namespace, label_selector=f"job-name={job_name}"
-        )
+        services = self.client_api.list_namespaced_service(namespace=namespace, label_selector=f"job-name={job_name}")
 
         for svc in services.items:
             service_name = svc.metadata.name
@@ -213,9 +184,7 @@ class ActivationKubernetes:
             logger.info(f"Service {service_name} is deleted")
 
     @staticmethod
-    def create_job(
-        job_name, activation_id, pod_template, backoff_limit=0, ttl=0
-    ) -> client.V1Job:
+    def create_job(job_name, activation_id, pod_template, backoff_limit=0, ttl=0) -> client.V1Job:
         metadata = client.V1ObjectMeta(
             name=job_name,
             labels={
@@ -245,8 +214,7 @@ class ActivationKubernetes:
             instance_name = activation_instance.name
             activation_job = self.batch_api.list_namespaced_job(
                 namespace=namespace,
-                label_selector="activation-id="
-                f"{activation_instance.activation.pk}",
+                label_selector="activation-id=" f"{activation_instance.activation.pk}",
                 timeout_seconds=0,
             )
 
@@ -263,9 +231,7 @@ class ActivationKubernetes:
                     job_name=activation_job_name,
                 )
 
-                secret_name = (
-                    f"activation-secret-{activation_instance.activation.id}"
-                )
+                secret_name = f"activation-secret-{activation_instance.activation.id}"
                 self.delete_secret(
                     secret_name=secret_name,
                     namespace=namespace,
@@ -277,9 +243,7 @@ class ActivationKubernetes:
                 logger.info(f"Job for : {instance_name} has been removed")
 
         except Exception as e:
-            raise K8sActivationException(
-                f"Stop {instance_name} Failed: \n {e}"
-            )
+            raise K8sActivationException(f"Stop {instance_name} Failed: \n {e}")
 
     def run_activation_job(
         self,
@@ -304,9 +268,7 @@ class ActivationKubernetes:
             time.sleep(10)
 
         logger.info(f"Create Job: {job_name}")
-        job_result = self.batch_api.create_namespaced_job(
-            namespace=namespace, body=job_spec
-        )
+        job_result = self.batch_api.create_namespaced_job(namespace=namespace, body=job_spec)
 
         logger.info(f"Job Info: {job_result}")
 
@@ -406,14 +368,10 @@ class ActivationKubernetes:
 
             line_number += 1
 
-        models.ActivationInstanceLog.objects.bulk_create(
-            activation_instance_logs
-        )
+        models.ActivationInstanceLog.objects.bulk_create(activation_instance_logs)
         logger.info(f"{line_number} of activation instance log are created.")
 
-    def set_activation_status(
-        self, instance: models.ActivationInstance, status: ActivationStatus
-    ) -> None:
+    def set_activation_status(self, instance: models.ActivationInstance, status: ActivationStatus) -> None:
         try:
             now = timezone.now()
             instance.status = status
@@ -462,9 +420,7 @@ class ActivationKubernetes:
                                 message = statuses[0].state.waiting.message
                                 reason = statuses[0].state.waiting.reason
                                 if reason in pod_failed_reasons:
-                                    self.delete_job(
-                                        activation_instance, namespace
-                                    )
+                                    self.delete_job(activation_instance, namespace)
                                     self.set_activation_status(
                                         instance=activation_instance,
                                         status=ActivationStatus.FAILED,
@@ -519,17 +475,14 @@ class ActivationKubernetes:
                             reason = statuses[0].state.terminated.reason
                             if exit_code == GRACEFUL_TERM:
                                 # The stopped status is set in except block
-                                raise DeactivationException(
-                                    f"Container exited with code {exit_code}"
-                                )
+                                raise DeactivationException(f"Container exited with code {exit_code}")
                             else:
                                 self.set_activation_status(
                                     instance=activation_instance,
                                     status=ActivationStatus.FAILED,
                                 )
                                 raise K8sActivationException(
-                                    f"Container failed: {reason} with "
-                                    f"exit code {exit_code}"
+                                    f"Container failed: {reason} with " f"exit code {exit_code}"
                                 )
 
                         done = True
@@ -540,13 +493,9 @@ class ActivationKubernetes:
             ):
                 raise
             except Exception as e:
-                raise K8sActivationException(
-                    f"Pod {pod_name} failed with error {e}"
-                )
+                raise K8sActivationException(f"Pod {pod_name} failed with error {e}")
 
-    def read_job_pod_log(
-        self, pod_name, namespace, activation_instance_id
-    ) -> None:
+    def read_job_pod_log(self, pod_name, namespace, activation_instance_id) -> None:
         w = watch.Watch()
         done = False
         line_number = 0
@@ -572,19 +521,11 @@ class ActivationKubernetes:
                 done = True
             except exceptions.ApiException as e:
                 if e.status == 404:  # Not Found
-                    raise DeactivationException(
-                        f"Failed to read logs of unavailable pod {pod_name}"
-                    )
+                    raise DeactivationException(f"Failed to read logs of unavailable pod {pod_name}")
                 else:
-                    raise K8sActivationException(
-                        f"Failed to read pod logs: \n {e}"
-                    )
+                    raise K8sActivationException(f"Failed to read pod logs: \n {e}")
             except DatabaseError:
-                message = (
-                    f"Instance [id: {activation_instance_id}] is not present."
-                )
+                message = f"Instance [id: {activation_instance_id}] is not present."
                 raise ActivationRecordNotFound(message)
             except Exception as e:
-                raise K8sActivationException(
-                    f"Failed to read pod logs: \n {e}"
-                )
+                raise K8sActivationException(f"Failed to read pod logs: \n {e}")

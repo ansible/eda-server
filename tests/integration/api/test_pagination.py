@@ -43,9 +43,7 @@ TEST_DATA = [
 def test_get_next_link(client: APIClient):
     models.Project.objects.bulk_create(TEST_DATA)
     response = client.get(f"{api_url_v1}/projects/?page_size=1")
-    assert (
-        response.data["next"] == f"{api_url_v1}/projects/?page=2&page_size=1"
-    )
+    assert response.data["next"] == f"{api_url_v1}/projects/?page=2&page_size=1"
 
     response = client.get(f"{api_url_v1}/projects/?page=3&page_size=1")
     assert response.data["next"] is None
@@ -55,10 +53,7 @@ def test_get_next_link(client: APIClient):
 def test_get_previous_link(client: APIClient):
     models.Project.objects.bulk_create(TEST_DATA)
     response = client.get(f"{api_url_v1}/projects/?page=3&page_size=1")
-    assert (
-        response.data["previous"]
-        == f"{api_url_v1}/projects/?page=2&page_size=1"
-    )
+    assert response.data["previous"] == f"{api_url_v1}/projects/?page=2&page_size=1"
 
     response = client.get(f"{api_url_v1}/projects/?page=1&page_size=1")
     assert response.data["previous"] is None

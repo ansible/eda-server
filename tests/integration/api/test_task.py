@@ -79,9 +79,7 @@ def test_retrieve_task(get_job: mock.Mock, client: APIClient):
         created_at="2023-01-25T15:24:45.148282",
         enqueued_at="2023-01-25T15:24:47.123923",
     )
-    response = client.get(
-        f"{api_url_v1}/tasks/6636aad2-7998-4376-bb4d-ef19796fd1b3/"
-    )
+    response = client.get(f"{api_url_v1}/tasks/6636aad2-7998-4376-bb4d-ef19796fd1b3/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {
         "id": "6636aad2-7998-4376-bb4d-ef19796fd1b3",
@@ -98,9 +96,7 @@ def test_retrieve_task(get_job: mock.Mock, client: APIClient):
 @mock.patch("aap_eda.api.views.tasks.get_job")
 def test_retrieve_task_not_exists(get_job: mock.Mock, client: APIClient):
     get_job.return_value = None
-    response = client.get(
-        f"{api_url_v1}/tasks/a13f539c-aaa1-46b6-80c3-7dbfad941292/"
-    )
+    response = client.get(f"{api_url_v1}/tasks/a13f539c-aaa1-46b6-80c3-7dbfad941292/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

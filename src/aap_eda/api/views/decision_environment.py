@@ -13,12 +13,7 @@
 #  limitations under the License.
 
 from django_filters import rest_framework as defaultfilters
-from drf_spectacular.utils import (
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
@@ -26,11 +21,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 
-from .mixins import (
-    CreateModelMixin,
-    PartialUpdateOnlyModelMixin,
-    ResponseSerializerMixin,
-)
+from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -98,28 +89,18 @@ class DecisionEnvironmentViewSet(
     def retrieve(self, request, pk):
         decision_environment = super().retrieve(request, pk)
         decision_environment.data["credential"] = (
-            models.Credential.objects.get(
-                pk=decision_environment.data["credential_id"]
-            )
+            models.Credential.objects.get(pk=decision_environment.data["credential_id"])
             if decision_environment.data["credential_id"]
             else None
         )
 
-        return Response(
-            serializers.DecisionEnvironmentReadSerializer(
-                decision_environment.data
-            ).data
-        )
+        return Response(serializers.DecisionEnvironmentReadSerializer(decision_environment.data).data)
 
     @extend_schema(
         description="Delete a decision environment by id",
         responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                None, description="Delete successful."
-            ),
-            status.HTTP_409_CONFLICT: OpenApiResponse(
-                None, description="Decision Environment in use by Activations."
-            ),
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(None, description="Delete successful."),
+            status.HTTP_409_CONFLICT: OpenApiResponse(None, description="Decision Environment in use by Activations."),
         },
         parameters=[
             OpenApiParameter(
@@ -134,9 +115,7 @@ class DecisionEnvironmentViewSet(
         instance = self.get_object()
         force_delete = request.query_params.get("force", "false").lower()
 
-        activations_exist = models.Activation.objects.filter(
-            decision_environment_id=instance.id
-        ).exists()
+        activations_exist = models.Activation.objects.filter(decision_environment_id=instance.id).exists()
 
         if activations_exist and force_delete not in ["true", "1", "yes"]:
             raise api_exc.Conflict(

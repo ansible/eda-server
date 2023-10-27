@@ -25,9 +25,7 @@ class TaskRefSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.URLField)
     def get_href(self, data: dict):
-        return reverse(
-            "task-detail", args=[data["id"]], request=self.context["request"]
-        )
+        return reverse("task-detail", args=[data["id"]], request=self.context["request"])
 
 
 class TaskSerializer(serializers.Serializer):
@@ -39,8 +37,6 @@ class TaskSerializer(serializers.Serializer):
     finished_at = serializers.DateTimeField(allow_null=True, source="ended_at")
     result = serializers.JSONField()
 
-    @extend_schema_field(
-        serializers.ChoiceField(choices=[x.value for x in JobStatus])
-    )
+    @extend_schema_field(serializers.ChoiceField(choices=[x.value for x in JobStatus]))
     def get_status(self, instance: Job) -> str:
         return instance.get_status()

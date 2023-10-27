@@ -39,9 +39,7 @@ def expand_ruleset_sources(rulebook_data: dict) -> dict:
     return expanded_ruleset_sources
 
 
-def insert_rulebook_related_data(
-    rulebook: models.Rulebook, data: dict
-) -> None:
+def insert_rulebook_related_data(rulebook: models.Rulebook, data: dict) -> None:
     expanded_sources = expand_ruleset_sources(data)
 
     rule_sets = [
@@ -71,9 +69,7 @@ def insert_rulebook_related_data(
 def build_ruleset_out_data(data: dict) -> dict:
     ruleset_id = int(data["id"])
     data["source_types"] = [src["type"] for src in (data["sources"] or [])]
-    data["rule_count"] = models.Rule.objects.filter(
-        ruleset_id=ruleset_id
-    ).count()
+    data["rule_count"] = models.Rule.objects.filter(ruleset_id=ruleset_id).count()
     data["fired_stats"] = build_fired_stats(data)
 
     for key in ["rulebook", "sources"]:

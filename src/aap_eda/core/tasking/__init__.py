@@ -6,11 +6,7 @@ from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
 from django_rq import enqueue, get_queue, job
 from rq import Connection, Queue as _Queue, Worker as _Worker
-from rq.defaults import (
-    DEFAULT_JOB_MONITORING_INTERVAL,
-    DEFAULT_RESULT_TTL,
-    DEFAULT_WORKER_TTL,
-)
+from rq.defaults import DEFAULT_JOB_MONITORING_INTERVAL, DEFAULT_RESULT_TTL, DEFAULT_WORKER_TTL
 from rq.job import Job as _Job, JobStatus
 from rq.serializers import JSONSerializer
 
@@ -201,9 +197,7 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     queue = get_queue(queue_name)
     job = job_from_queue(queue, job_id)
     if job:
-        logger.info(
-            f"Skip enqueing job: {job_id} because it is already enqueued"
-        )
+        logger.info(f"Skip enqueing job: {job_id} because it is already enqueued")
         return job
     else:
         kwargs["job_id"] = job_id

@@ -13,13 +13,8 @@
 #  limitations under the License.
 from rest_framework import serializers
 
-from aap_eda.api.serializers.decision_environment import (
-    DecisionEnvironmentRefSerializer,
-)
-from aap_eda.api.serializers.project import (
-    ExtraVarRefSerializer,
-    ProjectRefSerializer,
-)
+from aap_eda.api.serializers.decision_environment import DecisionEnvironmentRefSerializer
+from aap_eda.api.serializers.project import ExtraVarRefSerializer, ProjectRefSerializer
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.core import models, validators
 
@@ -88,9 +83,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "modified_at"]
 
     def to_representation(self, activation):
-        rules_count, rules_fired_count = get_rules_count(
-            activation.ruleset_stats
-        )
+        rules_count, rules_fired_count = get_rules_count(activation.ruleset_stats)
 
         return {
             "id": activation.id,
@@ -117,17 +110,13 @@ class ActivationListSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
-    rulebook_id = serializers.IntegerField(
-        validators=[validators.check_if_rulebook_exists]
-    )
+    rulebook_id = serializers.IntegerField(validators=[validators.check_if_rulebook_exists])
     extra_var_id = serializers.IntegerField(
         required=False,
         allow_null=True,
         validators=[validators.check_if_extra_var_exists],
     )
-    decision_environment_id = serializers.IntegerField(
-        validators=[validators.check_if_de_exists]
-    )
+    decision_environment_id = serializers.IntegerField(validators=[validators.check_if_de_exists])
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     def validate(self, data):
@@ -190,9 +179,7 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
 class ActivationReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the Activation with related objects info."""
 
-    decision_environment = DecisionEnvironmentRefSerializer(
-        required=False, allow_null=True
-    )
+    decision_environment = DecisionEnvironmentRefSerializer(required=False, allow_null=True)
     project = ProjectRefSerializer(required=False, allow_null=True)
     rulebook = RulebookRefSerializer(required=False, allow_null=True)
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
@@ -230,33 +217,15 @@ class ActivationReadSerializer(serializers.ModelSerializer):
 
     def to_representation(self, activation):
         decision_environment = (
-            DecisionEnvironmentRefSerializer(
-                activation.decision_environment
-            ).data
+            DecisionEnvironmentRefSerializer(activation.decision_environment).data
             if activation.decision_environment
             else None
         )
-        project = (
-            ProjectRefSerializer(activation.project).data
-            if activation.project
-            else None
-        )
-        rulebook = (
-            RulebookRefSerializer(activation.rulebook).data
-            if activation.rulebook
-            else None
-        )
-        extra_var = (
-            ExtraVarRefSerializer(activation.extra_var).data
-            if activation.extra_var
-            else None
-        )
-        activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=activation.id
-        )
-        rules_count, rules_fired_count = get_rules_count(
-            activation.ruleset_stats
-        )
+        project = ProjectRefSerializer(activation.project).data if activation.project else None
+        rulebook = RulebookRefSerializer(activation.rulebook).data if activation.rulebook else None
+        extra_var = ExtraVarRefSerializer(activation.extra_var).data if activation.extra_var else None
+        activation_instances = models.ActivationInstance.objects.filter(activation_id=activation.id)
+        rules_count, rules_fired_count = get_rules_count(activation.ruleset_stats)
         # restart_count can be zero even if there are more than one instance
         # because it is incremented only when the activation
         # is restarted automatically
@@ -277,9 +246,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project": project,
             "rulebook": rulebook,
             "extra_var": extra_var,
-            "instances": ActivationInstanceSerializer(
-                activation_instances, many=True
-            ).data,
+            "instances": ActivationInstanceSerializer(activation_instances, many=True).data,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -297,9 +264,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
     """Serializer for validating activations before reactivate them."""
 
     name = serializers.CharField(required=True)
-    decision_environment_id = serializers.IntegerField(
-        validators=[validators.check_if_de_exists]
-    )
+    decision_environment_id = serializers.IntegerField(validators=[validators.check_if_de_exists])
     extra_var_id = serializers.IntegerField(
         required=False,
         allow_null=True,

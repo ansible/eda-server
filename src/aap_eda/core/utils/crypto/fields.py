@@ -31,9 +31,7 @@ def encrypt_string(value: str) -> str:
 def decrypt_string(value: str) -> str:
     tokens = value.split("$", 3)
     if tokens[0] != "" or tokens[1] != "encrypted":
-        raise ValueError(
-            "Invalid encrypted string. Must start with $encrypted prefix."
-        )
+        raise ValueError("Invalid encrypted string. Must start with $encrypted prefix.")
     if tokens[2] != "fernet-256":
         raise ValueError("Only fernet-256 is supported at the moment.")
     value = tokens[3]
@@ -44,17 +42,11 @@ def decrypt_string(value: str) -> str:
 class BaseEncryptedField(models.Field):
     def __init__(self, *args, **kwargs):
         if kwargs.get("primary_key"):
-            raise ImproperlyConfigured(
-                f"{self.__class__.__name__} does not support primary_key=True"
-            )
+            raise ImproperlyConfigured(f"{self.__class__.__name__} does not support primary_key=True")
         if kwargs.get("unique"):
-            raise ImproperlyConfigured(
-                f"{self.__class__.__name__} does not support unique=True"
-            )
+            raise ImproperlyConfigured(f"{self.__class__.__name__} does not support unique=True")
         if kwargs.get("db_index"):
-            raise ImproperlyConfigured(
-                f"{self.__class__.__name__} does not support db_index=True"
-            )
+            raise ImproperlyConfigured(f"{self.__class__.__name__} does not support db_index=True")
 
         super().__init__(*args, **kwargs)
 

@@ -16,12 +16,7 @@ import yaml
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
-from drf_spectacular.utils import (
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -65,9 +60,7 @@ class RulebookViewSet(
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
         request=None,
-        responses={
-            status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)
-        },
+        responses={status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)},
         parameters=[
             OpenApiParameter(
                 name="id",
@@ -224,9 +217,7 @@ class AuditRuleViewSet(
     @extend_schema(
         description="Action list of a fired rule by its id",
         request=None,
-        responses={
-            status.HTTP_200_OK: serializers.AuditActionSerializer(many=True)
-        },
+        responses={status.HTTP_200_OK: serializers.AuditActionSerializer(many=True)},
         parameters=[
             OpenApiParameter(
                 name="id",
@@ -259,9 +250,7 @@ class AuditRuleViewSet(
     @extend_schema(
         description="Event list of a fired rule by its id",
         request=None,
-        responses={
-            status.HTTP_200_OK: serializers.AuditEventSerializer(many=True)
-        },
+        responses={status.HTTP_200_OK: serializers.AuditEventSerializer(many=True)},
         parameters=[
             OpenApiParameter(
                 name="id",
@@ -288,9 +277,7 @@ class AuditRuleViewSet(
 
         eqs = models.AuditEvent.objects.none()
         for audit_action in audit_actions:
-            eqs = eqs.union(
-                self.filter_queryset(audit_action.audit_events.all())
-            ).order_by("-received_at")
+            eqs = eqs.union(self.filter_queryset(audit_action.audit_events.all())).order_by("-received_at")
 
         results = self.paginate_queryset(eqs)
         serializer = serializers.AuditEventSerializer(results, many=True)

@@ -24,10 +24,7 @@ from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.core.tasking import get_queue, job, job_from_queue, unique_enqueue
-from aap_eda.services.ruleset.activate_rulesets import (
-    ActivateRulesets,
-    save_activation_and_instance,
-)
+from aap_eda.services.ruleset.activate_rulesets import ActivateRulesets, save_activation_and_instance
 from aap_eda.services.ruleset.activation_db_logger import ActivationDbLogger
 
 logger = logging.getLogger(__name__)
@@ -35,23 +32,14 @@ logger = logging.getLogger(__name__)
 
 def activate(activation_id: int, requester: str = "User") -> Job:
     job_id = f"activation-{activation_id}"
-    return unique_enqueue(
-        "activation", job_id, _activate, activation_id, requester
-    )
+    return unique_enqueue("activation", job_id, _activate, activation_id, requester)
 
 
 def _activate(activation_id: int, requester: str = "User") -> None:
-    logger.info(
-        f"Activating activation id: {activation_id} requested "
-        f"by {requester}"
-    )
+    logger.info(f"Activating activation id: {activation_id} requested " f"by {requester}")
 
     with transaction.atomic():
-        activation = (
-            models.Activation.objects.select_for_update()
-            .filter(id=activation_id)
-            .first()
-        )
+        activation = models.Activation.objects.select_for_update().filter(id=activation_id).first()
         if not activation or activation.status == ActivationStatus.DELETING:
             logger.info(f"Activation id: {activation_id} is deleted")
             return
@@ -79,16 +67,10 @@ def deactivate(
     requester: str = "User",
     delete: bool = False,
 ) -> None:
-    logger.info(
-        f"Disabling activation id: {activation_id} requested by {requester}"
-    )
+    logger.info(f"Disabling activation id: {activation_id} requested by {requester}")
 
     with transaction.atomic():
-        activation = (
-            models.Activation.objects.select_for_update()
-            .filter(id=activation_id)
-            .first()
-        )
+        activation = models.Activation.objects.select_for_update().filter(id=activation_id).first()
         if not activation:
             logger.warning(f"Activation {activation_id} is deleted.")
             return
@@ -99,16 +81,11 @@ def deactivate(
             ActivationStatus.STOPPED,
         ]:
             logger.warning(
-                f"Cannot deactivate the activation {activation.name} when its "
-                f"status is {activation.status}"
+                f"Cannot deactivate the activation {activation.name} when its " f"status is {activation.status}"
             )
             return
 
-        final_status = (
-            ActivationStatus.FAILED
-            if requester == "SCHEDULER"
-            else ActivationStatus.STOPPED
-        )
+        final_status = ActivationStatus.FAILED if requester == "SCHEDULER" else ActivationStatus.STOPPED
         _perform_deactivate(activation, final_status)
 
         if delete:
@@ -117,23 +94,15 @@ def deactivate(
         else:
             activation.current_job_id = None
             activation.status = final_status
-            activation.save(
-                update_fields=["current_job_id", "status", "modified_at"]
-            )
+            activation.save(update_fields=["current_job_id", "status", "modified_at"])
 
 
 @job("default")
 def restart(activation_id: int, requester: str = "User") -> None:
-    logger.info(
-        f"Restarting activation id: {activation_id} requested by {requester}"
-    )
+    logger.info(f"Restarting activation id: {activation_id} requested by {requester}")
 
     with transaction.atomic():
-        activation = (
-            models.Activation.objects.select_for_update()
-            .filter(id=activation_id)
-            .first()
-        )
+        activation = models.Activation.objects.select_for_update().filter(id=activation_id).first()
         if not activation:
             logger.warning(f"Activation {activation_id} is deleted.")
             return
@@ -151,8 +120,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
             ActivationStatus.DELETING,
         ]:
             logger.warning(
-                f"Cannot restart the activation {activation.name} when its "
-                f"status is {activation.status}"
+                f"Cannot restart the activation {activation.name} when its " f"status is {activation.status}"
             )
             return
 
@@ -162,9 +130,7 @@ def restart(activation_id: int, requester: str = "User") -> None:
         _schedule_activate(activation, requester)
 
 
-def _perform_deactivate(
-    activation: models.Activation, final_status: ActivationStatus
-) -> None:
+def _perform_deactivate(activation: models.Activation, final_status: ActivationStatus) -> None:
     logger.info(f"Task started: Deactivate Activation ({activation.name})")
 
     # clear the job from rq if it's pending/running
@@ -176,21 +142,18 @@ def _perform_deactivate(
             job = queue.fetch_job(job_id)
             job.cancel()
             logger.info(
-                f"The job: {job.id} for activation: {activation.name}"
-                f" is canceled from the queue: {queue.name}"
+                f"The job: {job.id} for activation: {activation.name}" f" is canceled from the queue: {queue.name}"
             )
 
     # deactivate activation instance if available
-    current_instances = (
-        models.ActivationInstance.objects.select_for_update().filter(
-            activation_id=activation.id,
-            status__in=[
-                ActivationStatus.STARTING,
-                ActivationStatus.PENDING,
-                ActivationStatus.RUNNING,
-                ActivationStatus.UNRESPONSIVE,
-            ],
-        )
+    current_instances = models.ActivationInstance.objects.select_for_update().filter(
+        activation_id=activation.id,
+        status__in=[
+            ActivationStatus.STARTING,
+            ActivationStatus.PENDING,
+            ActivationStatus.RUNNING,
+            ActivationStatus.UNRESPONSIVE,
+        ],
     )
 
     for instance in current_instances:
@@ -200,9 +163,7 @@ def _perform_deactivate(
             flush=True,
         )
 
-        ActivateRulesets().deactivate(
-            instance=instance, final_status=final_status
-        )
+        ActivateRulesets().deactivate(instance=instance, final_status=final_status)
 
 
 # Started by the scheduler, executed by the default worker
@@ -225,12 +186,8 @@ def _detect_unresponsive(now: timezone.datetime) -> None:
         ActivationStatus.RUNNING,
         ActivationStatus.STARTING,
     ]
-    cutoff_time = now - timedelta(
-        seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS
-    )
-    for instance in models.ActivationInstance.objects.filter(
-        status__in=running_statuses, updated_at__lt=cutoff_time
-    ):
+    cutoff_time = now - timedelta(seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS)
+    for instance in models.ActivationInstance.objects.filter(status__in=running_statuses, updated_at__lt=cutoff_time):
         instance.status = ActivationStatus.UNRESPONSIVE
         instance.updated_at = now
         save_activation_and_instance(instance, ["status", "updated_at"])
@@ -240,9 +197,7 @@ def _stop_unresponsive(now: timezone.datetime) -> None:
     for activation in models.Activation.objects.filter(
         status=ActivationStatus.UNRESPONSIVE,
     ):
-        logger.info(
-            f"Deactivate activation {activation.name} due to lost heartbeat"
-        )
+        logger.info(f"Deactivate activation {activation.name} due to lost heartbeat")
         deactivate(
             activation_id=activation.id,
             requester="SCHEDULER",
@@ -251,26 +206,19 @@ def _stop_unresponsive(now: timezone.datetime) -> None:
 
 
 def _start_completed(now: timezone.datetime):
-    cutoff_time = now - timedelta(
-        seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
-    )
+    cutoff_time = now - timedelta(seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE)
     for activation in models.Activation.objects.filter(
         is_enabled=True,
         status=ActivationStatus.COMPLETED,
         restart_policy=RestartPolicy.ALWAYS,
         status_updated_at__lt=cutoff_time,
     ):
-        logger.info(
-            f"Restart activation {activation.name} according to its restart"
-            " policy."
-        )
+        logger.info(f"Restart activation {activation.name} according to its restart" " policy.")
         _schedule_activate(activation, "SCHEDULER")
 
 
 def _start_failed(now: timezone.datetime):
-    cutoff_time = now - timedelta(
-        seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
-    )
+    cutoff_time = now - timedelta(seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE)
     restart_policies = [
         RestartPolicy.ALWAYS,
         RestartPolicy.ON_FAILURE,
@@ -283,10 +231,7 @@ def _start_failed(now: timezone.datetime):
         failure_count__lt=settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE,
         status_updated_at__lt=cutoff_time,
     ):
-        logger.info(
-            f"Restart activation {activation.name} according to its restart"
-            " policy."
-        )
+        logger.info(f"Restart activation {activation.name} according to its restart" " policy.")
         _schedule_activate(activation, "SCHEDULER")
 
 

@@ -33,17 +33,13 @@ class Inventory(models.Model):
             ),
         ]
         indexes = [
-            models.Index(
-                fields=["inventory_source"], name="ix_inventory_inv_src"
-            ),
+            models.Index(fields=["inventory_source"], name="ix_inventory_inv_src"),
         ]
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(null=True, default="")
     inventory = models.TextField(null=True)
-    inventory_source = models.TextField(
-        choices=InventorySource.choices(), null=False
-    )
+    inventory_source = models.TextField(choices=InventorySource.choices(), null=False)
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)

@@ -16,9 +16,7 @@ def raise_exception(self, request):
 
 
 @pytest.mark.django_db
-@mock.patch(
-    "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
-)
+@mock.patch("aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception)
 def test_debug_unexpected_exception(client: APIClient, settings):
     settings.DEBUG = True
     with pytest.raises(FallbackException):
@@ -26,9 +24,7 @@ def test_debug_unexpected_exception(client: APIClient, settings):
 
 
 @pytest.mark.django_db
-@mock.patch(
-    "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
-)
+@mock.patch("aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception)
 def test_non_debug_unexpected_exception(client: APIClient, settings):
     settings.DEBUG = False
     response = client.get(f"{api_url_v1}/projects/")

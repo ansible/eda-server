@@ -46,9 +46,7 @@ class ProjectImportError(Exception):
     pass
 
 
-def _project_import_wrapper(
-    func: Callable[[ProjectImportService, models.Project], None]
-):
+def _project_import_wrapper(func: Callable[[ProjectImportService, models.Project], None]):
     @wraps(func)
     def wrapper(self: ProjectImportService, project: models.Project):
         project.import_state = models.Project.ImportState.RUNNING
@@ -129,28 +127,20 @@ class ProjectImportService:
         for rulebook in self._find_rulebooks(repo):
             self._import_rulebook(project, rulebook)
 
-    def _sync_rulebooks(
-        self, project: models.Project, repo: StrPath, git_hash: str
-    ):
+    def _sync_rulebooks(self, project: models.Project, repo: StrPath, git_hash: str):
         # TODO(cutwater): The sync must take into account
         #  not rulebook name, but path.
         #  Must be fixed in https://github.com/ansible/aap-eda/pull/139
-        existing_rulebooks = {
-            obj.name: obj for obj in project.rulebook_set.all()
-        }
+        existing_rulebooks = {obj.name: obj for obj in project.rulebook_set.all()}
         for rulebook_info in self._find_rulebooks(repo):
             rulebook = existing_rulebooks.pop(rulebook_info.relpath, None)
             if rulebook is None:
                 self._import_rulebook(project, rulebook_info)
             else:
                 self._sync_rulebook(rulebook, rulebook_info, git_hash)
-        models.Rulebook.objects.filter(
-            pk__in=[obj.id for obj in existing_rulebooks.values()]
-        ).delete()
+        models.Rulebook.objects.filter(pk__in=[obj.id for obj in existing_rulebooks.values()]).delete()
 
-    def _import_rulebook(
-        self, project: models.Project, rulebook_info: RulebookInfo
-    ) -> models.Rulebook:
+    def _import_rulebook(self, project: models.Project, rulebook_info: RulebookInfo) -> models.Rulebook:
         rulebook = models.Rulebook.objects.create(
             project=project,
             name=rulebook_info.relpath,
@@ -188,8 +178,7 @@ class ProjectImportService:
 
         if not rulebooks_dir:
             raise ProjectImportError(
-                "The 'extensions/eda/rulebooks' or 'rulebooks' directory"
-                " doesn't exist within the project root."
+                "The 'extensions/eda/rulebooks' or 'rulebooks' directory" " doesn't exist within the project root."
             )
 
         for root, _dirs, files in os.walk(rulebooks_dir):
@@ -202,8 +191,7 @@ class ProjectImportService:
                     info = self._try_load_rulebook(rulebooks_dir, path)
                 except Exception:
                     logger.exception(
-                        "Unexpected exception when scanning file %s."
-                        " Skipping.",
+                        "Unexpected exception when scanning file %s." " Skipping.",
                         path,
                     )
                     continue
@@ -212,9 +200,7 @@ class ProjectImportService:
                     continue
                 yield info
 
-    def _try_load_rulebook(
-        self, rulebooks_dir: StrPath, rulebook_path: StrPath
-    ) -> Optional[RulebookInfo]:
+    def _try_load_rulebook(self, rulebooks_dir: StrPath, rulebook_path: StrPath) -> Optional[RulebookInfo]:
         with open(rulebook_path) as f:
             raw_content = f.read()
 

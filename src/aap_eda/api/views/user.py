@@ -13,12 +13,7 @@
 #  limitations under the License.
 import django.db.utils
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import (
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import mixins, permissions, status, views, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -28,11 +23,7 @@ from aap_eda.api import filters, serializers
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
-from .mixins import (
-    CreateModelMixin,
-    PartialUpdateOnlyModelMixin,
-    ResponseSerializerMixin,
-)
+from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 
 
 class CurrentUserView(views.APIView):
@@ -67,9 +58,7 @@ class CurrentUserView(views.APIView):
     )
     def patch(self, request: Request, *args, **kwargs) -> Response:
         user = request.user
-        serializer = serializers.CurrentUserUpdateSerializer(
-            user, data=request.data, partial=True
-        )
+        serializer = serializers.CurrentUserUpdateSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
@@ -151,9 +140,7 @@ class CurrentUserAwxTokenViewSet(
         return serializers.AwxTokenSerializer
 
     def get_queryset(self):
-        return models.AwxToken.objects.filter(user=self.request.user).order_by(
-            "id"
-        )
+        return models.AwxToken.objects.filter(user=self.request.user).order_by("id")
 
     def perform_create(self, serializer):
         try:

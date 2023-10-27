@@ -111,11 +111,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, project):
-        credential = (
-            CredentialRefSerializer(project["credential"]).data
-            if project["credential"]
-            else None
-        )
+        credential = CredentialRefSerializer(project["credential"]).data if project["credential"] else None
         return {
             "id": project["id"],
             "name": project["name"],

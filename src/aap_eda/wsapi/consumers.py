@@ -105,13 +105,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         logger.info(f"Start to handle workers: {message}")
         rulesets, extra_var = await self.get_resources(message.activation_id)
 
-        rulebook_message = Rulebook(
-            data=base64.b64encode(rulesets.encode()).decode()
-        )
+        rulebook_message = Rulebook(data=base64.b64encode(rulesets.encode()).decode())
         if extra_var:
-            extra_var_message = ExtraVars(
-                data=base64.b64encode(extra_var.extra_var.encode()).decode()
-            )
+            extra_var_message = ExtraVars(data=base64.b64encode(extra_var.extra_var.encode()).decode())
             await self.send(text_data=extra_var_message.json())
 
         controller_info = ControllerInfo(
@@ -142,31 +138,23 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
         logger.info(f"Start to handle heartbeat: {message}")
 
-        instance = models.ActivationInstance.objects.filter(
-            id=message.activation_id
-        ).first()
+        instance = models.ActivationInstance.objects.filter(id=message.activation_id).first()
 
         if instance:
             instance.updated_at = message.reported_at
             instance.save(update_fields=["updated_at"])
 
             activation = instance.activation
-            activation.ruleset_stats[
-                message.stats["ruleSetName"]
-            ] = message.stats
+            activation.ruleset_stats[message.stats["ruleSetName"]] = message.stats
             activation.save(update_fields=["ruleset_stats"])
         else:
-            logger.warning(
-                f"Activation instance {message.activation_id} is not present."
-            )
+            logger.warning(f"Activation instance {message.activation_id} is not present.")
 
     @database_sync_to_async
     def insert_event_related_data(self, message: AnsibleEventMessage) -> None:
         event_data = message.event or {}
         if event_data.get("stdout"):
-            job_instance = models.JobInstance.objects.get(
-                uuid=event_data.get("job_id")
-            )
+            job_instance = models.JobInstance.objects.get(uuid=event_data.get("job_id"))
 
             # TODO: broadcasting
             logger.debug(f"Job instance {job_instance.id} is broadcasting.")
@@ -203,9 +191,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 task=task,
                 status=status,
             )
-            logger.info(
-                f"Job instance host {job_instance_host.id} is created."
-            )
+            logger.info(f"Job instance host {job_instance_host.id} is created.")
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
@@ -213,9 +199,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         job_instance = models.JobInstance.objects.filter(uuid=job_id).first()
         job_instance_id = job_instance.id if job_instance else None
 
-        audit_rule = models.AuditRule.objects.filter(
-            rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
-        ).first()
+        audit_rule = models.AuditRule.objects.filter(rule_uuid=message.rule_uuid, fired_at=message.rule_run_at).first()
         if audit_rule is None:
             audit_rule = models.AuditRule.objects.create(
                 activation_instance_id=message.activation_id,
@@ -232,16 +216,11 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         else:
             # if rule has multiple actions and one of its action's status is
             # 'failed', keep rule's status as 'failed'
-            if (
-                audit_rule.status != message.status
-                and audit_rule.status != "failed"
-            ):
+            if audit_rule.status != message.status and audit_rule.status != "failed":
                 audit_rule.status = message.status
                 audit_rule.save()
 
-        audit_action = models.AuditAction.objects.filter(
-            id=message.action_uuid
-        ).first()
+        audit_action = models.AuditAction.objects.filter(id=message.action_uuid).first()
 
         if audit_action is None:
             audit_action = models.AuditAction.objects.create(
@@ -260,9 +239,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         for event_meta in matching_events.values():
             meta = event_meta.pop("meta")
             if meta:
-                audit_event = models.AuditEvent.objects.filter(
-                    id=meta.get("uuid")
-                ).first()
+                audit_event = models.AuditEvent.objects.filter(id=meta.get("uuid")).first()
 
                 if audit_event is None:
                     audit_event = models.AuditEvent.objects.create(
@@ -279,9 +256,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 audit_event.save()
 
     @database_sync_to_async
-    def insert_job_related_data(
-        self, message: JobMessage
-    ) -> models.JobInstance:
+    def insert_job_related_data(self, message: JobMessage) -> models.JobInstance:
         job_instance = models.JobInstance.objects.create(
             uuid=message.job_id,
             name=message.name,
@@ -302,20 +277,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return job_instance
 
     @database_sync_to_async
-    def get_resources(
-        self, activation_instance_id: str
-    ) -> tuple[str, models.ExtraVar]:
-        activation_instance = models.ActivationInstance.objects.get(
-            id=activation_instance_id
-        )
-        activation = models.Activation.objects.get(
-            id=activation_instance.activation_id
-        )
+    def get_resources(self, activation_instance_id: str) -> tuple[str, models.ExtraVar]:
+        activation_instance = models.ActivationInstance.objects.get(id=activation_instance_id)
+        activation = models.Activation.objects.get(id=activation_instance.activation_id)
 
         if activation.extra_var_id:
-            extra_var = models.ExtraVar.objects.filter(
-                id=activation.extra_var_id
-            ).first()
+            extra_var = models.ExtraVar.objects.filter(id=activation.extra_var_id).first()
         else:
             extra_var = None
 
@@ -324,13 +291,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_awx_token(self, message):
         # query for activation
-        activation_instance = models.ActivationInstance.objects.get(
-            id=message.activation_id
-        )
+        activation_instance = models.ActivationInstance.objects.get(id=message.activation_id)
 
         # check/get AWX token
-        awx_token = models.AwxToken.objects.filter(
-            user_id=activation_instance.activation.user_id
-        ).first()
+        awx_token = models.AwxToken.objects.filter(user_id=activation_instance.activation.user_id).first()
 
         return awx_token.token.get_secret_value()

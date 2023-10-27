@@ -48,9 +48,7 @@ class Ruleset(models.Model):
 
     name = models.TextField(null=False)
     sources = models.JSONField(default=dict)
-    rulebook = models.ForeignKey(
-        "Rulebook", on_delete=models.CASCADE, null=True
-    )
+    rulebook = models.ForeignKey("Rulebook", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
@@ -81,12 +79,8 @@ class AuditRule(models.Model):
     rule_uuid = models.UUIDField(null=True)
     ruleset_uuid = models.UUIDField(null=True)
     ruleset_name = models.TextField(null=True)
-    activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.SET_NULL, null=True
-    )
-    job_instance = models.ForeignKey(
-        "JobInstance", on_delete=models.SET_NULL, null=True
-    )
+    activation_instance = models.ForeignKey("ActivationInstance", on_delete=models.SET_NULL, null=True)
+    job_instance = models.ForeignKey("JobInstance", on_delete=models.SET_NULL, null=True)
 
 
 class AuditAction(models.Model):
@@ -102,9 +96,7 @@ class AuditAction(models.Model):
     fired_at = models.DateTimeField()
     rule_fired_at = models.DateTimeField(null=True)
 
-    audit_rule = models.ForeignKey(
-        "AuditRule", on_delete=models.CASCADE, null=True
-    )
+    audit_rule = models.ForeignKey("AuditRule", on_delete=models.CASCADE, null=True)
 
 
 class AuditEvent(models.Model):
@@ -119,6 +111,4 @@ class AuditEvent(models.Model):
     payload = models.JSONField(null=True)
     rule_fired_at = models.DateTimeField(null=True)
 
-    audit_actions = models.ManyToManyField(
-        "AuditAction", related_name="audit_events"
-    )
+    audit_actions = models.ManyToManyField("AuditAction", related_name="audit_events")

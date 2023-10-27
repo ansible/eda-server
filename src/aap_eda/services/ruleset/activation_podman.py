@@ -67,8 +67,7 @@ class ActivationPodman:
 
         if not self.decision_environment.image_url:
             raise ActivationException(
-                f"DecisionEnvironment: {self.decision_environment.name} does"
-                " not have image_url set"
+                f"DecisionEnvironment: {self.decision_environment.name} does" " not have image_url set"
             )
         self.pod_args = {}
         if podman_url:
@@ -109,15 +108,10 @@ class ActivationPodman:
                 "--heartbeat",
                 str(heartbeat),
             ]
-            if (
-                settings.ANSIBLE_RULEBOOK_LOG_LEVEL
-                and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS
-            ):
+            if settings.ANSIBLE_RULEBOOK_LOG_LEVEL and settings.ANSIBLE_RULEBOOK_LOG_LEVEL in VALID_LOG_LEVELS:
                 args.append(settings.ANSIBLE_RULEBOOK_LOG_LEVEL)
 
-            self.pod_args[
-                "name"
-            ] = f"eda-{activation_instance.id}-{uuid.uuid4()}"
+            self.pod_args["name"] = f"eda-{activation_instance.id}-{uuid.uuid4()}"
             if ports:
                 self.pod_args["ports"] = ports
             self._load_extra_args()
@@ -146,9 +140,7 @@ class ActivationPodman:
             activation_instance.status = ActivationStatus.RUNNING
             activation_instance.updated_at = now
             activation_instance.activation_pod_id = container.id
-            activation_instance.save(
-                update_fields=["status", "updated_at", "activation_pod_id"]
-            )
+            activation_instance.save(update_fields=["status", "updated_at", "activation_pod_id"])
 
             activation = activation_instance.activation
             activation.status = ActivationStatus.RUNNING
@@ -182,9 +174,7 @@ class ActivationPodman:
             logger.exception("Container run failed")
             raise
         except DatabaseError:
-            message = (
-                f"Activation instance {activation_instance.id} is not present."
-            )
+            message = f"Activation instance {activation_instance.id} is not present."
             raise ActivationRecordNotFound(message)
         finally:
             if container and self.client.containers.exists(container.id):
@@ -199,9 +189,7 @@ class ActivationPodman:
         if os.getuid() == 0:
             self.podman_url = "unix:///run/podman/podman.sock"
         else:
-            xdg_runtime_dir = os.getenv(
-                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-            )
+            xdg_runtime_dir = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
             self.podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
 
     def _login(self) -> None:
@@ -211,18 +199,14 @@ class ActivationPodman:
 
         try:
             registry = self.decision_environment.image_url.split("/")[0]
-            self.activation_db_logger.write(
-                f"Attempting to login to registry: {registry}", True
-            )
+            self.activation_db_logger.write(f"Attempting to login to registry: {registry}", True)
             self.client.login(
                 username=credential.username,
                 password=credential.secret.get_secret_value(),
                 registry=registry,
             )
 
-            logger.debug(
-                f"{credential.username} login succeeded to {registry}"
-            )
+            logger.debug(f"{credential.username} login succeeded to {registry}")
         except APIError:
             logger.exception("Login failed")
             raise
@@ -253,9 +237,7 @@ class ActivationPodman:
         return {"auth": base64.b64encode(encoded_data).decode("ascii")}
 
     def _set_auth_json_file(self) -> None:
-        xdg_runtime_dir = os.getenv(
-            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-        )
+        xdg_runtime_dir = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
         auth_file = f"{xdg_runtime_dir}/containers/auth.json"
         dir_name = os.path.dirname(auth_file)
         if os.path.exists(dir_name):
@@ -269,9 +251,7 @@ class ActivationPodman:
         try:
             image_url = self.decision_environment.image_url
             credential = self.decision_environment.credential
-            self.activation_db_logger.write(
-                f"Pulling image {self.decision_environment.image_url}", True
-            )
+            self.activation_db_logger.write(f"Pulling image {self.decision_environment.image_url}", True)
             kwargs = {}
             if credential:
                 kwargs["auth_config"] = {
@@ -283,26 +263,17 @@ class ActivationPodman:
 
             # https://github.com/containers/podman-py/issues/301
             if not image.id:
-                msg = (
-                    f"Image {image_url} pull failed. The image url "
-                    "or the credentials may be incorrect."
-                )
+                msg = f"Image {image_url} pull failed. The image url " "or the credentials may be incorrect."
                 logger.error(msg)
                 raise PodmanImagePullError(msg)
 
         except ImageNotFound:
-            logger.exception(
-                f"Image {self.decision_environment.image_url} not found"
-            )
+            logger.exception(f"Image {self.decision_environment.image_url} not found")
             raise
 
-    def _save_logs(
-        self, container: Container, instance: models.ActivationInstance
-    ) -> None:
+    def _save_logs(self, container: Container, instance: models.ActivationInstance) -> None:
         lines_streamed = 0
-        dkg = container.logs(
-            stream=True, follow=True, stderr=True, stdout=True
-        )
+        dkg = container.logs(stream=True, follow=True, stderr=True, stdout=True)
         try:
             while True:
                 line = next(dkg).decode("utf-8")
@@ -314,9 +285,7 @@ class ActivationPodman:
         try:
             self.return_code = container.wait(condition="exited")
             logger.info(f"return_code: {self.return_code}")
-            self.activation_db_logger.write(
-                f"Container exit code: {self.return_code}"
-            )
+            self.activation_db_logger.write(f"Container exit code: {self.return_code}")
 
             # If we haven't streamed any lines, collect the logs
             # when the container ends.
@@ -325,22 +294,15 @@ class ActivationPodman:
                 for line in container.logs():
                     self.activation_db_logger.write(line.decode("utf-8"))
 
-            logger.info(
-                f"{self.activation_db_logger.lines_written()}"
-                " activation instance log entries created."
-            )
+            logger.info(f"{self.activation_db_logger.lines_written()}" " activation instance log entries created.")
         except NotFound:
             self.return_code = GRACEFUL_TERM
             logger.info(f"Container {container.id} was removed.")
 
-        message = CONTAINER_ERROR_CODES_MAP.get(
-            self.return_code, f"exit code {self.return_code}"
-        )
+        message = CONTAINER_ERROR_CODES_MAP.get(self.return_code, f"exit code {self.return_code}")
         if self.return_code == 0 or self.return_code == GRACEFUL_TERM:
             logger.info(f"Container {container.id} received {message}.")
-            self.activation_db_logger.write(
-                f"Container {container.id} received {message}.", True
-            )
+            self.activation_db_logger.write(f"Container {container.id} received {message}.", True)
         else:
             instance.status = ActivationStatus.FAILED
             instance.save(update_fields=["status"])
@@ -356,10 +318,7 @@ class ActivationPodman:
         if hasattr(settings, "PODMAN_ENV_VARS") and settings.PODMAN_ENV_VARS:
             self.pod_args["environment"] = settings.PODMAN_ENV_VARS
 
-        if (
-            hasattr(settings, "PODMAN_EXTRA_ARGS")
-            and settings.PODMAN_EXTRA_ARGS
-        ):
+        if hasattr(settings, "PODMAN_EXTRA_ARGS") and settings.PODMAN_EXTRA_ARGS:
             for key, value in settings.PODMAN_EXTRA_ARGS.items():
                 self.pod_args[key] = value
 

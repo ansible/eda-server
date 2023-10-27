@@ -36,9 +36,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
 
 class UserListSerializer(serializers.Serializer):
-    id = serializers.IntegerField(
-        required=True, help_text="The ID of the user"
-    )
+    id = serializers.IntegerField(required=True, help_text="The ID of the user")
 
     username = serializers.CharField(
         required=True,

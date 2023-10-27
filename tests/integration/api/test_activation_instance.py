@@ -113,9 +113,7 @@ def test_list_activation_instances_filter_name(client: APIClient):
     )
 
     filter_name = "instance-1"
-    response = client.get(
-        f"{api_url_v1}/activation-instances/?name={filter_name}"
-    )
+    response = client.get(f"{api_url_v1}/activation-instances/?name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     assert response.data["results"][0]["name"] == instances[0].name
@@ -142,9 +140,7 @@ def test_list_activation_instances_filter_status(client: APIClient):
     )
 
     filter_name = "failed"
-    response = client.get(
-        f"{api_url_v1}/activation-instances/?status={filter_name}"
-    )
+    response = client.get(f"{api_url_v1}/activation-instances/?status={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     assert response.data["results"][0]["name"] == instances[1].name
@@ -177,14 +173,10 @@ def test_delete_activation_instance(client: APIClient):
         activation=activation,
     )
 
-    response = client.delete(
-        f"{api_url_v1}/activation-instances/{instance.id}/"
-    )
+    response = client.delete(f"{api_url_v1}/activation-instances/{instance.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert (
-        models.ActivationInstance.objects.filter(pk=instance.id).count() == 0
-    )
+    assert models.ActivationInstance.objects.filter(pk=instance.id).count() == 0
 
 
 @pytest.mark.django_db
@@ -210,9 +202,7 @@ def test_list_logs_from_activation_instance(client: APIClient):
         ]
     )
 
-    response = client.get(
-        f"{api_url_v1}/activation-instances/{instance.id}/logs/"
-    )
+    response = client.get(f"{api_url_v1}/activation-instances/{instance.id}/logs/")
     assert response.status_code == status.HTTP_200_OK
     response_logs = response.data["results"]
 
@@ -250,10 +240,7 @@ def test_list_activation_instance_logs_filter(client: APIClient):
     )
 
     filter_log = "log-1"
-    response = client.get(
-        f"{api_url_v1}/activation-instances/{instance.id}"
-        f"/logs/?log={filter_log}"
-    )
+    response = client.get(f"{api_url_v1}/activation-instances/{instance.id}" f"/logs/?log={filter_log}")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     assert response.data["results"][0]["log"] == instance_logs[0].log
@@ -268,18 +255,13 @@ def test_list_activation_instance_logs_filter_non_existent(client: APIClient):
     )
 
     filter_log = "doesn't exist"
-    response = client.get(
-        f"{api_url_v1}/activation-instances/{instance.id}"
-        f"/logs/?log={filter_log}"
-    )
+    response = client.get(f"{api_url_v1}/activation-instances/{instance.id}" f"/logs/?log={filter_log}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
 
 
-def assert_activation_instance_data(
-    data: Dict[str, Any], instance: models.ActivationInstance
-):
+def assert_activation_instance_data(data: Dict[str, Any], instance: models.ActivationInstance):
     assert data == {
         "id": instance.id,
         "name": instance.name,

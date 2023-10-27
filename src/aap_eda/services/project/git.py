@@ -46,9 +46,7 @@ if GIT_COMMAND is None:
 class GitRepository:
     """Represents a git repository."""
 
-    def __init__(
-        self, root: StrPath, *, _executor: Optional[GitExecutor] = None
-    ):
+    def __init__(self, root: StrPath, *, _executor: Optional[GitExecutor] = None):
         """
         Create an instance for existing repository.
 
@@ -180,11 +178,7 @@ class GitExecutor:
             logger.warning("%s", str(e))
             raise GitError(str(e)) from e
         except subprocess.CalledProcessError as e:
-            message = (
-                "Command returned non-zero exit status %s:"
-                "\n\tcommand: %s"
-                "\n\tstderr: %s"
-            )
+            message = "Command returned non-zero exit status %s:" "\n\tcommand: %s" "\n\tstderr: %s"
             logger.warning(message, e.returncode, e.cmd, e.stderr)
             if "Authentication failed" in e.stderr:
                 raise GitError("Authentication failed")

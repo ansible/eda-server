@@ -13,9 +13,7 @@ class Migration(migrations.Migration):
             model_name="project",
             name="name",
             field=models.TextField(
-                error_messages={
-                    "unique": "A project with this name already exists."
-                },
+                error_messages={"unique": "A project with this name already exists."},
                 unique=True,
             ),
         ),

@@ -14,13 +14,7 @@
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
-from rest_framework.exceptions import (
-    APIException,
-    AuthenticationFailed,
-    NotAuthenticated,
-    NotFound,
-    PermissionDenied,
-)
+from rest_framework.exceptions import APIException, AuthenticationFailed, NotAuthenticated, NotFound, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
@@ -41,12 +35,7 @@ def api_fallback_handler(exc, context):
     if (response is None) and (not settings.DEBUG):
         response = Response(
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            data={
-                "detail": (
-                    "Unexpected server error"
-                    "; contact your system administrator"
-                )
-            },
+            data={"detail": ("Unexpected server error" "; contact your system administrator")},
         )
         response["context"] = context
     return response
@@ -84,14 +73,9 @@ class Forbidden(APIException):
 
 class InvalidWebsocketScheme(APIException):
     status_code = 422
-    default_detail = (
-        "Connection Error: Invalid WebSocket URL scheme. "
-        "Scheme should be either 'ws' or 'wss'."
-    )
+    default_detail = "Connection Error: Invalid WebSocket URL scheme. " "Scheme should be either 'ws' or 'wss'."
 
 
 class InvalidWebsocketHost(APIException):
     status_code = 422
-    default_detail = (
-        "Connection Error: WebSocket URL must have a valid host address."
-    )
+    default_detail = "Connection Error: WebSocket URL must have a valid host address."

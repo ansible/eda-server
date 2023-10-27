@@ -52,9 +52,7 @@ class ActivationInstanceJobInstance(models.Model):
         db_table = "core_activation_instance_job_instance"
         unique_together = ["activation_instance", "job_instance"]
 
-    activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
-    )
+    activation_instance = models.ForeignKey("ActivationInstance", on_delete=models.CASCADE)
     job_instance = models.ForeignKey("JobInstance", on_delete=models.CASCADE)
 
 
@@ -62,9 +60,7 @@ class JobInstanceEvent(models.Model):
     class Meta:
         db_table = "core_job_instance_event"
         indexes = [
-            models.Index(
-                fields=["job_uuid"], name="ix_job_instance_event_job_uuid"
-            ),
+            models.Index(fields=["job_uuid"], name="ix_job_instance_event_job_uuid"),
         ]
 
     job_uuid = models.UUIDField()

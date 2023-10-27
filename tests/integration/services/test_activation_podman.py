@@ -105,21 +105,14 @@ def test_activation_podman(my_mock: mock.Mock, init_data):
 
     podman = ActivationPodman(decision_environment, None, activation_db_logger)
 
-    client_mock.login.assert_called_once_with(
-        username="adam", password="secret", registry="quay.io"
-    )
-    assert (
-        podman.podman_url
-        == f"unix:///run/user/{os.getuid()}/podman/podman.sock"
-    )
+    client_mock.login.assert_called_once_with(username="adam", password="secret", registry="quay.io")
+    assert podman.podman_url == f"unix:///run/user/{os.getuid()}/podman/podman.sock"
 
 
 @pytest.mark.django_db
 @mock.patch("uuid.uuid4")
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
-def test_activation_podman_run_worker_mode(
-    my_mock: mock.Mock, uuid_mock: mock.Mock, init_data
-):
+def test_activation_podman_run_worker_mode(my_mock: mock.Mock, uuid_mock: mock.Mock, init_data):
     credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
     client_mock.containers.run.return_value.logs.return_value = iter(
@@ -183,13 +176,9 @@ def test_activation_podman_run_worker_mode(
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
-def test_activation_podman_with_invalid_credential(
-    my_mock: mock.Mock, init_data
-):
+def test_activation_podman_with_invalid_credential(my_mock: mock.Mock, init_data):
     def raise_error(*args, **kwargs):
-        raise exceptions.APIError(
-            message="login attempt failed with status: 401 Unauthorized"
-        )
+        raise exceptions.APIError(message="login attempt failed with status: 401 Unauthorized")
 
     credential, decision_environment, activation_instance = init_data
     client_mock = mock.Mock()
@@ -216,9 +205,7 @@ def test_activation_podman_with_invalid_ports(my_mock: mock.Mock, init_data):
     activation_db_logger = ActivationDbLogger(activation_instance.id)
 
     podman = ActivationPodman(decision_environment, None, activation_db_logger)
-    with pytest.raises(
-        exceptions.APIError, match="bind: address already in use"
-    ):
+    with pytest.raises(exceptions.APIError, match="bind: address already in use"):
         podman.run_worker_mode(
             ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
             ws_ssl_verify="no",
@@ -252,9 +239,7 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
         containers_dir = os.path.join(tmpdirname, "containers")
         os.makedirs(containers_dir)
         with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmpdirname}):
-            podman = ActivationPodman(
-                decision_environment, None, activation_db_logger
-            )
+            podman = ActivationPodman(decision_environment, None, activation_db_logger)
             podman.run_worker_mode(
                 ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
                 ws_ssl_verify="no",
@@ -269,9 +254,7 @@ def test_activation_podman_with_auth_json(my_mock: mock.Mock, init_data):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.ruleset.activation_podman.PodmanClient")
-def test_activation_podman_with_existing_auth_json(
-    my_mock: mock.Mock, init_data
-):
+def test_activation_podman_with_existing_auth_json(my_mock: mock.Mock, init_data):
     credential, decision_environment, activation_instance = init_data
     data = f"{credential.username}:{credential.secret.get_secret_value()}"
     encoded_data = data.encode("ascii")
@@ -289,9 +272,7 @@ def test_activation_podman_with_existing_auth_json(
 
     activation_db_logger = ActivationDbLogger(activation_instance.id)
     old_key = "gobbledegook"
-    old_data = {
-        "auths": {"dummy": {"auth": old_key}, "quay.io": {"auth": old_key}}
-    }
+    old_data = {"auths": {"dummy": {"auth": old_key}, "quay.io": {"auth": old_key}}}
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         containers_dir = os.path.join(tmpdirname, "containers")
@@ -301,9 +282,7 @@ def test_activation_podman_with_existing_auth_json(
             json.dump(old_data, f, indent=6)
 
         with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmpdirname}):
-            podman = ActivationPodman(
-                decision_environment, None, activation_db_logger
-            )
+            podman = ActivationPodman(decision_environment, None, activation_db_logger)
             podman.run_worker_mode(
                 ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
                 ws_ssl_verify="no",

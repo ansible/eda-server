@@ -26,11 +26,7 @@ from .activation_db_logger import ActivationDbLogger
 from .activation_kubernetes import ActivationKubernetes
 from .activation_podman import ActivationPodman
 from .deactivation_podman import DeactivationPodman
-from .exceptions import (
-    ActivationException,
-    ActivationRecordNotFound,
-    DeactivationException,
-)
+from .exceptions import ActivationException, ActivationRecordNotFound, DeactivationException
 
 logger = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
@@ -121,9 +117,7 @@ class ActivateRulesets:
                     git_hash=activation.git_hash,
                 )
             except IntegrityError:
-                raise ActivationRecordNotFound(
-                    f"Activation {activation.name} has been deleted."
-                )
+                raise ActivationRecordNotFound(f"Activation {activation.name} has been deleted.")
 
             activation_db_logger = ActivationDbLogger(instance.id)
 
@@ -135,9 +129,7 @@ class ActivateRulesets:
                     instance=instance,
                     update_fields=["status", "ended_at", "updated_at"],
                 )
-                raise ActivationException(
-                    f"Invalid deployment type: {deployment_type}"
-                )
+                raise ActivationException(f"Invalid deployment type: {deployment_type}")
 
             ws_url = f"{ws_base_url}{ACTIVATION_PATH}"
 
@@ -206,9 +198,7 @@ class ActivateRulesets:
             try:
                 dtype = DeploymentType(deployment_type)
             except ValueError:
-                raise ActivationException(
-                    f"Invalid deployment type: {deployment_type}"
-                )
+                raise ActivationException(f"Invalid deployment type: {deployment_type}")
 
             if dtype == DeploymentType.PODMAN:
                 self.deactivate_in_podman(
@@ -221,9 +211,7 @@ class ActivateRulesets:
             else:
                 raise ActivationException(f"Unsupported {deployment_type}")
 
-            logger.info(
-                f"Stopped Activation, Name: {instance.name}, ID: {instance.id}"
-            )
+            logger.info(f"Stopped Activation, Name: {instance.name}, ID: {instance.id}")
             instance.status = final_status
             save_activation_and_instance(instance, ["status"])
 
@@ -250,9 +238,7 @@ class ActivateRulesets:
         instance: models.ActivationInstance,
         activation_db_logger: ActivationDbLogger,
     ):
-        restart_policy = (
-            instance.activation.restart_policy == RestartPolicy.ALWAYS
-        )
+        restart_policy = instance.activation.restart_policy == RestartPolicy.ALWAYS
         if instance.activation.is_enabled and restart_policy:
             self._log_restart_activation(
                 None,
@@ -273,16 +259,8 @@ class ActivateRulesets:
                 activation.restart_policy == RestartPolicy.ALWAYS
                 or activation.restart_policy == RestartPolicy.ON_FAILURE
             )
-            restart_limit = (
-                activation.failure_count
-                < settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
-            )
-            if (
-                activation.is_enabled
-                and activation.is_valid
-                and restart_policy
-                and restart_limit
-            ):
+            restart_limit = activation.failure_count < settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+            if activation.is_enabled and activation.is_valid and restart_policy and restart_limit:
                 self._log_restart_activation(
                     error,
                     activation,
@@ -297,17 +275,12 @@ class ActivateRulesets:
                 if not activation.is_enabled:
                     more_reason = "activation is disabled"
                 elif not restart_limit:
-                    more_reason = (
-                        "it has exceeds the maximum number of restarts"
-                    )
+                    more_reason = "it has exceeds the maximum number of restarts"
                 elif not restart_policy:
                     more_reason = "the restart policy is never"
                 elif not activation.is_valid:
                     more_reason = "it is not restartable"
-                msg = (
-                    f"Activation {activation.name} failed: {str(error)}. "
-                    f"Will not restart because {more_reason}"
-                )
+                msg = f"Activation {activation.name} failed: {str(error)}. " f"Will not restart because {more_reason}"
                 logger.error(msg)
                 activation_db_logger.write(msg)
         except DatabaseError:
@@ -356,9 +329,7 @@ class ActivateRulesets:
         )
 
         ports = {}
-        for _, port in find_ports(
-            activation_instance.activation.rulebook_rulesets
-        ):
+        for _, port in find_ports(activation_instance.activation.rulebook_rulesets):
             ports[f"{port}/tcp"] = port
 
         podman.run_worker_mode(
@@ -377,9 +348,7 @@ class ActivateRulesets:
         if activation_instance.activation_pod_id is None:
             return
 
-        podman = DeactivationPodman(
-            settings.PODMAN_SOCKET_URL, activation_db_logger
-        )
+        podman = DeactivationPodman(settings.PODMAN_SOCKET_URL, activation_db_logger)
         podman.deactivate(activation_instance)
 
     def activate_in_k8s(
@@ -393,9 +362,7 @@ class ActivateRulesets:
         k8s = ActivationKubernetes()
         _pull_policy = "Always"
 
-        ns_fileref = open(
-            "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
-        )
+        ns_fileref = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r")
         namespace = ns_fileref.read()
         ns_fileref.close()
 
@@ -411,12 +378,7 @@ class ActivateRulesets:
             url=ws_url,
             ssl_verify=ssl_verify,
             activation_instance_id=activation_instance.id,
-            ports=[
-                port
-                for _, port in find_ports(
-                    activation_instance.activation.rulebook_rulesets
-                )
-            ],
+            ports=[port for _, port in find_ports(activation_instance.activation.rulebook_rulesets)],
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
         )
 
@@ -442,12 +404,8 @@ class ActivateRulesets:
             ttl=30,
         )
 
-        for _, port in find_ports(
-            activation_instance.activation.rulebook_rulesets
-        ):
-            k8s.create_service(
-                namespace=namespace, job_name=job_name, port=port
-            )
+        for _, port in find_ports(activation_instance.activation.rulebook_rulesets):
+            k8s.create_service(namespace=namespace, job_name=job_name, port=port)
 
         # execute job
         k8s.run_activation_job(
@@ -461,9 +419,7 @@ class ActivateRulesets:
     def deactivate_in_k8s(self, activation_instance) -> None:
         k8s = ActivationKubernetes()
 
-        ns_fileref = open(
-            "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
-        )
+        ns_fileref = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r")
         namespace = ns_fileref.read()
         ns_fileref.close()
 

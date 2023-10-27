@@ -14,11 +14,7 @@
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import (
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -118,24 +114,18 @@ class ProjectViewSet(
         },
     )
     def create(self, request):
-        serializer = serializers.ProjectCreateRequestSerializer(
-            data=request.data
-        )
+        serializer = serializers.ProjectCreateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         project = serializer.save()
 
         job = tasks.import_project.delay(project_id=project.id)
 
         # Atomically update `import_task_id` field only.
-        models.Project.objects.filter(pk=project.id).update(
-            import_task_id=job.id
-        )
+        models.Project.objects.filter(pk=project.id).update(import_task_id=job.id)
         project.import_task_id = job.id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
-        return Response(
-            serializer.data, status=status.HTTP_201_CREATED, headers=headers
-        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @extend_schema(
         description="Get a project by id",
@@ -149,9 +139,7 @@ class ProjectViewSet(
     def retrieve(self, request, pk):
         project = super().retrieve(request, pk)
         project.data["credential"] = (
-            models.Credential.objects.get(pk=project.data["credential_id"])
-            if project.data["credential_id"]
-            else None
+            models.Credential.objects.get(pk=project.data["credential_id"]) if project.data["credential_id"] else None
         )
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
@@ -176,17 +164,13 @@ class ProjectViewSet(
     )
     def partial_update(self, request, pk):
         project = get_object_or_404(models.Project, pk=pk)
-        serializer = serializers.ProjectUpdateRequestSerializer(
-            instance=project, data=request.data, partial=True
-        )
+        serializer = serializers.ProjectUpdateRequestSerializer(instance=project, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         credential_id = request.data.get("credential_id")
 
         # Validate credential_id if has meaningful value
         if credential_id is not None and int(credential_id) > 0:
-            credential = models.Credential.objects.filter(
-                id=credential_id
-            ).first()
+            credential = models.Credential.objects.filter(id=credential_id).first()
             if not credential:
                 return Response(
                     {"errors": f"Credential [{credential_id}] not found"},
@@ -198,12 +182,8 @@ class ProjectViewSet(
         try:
             project.credential_id = credential_id
             project.name = request.data.get("name", project.name)
-            project.description = request.data.get(
-                "description", project.description
-            )
-            project.verify_ssl = request.data.get(
-                "verify_ssl", project.verify_ssl
-            )
+            project.description = request.data.get("description", project.description)
+            project.verify_ssl = request.data.get("verify_ssl", project.verify_ssl)
             project.save()
         except IntegrityError as e:
             return Response(
@@ -234,9 +214,7 @@ class ProjectViewSet(
             models.Project.ImportState.PENDING,
             models.Project.ImportState.RUNNING,
         ]:
-            raise api_exc.Conflict(
-                detail="Project import or sync is already running."
-            )
+            raise api_exc.Conflict(detail="Project import or sync is already running.")
 
         job = tasks.sync_project.delay(project_id=project.id)
 

@@ -61,25 +61,17 @@ class DeactivationPodman:
 
                     activation_instance.activation_pod_id = None
                     activation_instance.status = ActivationStatus.STOPPED
-                    activation_instance.save(
-                        update_fields=["status", "activation_pod_id"]
-                    )
+                    activation_instance.save(update_fields=["status", "activation_pod_id"])
             else:
                 logger.warning(f"Container {container_id} not found.")
-                self.activation_db_logger.write(
-                    f"Container {container_id} not found.", True
-                )
+                self.activation_db_logger.write(f"Container {container_id} not found.", True)
         except APIError as e:
-            logger.exception(
-                f"Failed to remove container: {container_id}; error: {str(e)}"
-            )
+            logger.exception(f"Failed to remove container: {container_id}; error: {str(e)}")
             raise
 
     def _default_podman_url(self) -> None:
         if os.getuid() == 0:
             self.podman_url = "unix:///run/podman/podman.sock"
         else:
-            xdg_runtime_dir = os.getenv(
-                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-            )
+            xdg_runtime_dir = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
             self.podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"

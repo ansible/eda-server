@@ -22,9 +22,7 @@ class InitData:
 
 @pytest.mark.django_db
 def test_list_decision_environments(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    credential = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
     obj = models.DecisionEnvironment.objects.create(
         name="de1", image_url="registry.com/img1:tag1", credential=credential
     )
@@ -44,18 +42,14 @@ def test_list_decision_environments(client: APIClient):
 
 @pytest.mark.django_db
 def test_create_decision_environment(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    credential = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
     data_in = {
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
         "credential_id": credential.id,
     }
-    response = client.post(
-        f"{api_url_v1}/decision-environments/", data=data_in
-    )
+    response = client.post(f"{api_url_v1}/decision-environments/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     id_ = response.data["id"]
     result = response.data
@@ -105,13 +99,9 @@ def test_retrieve_decision_environment_not_exist(client: APIClient):
 @pytest.mark.django_db
 def test_partial_update_decision_environment(client: APIClient, init_db):
     obj = init_db.decision_environment
-    credential = models.Credential.objects.create(
-        name="newcredential", username="me2", secret="sec2"
-    )
+    credential = models.Credential.objects.create(name="newcredential", username="me2", secret="sec2")
     data = {"credential_id": credential.id}
-    response = client.patch(
-        f"{api_url_v1}/decision-environments/{obj.id}/", data=data
-    )
+    response = client.patch(f"{api_url_v1}/decision-environments/{obj.id}/", data=data)
     assert response.status_code == status.HTTP_200_OK
     result = response.data
     result.pop("created_at")
@@ -123,9 +113,7 @@ def test_partial_update_decision_environment(client: APIClient, init_db):
         "credential_id": credential.id,
         "id": obj.id,
     }
-    updated_obj = models.DecisionEnvironment.objects.filter(
-        pk=int(obj.id)
-    ).first()
+    updated_obj = models.DecisionEnvironment.objects.filter(pk=int(obj.id)).first()
     assert updated_obj.credential == credential
 
 
@@ -145,9 +133,7 @@ def test_delete_decision_environment_success(client: APIClient, init_db):
     response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert (
-        models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
-    )
+    assert models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
 
 
 @pytest.mark.django_db
@@ -155,14 +141,10 @@ def test_delete_decision_environment_force(client: APIClient, init_db):
     obj_id = int(init_db.decision_environment.id)
     activation_id = int(init_db.activation.id)
 
-    response = client.delete(
-        f"{api_url_v1}/decision-environments/{obj_id}/?force=True"
-    )
+    response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/?force=True")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert (
-        models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
-    )
+    assert models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
     activation = models.Activation.objects.get(pk=activation_id)
     assert activation.decision_environment is None
 
@@ -196,9 +178,7 @@ def init_db():
         url="https://github.com/eda-project",
     )
 
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    credential = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
 
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de1",

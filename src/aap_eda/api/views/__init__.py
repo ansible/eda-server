@@ -17,13 +17,7 @@ from .auth import RoleViewSet, SessionLoginView, SessionLogoutView
 from .credential import CredentialViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .project import ExtraVarViewSet, ProjectViewSet
-from .rulebook import (
-    AuditEventViewSet,
-    AuditRuleViewSet,
-    RulebookViewSet,
-    RulesetViewSet,
-    RuleViewSet,
-)
+from .rulebook import AuditEventViewSet, AuditRuleViewSet, RulebookViewSet, RulesetViewSet, RuleViewSet
 from .tasks import TaskViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
 

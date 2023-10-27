@@ -18,9 +18,7 @@ from aap_eda.core import models
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)
-    password = serializers.CharField(
-        required=True, style={"input_type": "password"}
-    )
+    password = serializers.CharField(required=True, style={"input_type": "password"})
 
 
 # -----------------------------------------------------
@@ -54,9 +52,7 @@ class PermissionRefSerializer(serializers.ModelSerializer):
 # Roles
 # -----------------------------------------------------
 class RoleSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(
-        required=True, help_text="Unique UUID of the role"
-    )
+    id = serializers.UUIDField(required=True, help_text="Unique UUID of the role")
 
     name = serializers.CharField(
         required=True,
@@ -69,9 +65,7 @@ class RoleSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
-    is_default = serializers.BooleanField(
-        default=False, help_text="Indicates if the role is default"
-    )
+    is_default = serializers.BooleanField(default=False, help_text="Indicates if the role is default")
 
     class Meta:
         model = models.Role
@@ -80,9 +74,7 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class RoleListSerializer(serializers.Serializer):
-    id = serializers.UUIDField(
-        required=True, help_text="Unique UUID of the role"
-    )
+    id = serializers.UUIDField(required=True, help_text="Unique UUID of the role")
 
     name = serializers.CharField(
         required=True,
@@ -97,9 +89,7 @@ class RoleListSerializer(serializers.Serializer):
 
 
 class RoleDetailSerializer(serializers.Serializer):
-    id = serializers.UUIDField(
-        required=True, help_text="Unique UUID of the role"
-    )
+    id = serializers.UUIDField(required=True, help_text="Unique UUID of the role")
 
     name = serializers.CharField(
         required=True,
