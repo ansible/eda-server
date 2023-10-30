@@ -24,9 +24,7 @@ from aap_eda.services.project.git import GitError, GitExecutor, GitRepository
 
 @pytest.mark.django_db
 def test_git_clone():
-    credential = Credential.objects.create(
-        name="name", username="me", secret="pass"
-    )
+    credential = Credential.objects.create(name="name", username="me", secret="pass")
     credential.refresh_from_db()
     executor = mock.MagicMock(ENVIRON={})
     repository = GitRepository.clone(
@@ -98,9 +96,7 @@ def test_git_rev_parse_head():
     result = repository.rev_parse("HEAD")
 
     assert result == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    executor.assert_called_once_with(
-        ["rev-parse", "HEAD"], cwd="/path/to/repository"
-    )
+    executor.assert_called_once_with(["rev-parse", "HEAD"], cwd="/path/to/repository")
 
 
 @mock.patch("subprocess.run")
@@ -139,10 +135,7 @@ def test_git_executor_timeout(run_mock: mock.Mock):
     run_mock.side_effect = raise_timeout
 
     executor = GitExecutor()
-    message = re.escape(
-        f"""Command '{shutil.which("git")} status' """
-        """timed out after 10 seconds"""
-    )
+    message = re.escape(f"""Command '{shutil.which("git")} status' """ """timed out after 10 seconds""")
     with pytest.raises(GitError, match=message):
         executor(["status"], timeout=timeout)
 
@@ -150,16 +143,11 @@ def test_git_executor_timeout(run_mock: mock.Mock):
 @mock.patch("subprocess.run")
 def test_git_executor_error(run_mock: mock.Mock):
     def raise_error(cmd, **_kwargs):
-        raise subprocess.CalledProcessError(
-            128, cmd, stderr="fatal: not a git repository"
-        )
+        raise subprocess.CalledProcessError(128, cmd, stderr="fatal: not a git repository")
 
     run_mock.side_effect = raise_error
 
     executor = GitExecutor()
-    message = re.escape(
-        f"""Command '{shutil.which("git")} status'"""
-        " returned non-zero exit status 128."
-    )
+    message = re.escape(f"""Command '{shutil.which("git")} status'""" " returned non-zero exit status 128.")
     with pytest.raises(GitError, match=message):
         executor(["status"])

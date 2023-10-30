@@ -26,9 +26,7 @@ class DefaultPagination(pagination.PageNumberPagination):
 
         url = self.request.get_full_path()
 
-        return replace_query_param(
-            url, self.page_query_param, self.page.next_page_number()
-        )
+        return replace_query_param(url, self.page_query_param, self.page.next_page_number())
 
     def get_previous_link(self):
         if not self.page.has_previous():
@@ -54,14 +52,8 @@ class DefaultPagination(pagination.PageNumberPagination):
         )
 
     def get_paginated_response_schema(self, schema):
-        next_page_url = (
-            f"/eda/api/v1/example/"
-            f"?{self.page_query_param}=51&{self.page_size_query_param}=100"
-        )
-        prev_page_url = (
-            f"/eda/api/v1/example/"
-            f"?{self.page_query_param}=49&{self.page_size_query_param}=100"
-        )
+        next_page_url = f"/eda/api/v1/example/" f"?{self.page_query_param}=51&{self.page_size_query_param}=100"
+        prev_page_url = f"/eda/api/v1/example/" f"?{self.page_query_param}=49&{self.page_size_query_param}=100"
         return {
             "type": "object",
             "properties": {

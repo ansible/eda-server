@@ -17,11 +17,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import (
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import authentication, permissions, status, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -54,12 +50,8 @@ class SessionLoginView(APIView):
         description="Session cookie login",
         request=LoginSerializer,
         responses={
-            status.HTTP_403_FORBIDDEN: OpenApiResponse(
-                description="Invalid credentials or user is disabled."
-            ),
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                description="Login successful."
-            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(description="Invalid credentials or user is disabled."),
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(description="Login successful."),
         },
     )
     @method_decorator(csrf_protect)
@@ -69,14 +61,10 @@ class SessionLoginView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        user = authenticate(
-            request, username=data["username"], password=data["password"]
-        )
+        user = authenticate(request, username=data["username"], password=data["password"])
 
         if user is None:
-            raise exceptions.PermissionDenied(
-                "Invalid credentials or user is disabled."
-            )
+            raise exceptions.PermissionDenied("Invalid credentials or user is disabled.")
 
         login(request, user)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -91,9 +79,7 @@ class SessionLogoutView(APIView):
         description="Session logout.",
         request=None,
         responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                description="Logout successful."
-            ),
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(description="Logout successful."),
         },
     )
     @method_decorator(never_cache)

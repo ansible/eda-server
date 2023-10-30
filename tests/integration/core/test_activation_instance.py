@@ -17,11 +17,7 @@ import pytest
 
 from aap_eda.core import models
 from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
-from aap_eda.core.exceptions import (
-    StatusRequiredError,
-    UnknownStatusError,
-    UpdateFieldsRequiredError,
-)
+from aap_eda.core.exceptions import StatusRequiredError, UnknownStatusError, UpdateFieldsRequiredError
 
 
 @pytest.fixture()
@@ -69,10 +65,7 @@ def test_activation_instance_save(init_data):
     instance = init_data
 
     assert instance.status == ActivationStatus.PENDING
-    assert (
-        instance.status_message
-        == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
-    )
+    assert instance.status_message == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
 
     for status in [
         ActivationStatus.STARTING,
@@ -90,7 +83,4 @@ def test_activation_instance_save(init_data):
         instance.save(update_fields=["status"])
 
         instance.refresh_from_db()
-        assert (
-            instance.status_message
-            == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
-        )
+        assert instance.status_message == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]

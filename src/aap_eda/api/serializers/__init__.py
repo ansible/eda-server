@@ -21,17 +21,8 @@ from .activation import (
     ActivationSerializer,
     PostActivationSerializer,
 )
-from .auth import (
-    LoginSerializer,
-    RoleDetailSerializer,
-    RoleListSerializer,
-    RoleSerializer,
-)
-from .credential import (
-    CredentialCreateSerializer,
-    CredentialRefSerializer,
-    CredentialSerializer,
-)
+from .auth import LoginSerializer, RoleDetailSerializer, RoleListSerializer, RoleSerializer
+from .credential import CredentialCreateSerializer, CredentialRefSerializer, CredentialSerializer
 from .decision_environment import (
     DecisionEnvironmentCreateSerializer,
     DecisionEnvironmentReadSerializer,

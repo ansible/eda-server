@@ -53,14 +53,8 @@ class Permission(models.Model):
         unique_together = [("resource_type", "action")]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    resource_type = models.TextField(
-        null=False, blank=False, choices=ResourceType.choices()
-    )
-    action = models.TextField(
-        null=False, blank=False, choices=Action.choices()
-    )
+    resource_type = models.TextField(null=False, blank=False, choices=ResourceType.choices())
+    action = models.TextField(null=False, blank=False, choices=Action.choices())
 
     def __repr__(self):
-        return (
-            f"<{self.__class__.__name__}: {self.resource_type}:{self.action}>"
-        )
+        return f"<{self.__class__.__name__}: {self.resource_type}:{self.action}>"

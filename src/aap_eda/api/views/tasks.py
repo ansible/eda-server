@@ -34,9 +34,7 @@ class TaskViewSet(ViewSet):
         return Response(serializer.data)
 
     @extend_schema(
-        parameters=[
-            OpenApiParameter("id", OpenApiTypes.UUID, OpenApiParameter.PATH)
-        ],
+        parameters=[OpenApiParameter("id", OpenApiTypes.UUID, OpenApiParameter.PATH)],
         responses={
             status.HTTP_200_OK: serializers.TaskSerializer,
         },

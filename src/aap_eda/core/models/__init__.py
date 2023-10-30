@@ -17,22 +17,9 @@ from .auth import Permission, Role
 from .credential import Credential
 from .decision_environment import DecisionEnvironment
 from .inventory import Inventory
-from .job import (
-    ActivationInstanceJobInstance,
-    Job,
-    JobInstance,
-    JobInstanceEvent,
-    JobInstanceHost,
-)
+from .job import ActivationInstanceJobInstance, Job, JobInstance, JobInstanceEvent, JobInstanceHost
 from .project import ExtraVar, Project
-from .rulebook import (
-    AuditAction,
-    AuditEvent,
-    AuditRule,
-    Rule,
-    Rulebook,
-    Ruleset,
-)
+from .rulebook import AuditAction, AuditEvent, AuditRule, Rule, Rulebook, Ruleset
 from .user import AwxToken, User
 
 __all__ = [

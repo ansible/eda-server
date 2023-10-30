@@ -4,18 +4,13 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
-from tests.integration.api.test_activation import (
-    create_activation,
-    create_activation_related_data,
-)
+from tests.integration.api.test_activation import create_activation, create_activation_related_data
 from tests.integration.constants import api_url_v1
 
 
 @pytest.mark.django_db
 def test_list_credentials(client: APIClient):
-    obj = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    obj = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
     response = client.get(f"{api_url_v1}/credentials/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data["results"][0]
@@ -58,9 +53,7 @@ def test_create_credential(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_credential(client: APIClient):
-    obj = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    obj = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
     response = client.get(f"{api_url_v1}/credentials/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data
@@ -83,9 +76,7 @@ def test_retrieve_credential_not_exist(client: APIClient):
 
 @pytest.mark.django_db
 def test_partial_update_credential(client: APIClient):
-    obj = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    obj = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
     data = {"secret": "sec2"}
     response = client.patch(f"{api_url_v1}/credentials/{obj.id}/", data=data)
     assert response.status_code == status.HTTP_200_OK
@@ -105,9 +96,7 @@ def test_partial_update_credential(client: APIClient):
 
 @pytest.mark.django_db
 def test_delete_credential(client: APIClient):
-    obj = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    obj = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
     response = client.delete(f"{api_url_v1}/credentials/{obj.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
@@ -145,9 +134,7 @@ def test_delete_credential_used_by_activation_forced(client: APIClient):
 @pytest.mark.django_db
 def test_credential_decrypt_failure(client: APIClient, settings):
     settings.SECRET_KEY = "a-secret-key"
-    models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    models.Credential.objects.create(name="credential1", username="me", secret="sec1")
 
     response = client.get(f"{api_url_v1}/credentials/")
     assert response.status_code == status.HTTP_200_OK

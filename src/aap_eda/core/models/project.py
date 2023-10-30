@@ -63,9 +63,7 @@ class Project(models.Model):
     )
     archive_file = models.FileField(upload_to=PROJECT_ARCHIVE_DIR)
 
-    import_state = models.TextField(
-        choices=ImportState.choices, default=ImportState.PENDING, null=False
-    )
+    import_state = models.TextField(choices=ImportState.choices, default=ImportState.PENDING, null=False)
     import_task_id = models.UUIDField(null=True, default=None)
     import_error = models.TextField(null=True, default=None)
 

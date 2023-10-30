@@ -64,13 +64,9 @@ class ActivationDbLogger:
     def flush(self) -> None:
         try:
             if self.activation_instance_log_buffer:
-                models.ActivationInstanceLog.objects.bulk_create(
-                    self.activation_instance_log_buffer
-                )
+                models.ActivationInstanceLog.objects.bulk_create(self.activation_instance_log_buffer)
         except IntegrityError:
-            message = (
-                f"Instance id: {self.activation_instance_id} is not present."
-            )
+            message = f"Instance id: {self.activation_instance_id} is not present."
             raise ActivationRecordNotFound(message)
 
         self.activation_instance_log_buffer = []

@@ -83,9 +83,7 @@ def test_session_login_logout(live_server, user: models.User):
 
 
 @pytest.mark.django_db
-def test_session_login_invalid_credentials(
-    base_client: APIClient, user: models.User
-):
+def test_session_login_invalid_credentials(base_client: APIClient, user: models.User):
     response = base_client.post(
         login_url,
         data={
@@ -94,18 +92,14 @@ def test_session_login_invalid_credentials(
         },
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json() == {
-        "detail": "Invalid credentials or user is disabled."
-    }
+    assert response.json() == {"detail": "Invalid credentials or user is disabled."}
 
 
 @pytest.mark.django_db
 def test_logout_unauthenticated(base_client: APIClient):
     response = base_client.post(logout_url)
     assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def _get_crsf_token(client: RequestsClient):
@@ -194,9 +188,7 @@ def init_role():
 
 def init_role_permissions(role_data, user: models.User):
     resource_types = ["activation_instance", "user"]
-    permission_data = models.Permission.objects.filter(
-        resource_type__in=resource_types
-    )
+    permission_data = models.Permission.objects.filter(resource_type__in=resource_types)
 
     role_data.permissions.set(list(permission_data))
     role_data.users.add(user)

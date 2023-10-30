@@ -104,9 +104,7 @@ class RoleBasedPermission(permissions.BasePermission):
         resource_type, action = permission
         return self._check_permission(request.user, resource_type, action)
 
-    def _get_permission(
-        self, view: APIView
-    ) -> Optional[Tuple[ResourceType, Action]]:
+    def _get_permission(self, view: APIView) -> Optional[Tuple[ResourceType, Action]]:
         view_permission_func = getattr(view, "get_rbac_permission", None)
         if view_permission_func is not None:
             resource_type, action = view_permission_func()
@@ -158,9 +156,7 @@ class RoleBasedPermission(permissions.BasePermission):
                 )
         return action
 
-    def _check_permission(
-        self, user: models.User, resource_type: ResourceType, action: Action
-    ) -> bool:
+    def _check_permission(self, user: models.User, resource_type: ResourceType, action: Action) -> bool:
         return models.Permission.objects.filter(
             roles__users=user,
             resource_type=resource_type,

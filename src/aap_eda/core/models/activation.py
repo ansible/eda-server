@@ -14,16 +14,8 @@
 
 from django.db import models
 
-from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
-    ActivationStatus,
-    RestartPolicy,
-)
-from aap_eda.core.exceptions import (
-    StatusRequiredError,
-    UnknownStatusError,
-    UpdateFieldsRequiredError,
-)
+from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus, RestartPolicy
+from aap_eda.core.exceptions import StatusRequiredError, UnknownStatusError, UpdateFieldsRequiredError
 
 from .user import User
 
@@ -44,18 +36,10 @@ class Activation(models.Model):
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")
-    decision_environment = models.ForeignKey(
-        "DecisionEnvironment", on_delete=models.SET_NULL, null=True
-    )
-    project = models.ForeignKey(
-        "Project", on_delete=models.SET_NULL, null=True
-    )
-    rulebook = models.ForeignKey(
-        "Rulebook", on_delete=models.SET_NULL, null=True
-    )
-    extra_var = models.ForeignKey(
-        "ExtraVar", on_delete=models.CASCADE, null=True
-    )
+    decision_environment = models.ForeignKey("DecisionEnvironment", on_delete=models.SET_NULL, null=True)
+    project = models.ForeignKey("Project", on_delete=models.SET_NULL, null=True)
+    rulebook = models.ForeignKey("Rulebook", on_delete=models.SET_NULL, null=True)
+    extra_var = models.ForeignKey("ExtraVar", on_delete=models.CASCADE, null=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
@@ -91,26 +75,18 @@ class Activation(models.Model):
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
+                    "update_fields is required to use when saving " "due to race conditions"
                 )
             else:
                 if "status" in kwargs["update_fields"]:
                     self._is_valid_status()
 
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
+            if "status_message" in kwargs["update_fields"] and "status" not in kwargs["update_fields"]:
                 raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
+                    "status_message cannot be set by itself, " "it requires status and status_message together"
                 )
             # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
+            elif "status" in kwargs["update_fields"] and "status_message" not in kwargs["update_fields"]:
                 self._set_status_message()
                 kwargs["update_fields"].append("status_message")
 
@@ -161,26 +137,18 @@ class ActivationInstance(models.Model):
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
+                    "update_fields is required to use when saving " "due to race conditions"
                 )
             else:
                 if "status" in kwargs["update_fields"]:
                     self._is_valid_status()
 
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
+            if "status_message" in kwargs["update_fields"] and "status" not in kwargs["update_fields"]:
                 raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
+                    "status_message cannot be set by itself, " "it requires status and status_message together"
                 )
             # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
+            elif "status" in kwargs["update_fields"] and "status_message" not in kwargs["update_fields"]:
                 self.status_message = self._get_default_status_message()
                 kwargs["update_fields"].append("status_message")
 
@@ -203,8 +171,6 @@ class ActivationInstanceLog(models.Model):
     class Meta:
         db_table = "core_activation_instance_log"
 
-    activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
-    )
+    activation_instance = models.ForeignKey("ActivationInstance", on_delete=models.CASCADE)
     line_number = models.IntegerField()
     log = models.TextField()

@@ -17,9 +17,7 @@ from itertools import groupby
 
 def group_permission_resource(permission_data):
     grouped_permissions = []
-    for key, group in groupby(
-        permission_data, key=lambda x: (x["resource_type"])
-    ):
+    for key, group in groupby(permission_data, key=lambda x: (x["resource_type"])):
         actions = [item["action"] for item in group]
         grouped_permissions.append({"resource_type": key, "action": actions})
     return grouped_permissions

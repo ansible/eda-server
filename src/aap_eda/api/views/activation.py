@@ -15,21 +15,13 @@ import logging
 
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
-from drf_spectacular.utils import (
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import exceptions, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
-from aap_eda.api.serializers.activation import (
-    is_activation_valid,
-    parse_validation_errors,
-)
+from aap_eda.api.serializers.activation import is_activation_valid, parse_validation_errors
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
 from aap_eda.tasks.ruleset import activate, deactivate, restart
@@ -69,22 +61,16 @@ class ActivationViewSet(
         request=serializers.ActivationCreateSerializer,
         responses={
             status.HTTP_201_CREATED: serializers.ActivationReadSerializer,
-            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                description="Invalid data to create activation."
-            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(description="Invalid data to create activation."),
         },
     )
     def create(self, request):
         context = {"request": request}
-        serializer = serializers.ActivationCreateSerializer(
-            data=request.data, context=context
-        )
+        serializer = serializers.ActivationCreateSerializer(data=request.data, context=context)
         valid = serializer.is_valid()
         if not valid:
             error = parse_validation_errors(serializer.errors)
-            return Response(
-                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"errors": error}, status=status.HTTP_400_BAD_REQUEST)
 
         response = serializer.create(serializer.validated_data)
 
@@ -119,9 +105,7 @@ class ActivationViewSet(
         activations = models.Activation.objects.all()
         activations = self.filter_queryset(activations)
 
-        serializer = serializers.ActivationListSerializer(
-            activations, many=True
-        )
+        serializer = serializers.ActivationListSerializer(activations, many=True)
         result = self.paginate_queryset(serializer.data)
 
         return self.get_paginated_response(result)
@@ -141,9 +125,7 @@ class ActivationViewSet(
         description="List all instances for the Activation",
         request=None,
         responses={
-            status.HTTP_200_OK: serializers.ActivationInstanceSerializer(
-                many=True
-            ),
+            status.HTTP_200_OK: serializers.ActivationInstanceSerializer(many=True),
         },
         parameters=[
             OpenApiParameter(
@@ -170,14 +152,10 @@ class ActivationViewSet(
                 detail=f"Activation with ID={id} does not exist.",
             )
 
-        activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=id
-        )
+        activation_instances = models.ActivationInstance.objects.filter(activation_id=id)
         filtered_instances = self.filter_queryset(activation_instances)
         result = self.paginate_queryset(filtered_instances)
-        serializer = serializers.ActivationInstanceSerializer(
-            result, many=True
-        )
+        serializer = serializers.ActivationInstanceSerializer(result, many=True)
         return self.get_paginated_response(serializer.data)
 
     @extend_schema(
@@ -194,8 +172,7 @@ class ActivationViewSet(
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 None,
-                description="Activation not enabled do to current activation "
-                "status",
+                description="Activation not enabled do to current activation " "status",
             ),
         },
     )
@@ -222,9 +199,7 @@ class ActivationViewSet(
             activation.save(update_fields=["status", "status_message"])
             logger.error(f"Failed to enable {activation.name}: {error}")
 
-            return Response(
-                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"errors": error}, status=status.HTTP_400_BAD_REQUEST)
 
         logger.info(f"Now enabling {activation.name} ...")
 
@@ -266,13 +241,9 @@ class ActivationViewSet(
         if activation.is_enabled:
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
-            activation.save(
-                update_fields=["is_enabled", "status", "modified_at"]
-            )
+            activation.save(update_fields=["is_enabled", "status", "modified_at"])
 
-            deactivate.delay(
-                activation_id=activation.id, requester=activation.user.username
-            )
+            deactivate.delay(activation_id=activation.id, requester=activation.user.username)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -297,9 +268,7 @@ class ActivationViewSet(
         self._check_deleting(activation)
 
         if not activation.is_enabled:
-            raise api_exc.Forbidden(
-                detail="Activation is disabled and cannot be run."
-            )
+            raise api_exc.Forbidden(detail="Activation is disabled and cannot be run.")
 
         valid, error = is_activation_valid(activation)
         if not valid:
@@ -308,13 +277,9 @@ class ActivationViewSet(
             activation.save(update_fields=["status", "status_message"])
             logger.error(f"Failed to restart {activation.name}: {error}")
 
-            return Response(
-                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"errors": error}, status=status.HTTP_400_BAD_REQUEST)
 
-        restart.delay(
-            activation_id=activation.id, requester=activation.user.username
-        )
+        restart.delay(activation_id=activation.id, requester=activation.user.username)
 
         activation.restart_count += 1
         activation.save(update_fields=["restart_count", "modified_at"])
@@ -323,26 +288,20 @@ class ActivationViewSet(
 
     def _check_deleting(self, activation):
         if activation.status == ActivationStatus.DELETING:
-            raise exceptions.APIException(
-                detail="Object is being deleted", code=409
-            )
+            raise exceptions.APIException(detail="Object is being deleted", code=409)
 
 
 @extend_schema_view(
     retrieve=extend_schema(
         description="Get the Activation Instance by its id",
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ActivationInstanceSerializer
-            ),
+            status.HTTP_200_OK: OpenApiResponse(serializers.ActivationInstanceSerializer),
         },
     ),
     list=extend_schema(
         description="List all the Activation Instances",
         responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ActivationInstanceSerializer
-            ),
+            status.HTTP_200_OK: OpenApiResponse(serializers.ActivationInstanceSerializer),
         },
     ),
     destroy=extend_schema(
@@ -369,11 +328,7 @@ class ActivationInstanceViewSet(
     @extend_schema(
         description="List all logs for the Activation Instance",
         request=None,
-        responses={
-            status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(
-                many=True
-            )
-        },
+        responses={status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(many=True)},
         parameters=[
             OpenApiParameter(
                 name="id",
@@ -391,23 +346,15 @@ class ActivationInstanceViewSet(
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
-        instance_exists = models.ActivationInstance.objects.filter(
-            pk=id
-        ).exists()
+        instance_exists = models.ActivationInstance.objects.filter(pk=id).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
                 detail=f"Activation Instance with ID={id} does not exist.",
             )
 
-        activation_instance_logs = models.ActivationInstanceLog.objects.filter(
-            activation_instance_id=id
-        ).order_by("id")
-        activation_instance_logs = self.filter_queryset(
-            activation_instance_logs
-        )
+        activation_instance_logs = models.ActivationInstanceLog.objects.filter(activation_instance_id=id).order_by("id")
+        activation_instance_logs = self.filter_queryset(activation_instance_logs)
         results = self.paginate_queryset(activation_instance_logs)
-        serializer = serializers.ActivationInstanceLogSerializer(
-            results, many=True
-        )
+        serializer = serializers.ActivationInstanceLogSerializer(results, many=True)
         return self.get_paginated_response(serializer.data)

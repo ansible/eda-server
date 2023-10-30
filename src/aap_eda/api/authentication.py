@@ -1,6 +1,4 @@
-from rest_framework.authentication import (
-    SessionAuthentication as _SessionAuthentication,
-)
+from rest_framework.authentication import SessionAuthentication as _SessionAuthentication
 
 
 class SessionAuthentication(_SessionAuthentication):

@@ -16,23 +16,14 @@ import logging
 
 from cryptography import fernet
 from django_filters import rest_framework as defaultfilters
-from drf_spectacular.utils import (
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.core import models
 
-from .mixins import (
-    CreateModelMixin,
-    PartialUpdateOnlyModelMixin,
-    ResponseSerializerMixin,
-)
+from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin, ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +69,7 @@ logger = logging.getLogger(__name__)
     ),
     destroy=extend_schema(
         description="Delete a credential by id",
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                None, description="Delete successful."
-            )
-        },
+        responses={status.HTTP_204_NO_CONTENT: OpenApiResponse(None, description="Delete successful.")},
         parameters=[
             OpenApiParameter(
                 name="force",
@@ -110,12 +97,7 @@ class CredentialViewSet(
         if isinstance(exc, fernet.InvalidToken):
             return Response(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                data={
-                    "details": (
-                        "Credential decryption failed"
-                        "; contact your system administrator"
-                    )
-                },
+                data={"details": ("Credential decryption failed" "; contact your system administrator")},
             )
         return super().handle_exception(exc)
 
@@ -137,9 +119,7 @@ class CredentialViewSet(
 
         # If the credential is in use and the 'force' flag
         # is not True, raise a PermissionDenied exception
-        is_used = models.Activation.objects.filter(
-            decision_environment__credential=credential
-        ).exists()
+        is_used = models.Activation.objects.filter(decision_environment__credential=credential).exists()
 
         if is_used and not force:
             raise exceptions.Conflict(

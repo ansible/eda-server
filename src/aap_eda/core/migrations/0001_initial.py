@@ -39,9 +39,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "last_login",
-                    models.DateTimeField(
-                        blank=True, null=True, verbose_name="last login"
-                    ),
+                    models.DateTimeField(blank=True, null=True, verbose_name="last login"),
                 ),
                 (
                     "is_superuser",
@@ -54,29 +52,21 @@ class Migration(migrations.Migration):
                 (
                     "username",
                     models.CharField(
-                        error_messages={
-                            "unique": "A user with that username already exists."
-                        },
+                        error_messages={"unique": "A user with that username already exists."},
                         help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
                         max_length=150,
                         unique=True,
-                        validators=[
-                            django.contrib.auth.validators.UnicodeUsernameValidator()
-                        ],
+                        validators=[django.contrib.auth.validators.UnicodeUsernameValidator()],
                         verbose_name="username",
                     ),
                 ),
                 (
                     "first_name",
-                    models.CharField(
-                        blank=True, max_length=150, verbose_name="first name"
-                    ),
+                    models.CharField(blank=True, max_length=150, verbose_name="first name"),
                 ),
                 (
                     "last_name",
-                    models.CharField(
-                        blank=True, max_length=150, verbose_name="last name"
-                    ),
+                    models.CharField(blank=True, max_length=150, verbose_name="last name"),
                 ),
                 (
                     "email",
@@ -151,15 +141,11 @@ class Migration(migrations.Migration):
                 ("is_valid", models.BooleanField(default=False)),
                 (
                     "rulebook_name",
-                    models.TextField(
-                        help_text="Name of the referenced rulebook"
-                    ),
+                    models.TextField(help_text="Name of the referenced rulebook"),
                 ),
                 (
                     "rulebook_rulesets",
-                    models.TextField(
-                        help_text="Content of the last referenced rulebook"
-                    ),
+                    models.TextField(help_text="Content of the last referenced rulebook"),
                 ),
                 ("ruleset_stats", models.JSONField(default=dict)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -358,9 +344,7 @@ class Migration(migrations.Migration):
                 ("username", models.TextField(null=True)),
                 (
                     "secret",
-                    aap_eda.core.utils.crypto.fields.EncryptedTextField(
-                        null=True
-                    ),
+                    aap_eda.core.utils.crypto.fields.EncryptedTextField(null=True),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("modified_at", models.DateTimeField(auto_now=True)),
@@ -536,9 +520,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.UUIDField(
-                        default=uuid.uuid4, primary_key=True, serialize=False
-                    ),
+                    models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False),
                 ),
                 (
                     "resource_type",
@@ -720,9 +702,7 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.UUIDField(
-                        default=uuid.uuid4, primary_key=True, serialize=False
-                    ),
+                    models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False),
                 ),
                 ("name", models.TextField(unique=True)),
                 ("description", models.TextField(default="")),
@@ -731,9 +711,7 @@ class Migration(migrations.Migration):
                 ("modified_at", models.DateTimeField(auto_now=True)),
                 (
                     "permissions",
-                    models.ManyToManyField(
-                        related_name="roles", to="core.Permission"
-                    ),
+                    models.ManyToManyField(related_name="roles", to="core.Permission"),
                 ),
             ],
             options={
@@ -769,15 +747,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="jobinstancehost",
-            index=models.Index(
-                fields=["job_uuid"], name="ix_job_host_job_uuid"
-            ),
+            index=models.Index(fields=["job_uuid"], name="ix_job_host_job_uuid"),
         ),
         migrations.AddIndex(
             model_name="jobinstanceevent",
-            index=models.Index(
-                fields=["job_uuid"], name="ix_job_instance_event_job_uuid"
-            ),
+            index=models.Index(fields=["job_uuid"], name="ix_job_instance_event_job_uuid"),
         ),
         migrations.AddIndex(
             model_name="jobinstance",
@@ -856,9 +830,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="auditevent",
             name="audit_actions",
-            field=models.ManyToManyField(
-                related_name="audit_events", to="core.AuditAction"
-            ),
+            field=models.ManyToManyField(related_name="audit_events", to="core.AuditAction"),
         ),
         migrations.AddField(
             model_name="auditaction",
@@ -1002,9 +974,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="inventory",
-            index=models.Index(
-                fields=["inventory_source"], name="ix_inventory_inv_src"
-            ),
+            index=models.Index(fields=["inventory_source"], name="ix_inventory_inv_src"),
         ),
         migrations.AddConstraint(
             model_name="inventory",
@@ -1047,9 +1017,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="auditrule",
-            index=models.Index(
-                fields=["fired_at"], name="ix_audit_rule_fired_at"
-            ),
+            index=models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ),
         migrations.AlterUniqueTogether(
             name="auditaction",

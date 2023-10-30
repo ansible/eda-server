@@ -87,9 +87,7 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
     client = base_client
     response = client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.django_db
@@ -108,9 +106,7 @@ def test_update_current_user(client: APIClient, user: models.User, init_db):
 
 
 @pytest.mark.django_db
-def test_update_current_user_password(
-    client: APIClient, user: models.User, init_db
-):
+def test_update_current_user_password(client: APIClient, user: models.User, init_db):
     response = client.patch(
         f"{api_url_v1}/users/me/",
         data={"password": "updated-password"},
@@ -124,9 +120,7 @@ def test_update_current_user_password(
 
 
 @pytest.mark.django_db
-def test_update_current_user_username_fail(
-    client: APIClient, user: models.User, init_db
-):
+def test_update_current_user_username_fail(client: APIClient, user: models.User, init_db):
     response = client.patch(
         f"{api_url_v1}/users/me/",
         data={"username": "darth.vader"},
@@ -143,9 +137,7 @@ def test_update_current_user_username_fail(
 
 
 @pytest.mark.django_db
-def test_update_current_user_roles_fail(
-    client: APIClient, user: models.User, init_db
-):
+def test_update_current_user_roles_fail(client: APIClient, user: models.User, init_db):
     response = client.patch(f"{api_url_v1}/users/me/", data={"roles": []})
     # NOTE(cutwater): DRF serializer will not detect an unexpected field
     #   in PATCH operation, but must ignore it.
@@ -172,9 +164,7 @@ def test_create_user(
     response = client.post(f"{api_url_v1}/users/", data=create_user_data)
 
     assert response.status_code == status.HTTP_201_CREATED
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE)
 
 
 @pytest.mark.django_db
@@ -204,9 +194,7 @@ def test_retrieve_user_details(
         "modified_at": user.modified_at.strftime(DATETIME_FORMAT),
     }
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.READ)
 
 
 @pytest.mark.django_db
@@ -235,9 +223,7 @@ def test_list_users(
         ],
     }
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.READ)
 
 
 @pytest.mark.django_db
@@ -270,9 +256,7 @@ def test_partial_update_user(
         "modified_at": updated_user.modified_at.strftime(DATETIME_FORMAT),
     }
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.UPDATE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.UPDATE)
 
 
 @pytest.mark.django_db
@@ -287,9 +271,7 @@ def test_delete_user(
 
     assert models.User.objects.filter(id=user_id).count() == 0
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE)
 
 
 @pytest.mark.django_db
@@ -304,9 +286,7 @@ def test_delete_user_not_allowed(
 
     assert models.User.objects.filter(id=user_id).count() == 1
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE)
 
 
 @pytest.mark.django_db
@@ -336,9 +316,7 @@ def test_list_users_filter_username(
         ],
     }
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.READ)
 
 
 @pytest.mark.django_db
@@ -355,9 +333,7 @@ def test_list_users_filter_username_non_exist(
 
     assert len(results) == 0
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.USER, Action.READ)
 
 
 def init_role():

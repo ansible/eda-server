@@ -113,9 +113,7 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient, init_db):
 def test_list_rulebooks_filter_project(client: APIClient, init_db):
     filter_project = init_db.project.id
     rulebook = init_db.rulebook
-    response = client.get(
-        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
-    )
+    response = client.get(f"{api_url_v1}/rulebooks/?project_id={filter_project}")
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
     assert data["project_id"] == filter_project
@@ -125,9 +123,7 @@ def test_list_rulebooks_filter_project(client: APIClient, init_db):
 @pytest.mark.django_db
 def test_list_rulebooks_filter_project_non_existant(client: APIClient):
     filter_project = "10000"
-    response = client.get(
-        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
-    )
+    response = client.get(f"{api_url_v1}/rulebooks/?project_id={filter_project}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -409,9 +405,7 @@ def test_list_actions_from_audit_rule_filter_name(client: APIClient, init_db):
     filter_name = "action-1"
     audit_rule_id = init_db.audit_rule.id
 
-    response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?name={filter_name}"
-    )
+    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
 
     filtered_actions = response.data["results"]
@@ -429,15 +423,11 @@ def test_list_actions_from_audit_rule_filter_name(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_list_actions_from_audit_rule_filter_name_non_existant(
-    client: APIClient, init_db
-):
+def test_list_actions_from_audit_rule_filter_name_non_existant(client: APIClient, init_db):
     filter_name = "doesn't exist"
     audit_rule_id = init_db.audit_rule.id
 
-    response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?name={filter_name}"
-    )
+    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?name={filter_name}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -472,9 +462,7 @@ def test_list_audit_events(client: APIClient, init_db):
 def test_list_audit_events_filter_name(client: APIClient, init_db):
     filter_name = "event-1"
 
-    response = client.get(
-        f"{api_url_v1}/audit-events/?source_name={filter_name}"
-    )
+    response = client.get(f"{api_url_v1}/audit-events/?source_name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     filtered_audit_events = response.data["results"]
 
@@ -492,14 +480,10 @@ def test_list_audit_events_filter_name(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_list_audit_events_filter_name_non_existant(
-    client: APIClient, init_db
-):
+def test_list_audit_events_filter_name_non_existant(client: APIClient, init_db):
     filter_name = "doesn't exist"
 
-    response = client.get(
-        f"{api_url_v1}/audit-events/?source_name={filter_name}"
-    )
+    response = client.get(f"{api_url_v1}/audit-events/?source_name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     data = response.json()["results"]
     assert data == []

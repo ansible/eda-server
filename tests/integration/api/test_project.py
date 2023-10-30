@@ -33,9 +33,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
                 name="test-project-01",
                 url="https://git.example.com/acme/project-01",
                 git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-                credential=models.Credential.objects.create(
-                    name="credential1", username="me", secret="sec1"
-                ),
+                credential=models.Credential.objects.create(name="credential1", username="me", secret="sec1"),
                 import_state=models.Project.ImportState.PENDING,
                 import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
             ),
@@ -55,9 +53,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
     for data, project in zip(response.json()["results"], projects):
         assert_project_data(data, project)
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ)
 
 
 @pytest.mark.django_db
@@ -113,9 +109,7 @@ def test_list_projects_filter_name_none_exist(client: APIClient):
 def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
     project = models.Project.objects.create(
         name="test-project-01",
-        credential=models.Credential.objects.create(
-            name="credential1", username="me", secret="sec1"
-        ),
+        credential=models.Credential.objects.create(name="credential1", username="me", secret="sec1"),
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
@@ -123,9 +117,7 @@ def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
     assert response.status_code == status.HTTP_200_OK
     assert_project_data_details(response.json(), project)
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ)
 
 
 @pytest.mark.django_db
@@ -198,11 +190,7 @@ def test_create_project(
         # Check that project was created with valid data
         assert project.name == body["name"]
         assert project.url == body["url"]
-        assert (
-            project.verify_ssl is body["verify_ssl"]
-            if "verify_ssl" in body
-            else True
-        )
+        assert project.verify_ssl is body["verify_ssl"] if "verify_ssl" in body else True
         assert project.import_state == "pending"
         assert str(project.import_task_id) == job_id
 
@@ -212,9 +200,7 @@ def test_create_project(
         # Check that import task job was created
         import_project_task.delay.assert_called_with(project_id=project.id)
 
-        check_permission_mock.assert_called_with(
-            mock.ANY, mock.ANY, ResourceType.PROJECT, Action.CREATE
-        )
+        check_permission_mock.assert_called_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.CREATE)
 
 
 @pytest.mark.django_db
@@ -285,9 +271,7 @@ def test_sync_project(
     sync_project_task.delay.assert_called_once_with(
         project_id=project.id,
     )
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE)
 
 
 @pytest.mark.django_db
@@ -314,9 +298,7 @@ def test_sync_project_conflict_already_running(
 
     response = client.post(f"{api_url_v1}/projects/{project.id}/sync/")
     assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json() == {
-        "detail": "Project import or sync is already running."
-    }
+    assert response.json() == {"detail": "Project import or sync is already running."}
 
     project.refresh_from_db()
     assert project.import_state == initial_state
@@ -324,9 +306,7 @@ def test_sync_project_conflict_already_running(
 
     sync_project_task.delay.assert_not_called()
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE)
 
 
 @pytest.mark.django_db
@@ -353,9 +333,7 @@ def test_update_project_not_found(client: APIClient):
 
 @pytest.mark.django_db
 def test_update_project_with_400(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential", username="me", secret="sec"
-    )
+    credential = models.Credential.objects.create(name="credential", username="me", secret="sec")
     first = models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
@@ -374,9 +352,7 @@ def test_update_project_with_400(client: APIClient):
         "credential_id": first.credential_id,
     }
     # test empty string validator
-    response = client.patch(
-        f"{api_url_v1}/projects/{first.id}/", data={"name": ""}
-    )
+    response = client.patch(f"{api_url_v1}/projects/{first.id}/", data={"name": ""})
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["name"][0] == "This field may not be blank."
     # test unique name validator
@@ -395,12 +371,8 @@ def test_update_project_with_400(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_partial_update_project(
-    client: APIClient, check_permission_mock: mock.Mock
-):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+def test_partial_update_project(client: APIClient, check_permission_mock: mock.Mock):
+    credential = models.Credential.objects.create(name="credential1", username="me", secret="sec1")
 
     project = models.Project.objects.create(
         name="test-project-01",
@@ -427,9 +399,7 @@ def test_partial_update_project(
 
     assert_project_data(response.json(), project)
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE)
 
 
 @pytest.mark.django_db
@@ -444,9 +414,7 @@ def test_delete_project(client: APIClient, check_permission_mock: mock.Mock):
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not models.Project.objects.filter(pk=project.id).exists()
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.PROJECT, Action.DELETE
-    )
+    check_permission_mock.assert_called_once_with(mock.ANY, mock.ANY, ResourceType.PROJECT, Action.DELETE)
 
 
 @pytest.mark.django_db

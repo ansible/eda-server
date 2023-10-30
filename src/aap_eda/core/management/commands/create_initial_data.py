@@ -95,10 +95,7 @@ ROLES = [
     },
     {
         "name": "Operator",
-        "description": (
-            "Has read permissions. "
-            "Has permissions to enable and disable rulebook activations."
-        ),
+        "description": ("Has read permissions. " "Has permissions to enable and disable rulebook activations."),
         "permissions": {
             "activation": ["read", "enable", "disable", "restart"],
             "activation_instance": ["read"],
@@ -164,20 +161,13 @@ class Command(BaseCommand):
             return
 
         for role_data in ROLES:
-            role = models.Role.objects.create(
-                name=role_data["name"], description=role_data["description"]
-            )
+            role = models.Role.objects.create(name=role_data["name"], description=role_data["description"])
             total_permissions = 0
             for resource_type, actions in role_data["permissions"].items():
-                permissions = list(
-                    models.Permission.objects.filter(
-                        resource_type=resource_type, action__in=actions
-                    )
-                )
+                permissions = list(models.Permission.objects.filter(resource_type=resource_type, action__in=actions))
                 if len(permissions) != len(actions):
                     raise ImproperlyConfigured(
-                        f'Permission "{resource_type}" and one of "{actions}" '
-                        f"actions is missing in the database."
+                        f'Permission "{resource_type}" and one of "{actions}" ' f"actions is missing in the database."
                     )
                 role.permissions.add(*permissions)
                 total_permissions += len(actions)

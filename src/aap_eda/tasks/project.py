@@ -61,9 +61,7 @@ def _monitor_project_tasks(queue_name: str) -> None:
     queue = get_queue(queue_name)
 
     # Filter projects that doesn't have any related job
-    pending_projects = models.Project.objects.filter(
-        import_state=models.Project.ImportState.PENDING
-    )
+    pending_projects = models.Project.objects.filter(import_state=models.Project.ImportState.PENDING)
     missing_projects = []
     for project in pending_projects:
         job = queue.fetch_job(str(project.import_task_id))
@@ -74,9 +72,7 @@ def _monitor_project_tasks(queue_name: str) -> None:
     # based on the git_hash field
     for project in missing_projects:
         logger.info(
-            "monitor_project_tasks: "
-            f"Project {project.name} is missing a job"
-            " in the queue. Adding it back."
+            "monitor_project_tasks: " f"Project {project.name} is missing a job" " in the queue. Adding it back."
         )
         if project.git_hash:
             job = sync_project.delay(project.id)

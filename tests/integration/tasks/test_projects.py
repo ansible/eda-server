@@ -47,9 +47,7 @@ def test_monitor_project_tasks_import(
     )
     default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
-    worker = DefaultWorker(
-        [default_queue], connection=default_queue.connection
-    )
+    worker = DefaultWorker([default_queue], connection=default_queue.connection)
     worker.work(burst=True)
     project.refresh_from_db()
     assert str(project.import_task_id) == job_id
@@ -78,9 +76,7 @@ def test_monitor_project_tasks_sync(
     )
     default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
-    worker = DefaultWorker(
-        [default_queue], connection=default_queue.connection
-    )
+    worker = DefaultWorker([default_queue], connection=default_queue.connection)
     worker.work(burst=True)
     project.refresh_from_db()
     assert str(project.import_task_id) == job_id
@@ -112,9 +108,7 @@ def test_monitor_project_tasks_with_job(
     default_queue.enqueue(fake_job, job_id=expected_job_id)
     default_queue.enqueue(monitor_project_tasks)
 
-    worker = DefaultWorker(
-        [default_queue], connection=default_queue.connection
-    )
+    worker = DefaultWorker([default_queue], connection=default_queue.connection)
     worker.work(burst=True)
     project.refresh_from_db()
     assert str(project.import_task_id) == expected_job_id

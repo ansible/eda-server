@@ -58,15 +58,11 @@ def test_view_set_zeroconf(view_action, rbac_action):
         action=view_action,
     )
 
-    with mock.patch.object(
-        RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)
-    ) as check_method:
+    with mock.patch.object(RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)) as check_method:
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-        check_method.assert_called_once_with(
-            request.user, ResourceType.USER, rbac_action
-        )
+        check_method.assert_called_once_with(request.user, ResourceType.USER, rbac_action)
 
 
 def test_view_set_unknown_resource_type():
@@ -81,9 +77,7 @@ def test_view_set_unknown_resource_type():
     permission = RoleBasedPermission()
     with pytest.raises(ImproperlyConfigured) as exc_info:
         permission.has_permission(request, view)
-        exc_info.match(
-            "Cannot resolve basename into permission resource type for view "
-        )
+        exc_info.match("Cannot resolve basename into permission resource type for view ")
 
 
 def test_view_set_unknown_action():
@@ -98,9 +92,7 @@ def test_view_set_unknown_action():
     permission = RoleBasedPermission()
     with pytest.raises(ImproperlyConfigured) as exc_info:
         permission.has_permission(request, view)
-        exc_info.match(
-            "Cannot resolve view action into permission action for view "
-        )
+        exc_info.match("Cannot resolve view action into permission action for view ")
 
 
 def test_view_set_override_resource_type():
@@ -113,15 +105,11 @@ def test_view_set_override_resource_type():
         rbac_resource_type=ResourceType.USER,
     )
 
-    with mock.patch.object(
-        RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)
-    ) as check_method:
+    with mock.patch.object(RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)) as check_method:
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-        check_method.assert_called_once_with(
-            request.user, ResourceType.USER, Action.READ
-        )
+        check_method.assert_called_once_with(request.user, ResourceType.USER, Action.READ)
 
 
 def test_view_set_override_action():
@@ -134,15 +122,11 @@ def test_view_set_override_action():
         rbac_action=Action.READ,
     )
 
-    with mock.patch.object(
-        RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)
-    ) as check_method:
+    with mock.patch.object(RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)) as check_method:
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-        check_method.assert_called_once_with(
-            request.user, ResourceType.USER, Action.READ
-        )
+        check_method.assert_called_once_with(request.user, ResourceType.USER, Action.READ)
 
 
 def test_view_set_override_resource_type_and_action():
@@ -156,22 +140,16 @@ def test_view_set_override_resource_type_and_action():
         rbac_action=Action.READ,
     )
 
-    with mock.patch.object(
-        RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)
-    ) as check_method:
+    with mock.patch.object(RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)) as check_method:
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
-        check_method.assert_called_once_with(
-            request.user, ResourceType.USER, Action.READ
-        )
+        check_method.assert_called_once_with(request.user, ResourceType.USER, Action.READ)
 
 
 def test_view_set_override_get_permission():
     request = mock.Mock(user=mock.Mock(is_superuser=False))
-    get_rbac_permission = mock.Mock(
-        return_value=(ResourceType.USER, Action.READ)
-    )
+    get_rbac_permission = mock.Mock(return_value=(ResourceType.USER, Action.READ))
     view = mock.Mock(
         name="TestView",
         spec=["basename", "action", "get_rbac_permission"],
@@ -180,13 +158,9 @@ def test_view_set_override_get_permission():
         get_rbac_permission=get_rbac_permission,
     )
 
-    with mock.patch.object(
-        RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)
-    ) as check_method:
+    with mock.patch.object(RoleBasedPermission, "_check_permission", mock.Mock(return_value=True)) as check_method:
         permission = RoleBasedPermission()
         assert permission.has_permission(request, view) is True
 
         get_rbac_permission.assert_called_once_with()
-        check_method.assert_called_once_with(
-            request.user, ResourceType.USER, Action.READ
-        )
+        check_method.assert_called_once_with(request.user, ResourceType.USER, Action.READ)

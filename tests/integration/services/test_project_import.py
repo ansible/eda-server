@@ -45,9 +45,7 @@ class TestTempdirFactory:
 @pytest.fixture
 def service_tempdir_patch():
     factory = TestTempdirFactory()
-    with mock.patch.object(
-        ProjectImportService, "_temporary_directory", factory
-    ):
+    with mock.patch.object(ProjectImportService, "_temporary_directory", factory):
         yield factory
 
 
@@ -69,9 +67,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
         return repo_mock
 
     repo_mock = mock.Mock(name="GitRepository()")
-    repo_mock.rev_parse.return_value = (
-        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    )
+    repo_mock.rev_parse.return_value = "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
     git_mock.clone.side_effect = clone_project
 
@@ -115,25 +111,19 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
 
 
 @pytest.mark.django_db
-def test_project_import_with_new_layout(
-    storage_save_patch, service_tempdir_patch
-):
+def test_project_import_with_new_layout(storage_save_patch, service_tempdir_patch):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-02"
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
     repo_mock = mock.Mock(name="GitRepository()")
-    repo_mock.rev_parse.return_value = (
-        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    )
+    repo_mock.rev_parse.return_value = "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
 
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
     git_mock.clone.side_effect = clone_project
 
-    project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
-    )
+    project = models.Project.objects.create(name="test-project-01", url="https://git.example.com/repo.git")
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)
@@ -143,22 +133,15 @@ def test_project_import_with_new_layout(
 
 
 @pytest.mark.django_db
-def test_project_import_rulebook_directory_missing(
-    storage_save_patch, service_tempdir_patch
-):
+def test_project_import_rulebook_directory_missing(storage_save_patch, service_tempdir_patch):
     repo_mock = mock.Mock(name="GitRepository()")
-    repo_mock.rev_parse.return_value = (
-        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
-    )
+    repo_mock.rev_parse.return_value = "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
     git_mock.clone.return_value = repo_mock
 
-    project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
-    )
+    project = models.Project.objects.create(name="test-project-01", url="https://git.example.com/repo.git")
     message_expected = (
-        "The 'extensions/eda/rulebooks' or 'rulebooks'"
-        + " directory doesn't exist within the project root."
+        "The 'extensions/eda/rulebooks' or 'rulebooks'" + " directory doesn't exist within the project root."
     )
 
     service = ProjectImportService(git_cls=git_mock)
@@ -185,9 +168,7 @@ def _setup_project_sync():
     git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
     git_mock.clone.side_effect = clone_project
 
-    project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
-    )
+    project = models.Project.objects.create(name="test-project-01", url="https://git.example.com/repo.git")
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)

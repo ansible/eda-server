@@ -99,9 +99,7 @@ async def test_ansible_rulebook_consumer(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     activation_instance_with_extra_var = await _prepare_db_data()
-    activation_instance_without_extra_var = (
-        await _prepare_acitvation_instance_without_extra_var()
-    )
+    activation_instance_without_extra_var = await _prepare_acitvation_instance_without_extra_var()
 
     payload = {
         "type": "Worker",
@@ -137,9 +135,7 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_validation_errors():
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
+    communicator = WebsocketCommunicator(AnsibleRulebookConsumer.as_asgi(), "ws/")
     connected, _ = await communicator.connect(timeout=3)
     assert connected
 
@@ -337,12 +333,8 @@ async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
     await ws_communicator.send_json_to(payload)
     await ws_communicator.wait()
 
-    updated_activation_instance = await get_activation_instance(
-        activation_instance_id
-    )
-    assert (
-        updated_activation_instance.updated_at.strftime(DATETIME_FORMAT)
-    ) == payload["reported_at"]
+    updated_activation_instance = await get_activation_instance(activation_instance_id)
+    assert (updated_activation_instance.updated_at.strftime(DATETIME_FORMAT)) == payload["reported_at"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -567,9 +559,7 @@ def _prepare_job_instance():
 
 @pytest_asyncio.fixture(scope="function")
 async def ws_communicator() -> Generator[WebsocketCommunicator, None, None]:
-    communicator = WebsocketCommunicator(
-        AnsibleRulebookConsumer.as_asgi(), "ws/"
-    )
+    communicator = WebsocketCommunicator(AnsibleRulebookConsumer.as_asgi(), "ws/")
     connected, _ = await communicator.connect()
     assert connected
 

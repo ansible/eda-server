@@ -7,16 +7,10 @@ import aap_eda.core.enums
 
 def update_activation_status(apps, schema_editor):
     Activation = apps.get_model("core", "Activation")  # noqa: N806
-    ActivationInstance = apps.get_model(  # noqa: N806
-        "core", "ActivationInstance"
-    )
+    ActivationInstance = apps.get_model("core", "ActivationInstance")  # noqa: N806
 
     for activation in Activation.objects.all():
-        instance = (
-            ActivationInstance.objects.filter(activation_id=activation.id)
-            .order_by("-id")
-            .first()
-        )
+        instance = ActivationInstance.objects.filter(activation_id=activation.id).order_by("-id").first()
         if instance:
             activation.status = instance.status
             activation.save(update_fields=["status"])
@@ -99,7 +93,5 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.enums.ActivationStatus["PENDING"],
             ),
         ),
-        migrations.RunPython(
-            update_activation_status, backward_activation_status
-        ),
+        migrations.RunPython(update_activation_status, backward_activation_status),
     ]

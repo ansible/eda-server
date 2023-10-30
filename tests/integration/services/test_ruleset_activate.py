@@ -20,10 +20,7 @@ from django.conf import settings
 from podman.errors import ImageNotFound
 
 from aap_eda.core import models
-from aap_eda.services.ruleset.activate_rulesets import (
-    ACTIVATION_PATH,
-    ActivateRulesets,
-)
+from aap_eda.services.ruleset.activate_rulesets import ACTIVATION_PATH, ActivateRulesets
 
 TEST_ACTIVATION = {
     "name": "test-activation",
@@ -106,9 +103,7 @@ def init_data(get_activation_stats):
         rulesets=TEST_RULESETS,
         description=TEST_RULEBOOK["description"],
     )
-    extra_var = models.ExtraVar.objects.create(
-        name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR
-    )
+    extra_var = models.ExtraVar.objects.create(name="test-extra-var.yml", extra_var=TEST_EXTRA_VAR)
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -149,9 +144,7 @@ def get_activation_stats():
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
 @mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "podman"})
-def test_rulesets_activate_with_podman(
-    my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats
-):
+def test_rulesets_activate_with_podman(my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats):
     pod_mock = mock.Mock()
     my_mock.return_value = pod_mock
     log_mock = mock.Mock()
@@ -170,13 +163,9 @@ def test_rulesets_activate_with_podman(
     assert models.ActivationInstance.objects.count() == 1
     instance = models.ActivationInstance.objects.first()
     activation = models.Activation.objects.get(pk=instance.activation.id)
-    assert _get_rules_count(activation.ruleset_stats) == _get_rules_count(
-        get_activation_stats
-    )
+    assert _get_rules_count(activation.ruleset_stats) == _get_rules_count(get_activation_stats)
 
-    my_mock.assert_called_once_with(
-        init_data.decision_environment, "unix://socket_url", log_mock
-    )
+    my_mock.assert_called_once_with(init_data.decision_environment, "unix://socket_url", log_mock)
     pod_mock.run_worker_mode.assert_called_once_with(
         ws_url=f"{settings.WEBSOCKET_BASE_URL}{ACTIVATION_PATH}",
         ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
@@ -200,9 +189,7 @@ def _get_rules_count(ruleset_stats):
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationDbLogger")
 @mock.patch("aap_eda.services.ruleset.activate_rulesets.ActivationPodman")
 @mock.patch.dict(os.environ, {"DEPLOYMENT_TYPE": "podman"})
-def test_rulesets_activate_with_exception(
-    my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats
-):
+def test_rulesets_activate_with_exception(my_mock: mock.Mock, logger_mock: mock.Mock, init_data, get_activation_stats):
     def image_not_found():
         raise ImageNotFound()
 

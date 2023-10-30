@@ -76,19 +76,13 @@ def _get_secret_key() -> str:
     secret_key = settings.get("SECRET_KEY")
     secret_key_file = settings.get("SECRET_KEY_FILE")
     if secret_key and secret_key_file:
-        raise ImproperlyConfigured(
-            'Settings parameters "SECRET_KEY" and "SECRET_KEY_FILE"'
-            " are mutually exclusive."
-        )
+        raise ImproperlyConfigured('Settings parameters "SECRET_KEY" and "SECRET_KEY_FILE"' " are mutually exclusive.")
     if secret_key:
         return secret_key
     if secret_key_file:
         with open(secret_key_file) as fp:
             return fp.read().strip()
-    raise ImproperlyConfigured(
-        'Either "SECRET_KEY" or "SECRET_KEY_FILE" settings'
-        " parameters must be set."
-    )
+    raise ImproperlyConfigured('Either "SECRET_KEY" or "SECRET_KEY_FILE" settings' " parameters must be set.")
 
 
 SECRET_KEY = _get_secret_key()
@@ -96,19 +90,13 @@ SECRET_KEY = _get_secret_key()
 DEBUG = settings.get("DEBUG", False)
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
-ALLOWED_HOSTS = (
-    ALLOWED_HOSTS.split(",")
-    if isinstance(ALLOWED_HOSTS, str)
-    else ALLOWED_HOSTS
-)
+ALLOWED_HOSTS = ALLOWED_HOSTS.split(",") if isinstance(ALLOWED_HOSTS, str) else ALLOWED_HOSTS
 # A list or a comma separated string of allowed origins for CSRF protection
 # in the form of [scheme://]host[:port]. Supports wildcards.
 # More info: https://docs.djangoproject.com/en/4.2/ref/settings/#csrf-trusted-origins  # noqa: E501
 CSRF_TRUSTED_ORIGINS = settings.get("CSRF_TRUSTED_ORIGINS", [])
 CSRF_TRUSTED_ORIGINS = (
-    CSRF_TRUSTED_ORIGINS.split(",")
-    if isinstance(CSRF_TRUSTED_ORIGINS, str)
-    else CSRF_TRUSTED_ORIGINS
+    CSRF_TRUSTED_ORIGINS.split(",") if isinstance(CSRF_TRUSTED_ORIGINS, str) else CSRF_TRUSTED_ORIGINS
 )
 
 # Session settings
@@ -299,9 +287,7 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/v[0-9]",
     "SCHEMA_PATH_PREFIX_TRIM": True,
     "SERVERS": [{"url": f"/{API_PREFIX}/v1"}],
-    "PREPROCESSING_HOOKS": [
-        "aap_eda.api.openapi.preprocess_filter_api_routes"
-    ],
+    "PREPROCESSING_HOOKS": ["aap_eda.api.openapi.preprocess_filter_api_routes"],
 }
 
 # ---------------------------------------------------------
@@ -352,9 +338,7 @@ LOGGING = {
 # ---------------------------------------------------------
 
 EDA_CONTROLLER_URL = settings.get("CONTROLLER_URL", "default_controller_url")
-EDA_CONTROLLER_TOKEN = settings.get(
-    "CONTROLLER_TOKEN", "default_controller_token"
-)
+EDA_CONTROLLER_TOKEN = settings.get("CONTROLLER_TOKEN", "default_controller_token")
 EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 
 # ---------------------------------------------------------
@@ -374,21 +358,11 @@ PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
 # RULEBOOK LIVENESS SETTINGS
 # ---------------------------------------------------------
 
-RULEBOOK_LIVENESS_CHECK_SECONDS = int(
-    settings.get("RULEBOOK_LIVENESS_CHECK_SECONDS", 300)
-)
-RULEBOOK_LIVENESS_TIMEOUT_SECONDS = int(
-    settings.get("RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610)
-)
-ACTIVATION_RESTART_SECONDS_ON_COMPLETE = int(
-    settings.get("ACTIVATION_RESTART_SECONDS_ON_COMPLETE", 0)
-)
-ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(
-    settings.get("ACTIVATION_RESTART_SECONDS_ON_FAILURE", 60)
-)
-ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
-    settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5)
-)
+RULEBOOK_LIVENESS_CHECK_SECONDS = int(settings.get("RULEBOOK_LIVENESS_CHECK_SECONDS", 300))
+RULEBOOK_LIVENESS_TIMEOUT_SECONDS = int(settings.get("RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610))
+ACTIVATION_RESTART_SECONDS_ON_COMPLETE = int(settings.get("ACTIVATION_RESTART_SECONDS_ON_COMPLETE", 0))
+ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(settings.get("ACTIVATION_RESTART_SECONDS_ON_FAILURE", 60))
+ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5))
 
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL

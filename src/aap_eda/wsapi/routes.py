@@ -4,9 +4,7 @@ from django.urls import path
 
 from . import consumers
 
-wsapi_router = URLRouter(
-    [path("ansible-rulebook", consumers.AnsibleRulebookConsumer.as_asgi())]
-)
+wsapi_router = URLRouter([path("ansible-rulebook", consumers.AnsibleRulebookConsumer.as_asgi())])
 
 router = URLRouter(
     [
