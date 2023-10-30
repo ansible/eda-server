@@ -88,6 +88,7 @@ class Engine(ContainerEngine):
             self.client = client
         else:
             self.client = get_k8s_client()
+
         self._set_namespace()
         self.secret_name = f"activation-secret-{activation_id}"
 
@@ -116,7 +117,7 @@ class Engine(ContainerEngine):
                 for port in self._get_ports(request.ports):
                     self._create_service(port)
             LOGGER.info(f"Job {self.job_name} is running")
-            log_handler.write(f"Job {self.job_name} is running")
+            log_handler.write(f"Job {self.job_name} is running", True)
             return self.job_name
         except (
             ContainerStartError,
@@ -136,7 +137,6 @@ class Engine(ContainerEngine):
 
     # note(alex): the signature of this method is different from the interface
     def get_status(self, container_id: str) -> ActivationStatus:
-        # status = ActivationStatus.FAILED
         pod = self._get_job_pod(container_id)
 
         container_status = pod.status.container_statuses[0]
@@ -163,7 +163,6 @@ class Engine(ContainerEngine):
 
     def cleanup(self, container_id: str, log_handler: LogHandler):
         self.job_name = container_id
-        # TODO: update logs
         self._delete_secret(log_handler)
         self._delete_services(log_handler)
         self._delete_job(log_handler)
@@ -435,26 +434,27 @@ class Engine(ContainerEngine):
                 if pod_phase == "Pending":
                     statuses = event["object"].status.container_statuses
 
-                    if statuses and statuses[0]:
-                        if statuses[0].state.waiting:
-                            message = statuses[0].state.waiting.message
-                            reason = statuses[0].state.waiting.reason
+                    if statuses and statuses[0] and statuses[0].state.waiting:
+                        message = statuses[0].state.waiting.message
+                        reason = statuses[0].state.waiting.reason
 
-                            if reason in POD_FAILED_REASONS:
-                                error_msg = f"Failed to pull image: {message}"
-                                LOGGER.error(error_msg)
-                                log_handler.write(error_msg, True)
+                        if reason in POD_FAILED_REASONS:
+                            error_msg = f"Failed to pull image: {message}"
+                            LOGGER.error(error_msg)
+                            log_handler.write(error_msg, True)
 
-                                if reason == INVALID_IMAGE_NAME:
-                                    raise ActivationImageNotFound(message)
-                                else:
-                                    # What's the difference between ActivationImagePullError
-                                    # and ContainerImagePullError? which one should be used?
-                                    raise ActivationImagePullError(message)
+                            if reason == INVALID_IMAGE_NAME:
+                                raise ActivationImageNotFound(message)
+                            else:
+                                raise ActivationImagePullError(message)
 
                 if pod_phase == "Failed" or pod_phase == "Succeeded":
                     statuses = event["object"].status.container_statuses
-                    if statuses and statuses[0]:
+                    if (
+                        statuses
+                        and statuses[0]
+                        and statuses[0].state.terminated
+                    ):
                         exit_code = statuses[0].state.terminated.exit_code
                         reason = statuses[0].state.terminated.reason
                         if exit_code not in SUCCESSFUL_EXIT_CODES:
@@ -464,18 +464,22 @@ class Engine(ContainerEngine):
                             )
                             LOGGER.error(error_msg)
                             log_handler.write(error_msg, True)
+                            raise ContainerStartError(error_msg)
                     break
 
                 if pod_phase == "Running":
                     break
+
+                if pod_phase == "Unknown":
+                    error_msg = f"Pod {pod_name} has {pod_phase} status."
+                    LOGGER.error(error_msg)
+                    raise ContainerStartError(error_msg)
         except ApiException as e:
             raise ContainerStartError(
                 f"Pod {self.pod_name} failed with error {e}"
             )
         finally:
             watcher.stop()
-
-            LOGGER.info(f"Pod {self.pod_name} has started")
 
     def _set_namespace(self):
         namespace_file = (
@@ -559,9 +563,9 @@ class Engine(ContainerEngine):
                 )
             else:
                 message = (
-                    f"Failed to delete secret {self.secret_name}: ",
-                    f"status: {result.status}",
-                    f"reason: {result.reason}",
+                    f"Failed to delete secret {self.secret_name}: "
+                    f"status: {result.status}"
+                    f"reason: {result.reason}"
                 )
                 LOGGER.error(message)
                 log_handler.write(message, True)
