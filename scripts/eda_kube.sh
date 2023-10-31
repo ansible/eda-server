@@ -75,6 +75,21 @@ build-deployment() {
   kustomize build "${DEPLOY_DIR}" -o "${DEPLOY_DIR}/temp"
 }
 
+build-deployment-api() {
+  local _api_image="aap-eda:${1}"
+  local _temp_dir="${DEPLOY_DIR}"/temp
+
+  log-info "Using Deployment Directory: ${DEPLOY_DIR}/temp"
+
+  cd "${DEPLOY_DIR}"/eda-api
+  log-debug "kustomize edit set image aap-eda=${_api_image}"
+  kustomize edit set image aap-eda="${_api_image}"
+
+  cd "${PROJECT_DIR}"
+  log-debug "kustomize build ${DEPLOY_DIR} -o ${DEPLOY_DIR}/temp"
+  kustomize build "${DEPLOY_DIR}" -o "${DEPLOY_DIR}/temp"
+}
+
 build-eda-api-image() {
   local _image="aap-eda:${1}"
 
@@ -106,6 +121,11 @@ build-all() {
   build-eda-api-image "${1}"
   build-eda-ui-image "${1}"
   build-deployment "${1}"
+}
+
+build-api() {
+  build-eda-api-image "${1}"
+  build-deployment-api "${1}"
 }
 
 remove-image() {
@@ -178,6 +198,14 @@ clean-deployment() {
   remove-deployment-tempdir
 }
 
+clean-api-deployment() {
+  log-info "cleaning minikube api deployment..."
+  if kubectl get ns -o jsonpath='{..name}'| grep "${NAMESPACE}" &> /dev/null; then
+    log-debug "kubectl delete pods -l 'comp in (worker, api, scheduler)' -n ${NAMESPACE}"
+    kubectl delete pods -l 'comp in (worker, api, scheduler)' -n "${NAMESPACE}"
+  fi
+}
+
 port-forward() {
   local _svc_name=${1}
   local _local_port=${2}
@@ -225,7 +253,9 @@ get-eda-logs() {
 #
 case ${CMD} in
   "build") build-all "${VERSION}" ;;
+  "build-api") build-api "${VERSION}" ;;
   "clean") clean-deployment "${VERSION}";;
+  "clean-api") clean-api-deployment "${VERSION}";;
   "deploy") deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api 8000 ;;
   "port-forward-ui") port-forward-ui 8080 ;;
