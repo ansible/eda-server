@@ -144,9 +144,8 @@ class GitRepository:
 
 class GitExecutor:
     DEFAULT_TIMEOUT: Final = 30
-    ENVIRON: dict = {
-        "GIT_TERMINAL_PROMPT": "0",
-    }
+    ENVIRON: dict = os.environ.copy()
+    ENVIRON["GIT_TERMINAL_PROMPT"] = "0"
 
     def __call__(
         self,
