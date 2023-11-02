@@ -157,7 +157,7 @@ class GitRepository:
             if secret:
                 msg = str(e).replace(secret, "****")
             logger.warning("Git clone failed: %s", msg)
-            raise GitError(msg) from e
+            raise GitError(msg) from None
         return cls(path, _executor=_executor)
 
     def _execute_cmd(self, cmd: Iterable[str]):
@@ -200,9 +200,11 @@ class GitExecutor:
             raise GitError(str(e)) from e
         except subprocess.CalledProcessError as e:
             if "Authentication failed" in e.stderr:
-                raise GitAuthenticationError("Authentication failed")
+                raise GitAuthenticationError("Authentication failed") from None
             if "could not read Username" in e.stderr:
-                raise GitAuthenticationError("Credentials not provided")
+                raise GitAuthenticationError(
+                    "Credentials not provided"
+                ) from None
             # generic error
             usr_msg = f"Command git failed with return code {e.returncode}. "
             if e.stderr:
