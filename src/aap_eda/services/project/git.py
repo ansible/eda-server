@@ -32,6 +32,12 @@ class GitError(Exception):
     pass
 
 
+class GitAuthenticationError(Exception):
+    """Git Authentication error."""
+
+    pass
+
+
 class ExecutableNotFoundError(Exception):
     """Executable Not Found error."""
 
@@ -47,7 +53,10 @@ class GitRepository:
     """Represents a git repository."""
 
     def __init__(
-        self, root: StrPath, *, _executor: Optional[GitExecutor] = None
+        self,
+        root: StrPath,
+        *,
+        _executor: Optional[GitExecutor] = None,
     ):
         """
         Create an instance for existing repository.
@@ -116,17 +125,22 @@ class GitRepository:
         if _executor is None:
             _executor = GitExecutor()
 
+        final_url = url
+        secret = ""
         if credential:
-            passwd = credential.secret.get_secret_value()
-            _executor.ENVIRON["GIT_PASSWORD"] = passwd
+            secret = credential.secret.get_secret_value()
+            # TODO(alex): encapsulate url composition
             index = 0
             if url.startswith("https://"):
                 index = 8
             elif url.startswith("http://"):
                 index = 7
             if index > 0:
-                user = credential.username
-                url = f"{url[:index]}{user}:${{GIT_PASSWORD}}@{url[index:]}"
+                # user can be optional
+                user_part = (
+                    f"{credential.username}:" if credential.username else ""
+                )
+                final_url = f"{url[:index]}{user_part}{secret}@{url[index:]}"
 
         if not verify_ssl:
             _executor.ENVIRON["GIT_SSL_NO_VERIFY"] = "true"
@@ -134,9 +148,17 @@ class GitRepository:
         cmd = ["clone", "--quiet"]
         if depth is not None:
             cmd.extend(["--depth", str(depth)])
-        cmd.extend([url, os.fspath(path)])
-        _executor(cmd)
-        return GitRepository(path, _executor=_executor)
+        cmd.extend([final_url, os.fspath(path)])
+        logger.info("Cloning repository: %s", url)
+        try:
+            _executor(cmd)
+        except GitError as e:
+            msg = str(e)
+            if secret:
+                msg = msg.replace(secret, "****", 1)
+            logger.warning("Git clone failed: %s", msg)
+            raise GitError(msg) from None
+        return cls(path, _executor=_executor)
 
     def _execute_cmd(self, cmd: Iterable[str]):
         return self._executor(cmd, cwd=self.root)
@@ -150,10 +172,10 @@ class GitExecutor:
 
     def __call__(
         self,
-        args: Union[str, Iterable[str]],
+        args: Iterable[str],
         timeout: Optional[float] = None,
         cwd: Optional[StrPath] = None,
-        stdout: Optional[IO] = None,
+        stdout: Union[IO, int, None] = None,
     ):
         if stdout is None:
             stdout = subprocess.PIPE
@@ -162,12 +184,9 @@ class GitExecutor:
         if timeout is None:
             timeout = self.DEFAULT_TIMEOUT
 
-        if isinstance(args, Iterable):
-            args = " ".join(args)
         try:
             return subprocess.run(
-                f"{GIT_COMMAND} {args}",
-                shell=True,
+                [GIT_COMMAND, *args],
                 check=True,
                 encoding="utf-8",
                 env=self.ENVIRON,
@@ -180,15 +199,14 @@ class GitExecutor:
             logger.warning("%s", str(e))
             raise GitError(str(e)) from e
         except subprocess.CalledProcessError as e:
-            message = (
-                "Command returned non-zero exit status %s:"
-                "\n\tcommand: %s"
-                "\n\tstderr: %s"
-            )
-            logger.warning(message, e.returncode, e.cmd, e.stderr)
             if "Authentication failed" in e.stderr:
-                raise GitError("Authentication failed")
+                raise GitAuthenticationError("Authentication failed") from None
             if "could not read Username" in e.stderr:
-                raise GitError("Credentials not provided")
-            usr_msg = f"{e} Error: {e.stderr}"
-            raise GitError(usr_msg) from e
+                raise GitAuthenticationError(
+                    "Credentials not provided"
+                ) from None
+            # generic error
+            usr_msg = f"Command git failed with return code {e.returncode}."
+            if e.stderr:
+                usr_msg += f" Error: {e.stderr}"
+            raise GitError(usr_msg) from None
