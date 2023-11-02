@@ -16,8 +16,8 @@ import base64
 import json
 import logging
 import os
-from datetime import datetime
 
+from dateutil import parser
 from django.conf import settings
 from podman import PodmanClient
 from podman.domain.images import Image
@@ -25,6 +25,10 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.activation.exceptions import (
+    ActivationImageNotFound,
+    ActivationImagePullError,
+)
 
 from . import exceptions
 from .common import ContainerEngine, ContainerRequest, LogHandler
@@ -34,19 +38,23 @@ LOGGER = logging.getLogger(__name__)
 
 def get_podman_client():
     """Podman client factory."""
-    podman_url = settings.PODMAN_SOCKET_URL
-    if podman_url:
-        return PodmanClient(base_url=podman_url)
+    try:
+        podman_url = settings.PODMAN_SOCKET_URL
+        if podman_url:
+            return PodmanClient(base_url=podman_url)
 
-    if os.getuid() == 0:
-        podman_url = "unix:///run/podman/podman.sock"
-    else:
-        xdg_runtime_dir = os.getenv(
-            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-        )
-        podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
-    LOGGER.info(f"Using podman socket: {podman_url}")
-    return PodmanClient(base_url=podman_url)
+        if os.getuid() == 0:
+            podman_url = "unix:///run/podman/podman.sock"
+        else:
+            xdg_runtime_dir = os.getenv(
+                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
+            )
+            podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
+        LOGGER.info(f"Using podman socket: {podman_url}")
+        return PodmanClient(base_url=podman_url)
+    except ValueError as e:
+        LOGGER.error(f"Failed to initialize podman client: f{e}")
+        raise exceptions.ContainerEngineInitError(str(e))
 
 
 class Engine(ContainerEngine):
@@ -55,24 +63,38 @@ class Engine(ContainerEngine):
         _activation_id: str,
         client=None,
     ) -> None:
-        if client:
-            self.client = client
-        else:
-            self.client = get_podman_client()
-        LOGGER.debug(self.client.version())
+        try:
+            if client:
+                self.client = client
+            else:
+                self.client = get_podman_client()
+            LOGGER.debug(self.client.version())
+        except APIError as e:
+            LOGGER.error(f"Failed to initialize podman engine: f{e}")
+            raise exceptions.ContainerEngineInitError(str(e))
 
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
-        if self.client.containers.exists(container_id):
-            container = self.client.containers.get(container_id)
-            container.stop(ignore=True)
-            self.update_logs(container_id, log_handler)
-            try:
-                self._cleanup(container_id, log_handler)
-            except APIError as e:
-                LOGGER.exception(f"Failed to cleanup container {container_id}")
-                raise exceptions.ContainerCleanupError(
-                    f"Failed to cleanup container {container_id}"
-                ) from e
+        try:
+            if self.client.containers.exists(container_id):
+                container = self.client.containers.get(container_id)
+                try:
+                    container.stop(ignore=True)
+                    LOGGER.info(f"Container {container_id} is cleaned up.")
+                    self.update_logs(container_id, log_handler)
+                    self._cleanup(container_id, log_handler)
+                    log_handler.write(
+                        f"Container {container_id} is cleaned up.", True
+                    )
+                except NotFound:
+                    LOGGER.info(f"Container {container_id} not found.")
+                    log_handler.write(
+                        f"Container {container_id} not found.", True
+                    )
+        except APIError as e:
+            LOGGER.exception(f"Failed to cleanup container {container_id}")
+            raise exceptions.ContainerCleanupError(
+                f"Failed to cleanup container {container_id}"
+            ) from e
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         if not request.image_url:
@@ -112,6 +134,7 @@ class Engine(ContainerEngine):
                 f"pod_args: {pod_args}"
             )
 
+            log_handler.write(f"Container {container.id} is started.", True)
             return str(container.id)
         except (
             ContainerError,
@@ -142,35 +165,29 @@ class Engine(ContainerEngine):
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
+            since = None
             if log_handler.get_log_read_at():
                 since = int(log_handler.get_log_read_at().timestamp()) + 1
-            else:
-                start_dt = "2000-01-01T00:00:00-00:00"
-                since = (
-                    int(
-                        datetime.strptime(
-                            start_dt, "%Y-%m-%dT%H:%M:%S%z"
-                        ).timestamp()
-                    )
-                    + 1
-                )
 
             if self.client.containers.exists(container_id):
                 # ["running", "stopped", "exited", "unknown"]:
                 container = self.client.containers.get(container_id)
                 if container.status in ["running", "exited", "stopped"]:
-                    log_args = {"timestamps": True, "since": since}
-                    dt = None
+                    log_args = (
+                        {"timestamps": True, "since": since}
+                        if since
+                        else {"timestamps": True}
+                    )
+                    timestamp = None
                     for log in container.logs(**log_args):
-                        log = log.decode("utf-8")
-                        dt = log.split()[0]
+                        log = log.decode("utf-8").strip()
+                        timestamp, log = log.split(" ", 1)
                         log_handler.write(log)
 
-                    if dt:
-                        since = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S%z")
-
+                    if timestamp:
+                        dt = parser.parse(timestamp)
                         log_handler.flush()
-                        log_handler.set_log_read_at(since)
+                        log_handler.set_log_read_at(dt)
             else:
                 LOGGER.warning(f"Container {container_id} not found.")
                 log_handler.write(f"Container {container_id} not found.", True)
@@ -183,13 +200,17 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerUpdateLogsError(msg) from e
 
     def _cleanup(self, container_id: str, _log_handler: LogHandler):
-        if self.client.containers.exists(container_id):
-            container = self.client.containers.get(container_id)
-            try:
-                container.remove(force=True, v=True)
-                LOGGER.info(f"Container {container_id} is cleaned up.")
-            except NotFound:
-                LOGGER.info(f"Container {container_id} not found.")
+        try:
+            if self.client.containers.exists(container_id):
+                container = self.client.containers.get(container_id)
+                try:
+                    container.remove(force=True, v=True)
+                    LOGGER.info(f"Container {container_id} is cleaned up.")
+                except NotFound:
+                    LOGGER.info(f"Container {container_id} not found.")
+        except APIError as e:
+            LOGGER.error(f"Failed to cleanup {container_id}: {e}")
+            raise exceptions.ContainerCleanupError(str(e))
 
     def _get_ports(self, found_ports: dict) -> dict:
         ports = {}
@@ -214,9 +235,9 @@ class Engine(ContainerEngine):
             LOGGER.debug(
                 f"{credential.username} login succeeded to {registry}"
             )
-        except APIError:
-            LOGGER.exception("Login failed")
-            raise
+        except APIError as e:
+            LOGGER.exception("Login failed: f{e}")
+            raise exceptions.ContainerStartError(str(e))
 
     def _write_auth_json(self, request) -> None:
         if not self.auth_file:
@@ -278,12 +299,18 @@ class Engine(ContainerEngine):
                     "or the credentials may be incorrect."
                 )
                 LOGGER.error(msg)
-                raise exceptions.ContainerImagePullError(msg)
+                log_handler.write(msg, True)
+                raise ActivationImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound:
-            LOGGER.exception(f"Image {request.image_url} not found")
-            raise
+            msg = f"Image {request.image_url} not found"
+            LOGGER.exception(msg)
+            log_handler.write(msg, True)
+            raise ActivationImageNotFound(msg)
+        except APIError as e:
+            LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
+            raise exceptions.ContainerStartError(str(e))
 
     def _load_pod_args(self, request) -> dict:
         pod_args = {"name": request.name}
