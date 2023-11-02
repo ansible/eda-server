@@ -158,7 +158,6 @@ class ActivationManager:
     @run_with_lock
     def _check_start_prerequirements(self) -> None:
         """Check if the activation can be started."""
-
         disallowed_statuses = [
             ActivationStatus.STARTING,
             ActivationStatus.DELETING,
@@ -176,7 +175,7 @@ class ActivationManager:
         if self.db_instance.status in disallowed_statuses:
             msg = (
                 f"Activation {self.db_instance.id} is in "
-                "f{self.db_instance.status} state, can not be started."
+                f"{self.db_instance.status} state, can not be started."
             )
             LOGGER.warning(msg)
             raise exceptions.ActivationStartError(msg)
@@ -541,7 +540,8 @@ class ActivationManager:
                 )
                 raise exceptions.ActivationMonitorError(msg) from exc
             try:
-                # TODO: schedule activation based on ACTIVATION_RESTART_SECONDS_ON_FAILURE
+                # TODO: schedule activation based on
+                # ACTIVATION_RESTART_SECONDS_ON_FAILURE
                 self.start(is_restart=True)
             except exceptions.ActivationStartError as exc:
                 msg = (
@@ -580,7 +580,7 @@ class ActivationManager:
     def start(self, is_restart: bool = False):
         """Start an activation.
 
-        Called by the user or by the monitor when the restart policy is applied.
+        Called by the user or by the monitor when the restart policy is applied
         Ensure that the activation meets all the requirements to start,
         otherwise raise ActivationStartError.
         Starts the activation in an idepotent way.
