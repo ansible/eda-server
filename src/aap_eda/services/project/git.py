@@ -206,7 +206,7 @@ class GitExecutor:
                     "Credentials not provided"
                 ) from None
             # generic error
-            usr_msg = f"Command git failed with return code {e.returncode}. "
+            usr_msg = f"Command git failed with return code {e.returncode}."
             if e.stderr:
-                usr_msg += f"Error: {e.stderr}"
+                usr_msg += f" Error: {e.stderr}"
             raise GitError(usr_msg) from None
