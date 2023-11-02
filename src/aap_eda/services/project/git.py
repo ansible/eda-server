@@ -153,7 +153,9 @@ class GitRepository:
         try:
             _executor(cmd)
         except GitError as e:
-            msg = str(e).replace(secret, "****")
+            msg = str(e)
+            if secret:
+                msg = str(e).replace(secret, "****")
             logger.warning("Git clone failed: %s", msg)
             raise GitError(msg) from e
         return cls(path, _executor=_executor)
@@ -205,4 +207,4 @@ class GitExecutor:
             usr_msg = f"Command git failed with return code {e.returncode}. "
             if e.stderr:
                 usr_msg += f"Error: {e.stderr}"
-            raise GitError(usr_msg) from e
+            raise GitError(usr_msg) from None
