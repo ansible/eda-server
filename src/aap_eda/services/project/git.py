@@ -155,7 +155,7 @@ class GitRepository:
         except GitError as e:
             msg = str(e)
             if secret:
-                msg = str(e).replace(secret, "****")
+                msg = msg.replace(secret, "****")
             logger.warning("Git clone failed: %s", msg)
             raise GitError(msg) from None
         return cls(path, _executor=_executor)
