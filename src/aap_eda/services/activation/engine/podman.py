@@ -87,6 +87,9 @@ class Engine(ContainerEngine):
                     )
                 except NotFound:
                     LOGGER.info(f"Container {container_id} not found.")
+                    log_handler.write(
+                        f"Container {container_id} not found.", True
+                    )
         except APIError as e:
             LOGGER.exception(f"Failed to cleanup container {container_id}")
             raise exceptions.ContainerCleanupError(
@@ -296,12 +299,14 @@ class Engine(ContainerEngine):
                     "or the credentials may be incorrect."
                 )
                 LOGGER.error(msg)
+                log_handler.write(msg, True)
                 raise ActivationImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound:
             msg = f"Image {request.image_url} not found"
             LOGGER.exception(msg)
+            log_handler.write(msg, True)
             raise ActivationImageNotFound(msg)
         except APIError as e:
             LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
