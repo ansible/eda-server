@@ -202,10 +202,7 @@ class GitExecutor:
             if "could not read Username" in e.stderr:
                 raise GitAuthenticationError("Credentials not provided")
             # generic error
-            usr_msg = (
-                f"Command git failed with return code {e.returncode}. "
-                f"Cmd: {e.cmd} "
-            )
+            usr_msg = f"Command git failed with return code {e.returncode}. "
             if e.stderr:
                 usr_msg += f"Error: {e.stderr}"
             raise GitError(usr_msg) from e

@@ -70,7 +70,8 @@ def test_git_clone_leak_password(
         raise subprocess.CalledProcessError(
             128,
             cmd,
-            stderr="fatal: Unknown error",
+            stderr="fatal: Unable to access "
+            "'https://me:supersecret@git.example.com/repo.git'",
         )
 
     subprocess_run_mock.side_effect = raise_error
@@ -222,8 +223,7 @@ def test_git_executor_error(run_mock: mock.Mock):
 
     executor = GitExecutor()
     message = re.escape(
-        f"Command git failed with return code 128. "
-        f"""Cmd: ['{shutil.which("git")}', 'status'] """
+        "Command git failed with return code 128. "
         "Error: fatal: not a git repository",
     )
     with pytest.raises(GitError, match=message):
