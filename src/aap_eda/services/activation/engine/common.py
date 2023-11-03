@@ -29,7 +29,7 @@ class LogHandler(ABC):
         pass
 
     @abstractmethod
-    def get_log_read_at(self) -> datetime:
+    def get_log_read_at(self) -> tp.Optional[datetime]:
         pass
 
     @abstractmethod
