@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import os
+from datetime import timedelta
 
 from dateutil import parser
 from django.conf import settings
@@ -165,32 +166,36 @@ class Engine(ContainerEngine):
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
-            since = None
-            if log_handler.get_log_read_at():
-                since = int(log_handler.get_log_read_at().timestamp()) + 1
-
-            if self.client.containers.exists(container_id):
-                # ["running", "stopped", "exited", "unknown"]:
-                container = self.client.containers.get(container_id)
-                if container.status in ["running", "exited", "stopped"]:
-                    log_args = (
-                        {"timestamps": True, "since": since}
-                        if since
-                        else {"timestamps": True}
-                    )
-                    timestamp = None
-                    for log in container.logs(**log_args):
-                        log = log.decode("utf-8").strip()
-                        timestamp, log = log.split(" ", 1)
-                        log_handler.write(log)
-
-                    if timestamp:
-                        dt = parser.parse(timestamp)
-                        log_handler.flush()
-                        log_handler.set_log_read_at(dt)
-            else:
+            if not self.client.containers.exists(container_id):
                 LOGGER.warning(f"Container {container_id} not found.")
                 log_handler.write(f"Container {container_id} not found.", True)
+                return
+
+            since = None
+            log_read_at = log_handler.get_log_read_at()
+            if log_read_at:
+                since = log_read_at.replace(tzinfo=None) + timedelta(
+                    microseconds=1,
+                )
+
+            container = self.client.containers.get(container_id)
+            if container.status in ["running", "exited", "stopped"]:
+                log_args = {"timestamps": True}
+                if since:
+                    log_args["since"] = since
+                timestamp = None
+                for logline in container.logs(**log_args):
+                    log = logline.decode("utf-8").strip()
+                    log_parts = log.split(" ", 1)
+                    timestamp = log_parts[0]
+                    if len(log_parts) > 1:
+                        log_handler.write(log_parts[1])
+
+                if timestamp:
+                    dt = parser.parse(timestamp)
+                    log_handler.flush()
+                    log_handler.set_log_read_at(dt)
+
         except APIError as e:
             msg = (
                 "Failed to fetch container logs: "
