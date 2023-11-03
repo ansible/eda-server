@@ -14,7 +14,7 @@
 
 import logging
 from datetime import datetime
-from typing import Union
+from typing import Optional, Union
 
 from django.conf import settings
 from django.db import IntegrityError
@@ -76,7 +76,7 @@ class DBLogger(LogHandler):
 
         self.activation_instance_log_buffer = []
 
-    def get_log_read_at(self) -> datetime:
+    def get_log_read_at(self) -> Optional[datetime]:
         try:
             activation_instance = models.ActivationInstance.objects.get(
                 pk=self.activation_instance_id
