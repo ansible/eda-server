@@ -313,7 +313,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "simple": {
-            "format": "{asctime} {levelname:<8} {message}",
+            "format": "{asctime} {name} {levelname:<8} {message}",
             "style": "{",
         },
     },
