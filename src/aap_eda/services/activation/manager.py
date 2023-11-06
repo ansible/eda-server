@@ -206,6 +206,27 @@ class ActivationManager:
             msg = f"Activation {self.db_instance.id} has not pod id."
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
+    def _check_non_finalized_instances(self) -> None:
+        instances = models.ActivationInstance.objects.filter(
+            activation=self.db_instance,
+        )
+        for instance in instances:
+            if instance.status not in [
+                ActivationStatus.STOPPED,
+                ActivationStatus.COMPLETED,
+                ActivationStatus.FAILED,
+                ActivationStatus.ERROR,
+            ]:
+                msg = (
+                    f"Activation {self.db_instance.id} has an unexpected "
+                    f"instance {instance.id} in {instance.status} status. "
+                    "Cleaning up the instance."
+                )
+                LOGGER.warning(msg)
+                self._cleanup()
+                self._set_latest_instance_status(ActivationStatus.STOPPED)
+                self._set_activation_pod_id(pod_id=None)
+
     def _start_activation_instance(self):
         """Start a new activation instance.
 
@@ -214,65 +235,84 @@ class ActivationManager:
         """
         self._set_activation_status(ActivationStatus.STARTING)
 
-        # TODO(alex): long try block, we should be more specific
+        # Ensure status of previous instances
+        # For consistency, we should not have previous instances in
+        # wrong status. If we create a new instance, it means that
+        # the previous instance should be previously managed.
+        # This is a safety check.
+        self._check_non_finalized_instances()
+
+        # create a new instance
+        LOGGER.info(
+            "Creating a new activation instance for "
+            f"activation: {self.db_instance.id}",
+        )
+        self._create_activation_instance()
+
+        self.db_instance.refresh_from_db()
+        log_handler = DBLogger(self.latest_instance.id)
+
+        LOGGER.info(
+            "Starting container for activation instance: "
+            f"{self.latest_instance.id}",
+        )
+
+        # start the container
         try:
             container_request = self._build_container_request()
+            container_id = self.container_engine.start(
+                container_request,
+                log_handler,
+            )
         except ValidationError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: Container request is not valid."
                 f"Errors: {exc.errors()}"
             )
-            LOGGER.error(msg)
-            self._set_activation_status(ActivationStatus.ERROR, msg)
-            raise exceptions.ActivationStartError(msg) from None
-
-        try:
-            LOGGER.info(
-                "Creating a new activation instance for "
-                f"activation: {self.db_instance.id}",
+            self._error_instance(msg)
+            self._error_activation(msg)
+            raise exceptions.ActivationStartError(msg) from exc
+        except engine_exceptions.ContainerImagePullError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to start. "
+                f"Reason: {exc}"
             )
-            self._create_activation_instance()
-            self.db_instance.refresh_from_db()
-            self._set_latest_instance_status(ActivationStatus.STARTING)
-            log_handler = DBLogger(self.latest_instance.id)
-
-            LOGGER.info(
-                "Starting container for activation instance: "
-                f"{self.latest_instance.id}",
-            )
-
-            container_id = self.container_engine.start(
-                container_request,
-                log_handler,
-            )
-
-            # update status
-            self._set_activation_status(ActivationStatus.RUNNING)
-            self._set_latest_instance_status(ActivationStatus.RUNNING)
-            self._set_activation_pod_id(pod_id=container_id)
-            self._reset_failure_count()
-
-            # update logs
-            LOGGER.info(
-                "Container start successful, "
-                "updating logs for activation instance: "
-                f"{self.latest_instance.id}",
-            )
-            self.container_engine.update_logs(container_id, log_handler)
-
-        # note(alex): we may need to catch explicit exceptions
-        # ContainerImagePullError might need to be handled differently
-        # because it can be an error network and we might want to retry
-        # so, activation should be in FAILED state to be handled by the monitor
+            self._fail_instance(msg)
+            self._set_activation_status(ActivationStatus.FAILED, msg)
+            self._failed_policy()
+            raise exceptions.ActivationStartError(msg) from exc
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: {exc}"
             )
-            LOGGER.error(msg)
-            self._set_activation_status(ActivationStatus.ERROR, msg)
+            self._error_instance(msg)
+            self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
+
+        # update status
+        self._set_activation_status(ActivationStatus.RUNNING)
+        self._set_latest_instance_status(ActivationStatus.RUNNING)
+        self._set_activation_pod_id(pod_id=container_id)
+        self._reset_failure_count()
+
+        # update logs
+        LOGGER.info(
+            "Container start successful, "
+            "updating logs for activation instance: "
+            f"{self.latest_instance.id}",
+        )
+        try:
+            self.container_engine.update_logs(container_id, log_handler)
+        except engine_exceptions.ContainerUpdateLogsError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to update logs. "
+                f"Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            # Alex: Not sure if we want to change the status here.
+            # For now, we are not changing the status of the activation
 
     def _cleanup(self):
         """Cleanup the latest instance of the activation."""
@@ -590,6 +630,10 @@ class ActivationManager:
         self._set_latest_instance_status(ActivationStatus.STOPPED)
         self._set_activation_pod_id(pod_id=None)
 
+    def _error_activation(self, msg: str):
+        LOGGER.error(msg)
+        self._set_activation_status(ActivationStatus.ERROR, msg)
+
     def start(self, is_restart: bool = False):
         """Start an activation.
 
@@ -615,10 +659,13 @@ class ActivationManager:
         except (
             exceptions.ActivationInstanceNotFound,
             exceptions.ActivationInstancePodIdNotFound,
-        ) as exc:
-            raise exceptions.ActivationStartError(str(exc)) from None
+        ):
+            LOGGER.info(
+                f"Start operation activation id: {self.db_instance.id} "
+                "Expected activation instance or pod id but not found, "
+                "recreating.",
+            )
 
-        # TODO: ensure previous instance status before starting a new one
         self._start_activation_instance()
         if is_restart:
             self._increase_restart_count()
@@ -663,9 +710,8 @@ class ActivationManager:
                 f"Activation {self.db_instance.id} failed to cleanup. "
                 f"Reason: {exc}"
             )
-            LOGGER.error(msg)
             # Alex: Not sure if we want to change the status here.
-            self._set_activation_status(ActivationStatus.ERROR, msg)
+            self._error_activation(msg)
             raise exceptions.ActivationStopError(msg) from exc
         LOGGER.info(
             f"Activation manager activation id: {self.db_instance.id} "
@@ -844,10 +890,13 @@ class ActivationManager:
                 status=ActivationStatus.STARTING,
                 git_hash=self.db_instance.git_hash,
             )
-        except IntegrityError:
-            raise exceptions.ActivationRecordNotFound(
-                f"Activation {self.db_instance.name} has been deleted."
+        except IntegrityError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to create "
+                f"activation instance. Reason: {exc}"
             )
+            self._error_activation(msg)
+            raise exceptions.ActivationStartError(msg) from exc
 
     def _build_container_request(self) -> ContainerRequest:
         return ContainerRequest(
