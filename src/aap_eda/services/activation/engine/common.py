@@ -46,7 +46,7 @@ class AnsibleRulebookCmdLine(BaseModel):
     ws_ssl_verify: str
     heartbeat: int
     id: str
-    log_level: str  # -v or -vv or None
+    log_level: tp.Optional[str] = None  # -v or -vv or None
 
     def command(self) -> str:
         return "ansible-rulebook"
