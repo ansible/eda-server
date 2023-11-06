@@ -101,7 +101,9 @@ class Engine(ContainerEngine):
             self._set_auth_json_file()
             self._login(request)
             LOGGER.info(f"Image URL is {request.image_url}")
-            self._pull_image(request, log_handler)
+            # TODO: implement IfNotPresent policy
+            if request.pull_policy == "Always":
+                self._pull_image(request, log_handler)
             log_handler.write("Starting Container", True)
             command = request.cmdline.command_and_args()
             log_handler.write(f"Container args {command}", True)

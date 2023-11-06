@@ -367,6 +367,7 @@ PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
 PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
 PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
+DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
