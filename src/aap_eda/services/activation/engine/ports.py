@@ -1,3 +1,5 @@
+import contextlib
+
 import yaml
 
 
@@ -31,8 +33,8 @@ def find_ports(rulebook_text: str) -> list[tuple]:
             host = source_args.get("host")
             # Get port if it exists
             maybe_port = source_args.get("port")
-            # If port is an int we found a port to expose
-            if isinstance(maybe_port, int):
-                found_ports.append((host, maybe_port))
+            # port may be a string or an integer
+            with contextlib.suppress(ValueError):
+                found_ports.append((host, int(maybe_port)))
 
     return found_ports
