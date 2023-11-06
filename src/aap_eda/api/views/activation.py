@@ -292,9 +292,6 @@ class ActivationViewSet(
 
         restart_activation(activation_id=activation.id)
 
-        activation.restart_count += 1
-        activation.save(update_fields=["restart_count", "modified_at"])
-
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _check_deleting(self, activation):
