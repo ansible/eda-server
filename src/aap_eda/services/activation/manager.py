@@ -25,6 +25,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
+from pydantic import ValidationError
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
@@ -215,6 +216,18 @@ class ActivationManager:
 
         # TODO(alex): long try block, we should be more specific
         try:
+            container_request = self._build_container_request()
+        except ValidationError as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to start. "
+                f"Reason: Container request is not valid."
+                f"Errors: {exc.errors()}"
+            )
+            LOGGER.error(msg)
+            self._set_activation_status(ActivationStatus.ERROR, msg)
+            raise exceptions.ActivationStartError(msg) from None
+
+        try:
             LOGGER.info(
                 "Creating a new activation instance for "
                 f"activation: {self.db_instance.id}",
@@ -228,7 +241,7 @@ class ActivationManager:
                 "Starting container for activation instance: "
                 f"{self.latest_instance.id}",
             )
-            container_request = self._build_container_request()
+
             container_id = self.container_engine.start(
                 container_request,
                 log_handler,
