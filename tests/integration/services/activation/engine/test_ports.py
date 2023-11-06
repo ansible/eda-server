@@ -30,6 +30,20 @@ def test_ports():
     assert ports == [("0.0.0.0", 5555)]
 
 
+def test_ports_as_string():
+    rulebook = """
+---
+- name: Run a webhook service
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: "5555"
+"""
+    ports = find_ports(rulebook)
+
+    assert ports == [(None, 5555)]
+
+
 def test_ports_with_multi_sources():
     rulebook = """
 ---
