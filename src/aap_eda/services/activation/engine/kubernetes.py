@@ -63,7 +63,7 @@ class Client:
     network_api: k8sclient.NetworkingV1Api
 
 
-def get_k8s_client():
+def get_k8s_client() -> Client:
     """K8S client factory."""
     # Setup kubernetes api client
     try:
@@ -135,7 +135,6 @@ class Engine(ContainerEngine):
             self.cleanup(self.job_name, log_handler)
             raise
 
-    # note(alex): the signature of this method is different from the interface
     def get_status(self, container_id: str) -> ActivationStatus:
         pod = self._get_job_pod(container_id)
 
@@ -158,10 +157,10 @@ class Engine(ContainerEngine):
         LOGGER.info(f"Job {container_id} status: {status}")
         return status
 
-    def _get_ports(self, found_ports: dict) -> list:
+    def _get_ports(self, found_ports: list[tuple]) -> list[int]:
         return [port for _, port in found_ports]
 
-    def cleanup(self, container_id: str, log_handler: LogHandler):
+    def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         self.job_name = container_id
         self._delete_secret(log_handler)
         self._delete_services(log_handler)
@@ -216,7 +215,7 @@ class Engine(ContainerEngine):
             )
             raise ContainerUpdateLogsError(str(e))
 
-    def _get_job_pod(self, job_name) -> k8sclient.V1Pod:
+    def _get_job_pod(self, job_name: str) -> k8sclient.V1Pod:
         job_label = f"job-name={job_name}"
         try:
             result = self.client.core_api.list_namespaced_pod(
@@ -293,7 +292,7 @@ class Engine(ContainerEngine):
         LOGGER.info(f"Created Pod template: {self.pod_name}")
         return pod_template
 
-    def _create_service(self, port):
+    def _create_service(self, port: int) -> None:
         # only create the service if it does not already exist
         service_name = f"{self.job_name}-{port}"
 
@@ -481,7 +480,7 @@ class Engine(ContainerEngine):
         finally:
             watcher.stop()
 
-    def _set_namespace(self):
+    def _set_namespace(self) -> None:
         namespace_file = (
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
         )

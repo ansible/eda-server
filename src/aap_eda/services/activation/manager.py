@@ -845,6 +845,10 @@ class ActivationManager:
             ports=find_ports(self.db_instance.rulebook_rulesets),
             activation_id=self.db_instance.id,
             activation_instance_id=self.latest_instance.id,
+            env_vars=settings.PODMAN_ENV_VARS,
+            extra_arg=settings.PODMAN_EXTRA_ARGS,
+            mem_limit=settings.PODMAN_MEM_LIMIT,
+            mounts=settings.PODMAN_MOUNTS,
         )
 
     def _build_credential(self) -> tp.Optional[Credential]:
