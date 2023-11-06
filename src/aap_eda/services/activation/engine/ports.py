@@ -34,6 +34,8 @@ def find_ports(rulebook_text: str) -> list[tuple]:
             # Get port if it exists
             maybe_port = source_args.get("port")
             # port may be a string or an integer
+            if maybe_port is None:
+                continue
             with contextlib.suppress(ValueError):
                 found_ports.append((host, int(maybe_port)))
 
