@@ -31,12 +31,12 @@ from aap_eda.services.activation.exceptions import (
 )
 
 from . import exceptions
-from .common import ContainerEngine, ContainerRequest, LogHandler
+from .common import ContainerEngine, ContainerRequest, Credential, LogHandler
 
 LOGGER = logging.getLogger(__name__)
 
 
-def get_podman_client():
+def get_podman_client() -> PodmanClient:
     """Podman client factory."""
     try:
         podman_url = settings.PODMAN_SOCKET_URL
@@ -146,7 +146,6 @@ class Engine(ContainerEngine):
             log_handler.write(error_message, flush=True)
             raise exceptions.ContainerStartError(error_message) from e
 
-    # note(alex): the signature of this method is different from the interface
     def get_status(self, container_id: str) -> ActivationStatus:
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
@@ -199,7 +198,7 @@ class Engine(ContainerEngine):
             LOGGER.exception(msg)
             raise exceptions.ContainerUpdateLogsError(msg) from e
 
-    def _cleanup(self, container_id: str, _log_handler: LogHandler):
+    def _cleanup(self, container_id: str, _log_handler: LogHandler) -> None:
         try:
             if self.client.containers.exists(container_id):
                 container = self.client.containers.get(container_id)
@@ -212,14 +211,14 @@ class Engine(ContainerEngine):
             LOGGER.error(f"Failed to cleanup {container_id}: {e}")
             raise exceptions.ContainerCleanupError(str(e))
 
-    def _get_ports(self, found_ports: dict) -> dict:
+    def _get_ports(self, found_ports: list[tuple]) -> dict:
         ports = {}
         for _, port in found_ports:
             ports[f"{port}/tcp"] = port
 
         return ports
 
-    def _login(self, request) -> None:
+    def _login(self, request: ContainerRequest) -> None:
         credential = request.credential
         if not credential:
             return
@@ -239,7 +238,7 @@ class Engine(ContainerEngine):
             LOGGER.exception("Login failed: f{e}")
             raise exceptions.ContainerStartError(str(e))
 
-    def _write_auth_json(self, request) -> None:
+    def _write_auth_json(self, request: ContainerRequest) -> None:
         if not self.auth_file:
             LOGGER.debug("No auth file to create")
             return
@@ -259,7 +258,7 @@ class Engine(ContainerEngine):
         with open(self.auth_file, "w") as f:
             json.dump(auth_dict, f, indent=6)
 
-    def _create_auth_key(self, credential) -> dict:
+    def _create_auth_key(self, credential: Credential) -> dict:
         data = f"{credential.username}:{credential.secret}"
         encoded_data = data.encode("ascii")
         return {"auth": base64.b64encode(encoded_data).decode("ascii")}
@@ -312,7 +311,7 @@ class Engine(ContainerEngine):
             LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
             raise exceptions.ContainerStartError(str(e))
 
-    def _load_pod_args(self, request) -> dict:
+    def _load_pod_args(self, request: ContainerRequest) -> dict:
         pod_args = {"name": request.name}
         if request.ports:
             pod_args["ports"] = self._get_ports(request.ports)

@@ -86,7 +86,7 @@ class ContainerRequest(BaseModel):
     activation_instance_id: str
     activation_id: str
     credential: tp.Optional[Credential] = None
-    ports: tp.Optional[dict] = None
+    ports: tp.Optional[list[tuple]] = None
     pull_policy: str = "Always"  # Defaults to Always for K8S
     mem_limit: tp.Optional[str] = None
     mounts: tp.Optional[dict] = None

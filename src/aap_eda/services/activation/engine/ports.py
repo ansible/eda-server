@@ -1,11 +1,13 @@
 import yaml
 
 
-def find_ports(rulebook_text: str):
-    """Returns (host, port) pairs for all sources in a rulebook.
+def find_ports(rulebook_text: str) -> list[tuple]:
+    """
+    Return (host, port) pairs for all sources in a rulebook.
 
     Walk the rulebook and find ports in source parameters
-    Assume the rulebook is valid if it imported"""
+    Assume the rulebook is valid if it imported
+    """
     rulebook = yaml.safe_load(rulebook_text)
 
     # Make a list of host, port pairs found in all sources in
@@ -22,6 +24,8 @@ def find_ports(rulebook_text: str):
             # The first remaining key is the type and the arguments
             source_plugin = list(source.keys())[0]
             source_args = source[source_plugin]
+            if source_args is None:
+                continue
             # Get host if it exists
             # Maybe check for "0.0.0.0" in the future
             host = source_args.get("host")
