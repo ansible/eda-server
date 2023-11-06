@@ -26,10 +26,6 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.activation.exceptions import (
-    ActivationImageNotFound,
-    ActivationImagePullError,
-)
 
 from . import exceptions
 from .common import ContainerEngine, ContainerRequest, Credential, LogHandler
@@ -304,14 +300,14 @@ class Engine(ContainerEngine):
                 )
                 LOGGER.error(msg)
                 log_handler.write(msg, True)
-                raise ActivationImagePullError(msg)
+                raise exceptions.ContainerImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound:
             msg = f"Image {request.image_url} not found"
             LOGGER.exception(msg)
             log_handler.write(msg, True)
-            raise ActivationImageNotFound(msg)
+            raise exceptions.ContainerImagePullError(msg)
         except APIError as e:
             LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
             raise exceptions.ContainerStartError(str(e))
