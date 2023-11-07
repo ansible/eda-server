@@ -17,6 +17,7 @@ import typing as tp
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+from django.conf import settings
 from pydantic import BaseModel
 
 import aap_eda.services.activation.engine.exceptions as exceptions
@@ -87,7 +88,7 @@ class ContainerRequest(BaseModel):
     activation_id: str
     credential: tp.Optional[Credential] = None
     ports: tp.Optional[list[tuple]] = None
-    pull_policy: str = "Always"  # Defaults to Always for K8S
+    pull_policy: str = settings.DEFAULT_PULL_POLICY  # Always by default
     mem_limit: tp.Optional[str] = None
     mounts: tp.Optional[dict] = None
     env_vars: tp.Optional[dict] = None
