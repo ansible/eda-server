@@ -28,17 +28,15 @@ from kubernetes.config.config_exception import ConfigException
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
+    ContainerEngineError,
     ContainerEngineInitError,
+    ContainerImagePullError,
     ContainerNotFoundError,
     ContainerStartError,
     ContainerUpdateLogsError,
 )
-from aap_eda.services.activation.exceptions import (
-    ActivationImageNotFound,
-    ActivationImagePullError,
-    K8sActivationException,
-)
 
+from . import messages
 from .common import ContainerEngine, ContainerRequest, LogHandler
 
 LOGGER = logging.getLogger(__name__)
@@ -112,20 +110,20 @@ class Engine(ContainerEngine):
             log_handler.write(f"Image URL is {request.image_url}", True)
             self._create_job(request, log_handler)
             LOGGER.info("Waiting for pod to start")
-            self._wait_for_pod_to_start(log_handler)
+            try:
+                self._wait_for_pod_to_start(log_handler)
+            except ContainerImagePullError as e:
+                msg = messages.IMAGE_PULL_ERROR.format(
+                    image_url=request.image_url,
+                )
+                raise ContainerImagePullError(msg) from e
             if request.ports:
                 for port in self._get_ports(request.ports):
                     self._create_service(port)
             LOGGER.info(f"Job {self.job_name} is running")
             log_handler.write(f"Job {self.job_name} is running", True)
             return self.job_name
-        except (
-            ContainerStartError,
-            ContainerUpdateLogsError,
-            ActivationImageNotFound,
-            ActivationImagePullError,
-            K8sActivationException,
-        ) as e:
+        except ContainerEngineError as e:
             LOGGER.error(f"Failed to start job {self.job_name}, doing cleanup")
             LOGGER.error(e)
             log_handler.write(
@@ -153,7 +151,13 @@ class Engine(ContainerEngine):
                     f"Pod exited with {exit_code}, reason "
                     f"{container_status.state.terminated.reason}"
                 )
-
+        else:
+            LOGGER.error(
+                "Pod is not running or terminated, "
+                f"status: {container_status}"
+                "set status to error.",
+            )
+            status = ActivationStatus.ERROR
         LOGGER.info(f"Job {container_id} status: {status}")
         return status
 
@@ -438,14 +442,7 @@ class Engine(ContainerEngine):
                         reason = statuses[0].state.waiting.reason
 
                         if reason in POD_FAILED_REASONS:
-                            error_msg = f"Failed to pull image: {message}"
-                            LOGGER.error(error_msg)
-                            log_handler.write(error_msg, True)
-
-                            if reason == INVALID_IMAGE_NAME:
-                                raise ActivationImageNotFound(message)
-                            else:
-                                raise ActivationImagePullError(message)
+                            raise ContainerImagePullError(message)
 
                 if pod_phase == "Failed" or pod_phase == "Succeeded":
                     statuses = event["object"].status.container_statuses

@@ -280,12 +280,19 @@ class ActivationManager:
             )
             self._fail_instance(msg)
             self._set_activation_status(ActivationStatus.FAILED, msg)
-            self._failed_policy()
             raise exceptions.ActivationStartError(msg) from exc
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: {exc}"
+            )
+            self._error_instance(msg)
+            self._error_activation(msg)
+            raise exceptions.ActivationStartError(msg) from exc
+        except Exception as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to start "
+                f"due to an un expected error. Msg: {exc}"
             )
             self._error_instance(msg)
             self._error_activation(msg)
