@@ -356,6 +356,6 @@ def parse_validation_errors(errors: dict) -> str:
     messages = {key: str(error[0]) for key, error in errors.items() if error}
 
     if "non_field_errors" in messages:
-        messages["errors"] = messages.pop("non_field_errors")
+        messages["field_errors"] = messages.pop("non_field_errors")
 
     return str(messages)
