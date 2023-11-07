@@ -27,7 +27,7 @@ from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
 
-from . import exceptions
+from . import exceptions, messages
 from .common import ContainerEngine, ContainerRequest, Credential, LogHandler
 
 LOGGER = logging.getLogger(__name__)
@@ -305,9 +305,8 @@ class Engine(ContainerEngine):
 
             # https://github.com/containers/podman-py/issues/301
             if not image.id:
-                msg = (
-                    f"Image {request.image_url} pull failed. The image url "
-                    "or the credentials may be incorrect."
+                msg = messages.IMAGE_PULL_ERROR.format(
+                    image_url=request.image_url,
                 )
                 LOGGER.error(msg)
                 log_handler.write(msg, True)
