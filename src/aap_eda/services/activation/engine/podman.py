@@ -93,6 +93,13 @@ class Engine(ContainerEngine):
                 f"Failed to cleanup container {container_id}"
             ) from e
 
+    def _image_exists(self, image_url: str) -> bool:
+        try:
+            self.client.images.get(image_url)
+        except ImageNotFound:
+            return False
+        return True
+
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         if not request.image_url:
             raise exceptions.ContainerStartError("Missing image url")
@@ -101,7 +108,11 @@ class Engine(ContainerEngine):
             self._set_auth_json_file()
             self._login(request)
             LOGGER.info(f"Image URL is {request.image_url}")
-            self._pull_image(request, log_handler)
+            if request.pull_policy == "Always" or not self._image_exists(
+                request.image_url,
+            ):
+                self._pull_image(request, log_handler)
+
             log_handler.write("Starting Container", True)
             command = request.cmdline.command_and_args()
             log_handler.write(f"Container args {command}", True)
