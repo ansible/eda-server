@@ -81,12 +81,11 @@ def _run_request(
             manager.restart()
         elif request.request == ActivationRequest.DELETE:
             manager.delete()
-    except Exception:
+    except Exception as e:
         LOGGER.exception(
             f"Failed to process request {request.request} for "
-            f"activation {activation.id}",
+            f"activation {activation.id}. Reason {str(e)}",
         )
-        raise
     return True
 
 
