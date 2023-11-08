@@ -220,8 +220,10 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
         return queue.enqueue(*args, **kwargs)
 
 
-def job_from_queue(queue: Queue, job_id: str) -> Optional[Job]:
+def job_from_queue(queue: Union[Queue, str], job_id: str) -> Optional[Job]:
     """Return queue job if it not canceled or finished else None."""
+    if type(queue) is str:
+        queue = get_queue(name=queue)
     job = queue.fetch_job(job_id)
     if job and job.get_status(refresh=True) in [
         JobStatus.QUEUED,
