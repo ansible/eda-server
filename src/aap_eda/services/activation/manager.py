@@ -37,6 +37,7 @@ from aap_eda.services.activation.engine.common import (
     ContainerRequest,
     Credential,
 )
+from aap_eda.tasks.orchestrator import system_restart_activation
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
@@ -90,6 +91,7 @@ class ActivationManager:
         self,
         db_instance: models.Activation,
         container_engine: tp.Optional[ContainerEngine] = None,
+        container_logger_class: type[DBLogger] = DBLogger,
     ):
         """Initialize the Activation Manager.
 
@@ -102,6 +104,8 @@ class ActivationManager:
             self.container_engine = container_engine
         else:
             self.container_engine = new_container_engine(db_instance.id)
+
+        self.container_logger_class = container_logger_class
 
     @property
     def latest_instance(self) -> tp.Optional[models.ActivationInstance]:
@@ -250,7 +254,7 @@ class ActivationManager:
         self._create_activation_instance()
 
         self.db_instance.refresh_from_db()
-        log_handler = DBLogger(self.latest_instance.id)
+        log_handler = self.container_logger_class(self.latest_instance.id)
 
         LOGGER.info(
             "Starting container for activation instance: "
@@ -280,6 +284,7 @@ class ActivationManager:
             )
             self._fail_instance(msg)
             self._set_activation_status(ActivationStatus.FAILED, msg)
+            self._failed_policy()
             raise exceptions.ActivationStartError(msg) from exc
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
@@ -328,7 +333,7 @@ class ActivationManager:
         self._set_latest_instance_status(ActivationStatus.STOPPING)
         latest_instance = self.db_instance.latest_instance
 
-        log_handler = DBLogger(latest_instance.id)
+        log_handler = self.container_logger_class(latest_instance.id)
         self.container_engine.cleanup(
             latest_instance.activation_pod_id,
             log_handler,
@@ -387,18 +392,22 @@ class ActivationManager:
     def _unresponsive_policy(self):
         """Apply the unresponsive restart policy."""
         LOGGER.info(
-            "Monitor operation: unresponsive mode called for "
-            f"activation id: {self.db_instance.id}"
+            "Unresponsive policy called for "
+            f"activation id: {self.db_instance.id}",
         )
+        container_logger = self.container_logger_class(self.latest_instance.id)
         if self.db_instance.restart_policy == RestartPolicy.NEVER:
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
-                f"Restart policy is set to {self.db_instance.restart_policy}.",
+                f"Restart policy is set to {self.db_instance.restart_policy}."
+                "No restart policy is applied."
             )
             user_msg = (
                 "Activation is unresponsive. "
                 "Liveness check for ansible rulebook timed out. "
+                "Restart policy is not applicable."
             )
+            container_logger.write(user_msg, flush=True)
             self._fail_instance(user_msg)
             self._set_activation_status(
                 ActivationStatus.FAILED,
@@ -408,27 +417,28 @@ class ActivationManager:
         else:
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
-                f"Restart policy is set to {self.db_instance.restart_policy}.",
+                f"Restart policy is set to {self.db_instance.restart_policy}."
+                "Restart policy is applied.",
             )
             user_msg = (
-                "Activation instance is unresponsive. "
+                "Activation is unresponsive. "
                 "Liveness check for ansible rulebook timed out. "
-                "Restart policy is applied."
+                "Activation is going to be restarted."
             )
-
+            container_logger.write(user_msg, flush=True)
             self._fail_instance(msg=user_msg)
-            try:
-                self.start(is_restart=True)
-            except exceptions.ActivationStartError as exc:
-                msg = (
-                    f"Activation {self.db_instance.id} failed to start. "
-                    f"Reason: {exc}"
-                )
-                LOGGER.error(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
-                raise exceptions.ActivationMonitorError(msg) from exc
+            self._set_activation_status(
+                ActivationStatus.FAILED,
+                user_msg,
+            )
+            system_restart_activation(self.db_instance.id, delay=1)
 
     def _missing_container_policy(self):
+        LOGGER.info(
+            "Missing container policy called for "
+            f"activation id: {self.db_instance.id}",
+        )
+        container_logger = self.container_logger_class(self.latest_instance.id)
         msg = "Missing container for running activation."
         try:
             self._fail_instance(msg)
@@ -444,29 +454,24 @@ class ActivationManager:
 
         if self.db_instance.restart_policy == RestartPolicy.NEVER:
             msg += " Restart policy not applicable."
-            self._set_activation_status(
-                ActivationStatus.FAILED,
-                msg,
-            )
         else:
-            try:
-                self.start(is_restart=True)
-            except exceptions.ActivationStartError as exc:
-                msg = (
-                    f"Activation {self.db_instance.id} failed to start. "
-                    f"Reason: {exc}"
-                )
-                LOGGER.error(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
-                raise exceptions.ActivationMonitorError(msg) from exc
+            msg += " Restart policy is applied."
+            system_restart_activation(self.db_instance.id, delay=1)
+
+        self._set_activation_status(
+            ActivationStatus.FAILED,
+            msg,
+        )
+        container_logger.write(msg, flush=True)
 
     def _completed_policy(self):
         """Apply the completed restart policy.
 
         Completed containers are only restart with ALWAYS policy.+
         """
+        container_logger = self.container_logger_class(self.latest_instance.id)
         LOGGER.info(
-            "Monitor operation: completed mode called for "
+            "Completed policy called for "
             f"activation id: {self.db_instance.id}",
         )
 
@@ -476,24 +481,19 @@ class ActivationManager:
                 f"Restart policy is set to {self.db_instance.restart_policy}.",
             )
             user_msg = (
-                "Activation completed successfully. Restart policy is applied."
+                f"Activation completed going to be restarted in "
+                f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds. "
+                f"accordingly to the restart policy {RestartPolicy.ALWAYS}"
             )
+            container_logger.write(user_msg, flush=True)
             self._set_latest_instance_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-            # TODO: schedule activation based on
-            # ACTIVATION_RESTART_SECONDS_ON_COMPLETE
-            # We should have a status like "pending restart"
-            try:
-                self.start()
-            except exceptions.ActivationStartError as exc:
-                msg = (
-                    f"Activation {self.db_instance.id} failed to start. "
-                    f"Reason: {exc}"
-                )
-                LOGGER.error(msg)
-                raise exceptions.ActivationMonitorError(msg) from exc
+            system_restart_activation(
+                self.db_instance.id,
+                delay=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
+            )
         else:
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
@@ -508,17 +508,16 @@ class ActivationManager:
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-
-            user_msg = "Activation completed successfully."
             self._set_activation_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
 
     def _failed_policy(self):
+        container_logger = self.container_logger_class(self.latest_instance.id)
         """Apply the failed restart policy."""
         LOGGER.info(
-            "Monitor operation: failed mode called for "
+            "Failed policy called for "
             f"activation id: {self.db_instance.id}",
         )
 
@@ -529,6 +528,7 @@ class ActivationManager:
                 f"Restart policy is set to {self.db_instance.restart_policy}.",
             )
             user_msg = "Activation failed. Restart policy is not applicable."
+            container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
                 self._set_activation_status(
@@ -561,6 +561,7 @@ class ActivationManager:
                 "Has reached the maximum number of restarts. "
                 "Restart policy is not applicable."
             )
+            container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
                 self._set_activation_status(
@@ -579,13 +580,18 @@ class ActivationManager:
                 raise exceptions.ActivationMonitorError(msg) from exc
         # Restart
         else:
-            LOGGER.info(
-                f"Activation id: {self.db_instance.id} "
-                f"Restart policy is set to {self.db_instance.restart_policy}.",
+            user_msg = (
+                f"Activation failed going to be restarted in "
+                f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds. "
+                f"accordingly to the restart policy 'on-failure'"
             )
-            user_msg = "Activation failed. Restart policy is applied."
+            container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
+                self._set_activation_status(
+                    ActivationStatus.FAILED,
+                    user_msg,
+                )
             except engine_exceptions.ContainerCleanupError as exc:
                 msg = (
                     f"Activation {self.db_instance.id} failed to cleanup. "
@@ -599,18 +605,16 @@ class ActivationManager:
                     msg,
                 )
                 raise exceptions.ActivationMonitorError(msg) from exc
-            try:
-                # TODO: schedule activation based on
-                # ACTIVATION_RESTART_SECONDS_ON_FAILURE
-                self.start(is_restart=True)
-            except exceptions.ActivationStartError as exc:
-                msg = (
-                    f"Activation {self.db_instance.id} failed to start. "
-                    f"Reason: {exc}"
-                )
-                LOGGER.error(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
-                raise exceptions.ActivationMonitorError(msg) from exc
+            LOGGER.info(
+                f"Activation id: {self.db_instance.id} "
+                f"Restart policy is set to {self.db_instance.restart_policy}. "
+                f"Scheduling restart in "
+                "{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE}",
+            )
+            system_restart_activation(
+                self.db_instance.id,
+                delay=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
+            )
 
     def _fail_instance(self, msg: tp.Optional[str] = None):
         """Fail the latest activation instance."""
@@ -679,6 +683,10 @@ class ActivationManager:
 
     def stop(self):
         """User requested stop."""
+        LOGGER.info(
+            "Stop operation requested for activation "
+            f"id: {self.db_instance.id} Stopping activation.",
+        )
         try:
             self.db_instance.refresh_from_db()
         except ObjectDoesNotExist:
@@ -688,11 +696,7 @@ class ActivationManager:
             )
             raise exceptions.ActivationStartError(
                 "The Activation does not exist."
-            )
-        LOGGER.info(
-            f"Activation manager activation id: {self.db_instance.id} "
-            "Stopping activation.",
-        )
+            ) from None
         try:
             self._check_latest_instance()
             if self._is_already_stopped():
@@ -712,7 +716,7 @@ class ActivationManager:
 
         try:
             self._stop_instance()
-            self._set_activation_status(ActivationStatus.STOPPED)
+
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to cleanup. "
@@ -721,34 +725,44 @@ class ActivationManager:
             # Alex: Not sure if we want to change the status here.
             self._error_activation(msg)
             raise exceptions.ActivationStopError(msg) from exc
+        user_msg = "Stop requested by user. "
+        self._set_activation_status(ActivationStatus.STOPPED, user_msg)
+        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger.write(user_msg, flush=True)
         LOGGER.info(
-            f"Activation manager activation id: {self.db_instance.id} "
+            f"Stop operation activation id: {self.db_instance.id} "
             "Activation stopped.",
         )
 
     def restart(self):
         """User requested restart."""
+        container_logger = self.container_logger_class(self.latest_instance.id)
+
         LOGGER.info(
-            f"Activation manager activation id: {self.db_instance.id} "
-            "Restarting activation.",
+            "Restart operation requested for activation id: "
+            "{self.db_instance.id} ",
         )
         self.stop()
-        self.start(is_restart=True)
+
         LOGGER.info(
             f"Activation manager activation id: {self.db_instance.id} "
-            "Activation restarted",
+            "Activation restart scheduled for 1 second.",
         )
+        user_msg = "Restart requested by user. "
+        self._set_activation_status(ActivationStatus.STOPPED, user_msg)
+        container_logger.write(user_msg, flush=True)
+        system_restart_activation(self.db_instance.id, delay=1)
 
     def delete(self):
         """User requested delete."""
         LOGGER.info(
-            f"Activation manager activation id: {self.db_instance.id} "
-            "Deleting activation.",
+            f"Delete operation requested for activation id: "
+            f"{self.db_instance.id},",
         )
         self.stop()
         self.db_instance.delete()
         LOGGER.info(
-            f"Activation manager activation id: {self.db_instance.id} "
+            f"Delete operation for activation id: {self.db_instance.id} "
             "Activation deleted.",
         )
 
@@ -769,7 +783,7 @@ class ActivationManager:
         injection if in the future we need to apply different policies.
         """
         LOGGER.info(
-            "Activation manager monitoring "
+            "Monitor activation requested for  "
             f"activation id: {self.db_instance.id}",
         )
 
@@ -882,7 +896,7 @@ class ActivationManager:
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
-        log_handler = DBLogger(self.latest_instance.id)
+        log_handler = self.container_logger_class(self.latest_instance.id)
         # TODO: check latest instance
         # TODO: catch exceptions from the engine
         self.container_engine.update_logs(

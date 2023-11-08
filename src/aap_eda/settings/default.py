@@ -280,7 +280,7 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {"func": "aap_eda.tasks.orchestrator.monitor_activations", "interval": 10},
+    {"func": "aap_eda.tasks.orchestrator.monitor_activations", "interval": 5},
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
