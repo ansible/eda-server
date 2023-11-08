@@ -58,11 +58,18 @@ def _arbitrate(
 
         # nothing can be done after delete
         # or dedup
+        # or skip auto_start
         if (
             ref_request.request == ActivationRequest.DELETE
             or request.request == ref_request.request
+            or request.request == ActivationRequest.AUTO_START
         ):
             request.delete()
+            continue
+
+        if ref_request.request == ActivationRequest.AUTO_START:
+            ref_request.delete()
+            ref_request = request
             continue
 
         if (
