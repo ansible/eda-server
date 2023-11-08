@@ -707,6 +707,7 @@ class ActivationManager:
                 f"Stop operation activation id: {self.db_instance.id} "
                 "No instance or pod id found.",
             )
+            self._set_activation_status(ActivationStatus.STOPPED)
             return
 
         try:
