@@ -31,14 +31,11 @@ from aap_eda.services.activation.engine.common import (
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineInitError,
+    ContainerImagePullError,
     ContainerNotFoundError,
     ContainerStartError,
 )
 from aap_eda.services.activation.engine.podman import Engine
-from aap_eda.services.activation.exceptions import (
-    ActivationImageNotFound,
-    ActivationImagePullError,
-)
 
 
 @dataclass
@@ -222,7 +219,7 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
     engine.client.images.pull.side_effect = raise_error
 
     with pytest.raises(
-        ActivationImageNotFound, match=f"Image {request.image_url} not found"
+        ContainerImagePullError, match=f"Image {request.image_url} not found"
     ):
         engine.start(request, log_handler)
 
@@ -250,7 +247,7 @@ def test_engine_start_with_image_pull_exception(init_data, podman_engine):
     )
 
     with mock.patch.object(engine.client, "images", image_mock):
-        with pytest.raises(ActivationImagePullError, match=msg):
+        with pytest.raises(ContainerImagePullError, match=msg):
             engine.start(request, log_handler)
 
     assert models.ActivationInstanceLog.objects.last().log == msg
