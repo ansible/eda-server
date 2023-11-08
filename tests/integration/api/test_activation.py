@@ -490,7 +490,7 @@ def test_restart_activation_with_invalid_tokens(client: APIClient, action):
     )
 
     error_message = (
-        "{'errors': 'More than one controller token found, "
+        "{'field_errors': 'More than one controller token found, "
         "currently only 1 token is supported'}"
     )
 
@@ -510,13 +510,13 @@ def test_restart_activation_with_invalid_tokens(client: APIClient, action):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         response.data["errors"]
-        == "{'errors': 'No controller token specified'}"
+        == "{'field_errors': 'No controller token specified'}"
     )
     activation.refresh_from_db()
     assert activation.status == ActivationStatus.ERROR
     assert (
         activation.status_message
-        == "{'errors': 'No controller token specified'}"
+        == "{'field_errors': 'No controller token specified'}"
     )
 
 
@@ -798,7 +798,7 @@ def test_create_activation_no_token(client: APIClient):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         str(response.data["errors"])
-        == "{'errors': 'No controller token specified'}"
+        == "{'field_errors': 'No controller token specified'}"
     )
 
 
@@ -817,6 +817,6 @@ def test_create_activation_more_tokens(client: APIClient):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         str(response.data["errors"])
-        == "{'errors': 'More than one controller token found, "
+        == "{'field_errors': 'More than one controller token found, "
         "currently only 1 token is supported'}"
     )
