@@ -46,26 +46,25 @@ def test_queue(activations):
     queue.push(activations[0].id, ActivationRequest.STOP)
     queue.push(activations[1].id, ActivationRequest.DELETE)
     queue.push(activations[0].id, ActivationRequest.START)
-    queue.push(activations[0].id, ActivationRequest.RESTART)
-    assert models.ActivationRequestQueue.objects.count() == 4
+    assert models.ActivationRequestQueue.objects.count() == 3
     assert queue.list_activations() == [
         activations[0].id,
         activations[1].id,
     ]
 
     requests = queue.peek_all(activations[0].id)
-    assert len(requests) == 3
+    assert len(requests) == 2
 
     queue.pop_until(activations[0].id, requests[1].id)
-    assert len(queue.peek_all(activations[0].id)) == 1
+    assert len(queue.peek_all(activations[0].id)) == 0
 
 
 @pytest.mark.parametrize(
     "requests",
     [
         {
-            "queued": [ActivationRequest.START],
-            "dequeued": [ActivationRequest.START],
+            "queued": [ActivationRequest.AUTO_START],
+            "dequeued": [ActivationRequest.AUTO_START],
         },
         {"queued": [], "dequeued": []},
         {
@@ -88,8 +87,10 @@ def test_queue(activations):
         },
         {
             "queued": [
+                ActivationRequest.AUTO_START,
                 ActivationRequest.RESTART,
                 ActivationRequest.STOP,
+                ActivationRequest.AUTO_START,
                 ActivationRequest.START,
             ],
             "dequeued": [

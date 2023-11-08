@@ -391,6 +391,7 @@ ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(
 ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
     settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5)
 )
+MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL

@@ -14,6 +14,8 @@
 
 import logging
 
+from django.conf import settings
+
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ActivationStatus
@@ -35,45 +37,74 @@ def _manage(activation_id: int) -> None:
     if there are no pending requests.
     """
     activation = models.Activation.objects.get(id=activation_id)
-    has_user_requests = False
-    pending_requests = requests_queue.peek_all(activation_id)
-    while pending_requests:
-        for request in pending_requests:
-            LOGGER.info(
-                f"Processing request {request.request} for activation "
-                f"{activation_id}",
-            )
-            manager = ActivationManager(activation)
-            try:
-                if request.request == ActivationRequest.START:
-                    manager.start()
-                elif request.request == ActivationRequest.STOP:
-                    manager.stop()
-                elif request.request == ActivationRequest.RESTART:
-                    manager.restart()
-                elif request.request == ActivationRequest.DELETE:
-                    manager.delete()
-            except Exception:
-                LOGGER.exception(
-                    f"Failed to process request {request.request} for "
-                    f"activation {activation_id}",
-                )
-                raise
-            finally:
-                requests_queue.pop_until(activation_id, request.id)
-        has_user_requests = True
-        pending_requests = requests_queue.peek_all(activation_id)
 
-    if not has_user_requests:
+    has_request_processed = False
+    while_condition = True
+    while while_condition:
+        pending_requests = requests_queue.peek_all(activation_id)
+        while_condition = bool(pending_requests)
+        for request in pending_requests:
+            if _run_request(activation, request):
+                requests_queue.pop_until(activation_id, request.id)
+                has_request_processed = True
+            else:
+                while_condition = False
+                break
+
+    if not has_request_processed:
         LOGGER.info(
             f"Processing monitor request for activation {activation_id}",
         )
         ActivationManager(activation).monitor()
 
 
+def _run_request(
+    activation: models.Activation, request: ActivationRequest
+) -> bool:
+    """Attempt to run a request for an activation via the manager."""
+    LOGGER.info(
+        f"Processing request {request.request} for activation "
+        f"{activation.id}",
+    )
+    start_commands = [ActivationRequest.START, ActivationRequest.AUTO_START]
+    if request.request in start_commands:
+        if not _can_start_new_activation(activation):
+            return False
+
+    manager = ActivationManager(activation)
+    try:
+        if request.request in start_commands:
+            manager.start(request.request == ActivationRequest.AUTO_START)
+        elif request.request == ActivationRequest.STOP:
+            manager.stop()
+        elif request.request == ActivationRequest.RESTART:
+            manager.restart()
+        elif request.request == ActivationRequest.DELETE:
+            manager.delete()
+    except Exception:
+        LOGGER.exception(
+            f"Failed to process request {request.request} for "
+            f"activation {activation.id}",
+        )
+        raise
+    return True
+
+
+def _can_start_new_activation(activation: models.Activation) -> bool:
+    num_running_activations = models.Activation.objects.filter(
+        status=ActivationStatus.RUNNING
+    ).count()
+    if num_running_activations >= settings.MAX_RUNNING_ACTIVATIONS:
+        LOGGER.info(
+            "No capacity to start a new activation. "
+            f"Activation {activation.id} is postponed"
+        )
+        return False
+    return True
+
+
 def _make_user_request(
-    activation_id: int,
-    request_type: ActivationRequest,
+    activation_id: int, request_type: ActivationRequest
 ) -> None:
     """Enqueue a task to manage the activation with the given id."""
     requests_queue.push(activation_id, request_type)
@@ -84,6 +115,11 @@ def _make_user_request(
 def start_activation(activation_id: int) -> None:
     """Create a request to start the activation with the given id."""
     _make_user_request(activation_id, ActivationRequest.START)
+
+
+def auto_start_activation(activation_id: int) -> None:
+    """Create a request to execute auto restart an activation."""
+    _make_user_request(activation_id, ActivationRequest.AUTO_START)
 
 
 def stop_activation(activation_id: int) -> None:
