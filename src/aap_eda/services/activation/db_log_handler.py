@@ -42,7 +42,9 @@ class DBLogger(LogHandler):
     def lines_written(self) -> int:
         return self.line_number
 
-    def write(self, lines: Union[list[str], str], flush=False) -> None:
+    def write(
+        self, lines: Union[list[str], str], flush=False, timestamp=True
+    ) -> None:
         if self.incremental_flush and self.line_number % self.flush_after == 0:
             self.flush()
 
@@ -50,6 +52,10 @@ class DBLogger(LogHandler):
             lines = [lines]
 
         for line in lines:
+            if timestamp:
+                dt = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]}"
+                line = f"{dt} {line}"
+
             self.activation_instance_log_buffer.append(
                 models.ActivationInstanceLog(
                     line_number=self.line_number,
