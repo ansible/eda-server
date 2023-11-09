@@ -192,7 +192,9 @@ class Engine(ContainerEngine):
                     log_parts = log.split(" ", 1)
                     timestamp = log_parts[0]
                     if len(log_parts) > 1:
-                        log_handler.write(log_parts[1])
+                        log_handler.write(
+                            lines=log_parts[1], flush=False, timestamp=False
+                        )
 
                 if timestamp:
                     dt = parser.parse(timestamp)
