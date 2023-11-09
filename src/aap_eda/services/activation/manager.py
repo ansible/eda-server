@@ -924,7 +924,10 @@ class ActivationManager:
         return ContainerRequest(
             credential=self._build_credential(),
             cmdline=self._build_cmdline(),
-            name=f"eda-{self.latest_instance.id}-{uuid.uuid4()}",
+            name=(
+                f"{settings.CONTAINER_NAME_PRREFIX}-{self.latest_instance.id}"
+                f"-{uuid.uuid4()}"
+            ),
             image_url=self.db_instance.decision_environment.image_url,
             ports=find_ports(self.db_instance.rulebook_rulesets),
             activation_id=self.db_instance.id,
