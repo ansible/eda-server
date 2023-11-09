@@ -925,7 +925,7 @@ class ActivationManager:
             credential=self._build_credential(),
             cmdline=self._build_cmdline(),
             name=(
-                f"{settings.CONTAINER_NAME_PRREFIX}-{self.latest_instance.id}"
+                f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
                 f"-{uuid.uuid4()}"
             ),
             image_url=self.db_instance.decision_environment.image_url,
