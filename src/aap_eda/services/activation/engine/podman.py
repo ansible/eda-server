@@ -16,7 +16,6 @@ import base64
 import json
 import logging
 import os
-from datetime import timedelta
 
 from dateutil import parser
 from django.conf import settings
@@ -180,9 +179,7 @@ class Engine(ContainerEngine):
             since = None
             log_read_at = log_handler.get_log_read_at()
             if log_read_at:
-                since = log_read_at.replace(tzinfo=None) + timedelta(
-                    microseconds=1,
-                )
+                since = int(log_handler.get_log_read_at().timestamp()) + 1
 
             container = self.client.containers.get(container_id)
             if container.status in ["running", "exited", "stopped"]:
