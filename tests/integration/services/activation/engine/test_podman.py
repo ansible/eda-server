@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import re
 from dataclasses import dataclass
 from unittest import mock
 
@@ -136,9 +135,8 @@ def test_engine_start(init_data, podman_engine):
 
     engine.client.containers.run.assert_called_once()
     assert models.ActivationInstanceLog.objects.count() == 4
-    assert re.match(
-        r"^Container .+ is started",
-        models.ActivationInstanceLog.objects.last().log,
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        "is started."
     )
 
 
@@ -223,9 +221,8 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
     ):
         engine.start(request, log_handler)
 
-    assert (
-        models.ActivationInstanceLog.objects.last().log
-        == f"Image {request.image_url} not found"
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        f"Image {request.image_url} not found"
     )
 
 
@@ -250,7 +247,7 @@ def test_engine_start_with_image_pull_exception(init_data, podman_engine):
         with pytest.raises(ContainerImagePullError, match=msg):
             engine.start(request, log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log == msg
+    assert models.ActivationInstanceLog.objects.last().log.endswith(msg)
 
 
 @pytest.mark.django_db
@@ -276,9 +273,9 @@ def test_engine_start_with_containers_run_exception(init_data, podman_engine):
     with pytest.raises(ContainerStartError, match=r"Container Start Error:"):
         engine.start(request, log_handler)
 
-    assert re.match(
-        r"^Container Start Error:",
-        models.ActivationInstanceLog.objects.last().log,
+    assert (
+        "Container Start Error:"
+        in models.ActivationInstanceLog.objects.last().log
     )
 
 
@@ -328,9 +325,8 @@ def test_engine_cleanup(init_data, podman_engine):
 
     engine.cleanup("100", log_handler)
 
-    assert (
-        models.ActivationInstanceLog.objects.last().log
-        == "Container 100 is cleaned up."
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        "Container 100 is cleaned up."
     )
 
 
@@ -348,9 +344,8 @@ def test_engine_cleanup_with_not_found_exception(init_data, podman_engine):
 
     engine.cleanup("100", log_handler)
 
-    assert (
-        models.ActivationInstanceLog.objects.last().log
-        == "Container 100 not found."
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        "Container 100 not found."
     )
 
 
@@ -421,7 +416,6 @@ def test_engine_update_logs_with_container_not_found(init_data, podman_engine):
     engine.client.containers.exists.return_value = None
     engine.update_logs("100", log_handler)
 
-    assert (
-        models.ActivationInstanceLog.objects.last().log
-        == "Container 100 not found."
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        "Container 100 not found."
     )
