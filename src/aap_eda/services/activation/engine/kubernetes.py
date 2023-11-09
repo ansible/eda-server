@@ -202,7 +202,9 @@ class Engine(ContainerEngine):
 
                 for line in log.splitlines():
                     timestamp, content = line.split(" ", 1)
-                    log_handler.write(content)
+                    log_handler.write(
+                        lines=content, flush=False, timestamp=False
+                    )
 
                 if timestamp:
                     dt = parser.parse(timestamp)
