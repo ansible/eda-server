@@ -368,6 +368,7 @@ PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
 PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
 PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
 DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
+CONTAINER_NAME_PRREFIX = settings.get("CONTAINER_NAME_PRREFIX", "eda")
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
