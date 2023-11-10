@@ -60,7 +60,10 @@ def _manage(activation_id: int) -> None:
                 while_condition = False
                 break
 
-    if not has_request_processed:
+    if (
+        not has_request_processed
+        and activation.status == ActivationStatus.RUNNING
+    ):
         LOGGER.info(
             f"Processing monitor request for activation {activation_id}",
         )
