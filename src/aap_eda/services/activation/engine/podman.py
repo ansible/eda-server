@@ -182,31 +182,30 @@ class Engine(ContainerEngine):
                 since = int(log_handler.get_log_read_at().timestamp()) + 1
 
             container = self.client.containers.get(container_id)
-            if container.status in ["running", "exited", "stopped"]:
-                log_args = {"timestamps": True}
-                if since:
-                    log_args["since"] = since
-                timestamp = None
-                for logline in container.logs(**log_args):
-                    log = logline.decode("utf-8").strip()
-                    log_parts = log.split(" ", 1)
-                    timestamp = log_parts[0]
-                    if len(log_parts) > 1:
-                        log_handler.write(
-                            lines=log_parts[1], flush=False, timestamp=False
-                        )
-
-                if timestamp:
-                    dt = parser.parse(timestamp)
-                    log_handler.flush()
-                    log_handler.set_log_read_at(dt)
-
-                if container.status == "exited":
-                    exit_code = container.attrs.get("State").get("ExitCode")
+            log_args = {"timestamps": True, "stderr": True}
+            if since:
+                log_args["since"] = since
+            timestamp = None
+            for logline in container.logs(**log_args):
+                log = logline.decode("utf-8").strip()
+                log_parts = log.split(" ", 1)
+                timestamp = log_parts[0]
+                if len(log_parts) > 1:
                     log_handler.write(
-                        f"Container {container_id} exited with {exit_code}.",
-                        True,
+                        lines=log_parts[1], flush=False, timestamp=False
                     )
+
+            if timestamp:
+                dt = parser.parse(timestamp)
+                log_handler.flush()
+                log_handler.set_log_read_at(dt)
+
+            if container.status == "exited":
+                exit_code = container.attrs.get("State").get("ExitCode")
+                log_handler.write(
+                    f"Container {container_id} exited with {exit_code}.",
+                    True,
+                )
 
         except APIError as e:
             msg = (
