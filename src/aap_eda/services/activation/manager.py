@@ -481,8 +481,8 @@ class ActivationManager:
                 f"Restart policy is set to {self.db_instance.restart_policy}.",
             )
             user_msg = (
-                f"Activation completed going to be restarted in "
-                f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds. "
+                f"Activation completed. It will be restarted in "
+                f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds "
                 f"accordingly to the restart policy {RestartPolicy.ALWAYS}"
             )
             container_logger.write(user_msg, flush=True)
@@ -496,7 +496,7 @@ class ActivationManager:
             )
         else:
             LOGGER.info(
-                f"Activation id: {self.db_instance.id} "
+                f"Activation {self.db_instance.id} completed. "
                 f"Restart policy is set to {self.db_instance.restart_policy}. "
                 "No restart policy is applied.",
             )
@@ -580,10 +580,15 @@ class ActivationManager:
                 raise exceptions.ActivationMonitorError(msg) from exc
         # Restart
         else:
+            count_msg = (
+                f"({self.db_instance.failure_count}/"
+                f"{settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE})"
+            )
             user_msg = (
-                f"Activation failed going to be restarted in "
-                f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds. "
-                f"accordingly to the restart policy 'on-failure'"
+                f"Activation failed. It will be restarted {count_msg} in "
+                f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds "
+                "accordingly to the restart policy "
+                f"{self.db_instance.restart_policy}"
             )
             container_logger.write(user_msg, flush=True)
             try:
@@ -606,10 +611,10 @@ class ActivationManager:
                 )
                 raise exceptions.ActivationMonitorError(msg) from exc
             LOGGER.info(
-                f"Activation id: {self.db_instance.id} "
+                f"Activation {self.db_instance.id} failed. "
                 f"Restart policy is set to {self.db_instance.restart_policy}. "
                 f"Scheduling restart in "
-                "{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE}",
+                "{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
                 self.db_instance.id,
@@ -749,7 +754,7 @@ class ActivationManager:
             "Activation restart scheduled for 1 second.",
         )
         user_msg = "Restart requested by user. "
-        self._set_activation_status(ActivationStatus.STOPPED, user_msg)
+        self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
         system_restart_activation(self.db_instance.id, delay=1)
 
