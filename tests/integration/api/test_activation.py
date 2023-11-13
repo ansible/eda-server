@@ -309,8 +309,7 @@ def test_create_activation_with_bad_entity(
             },
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        error = f"'{key}_id': '{dependent_object[key]}'"
-        assert str(response.data["errors"]) == "{%s}" % error
+        assert response.data[f"{key}_id"][0] == f"{dependent_object[key]}"
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.ACTIVATION, Action.CREATE
@@ -490,7 +489,7 @@ def test_restart_activation_with_invalid_tokens(client: APIClient, action):
     )
 
     error_message = (
-        "{'field_errors': 'More than one controller token found, "
+        "{'non_field_errors': 'More than one controller token found, "
         "currently only 1 token is supported'}"
     )
 
@@ -510,13 +509,13 @@ def test_restart_activation_with_invalid_tokens(client: APIClient, action):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         response.data["errors"]
-        == "{'field_errors': 'No controller token specified'}"
+        == "{'non_field_errors': 'No controller token specified'}"
     )
     activation.refresh_from_db()
     assert activation.status == ActivationStatus.ERROR
     assert (
         activation.status_message
-        == "{'field_errors': 'No controller token specified'}"
+        == "{'non_field_errors': 'No controller token specified'}"
     )
 
 
@@ -797,8 +796,7 @@ def test_create_activation_no_token(client: APIClient):
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        str(response.data["errors"])
-        == "{'field_errors': 'No controller token specified'}"
+        response.data["non_field_errors"][0] == "No controller token specified"
     )
 
 
@@ -815,8 +813,7 @@ def test_create_activation_more_tokens(client: APIClient):
     client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN_2)
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        str(response.data["errors"])
-        == "{'field_errors': 'More than one controller token found, "
-        "currently only 1 token is supported'}"
+    assert response.data["non_field_errors"][0] == (
+        "More than one controller token found, "
+        "currently only 1 token is supported"
     )
