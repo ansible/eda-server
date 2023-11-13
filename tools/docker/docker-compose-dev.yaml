@@ -90,6 +90,9 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+
 
   eda-scheduler:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
