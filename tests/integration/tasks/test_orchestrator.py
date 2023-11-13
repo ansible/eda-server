@@ -60,28 +60,44 @@ def max_running_activations():
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
-def test_manage_start(manager_mock, activation):
-    queue.push(activation.id, ActivationRequest.START)
+@pytest.mark.parametrize(
+    "verb",
+    [
+        ActivationRequest.START,
+        ActivationRequest.RESTART,
+        ActivationRequest.STOP,
+        ActivationRequest.DELETE,
+        ActivationRequest.AUTO_START,
+    ],
+)
+@mock.patch("aap_eda.services.activation.manager.ActivationManager")
+def test_manage_request(manager_mock, activation, verb):
+    queue.push(activation.id, verb)
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
-    manager_instance_mock.start.return_value = mock.Mock()
 
     orchestrator._manage(activation.id)
 
     manager_mock.assert_called_once_with(activation)
-    manager_instance_mock.start.assert_called_once()
+    if verb == ActivationRequest.START:
+        manager_instance_mock.start.assert_called_once_with(False)
+    elif verb == ActivationRequest.RESTART:
+        manager_instance_mock.restart.assert_called_once()
+    elif verb == ActivationRequest.STOP:
+        manager_instance_mock.stop.assert_called_once()
+    elif verb == ActivationRequest.DELETE:
+        manager_instance_mock.delete.assert_called_once()
+    elif verb == ActivationRequest.AUTO_START:
+        manager_instance_mock.start.assert_called_once_with(True)
     assert len(queue.peek_all(activation.id)) == 0
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
+@mock.patch("aap_eda.services.activation.manager.ActivationManager")
 def test_manage_not_start(manager_mock, activation, max_running_activations):
     queue.push(activation.id, ActivationRequest.START)
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
-    manager_instance_mock.monitor.return_value = mock.Mock()
-    manager_instance_mock.start.return_value = mock.Mock()
 
     orchestrator._manage(activation.id)
 
@@ -89,3 +105,74 @@ def test_manage_not_start(manager_mock, activation, max_running_activations):
     manager_instance_mock.monitor.assert_called_once()
     manager_instance_mock.start.assert_not_called()
     assert len(queue.peek_all(activation.id)) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "command, queued_request",
+    [
+        (orchestrator.start_activation, ActivationRequest.START),
+        (orchestrator.stop_activation, ActivationRequest.STOP),
+        (orchestrator.start_activation, ActivationRequest.START),
+        (orchestrator.delete_activation, ActivationRequest.DELETE),
+        (orchestrator.restart_activation, ActivationRequest.RESTART),
+    ],
+)
+@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+def test_activation_requests(
+    enqueue_mock, activation, command, queued_request
+):
+    command(activation.id)
+    enqueue_args = [
+        "activation",
+        orchestrator._manage_activation_job_id(activation.id),
+        orchestrator._manage,
+        activation.id,
+    ]
+    enqueue_mock.assert_called_once_with(*enqueue_args)
+
+    queued = models.ActivationRequestQueue.objects.first()
+    assert queued.activation == activation
+    assert queued.request == queued_request
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.enqueue_delay")
+def test_system_restart_activation(enqueue_mock, activation):
+    orchestrator.system_restart_activation(activation.id, 5)
+    enqueue_args = [
+        "default",
+        5,
+        orchestrator.auto_start_activation,
+        activation.id,
+    ]
+    enqueue_mock.assert_called_once_with(*enqueue_args)
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+def test_monitor_activations(
+    enqueue_mock, activation, max_running_activations
+):
+    call_args = [
+        mock.call(
+            "activation",
+            orchestrator._manage_activation_job_id(activation.id),
+            orchestrator._manage,
+            activation.id,
+        )
+    ]
+    for running in max_running_activations:
+        call_args.append(
+            mock.call(
+                "activation",
+                orchestrator._manage_activation_job_id(running.id),
+                orchestrator._manage,
+                running.id,
+            )
+        )
+
+    queue.push(activation.id, ActivationRequest.START)
+    orchestrator.monitor_activations()
+
+    enqueue_mock.assert_has_calls(call_args, any_order=True)
