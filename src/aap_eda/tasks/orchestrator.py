@@ -20,18 +20,10 @@ import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ActivationStatus
 from aap_eda.core.models import ActivationRequestQueue
-from aap_eda.core.tasking import enqueue_delay, unique_enqueue
+from aap_eda.core.tasking import unique_enqueue
+from aap_eda.services.activation.manager import ActivationManager
 
 LOGGER = logging.getLogger(__name__)
-
-
-# This is a workaround to avoid circular imports
-# This should be refactored, probably the manager should consume
-# the queue directly in a sort of producer-consumer pattern
-def _get_manager_class() -> type:
-    from aap_eda.services.activation.manager import ActivationManager
-
-    return ActivationManager
 
 
 def _manage_activation_job_id(activation_id: int) -> str:
@@ -67,8 +59,7 @@ def _manage(activation_id: int) -> None:
         LOGGER.info(
             f"Processing monitor request for activation {activation_id}",
         )
-        manager_class = _get_manager_class()
-        manager_class(activation).monitor()
+        ActivationManager(activation).monitor()
 
 
 def _run_request(
@@ -86,8 +77,7 @@ def _run_request(
     ):
         return False
 
-    manager_class = _get_manager_class()
-    manager = manager_class(activation)
+    manager = ActivationManager(activation)
     try:
         if request.request in start_commands:
             manager.start(request.request == ActivationRequest.AUTO_START)
@@ -133,11 +123,6 @@ def start_activation(activation_id: int) -> None:
     _make_user_request(activation_id, ActivationRequest.START)
 
 
-def auto_start_activation(activation_id: int) -> None:
-    """Create a request to execute auto restart an activation."""
-    _make_user_request(activation_id, ActivationRequest.AUTO_START)
-
-
 def stop_activation(activation_id: int) -> None:
     """Create a request to stop the activation with the given id."""
     _make_user_request(activation_id, ActivationRequest.STOP)
@@ -151,15 +136,6 @@ def delete_activation(activation_id: int) -> None:
 def restart_activation(activation_id: int) -> None:
     """Create a request to restart the activation with the given id."""
     _make_user_request(activation_id, ActivationRequest.RESTART)
-
-
-def system_restart_activation(activation_id: int, delay: int) -> None:
-    """Create a request from the system to start the activation.
-
-    This function is intended to be used by the manager to schedule
-    a start of the activation for restart policies.
-    """
-    enqueue_delay("default", delay, auto_start_activation, activation_id)
 
 
 def monitor_activations() -> None:

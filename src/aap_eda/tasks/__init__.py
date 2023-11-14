@@ -13,10 +13,8 @@
 #  limitations under the License.
 
 from .project import import_project, sync_project
-from .ruleset import activate
 
 __all__ = (
     "import_project",
     "sync_project",
-    "activate",
 )
