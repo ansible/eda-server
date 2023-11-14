@@ -8,6 +8,7 @@ PROJECT_DIR="${SCRIPTS_DIR}/.."
 
 CMD=${1:-help}
 VERSION=${2:-'latest'}
+PORT=${2:-''}
 
 # dev environment variables
 export EDA_DEV_UI_GIT_REPO=${EDA_DEV_UI_GIT_REPO:-'git@github.com:ansible/ansible-ui.git'}
@@ -188,7 +189,7 @@ port-forward() {
 }
 
 port-forward-ui() {
-  local _local_port=${1}
+  local _local_port=${PORT:-"8080"}
   local _svc_name=eda-ui
   local _svc_port=8080
 
@@ -197,7 +198,7 @@ port-forward-ui() {
 }
 
 port-forward-api() {
-  local _local_port=${1}
+  local _local_port=${PORT:-"8000"}
   local _svc_name=eda-api
   local _svc_port=8000
 
@@ -227,8 +228,8 @@ case ${CMD} in
   "build") build-all "${VERSION}" ;;
   "clean") clean-deployment "${VERSION}";;
   "deploy") deploy "${VERSION}" ;;
-  "port-forward-api") port-forward-api 8000 ;;
-  "port-forward-ui") port-forward-ui 8080 ;;
+  "port-forward-api") port-forward-api ${PORT} ;;
+  "port-forward-ui") port-forward-ui ${PORT} ;;
   "port-forward-pg") port-forward-pg 5432 ;;
   "eda-logs") get-eda-logs ;;
   "help") usage ;;
