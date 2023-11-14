@@ -70,7 +70,7 @@ def max_running_activations():
         ActivationRequest.AUTO_START,
     ],
 )
-@mock.patch("aap_eda.services.activation.manager.ActivationManager")
+@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
 def test_manage_request(manager_mock, activation, verb):
     queue.push(activation.id, verb)
     manager_instance_mock = mock.Mock()
@@ -93,8 +93,10 @@ def test_manage_request(manager_mock, activation, verb):
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.services.activation.manager.ActivationManager")
+@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
 def test_manage_not_start(manager_mock, activation, max_running_activations):
+    activation.status = ActivationStatus.RUNNING
+    activation.save(update_fields=["status"])
     queue.push(activation.id, ActivationRequest.START)
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
@@ -134,19 +136,6 @@ def test_activation_requests(
     queued = models.ActivationRequestQueue.objects.first()
     assert queued.activation == activation
     assert queued.request == queued_request
-
-
-@pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.enqueue_delay")
-def test_system_restart_activation(enqueue_mock, activation):
-    orchestrator.system_restart_activation(activation.id, 5)
-    enqueue_args = [
-        "default",
-        5,
-        orchestrator.auto_start_activation,
-        activation.id,
-    ]
-    enqueue_mock.assert_called_once_with(*enqueue_args)
 
 
 @pytest.mark.django_db

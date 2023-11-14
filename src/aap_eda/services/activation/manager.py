@@ -37,7 +37,9 @@ from aap_eda.services.activation.engine.common import (
     ContainerRequest,
     Credential,
 )
-from aap_eda.tasks.orchestrator import system_restart_activation
+from aap_eda.services.activation.restart_helper import (
+    system_restart_activation,
+)
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
@@ -431,7 +433,7 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(self.db_instance.id, delay=1)
+            system_restart_activation(self.db_instance.id, delay_seconds=1)
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -456,7 +458,7 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(self.db_instance.id, delay=1)
+            system_restart_activation(self.db_instance.id, delay_seconds=1)
 
         self._set_activation_status(
             ActivationStatus.FAILED,
@@ -492,7 +494,7 @@ class ActivationManager:
             )
             system_restart_activation(
                 self.db_instance.id,
-                delay=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
+                delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
             )
         else:
             LOGGER.info(
@@ -581,7 +583,7 @@ class ActivationManager:
         # Restart
         else:
             count_msg = (
-                f"({self.db_instance.failure_count}/"
+                f"({self.db_instance.failure_count + 1}/"
                 f"{settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE})"
             )
             user_msg = (
@@ -618,7 +620,7 @@ class ActivationManager:
             )
             system_restart_activation(
                 self.db_instance.id,
-                delay=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
+                delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
 
     def _fail_instance(self, msg: tp.Optional[str] = None):
@@ -756,7 +758,7 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(self.db_instance.id, delay=1)
+        system_restart_activation(self.db_instance.id, delay_seconds=1)
 
     def delete(self):
         """User requested delete."""
