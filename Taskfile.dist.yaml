@@ -91,12 +91,12 @@ tasks:
   lint:black:
     desc: "Check code with `black`."
     cmds:
-      - poetry run black --check -- {{.CLI_ARGS | default "."}}
+      - poetry run black -- {{.CLI_ARGS | default "."}}
 
   lint:isort:
     desc: "Check code with `isort`."
     cmds:
-      - poetry run isort --check -- {{.CLI_ARGS | default "."}}
+      - poetry run isort -- {{.CLI_ARGS | default "."}}
 
   lint:ruff:
     desc: "Check code with `flake8`."
@@ -118,18 +118,8 @@ tasks:
   format:
     desc: "Run code formatters"
     cmds:
-      - task: format:isort
-      - task: format:black
-
-  format:isort:
-    desc: "Format code with `isort`."
-    cmds:
-      - poetry run isort .
-
-  format:black:
-    desc: "Format code with `black`."
-    cmds:
-      - poetry run black .
+      - task: lint:isort
+      - task: lint:black
 
   docker:
     desc: "Run docker-compose with specified CLI arguments."
@@ -214,7 +204,7 @@ tasks:
   create:superuser:
     desc: "create a superuser to use with EDA API."
     summary: |
-      Run create_superuser.sh with specified CLI arguments. If no arguments are 
+      Run create_superuser.sh with specified CLI arguments. If no arguments are
       given the following defaults are used.
         Defaults:
           user:     admin

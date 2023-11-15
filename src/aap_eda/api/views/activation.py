@@ -26,10 +26,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
-from aap_eda.api.serializers.activation import (
-    is_activation_valid,
-    parse_validation_errors,
-)
+from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
 from aap_eda.tasks.orchestrator import (
@@ -84,12 +81,7 @@ class ActivationViewSet(
         serializer = serializers.ActivationCreateSerializer(
             data=request.data, context=context
         )
-        valid = serializer.is_valid()
-        if not valid:
-            error = parse_validation_errors(serializer.errors)
-            return Response(
-                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer.is_valid(raise_exception=True)
 
         response = serializer.create(serializer.validated_data)
 
@@ -298,6 +290,10 @@ class ActivationViewSet(
             activation.status_message = error
             activation.save(update_fields=["status", "status_message"])
             logger.error(f"Failed to restart {activation.name}: {error}")
+
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
 
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST

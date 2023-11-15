@@ -61,6 +61,7 @@ services:
         && scripts/create_superuser.sh
         && gunicorn -b 0.0.0.0:8000
         -w ${EDA_API_WORKERS:-4} aap_eda.wsgi
+        --access-logfile -
     ports:
       - '8000:8000'
     depends_on:
