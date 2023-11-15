@@ -290,6 +290,10 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
+
         restart_activation(activation_id=activation.id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
