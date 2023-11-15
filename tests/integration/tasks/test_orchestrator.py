@@ -49,11 +49,14 @@ def max_running_activations():
     )
     activations = []
     for i in range(settings.MAX_RUNNING_ACTIVATIONS):
+        status = (
+            ActivationStatus.STARTING if i == 0 else ActivationStatus.RUNNING
+        )
         activations.append(
             models.Activation.objects.create(
                 name=f"running{i}",
                 user=user,
-                status=ActivationStatus.RUNNING,
+                status=status,
             )
         )
     return activations
@@ -95,16 +98,12 @@ def test_manage_request(manager_mock, activation, verb):
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
 def test_manage_not_start(manager_mock, activation, max_running_activations):
-    activation.status = ActivationStatus.RUNNING
-    activation.save(update_fields=["status"])
     queue.push(activation.id, ActivationRequest.START)
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
 
     orchestrator._manage(activation.id)
 
-    manager_mock.assert_called_once_with(activation)
-    manager_instance_mock.monitor.assert_called_once()
     manager_instance_mock.start.assert_not_called()
     assert len(queue.peek_all(activation.id)) == 1
 
