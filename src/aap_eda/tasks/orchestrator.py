@@ -104,7 +104,7 @@ def _run_request(
 
 def _can_start_new_activation(activation: models.Activation) -> bool:
     num_running_activations = models.Activation.objects.filter(
-        status=ActivationStatus.RUNNING,
+        status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
     ).count()
     if num_running_activations >= settings.MAX_RUNNING_ACTIVATIONS:
         LOGGER.info(
