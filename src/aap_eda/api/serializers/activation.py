@@ -355,7 +355,4 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
 def parse_validation_errors(errors: dict) -> str:
     messages = {key: str(error[0]) for key, error in errors.items() if error}
 
-    if "non_field_errors" in messages:
-        messages["errors"] = messages.pop("non_field_errors")
-
     return str(messages)

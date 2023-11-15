@@ -19,15 +19,25 @@ from unittest import mock
 import pytest
 
 from aap_eda.core.models import Credential
-from aap_eda.services.project.git import GitError, GitExecutor, GitRepository
+from aap_eda.services.project.git import (
+    GitAuthenticationError,
+    GitError,
+    GitExecutor,
+    GitRepository,
+)
+
+
+@pytest.fixture
+def credential() -> Credential:
+    credential = Credential.objects.create(
+        name="name", username="me", secret="supersecret"
+    )
+    credential.refresh_from_db()
+    return credential
 
 
 @pytest.mark.django_db
-def test_git_clone():
-    credential = Credential.objects.create(
-        name="name", username="me", secret="pass"
-    )
-    credential.refresh_from_db()
+def test_git_clone(credential: Credential):
     executor = mock.MagicMock(ENVIRON={})
     repository = GitRepository.clone(
         "https://git.example.com/repo.git",
@@ -39,13 +49,69 @@ def test_git_clone():
         [
             "clone",
             "--quiet",
-            "https://me:${GIT_PASSWORD}@git.example.com/repo.git",
+            "https://me:supersecret@git.example.com/repo.git",
             "/path/to/repository",
-        ]
+        ],
     )
     assert "GIT_SSL_NO_VERIFY" not in executor.ENVIRON
     assert isinstance(repository, GitRepository)
     assert repository.root == "/path/to/repository"
+
+
+@mock.patch("subprocess.run")
+@pytest.mark.django_db
+def test_git_clone_leak_password(
+    subprocess_run_mock: mock.Mock,
+    credential: Credential,
+):
+    executor = GitExecutor()
+
+    def raise_error(cmd, **kwargs):
+        raise subprocess.CalledProcessError(
+            128,
+            cmd,
+            stderr="fatal: Unable to access "
+            "'https://me:supersecret@git.example.com/repo.git'",
+        )
+
+    subprocess_run_mock.side_effect = raise_error
+
+    with pytest.raises(GitError) as exc_info:
+        GitRepository.clone(
+            "https://git.example.com/repo.git",
+            "/path/to/repository",
+            credential=credential,
+            _executor=executor,
+        )
+    assert "supersecret" not in str(exc_info)
+    assert "****" in str(exc_info)
+
+
+@mock.patch("subprocess.run")
+@pytest.mark.django_db
+def test_git_clone_auth_error(
+    subprocess_run_mock: mock.Mock,
+    credential: Credential,
+):
+    executor = GitExecutor()
+
+    def raise_error(cmd, **kwargs):
+        raise subprocess.CalledProcessError(
+            128,
+            cmd,
+            stderr="Authentication failed",
+        )
+
+    subprocess_run_mock.side_effect = raise_error
+
+    with pytest.raises(GitAuthenticationError) as exc_info:
+        GitRepository.clone(
+            "https://git.example.com/repo.git",
+            "/path/to/repository",
+            credential=credential,
+            _executor=executor,
+        )
+    assert "supersecret" not in str(exc_info)
 
 
 def test_git_clone_without_ssl_verification():
@@ -108,16 +174,13 @@ def test_git_executor_call(run_mock: mock.Mock):
     executor = GitExecutor()
     executor(["clone", "https://git.example.com/repo.git", "/test/repo"])
     run_mock.assert_called_once_with(
-        " ".join(
-            [
-                shutil.which("git"),
-                "clone",
-                "https://git.example.com/repo.git",
-                "/test/repo",
-            ]
-        ),
+        [
+            shutil.which("git"),
+            "clone",
+            "https://git.example.com/repo.git",
+            "/test/repo",
+        ],
         check=True,
-        shell=True,
         encoding="utf-8",
         env={
             "GIT_TERMINAL_PROMPT": "0",
@@ -140,7 +203,7 @@ def test_git_executor_timeout(run_mock: mock.Mock):
 
     executor = GitExecutor()
     message = re.escape(
-        f"""Command '{shutil.which("git")} status' """
+        f"""Command '['{shutil.which("git")}', 'status']' """
         """timed out after 10 seconds"""
     )
     with pytest.raises(GitError, match=message):
@@ -151,15 +214,17 @@ def test_git_executor_timeout(run_mock: mock.Mock):
 def test_git_executor_error(run_mock: mock.Mock):
     def raise_error(cmd, **_kwargs):
         raise subprocess.CalledProcessError(
-            128, cmd, stderr="fatal: not a git repository"
+            128,
+            cmd,
+            stderr="fatal: not a git repository",
         )
 
     run_mock.side_effect = raise_error
 
     executor = GitExecutor()
     message = re.escape(
-        f"""Command '{shutil.which("git")} status'"""
-        " returned non-zero exit status 128."
+        "Command git failed with return code 128. "
+        "Error: fatal: not a git repository",
     )
     with pytest.raises(GitError, match=message):
         executor(["status"])
