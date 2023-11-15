@@ -12,9 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+
+from django.db.utils import IntegrityError
+
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.tasking import enqueue_delay
+
+LOGGER = logging.getLogger(__name__)
 
 
 def system_restart_activation(activation_id: int, delay_seconds: int) -> None:
@@ -23,8 +29,19 @@ def system_restart_activation(activation_id: int, delay_seconds: int) -> None:
     This function is intended to be used by the manager to schedule
     a start of the activation for restart policies.
     """
+    LOGGER.debug(
+        f"Queuing auto-start for activation {activation_id} "
+        f"in {delay_seconds} seconds",
+    )
     enqueue_delay("default", delay_seconds, _queue_auto_start, activation_id)
 
 
 def _queue_auto_start(activation_id: int) -> None:
-    requests_queue.push(activation_id, ActivationRequest.AUTO_START)
+    LOGGER.info(f"Requesting auto-start for activation {activation_id}")
+    try:
+        requests_queue.push(activation_id, ActivationRequest.AUTO_START)
+    except IntegrityError:
+        LOGGER.warning(
+            f"Activation {activation_id} no longer exists, "
+            "auto-start request will not be processed",
+        )

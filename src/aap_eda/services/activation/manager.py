@@ -616,7 +616,7 @@ class ActivationManager:
                 f"Activation {self.db_instance.id} failed. "
                 f"Restart policy is set to {self.db_instance.restart_policy}. "
                 f"Scheduling restart in "
-                "{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
+                f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
                 self.db_instance.id,
