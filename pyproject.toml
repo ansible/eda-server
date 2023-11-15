@@ -28,7 +28,7 @@ dev = ["psycopg2-binary"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4"
-django = "<4"
+django = ">=4.2,<4.3"
 djangorestframework = "*"
 dynaconf = ">=3"
 drf-spectacular = "*"
