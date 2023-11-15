@@ -37,7 +37,14 @@ def _manage(activation_id: int) -> None:
     It will run pending user requests or monitor the activation
     if there are no pending requests.
     """
-    activation = models.Activation.objects.get(id=activation_id)
+    try:
+        activation = models.Activation.objects.get(id=activation_id)
+    except models.Activation.DoesNotExist:
+        LOGGER.warning(
+            f"Activation {activation_id} no longer exists, "
+            "activation manager task will not be processed",
+        )
+        return
 
     has_request_processed = False
     while_condition = True
