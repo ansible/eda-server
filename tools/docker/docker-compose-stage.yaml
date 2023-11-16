@@ -16,6 +16,9 @@ x-environment:
   - EDA_PROTOCOL=http
   - EDA_HOST=eda-api:8000
   - EDA_SERVER=http://eda-api:8000
+  - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
+  - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
+  - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@json None'}
 
 services:
   podman-pre-setup:
