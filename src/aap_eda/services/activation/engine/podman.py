@@ -27,7 +27,13 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core.enums import ActivationStatus
 
 from . import exceptions, messages
-from .common import ContainerEngine, ContainerRequest, Credential, LogHandler
+from .common import (
+    ContainerEngine,
+    ContainerRequest,
+    ContainerStatus,
+    Credential,
+    LogHandler,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -153,17 +159,45 @@ class Engine(ContainerEngine):
             log_handler.write(error_message, flush=True)
             raise exceptions.ContainerStartError(error_message) from e
 
-    def get_status(self, container_id: str) -> ActivationStatus:
+    def get_status(self, container_id: str) -> ContainerStatus:
         if self.client.containers.exists(container_id):
             container = self.client.containers.get(container_id)
             if container.status == "exited":
                 exit_code = container.attrs.get("State").get("ExitCode")
                 if exit_code == 0:
-                    return ActivationStatus.COMPLETED
+                    message = messages.POD_COMPLETED.format(
+                        pod_id=container_id,
+                    )
+                    return ContainerStatus(
+                        status=ActivationStatus.COMPLETED,
+                        message=message,
+                    )
                 else:
-                    return ActivationStatus.FAILED
+                    return ContainerStatus(
+                        status=ActivationStatus.FAILED,
+                        message=container.attrs.get("State").get("Error", ""),
+                    )
             elif container.status == "running":
-                return ActivationStatus.RUNNING
+                return ContainerStatus(
+                    status=ActivationStatus.RUNNING,
+                    message=messages.POD_RUNNING.format(
+                        pod_id=container_id,
+                    ),
+                )
+            elif container.status == "stopped":
+                return ContainerStatus(
+                    status=ActivationStatus.STOPPED,
+                    message=messages.POD_STOPPED.format(
+                        pod_id=container_id,
+                    ),
+                )
+            else:  # container.status == "unknown":
+                return ContainerStatus(
+                    status=ActivationStatus.ERROR,
+                    message=messages.POD_ERROR.format(
+                        pod_id=container_id,
+                    ),
+                )
         else:
             raise exceptions.ContainerNotFoundError(
                 f"Container id {container_id} not found"
