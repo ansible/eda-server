@@ -97,6 +97,11 @@ class ContainerRequest(BaseModel):
     extra_args: tp.Optional[dict] = None
 
 
+class ContainerStatus(BaseModel):
+    status: ActivationStatus
+    message: str = ""
+
+
 class ContainerEngine(ABC):
     """Abstract interface to connect to the deployment backend."""
 
@@ -105,7 +110,7 @@ class ContainerEngine(ABC):
         ...
 
     @abstractmethod
-    def get_status(self, container_id: str) -> ActivationStatus:
+    def get_status(self, container_id: str) -> ContainerStatus:
         try:
             # Implementation
             ...

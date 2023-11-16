@@ -37,10 +37,14 @@ from aap_eda.services.activation.engine.exceptions import (
 )
 
 from . import messages
-from .common import ContainerEngine, ContainerRequest, LogHandler
+from .common import (
+    ContainerEngine,
+    ContainerRequest,
+    ContainerStatus,
+    LogHandler,
+)
 
 LOGGER = logging.getLogger(__name__)
-SUCCESSFUL_EXIT_CODES = [0, 143]
 KEEP_JOBS_FOR_SECONDS = 300
 
 INVALID_IMAGE_NAME = "InvalidImageName"
@@ -133,20 +137,34 @@ class Engine(ContainerEngine):
             self.cleanup(self.job_name, log_handler)
             raise
 
-    def get_status(self, container_id: str) -> ActivationStatus:
+    def get_status(self, container_id: str) -> ContainerStatus:
         pod = self._get_job_pod(container_id)
 
         container_status = pod.status.container_statuses[0]
         if container_status.state.running:
-            status = ActivationStatus.RUNNING
+            message = messages.POD_RUNNING.format(
+                pod_id=container_id,
+            )
+            status = ContainerStatus(
+                status=ActivationStatus.RUNNING,
+                message=message,
+            )
         elif container_status.state.terminated:
             exit_code = container_status.state.terminated.exit_code
-            # should change 143 to ActivationStatus.STOPPED?
-            if exit_code in SUCCESSFUL_EXIT_CODES:
-                status = ActivationStatus.COMPLETED
-                LOGGER.info("Pod has successfully exited")
+            if exit_code == 0:
+                message = messages.POD_COMPLETED.format(
+                    pod_id=container_id,
+                )
+                status = ContainerStatus(
+                    status=ActivationStatus.COMPLETED,
+                    message=message,
+                )
+                LOGGER.info(message)
             else:
-                status = ActivationStatus.FAILED
+                status = ContainerStatus(
+                    status=ActivationStatus.FAILED,
+                    message=container_status.state.terminated.message or "",
+                )
                 LOGGER.info(
                     f"Pod exited with {exit_code}, reason "
                     f"{container_status.state.terminated.reason}"
@@ -157,7 +175,11 @@ class Engine(ContainerEngine):
                 f"status: {container_status}"
                 "set status to error.",
             )
-            status = ActivationStatus.ERROR
+            status = ContainerStatus(
+                status=ActivationStatus.ERROR,
+                message=container_status.state.waiting.message or "",
+            )
+
         LOGGER.info(f"Job {container_id} status: {status}")
         return status
 
@@ -455,7 +477,7 @@ class Engine(ContainerEngine):
                     ):
                         exit_code = statuses[0].state.terminated.exit_code
                         reason = statuses[0].state.terminated.reason
-                        if exit_code not in SUCCESSFUL_EXIT_CODES:
+                        if exit_code != 0:
                             error_msg = (
                                 f"Pod {pod_name} failed with "
                                 f"exit code {exit_code}"

@@ -29,6 +29,7 @@ from aap_eda.services.activation.engine.common import (
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineInitError,
+    ContainerImagePullError,
     ContainerStartError,
 )
 from aap_eda.services.activation.engine.kubernetes import (
@@ -36,10 +37,6 @@ from aap_eda.services.activation.engine.kubernetes import (
     IMAGE_PULL_ERROR,
     INVALID_IMAGE_NAME,
     Engine,
-)
-from aap_eda.services.activation.exceptions import (
-    ActivationImageNotFound,
-    ActivationImagePullError,
 )
 
 
@@ -289,9 +286,8 @@ def test_engine_start(init_data, kubernetes_engine):
     )
 
     assert models.ActivationInstanceLog.objects.count() == 4
-    assert (
-        models.ActivationInstanceLog.objects.last().log
-        == f"Job {engine.job_name} is running"
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        f"Job {engine.job_name} is running"
     )
 
 
@@ -310,9 +306,8 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
             watcher.stream.return_value = get_stream_event(phase)
             engine.start(request, log_handler)
 
-            assert (
-                models.ActivationInstanceLog.objects.last().log
-                == f"Job {engine.job_name} is running"
+            assert models.ActivationInstanceLog.objects.last().log.endswith(
+                f"Job {engine.job_name} is running"
             )
 
         for phase in ["Failed", "Unknown"]:
@@ -326,9 +321,9 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
 @pytest.mark.parametrize(
     "image_reasons",
     [
-        {INVALID_IMAGE_NAME: ActivationImageNotFound},
-        {IMAGE_PULL_ERROR: ActivationImagePullError},
-        {IMAGE_PULL_BACK_OFF: ActivationImagePullError},
+        {INVALID_IMAGE_NAME: ContainerImagePullError},
+        {IMAGE_PULL_ERROR: ContainerImagePullError},
+        {IMAGE_PULL_BACK_OFF: ContainerImagePullError},
     ],
 )
 @pytest.mark.django_db
@@ -369,9 +364,9 @@ def test_get_status(kubernetes_engine, container_statuses):
     ):
         for key in container_statuses:
             pod_mock.status.container_statuses = get_pod_statuses(key)
-            status = engine.get_status("container_id")
+            pod_status = engine.get_status("container_id")
 
-            assert status == container_statuses[key]
+            assert pod_status.status == container_statuses[key]
 
 
 @pytest.mark.parametrize(
@@ -381,7 +376,7 @@ def test_get_status(kubernetes_engine, container_statuses):
         {1: ActivationStatus.FAILED},
         {2: ActivationStatus.FAILED},
         {137: ActivationStatus.FAILED},
-        {143: ActivationStatus.COMPLETED},
+        {143: ActivationStatus.FAILED},
     ],
 )
 @pytest.mark.django_db
@@ -396,9 +391,9 @@ def test_get_status_with_exit_codes(kubernetes_engine, exit_codes):
             pod_mock.status.container_statuses = (
                 get_pod_statuses_with_exit_code(code)
             )
-            status = engine.get_status("container_id")
+            pod_status = engine.get_status("container_id")
 
-            assert status == exit_codes[code]
+            assert pod_status.status == exit_codes[code]
 
 
 @pytest.mark.django_db
@@ -412,16 +407,15 @@ def test_cleanup_secret(init_data, kubernetes_engine):
         core_api_mock.delete_namespaced_secret.return_value = status_mock
         engine._delete_secret(log_handler)
 
-        assert (
-            models.ActivationInstanceLog.objects.last().log
-            == f"Secret {engine.secret_name} is deleted."
+        assert models.ActivationInstanceLog.objects.last().log.endswith(
+            f"Secret {engine.secret_name} is deleted."
         )
 
         status_mock.status = "Fail"
         status_mock.reason = "Not found"
         engine._delete_secret(log_handler)
 
-        assert models.ActivationInstanceLog.objects.last().log == (
+        assert models.ActivationInstanceLog.objects.last().log.endswith(
             f"Failed to delete secret {engine.secret_name}: "
             f"status: {status_mock.status}"
             f"reason: {status_mock.reason}"
@@ -445,9 +439,8 @@ def test_cleanup_service(init_data, kubernetes_engine):
 
         core_api_mock.delete_namespaced_service.assert_called_once()
 
-        assert (
-            models.ActivationInstanceLog.objects.last().log
-            == f"Service {service_name} is deleted."
+        assert models.ActivationInstanceLog.objects.last().log.endswith(
+            f"Service {service_name} is deleted."
         )
 
 
@@ -500,9 +493,8 @@ def test_cleanup(init_data, kubernetes_engine):
                 services_mock.assert_called_once()
                 job_mock.assert_called_once()
 
-    assert (
-        models.ActivationInstanceLog.objects.last().log
-        == f"Job {job_name} is cleaned up."
+    assert models.ActivationInstanceLog.objects.last().log.endswith(
+        f"Job {job_name} is cleaned up."
     )
 
 
