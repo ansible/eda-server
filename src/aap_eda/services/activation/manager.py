@@ -350,7 +350,7 @@ class ActivationManager:
             latest_instance = self.latest_instance
 
             with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
-                container_status = self.container_engine.get_status(
+                container_status, _ = self.container_engine.get_status(
                     container_id=latest_instance.activation_pod_id,
                 )
 
@@ -854,7 +854,7 @@ class ActivationManager:
         # get the status of the container
         container_status = None
         with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
-            container_status = self.container_engine.get_status(
+            container_status, _ = self.container_engine.get_status(
                 container_id=self.latest_instance.activation_pod_id,
             )
 

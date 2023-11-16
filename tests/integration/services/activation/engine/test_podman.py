@@ -23,6 +23,7 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.db_log_handler import DBLogger
+from aap_eda.services.activation.engine import messages
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
@@ -290,7 +291,10 @@ def test_engine_get_status(podman_engine):
     container_mock.status = "running"
     activation_status = engine.get_status("container_id")
 
-    assert activation_status == ActivationStatus.RUNNING
+    assert activation_status.status == ActivationStatus.RUNNING
+    assert activation_status.message == messages.POD_RUNNING.format(
+        pod_id="container_id"
+    )
 
     # when status in "exited"
     container_mock.status = "exited"
@@ -303,7 +307,7 @@ def test_engine_get_status(podman_engine):
         container_mock.attrs.get.return_value.get.return_value = key
         activation_status = engine.get_status("container_id")
 
-        assert activation_status == value
+        assert activation_status.status == value
 
 
 @pytest.mark.django_db
