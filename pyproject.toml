@@ -12,9 +12,7 @@ version = "0.1.0"
 description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
-packages = [
-    {include = "aap_eda", from = "src"}
-]
+packages = [{ include = "aap_eda", from = "src" }]
 
 [tool.poetry.scripts]
 aap-eda-manage = 'aap_eda.manage:main'
@@ -44,15 +42,16 @@ kubernetes = "*"
 podman = ">=4.5"
 rq-scheduler = "^0.10"
 # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-# We are temporarily updating it to use latest from devel branch to keep consistency accross 
+# We are temporarily updating it to use latest from devel branch to keep consistency accross
 # other AAP components
-django-ansible-base = {git = "https://github.com/ansible/django-ansible-base.git"}
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git" }
+jinja2 = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
-requests = { version="*", python="<4.0" }
+requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-redis = "^3.0.2"
 
@@ -60,7 +59,7 @@ pytest-redis = "^3.0.2"
 flake8 = "*"
 isort = "*"
 black = "*"
-flake8-broken-line = { version="*", python="<4.0" }
+flake8-broken-line = { version = "*", python = "<4.0" }
 flake8-string-format = "*"
 # This is an experimental linter.
 ruff = "*"
@@ -71,7 +70,7 @@ flake8-bugbear = "*"
 flake8-comprehensions = "*"
 flake8-debugger = "*"
 flake8-docstrings = "*"
-flake8-eradicate = { version="*", python="<4.0" }
+flake8-eradicate = { version = "*", python = "<4.0" }
 flake8-print = "*"
 
 [tool.poetry.group.dev.dependencies]
@@ -95,11 +94,11 @@ line-length = 79
 select = [
     "E",
     "F",
-    "D",        # flake8-docstrings
-    "TID",      # flake8-tidy-imports
+    "D",   # flake8-docstrings
+    "TID", # flake8-tidy-imports
 ]
 extend-ignore = [
-    "D1",       #  Missing docstrings errors
+    "D1", #  Missing docstrings errors
 ]
 
 [tool.ruff.per-file-ignores]

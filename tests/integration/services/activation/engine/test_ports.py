@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pytest
+
+from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine.ports import find_ports
 
 
@@ -25,8 +28,11 @@ def test_ports():
         host: 0.0.0.0
         port: 5555
 """
-    ports = find_ports(rulebook)
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
+    assert ports == [("0.0.0.0", 5555)]
 
+    ports = find_ports(rulebook)
     assert ports == [("0.0.0.0", 5555)]
 
 
@@ -39,7 +45,8 @@ def test_ports_as_string():
     - ansible.eda.webhook:
         port: "5555"
 """
-    ports = find_ports(rulebook)
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
 
     assert ports == [(None, 5555)]
 
@@ -57,7 +64,8 @@ def test_ports_with_multi_sources():
         host: 127.0.0.1
         port: 8888
 """
-    ports = find_ports(rulebook)
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
 
     assert ports == [("0.0.0.0", 5555), ("127.0.0.1", 8888)]
 
@@ -71,7 +79,8 @@ def test_ports_without_host():
     - ansible.eda.webhook:
         port: 5555
 """
-    ports = find_ports(rulebook)
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
 
     assert ports == [(None, 5555)]
 
@@ -85,7 +94,8 @@ def test_ports_without_port():
     - ansible.eda.webhook:
         host: 0.0.0.0
 """
-    ports = find_ports(rulebook)
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
 
     assert ports == []
 
@@ -98,6 +108,68 @@ def test_ports_with_empty_plugin():
   sources:
     - ansible.eda.webhook:
 """
-    ports = find_ports(rulebook)
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
 
     assert ports == []
+
+
+def test_ports_with_extra_vars():
+    rulebook = """
+---
+- name: Run a webhook listener service
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        host: "localhost"
+        port: "{{ webhook_port | default(5000) }}"
+"""
+    context = {"webhook_port": 8000}
+    ports = find_ports(rulebook, context)
+    assert ports == [("localhost", 8000)]
+
+    context = {"webhook_port": "8000"}
+    ports = find_ports(rulebook, context)
+    assert ports == [("localhost", 8000)]
+
+    context = {"webhook_port": "bad_num"}
+    ports = find_ports(rulebook, context)
+    assert ports == []
+
+    context = {"port": 8000}
+    ports = find_ports(rulebook, context)
+    assert ports == [("localhost", 5000)]
+
+    context = {"port": "bad_num"}
+    ports = find_ports(rulebook, context)
+    assert ports == [("localhost", 5000)]
+
+    context = {}
+    ports = find_ports(rulebook, context)
+    assert ports == [("localhost", 5000)]
+
+    context = {"webhook_port": 8000, "extra_var": "var", "extra_int": 0}
+    ports = find_ports(rulebook, context)
+    assert ports == [("localhost", 8000)]
+
+    ports = find_ports(rulebook)
+    assert ports == [("localhost", 5000)]
+
+    context = "bad_context"
+    with pytest.raises(exceptions.ActivationStartError):
+        find_ports(rulebook, context)
+
+
+def test_ports_with_extra_vars_without_default():
+    rulebook = """
+---
+- name: Run a webhook listener service
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        port: "{{ webhook_port }}"
+"""
+    context = {"port": 8000}
+
+    with pytest.raises(exceptions.ActivationStartError):
+        find_ports(rulebook, context)

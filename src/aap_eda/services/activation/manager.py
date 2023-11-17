@@ -20,6 +20,7 @@ import uuid
 from datetime import timedelta
 from functools import wraps
 
+import yaml
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -928,6 +929,15 @@ class ActivationManager:
             raise exceptions.ActivationStartError(msg) from exc
 
     def _build_container_request(self) -> ContainerRequest:
+        if self.db_instance.extra_var:
+            context = yaml.safe_load(self.db_instance.extra_var.extra_var)
+            if not isinstance(context, dict):
+                msg = f"{context} is not in dict format."
+                LOGGER.error(msg)
+                raise exceptions.ActivationStartError(msg)
+        else:
+            context = {}
+
         return ContainerRequest(
             credential=self._build_credential(),
             cmdline=self._build_cmdline(),
@@ -936,7 +946,7 @@ class ActivationManager:
                 f"-{uuid.uuid4()}"
             ),
             image_url=self.db_instance.decision_environment.image_url,
-            ports=find_ports(self.db_instance.rulebook_rulesets),
+            ports=find_ports(self.db_instance.rulebook_rulesets, context),
             activation_id=self.db_instance.id,
             activation_instance_id=self.latest_instance.id,
             env_vars=settings.PODMAN_ENV_VARS,
