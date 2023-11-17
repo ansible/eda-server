@@ -43,6 +43,7 @@ cryptography = "*"
 kubernetes = "*"
 podman = ">=4.5"
 rq-scheduler = "^0.10"
+jinja2 = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
