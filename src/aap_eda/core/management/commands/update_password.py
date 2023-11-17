@@ -33,7 +33,7 @@ class Command(BaseCommand):
             user.set_password(password)
             user.save()
         except models.User.DoesNotExist:
-            raise CommandError(f"User '{username}' does not exist. ")
+            raise CommandError(f"User '{username}' does not exist.")
 
         self.stdout.write(
             f"Successfully updated the password of user '{username}'"
