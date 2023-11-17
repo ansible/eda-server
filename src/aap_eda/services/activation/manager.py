@@ -350,17 +350,19 @@ class ActivationManager:
             latest_instance = self.latest_instance
 
             with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
-                container_status, _ = self.container_engine.get_status(
+                container_status = self.container_engine.get_status(
                     container_id=latest_instance.activation_pod_id,
                 )
 
             if latest_instance.status == status and (
-                container_status is not None and container_status == status
+                container_status is not None
+                and container_status.status == status
             ):
                 return True
 
             if latest_instance.status == status and (
-                container_status is not None and container_status != status
+                container_status is not None
+                and container_status.status != status
             ):
                 return False
 
@@ -466,7 +468,7 @@ class ActivationManager:
         )
         container_logger.write(msg, flush=True)
 
-    def _completed_policy(self):
+    def _completed_policy(self, container_msg: str):
         """Apply the completed restart policy.
 
         Completed containers are only restart with ALWAYS policy.+
@@ -487,6 +489,8 @@ class ActivationManager:
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds "
                 f"accordingly to the restart policy {RestartPolicy.ALWAYS}"
             )
+            if container_msg:
+                user_msg += f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             self._set_latest_instance_status(
                 ActivationStatus.COMPLETED,
@@ -506,6 +510,8 @@ class ActivationManager:
                 "Activation completed successfully. "
                 "No restart policy is applied."
             )
+            if container_msg:
+                user_msg += f"{container_msg} {user_msg}"
             self._set_latest_instance_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
@@ -515,7 +521,7 @@ class ActivationManager:
                 user_msg,
             )
 
-    def _failed_policy(self):
+    def _failed_policy(self, container_msg: str):
         container_logger = self.container_logger_class(self.latest_instance.id)
         """Apply the failed restart policy."""
         LOGGER.info(
@@ -530,6 +536,8 @@ class ActivationManager:
                 f"Restart policy is set to {self.db_instance.restart_policy}.",
             )
             user_msg = "Activation failed. Restart policy is not applicable."
+            if container_msg:
+                user_msg += f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
@@ -563,6 +571,8 @@ class ActivationManager:
                 "Has reached the maximum number of restarts. "
                 "Restart policy is not applicable."
             )
+            if container_msg:
+                user_msg += f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
@@ -592,6 +602,8 @@ class ActivationManager:
                 "accordingly to the restart policy "
                 f"{self.db_instance.restart_policy}"
             )
+            if container_msg:
+                user_msg += f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
@@ -854,7 +866,7 @@ class ActivationManager:
         # get the status of the container
         container_status = None
         with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
-            container_status, _ = self.container_engine.get_status(
+            container_status = self.container_engine.get_status(
                 container_id=self.latest_instance.activation_pod_id,
             )
 
@@ -871,31 +883,42 @@ class ActivationManager:
         )
 
         self.update_logs()
-        # TODO: container status maybe should use its own dataclass
-        if container_status == ActivationStatus.COMPLETED:  # RC == 0
-            self._completed_policy()
+
+        if container_status.status == ActivationStatus.COMPLETED:  # RC == 0
+            self._completed_policy(container_status.message)
             return
-        if container_status == ActivationStatus.FAILED:  # RC != 0
-            self._failed_policy()
+        if container_status.status == ActivationStatus.FAILED:  # RC != 0
+            self._failed_policy(container_status.message)
             return
 
-        if container_status == ActivationStatus.RUNNING:
+        if container_status.status == ActivationStatus.RUNNING:
             msg = (
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 "Container is running. "
                 "Updating logs."
             )
+            LOGGER.info(msg)
             return
 
         # we don't expect an error status for the container
-        if container_status == ActivationStatus.ERROR:
-            raise exceptions.ActivationMonitorError(
-                f"Container {self.latest_instance.activation_pod_id} "
-                "is in an error state."
+        # in these cases we run the cleanup and set the activation to error
+        if container_status.status == ActivationStatus.ERROR:
+            msg = (
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                f"Container is in an error state. {container_status.message}"
             )
+            LOGGER.error(msg)
+            log_handler = self.container_logger_class(self.latest_instance.id)
+            self.container_engine.cleanup(
+                self.latest_instance.activation_pod_id,
+                log_handler,
+            )
+            self._error_instance(msg)
+            self._error_activation(msg)
+            raise exceptions.ActivationMonitorError(msg)
 
         # we don't expect stopping status for the container
-        if container_status == ActivationStatus.STOPPED:
+        if container_status.status == ActivationStatus.STOPPED:
             raise exceptions.ActivationMonitorError(
                 f"Container {self.latest_instance.activation_pod_id} "
                 "is in an stopped state.",

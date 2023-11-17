@@ -148,15 +148,16 @@ class Activation(models.Model):
     ) -> None:
         self.status = status
         self.status_updated_at = models.functions.Now()
+        update_fields = [
+            "status",
+            "status_updated_at",
+            "modified_at",
+        ]
         if status_message:
             self.status_message = status_message
+            update_fields.append("status_message")
         self.save(
-            update_fields=[
-                "status",
-                "status_updated_at",
-                "status_message",
-                "modified_at",
-            ]
+            update_fields=update_fields,
         )
 
 
@@ -233,14 +234,25 @@ class ActivationInstance(models.Model):
     ) -> None:
         self.status = status
         self.updated_at = models.functions.Now()
+        update_fields = [
+            "status",
+            "updated_at",
+        ]
         if status_message:
             self.status_message = status_message
+            update_fields.append("status_message")
+
+        if status in [
+            ActivationStatus.STOPPED,
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+            ActivationStatus.ERROR,
+        ]:
+            self.ended_at = models.functions.Now()
+            update_fields.append("ended_at")
+
         self.save(
-            update_fields=[
-                "status",
-                "status_message",
-                "updated_at",
-            ]
+            update_fields=update_fields,
         )
 
 
