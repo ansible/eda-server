@@ -218,7 +218,7 @@ port-forward-pg() {
 
 get-eda-logs() {
   log-debug "kubectl logs -n ${NAMESPACE} -l app=eda -f"
-  kubectl logs -n "${NAMESPACE}" -l app=eda -f
+  kubectl logs -n "${NAMESPACE}" -l app=eda --max-log-requests=10 -f
 }
 
 #
