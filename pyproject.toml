@@ -70,6 +70,9 @@ flake8-docstrings = "*"
 flake8-eradicate = { version="*", python="<4.0" }
 flake8-print = "*"
 
+[tool.poetry.group.dev.dependencies]
+ipython = "*"
+
 # -------------------------------------
 # Tools
 # -------------------------------------
