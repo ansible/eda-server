@@ -81,7 +81,7 @@ services:
       - '../../:/app/src:z'
 
   eda-ws:
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
     command:
       - /bin/bash
