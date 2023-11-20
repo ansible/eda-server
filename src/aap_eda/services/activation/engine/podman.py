@@ -160,48 +160,65 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerStartError(error_message) from e
 
     def get_status(self, container_id: str) -> ContainerStatus:
-        if self.client.containers.exists(container_id):
-            container = self.client.containers.get(container_id)
-            if container.status == "exited":
-                exit_code = container.attrs.get("State").get("ExitCode")
-                if exit_code == 0:
-                    message = messages.POD_COMPLETED.format(
-                        pod_id=container_id,
-                    )
-                    return ContainerStatus(
-                        status=ActivationStatus.COMPLETED,
-                        message=message,
-                    )
-                else:
-                    return ContainerStatus(
-                        status=ActivationStatus.FAILED,
-                        message=container.attrs.get("State").get("Error", ""),
-                    )
-            elif container.status == "running":
-                return ContainerStatus(
-                    status=ActivationStatus.RUNNING,
-                    message=messages.POD_RUNNING.format(
-                        pod_id=container_id,
-                    ),
-                )
-            elif container.status == "stopped":
-                return ContainerStatus(
-                    status=ActivationStatus.STOPPED,
-                    message=messages.POD_STOPPED.format(
-                        pod_id=container_id,
-                    ),
-                )
-            else:  # container.status == "unknown":
-                return ContainerStatus(
-                    status=ActivationStatus.ERROR,
-                    message=messages.POD_ERROR.format(
-                        pod_id=container_id,
-                    ),
-                )
-        else:
+        if not self.client.containers.exists(container_id):
             raise exceptions.ContainerNotFoundError(
                 f"Container id {container_id} not found"
             )
+
+        container = self.client.containers.get(container_id)
+        error_msg = container.attrs.get("State").get("Error", "")
+
+        if container.status == "exited":
+            exit_code = container.attrs.get("State").get("ExitCode")
+            if exit_code == 0:
+                message = messages.POD_COMPLETED.format(
+                    pod_id=container_id,
+                )
+                return ContainerStatus(
+                    status=ActivationStatus.COMPLETED,
+                    message=message,
+                )
+            if not error_msg:
+                error_msg = messages.POD_GENERIC_FAIL.format(
+                    pod_id=container_id,
+                    exit_code=exit_code,
+                )
+            return ContainerStatus(
+                status=ActivationStatus.FAILED,
+                message=error_msg,
+            )
+        if container.status == "running":
+            return ContainerStatus(
+                status=ActivationStatus.RUNNING,
+                message=messages.POD_RUNNING.format(
+                    pod_id=container_id,
+                ),
+            )
+        if container.status == "created":
+            if not error_msg:
+                error_msg = messages.POD_NOT_RUNNING.format(
+                    pod_id=container_id,
+                )
+
+            return ContainerStatus(
+                status=ActivationStatus.FAILED,
+                message=error_msg,
+            )
+        if container.status == "paused":
+            return ContainerStatus(
+                status=ActivationStatus.FAILED,
+                message=messages.POD_PAUSED.format(
+                    pod_id=container_id,
+                ),
+            )
+
+        # container.status == "unknown":
+        return ContainerStatus(
+            status=ActivationStatus.ERROR,
+            message=messages.POD_ERROR.format(
+                pod_id=container_id,
+            ),
+        )
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
