@@ -491,7 +491,7 @@ class ActivationManager:
                 f"accordingly to the restart policy {RestartPolicy.ALWAYS}"
             )
             if container_msg:
-                user_msg += f"{container_msg} {user_msg}"
+                user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             self._set_latest_instance_status(
                 ActivationStatus.COMPLETED,
@@ -512,7 +512,7 @@ class ActivationManager:
                 "No restart policy is applied."
             )
             if container_msg:
-                user_msg += f"{container_msg} {user_msg}"
+                user_msg = f"{container_msg} {user_msg}"
             self._set_latest_instance_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
@@ -538,7 +538,7 @@ class ActivationManager:
             )
             user_msg = "Activation failed. Restart policy is not applicable."
             if container_msg:
-                user_msg += f"{container_msg} {user_msg}"
+                user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
@@ -573,7 +573,7 @@ class ActivationManager:
                 "Restart policy is not applicable."
             )
             if container_msg:
-                user_msg += f"{container_msg} {user_msg}"
+                user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
@@ -604,7 +604,7 @@ class ActivationManager:
                 f"{self.db_instance.restart_policy}"
             )
             if container_msg:
-                user_msg += f"{container_msg} {user_msg}"
+                user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
