@@ -5,7 +5,7 @@ x-environment:
   - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
   - EDA_ALLOWED_HOSTS=['*']
   - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-api:8000}
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-ws:8000}
   - EDA_WEBSOCKET_SSL_VERIFY=no
   - EDA_PODMAN_SOCKET_URL=tcp://podman:8888
   - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
@@ -14,6 +14,9 @@ x-environment:
   - EDA_PROTOCOL=http
   - EDA_HOST=${EDA_HOST:-eda-api:8000}
   - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
+  - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
+  - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
+  - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
 
 services:
   podman-pre-setup:
@@ -76,6 +79,23 @@ services:
       retries: 10
     volumes:
       - '../../:/app/src:z'
+
+  eda-ws:
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - '8001:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+
 
   eda-scheduler:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
