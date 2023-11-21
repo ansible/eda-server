@@ -94,11 +94,9 @@ class Engine(ContainerEngine):
                         f"Container {container_id} not found.",
                         flush=True,
                     )
+        # ContainerCleanupError handled by the manager
         except APIError as e:
-            msg = f"Failed to cleanup container {container_id} error: {e}"
-            LOGGER.error(msg)
-            log_handler.write(msg, flush=True)
-            return
+            raise exceptions.ContainerCleanupError(str(e)) from e
 
     def _image_exists(self, image_url: str) -> bool:
         try:
@@ -257,16 +255,12 @@ class Engine(ContainerEngine):
                 exit_code = container.attrs.get("State").get("ExitCode")
                 log_handler.write(
                     f"Container {container_id} exited with {exit_code}.",
-                    True,
+                    flush=True,
                 )
 
+        # ContainerUpdateLogsError handled by the manager
         except APIError as e:
-            msg = (
-                "Failed to fetch container logs: "
-                "{container_id}; error: {str(e)}"
-            )
-            LOGGER.exception(msg)
-            raise exceptions.ContainerUpdateLogsError(msg) from e
+            raise exceptions.ContainerUpdateLogsError(str(e)) from e
 
     def _cleanup(self, container_id: str, _log_handler: LogHandler) -> None:
         try:
