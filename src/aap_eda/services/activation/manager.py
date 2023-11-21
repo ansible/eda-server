@@ -331,16 +331,26 @@ class ActivationManager:
 
     def _cleanup(self):
         """Cleanup the latest instance of the activation."""
-        # TODO: Catch exceptions from the engine as well as start method does
-        self._set_activation_status(ActivationStatus.STOPPING)
-        self._set_latest_instance_status(ActivationStatus.STOPPING)
         latest_instance = self.db_instance.latest_instance
 
         log_handler = self.container_logger_class(latest_instance.id)
-        self.container_engine.cleanup(
-            latest_instance.activation_pod_id,
-            log_handler,
-        )
+        try:
+            self.container_engine.cleanup(
+                latest_instance.activation_pod_id,
+                log_handler,
+            )
+        # We don't have identified cases where we stop the workflow
+        # because of a cleanup error. So we are not raising an exception.
+        # In the future we may want to raise an exception
+        # and catch it where the cleanup is called.
+        except engine_exceptions.ContainerEngineError as exc:
+            pod_id = latest_instance.activation_pod_id
+            msg = (
+                f"Activation {self.db_instance.id} failed to cleanup its "
+                f"latest instance {latest_instance.id} with pod id {pod_id}. "
+                f"Reason: {exc}"
+            )
+            LOGGER.error(msg)
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
         """Check if the activation is in a given status."""
@@ -657,6 +667,7 @@ class ActivationManager:
 
     def _stop_instance(self):
         """Stop the latest activation instance."""
+        self._set_latest_instance_status(ActivationStatus.STOPPING)
         self._cleanup()
         self._set_latest_instance_status(ActivationStatus.STOPPED)
         self._set_activation_pod_id(pod_id=None)
@@ -735,11 +746,12 @@ class ActivationManager:
             return
 
         try:
+            self._set_activation_status(ActivationStatus.STOPPING)
             self._stop_instance()
 
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
-                f"Activation {self.db_instance.id} failed to cleanup. "
+                f"Activation {self.db_instance.id} failed to stop. "
                 f"Reason: {exc}"
             )
             # Alex: Not sure if we want to change the status here.
@@ -779,7 +791,7 @@ class ActivationManager:
             f"Delete operation requested for activation id: "
             f"{self.db_instance.id},",
         )
-        self.stop()
+        self._cleanup()
         self.db_instance.delete()
         LOGGER.info(
             f"Delete operation for activation id: {self.db_instance.id} "
@@ -886,9 +898,11 @@ class ActivationManager:
         self.update_logs()
 
         if container_status.status == ActivationStatus.COMPLETED:  # RC == 0
+            self._cleanup()
             self._completed_policy(container_status.message)
             return
         if container_status.status == ActivationStatus.FAILED:  # RC != 0
+            self._cleanup()
             self._failed_policy(container_status.message)
             return
 
@@ -909,11 +923,7 @@ class ActivationManager:
                 f"Container is in an error state. {container_status.message}"
             )
             LOGGER.error(msg)
-            log_handler = self.container_logger_class(self.latest_instance.id)
-            self.container_engine.cleanup(
-                self.latest_instance.activation_pod_id,
-                log_handler,
-            )
+            self._cleanup()
             self._error_instance(msg)
             self._error_activation(msg)
             raise exceptions.ActivationMonitorError(msg)
