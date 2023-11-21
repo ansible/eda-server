@@ -188,10 +188,17 @@ class Engine(ContainerEngine):
 
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         self.job_name = container_id
-        self._delete_secret(log_handler)
-        self._delete_services(log_handler)
-        self._delete_job(log_handler)
-        log_handler.write(f"Job {container_id} is cleaned up.", True)
+        try:
+            self._delete_secret(log_handler)
+            self._delete_services(log_handler)
+            self._delete_job(log_handler)
+        except ContainerCleanupError as exc:
+            msg = f"Failed to cleanup job {container_id} error: {exc}"
+            LOGGER.error(msg)
+            log_handler.write(msg, flush=True)
+            return
+
+        log_handler.write(f"Job {container_id} is cleaned up.", flush=True)
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:

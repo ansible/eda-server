@@ -43,7 +43,10 @@ class DBLogger(LogHandler):
         return self.line_number
 
     def write(
-        self, lines: Union[list[str], str], flush=False, timestamp=True
+        self,
+        lines: Union[list[str], str],
+        flush: bool = False,
+        timestamp: bool = True,
     ) -> None:
         if self.incremental_flush and self.line_number % self.flush_after == 0:
             self.flush()
