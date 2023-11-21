@@ -85,18 +85,20 @@ class Engine(ContainerEngine):
                     self.update_logs(container_id, log_handler)
                     self._cleanup(container_id, log_handler)
                     log_handler.write(
-                        f"Container {container_id} is cleaned up.", True
+                        f"Container {container_id} is cleaned up.",
+                        flush=True,
                     )
                 except NotFound:
                     LOGGER.info(f"Container {container_id} not found.")
                     log_handler.write(
-                        f"Container {container_id} not found.", True
+                        f"Container {container_id} not found.",
+                        flush=True,
                     )
         except APIError as e:
-            LOGGER.exception(f"Failed to cleanup container {container_id}")
-            raise exceptions.ContainerCleanupError(
-                f"Failed to cleanup container {container_id}"
-            ) from e
+            msg = f"Failed to cleanup container {container_id} error: {e}"
+            LOGGER.error(msg)
+            log_handler.write(msg, flush=True)
+            return
 
     def _image_exists(self, image_url: str) -> bool:
         try:

@@ -27,7 +27,10 @@ from aap_eda.core.enums import ActivationStatus
 class LogHandler(ABC):
     @abstractmethod
     def write(
-        self, lines: tp.Union[list[str], str], flush: bool, timestamp: bool
+        self,
+        lines: tp.Union[list[str], str],
+        flush: bool = False,
+        timestamp: bool = True,
     ) -> None:
         pass
 
