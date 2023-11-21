@@ -318,32 +318,25 @@ class ActivationManager:
             "updating logs for activation instance: "
             f"{self.latest_instance.id}",
         )
-        try:
-            self.container_engine.update_logs(container_id, log_handler)
-        except engine_exceptions.ContainerUpdateLogsError as exc:
-            msg = (
-                f"Activation {self.db_instance.id} failed to update logs. "
-                f"Reason: {exc}"
-            )
-            LOGGER.error(msg)
-            # Alex: Not sure if we want to change the status here.
-            # For now, we are not changing the status of the activation
+
+        self.update_logs()
 
     def _cleanup(self):
         """Cleanup the latest instance of the activation."""
         latest_instance = self.db_instance.latest_instance
 
         log_handler = self.container_logger_class(latest_instance.id)
+
         try:
             self.container_engine.cleanup(
                 latest_instance.activation_pod_id,
                 log_handler,
             )
-        # We don't have identified cases where we stop the workflow
-        # because of a cleanup error. So we are not raising an exception.
-        # In the future we may want to raise an exception
-        # and catch it where the cleanup is called.
-        except engine_exceptions.ContainerEngineError as exc:
+
+        # We don't have identified cases where we want to stop the workflow
+        # because of a cleanup error.
+        # We are just logging the error and continue.
+        except engine_exceptions.ContainerCleanupError as exc:
             pod_id = latest_instance.activation_pod_id
             msg = (
                 f"Activation {self.db_instance.id} failed to cleanup its "
@@ -351,6 +344,8 @@ class ActivationManager:
                 f"Reason: {exc}"
             )
             LOGGER.error(msg)
+            log_handler.write(msg, flush=True)
+            return
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
         """Check if the activation is in a given status."""
@@ -938,12 +933,40 @@ class ActivationManager:
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
         log_handler = self.container_logger_class(self.latest_instance.id)
-        # TODO: check latest instance
-        # TODO: catch exceptions from the engine
-        self.container_engine.update_logs(
-            container_id=self.latest_instance.activation_pod_id,
-            log_handler=log_handler,
-        )
+        try:
+            self._check_latest_instance()
+        except (
+            exceptions.ActivationInstanceNotFound,
+            exceptions.ActivationInstancePodIdNotFound,
+        ):
+            msg = (
+                f"Update logs operation failed for activation id: "
+                f"{self.db_instance.id} No instance or pod id found."
+            )
+            LOGGER.error(msg)
+            # Alex: Not sure if we want to change the status here.
+            # For now, we are not changing the status of the activation
+            return
+
+        try:
+            self.container_engine.update_logs(
+                container_id=self.latest_instance.activation_pod_id,
+                log_handler=log_handler,
+            )
+
+        # We don't have identified cases where we want to stop the workflow
+        # because of a log error.
+        # We are just logging the error and continue.
+        except engine_exceptions.ContainerEngineError as exc:
+            msg = (
+                f"Logs for activation {self.db_instance.id} could not be "
+                f"fetch. Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            log_handler.write(msg, flush=True)
+            # Alex: Not sure if we want to change the status here.
+            # For now, we are not changing the status of the activation
+            return
 
     def _create_activation_instance(self):
         try:
