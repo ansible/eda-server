@@ -46,6 +46,8 @@ class Activation(models.Model):
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")
+    # TODO(alex) Since local activations are no longer supported
+    # this field should be mandatory.
     decision_environment = models.ForeignKey(
         "DecisionEnvironment", on_delete=models.SET_NULL, null=True
     )
