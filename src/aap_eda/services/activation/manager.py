@@ -987,6 +987,8 @@ class ActivationManager:
     def _build_container_request(self) -> ContainerRequest:
         if self.db_instance.extra_var:
             context = yaml.safe_load(self.db_instance.extra_var.extra_var)
+            # TODO: This will be validated by the api
+            # https://issues.redhat.com/browse/AAP-18358
             if not isinstance(context, dict):
                 msg = f"{context} is not in dict format."
                 LOGGER.error(msg)
@@ -1006,7 +1008,7 @@ class ActivationManager:
             activation_id=self.db_instance.id,
             activation_instance_id=self.latest_instance.id,
             env_vars=settings.PODMAN_ENV_VARS,
-            extra_arg=settings.PODMAN_EXTRA_ARGS,
+            extra_args=settings.PODMAN_EXTRA_ARGS,
             mem_limit=settings.PODMAN_MEM_LIMIT,
             mounts=settings.PODMAN_MOUNTS,
         )
@@ -1021,6 +1023,14 @@ class ActivationManager:
         return None
 
     def _build_cmdline(self) -> AnsibleRulebookCmdLine:
+        if not self.latest_instance:
+            msg = (
+                f"Activation {self.db_instance.id} does not have an instance, "
+                "cmdline can not be built."
+            )
+            LOGGER.exception(msg)
+            raise exceptions.ActivationManagerError(msg)
+
         return AnsibleRulebookCmdLine(
             ws_url=settings.WEBSOCKET_BASE_URL + ACTIVATION_PATH,
             log_level=settings.ANSIBLE_RULEBOOK_LOG_LEVEL,

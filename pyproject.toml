@@ -12,9 +12,7 @@ version = "0.1.0"
 description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
-packages = [
-    {include = "aap_eda", from = "src"}
-]
+packages = [{ include = "aap_eda", from = "src" }]
 
 [tool.poetry.scripts]
 aap-eda-manage = 'aap_eda.manage:main'
@@ -49,7 +47,7 @@ jinja2 = "*"
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
-requests = { version="*", python="<4.0" }
+requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-redis = "^3.0.2"
 
@@ -57,7 +55,7 @@ pytest-redis = "^3.0.2"
 flake8 = "*"
 isort = "*"
 black = "*"
-flake8-broken-line = { version="*", python="<4.0" }
+flake8-broken-line = { version = "*", python = "<4.0" }
 flake8-string-format = "*"
 # This is an experimental linter.
 ruff = "*"
@@ -68,7 +66,7 @@ flake8-bugbear = "*"
 flake8-comprehensions = "*"
 flake8-debugger = "*"
 flake8-docstrings = "*"
-flake8-eradicate = { version="*", python="<4.0" }
+flake8-eradicate = { version = "*", python = "<4.0" }
 flake8-print = "*"
 
 # -------------------------------------
@@ -89,16 +87,21 @@ line-length = 79
 select = [
     "E",
     "F",
-    "D",        # flake8-docstrings
-    "TID",      # flake8-tidy-imports
+    "D",   # flake8-docstrings
+    "TID", # flake8-tidy-imports
 ]
 extend-ignore = [
-    "D1",       #  Missing docstrings errors
+    "D1", #  Missing docstrings errors
 ]
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 "src/aap_eda/core/migrations/*" = ["E501"]
+"tests/**/*.py" = [
+    "S101",   # Asserts allowed in tests
+    "ARG",    # Fixtures are not always used explicitly
+    "SLF001", # Call private methods in tests
+]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"
