@@ -54,6 +54,7 @@ class Activation(models.Model):
     project = models.ForeignKey(
         "Project", on_delete=models.SET_NULL, null=True
     )
+    # TODO(alex): this field should be mandatory.
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.SET_NULL, null=True
     )
@@ -72,6 +73,8 @@ class Activation(models.Model):
     restart_count = models.IntegerField(default=0)
     failure_count = models.IntegerField(default=0)  # internal, since last good
     is_valid = models.BooleanField(default=False)  # internal, passed first run
+    # TODO(alex): name and rulesets should be populated in the model, not in
+    # the serializer.
     rulebook_name = models.TextField(
         null=False,
         help_text="Name of the referenced rulebook",
