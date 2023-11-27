@@ -255,11 +255,11 @@ if RQ_UNIX_SOCKET_PATH:
     RQ_QUEUES = {
         "default": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 300,
         },
         "activation": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 120,
         },
     }
 else:
@@ -267,12 +267,12 @@ else:
         "default": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 300,
         },
         "activation": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 120,
         },
     }
 RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
