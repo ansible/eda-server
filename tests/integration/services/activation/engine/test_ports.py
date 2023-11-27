@@ -51,16 +51,31 @@ def test_ports_as_string():
     assert ports == [(None, 5555)]
 
 
+def test_ports_on_unsafe_plugins():
+    rulebook = """
+---
+- name: Run a webhook service
+  hosts: all
+  sources:
+    - ansible.eda.kafka:
+        port: "5555"
+"""
+    context = {}
+    ports = find_ports(rulebook, context)
+
+    assert len(ports) == 0
+
+
 def test_ports_with_multi_sources():
     rulebook = """
 ---
 - name: Run a webhook service
   hosts: all
   sources:
-    - ansible.eda.webhook1:
+    - ansible.eda.webhook:
         host: 0.0.0.0
         port: 5555
-    - ansible.eda.webhook2:
+    - ansible.eda.webhook:
         host: 127.0.0.1
         port: 8888
 """

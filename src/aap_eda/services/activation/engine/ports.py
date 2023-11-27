@@ -3,6 +3,7 @@ import logging
 
 import jinja2
 import yaml
+from django.conf import settings
 from jinja2.exceptions import UndefinedError
 from jinja2.nativetypes import NativeTemplate
 
@@ -44,6 +45,10 @@ def find_ports(rulebook_text: str, context: dict = None) -> list[tuple]:
             # The first remaining key is the type and the arguments
             source_plugin = list(source.keys())[0]
             source_args = source[source_plugin]
+
+            if source_plugin not in settings.SAFE_PLUGINS_FOR_PORT_FORWARD:
+                continue
+
             if source_args is None:
                 continue
             # Get host if it exists

@@ -255,11 +255,11 @@ if RQ_UNIX_SOCKET_PATH:
     RQ_QUEUES = {
         "default": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 300,
+            "DEFAULT_TIMEOUT": -1,
         },
         "activation": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 120,
+            "DEFAULT_TIMEOUT": -1,
         },
     }
 else:
@@ -267,12 +267,12 @@ else:
         "default": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": 300,
+            "DEFAULT_TIMEOUT": -1,
         },
         "activation": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": 120,
+            "DEFAULT_TIMEOUT": -1,
         },
     }
 RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
@@ -399,3 +399,7 @@ MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 # ---------------------------------------------------------
 ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+
+SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
+    "SAFE_PLUGINS_FOR_PORT_FORWARD", ["ansible.eda.webhook"]
+)
