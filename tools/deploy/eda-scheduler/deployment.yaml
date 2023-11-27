@@ -32,26 +32,9 @@ spec:
               value: secret
             - name: EDA_MQ_HOST
               value: eda-redis
-            - name: EDA_WEBSOCKET_BASE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: eda-env-properties
-                  key: EDA_WEBSOCKET_BASE_URL
-            - name: EDA_WEBSOCKET_SSL_VERIFY
-              valueFrom:
-                configMapKeyRef:
-                  name: eda-env-properties
-                  key: EDA_WEBSOCKET_SSL_VERIFY
-            - name: EDA_CONTROLLER_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: eda-env-properties
-                  key: EDA_CONTROLLER_URL
-            - name: EDA_CONTROLLER_SSL_VERIFY
-              valueFrom:
-                configMapKeyRef:
-                  name: eda-env-properties
-                  key: EDA_CONTROLLER_SSL_VERIFY
+          envFrom:
+          - configMapRef:
+              name: eda-env-properties
           image: aap-eda
           imagePullPolicy: Never
           name: eda-scheduler
