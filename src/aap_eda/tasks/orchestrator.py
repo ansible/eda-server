@@ -87,7 +87,9 @@ def _run_request(
     manager = ActivationManager(activation)
     try:
         if request.request in start_commands:
-            manager.start(request.request == ActivationRequest.AUTO_START)
+            manager.start(
+                is_restart=request.request == ActivationRequest.AUTO_START,
+            )
         elif request.request == ActivationRequest.STOP:
             manager.stop()
         elif request.request == ActivationRequest.RESTART:
