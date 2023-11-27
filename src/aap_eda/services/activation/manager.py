@@ -285,10 +285,8 @@ class ActivationManager:
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: {exc}"
             )
-            self._fail_instance(msg)
-            self._set_activation_status(ActivationStatus.FAILED, msg)
-            self._failed_policy()
-            raise exceptions.ActivationStartError(msg) from exc
+            self._failed_policy(msg)
+            return
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
@@ -323,7 +321,18 @@ class ActivationManager:
 
     def _cleanup(self):
         """Cleanup the latest instance of the activation."""
+        LOGGER.info(
+            "Cleanup operation requested for activation id: "
+            f"{self.db_instance.id}",
+        )
         latest_instance = self.db_instance.latest_instance
+
+        if not latest_instance or not latest_instance.activation_pod_id:
+            LOGGER.info(
+                f"Cleanup operation activation id: {self.db_instance.id} "
+                "No instance or pod id found.",
+            )
+            return
 
         log_handler = self.container_logger_class(latest_instance.id)
 
@@ -786,8 +795,26 @@ class ActivationManager:
             f"Delete operation requested for activation id: "
             f"{self.db_instance.id},",
         )
-        self._cleanup()
-        self.db_instance.delete()
+        try:
+            self._cleanup()
+
+        # We catch all exceptions here to ensure that the activation is deleted
+        except Exception as exc:
+            msg = (
+                f"Activation {self.db_instance.id} failed to cleanup. "
+                f"Reason: {exc}"
+            )
+            LOGGER.error(msg)
+
+        try:
+            self.db_instance.delete()
+        except ObjectDoesNotExist:
+            msg = (
+                f"Delete operation Failed: Activation {self.db_instance.id} "
+                "does not exist."
+            )
+            LOGGER.error(msg)
+            raise exceptions.ActivationManagerError(msg) from None
         LOGGER.info(
             f"Delete operation for activation id: {self.db_instance.id} "
             "Activation deleted.",
