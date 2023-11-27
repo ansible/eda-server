@@ -251,13 +251,6 @@ class Engine(ContainerEngine):
                 log_handler.flush()
                 log_handler.set_log_read_at(dt)
 
-            if container.status == "exited":
-                exit_code = container.attrs.get("State").get("ExitCode")
-                log_handler.write(
-                    f"Container {container_id} exited with {exit_code}.",
-                    flush=True,
-                )
-
         # ContainerUpdateLogsError handled by the manager
         except APIError as e:
             raise exceptions.ContainerUpdateLogsError(str(e)) from e
