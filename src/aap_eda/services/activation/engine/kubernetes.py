@@ -111,7 +111,7 @@ class Engine(ContainerEngine):
         # f"{request.id}-{uuid.uuid4()}" #noqa: E800
         try:
             log_handler.write("Creating Job")
-            log_handler.write(f"Image URL is {request.image_url}", True)
+            log_handler.write(f"Image URL is {request.image_url}", flush=True)
             self._create_job(request, log_handler)
             LOGGER.info("Waiting for pod to start")
             try:
@@ -125,15 +125,15 @@ class Engine(ContainerEngine):
                 for port in self._get_ports(request.ports):
                     self._create_service(port)
             LOGGER.info(f"Job {self.job_name} is running")
-            log_handler.write(f"Job {self.job_name} is running", True)
+            log_handler.write(f"Job {self.job_name} is running", flush=True)
             return self.job_name
         except ContainerEngineError as e:
-            LOGGER.error(f"Failed to start job {self.job_name}, doing cleanup")
-            LOGGER.error(e)
-            log_handler.write(
-                f"Failed to start job {self.job_name}, doing cleanup.", True
+            msg = (
+                f"Failed to start job {self.job_name}, doing cleanup."
+                f"Reason: {e}"
             )
-            log_handler.write(f"{e}", True)
+            LOGGER.error(msg)
+            log_handler.write(msg, flush=True)
             self.cleanup(self.job_name, log_handler)
             raise
 
@@ -471,31 +471,10 @@ class Engine(ContainerEngine):
                         if reason in POD_FAILED_REASONS:
                             raise ContainerImagePullError(message)
 
-                if pod_phase == "Failed" or pod_phase == "Succeeded":
-                    statuses = event["object"].status.container_statuses
-                    if (
-                        statuses
-                        and statuses[0]
-                        and statuses[0].state.terminated
-                    ):
-                        exit_code = statuses[0].state.terminated.exit_code
-                        reason = statuses[0].state.terminated.reason
-                        if exit_code != 0:
-                            error_msg = (
-                                f"Pod {pod_name} failed with "
-                                f"exit code {exit_code}"
-                            )
-                            LOGGER.error(error_msg)
-                            log_handler.write(error_msg, True)
-                            raise ContainerStartError(error_msg)
+                if pod_phase in ["Failed", "Succeeded", "Running"]:
                     break
-
-                if pod_phase == "Running":
-                    break
-
                 if pod_phase == "Unknown":
                     error_msg = f"Pod {pod_name} has {pod_phase} status."
-                    LOGGER.error(error_msg)
                     raise ContainerStartError(error_msg)
         except ApiException as e:
             raise ContainerStartError(
