@@ -486,6 +486,7 @@ def test_list_actions_from_audit_rule_filter_name(client: APIClient, init_db):
         "fired_at",
         "rule_fired_at",
         "audit_rule_id",
+        "status_message",
     ]
 
 

@@ -547,6 +547,7 @@ def create_action_payload(
         "rule_run_at": rule_run_at,
         "matching_events": matching_events,
         "status": action_status,
+        "message": "Action run successfully",
     }
 
 
