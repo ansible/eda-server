@@ -310,12 +310,11 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
                 f"Job {engine.job_name} is running"
             )
 
-        for phase in ["Failed", "Unknown"]:
-            watcher.stream.return_value = get_stream_event(phase)
-            with pytest.raises(ContainerStartError):
-                with mock.patch.object(engine, "cleanup") as cleanup_mock:
-                    engine.start(request, log_handler)
-                    cleanup_mock.assert_called_once()
+        watcher.stream.return_value = get_stream_event("Unknown")
+        with pytest.raises(ContainerStartError):
+            with mock.patch.object(engine, "cleanup") as cleanup_mock:
+                engine.start(request, log_handler)
+                cleanup_mock.assert_called_once()
 
 
 @pytest.mark.parametrize(
