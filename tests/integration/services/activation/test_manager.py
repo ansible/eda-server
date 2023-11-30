@@ -399,6 +399,27 @@ def test_stop_no_pod(
 
 
 @pytest.mark.django_db
+def test_stop_pending(
+    basic_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is pending."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=basic_activation,
+    )
+
+    activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert not container_engine_mock.get_status.called
+    assert not container_engine_mock.cleanup.called
+    assert "No instance or pod id found" in eda_caplog.text
+    assert basic_activation.status == ActivationStatus.STOPPED
+    assert basic_activation.latest_instance is None
+
+
+@pytest.mark.django_db
 def test_delete_already_deleted(
     activation_with_instance: models.Activation,
     eda_caplog: LogCaptureFixture,

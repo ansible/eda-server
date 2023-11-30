@@ -744,6 +744,7 @@ class ActivationManager:
                 "The Activation does not exist."
             ) from None
         try:
+            self._check_latest_instance_and_pod_id()
             if self._is_already_stopped():
                 msg = f"Activation {self.db_instance.id} is already stopped."
                 LOGGER.info(msg)
