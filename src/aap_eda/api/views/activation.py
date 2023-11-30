@@ -50,13 +50,8 @@ logger = logging.getLogger(__name__)
         },
     ),
 )
-# REVIEW(cutwater): Since this class implements `create` method,
-#   the `CreateModelMixin` is redundant.
 class ActivationViewSet(
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
-    mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
     queryset = models.Activation.objects.all()
