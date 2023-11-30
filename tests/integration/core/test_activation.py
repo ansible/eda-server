@@ -117,9 +117,7 @@ def test_activation_save(init_data):
 
 @pytest.mark.django_db
 def test_activation_latest_instance_field(init_data):
-    """
-    Test that the latest_instance field is updated when a new instance is created
-    """
+    """Test latest_instance field is updated when a new instance is created."""
     activation = init_data
     assert activation.latest_instance is None
 
