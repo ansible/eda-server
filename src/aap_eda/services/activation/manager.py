@@ -199,7 +199,7 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg)
 
-    def _check_latest_instance(self) -> None:
+    def _check_latest_instance_and_pod_id(self) -> None:
         """Check if the activation has a latest instance and pod id."""
         if not self.latest_instance:
             # how we want to handle this case?
@@ -358,31 +358,42 @@ class ActivationManager:
 
     def _is_in_status(self, status: ActivationStatus) -> bool:
         """Check if the activation is in a given status."""
-        if self.db_instance.status == status:
-            self._check_latest_instance()
+        if self.db_instance.status != status:
+            return False
 
-            container_status = None
-            latest_instance = self.latest_instance
+        try:
+            self._check_latest_instance_and_pod_id()
+            pod_id = self.latest_instance.activation_pod_id
+        except exceptions.ActivationInstancePodIdNotFound:
+            pod_id = None
 
+        container_status = None
+        latest_instance = self.latest_instance
+
+        if pod_id:
             with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
                 container_status = self.container_engine.get_status(
                     container_id=latest_instance.activation_pod_id,
                 )
 
-            if latest_instance.status == status and (
-                container_status is not None
-                and container_status.status == status
-            ):
-                return True
+        if latest_instance.status != status:
+            return False
 
-            if latest_instance.status == status and (
-                container_status is not None
-                and container_status.status != status
-            ):
-                return False
+        if latest_instance.status == status and (
+            container_status is not None and container_status.status == status
+        ):
+            return True
 
-            if latest_instance.status != status:
-                return False
+        if latest_instance.status == status and (
+            container_status is not None and container_status.status != status
+        ):
+            return False
+
+        if (
+            status != ActivationStatus.RUNNING
+            and latest_instance.status == status
+        ):
+            return True
 
         return False
 
@@ -726,14 +737,13 @@ class ActivationManager:
             self.db_instance.refresh_from_db()
         except ObjectDoesNotExist:
             LOGGER.error(
-                f"Stop operation Failed: Activation {self.db_instance.id} "
+                f"Stop operation failed: Activation {self.db_instance.id} "
                 "does not exist.",
             )
-            raise exceptions.ActivationStartError(
+            raise exceptions.ActivationStopError(
                 "The Activation does not exist."
             ) from None
         try:
-            self._check_latest_instance()
             if self._is_already_stopped():
                 msg = f"Activation {self.db_instance.id} is already stopped."
                 LOGGER.info(msg)
@@ -761,7 +771,7 @@ class ActivationManager:
             # Alex: Not sure if we want to change the status here.
             self._error_activation(msg)
             raise exceptions.ActivationStopError(msg) from exc
-        user_msg = "Stop requested by user. "
+        user_msg = "Stop requested by user."
         self._set_activation_status(ActivationStatus.STOPPED, user_msg)
         container_logger = self.container_logger_class(self.latest_instance.id)
         container_logger.write(user_msg, flush=True)
@@ -808,9 +818,9 @@ class ActivationManager:
 
         try:
             self.db_instance.delete()
-        except ObjectDoesNotExist:
+        except (ObjectDoesNotExist, ValueError):
             msg = (
-                f"Delete operation Failed: Activation {self.db_instance.id} "
+                f"Delete operation failed: Activation {self.db_instance.id} "
                 "does not exist."
             )
             LOGGER.error(msg)
@@ -853,14 +863,18 @@ class ActivationManager:
                 f"Activation {self.db_instance.id} does not exist."
             )
 
-        # Ensure that the activation instance exists
+        # Monitor expects that the activation has a latest instance
+        # and a pod id
         try:
-            self._check_latest_instance()
-        except (
-            exceptions.ActivationInstanceNotFound,
-            exceptions.ActivationInstancePodIdNotFound,
-        ) as e:
+            self._check_latest_instance_and_pod_id()
+        except exceptions.ActivationInstanceNotFound as e:
             LOGGER.error(f"Monitor operation Failed: {e}")
+            self._error_activation(f"{e}")
+            raise exceptions.ActivationMonitorError(f"{e}")
+        except exceptions.ActivationInstancePodIdNotFound as e:
+            LOGGER.error(f"Monitor operation Failed: {e}")
+            self._error_activation(f"{e}")
+            self._error_instance(f"{e}")
             raise exceptions.ActivationMonitorError(f"{e}")
 
         # Disabled activations should be stopped
@@ -961,7 +975,7 @@ class ActivationManager:
         """Update the logs of the latest instance of the activation."""
         log_handler = self.container_logger_class(self.latest_instance.id)
         try:
-            self._check_latest_instance()
+            self._check_latest_instance_and_pod_id()
         except (
             exceptions.ActivationInstanceNotFound,
             exceptions.ActivationInstancePodIdNotFound,
