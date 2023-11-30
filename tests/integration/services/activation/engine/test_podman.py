@@ -358,14 +358,14 @@ def test_engine_cleanup_with_api_exception(init_data, podman_engine):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
 
+    err_msg = "Not found"
+
     def raise_error(*args, **kwargs):
-        raise APIError("Not found")
+        raise APIError(err_msg)
 
     engine.client.containers.get.side_effect = raise_error
 
-    with pytest.raises(
-        ContainerCleanupError, match="Failed to cleanup container 100"
-    ):
+    with pytest.raises(ContainerCleanupError, match=err_msg):
         engine.cleanup("100", log_handler)
 
 
