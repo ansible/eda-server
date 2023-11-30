@@ -19,9 +19,11 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 from _pytest.logging import LogCaptureFixture
 from pytest_django.fixtures import SettingsWrapper
+from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerEngine
 from aap_eda.services.activation.manager import (
     ACTIVATION_PATH,
@@ -271,3 +273,235 @@ def test_start_first_run(
     assert basic_activation.latest_instance.status == ActivationStatus.RUNNING
     assert basic_activation.latest_instance.activation_pod_id == "test-pod-id"
     assert basic_activation.restart_count == 0
+
+
+@pytest.mark.django_db
+def test_start_restart(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test start verb for a restarted activation."""
+    activation_manager = ActivationManager(
+        db_instance=running_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.start.return_value = "test-pod-id"
+    activation_manager.start(is_restart=True)
+    assert container_engine_mock.start.called
+    assert container_engine_mock.update_logs.called
+    assert "Starting" in eda_caplog.text
+    assert running_activation.status == ActivationStatus.RUNNING
+    assert (
+        running_activation.latest_instance.status == ActivationStatus.RUNNING
+    )
+    assert (
+        running_activation.latest_instance.activation_pod_id == "test-pod-id"
+    )
+    assert running_activation.restart_count == 1
+
+
+@pytest.mark.django_db
+def test_stop_deleted_activation(
+    activation_with_instance: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is deleted."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=activation_with_instance,
+    )
+    activation_with_instance.delete()
+    with pytest.raises(exceptions.ActivationStopError) as exc:
+        activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert "does not exist" in str(exc.value)
+    assert "does not exist" in eda_caplog.text
+
+
+@pytest.mark.django_db
+def test_stop_already_stopped(
+    activation_with_instance: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is stopped."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=activation_with_instance,
+    )
+
+    activation_with_instance.status = ActivationStatus.STOPPED
+    activation_with_instance.latest_instance.status = ActivationStatus.STOPPED
+    activation_with_instance.latest_instance.save(
+        update_fields=["status", "activation_pod_id"],
+    )
+    activation_with_instance.save(update_fields=["status"])
+
+    activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert "already stopped" in eda_caplog.text
+
+
+@pytest.mark.django_db
+def test_stop_running(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is running."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert "Cleanup operation requested" in eda_caplog.text
+    assert "Activation stopped." in eda_caplog.text
+    assert running_activation.status == ActivationStatus.STOPPED
+    assert (
+        running_activation.latest_instance.status == ActivationStatus.STOPPED
+    )
+    assert running_activation.latest_instance.activation_pod_id is None
+    assert running_activation.status_message == "Stop requested by user."
+    assert container_engine_mock.cleanup.called
+
+
+@pytest.mark.django_db
+def test_stop_no_pod(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is running but no pod is found."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    container_engine_mock.get_status.side_effect = (
+        engine_exceptions.ContainerNotFoundError
+    )
+
+    activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert "Cleanup operation requested" in eda_caplog.text
+    assert "Activation stopped." in eda_caplog.text
+    assert running_activation.status == ActivationStatus.STOPPED
+    assert (
+        running_activation.latest_instance.status == ActivationStatus.STOPPED
+    )
+    assert running_activation.latest_instance.activation_pod_id is None
+    assert running_activation.status_message == "Stop requested by user."
+    assert container_engine_mock.cleanup.called
+
+
+@pytest.mark.django_db
+def test_delete_already_deleted(
+    activation_with_instance: models.Activation,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test delete verb when activation is deleted."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=activation_with_instance,
+    )
+    activation_with_instance.delete()
+    with pytest.raises(exceptions.ActivationManagerError) as exc:
+        activation_manager.delete()
+    assert "Delete operation requested" in eda_caplog.text
+    assert "does not exist" in str(exc.value)
+    assert "does not exist" in eda_caplog.text
+
+
+@pytest.mark.parametrize(
+    "activation,status",
+    [
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            ActivationStatus.STOPPED,
+            id="stopped",
+        ),
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            ActivationStatus.ERROR,
+            id="error",
+        ),
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            ActivationStatus.FAILED,
+            id="failed",
+        ),
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            ActivationStatus.COMPLETED,
+            id="completed",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_delete_no_pod(
+    activation: models.Activation,
+    status: ActivationStatus,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test delete verb for any activation."""
+    activation.status = status
+    activation.save(update_fields=["status"])
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=activation,
+    )
+
+    activation_manager.delete()
+    assert "Delete operation requested" in eda_caplog.text
+    assert "Cleanup operation requested" in eda_caplog.text
+    assert "Activation deleted." in eda_caplog.text
+    assert not container_engine_mock.cleanup.called
+    assert models.Activation.objects.filter(id=activation.id).count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_running(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test delete verb when activation is running."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    activation_manager.delete()
+    assert "Delete operation requested" in eda_caplog.text
+    assert "Cleanup operation requested" in eda_caplog.text
+    assert "Activation deleted." in eda_caplog.text
+    assert container_engine_mock.cleanup.called
+    assert (
+        models.Activation.objects.filter(id=running_activation.id).count() == 0
+    )
+
+
+@pytest.mark.django_db
+def test_delete_with_exception(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test that the activation is deleted even if there is an error."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+    container_engine_mock.cleanup.side_effect = Exception("test")
+    activation_manager.delete()
+    assert container_engine_mock.cleanup.called
+    assert "Delete operation requested" in eda_caplog.text
+    assert "failed to cleanup." in eda_caplog.text
+    assert (
+        models.Activation.objects.filter(id=running_activation.id).count() == 0
+    )
