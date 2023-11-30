@@ -2,6 +2,7 @@
 
 import django.db.models.deletion
 from django.db import migrations, models
+from django.utils import timezone
 
 
 # Ensure that the latest_instance field is populated for all existing
@@ -22,6 +23,20 @@ def populate_latest_instance(apps, schema_editor):
         if latest_instance:
             activation.latest_instance = latest_instance
             activation.save(update_fields=["latest_instance"])
+
+
+# Ensure that the log_read_at field is populated for all existing
+# activation instances after the migration is applied.
+def populate_log_read_at(apps, schema_editor):
+    ActivationInstance = apps.get_model(  # noqa: N806
+        "core",
+        "ActivationInstance",
+    )
+    current_datetime = timezone.now()
+
+    for instance in ActivationInstance.objects.all():
+        instance.log_read_at = current_datetime
+        instance.save(update_fields=["log_read_at"])
 
 
 class Migration(migrations.Migration):  # noqa: D101
@@ -85,6 +100,10 @@ class Migration(migrations.Migration):  # noqa: D101
         ),
         migrations.RunPython(
             populate_latest_instance,
+            migrations.RunPython.noop,
+        ),
+        migrations.RunPython(
+            populate_log_read_at,
             migrations.RunPython.noop,
         ),
     ]
