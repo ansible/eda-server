@@ -83,7 +83,7 @@ def test_manage_request(manager_mock, activation, verb):
 
     manager_mock.assert_called_once_with(activation)
     if verb == ActivationRequest.START:
-        manager_instance_mock.start.assert_called_once_with(False)
+        manager_instance_mock.start.assert_called_once_with(is_restart=False)
     elif verb == ActivationRequest.RESTART:
         manager_instance_mock.restart.assert_called_once()
     elif verb == ActivationRequest.STOP:
@@ -91,7 +91,7 @@ def test_manage_request(manager_mock, activation, verb):
     elif verb == ActivationRequest.DELETE:
         manager_instance_mock.delete.assert_called_once()
     elif verb == ActivationRequest.AUTO_START:
-        manager_instance_mock.start.assert_called_once_with(True)
+        manager_instance_mock.start.assert_called_once_with(is_restart=True)
     assert len(queue.peek_all(activation.id)) == 0
 
 
@@ -161,6 +161,8 @@ def test_monitor_activations(
         )
 
     queue.push(activation.id, ActivationRequest.START)
+    for running in max_running_activations:
+        queue.push(running.id, ActivationRequest.START)
     orchestrator.monitor_activations()
 
     enqueue_mock.assert_has_calls(call_args, any_order=True)
