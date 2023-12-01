@@ -14,7 +14,9 @@ RUN DNF=dnf \
     gcc \
     gettext \
     git-core \
-    java-17-openjdk-headless" \
+    java-17-openjdk-headless \
+    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    openldap-devel" \
     && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf

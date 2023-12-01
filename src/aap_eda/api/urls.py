@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.urls import urls as base_urls
 from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularJSONAPIView,
@@ -72,6 +73,8 @@ v1_urls = [
     path("auth/session/logout/", views.SessionLogoutView.as_view()),
     path("users/me/", views.CurrentUserView.as_view()),
     *router.urls,
+    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    path("", include(base_urls)),
 ]
 
 urlpatterns = [

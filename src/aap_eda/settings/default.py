@@ -128,6 +128,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
+    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    "ansible_base",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -141,6 +143,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.utils.middleware.AuthenticatorBackendMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
@@ -230,7 +234,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "aap_eda.api.authentication.SessionAuthentication",
+        # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+        "ansible_base.authentication.session.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -344,6 +349,12 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+        "ansible_base": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -395,3 +406,15 @@ ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
 # ---------------------------------------------------------
 ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+
+# LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_AUTHENTICATOR_CLASS_PREFIXES = [
+    "aap_eda.core.authenticator_plugins"
+]
+AUTHENTICATION_BACKENDS = [
+    "ansible_base.authentication.backend.AnsibleBaseAuth",
+    "django.contrib.auth.backends.ModelBackend",
+]

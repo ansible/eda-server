@@ -43,6 +43,8 @@ cryptography = "*"
 kubernetes = "*"
 podman = ">=4.5"
 rq-scheduler = "^0.10"
+# LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+django-ansible-base = {git = "https://github.com/ansible/django-ansible-base.git", tag = "0.1.0"}
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
