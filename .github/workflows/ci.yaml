@@ -80,6 +80,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+      - name: Install LDAP dependencies
+        run: |
+            set -ex
+            sudo apt update
+            sudo apt install python3-dev libldap2-dev libsasl2-dev libssl-dev
+
       - name: Install poetry
         run: pipx install poetry
 
