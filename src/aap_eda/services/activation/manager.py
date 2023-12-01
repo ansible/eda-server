@@ -199,13 +199,17 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg)
 
-    def _check_latest_instance_and_pod_id(self) -> None:
-        """Check if the activation has a latest instance and pod id."""
+    def _check_latest_instance(self) -> None:
+        """Check if the activation has a latest instance."""
         if not self.latest_instance:
             # how we want to handle this case?
             # for now we raise an error and let the monitor correct it
             msg = f"Activation {self.db_instance.id} has not instances."
             raise exceptions.ActivationInstanceNotFound(msg)
+
+    def _check_latest_instance_and_pod_id(self) -> None:
+        """Check if the activation has a latest instance and pod id."""
+        self._check_latest_instance()
 
         if not self.latest_instance.activation_pod_id:
             # how we want to handle this case?
@@ -744,18 +748,15 @@ class ActivationManager:
                 "The Activation does not exist."
             ) from None
         try:
-            self._check_latest_instance_and_pod_id()
+            self._check_latest_instance()
             if self._is_already_stopped():
                 msg = f"Activation {self.db_instance.id} is already stopped."
                 LOGGER.info(msg)
                 return
-        except (
-            exceptions.ActivationInstanceNotFound,
-            exceptions.ActivationInstancePodIdNotFound,
-        ):
+        except exceptions.ActivationInstanceNotFound:
             LOGGER.info(
                 f"Stop operation activation id: {self.db_instance.id} "
-                "No instance or pod id found.",
+                "No instance found.",
             )
             self._set_activation_status(ActivationStatus.STOPPED)
             return

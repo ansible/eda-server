@@ -335,13 +335,14 @@ def test_stop_already_stopped(
     activation_with_instance.status = ActivationStatus.STOPPED
     activation_with_instance.latest_instance.status = ActivationStatus.STOPPED
     activation_with_instance.latest_instance.save(
-        update_fields=["status", "activation_pod_id"],
+        update_fields=["status"],
     )
     activation_with_instance.save(update_fields=["status"])
 
     activation_manager.stop()
     assert "Stopping" in eda_caplog.text
     assert "already stopped" in eda_caplog.text
+    assert not container_engine_mock.cleanup.called
 
 
 @pytest.mark.django_db
@@ -414,9 +415,67 @@ def test_stop_pending(
     assert "Stopping" in eda_caplog.text
     assert not container_engine_mock.get_status.called
     assert not container_engine_mock.cleanup.called
-    assert "No instance or pod id found" in eda_caplog.text
+    assert "No instance found" in eda_caplog.text
     assert basic_activation.status == ActivationStatus.STOPPED
     assert basic_activation.latest_instance is None
+
+
+@pytest.mark.django_db
+def test_stop_stopped_instance_running(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is stopped but instance is running."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    running_activation.status = ActivationStatus.STOPPED
+    running_activation.save(update_fields=["status"])
+
+    activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert container_engine_mock.get_status.called
+    assert container_engine_mock.cleanup.called
+    assert running_activation.status == ActivationStatus.STOPPED
+    assert (
+        running_activation.latest_instance.status == ActivationStatus.STOPPED
+    )
+    assert running_activation.latest_instance.activation_pod_id is None
+
+
+@pytest.mark.django_db
+def test_stop_stopped_pod_running(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test stop verb when activation is stopped but pod is running."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    running_activation.status = ActivationStatus.STOPPED
+    running_activation.save(update_fields=["status"])
+    running_activation.latest_instance.status = ActivationStatus.STOPPED
+    running_activation.latest_instance.save(update_fields=["status"])
+
+    container_engine_mock.get_status.return_value = MagicMock(
+        status=ActivationStatus.RUNNING,
+    )
+
+    activation_manager.stop()
+    assert "Stopping" in eda_caplog.text
+    assert container_engine_mock.get_status.called
+    assert container_engine_mock.cleanup.called
+    assert running_activation.status == ActivationStatus.STOPPED
+    assert (
+        running_activation.latest_instance.status == ActivationStatus.STOPPED
+    )
+    assert running_activation.latest_instance.activation_pod_id is None
 
 
 @pytest.mark.django_db
