@@ -526,6 +526,10 @@ class ActivationManager:
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
+            self._set_activation_status(
+                ActivationStatus.COMPLETED,
+                user_msg,
+            )
             system_restart_activation(
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
