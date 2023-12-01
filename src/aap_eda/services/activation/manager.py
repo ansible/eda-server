@@ -515,9 +515,10 @@ class ActivationManager:
                 f"Restart policy is set to {self.db_instance.restart_policy}.",
             )
             user_msg = (
-                f"Activation completed. It will be restarted in "
+                f"Activation completed. It will attempt to restart in "
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds "
-                f"accordingly to the restart policy {RestartPolicy.ALWAYS}"
+                f"according to the restart policy {RestartPolicy.ALWAYS}."
+                "It may take longer if there is no capacity available."
             )
             if container_msg:
                 user_msg = f"{container_msg} {user_msg}"
@@ -631,10 +632,11 @@ class ActivationManager:
                 f"{settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE})"
             )
             user_msg = (
-                f"Activation failed. It will be restarted {count_msg} in "
-                f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds "
-                "accordingly to the restart policy "
-                f"{self.db_instance.restart_policy}"
+                f"Activation failed. It will attempt to restart {count_msg} in"
+                f" {settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds "
+                "according to the restart policy "
+                f"{self.db_instance.restart_policy}."
+                "It may take longer if there is no capacity available."
             )
             if container_msg:
                 user_msg = f"{container_msg} {user_msg}"
