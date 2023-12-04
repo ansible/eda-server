@@ -234,8 +234,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "aap_eda.api.pagination.DefaultPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
-        "ansible_base.authentication.session.SessionAuthentication",
+        "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
