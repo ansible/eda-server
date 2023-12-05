@@ -395,9 +395,8 @@ def test_list_audit_rules_ordering(client: APIClient, init_db, ordering_field):
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
     assert len(audit_rules) == 2
-    assert (
-        audit_rules[0][ordering_field]
-        == init_db.audit_rule_1.__dict__[ordering_field]
+    assert audit_rules[0][ordering_field] == getattr(
+        init_db.audit_rule_1, ordering_field
     )
 
     response = client.get(
@@ -406,9 +405,8 @@ def test_list_audit_rules_ordering(client: APIClient, init_db, ordering_field):
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
     assert len(audit_rules) == 2
-    assert (
-        audit_rules[0][ordering_field]
-        == init_db.audit_rule_2.__dict__[ordering_field]
+    assert audit_rules[0][ordering_field] == getattr(
+        init_db.audit_rule_2, ordering_field
     )
 
 
@@ -507,9 +505,8 @@ def test_list_actions_from_audit_rule_ordering(
     assert response.status_code == status.HTTP_200_OK
     actions = response.data["results"]
     assert len(actions) == 2
-    assert (
-        actions[0][ordering_field]
-        == init_db.audit_action_1.__dict__[ordering_field]
+    assert actions[0][ordering_field] == getattr(
+        init_db.audit_action_1, ordering_field
     )
 
     response = client.get(
@@ -519,9 +516,8 @@ def test_list_actions_from_audit_rule_ordering(
     assert response.status_code == status.HTTP_200_OK
     actions = response.data["results"]
     assert len(actions) == 2
-    assert (
-        actions[0][ordering_field]
-        == init_db.audit_action_2.__dict__[ordering_field]
+    assert actions[0][ordering_field] == getattr(
+        init_db.audit_action_2, ordering_field
     )
 
 
@@ -568,9 +564,8 @@ def test_list_events_from_audit_rule_ordering(
     assert response.status_code == status.HTTP_200_OK
     events = response.data["results"]
     assert len(events) == 4
-    assert (
-        events[0][ordering_field]
-        == init_db.audit_event_1.__dict__[ordering_field]
+    assert events[0][ordering_field] == getattr(
+        init_db.audit_event_1, ordering_field
     )
 
     response = client.get(
@@ -580,9 +575,8 @@ def test_list_events_from_audit_rule_ordering(
     assert response.status_code == status.HTTP_200_OK
     events = response.data["results"]
     assert len(events) == 4
-    assert (
-        events[0][ordering_field]
-        == init_db.audit_event_4.__dict__[ordering_field]
+    assert events[0][ordering_field] == getattr(
+        init_db.audit_event_4, ordering_field
     )
 
 
@@ -650,9 +644,8 @@ def test_list_events_ordering(client: APIClient, init_db, ordering_field):
     assert response.status_code == status.HTTP_200_OK
     events = response.data["results"]
     assert len(events) == 4
-    assert (
-        events[0][ordering_field]
-        == init_db.audit_event_1.__dict__[ordering_field]
+    assert events[0][ordering_field] == getattr(
+        init_db.audit_event_1, ordering_field
     )
 
     response = client.get(
@@ -662,9 +655,8 @@ def test_list_events_ordering(client: APIClient, init_db, ordering_field):
     assert response.status_code == status.HTTP_200_OK
     events = response.data["results"]
     assert len(events) == 4
-    assert (
-        events[0][ordering_field]
-        == init_db.audit_event_4.__dict__[ordering_field]
+    assert events[0][ordering_field] == getattr(
+        init_db.audit_event_4, ordering_field
     )
 
 
