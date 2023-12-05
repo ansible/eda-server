@@ -24,6 +24,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
@@ -204,8 +205,15 @@ class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.AuditRule.objects.all()
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
     filterset_class = filters.AuditRuleFilter
+    ordering_fields = [
+        "id",
+        "name",
+        "status",
+        "activation_instance__name",
+        "fired_at",
+    ]
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -240,6 +248,14 @@ class AuditRuleViewSet(
         detail=False,
         queryset=models.AuditAction.objects.order_by("id"),
         filterset_class=filters.AuditRuleActionFilter,
+        ordering_fields=[
+            "id",
+            "name",
+            "status",
+            "url",
+            "fired_at",
+            "rule_fired_at",
+        ],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/actions",
     )
@@ -275,6 +291,13 @@ class AuditRuleViewSet(
         detail=False,
         queryset=models.AuditEvent.objects.order_by("id"),
         filterset_class=filters.AuditRuleEventFilter,
+        ordering_fields=[
+            "id",
+            "source_name",
+            "source_type",
+            "received_at",
+            "rule_fired_at",
+        ],
         rbac_resource_type=ResourceType.AUDIT_EVENT,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/events",
@@ -292,7 +315,7 @@ class AuditRuleViewSet(
                 self.filter_queryset(audit_action.audit_events.all())
             ).order_by("-received_at")
 
-        results = self.paginate_queryset(eqs)
+        results = self.paginate_queryset(self.filter_queryset(eqs))
         serializer = serializers.AuditEventSerializer(results, many=True)
 
         return self.get_paginated_response(serializer.data)
@@ -323,8 +346,15 @@ class AuditEventViewSet(
 ):
     queryset = models.AuditEvent.objects.all()
     serializer_class = serializers.AuditEventSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
     filterset_class = filters.AuditRuleEventFilter
+    ordering_fields = [
+        "id",
+        "source_name",
+        "source_type",
+        "received_at",
+        "rule_fired_at",
+    ]
 
     rbac_resource_type = ResourceType.AUDIT_EVENT
 
