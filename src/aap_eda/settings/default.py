@@ -128,7 +128,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
-    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
     "ansible_base",
     # Local apps
     "aap_eda.api",
@@ -143,7 +143,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
     "ansible_base.utils.middleware.AuthenticatorBackendMiddleware",
 ]
 
@@ -348,7 +348,8 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
-        # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+        # Experimental LDAP Integration
+        # https://issues.redhat.com/browse/AAP-16938
         "ansible_base": {
             "handlers": ["console"],
             "level": "INFO",
@@ -406,7 +407,7 @@ ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
 ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
 
-# LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+# Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE SETTINGS
 # ---------------------------------------------------------

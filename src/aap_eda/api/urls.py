@@ -73,7 +73,7 @@ v1_urls = [
     path("auth/session/logout/", views.SessionLogoutView.as_view()),
     path("users/me/", views.CurrentUserView.as_view()),
     *router.urls,
-    # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
     path("", include(base_urls)),
 ]
 

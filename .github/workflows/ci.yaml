@@ -80,7 +80,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # LDAP Integration for 2.4 https://issues.redhat.com/browse/AAP-16938
+      # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
       - name: Install LDAP dependencies
         run: |
             set -ex
