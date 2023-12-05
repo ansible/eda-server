@@ -121,7 +121,7 @@ class ContainerEngine(ABC):
             raise exceptions.ContainerNotFoundError(e) from e
 
     @abstractmethod
-    def start(self, request: ContainerRequest, logger: LogHandler) -> str:
+    def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # It returns the container id
         try:
             # Implementation
@@ -132,7 +132,7 @@ class ContainerEngine(ABC):
             raise exceptions.ContainerStartError(e) from e
 
     @abstractmethod
-    def cleanup(self, container_id: str, logger: LogHandler) -> None:
+    def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         try:
             # Implementation
             ...

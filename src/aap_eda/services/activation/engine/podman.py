@@ -71,6 +71,8 @@ class Engine(ContainerEngine):
             else:
                 self.client = get_podman_client()
             LOGGER.debug(self.client.version())
+
+            self.auth_file = None
         except APIError as e:
             LOGGER.error(f"Failed to initialize podman engine: f{e}")
             raise exceptions.ContainerEngineInitError(str(e))
@@ -302,7 +304,7 @@ class Engine(ContainerEngine):
 
         auth_dict = {}
         if os.path.exists(self.auth_file):
-            with open(self.auth_file) as f:
+            with open(self.auth_file, encoding="utf-8") as f:
                 auth_dict = json.load(f)
 
         if "auths" not in auth_dict:
@@ -312,7 +314,7 @@ class Engine(ContainerEngine):
             request.credential
         )
 
-        with open(self.auth_file, "w") as f:
+        with open(self.auth_file, mode="w", encoding="utf-8") as f:
             json.dump(auth_dict, f, indent=6)
 
     def _create_auth_key(self, credential: Credential) -> dict:
@@ -358,11 +360,11 @@ class Engine(ContainerEngine):
                 raise exceptions.ContainerImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
-        except ImageNotFound:
+        except ImageNotFound as e:
             msg = f"Image {request.image_url} not found"
             LOGGER.exception(msg)
             log_handler.write(msg, True)
-            raise exceptions.ContainerImagePullError(msg)
+            raise exceptions.ContainerImagePullError(msg) from e
         except APIError as e:
             LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
             raise exceptions.ContainerStartError(str(e))
