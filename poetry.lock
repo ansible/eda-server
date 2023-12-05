@@ -558,6 +558,17 @@ files = [
 ]
 
 [[package]]
+name = "defusedxml"
+version = "0.7.1"
+description = "XML bomb protection for Python stdlib modules"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+files = [
+    {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
+    {file = "defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"},
+]
+
+[[package]]
 name = "django"
 version = "4.2.7"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
@@ -576,6 +587,63 @@ tzdata = {version = "*", markers = "sys_platform == \"win32\""}
 [package.extras]
 argon2 = ["argon2-cffi (>=19.1.0)"]
 bcrypt = ["bcrypt"]
+
+[[package]]
+name = "django-ansible-base"
+version = "0.0.0"
+description = "A Django app used by ansible services"
+optional = false
+python-versions = ">=3.9"
+files = []
+develop = false
+
+[package.dependencies]
+cryptography = "*"
+Django = ">=4.2.5,<4.3.0"
+django-auth-ldap = "*"
+django-crum = "*"
+django-filter = "*"
+djangorestframework = "*"
+drf-spectacular = "*"
+inflection = "*"
+python-ldap = "*"
+social-auth-app-django = "*"
+tabulate = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/ansible/django-ansible-base.git"
+reference = "0.1.0"
+resolved_reference = "a07fffe8f40fb1798069e97056cd1c666ff4e5f1"
+
+[[package]]
+name = "django-auth-ldap"
+version = "4.6.0"
+description = "Django LDAP authentication backend"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "django-auth-ldap-4.6.0.tar.gz", hash = "sha256:9ae2bf87f9b6367b6cfd94a0451896cbc728e5400ed81cbfbd58ce743c0909a2"},
+    {file = "django_auth_ldap-4.6.0-py3-none-any.whl", hash = "sha256:4e82ded9292dc6ac7a75784d81b95174b72ca5e650a76e11317e3b68008e56d8"},
+]
+
+[package.dependencies]
+Django = ">=3.2"
+python-ldap = ">=3.1"
+
+[[package]]
+name = "django-crum"
+version = "0.7.9"
+description = "Django middleware to capture current request and user."
+optional = false
+python-versions = "*"
+files = [
+    {file = "django-crum-0.7.9.tar.gz", hash = "sha256:65e9bc0f070a663fafc4d9e357f45fd4e6f01838b20a9e2fb7670f5706754288"},
+    {file = "django_crum-0.7.9-py2.py3-none-any.whl", hash = "sha256:037cc8b822975bb1d41cd24269b59a512cc77448fadc3f34ab9a17b229b4b471"},
+]
+
+[package.dependencies]
+django = ">=1.8"
 
 [[package]]
 name = "django-filter"
@@ -1541,6 +1609,23 @@ plugins = ["importlib-metadata"]
 windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
+name = "pyjwt"
+version = "2.8.0"
+description = "JSON Web Token implementation in Python"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "PyJWT-2.8.0-py3-none-any.whl", hash = "sha256:59127c392cc44c2da5bb3192169a91f429924e17aff6534d70fdc02ab3e04320"},
+    {file = "PyJWT-2.8.0.tar.gz", hash = "sha256:57e28d156e3d5c10088e0c68abb90bfac3df82b40a71bd0daa20c65ccd5c23de"},
+]
+
+[package.extras]
+crypto = ["cryptography (>=3.4.0)"]
+dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
+docs = ["sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
+tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
+
+[[package]]
 name = "pyopenssl"
 version = "23.1.1"
 description = "Python wrapper module around the OpenSSL library"
@@ -1700,6 +1785,38 @@ files = [
 
 [package.dependencies]
 six = ">=1.5"
+
+[[package]]
+name = "python-ldap"
+version = "3.4.4"
+description = "Python modules for implementing LDAP clients"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "python-ldap-3.4.4.tar.gz", hash = "sha256:7edb0accec4e037797705f3a05cbf36a9fde50d08c8f67f2aef99a2628fab828"},
+]
+
+[package.dependencies]
+pyasn1 = ">=0.3.7"
+pyasn1_modules = ">=0.1.5"
+
+[[package]]
+name = "python3-openid"
+version = "3.2.0"
+description = "OpenID support for modern servers and consumers."
+optional = false
+python-versions = "*"
+files = [
+    {file = "python3-openid-3.2.0.tar.gz", hash = "sha256:33fbf6928f401e0b790151ed2b5290b02545e8775f982485205a066f874aaeaf"},
+    {file = "python3_openid-3.2.0-py3-none-any.whl", hash = "sha256:6626f771e0417486701e0b4daff762e7212e820ca5b29fcc0d05f6f8736dfa6b"},
+]
+
+[package.dependencies]
+defusedxml = "*"
+
+[package.extras]
+mysql = ["mysql-connector-python"]
+postgresql = ["psycopg2"]
 
 [[package]]
 name = "pytz"
@@ -1962,6 +2079,47 @@ files = [
 ]
 
 [[package]]
+name = "social-auth-app-django"
+version = "5.4.0"
+description = "Python Social Authentication, Django integration."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "social-auth-app-django-5.4.0.tar.gz", hash = "sha256:09ac02a063cb313eed5e9ef2f9ac4477c8bf5bbd685925ff3aba43f9072f1bbb"},
+    {file = "social_auth_app_django-5.4.0-py3-none-any.whl", hash = "sha256:28c65b2e2092f30cdb3cf912eeaa6988b49fdf4001b29bd89e683673d700a38e"},
+]
+
+[package.dependencies]
+Django = ">=3.2"
+social-auth-core = ">=4.4.1"
+
+[[package]]
+name = "social-auth-core"
+version = "4.5.1"
+description = "Python social authentication made simple."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "social-auth-core-4.5.1.tar.gz", hash = "sha256:307a4ba64d4f3ec86e4389163eac1d8b8656ffe5ab2e964aeff043ab00b3a662"},
+    {file = "social_auth_core-4.5.1-py3-none-any.whl", hash = "sha256:54d0c598bf6ea0ec12bbcf78bee035c7cd604b5d781d80b7997e9e033c3ac05d"},
+]
+
+[package.dependencies]
+cryptography = ">=1.4"
+defusedxml = ">=0.5.0rc1"
+oauthlib = ">=1.0.3"
+PyJWT = ">=2.7.0"
+python3-openid = ">=3.0.10"
+requests = ">=2.9.1"
+requests-oauthlib = ">=0.6.1"
+
+[package.extras]
+all = ["cryptography (>=2.1.1)", "python3-saml (>=1.5.0)"]
+allpy3 = ["cryptography (>=2.1.1)", "python3-saml (>=1.5.0)"]
+azuread = ["cryptography (>=2.1.1)"]
+saml = ["python3-saml (>=1.5.0)"]
+
+[[package]]
 name = "sqlparse"
 version = "0.4.4"
 description = "A non-validating SQL parser."
@@ -1995,6 +2153,20 @@ pure-eval = "*"
 
 [package.extras]
 tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
+
+[[package]]
+name = "tabulate"
+version = "0.9.0"
+description = "Pretty-print tabular data"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f"},
+    {file = "tabulate-0.9.0.tar.gz", hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c"},
+]
+
+[package.extras]
+widechars = ["wcwidth"]
 
 [[package]]
 name = "tomli"
@@ -2234,4 +2406,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4"
-content-hash = "b5741f648f95316931e0baca7fdd9a075c7e7061a1243246b3ca2b0d91157c7e"
+content-hash = "a6a14c5c21e14d27ed0c5988908d4c7feeac2227d975abfc9e2697c67c7fb9c8"
