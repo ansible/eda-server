@@ -69,7 +69,7 @@ services:
         && scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
-      - '8000:8000'
+      - '8010:8000'
     depends_on:
       redis:
         condition: service_healthy
@@ -166,7 +166,7 @@ services:
       POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
     healthcheck:
