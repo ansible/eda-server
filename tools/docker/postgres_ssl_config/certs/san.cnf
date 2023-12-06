@@ -1,0 +1,26 @@
+[req]
+prompt = no
+req_extensions = req_ext
+distinguished_name = dn
+
+[dn]
+C=BR
+ST=Sao Paulo
+L=Sao Paulo
+O=Red Hat
+OU=Ansible EDA
+emailAddress=mmagnani@redhat.com
+CN = *.eda.local
+
+[req_ext]
+subjectAltName = @alt_names
+keyUsage = digitalSignature,keyAgreement
+extendedKeyUsage = serverAuth, clientAuth
+
+[alt_names]
+DNS.1 = ui.eda.local
+DNS.2 = postgres.eda.local
+DNS.3 = redis.eda.local
+DNS.4 = api.eda.local
+DNS.5 = daphne.eda.local
+DNS.6 = 127.0.0.1

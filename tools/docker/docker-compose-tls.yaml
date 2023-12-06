@@ -17,6 +17,12 @@ x-environment:
   - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
   - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
   - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
+  - EDA_PGSSLMODE=${EDA_PGSSLMODE:-require}
+  - EDA_PGSSLCERT=${EDA_PGSSLCERT:-./postgres_ssl_config/certs/eda-lab.crt}
+  - EDA_PGSSLKEY=${EDA_PGSSLKEY:-./postgres_ssl_config/certs/eda-lab.key}
+  - EDA_PGSSLROOTCERT=${EDA_PGSSLROOTCERT:-./postgres_ssl_config/certs/ca.cer}
+  - SSL_CERTIFICATE=/certs/eda-lab.crt
+  - SSL_CERTIFICATE_KEY=/certs/eda-lab.key
 
 services:
   podman-pre-setup:
@@ -50,6 +56,8 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+    volumes:
+      - "./tools/docker/postgres_ssl_config/certs:/certs:z"
 
   eda-api:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
@@ -162,10 +170,13 @@ services:
       POSTGRESQL_PASSWORD: secret
       POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - '5432:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
+      - "${EDA_PGSSL_PATHCONFIG:-./postgres_ssl_config/postgresql-cfg}:/opt/app-root/src/postgresql-cfg:z"
+      - "${EDA_PGSSL_PATHCERT:-./postgres_ssl_config/certs}:/opt/app-root/src/certs:z"
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
@@ -187,7 +198,3 @@ services:
 volumes:
   postgres_data: {}
   podman_data: {}
-
-networks:
-  service-mesh:
-    name: service-mesh
