@@ -98,9 +98,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
 
-        if msg_type != MessageType.SHUTDOWN:
-            await self.send(text_data=json.dumps({"type": "Hello"}))
-
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
         rulesets, extra_var = await self.get_resources(message.activation_id)
