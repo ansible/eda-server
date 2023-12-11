@@ -132,6 +132,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
+    "ansible_base",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -145,6 +147,8 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.utils.middleware.AuthenticatorBackendMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
@@ -353,6 +357,13 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        # Experimental LDAP Integration
+        # https://issues.redhat.com/browse/AAP-16938
+        "ansible_base": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -404,3 +415,15 @@ ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
 # ---------------------------------------------------------
 ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+
+# Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_AUTHENTICATOR_CLASS_PREFIXES = [
+    "aap_eda.core.authenticator_plugins"
+]
+AUTHENTICATION_BACKENDS = [
+    "ansible_base.authentication.backend.AnsibleBaseAuth",
+    "django.contrib.auth.backends.ModelBackend",
+]
