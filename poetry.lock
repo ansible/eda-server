@@ -1259,9 +1259,9 @@ htmlsoup = ["BeautifulSoup4"]
 source = ["Cython (>=0.29.35)"]
 
 [[package]]
-name = "matplotlib-inline"
-version = "0.1.6"
-description = "Inline Matplotlib backend for Jupyter"
+name = "markupsafe"
+version = "2.1.3"
+description = "Safely add untrusted strings to HTML/XML markup."
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -2673,4 +2673,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4"
-content-hash = "3a92ec9e16058d5870f81c0ba3abdd62bd6867150fc8d574f195e4320dac3c4f"
+content-hash = "7bbb72cc3351198e69f694b28527ec8452849cde6a736da9cfa40ac476785dfb"
