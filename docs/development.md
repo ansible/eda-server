@@ -157,6 +157,8 @@ git clone git@github.com:ansible/eda-server.git
 
 ### Install dependencies
 
+**NOTE**: Since we added experimental [LDAP authentication](https://github.com/ansible/eda-server/pull/557), we have new dependencies such as `xmlsec` for which you may need to install the required [native libraries first](https://pypi.org/project/xmlsec/).
+
 Go you project directory and install dependencies for local development:
 
 ```shell
