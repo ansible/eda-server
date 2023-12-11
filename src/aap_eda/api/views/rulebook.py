@@ -321,44 +321,6 @@ class AuditRuleViewSet(
         return self.get_paginated_response(serializer.data)
 
 
-@extend_schema_view(
-    retrieve=extend_schema(
-        description="Get the audit event by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.AuditEventSerializer,
-                description="Return the audit event by its id.",
-            ),
-        },
-    ),
-    list=extend_schema(
-        description="List all audit events",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.AuditEventSerializer,
-                description="Return a list of audit events.",
-            ),
-        },
-    ),
-)
-class AuditEventViewSet(
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.AuditEvent.objects.all()
-    serializer_class = serializers.AuditEventSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
-    filterset_class = filters.AuditRuleEventFilter
-    ordering_fields = [
-        "id",
-        "source_name",
-        "source_type",
-        "received_at",
-        "rule_fired_at",
-    ]
-
-    rbac_resource_type = ResourceType.AUDIT_EVENT
-
-
 class RuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):

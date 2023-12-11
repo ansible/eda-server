@@ -18,7 +18,6 @@ from .credential import CredentialViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .project import ExtraVarViewSet, ProjectViewSet
 from .rulebook import (
-    AuditEventViewSet,
     AuditRuleViewSet,
     RulebookViewSet,
     RulesetViewSet,
@@ -35,7 +34,6 @@ __all__ = (
     # project
     "ExtraVarViewSet",
     "ProjectViewSet",
-    "AuditEventViewSet",
     "AuditRuleViewSet",
     "RulebookViewSet",
     "RulesetViewSet",
