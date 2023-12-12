@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
-from django_rq import enqueue, get_queue, job
+from django_rq import enqueue, get_queue, get_scheduler, job
 from rq import Connection, Queue as _Queue, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
@@ -192,6 +193,14 @@ class ActivationWorker(_Worker):
         )
 
 
+def enqueue_delay(queue_name: str, delay: int, *args, **kwargs) -> Job:
+    """Enqueue a job to run after specific seconds."""
+    scheduler = get_scheduler(name=queue_name)
+    return scheduler.enqueue_at(
+        datetime.utcnow() + timedelta(seconds=delay), *args, **kwargs
+    )
+
+
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     """Enqueue a new job if it is not already enqueued.
 
@@ -211,8 +220,10 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
         return queue.enqueue(*args, **kwargs)
 
 
-def job_from_queue(queue: Queue, job_id: str) -> Optional[Job]:
+def job_from_queue(queue: Union[Queue, str], job_id: str) -> Optional[Job]:
     """Return queue job if it not canceled or finished else None."""
+    if type(queue) is str:
+        queue = get_queue(name=queue)
     job = queue.fetch_job(job_id)
     if job and job.get_status(refresh=True) in [
         JobStatus.QUEUED,
