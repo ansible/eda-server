@@ -484,6 +484,7 @@ class Engine(ContainerEngine):
             raise ContainerStartError(
                 f"Pod {self.pod_name} failed with error {e}"
             ) from e
+
         finally:
             watcher.stop()
 
