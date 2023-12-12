@@ -16,7 +16,7 @@ RUN DNF=dnf \
     git-core \
     java-17-openjdk-headless \
     # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    openldap-devel libxml2-devel xmlsec1-devel xmlsec1-openssl-devel libtool-ltdl-devel" \
+    openldap-devel xmlsec1-devel libtool-ltdl-devel" \
     && $DNF -y install dnf-plugins-core \
     && $DNF -y config-manager --set-enabled crb \
     && $DNF -y install $INSTALL_PACKAGES \
