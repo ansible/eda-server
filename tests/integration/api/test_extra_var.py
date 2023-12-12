@@ -56,3 +56,15 @@ def test_retrieve_extra_var(client: APIClient):
 def test_retrieve_extra_var_not_exist(client: APIClient):
     response = client.get(f"{api_url_v1}/extra-vars/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    "extra_var", ["John", "John, ", "[John, 3,]", '{"name": "John" - 2 }']
+)
+@pytest.mark.django_db
+def test_extra_var_invalid_data(client: APIClient, extra_var):
+    invalid_data = {
+        "extra_var": extra_var,
+    }
+    response = client.post(f"{api_url_v1}/extra-vars/", data=invalid_data)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
