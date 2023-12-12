@@ -1,6 +1,5 @@
 import uuid
 from typing import Generator
-from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -47,56 +46,6 @@ DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_ansible_rulebook_consumer(
-    ws_communicator: WebsocketCommunicator,
-):
-    test_payloads = [
-        {"handle_workers": {"type": "Worker", "activation_id": "1"}},
-        {
-            "handle_actions": {
-                "type": "Action",
-                "action": "run_playbook",
-                "action_uuid": DUMMY_UUID,
-                "activation_id": 1,
-                "run_at": "2023-03-20T18:14:55.036753Z",
-                "playbook_name": "playbook",
-                "job_id": "uuid_1234",
-                "ruleset": "ruleset",
-                "ruleset_uuid": DUMMY_UUID,
-                "rule": "rule",
-                "rule_uuid": DUMMY_UUID,
-                "rc": 0,
-                "status": "succeeded",
-            }
-        },
-        {
-            "handle_jobs": {
-                "type": "Job",
-                "job_id": "uuid_1234",
-                "ansible_rulebook_id": 1,
-                "name": "ansible.eda.hello",
-                "ruleset": "ruleset",
-                "rule": "rule",
-                "hosts": "hosts",
-                "action": "run_playbook",
-                "run_at": "2023-03-20T18:14:55.036753Z",
-            }
-        },
-        {"handle_events": {"type": "AnsibleEvent", "event": {}}},
-    ]
-
-    for payload in test_payloads:
-        for key, value in payload.items():
-            with patch.object(AnsibleRulebookConsumer, key) as mocker:
-                await ws_communicator.send_json_to(value)
-                response = await ws_communicator.receive_json_from()
-
-                mocker.assert_called_once()
-
-    assert response["type"] == "Hello"
-
-
-@pytest.mark.django_db(transaction=True)
 async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     activation_instance_with_extra_var = await _prepare_db_data()
     activation_instance_without_extra_var = (
@@ -114,7 +63,6 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
         "Rulebook",
         "ControllerInfo",
         "EndOfResponse",
-        "Hello",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
@@ -129,7 +77,6 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
         "Rulebook",
         "ControllerInfo",
         "EndOfResponse",
-        "Hello",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
