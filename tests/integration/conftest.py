@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+
 import pytest
 from django.conf import settings
 from pytest_redis import factories
@@ -40,3 +42,13 @@ def test_queue_name():
 @pytest.fixture
 def default_queue(test_queue_name, redis_external) -> Queue:
     return Queue(test_queue_name, connection=redis_external)
+
+
+@pytest.fixture
+def caplog_factory(caplog):
+    def _factory(logger):
+        logger.setLevel(logging.INFO)
+        logger.handlers += [caplog.handler]
+        return caplog
+
+    return _factory

@@ -79,6 +79,8 @@ class ActivationStatus(DjangoStrEnum):
     STOPPED = "stopped"
     DELETING = "deleting"
     COMPLETED = "completed"
+    # TODO: unresponsive status is no longer necessary
+    # monitor task will handle it
     UNRESPONSIVE = "unresponsive"
     ERROR = "error"
 
@@ -101,3 +103,11 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.UNRESPONSIVE: "Activation is not responsive",
     ActivationStatus.ERROR: "Activation is in an error state",
 }
+
+
+class ActivationRequest(DjangoStrEnum):
+    START = "start"
+    STOP = "stop"
+    RESTART = "restart"
+    DELETE = "delete"
+    AUTO_START = "auto_start"

@@ -13,18 +13,14 @@
 #  limitations under the License.
 
 
-import logging
-
 import pytest
 
 from aap_eda.core.tasking import logger, unique_enqueue
 
 
 @pytest.fixture
-def eda_caplog(caplog):
-    logger.setLevel(logging.INFO)
-    logger.handlers += [caplog.handler]
-    return caplog
+def eda_caplog(caplog_factory):
+    return caplog_factory(logger)
 
 
 def fake_task(number: int):
