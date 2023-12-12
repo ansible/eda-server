@@ -274,8 +274,13 @@ task create:superuser
 Locally:
 
 ```shell
+task run:api
+# OR
 task manage -- runserver
 ```
+
+**NOTE**: When running the API server locally, make sure to bring up the scheduler container
+by running `task run:scheduler`
 
 With docker compose:
 
