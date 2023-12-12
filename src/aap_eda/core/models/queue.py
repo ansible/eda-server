@@ -12,9 +12,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .project import import_project, sync_project
+from django.db import models
 
-__all__ = (
-    "import_project",
-    "sync_project",
-)
+from aap_eda.core.enums import ActivationRequest
+
+
+class ActivationRequestQueue(models.Model):
+    class Meta:
+        db_table = "core_activation_request_queue"
+        ordering = ["id"]
+
+    request = models.TextField(null=False, choices=ActivationRequest.choices())
+    activation = models.ForeignKey(
+        "Activation", on_delete=models.CASCADE, null=False
+    )
+
+
+__all__ = [
+    "ActivationRequestQueue",
+]

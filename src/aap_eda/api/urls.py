@@ -34,7 +34,6 @@ router.register("tasks", views.TaskViewSet, basename="task")
 router.register("activations", views.ActivationViewSet)
 router.register("activation-instances", views.ActivationInstanceViewSet)
 router.register("audit-rules", views.AuditRuleViewSet)
-router.register("audit-events", views.AuditEventViewSet)
 router.register("users", views.UserViewSet)
 router.register(
     "users/me/awx-tokens",

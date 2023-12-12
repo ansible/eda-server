@@ -268,11 +268,11 @@ if RQ_UNIX_SOCKET_PATH:
     RQ_QUEUES = {
         "default": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 300,
         },
         "activation": {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 120,
         },
     }
 else:
@@ -280,12 +280,12 @@ else:
         "default": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 300,
         },
         "activation": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": -1,
+            "DEFAULT_TIMEOUT": 120,
         },
     }
 RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
@@ -293,7 +293,7 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {"func": "aap_eda.tasks.ruleset.monitor_activations", "interval": 60},
+    {"func": "aap_eda.tasks.orchestrator.monitor_activations", "interval": 5},
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
@@ -389,6 +389,8 @@ PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
 PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
 PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
+DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
+CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
@@ -397,8 +399,9 @@ PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
 RULEBOOK_LIVENESS_CHECK_SECONDS = int(
     settings.get("RULEBOOK_LIVENESS_CHECK_SECONDS", 300)
 )
-RULEBOOK_LIVENESS_TIMEOUT_SECONDS = int(
-    settings.get("RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 610)
+RULEBOOK_LIVENESS_TIMEOUT_SECONDS = (
+    int(settings.get("RULEBOOK_LIVENESS_TIMEOUT_SECONDS", 310))
+    + RULEBOOK_LIVENESS_CHECK_SECONDS
 )
 ACTIVATION_RESTART_SECONDS_ON_COMPLETE = int(
     settings.get("ACTIVATION_RESTART_SECONDS_ON_COMPLETE", 0)
@@ -409,6 +412,7 @@ ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(
 ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
     settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5)
 )
+MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL

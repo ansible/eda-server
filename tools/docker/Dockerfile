@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi:latest
+FROM quay.io/centos/centos:stream9
 
 ARG USER_ID=${USER_ID:-1001}
 RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
@@ -16,7 +16,9 @@ RUN DNF=dnf \
     git-core \
     java-17-openjdk-headless \
     # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    openldap-devel" \
+    openldap-devel xmlsec1-devel libtool-ltdl-devel" \
+    && $DNF -y install dnf-plugins-core \
+    && $DNF -y config-manager --set-enabled crb \
     && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf
@@ -48,9 +50,9 @@ RUN poetry install -E all --only-root
 
 USER 0
 RUN for dir in \
-      /app \
-      /app/venv \
-      /app/venv/bin ; \
+    /app \
+    /app/venv \
+    /app/venv/bin ; \
     do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done
 
 USER "$USER_ID"

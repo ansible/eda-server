@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import typing as tp
+
 from django.db import models
 
 from aap_eda.core.enums import (
@@ -44,12 +46,15 @@ class Activation(models.Model):
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")
+    # TODO(alex) Since local activations are no longer supported
+    # this field should be mandatory.
     decision_environment = models.ForeignKey(
         "DecisionEnvironment", on_delete=models.SET_NULL, null=True
     )
     project = models.ForeignKey(
         "Project", on_delete=models.SET_NULL, null=True
     )
+    # TODO(alex): this field should be mandatory.
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.SET_NULL, null=True
     )
@@ -68,6 +73,8 @@ class Activation(models.Model):
     restart_count = models.IntegerField(default=0)
     failure_count = models.IntegerField(default=0)  # internal, since last good
     is_valid = models.BooleanField(default=False)  # internal, passed first run
+    # TODO(alex): name and rulesets should be populated in the model, not in
+    # the serializer.
     rulebook_name = models.TextField(
         null=False,
         help_text="Name of the referenced rulebook",
@@ -82,6 +89,13 @@ class Activation(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
+    latest_instance = models.OneToOneField(
+        "ActivationInstance",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     def save(self, *args, **kwargs):
         # when creating
@@ -134,6 +148,23 @@ class Activation(models.Model):
         except ValueError as error:
             raise UnknownStatusError(error)
 
+    def update_status(
+        self, status: ActivationStatus, status_message: tp.Optional[str] = None
+    ) -> None:
+        self.status = status
+        self.status_updated_at = models.functions.Now()
+        update_fields = [
+            "status",
+            "status_updated_at",
+            "modified_at",
+        ]
+        if status_message:
+            self.status_message = status_message
+            update_fields.append("status_message")
+        self.save(
+            update_fields=update_fields,
+        )
+
 
 class ActivationInstance(models.Model):
     class Meta:
@@ -152,12 +183,16 @@ class ActivationInstance(models.Model):
     ended_at = models.DateTimeField(null=True)
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
+    log_read_at = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
         # when creating
         if self._state.adding:
             if self.status_message is None:
                 self.status_message = self._get_default_status_message()
+
+                # populate latest_instance of activation at creation
+                self.activation.latest_instance = self
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
@@ -185,6 +220,7 @@ class ActivationInstance(models.Model):
                 kwargs["update_fields"].append("status_message")
 
         super().save(*args, **kwargs)
+        self.activation.save(update_fields=["latest_instance"])
 
     def _get_default_status_message(self):
         try:
@@ -197,6 +233,32 @@ class ActivationInstance(models.Model):
             ActivationStatus(self.status)
         except ValueError as error:
             raise UnknownStatusError(error)
+
+    def update_status(
+        self, status: ActivationStatus, status_message: tp.Optional[str] = None
+    ) -> None:
+        self.status = status
+        self.updated_at = models.functions.Now()
+        update_fields = [
+            "status",
+            "updated_at",
+        ]
+        if status_message:
+            self.status_message = status_message
+            update_fields.append("status_message")
+
+        if status in [
+            ActivationStatus.STOPPED,
+            ActivationStatus.COMPLETED,
+            ActivationStatus.FAILED,
+            ActivationStatus.ERROR,
+        ]:
+            self.ended_at = models.functions.Now()
+            update_fields.append("ended_at")
+
+        self.save(
+            update_fields=update_fields,
+        )
 
 
 class ActivationInstanceLog(models.Model):
