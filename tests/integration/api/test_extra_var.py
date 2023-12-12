@@ -68,3 +68,15 @@ def test_extra_var_invalid_data(client: APIClient, extra_var):
     }
     response = client.post(f"{api_url_v1}/extra-vars/", data=invalid_data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.parametrize(
+    "extra_var", ["John: Doe", "John: 2", '{"name": "John"}', '"age": 20']
+)
+@pytest.mark.django_db
+def test_extra_var_valid_data(client: APIClient, extra_var):
+    valid_data = {
+        "extra_var": extra_var,
+    }
+    response = client.post(f"{api_url_v1}/extra-vars/", data=valid_data)
+    assert response.status_code == status.HTTP_201_CREATED
