@@ -77,7 +77,7 @@ def get_k8s_client() -> Client:
             network_api=k8sclient.NetworkingV1Api(),
         )
     except ConfigException as e:
-        raise ContainerEngineInitError(str(e))
+        raise ContainerEngineInitError(str(e)) from e
 
 
 class Engine(ContainerEngine):
@@ -93,6 +93,8 @@ class Engine(ContainerEngine):
 
         self._set_namespace()
         self.secret_name = f"activation-secret-{activation_id}"
+        self.job_name = None
+        self.pod_name = None
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version
@@ -237,10 +239,12 @@ class Engine(ContainerEngine):
                     log_handler.flush()
                     log_handler.set_log_read_at(dt)
             else:
-                LOGGER.warning(f"Pod with label {container_id} not found.")
-                log_handler.write(
-                    f"Pod with label {container_id} not found.", True
+                msg = (
+                    f"Pod with label {container_id} has unhandled state: "
+                    f"{container_status.state}."
                 )
+                LOGGER.warning(msg)
+                log_handler.write(msg, flush=True)
 
         # ContainerUpdateLogsError handled by the manager
         except ApiException as e:
@@ -259,7 +263,7 @@ class Engine(ContainerEngine):
             return result.items[0]
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise ContainerNotFoundError(str(e))
+            raise ContainerNotFoundError(str(e)) from e
 
     def _create_container_spec(
         self,
@@ -358,7 +362,7 @@ class Engine(ContainerEngine):
                 LOGGER.info(f"Service already exists: {service_name}")
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise ContainerStartError(str(e))
+            raise ContainerStartError(str(e)) from e
 
     def _delete_services(self, log_handler: LogHandler) -> None:
         try:
@@ -378,7 +382,7 @@ class Engine(ContainerEngine):
                 log_handler.write(f"Service {service_name} is deleted.", True)
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise ContainerCleanupError(str(e))
+            raise ContainerCleanupError(str(e)) from e
 
     def _create_job(
         self,
@@ -415,7 +419,7 @@ class Engine(ContainerEngine):
             LOGGER.info(f"Submitted Job template: {self.job_name},")
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise ContainerStartError(str(e))
+            raise ContainerStartError(str(e)) from e
 
         return job_result
 
@@ -446,7 +450,7 @@ class Engine(ContainerEngine):
         except ApiException as e:
             raise ContainerCleanupError(
                 f"Stop of {self.job_name} Failed: \n {e}"
-            )
+            ) from e
 
     def _wait_for_pod_to_start(self, log_handler: LogHandler) -> None:
         watcher = watch.Watch()
@@ -479,7 +483,8 @@ class Engine(ContainerEngine):
         except ApiException as e:
             raise ContainerStartError(
                 f"Pod {self.pod_name} failed with error {e}"
-            )
+            ) from e
+
         finally:
             watcher.stop()
 
@@ -488,14 +493,16 @@ class Engine(ContainerEngine):
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
         )
         try:
-            with open(namespace_file, "r") as namespace_ref:
+            with open(
+                namespace_file, mode="r", encoding="utf-8"
+            ) as namespace_ref:
                 self.namespace = namespace_ref.read()
 
             LOGGER.info(f"Namespace is {self.namespace}")
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             message = f"Namespace file {namespace_file} does not exist."
             LOGGER.error(message)
-            raise ContainerEngineInitError(message)
+            raise ContainerEngineInitError(message) from e
 
     def _create_secret(
         self,
@@ -542,7 +549,7 @@ class Engine(ContainerEngine):
             LOGGER.info(f"Created secret: name: {self.secret_name}")
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise ContainerStartError(str(e))
+            raise ContainerStartError(str(e)) from e
 
     def _delete_secret(self, log_handler: LogHandler) -> None:
         try:
@@ -573,4 +580,4 @@ class Engine(ContainerEngine):
                 log_handler.write(message, True)
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
-            raise ContainerCleanupError(str(e))
+            raise ContainerCleanupError(str(e)) from e
