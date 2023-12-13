@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/ansible/eda-server/graph/badge.svg?token=N6Z2DZGKGZ)](https://codecov.io/gh/ansible/eda-server)
 
-[![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
+[![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
 
 ![Python 3.9](https://img.shields.io/badge/Python-3.9-blue)
 ![Python 3.10](https://img.shields.io/badge/Python-3.10-blue)
