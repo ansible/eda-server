@@ -58,7 +58,7 @@ def test_retrieve_extra_var_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-NOT_OBJECT_ERROR_MSG = "yaml is not in object format"
+NOT_OBJECT_ERROR_MSG = "Extra var is not in object format"
 NOT_YAML_JSON_ERROR_MSG = "Extra var must be in JSON or YAML format"
 
 

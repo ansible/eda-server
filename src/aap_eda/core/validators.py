@@ -75,7 +75,9 @@ def is_extra_var_dict(extra_var: str):
     try:
         data = yaml.safe_load(extra_var)
         if not isinstance(data, dict):
-            raise serializers.ValidationError("yaml is not in object format")
+            raise serializers.ValidationError(
+                "Extra var is not in object format"
+            )
     except yaml.YAMLError:
         raise serializers.ValidationError(
             "Extra var must be in JSON or YAML format"
