@@ -335,6 +335,12 @@ class AuditActionSerializer(serializers.ModelSerializer):
         help_text="The fired timestamp of the action",
     )
 
+    status_message = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Message of the action",
+    )
+
     class Meta:
         model = models.AuditAction
         fields = [
@@ -345,6 +351,7 @@ class AuditActionSerializer(serializers.ModelSerializer):
             "fired_at",
             "rule_fired_at",
             "audit_rule_id",
+            "status_message",
         ]
         read_only_fields = ["id"]
 

@@ -102,6 +102,7 @@ class AuditAction(models.Model):
     url = models.URLField(blank=True)
     fired_at = models.DateTimeField()
     rule_fired_at = models.DateTimeField(null=True)
+    status_message = models.TextField(null=True, default=None)
 
     audit_rule = models.ForeignKey(
         "AuditRule", on_delete=models.CASCADE, null=True
