@@ -1,3 +1,20 @@
+**Maintenance Status**
+
+![Maintained? yes](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
+
+**Codecov**
+
+[![codecov](https://codecov.io/gh/ansible/eda-server/graph/badge.svg?token=N6Z2DZGKGZ)](https://codecov.io/gh/ansible/eda-server)
+
+**GitHub Workflow**
+
+[![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
+
+**Version**
+![Python 3.9](https://img.shields.io/badge/Python-3.9-blue)
+![Python 3.10](https://img.shields.io/badge/Python-3.10-blue)
+![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
+
 # Event Driven Ansible Controller
 
 This repository contains the source code for the Event Driven Ansible Controller, aka EDA-Controller.
@@ -15,7 +32,7 @@ Refer to the [development guide](docs/development.md) for further information if
 ## Contributing
 
 We ask all of our community members and contributors to adhere to the [Ansible code of conduct](https://docs.ansible.com/ansible/latest/community/code_of_conduct.html).
-If you have questions or need assistance, please reach out to our community team at codeofconduct@ansible.com
+If you have questions or need assistance, please reach out to our community team at <codeofconduct@ansible.com>
 
 Refer to the [Contributing guide](docs/contributing.md) for further information.
 
