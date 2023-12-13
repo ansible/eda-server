@@ -18,6 +18,8 @@ from unittest import mock
 import pytest
 from dateutil import parser
 from kubernetes import client as k8sclient
+from kubernetes.client.rest import ApiException
+from kubernetes.config.config_exception import ConfigException
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -25,18 +27,23 @@ from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
+    Credential,
 )
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
+    ContainerEngineError,
     ContainerEngineInitError,
     ContainerImagePullError,
+    ContainerNotFoundError,
     ContainerStartError,
+    ContainerUpdateLogsError,
 )
 from aap_eda.services.activation.engine.kubernetes import (
     IMAGE_PULL_BACK_OFF,
     IMAGE_PULL_ERROR,
     INVALID_IMAGE_NAME,
     Engine,
+    get_k8s_client,
 )
 
 
@@ -88,6 +95,12 @@ def get_request(data: InitData):
         activation_instance_id=data.activation_instance.id,
         activation_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
+        credential=Credential(username="admin", secret="secret"),
+        ports=[("localhost", 8080)],
+        mem_limit="8G",
+        mounts={"/dev": "/opt"},
+        env_vars={"a": 1},
+        extra_args={"b": 2},
     )
 
 
@@ -121,8 +134,8 @@ def get_container_state(phase: str):
         )
 
 
-def get_stream_event(phase: str):
-    pod = k8sclient.V1Pod(
+def get_pod(phase: str):
+    return k8sclient.V1Pod(
         metadata=k8sclient.V1ObjectMeta(
             name="job_name",
             namespace="aap-eda",
@@ -141,6 +154,10 @@ def get_stream_event(phase: str):
             phase=phase,
         ),
     )
+
+
+def get_stream_event(phase: str):
+    pod = get_pod(phase)
 
     event = {}
     event["object"] = pod
@@ -207,6 +224,22 @@ def get_pod_statuses(container_status: str):
                 restart_count=0,
             )
         ]
+    else:
+        return [
+            k8sclient.V1ContainerStatus(
+                name="container-status",
+                ready=True,
+                image="test_image",
+                image_id="test_image_id",
+                state=k8sclient.V1ContainerState(
+                    waiting=k8sclient.V1ContainerStateWaiting(
+                        message="waiting_message",
+                        reason="too many things",
+                    )
+                ),
+                restart_count=0,
+            )
+        ]
 
 
 def get_pod_statuses_with_exit_code(exit_code: int):
@@ -267,6 +300,28 @@ def test_engine_init_with_exception(init_data):
         )
 
 
+def test_get_k8s_client():
+    with mock.patch("kubernetes.config.load_incluster_config"):
+        client = get_k8s_client()
+
+        assert client is not None
+        assert client.batch_api is not None
+        assert client.core_api is not None
+        assert client.network_api is not None
+
+
+def test_get_k8s_client_exception():
+    def raise_config_exception(*args, **kwargs):
+        raise ConfigException("Config error")
+
+    with mock.patch(
+        "kubernetes.config.load_incluster_config",
+        side_effect=raise_config_exception,
+    ):
+        with pytest.raises(ContainerEngineInitError, match="Config error"):
+            get_k8s_client()
+
+
 @pytest.mark.django_db
 def test_engine_start(init_data, kubernetes_engine):
     engine = kubernetes_engine
@@ -285,10 +340,27 @@ def test_engine_start(init_data, kubernetes_engine):
         f"{init_data.activation_instance.id}"
     )
 
-    assert models.ActivationInstanceLog.objects.count() == 4
+    assert models.ActivationInstanceLog.objects.count() == 5
     assert models.ActivationInstanceLog.objects.last().log.endswith(
         f"Job {engine.job_name} is running"
     )
+
+
+@pytest.mark.django_db
+def test_engine_start_with_create_job_exception(init_data, kubernetes_engine):
+    engine = kubernetes_engine
+    request = get_request(init_data)
+    log_handler = DBLogger(init_data.activation_instance.id)
+
+    def raise_api_error(*args, **kwargs):
+        raise ApiException("Job create error")
+
+    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+        batch_api_mock.create_namespaced_job.side_effect = raise_api_error
+        with mock.patch.object(engine, "cleanup") as cleanup_mock:
+            with pytest.raises(ContainerEngineError):
+                engine.start(request, log_handler)
+                cleanup_mock.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -351,6 +423,7 @@ def test_engine_start_with_invalid_image_exception(
     [
         {"running": ActivationStatus.RUNNING},
         {"terminated": ActivationStatus.COMPLETED},
+        {"unknown": ActivationStatus.ERROR},
     ],
 )
 @pytest.mark.django_db
@@ -396,7 +469,7 @@ def test_get_status_with_exit_codes(kubernetes_engine, exit_codes):
 
 
 @pytest.mark.django_db
-def test_cleanup_secret(init_data, kubernetes_engine):
+def test_delete_secret(init_data, kubernetes_engine):
     engine = kubernetes_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     status_mock = mock.Mock()
@@ -420,9 +493,18 @@ def test_cleanup_secret(init_data, kubernetes_engine):
             f"reason: {status_mock.reason}"
         )
 
+    def raise_api_error(*args, **kwargs):
+        raise ApiException("Secret delete error")
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.delete_namespaced_secret.side_effect = raise_api_error
+
+        with pytest.raises(ContainerCleanupError):
+            engine._delete_secret(log_handler)
+
 
 @pytest.mark.django_db
-def test_cleanup_service(init_data, kubernetes_engine):
+def test_delete_service(init_data, kubernetes_engine):
     engine = kubernetes_engine
     engine.job_name = "activation-job"
     log_handler = DBLogger(init_data.activation_instance.id)
@@ -442,9 +524,22 @@ def test_cleanup_service(init_data, kubernetes_engine):
             f"Service {service_name} is deleted."
         )
 
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_service.return_value.items = [
+            service_mock
+        ]
+
+        def raise_api_error(*args, **kwargs):
+            raise ApiException("Container delete failed")
+
+        core_api_mock.delete_namespaced_service.side_effect = raise_api_error
+
+        with pytest.raises(ContainerCleanupError):
+            engine._delete_services(log_handler)
+
 
 @pytest.mark.django_db
-def test_cleanup_job(init_data, kubernetes_engine):
+def test_delete_job(init_data, kubernetes_engine):
     engine = kubernetes_engine
     job_name = "eda-job"
     engine.job_name = job_name
@@ -459,9 +554,17 @@ def test_cleanup_job(init_data, kubernetes_engine):
 
         batch_api_mock.delete_namespaced_job.assert_called_once()
 
+    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+        batch_api_mock.list_namespaced_job.return_value.items = None
+        engine._delete_job(log_handler)
+
+        assert models.ActivationInstanceLog.objects.last().log.endswith(
+            f"Job for {job_name} has been removed."
+        )
+
 
 @pytest.mark.django_db
-def test_cleanup_job_with_exception(init_data, kubernetes_engine):
+def test_delete_job_with_exception(init_data, kubernetes_engine):
     engine = kubernetes_engine
     job_name = "eda-job"
     engine.job_name = job_name
@@ -473,6 +576,15 @@ def test_cleanup_job_with_exception(init_data, kubernetes_engine):
     with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
         batch_api_mock.list_namespaced_job.return_value.items = [job_mock]
         batch_api_mock.delete_namespaced_job.return_value.status = "Failure"
+
+        with pytest.raises(ContainerCleanupError):
+            engine._delete_job(log_handler)
+
+    def raise_api_error(*args, **kwargs):
+        raise ApiException("Container not found")
+
+    with mock.patch.object(engine.client, "batch_api") as batch_api_mock:
+        batch_api_mock.list_namespaced_job.side_effect = raise_api_error
 
         with pytest.raises(ContainerCleanupError):
             engine._delete_job(log_handler)
@@ -530,6 +642,98 @@ def test_update_logs(init_data, kubernetes_engine):
             ]
             engine.update_logs(job_name, log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log == f"{message}"
-    init_data.activation_instance.refresh_from_db()
-    assert init_data.activation_instance.log_read_at > init_log_read_at
+            assert (
+                models.ActivationInstanceLog.objects.last().log == f"{message}"
+            )
+            init_data.activation_instance.refresh_from_db()
+            assert init_data.activation_instance.log_read_at > init_log_read_at
+
+        def raise_api_error(*args, **kwargs):
+            raise ApiException("Container not found")
+
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.read_namespaced_pod_log.side_effect = raise_api_error
+
+            with pytest.raises(ContainerUpdateLogsError):
+                engine.update_logs(job_name, log_handler)
+
+    with mock.patch.object(
+        engine, "_get_job_pod", mock.Mock(return_value=pod_mock)
+    ):
+        pod_mock.status.container_statuses = get_pod_statuses("unknown")
+        log_mock = mock.Mock()
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            engine.update_logs(job_name, log_handler)
+            msg = f"Pod with label {job_name} has unhandled state:"
+            assert msg in models.ActivationInstanceLog.objects.last().log
+
+
+@pytest.mark.django_db
+def test_get_job_pod(init_data, kubernetes_engine):
+    engine = kubernetes_engine
+    pods_mock = mock.Mock()
+    pod = get_pod("running")
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_pod.return_value = pods_mock
+        pods_mock.items = [pod]
+
+        job_pod = engine._get_job_pod("eda-pod")
+
+        assert job_pod is not None
+        assert job_pod == pod
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_pod.return_value = pods_mock
+        pods_mock.items = None
+
+        with pytest.raises(ContainerNotFoundError):
+            engine._get_job_pod("eda-pod")
+
+    def raise_api_error(*args, **kwargs):
+        raise ApiException("Container not found")
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_pod.side_effect = raise_api_error
+
+        with pytest.raises(ContainerNotFoundError):
+            engine._get_job_pod("eda-pod")
+
+
+@pytest.mark.django_db
+def test_create_service(init_data, kubernetes_engine):
+    engine = kubernetes_engine
+    engine.job_name = "eda-job"
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_service.return_value.items = None
+        engine._create_service(8000)
+
+        core_api_mock.create_namespaced_service.assert_called_once()
+
+    def raise_api_error(*args, **kwargs):
+        raise ApiException("Service not found")
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_service.side_effect = raise_api_error
+
+        with pytest.raises(ContainerStartError):
+            engine._create_service(8000)
+
+
+@pytest.mark.django_db
+def test_create_secret(init_data, kubernetes_engine):
+    engine = kubernetes_engine
+    engine.job_name = "eda-job"
+    request = get_request(init_data)
+    log_handler = DBLogger(init_data.activation_instance.id)
+
+    def raise_api_error(*args, **kwargs):
+        raise ApiException("Secret create error")
+
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.create_namespaced_secret.side_effect = raise_api_error
+
+        with pytest.raises(ContainerStartError):
+            engine._create_secret(request, log_handler)
+            core_api_mock.delete_namespaced_secret.assert_called_once()

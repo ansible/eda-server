@@ -12,11 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from unittest import mock
 
 import pytest
 from dateutil import parser
+from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
@@ -27,6 +30,7 @@ from aap_eda.services.activation.engine import messages
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
+    Credential,
 )
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
@@ -34,8 +38,11 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerImagePullError,
     ContainerNotFoundError,
     ContainerStartError,
+    ContainerUpdateLogsError,
 )
-from aap_eda.services.activation.engine.podman import Engine
+from aap_eda.services.activation.engine.podman import Engine, get_podman_client
+
+DATA_DIR = Path(__file__).parent / "data"
 
 
 @dataclass
@@ -86,6 +93,33 @@ def get_request(data: InitData):
         activation_instance_id=data.activation_instance.id,
         activation_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
+        ports=[("localhost", 8080)],
+        mem_limit="8G",
+        mounts={"/dev": "/opt"},
+        env_vars={"a": 1},
+        extra_args={"b": 2},
+    )
+
+
+def get_request_with_never_pull_policy(data: InitData):
+    return ContainerRequest(
+        name="test-request",
+        image_url="quay.io/ansible/ansible-rulebook:main",
+        activation_instance_id=data.activation_instance.id,
+        activation_id=data.activation.id,
+        cmdline=get_ansible_rulebook_cmdline(data),
+        pull_policy="Never",
+    )
+
+
+def get_request_with_credential(data: InitData):
+    return ContainerRequest(
+        name="test-request",
+        image_url="quay.io/ansible/ansible-rulebook:main",
+        activation_instance_id=data.activation_instance.id,
+        activation_id=data.activation.id,
+        cmdline=get_ansible_rulebook_cmdline(data),
+        credential=Credential(username="me", secret="secret"),
     )
 
 
@@ -106,6 +140,33 @@ def podman_engine(init_data):
         )
 
         yield engine
+
+
+def test_get_podman_client(settings):
+    settings.PODMAN_SOCKET_URL = None
+    uid_0_mock = mock.Mock(return_value=0)
+
+    with mock.patch("os.getuid", uid_0_mock):
+        client = get_podman_client()
+        assert client.api.base_url.netloc == "%2Frun%2Fpodman%2Fpodman.sock"
+
+    client = get_podman_client()
+    assert (
+        client.api.base_url.netloc
+        == f"%2Frun%2Fuser%2F{os.getuid()}%2Fpodman%2Fpodman.sock"
+    )
+
+
+def test_get_podman_client_with_exception(settings):
+    def raise_error(*args, **kwargs):
+        raise ValueError("Failed to initialize client")
+
+    with mock.patch.object(PodmanClient, "__init__", side_effect=raise_error):
+        with pytest.raises(
+            ContainerEngineInitError,
+            match="Failed to initialize client",
+        ):
+            get_podman_client()
 
 
 @pytest.mark.django_db
@@ -180,6 +241,11 @@ def test_engine_start_with_credential(init_data, podman_engine):
         remove=True,
         detach=True,
         name=request.name,
+        ports={"8080/tcp": 8080},
+        mem_limit="8G",
+        mounts={"/dev": "/opt"},
+        environment={"a": 1},
+        b=2,
     )
 
 
@@ -212,10 +278,10 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
     request = get_request(init_data)
     request.credential = credential
 
-    def raise_error(*args, **kwargs):
+    def raise_not_found_error(*args, **kwargs):
         raise ImageNotFound("Image not found")
 
-    engine.client.images.pull.side_effect = raise_error
+    engine.client.images.pull.side_effect = raise_not_found_error
 
     with pytest.raises(
         ContainerImagePullError, match=f"Image {request.image_url} not found"
@@ -225,6 +291,25 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
     assert models.ActivationInstanceLog.objects.last().log.endswith(
         f"Image {request.image_url} not found"
     )
+
+
+@pytest.mark.django_db
+def test_engine_start_with_image_api_exception(init_data, podman_engine):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+    engine = podman_engine
+    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(init_data)
+    request.credential = credential
+
+    def raise_api_error(*args, **kwargs):
+        raise APIError("Image not found")
+
+    engine.client.images.pull.side_effect = raise_api_error
+
+    with pytest.raises(ContainerStartError, match="Image not found"):
+        engine.start(request, log_handler)
 
 
 @pytest.mark.django_db
@@ -281,6 +366,17 @@ def test_engine_start_with_containers_run_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
+def test_engine_start_with_never_pull_policy_request(init_data, podman_engine):
+    engine = podman_engine
+    request = get_request_with_never_pull_policy(init_data)
+    log_handler = DBLogger(init_data.activation_instance.id)
+
+    engine.start(request, log_handler)
+
+    engine.client.containers.run.assert_called_once()
+
+
+@pytest.mark.django_db
 def test_engine_get_status(podman_engine):
     engine = podman_engine
 
@@ -296,6 +392,25 @@ def test_engine_get_status(podman_engine):
         pod_id="container_id"
     )
 
+    # when status in "created"
+    container_mock.status = "created"
+    container_mock.attrs = {"State": {"Error": None}}
+    activation_status = engine.get_status("container_id")
+
+    assert activation_status.status == ActivationStatus.FAILED
+
+    # when status in "paused"
+    container_mock.status = "paused"
+    activation_status = engine.get_status("container_id")
+
+    assert activation_status.status == ActivationStatus.FAILED
+
+    # when status in "unknown"
+    container_mock.status = "unknown"
+    activation_status = engine.get_status("container_id")
+
+    assert activation_status.status == ActivationStatus.ERROR
+
     # when status in "exited"
     container_mock.status = "exited"
     expects = [
@@ -304,7 +419,7 @@ def test_engine_get_status(podman_engine):
     ]
 
     for key, value in expects:
-        container_mock.attrs.get.return_value.get.return_value = key
+        container_mock.attrs = {"State": {"ExitCode": key}}
         activation_status = engine.get_status("container_id")
 
         assert activation_status.status == value
@@ -354,7 +469,26 @@ def test_engine_cleanup_with_not_found_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_cleanup_with_api_exception(init_data, podman_engine):
+def test_engine_cleanup_with_remove_exception(init_data, podman_engine):
+    engine = podman_engine
+    log_handler = DBLogger(init_data.activation_instance.id)
+
+    err_msg = "Not found"
+
+    def raise_error(*args, **kwargs):
+        raise APIError(err_msg)
+
+    container_mock = mock.Mock()
+    engine.client.containers.get.return_value = container_mock
+    container_mock.logs.return_value = []
+    container_mock.remove.side_effect = raise_error
+
+    with pytest.raises(ContainerCleanupError, match=err_msg):
+        engine.cleanup("100", log_handler)
+
+
+@pytest.mark.django_db
+def test_engine_cleanup_with_get_exception(init_data, podman_engine):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
 
@@ -423,3 +557,39 @@ def test_engine_update_logs_with_container_not_found(init_data, podman_engine):
     assert models.ActivationInstanceLog.objects.last().log.endswith(
         "Container 100 not found."
     )
+
+
+@pytest.mark.django_db
+def test_engine_update_logs_with_exception(init_data, podman_engine):
+    engine = podman_engine
+    log_handler = DBLogger(init_data.activation_instance.id)
+
+    def raise_error(*args, **kwargs):
+        raise APIError("Not found")
+
+    engine.client.containers.exists.side_effect = raise_error
+
+    with pytest.raises(ContainerUpdateLogsError, match="Not found"):
+        engine.update_logs("100", log_handler)
+
+
+@pytest.mark.django_db
+def test_set_auth_json(podman_engine):
+    engine = podman_engine
+
+    with mock.patch("os.path.dirname"):
+        engine._set_auth_json_file()
+
+        assert (
+            engine.auth_file == f"/run/user/{os.getuid()}/containers/auth.json"
+        )
+
+
+@pytest.mark.django_db
+def test_write_auth_json(init_data, podman_engine):
+    engine = podman_engine
+    engine.auth_file = f"{DATA_DIR}/auth.json"
+    request = get_request_with_credential(init_data)
+
+    engine._write_auth_json(request)
+    assert engine.auth_file is not None
