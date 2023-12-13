@@ -289,7 +289,7 @@ class AuditRuleViewSet(
     )
     @action(
         detail=False,
-        queryset=models.AuditEvent.objects.order_by("id"),
+        queryset=models.AuditEvent.objects.order_by("-received_at"),
         filterset_class=filters.AuditRuleEventFilter,
         ordering_fields=[
             "id",
@@ -313,9 +313,9 @@ class AuditRuleViewSet(
         for audit_action in audit_actions:
             eqs = eqs.union(
                 self.filter_queryset(audit_action.audit_events.all())
-            ).order_by("-received_at")
+            )
 
-        results = self.paginate_queryset(self.filter_queryset(eqs))
+        results = self.paginate_queryset(eqs)
         serializer = serializers.AuditEventSerializer(results, many=True)
 
         return self.get_paginated_response(serializer.data)
