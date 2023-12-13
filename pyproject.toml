@@ -25,7 +25,7 @@ all = ["psycopg2"]
 dev = ["psycopg2-binary"]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4"
+python = ">=3.9,<3.12"
 django = ">=4.2,<4.3"
 djangorestframework = "*"
 dynaconf = ">=3"

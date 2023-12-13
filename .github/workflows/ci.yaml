@@ -49,6 +49,12 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.9"
+          - "3.10"
+          - "3.11"
     env:
       EDA_SECRET_KEY: 'test'
       EDA_DB_PASSWORD: 'secret'
@@ -93,7 +99,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "${{ matrix.python-version }}"
           cache: 'poetry'
 
       - name: Install package
@@ -111,6 +117,6 @@ jobs:
           env_vars: OS,PYTHON
           fail_ci_if_error: false
           files: ./coverage.xml
-          flags: "unit-int-tests"
+          flags: "unit-int-tests-${{ matrix.python-version }}"
           name: codecov-umbrella
           verbose: true
