@@ -165,7 +165,7 @@ class GitRepository:
 
 
 class GitExecutor:
-    DEFAULT_TIMEOUT: Final = 30
+    DEFAULT_TIMEOUT: Final = 120
     ENVIRON: dict = {
         "GIT_TERMINAL_PROMPT": "0",
     }
