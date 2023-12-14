@@ -249,12 +249,10 @@ class AuditRuleViewSet(
         queryset=models.AuditAction.objects.order_by("id"),
         filterset_class=filters.AuditRuleActionFilter,
         ordering_fields=[
-            "id",
             "name",
             "status",
             "url",
             "fired_at",
-            "rule_fired_at",
         ],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/actions",
@@ -292,11 +290,9 @@ class AuditRuleViewSet(
         queryset=models.AuditEvent.objects.order_by("-received_at"),
         filterset_class=filters.AuditRuleEventFilter,
         ordering_fields=[
-            "id",
             "source_name",
             "source_type",
             "received_at",
-            "rule_fired_at",
         ],
         rbac_resource_type=ResourceType.AUDIT_EVENT,
         rbac_action=Action.READ,
@@ -309,13 +305,13 @@ class AuditRuleViewSet(
             rule_fired_at=audit_rule.fired_at,
         )
 
-        eqs = models.AuditEvent.objects.none()
+        audit_events = models.AuditEvent.objects.none()
         for audit_action in audit_actions:
-            eqs = eqs.union(
-                self.filter_queryset(audit_action.audit_events.all())
-            )
+            audit_events |= audit_action.audit_events.all()
 
-        results = self.paginate_queryset(eqs)
+        filtered_audit_events = self.filter_queryset(audit_events.distinct())
+
+        results = self.paginate_queryset(filtered_audit_events)
         serializer = serializers.AuditEventSerializer(results, many=True)
 
         return self.get_paginated_response(serializer.data)
