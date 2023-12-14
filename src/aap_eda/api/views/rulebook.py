@@ -30,7 +30,11 @@ from rest_framework.response import Response
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
-from aap_eda.services.rulebook import build_fired_stats, build_ruleset_out_data
+from aap_eda.services.rulebook import (
+    build_fired_stats,
+    build_ruleset_out_data,
+    build_source_list,
+)
 
 
 @extend_schema_view(
@@ -113,6 +117,36 @@ class RulebookViewSet(
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
         return JsonResponse(data)
+
+    @extend_schema(
+        description="Source list of a rulebook by its id",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.SourceSerializer(many=True)
+        },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this rulebook.",  # noqa: E501
+            )
+        ],
+    )
+    @action(
+        detail=False,
+        rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/sources",
+    )
+    def sources(self, request, id):
+        rulebook = get_object_or_404(models.Rulebook, id=id)
+        rulesets = yaml.safe_load(rulebook.rulesets)
+
+        results = build_source_list(rulesets)
+        results = self.paginate_queryset(results)
+        serializer = serializers.SourceSerializer(results, many=True)
+
+        return self.get_paginated_response(serializer.data)
 
 
 class RulesetViewSet(

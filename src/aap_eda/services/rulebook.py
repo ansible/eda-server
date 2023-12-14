@@ -14,6 +14,43 @@
 
 from aap_eda.core import models
 
+DEFAULT_SOURCE_NAME_PREFIX = "EDA_AUTO_SOURCE_"
+
+
+def build_source_list(rulesets: list[dict]) -> list[dict]:
+    results = []
+    if rulesets is None:
+        return results
+
+    i = 1
+    for ruleset in rulesets:
+        duplicate_names = {}
+        srcs = ruleset.get("sources", [])
+        for src in srcs:
+            src_record = {}
+            src_record["name"] = f"{DEFAULT_SOURCE_NAME_PREFIX}{i}"
+            for src_key, src_val in src.items():
+                if src_key == "name":
+                    if src_val in duplicate_names.keys():
+                        duplicate_names[src_val] += 1
+                        src_record[
+                            "name"
+                        ] = f"{src_val} #{duplicate_names[src_val]}"
+                    else:
+                        src_record["name"] = src_val
+
+                if src_key not in ["name", "filters"]:
+                    src_record["type"] = src_key
+                    src_record["args"] = src_val or {}
+
+            if src_record not in results:
+                results.append(src_record)
+                i += 1
+
+                duplicate_names[src_record["name"]] = 1
+
+    return results
+
 
 def expand_ruleset_sources(rulebook_data: dict) -> dict:
     # TODO(cutwater): Docstring needed

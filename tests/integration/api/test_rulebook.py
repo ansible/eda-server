@@ -21,6 +21,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from aap_eda.services.rulebook import DEFAULT_SOURCE_NAME_PREFIX
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -194,6 +195,23 @@ def test_list_rulesets_from_rulebook(client: APIClient, init_db):
         "rule_count",
         "fired_stats",
     ]
+
+
+@pytest.mark.django_db
+def test_list_sources_from_rulebook(client: APIClient, init_db):
+    rulebook_id = init_db.rulebook.id
+
+    response = client.get(f"{api_url_v1}/rulebooks/{rulebook_id}/sources/")
+    assert response.status_code == status.HTTP_200_OK
+
+    sources = response.data["results"]
+    assert len(sources) == 2
+    assert sources[0]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}1"
+    assert sources[0]["type"] == "ansible.eda.range"
+    assert sources[0]["args"] == {"limit": 5, "delay": 1}
+    assert sources[1]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}2"
+    assert sources[1]["type"] == "ansible.eda.range"
+    assert sources[1]["args"] == {"limit": 5, "delay": 1}
 
 
 def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
