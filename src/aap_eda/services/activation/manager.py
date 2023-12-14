@@ -1036,12 +1036,6 @@ class ActivationManager:
     def _build_container_request(self) -> ContainerRequest:
         if self.db_instance.extra_var:
             context = yaml.safe_load(self.db_instance.extra_var.extra_var)
-            # TODO: This will be validated by the api
-            # https://issues.redhat.com/browse/AAP-18358
-            if not isinstance(context, dict):
-                msg = f"{context} is not in dict format."
-                LOGGER.error(msg)
-                raise exceptions.ActivationStartError(msg)
         else:
             context = {}
 

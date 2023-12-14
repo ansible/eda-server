@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+import yaml
 from rest_framework import serializers
 
 from aap_eda.core import models
@@ -68,3 +69,16 @@ def check_awx_tokens(user_id: int) -> int:
         )
 
     return user_id
+
+
+def is_extra_var_dict(extra_var: str):
+    try:
+        data = yaml.safe_load(extra_var)
+        if not isinstance(data, dict):
+            raise serializers.ValidationError(
+                "Extra var is not in object format"
+            )
+    except yaml.YAMLError:
+        raise serializers.ValidationError(
+            "Extra var must be in JSON or YAML format"
+        )
