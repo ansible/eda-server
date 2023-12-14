@@ -187,7 +187,7 @@ def test_git_executor_call(run_mock: mock.Mock):
         },
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=30,
+        timeout=120,
         cwd=None,
     )
 
