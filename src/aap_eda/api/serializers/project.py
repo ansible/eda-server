@@ -16,7 +16,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.credential import CredentialRefSerializer
-from aap_eda.core import models
+from aap_eda.core import models, validators
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -143,6 +143,7 @@ class ExtraVarSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
+        validators=[validators.is_extra_var_dict],
     )
 
     class Meta:
