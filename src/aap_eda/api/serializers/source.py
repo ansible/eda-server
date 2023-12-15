@@ -56,7 +56,6 @@ class SourceOutSerializer(serializers.ModelSerializer):
             "name",
             "args",
             "type",
-            "listener_args",
             "is_enabled",
             "restart_policy",
             "activation_id",
