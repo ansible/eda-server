@@ -28,6 +28,7 @@ from .rulebook import (
     RulebookFilter,
     RulesetFilter,
 )
+from .source import SourceFilter
 from .user import UserFilter
 
 __all__ = (
@@ -51,4 +52,6 @@ __all__ = (
     "UserFilter",
     # role
     "RoleFilter",
+    # source
+    "SourceFilter",
 )

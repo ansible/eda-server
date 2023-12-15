@@ -61,6 +61,7 @@ from .rulebook import (
     RulesetOutSerializer,
     RulesetSerializer,
 )
+from .source import SourceOutSerializer, SourceSerializer
 from .tasks import TaskRefSerializer, TaskSerializer
 from .user import (
     AwxTokenCreateSerializer,
@@ -122,4 +123,7 @@ __all__ = (
     "RoleSerializer",
     "RoleListSerializer",
     "RoleDetailSerializer",
+    # sources
+    "SourceSerializer",
+    "SourceOutSerializer",
 )

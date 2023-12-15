@@ -422,3 +422,5 @@ AUTHENTICATION_BACKENDS = [
     "ansible_base.authentication.backend.AnsibleBaseAuth",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+EDA_PG_NOTIFY_DSN = "host=localhost dbname=eda user=postgres password=secret"
