@@ -423,4 +423,13 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-EDA_PG_NOTIFY_DSN = "host=localhost dbname=eda user=postgres password=secret"
+_DEFAULT_PG_NOTIFY_DSN = (
+    f"host={DATABASES['default']['HOST']},"
+    f"port={DATABASES['default']['PORT']},"
+    f"dbname={DATABASES['default']['NAME']},"
+    f"user={DATABASES['default']['USER']},"
+    f"password={DATABASES['default']['PASSWORD']}"
+)
+
+
+PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)

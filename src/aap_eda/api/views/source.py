@@ -99,7 +99,7 @@ class SourceViewSet(
         # TODO: set listener_args
         if response.listener_args is None:
             listener_args = {
-                "EDA_PG_NOTIFY_DSN": settings.EDA_PG_NOTIFY_DSN,
+                "EDA_PG_NOTIFY_DSN": settings.PG_NOTIFY_DSN,
                 "EDA_PG_NOTIFY_CHANNEL": str(response.uuid),
             }
             response.listener_args = yaml.dump(listener_args)
