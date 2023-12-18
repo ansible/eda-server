@@ -13,6 +13,8 @@
 #  limitations under the License.
 
 import yaml
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -44,6 +46,7 @@ class SourceSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
+    @extend_schema_field(OpenApiTypes.STR)
     def validate_args(self, value):
         if value:
             try:
@@ -84,8 +87,8 @@ class SourceOutSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
-    def get_user(self, obj):
+    def get_user(self, obj) -> str:
         return f"{obj.user.username}"
 
-    def get_args(self, obj):
+    def get_args(self, obj) -> str:
         return f"{yaml.dump(obj.args)}"

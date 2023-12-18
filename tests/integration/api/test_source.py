@@ -132,3 +132,18 @@ def test_create_source_bad_args(
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
     )
+
+
+@pytest.mark.django_db
+def test_create_source_empty_args(
+    client: APIClient, check_permission_mock: mock.Mock
+):
+    data_in = {
+        "name": "test_source",
+        "type": "ansible.eda.generic",
+    }
+    response = client.post(f"{api_url_v1}/sources/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
+    )
