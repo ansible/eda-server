@@ -25,11 +25,11 @@ class Source(models.Model):
     class Meta:
         db_table = "core_source"
         indexes = [
-            models.Index(fields=["uuid"], name="ix_source_uuid"),
+            models.Index(fields=["id"], name="ix_source_id"),
             models.Index(fields=["name"], name="ix_source_name"),
         ]
 
-    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    uuid = models.UUIDField(default=uuid.uuid4)
     type = models.TextField(null=False)
     name = models.TextField(null=False, unique=True)
     args = models.TextField(null=True, default=None)

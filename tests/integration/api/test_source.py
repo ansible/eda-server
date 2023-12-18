@@ -81,7 +81,7 @@ def test_retrieve_source(client: APIClient, check_permission_mock: mock.Mock):
         user=user,
     )
 
-    response = client.get(f"{api_url_v1}/sources/{source.uuid}/")
+    response = client.get(f"{api_url_v1}/sources/{source.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == source.name
     assert response.data["type"] == source.type

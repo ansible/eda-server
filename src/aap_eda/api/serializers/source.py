@@ -28,6 +28,7 @@ class SourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Source
         read_only_fields = [
+            "id",
             "uuid",
             "created_at",
             "modified_at",
@@ -48,6 +49,7 @@ class SourceOutSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Source
         read_only_fields = [
+            "id",
             "uuid",
             "created_at",
             "modified_at",
