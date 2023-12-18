@@ -14,7 +14,6 @@
 
 import logging
 
-import yaml
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
@@ -84,11 +83,6 @@ class SourceViewSet(
     )
     def create(self, request):
         context = {"request": request}
-
-        # convert 'args' into yaml format
-        in_args = request.data.get("args", {})
-        request.data["args"] = yaml.dump(in_args)
-
         serializer = serializers.SourceSerializer(
             data=request.data,
             context=context,
@@ -96,14 +90,11 @@ class SourceViewSet(
         serializer.is_valid(raise_exception=True)
         response = serializer.create(serializer.validated_data)
 
-        # TODO: set listener_args
-        if response.listener_args is None:
-            listener_args = {
-                "EDA_PG_NOTIFY_DSN": settings.PG_NOTIFY_DSN,
-                "EDA_PG_NOTIFY_CHANNEL": str(response.uuid),
-            }
-            response.listener_args = yaml.dump(listener_args)
-            response.save(update_fields=["listener_args"])
+        response.listener_args = {
+            "EDA_PG_NOTIFY_DSN": settings.PG_NOTIFY_DSN,
+            "EDA_PG_NOTIFY_CHANNEL": str(response.uuid),
+        }
+        response.save(update_fields=["listener_args"])
 
         return Response(
             serializers.SourceOutSerializer(response).data,

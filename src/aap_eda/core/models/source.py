@@ -32,8 +32,8 @@ class Source(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4)
     type = models.TextField(null=False)
     name = models.TextField(null=False, unique=True)
-    args = models.TextField(null=True, default=None)
-    listener_args = models.TextField(null=True, default=None)
+    args = models.JSONField()
+    listener_args = models.JSONField(null=True, default=None)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,

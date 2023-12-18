@@ -12,7 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import yaml
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from aap_eda.core import models
 
@@ -42,9 +44,25 @@ class SourceSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
+    def validate_args(self, value):
+        if value:
+            try:
+                parsed_args = yaml.safe_load(value)
+            except yaml.YAMLError:
+                raise ValidationError("Invalid YAML format for 'args'")
+
+            if not isinstance(parsed_args, dict):
+                raise ValidationError(
+                    "The 'args' field must be a YAML object (dictionary)"
+                )
+
+            return parsed_args
+        return value
+
 
 class SourceOutSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
+    args = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Source
@@ -68,3 +86,6 @@ class SourceOutSerializer(serializers.ModelSerializer):
 
     def get_user(self, obj):
         return f"{obj.user.username}"
+
+    def get_args(self, obj):
+        return f"{yaml.dump(obj.args)}"

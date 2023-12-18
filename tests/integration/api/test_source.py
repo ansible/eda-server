@@ -38,7 +38,7 @@ def test_list_sources(client: APIClient, check_permission_mock: mock.Mock):
                 uuid=uuid.uuid4(),
                 name="test-source-1",
                 type="ansible.eda.range",
-                args={"limit": 5, "delay": 1},
+                args='{"limit": 5, "delay": 1}',
                 user=user,
             ),
             models.Source(
@@ -97,15 +97,37 @@ def test_create_source(client: APIClient, check_permission_mock: mock.Mock):
     data_in = {
         "name": "test_source",
         "type": "ansible.eda.generic",
-        "args": {"limit": 1, "delay": 5},
+        "args": '{"limit": 1, "delay": 5}',
     }
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     result = response.data
     assert result["name"] == "test_source"
     assert result["type"] == "ansible.eda.generic"
-    assert result["args"] == "delay: 5\nlimit: 1"
+    assert result["args"] == "delay: 5\nlimit: 1\n"
     assert result["user"] == "test.admin"
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
+def test_create_source_bad_args(
+    client: APIClient, check_permission_mock: mock.Mock
+):
+    data_in = {
+        "name": "test_source",
+        "type": "ansible.eda.generic",
+        "args": "gobbledegook",
+    }
+    response = client.post(f"{api_url_v1}/sources/", data=data_in)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    result = response.data
+    assert (
+        result["args"][0].title()
+        == "The 'Args' Field Must Be A Yaml Object (Dictionary)"
+    )
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
