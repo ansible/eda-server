@@ -132,8 +132,8 @@ def test_create_source_bad_args(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     result = response.data
     assert (
-        result["args"][0].title()
-        == "The 'Args' Field Must Be A Yaml Object (Dictionary)"
+        str(result["args"][0])
+        == "The 'args' field must be a YAML object (dictionary)"
     )
 
     check_permission_mock.assert_called_once_with(
@@ -173,8 +173,28 @@ def test_create_source_bad_de(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     result = response.data
     assert (
-        result["decision_environment_id"][0].title()
-        == "Decisionenvironment With Id 99999 Does Not Exist"
+        str(result["decision_environment_id"][0])
+        == "DecisionEnvironment with id 99999 does not exist"
+    )
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
+def test_create_source_no_de(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+):
+    data_in = {
+        "name": "test_source",
+        "type": "ansible.eda.generic",
+    }
+    response = client.post(f"{api_url_v1}/sources/", data=data_in)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    result = response.data
+    assert (
+        str(result["decision_environment_id"][0]) == "This field is required."
     )
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
