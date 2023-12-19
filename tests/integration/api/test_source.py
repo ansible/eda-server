@@ -22,9 +22,19 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 from tests.integration.constants import api_url_v1
 
+TEST_DECISION_ENV = {
+    "name": "test-de",
+    "description": "test de",
+    "image_url": "quay.io/ansible/ansible-rulebook",
+}
+
 
 @pytest.mark.django_db
-def test_list_sources(client: APIClient, check_permission_mock: mock.Mock):
+def test_list_sources(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
+):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -40,6 +50,7 @@ def test_list_sources(client: APIClient, check_permission_mock: mock.Mock):
                 type="ansible.eda.range",
                 args='{"limit": 5, "delay": 1}',
                 user=user,
+                decision_environment_id=default_de.id,
             ),
             models.Source(
                 uuid=uuid.uuid4(),
@@ -47,6 +58,7 @@ def test_list_sources(client: APIClient, check_permission_mock: mock.Mock):
                 type="ansible.eda.range",
                 args={"limit": 6, "delay": 2},
                 user=user,
+                decision_environment_id=default_de.id,
             ),
         ]
     )
@@ -65,7 +77,11 @@ def test_list_sources(client: APIClient, check_permission_mock: mock.Mock):
 
 
 @pytest.mark.django_db
-def test_retrieve_source(client: APIClient, check_permission_mock: mock.Mock):
+def test_retrieve_source(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
+):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -79,6 +95,7 @@ def test_retrieve_source(client: APIClient, check_permission_mock: mock.Mock):
         type="ansible.eda.range",
         args={"limit": 5, "delay": 1},
         user=user,
+        decision_environment_id=default_de.id,
     )
 
     response = client.get(f"{api_url_v1}/sources/{source.id}/")
@@ -93,11 +110,16 @@ def test_retrieve_source(client: APIClient, check_permission_mock: mock.Mock):
 
 
 @pytest.mark.django_db
-def test_create_source(client: APIClient, check_permission_mock: mock.Mock):
+def test_create_source(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
+):
     data_in = {
         "name": "test_source",
         "type": "ansible.eda.generic",
         "args": '{"limit": 1, "delay": 5}',
+        "decision_environment_id": default_de.id,
     }
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
@@ -114,12 +136,15 @@ def test_create_source(client: APIClient, check_permission_mock: mock.Mock):
 
 @pytest.mark.django_db
 def test_create_source_bad_args(
-    client: APIClient, check_permission_mock: mock.Mock
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
 ):
     data_in = {
         "name": "test_source",
         "type": "ansible.eda.generic",
         "args": "gobbledegook",
+        "decision_environment_id": default_de.id,
     }
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -136,14 +161,34 @@ def test_create_source_bad_args(
 
 @pytest.mark.django_db
 def test_create_source_empty_args(
-    client: APIClient, check_permission_mock: mock.Mock
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
 ):
     data_in = {
         "name": "test_source",
         "type": "ansible.eda.generic",
+        "decision_environment_id": default_de.id,
     }
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
+def test_create_source_bad_de(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+):
+    data_in = {
+        "name": "test_source",
+        "type": "ansible.eda.generic",
+        "decision_environment_id": 99999,
+    }
+    response = client.post(f"{api_url_v1}/sources/", data=data_in)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
     )

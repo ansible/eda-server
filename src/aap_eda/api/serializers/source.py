@@ -13,21 +13,40 @@
 #  limitations under the License.
 
 import yaml
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from aap_eda.core import models
+from aap_eda.core import models, validators
+
+
+class YAMLSerializerField(serializers.Field):
+    """Serializer for YAML a superset of JSON."""
+
+    def to_internal_value(self, data) -> dict:
+        if data:
+            try:
+                parsed_args = yaml.safe_load(data)
+            except yaml.YAMLError:
+                raise ValidationError("Invalid YAML format for 'args'")
+
+            if not isinstance(parsed_args, dict):
+                raise ValidationError(
+                    "The 'args' field must be a YAML object (dictionary)"
+                )
+
+            return parsed_args
+        return data
+
+    def to_representation(self, value) -> str:
+        return yaml.dump(value)
 
 
 class SourceSerializer(serializers.ModelSerializer):
     decision_environment_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
+        validators=[validators.check_if_de_exists]
     )
-
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    args = YAMLSerializerField(required=False, allow_null=True)
 
     class Meta:
         model = models.Source
@@ -46,26 +65,10 @@ class SourceSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
-    @extend_schema_field(OpenApiTypes.STR)
-    def validate_args(self, value):
-        if value:
-            try:
-                parsed_args = yaml.safe_load(value)
-            except yaml.YAMLError:
-                raise ValidationError("Invalid YAML format for 'args'")
-
-            if not isinstance(parsed_args, dict):
-                raise ValidationError(
-                    "The 'args' field must be a YAML object (dictionary)"
-                )
-
-            return parsed_args
-        return value
-
 
 class SourceOutSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
-    args = serializers.SerializerMethodField()
+    args = YAMLSerializerField()
 
     class Meta:
         model = models.Source
@@ -81,7 +84,6 @@ class SourceOutSerializer(serializers.ModelSerializer):
             "type",
             "is_enabled",
             "restart_policy",
-            "activation_id",
             "decision_environment_id",
             "user",
             *read_only_fields,
@@ -89,6 +91,3 @@ class SourceOutSerializer(serializers.ModelSerializer):
 
     def get_user(self, obj) -> str:
         return f"{obj.user.username}"
-
-    def get_args(self, obj) -> str:
-        return f"{yaml.dump(obj.args)}"

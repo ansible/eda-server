@@ -40,7 +40,7 @@ class Source(models.Model):
     )
     is_enabled = models.BooleanField(default=True)
 
-    activation = models.ForeignKey(
+    listener_activation = models.ForeignKey(
         "Activation", on_delete=models.SET_NULL, null=True
     )
     decision_environment = models.ForeignKey(
