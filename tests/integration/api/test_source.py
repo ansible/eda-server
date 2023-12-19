@@ -22,26 +22,14 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 from tests.integration.constants import api_url_v1
 
-TEST_DECISION_ENV = {
-    "name": "test-de",
-    "description": "test de",
-    "image_url": "quay.io/ansible/ansible-rulebook",
-}
-
 
 @pytest.mark.django_db
 def test_list_sources(
     client: APIClient,
     check_permission_mock: mock.Mock,
     default_de: models.DecisionEnvironment,
+    default_user: models.User,
 ):
-    user = models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
     sources = models.Source.objects.bulk_create(
         [
             models.Source(
@@ -49,7 +37,7 @@ def test_list_sources(
                 name="test-source-1",
                 type="ansible.eda.range",
                 args='{"limit": 5, "delay": 1}',
-                user=user,
+                user=default_user,
                 decision_environment_id=default_de.id,
             ),
             models.Source(
@@ -57,7 +45,7 @@ def test_list_sources(
                 name="test-source-2",
                 type="ansible.eda.range",
                 args={"limit": 6, "delay": 2},
-                user=user,
+                user=default_user,
                 decision_environment_id=default_de.id,
             ),
         ]
@@ -81,20 +69,14 @@ def test_retrieve_source(
     client: APIClient,
     check_permission_mock: mock.Mock,
     default_de: models.DecisionEnvironment,
+    default_user: models.User,
 ):
-    user = models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
     source = models.Source.objects.create(
         uuid=uuid.uuid4(),
         name="test-source-1",
         type="ansible.eda.range",
         args={"limit": 5, "delay": 1},
-        user=user,
+        user=default_user,
         decision_environment_id=default_de.id,
     )
 
@@ -189,6 +171,11 @@ def test_create_source_bad_de(
     }
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+    result = response.data
+    assert (
+        result["decision_environment_id"][0].title()
+        == "Decisionenvironment With Id 99999 Does Not Exist"
+    )
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
     )
