@@ -34,6 +34,7 @@ from .rulebook import (
     Rulebook,
     Ruleset,
 )
+from .source import Source
 from .user import AwxToken, User
 
 __all__ = [
@@ -61,4 +62,5 @@ __all__ = [
     "Credential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
+    "Source",
 ]

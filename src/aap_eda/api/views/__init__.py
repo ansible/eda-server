@@ -23,6 +23,7 @@ from .rulebook import (
     RulesetViewSet,
     RuleViewSet,
 )
+from .source import SourceViewSet
 from .tasks import TaskViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
 
@@ -51,4 +52,6 @@ __all__ = (
     "CredentialViewSet",
     # decision_environment
     "DecisionEnvironmentViewSet",
+    # source
+    "SourceViewSet",
 )

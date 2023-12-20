@@ -51,6 +51,7 @@ class ResourceType(DjangoStrEnum):
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
     CREDENTIAL = "credential"
+    SOURCE = "source"
 
 
 class Action(DjangoStrEnum):
