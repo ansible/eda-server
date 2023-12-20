@@ -21,6 +21,7 @@ from aap_eda.api.serializers.project import (
     ProjectRefSerializer,
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
+from aap_eda.api.serializers.source import SourceOutSerializer
 from aap_eda.core import models, validators
 
 
@@ -48,6 +49,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "status_message",
+            "sources",
         ]
         read_only_fields = [
             "id",
@@ -84,6 +86,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "status_message",
+            "sources",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -91,6 +94,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
+
+        sources = []
+        if activation.sources:
+            for source in activation.sources.all():
+                sources.append(SourceOutSerializer(source).data)
 
         return {
             "id": activation.id,
@@ -111,6 +119,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "created_at": activation.created_at,
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
+            "sources": sources,
         }
 
 
@@ -130,6 +139,12 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
+    sources = serializers.ListField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_sources_exists],
+    )
+
     def validate(self, data):
         user = data["user"]
         validators.check_awx_tokens(user.id)
@@ -147,6 +162,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "extra_var_id",
             "user",
             "restart_policy",
+            "sources",
         ]
 
     def create(self, validated_data):
@@ -225,6 +241,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "modified_at",
             "restarted_at",
             "status_message",
+            "sources",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -265,6 +282,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if len(activation_instances) > 1 and activation.restart_count > 0
             else None
         )
+        sources = []
+        if activation.sources:
+            for source in activation.sources.all():
+                sources.append(SourceOutSerializer(source).data)
 
         return {
             "id": activation.id,
@@ -290,6 +311,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
+            "sources": sources,
         }
 
 

@@ -82,3 +82,14 @@ def is_extra_var_dict(extra_var: str):
         raise serializers.ValidationError(
             "Extra var must be in JSON or YAML format"
         )
+
+
+def check_if_sources_exists(source_ids: list[int]) -> list[int]:
+    for source_id in source_ids:
+        try:
+            models.Source.objects.get(pk=source_id)
+        except models.Source.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Source with id {source_id} does not exist"
+            )
+    return source_ids
