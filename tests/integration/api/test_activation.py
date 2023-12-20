@@ -316,8 +316,8 @@ def test_create_activation_with_bad_sources(client: APIClient):
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        response.data["sources"][0].title()
-        == "Source With Id 1492 Does Not Exist"
+        str(response.data["sources"][0])
+        == "Source with id 1492 does not exist"
     )
 
 
