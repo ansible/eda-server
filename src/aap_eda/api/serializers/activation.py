@@ -95,11 +95,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
             activation.ruleset_stats
         )
 
-        sources = []
-        if activation.sources:
-            for source in activation.sources.all():
-                sources.append(SourceOutSerializer(source).data)
-
+        sources = [
+            SourceOutSerializer(source).data
+            for source in activation.sources.all()
+        ]
         return {
             "id": activation.id,
             "name": activation.name,
