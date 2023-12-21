@@ -28,6 +28,12 @@ from aap_eda.core import models, validators
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
+    sources = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=SourceOutSerializer(),
+    )
+
     class Meta:
         model = models.Activation
         fields = [
@@ -64,6 +70,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
 
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
+    sources = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=SourceOutSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -141,6 +152,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     sources = serializers.ListField(
         required=False,
         allow_null=True,
+        child=serializers.IntegerField(),
         validators=[validators.check_if_sources_exists],
     )
 
