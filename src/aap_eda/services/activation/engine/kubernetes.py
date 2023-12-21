@@ -304,10 +304,12 @@ class Engine(ContainerEngine):
         LOGGER.info(
             f"Created container: name: {container.name}, "
             f"image: {container.image} "
-            f"args: {container.args}"
+            f"args: {request.cmdline.get_args(sanitized=True)}"
         )
 
-        log_handler.write(f"Container args {container.args}", True)
+        log_handler.write(
+            f"Container args {request.cmdline.get_args(sanitized=True)}", True
+        )
 
         return container
 

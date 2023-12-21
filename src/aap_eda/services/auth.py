@@ -12,7 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import secrets
 from itertools import groupby
+
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from aap_eda.core.models import User
 
 
 def group_permission_resource(permission_data):
@@ -29,3 +34,17 @@ def display_permissions(role_data: dict) -> dict:
     grouped_permissions = group_permission_resource(role_data["permissions"])
     role_data["permissions"] = grouped_permissions
     return role_data
+
+
+def create_jwt_token() -> tuple[str, str]:
+    """Create JWT access and refresh token pair.
+
+    They can be sent to rulebook clients through command line arguments.
+    """
+    user, _ = User.objects.get_or_create(
+        username="_token_service_user",
+        is_service_account=True,
+        defaults={"password": secrets.token_urlsafe()},
+    )
+    rf = RefreshToken.for_user(user)
+    return (str(rf.access_token), str(rf))

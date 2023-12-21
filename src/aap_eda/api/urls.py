@@ -20,6 +20,7 @@ from drf_spectacular.views import (
     SpectacularYAMLAPIView,
 )
 from rest_framework import routers
+from rest_framework_simplejwt import views as jwt_views
 
 from . import views
 
@@ -73,6 +74,11 @@ v1_urls = [
     path("", include(openapi_urls)),
     path("auth/session/login/", views.SessionLoginView.as_view()),
     path("auth/session/logout/", views.SessionLogoutView.as_view()),
+    path(
+        "auth/token/refresh/",
+        jwt_views.TokenRefreshView.as_view(),
+        name="token_refresh",
+    ),
     path("users/me/", views.CurrentUserView.as_view()),
     *router.urls,
 ]

@@ -41,6 +41,7 @@ from aap_eda.services.activation.engine.common import (
 from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
+from aap_eda.services.auth import create_jwt_token
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
@@ -48,7 +49,8 @@ from .engine.factory import new_container_engine
 from .engine.ports import find_ports
 
 LOGGER = logging.getLogger(__name__)
-ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
+ACTIVATION_PATH = f"/{settings.API_PREFIX}/ws/ansible-rulebook"
+TOKEN_RENEW_PATH = f"/{settings.API_PREFIX}/v1/auth/token/refresh/"
 
 
 class HasDbInstance(tp.Protocol):
@@ -1074,10 +1076,14 @@ class ActivationManager:
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
 
+        access_token, refresh_token = create_jwt_token()
         return AnsibleRulebookCmdLine(
             ws_url=settings.WEBSOCKET_BASE_URL + ACTIVATION_PATH,
             log_level=settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+            ws_access_token=access_token,
+            ws_refresh_token=refresh_token,
+            ws_token_url=settings.WEBSOCKET_TOKEN_BASE_URL + TOKEN_RENEW_PATH,
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             id=str(self.latest_instance.id),
         )
