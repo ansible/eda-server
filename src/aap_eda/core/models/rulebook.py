@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import yaml
 from django.db import models
 
 __all__ = (
@@ -36,10 +37,25 @@ class Rulebook(models.Model):
     name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
     # TODO: this field should not have a default value.
+    # TODO: should the content of this field be validated?
+    # https://issues.redhat.com/browse/AAP-19202
     rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    # For instrospection purposes we need to return a dict
+    def get_rulesets_data(self) -> list:
+        """Return rulesets data as a dict."""
+        try:
+            return yaml.safe_load(self.rulesets)
+        except yaml.YAMLError as e:
+            raise ValueError(
+                (
+                    "Unable to parse rulesets data for rulebook "
+                    f" {self.id} - {self.name}: Error: {e}"
+                )
+            )
 
 
 class Ruleset(models.Model):

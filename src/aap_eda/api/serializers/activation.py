@@ -48,6 +48,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "status_message",
+            "awx_token_id",
         ]
         read_only_fields = [
             "id",
@@ -84,6 +85,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "status_message",
+            "awx_token_id",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -111,11 +113,26 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "created_at": activation.created_at,
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
+            "awx_token_id": activation.awx_token_id,
         }
 
 
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
+
+    class Meta:
+        model = models.Activation
+        fields = [
+            "name",
+            "description",
+            "is_enabled",
+            "decision_environment_id",
+            "rulebook_id",
+            "extra_var_id",
+            "user",
+            "restart_policy",
+            "awx_token_id",
+        ]
 
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists]
@@ -130,24 +147,25 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
+    awx_token_id = serializers.IntegerField(
+        allow_null=True,
+        validators=[validators.check_if_awx_token_exists],
+        required=False,
+    )
+
     def validate(self, data):
         user = data["user"]
-        validators.check_awx_tokens(user.id)
+        awx_token = models.AwxToken.objects.filter(
+            id=data.get("awx_token_id"),
+        ).first()
+        if awx_token and awx_token.user != user:
+            raise serializers.ValidationError(
+                "The Awx Token does not belong to the user."
+            )
+        if not awx_token:
+            validate_rulebook_token(data["rulebook_id"])
 
         return data
-
-    class Meta:
-        model = models.Activation
-        fields = [
-            "name",
-            "description",
-            "is_enabled",
-            "decision_environment_id",
-            "rulebook_id",
-            "extra_var_id",
-            "user",
-            "restart_policy",
-        ]
 
     def create(self, validated_data):
         rulebook_id = validated_data["rulebook_id"]
@@ -225,6 +243,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "modified_at",
             "restarted_at",
             "status_message",
+            "awx_token_id",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -290,6 +309,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
+            "awx_token_id": activation.awx_token_id,
         }
 
 
@@ -305,10 +325,17 @@ class PostActivationSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_if_extra_var_exists],
     )
+    awx_token_id = serializers.IntegerField(
+        allow_null=True,
+        validators=[validators.check_if_awx_token_exists],
+    )
+    rulebook_id = serializers.IntegerField(allow_null=True)
 
     def validate(self, data):
-        user_id = self.initial_data["user_id"]
-        validators.check_awx_tokens(user_id)
+        awx_token = data.get("awx_token_id")
+
+        if not awx_token:
+            validate_rulebook_token(data["rulebook_id"])
 
         return data
 
@@ -323,6 +350,8 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "user_id",
             "created_at",
             "modified_at",
+            "awx_token_id",
+            "rulebook_id",
         ]
         read_only_fields = [
             "id",
@@ -356,3 +385,23 @@ def parse_validation_errors(errors: dict) -> str:
     messages = {key: str(error[0]) for key, error in errors.items() if error}
 
     return str(messages)
+
+
+def validate_rulebook_token(rulebook_id: int) -> None:
+    """Validate if the rulebook requires an Awx Token."""
+    rulebook = models.Rulebook.objects.get(id=rulebook_id)
+
+    # TODO: rulesets are stored as a string in the rulebook model
+    # proper instrospection should require a validation of the
+    # rulesets. https://issues.redhat.com/browse/AAP-19202
+    try:
+        rulesets_data = rulebook.get_rulesets_data()
+    except ValueError:
+        raise serializers.ValidationError("Invalid rulebook data.")
+
+    if validators.check_rulesets_require_token(
+        rulesets_data,
+    ):
+        raise serializers.ValidationError(
+            "The rulebook requires an Awx Token.",
+        )

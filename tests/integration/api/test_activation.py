@@ -94,6 +94,65 @@ collections:
   - benthomasson.eda
 """
 
+RULESET_WITH_JOB_TEMPLATE = """
+---
+- name: test
+  sources:
+    - ansible.eda.range:
+        limit: 10
+  rules:
+    - name: example rule
+      condition: event.i == 8
+      actions:
+        - run_job_template:
+            organization: Default
+            name: example
+"""
+
+
+@pytest.fixture
+def new_admin_awx_token_instance(admin_user: models.User) -> models.AwxToken:
+    token = models.AwxToken.objects.create(
+        name="test-awx-token",
+        token="maytheforcebewithyou",
+        user=admin_user,
+    )
+    return token
+
+
+@pytest.fixture
+def new_rulebook_instance_with_job_template() -> models.Rulebook:
+    project = models.Project.objects.create(
+        git_hash=TEST_PROJECT["git_hash"],
+        name="test-project-42",
+        url=TEST_PROJECT["url"],
+        description=TEST_PROJECT["description"],
+    )
+    rulebook = models.Rulebook.objects.create(
+        name="test-rulebook.yml",
+        description="test rulebook",
+        rulesets=RULESET_WITH_JOB_TEMPLATE,
+        project=project,
+    )
+    return rulebook
+
+
+@pytest.fixture
+def new_user_and_awxtoken_instance() -> tuple[models.User, models.AwxToken]:
+    user = models.User.objects.create_user(
+        username="obi-wan.kenobi",
+        first_name="Obi-Wan",
+        last_name="Kenobi",
+        email="obiwan@example.com",
+        password="secret",
+    )
+    token = models.AwxToken.objects.create(
+        name="test-awx-token",
+        token="maytheforcebewithyou",
+        user=user,
+    )
+    return user, token
+
 
 def create_activation_related_data(with_project=True):
     user = models.User.objects.create_user(
@@ -463,56 +522,6 @@ def test_restart_activation(client: APIClient):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("action", ["restart", "enable"])
-def test_restart_activation_with_invalid_tokens(client: APIClient, action):
-    fks = create_activation_related_data()
-    activation = create_activation(fks)
-    if action == "enable":
-        activation.is_enabled = False
-        activation.save(update_fields=["is_enabled"])
-
-    models.AwxToken.objects.create(
-        name="new_token_name",
-        token="new_token",
-        user_id=fks["user_id"],
-    )
-
-    response = client.post(
-        f"{api_url_v1}/activations/{activation.id}/{action}/"
-    )
-
-    error_message = (
-        "{'non_field_errors': 'More than one controller token found, "
-        "currently only 1 token is supported'}"
-    )
-
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["errors"] == error_message
-
-    activation.refresh_from_db()
-    assert activation.status == ActivationStatus.ERROR
-    assert activation.status_message == error_message
-
-    models.AwxToken.objects.filter(user_id=fks["user_id"]).delete()
-
-    response = client.post(
-        f"{api_url_v1}/activations/{activation.id}/{action}/"
-    )
-
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        response.data["errors"]
-        == "{'non_field_errors': 'No controller token specified'}"
-    )
-    activation.refresh_from_db()
-    assert activation.status == ActivationStatus.ERROR
-    assert (
-        activation.status_message
-        == "{'non_field_errors': 'No controller token specified'}"
-    )
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("action", ["restart", "enable"])
 def test_restart_activation_without_de(client: APIClient, action):
     fks = create_activation_related_data()
     activation = create_activation(fks)
@@ -776,35 +785,109 @@ def test_is_activation_valid():
 
 
 @pytest.mark.django_db
-def test_create_activation_no_token(client: APIClient):
+def test_create_activation_no_token_no_required(client: APIClient):
+    """Test that an activation can be created without a token if the
+    rulebook does not require one."""
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["is_enabled"] = True
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_create_activation_no_token_but_required(
+    client: APIClient,
+    new_rulebook_instance_with_job_template: models.Rulebook,
+):
+    """Test that an activation cannot be created without a token if the
+    rulebook requires one."""
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["is_enabled"] = True
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = new_rulebook_instance_with_job_template.id
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        response.data["non_field_errors"][0] == "No controller token specified"
+        "The rulebook requires an Awx Token."
+        in response.data["non_field_errors"]
     )
 
 
 @pytest.mark.django_db
-def test_create_activation_more_tokens(client: APIClient):
+def test_create_activation_with_unvalid_token(
+    client: APIClient,
+    new_rulebook_instance_with_job_template: models.Rulebook,
+    new_user_and_awxtoken_instance: tuple[models.User, models.AwxToken],
+):
+    """Test that an activation cannot be created with a token that
+    does not belong to the user."""
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["is_enabled"] = True
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation["rulebook_id"] = new_rulebook_instance_with_job_template.id
+    test_activation["awx_token_id"] = new_user_and_awxtoken_instance[1].id
 
-    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
-    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN_2)
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["non_field_errors"][0] == (
-        "More than one controller token found, "
-        "currently only 1 token is supported"
+    assert (
+        "The Awx Token does not belong to the user."
+        in response.data["non_field_errors"]
     )
+
+
+@pytest.mark.django_db
+def test_restart_activation_with_required_token_deleted(
+    client: APIClient,
+    new_rulebook_instance_with_job_template: models.Rulebook,
+    new_admin_awx_token_instance: models.AwxToken,
+):
+    """Test that an activation cannot be restarted when the token
+    required is deleted."""
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["is_enabled"] = True
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = new_rulebook_instance_with_job_template.id
+    test_activation["awx_token_id"] = new_admin_awx_token_instance.id
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+    token = models.AwxToken.objects.get(id=new_admin_awx_token_instance.id)
+    token.delete()
+
+    response = client.post(
+        f"{api_url_v1}/activations/{response.data['id']}/restart/",
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "The rulebook requires an Awx Token." in response.data["errors"]
+
+
+@pytest.mark.django_db
+def test_create_activation_with_awx_token(
+    client: APIClient,
+    new_rulebook_instance_with_job_template: models.Rulebook,
+    new_admin_awx_token_instance: models.AwxToken,
+):
+    """Test that an activation can be created with a token if the
+    rulebook requires one."""
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["is_enabled"] = True
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = new_rulebook_instance_with_job_template.id
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation["awx_token_id"] = new_admin_awx_token_instance.id
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
