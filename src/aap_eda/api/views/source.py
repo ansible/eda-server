@@ -92,7 +92,7 @@ class SourceViewSet(
 
         response.listener_args = {
             "EDA_PG_NOTIFY_DSN": settings.PG_NOTIFY_DSN,
-            "EDA_PG_NOTIFY_CHANNEL": str(response.uuid),
+            "EDA_PG_NOTIFY_CHANNEL": str(response.uuid).replace("-", "_"),
         }
         response.save(update_fields=["listener_args"])
 

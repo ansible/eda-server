@@ -424,10 +424,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 _DEFAULT_PG_NOTIFY_DSN = (
-    f"host={DATABASES['default']['HOST']},"
-    f"port={DATABASES['default']['PORT']},"
-    f"dbname={DATABASES['default']['NAME']},"
-    f"user={DATABASES['default']['USER']},"
+    f"host={DATABASES['default']['HOST']} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
     f"password={DATABASES['default']['PASSWORD']}"
 )
 

@@ -15,6 +15,7 @@ import uuid
 from unittest import mock
 
 import pytest
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -110,6 +111,38 @@ def test_create_source(
     assert result["type"] == "ansible.eda.generic"
     assert result["args"] == "delay: 5\nlimit: 1\n"
     assert result["user"] == "test.admin"
+
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
+def test_create_source_listener_args(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
+):
+    data_in = {
+        "name": "test_source",
+        "type": "ansible.eda.generic",
+        "args": '{"limit": 1, "delay": 5}',
+        "decision_environment_id": default_de.id,
+    }
+
+    response = client.post(f"{api_url_v1}/sources/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    result = response.data
+    assert result["name"] == "test_source"
+    assert result["type"] == "ansible.eda.generic"
+    assert result["args"] == "delay: 5\nlimit: 1\n"
+    assert result["user"] == "test.admin"
+    source = models.Source.objects.get(pk=result["id"])
+    assert source.listener_args["EDA_PG_NOTIFY_CHANNEL"] == str(
+        source.uuid
+    ).replace("-", "_")
+
+    assert source.listener_args["EDA_PG_NOTIFY_DSN"] == settings.PG_NOTIFY_DSN
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
