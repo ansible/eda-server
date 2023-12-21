@@ -170,7 +170,9 @@ class Engine(ContainerEngine):
         container = self.client.containers.get(container_id)
         error_msg = container.attrs.get("State").get("Error", "")
 
-        if container.status == "exited":
+        # Check container status
+        # Ref: https://github.com/containers/podman/blob/main/libpod/define/containerstate.go # noqa: E501
+        if container.status in ["exited", "stopped"]:
             exit_code = container.attrs.get("State").get("ExitCode")
             if exit_code == 0:
                 message = messages.POD_COMPLETED.format(
@@ -189,13 +191,15 @@ class Engine(ContainerEngine):
                 status=ActivationStatus.FAILED,
                 message=error_msg,
             )
-        if container.status == "running":
+
+        if container.status in ["running", "stopping"]:
             return ContainerStatus(
                 status=ActivationStatus.RUNNING,
                 message=messages.POD_RUNNING.format(
                     pod_id=container_id,
                 ),
             )
+
         if container.status == "created":
             if not error_msg:
                 error_msg = messages.POD_NOT_RUNNING.format(
@@ -206,19 +210,30 @@ class Engine(ContainerEngine):
                 status=ActivationStatus.FAILED,
                 message=error_msg,
             )
-        if container.status == "paused":
+
+        # Not expected statuses
+        if container.status in [
+            "paused",
+            "restarting",
+            "removing",
+            "dead",
+            "configured",
+            "unknown",
+        ]:
             return ContainerStatus(
                 status=ActivationStatus.FAILED,
-                message=messages.POD_PAUSED.format(
+                message=messages.POD_WRONG_STATE.format(
                     pod_id=container_id,
+                    pod_state=container.status,
                 ),
             )
 
-        # container.status == "unknown":
+        # undocumented status, fail safe
         return ContainerStatus(
             status=ActivationStatus.ERROR,
-            message=messages.POD_ERROR.format(
+            message=messages.POD_UNEXPECTED.format(
                 pod_id=container_id,
+                pod_state=container.status,
             ),
         )
 
