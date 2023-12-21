@@ -19,6 +19,7 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.views.source import EDA_CHANNEL_PREFIX
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 from tests.integration.constants import api_url_v1
@@ -138,9 +139,9 @@ def test_create_source_listener_args(
     assert result["args"] == "delay: 5\nlimit: 1\n"
     assert result["user"] == "test.admin"
     source = models.Source.objects.get(pk=result["id"])
-    assert source.listener_args["EDA_PG_NOTIFY_CHANNEL"] == str(
-        source.uuid
-    ).replace("-", "_")
+    assert source.listener_args["EDA_PG_NOTIFY_CHANNEL"] == (
+        f"{EDA_CHANNEL_PREFIX}" f"{str(source.uuid).replace('-', '_')}"
+    )
 
     assert source.listener_args["EDA_PG_NOTIFY_DSN"] == settings.PG_NOTIFY_DSN
 
