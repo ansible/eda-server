@@ -27,6 +27,8 @@ from aap_eda.core.enums import ResourceType
 
 logger = logging.getLogger(__name__)
 
+EDA_CHANNEL_PREFIX = "eda_"
+
 
 class SourceViewSet(
     mixins.CreateModelMixin,
@@ -92,7 +94,10 @@ class SourceViewSet(
 
         response.listener_args = {
             "EDA_PG_NOTIFY_DSN": settings.PG_NOTIFY_DSN,
-            "EDA_PG_NOTIFY_CHANNEL": str(response.uuid),
+            "EDA_PG_NOTIFY_CHANNEL": (
+                f"{EDA_CHANNEL_PREFIX}"
+                f"{str(response.uuid).replace('-','_')}"
+            ),
         }
         response.save(update_fields=["listener_args"])
 
