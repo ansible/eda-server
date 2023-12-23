@@ -27,6 +27,7 @@ from aap_eda.core.exceptions import (
     UpdateFieldsRequiredError,
 )
 
+from .source import Source
 from .user import User
 
 __all__ = (
@@ -95,6 +96,10 @@ class Activation(models.Model):
         default=None,
         on_delete=models.SET_NULL,
         related_name="+",
+    )
+    sources = models.ManyToManyField(
+        Source,
+        default=None,
     )
 
     def save(self, *args, **kwargs):

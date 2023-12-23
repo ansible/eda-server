@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import uuid
 from typing import Any, Dict
 from unittest import mock
 
@@ -143,6 +144,20 @@ def create_activation_related_data(with_project=True):
         else None
     )
     extra_var_id = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR).pk
+    source1 = models.Source.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-source1",
+        type="ansible.eda.generic",
+        args='{"a": 1, "b": 2}',
+        user=user,
+    )
+    source2 = models.Source.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-source2",
+        type="ansible.eda.range",
+        args='{"limit": 1, "delay": 2}',
+        user=user,
+    )
 
     return {
         "user_id": user_id,
@@ -151,6 +166,7 @@ def create_activation_related_data(with_project=True):
         "rulebook_id": rulebook_id,
         "extra_var_id": extra_var_id,
         "credential_id": credential_id,
+        "sources": [source1, source2],
     }
 
 
@@ -163,6 +179,8 @@ def create_activation(fks: dict):
     activation_data["user_id"] = fks["user_id"]
     activation = models.Activation(**activation_data)
     activation.save()
+    for source in fks["sources"]:
+        activation.sources.add(source)
 
     return activation
 
@@ -234,6 +252,72 @@ def test_create_activation(client: APIClient):
     assert (
         activation.status_message
         == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_sources(client: APIClient):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation["sources"] = [source.id for source in fks["sources"]]
+
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert_activation_base_data(
+        data,
+        activation,
+    )
+    if activation.project:
+        assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
+    else:
+        assert not data["project"]
+    if activation.rulebook:
+        assert data["rulebook"] == {
+            "id": activation.rulebook.id,
+            **TEST_RULEBOOK,
+        }
+    else:
+        assert not data["rulebook"]
+    assert data["decision_environment"] == {
+        "id": activation.decision_environment.id,
+        **TEST_DECISION_ENV,
+    }
+    assert data["extra_var"] == {
+        "id": activation.extra_var.id,
+    }
+    assert activation.rulebook_name == TEST_RULEBOOK["name"]
+    assert activation.rulebook_rulesets == TEST_RULESETS
+    assert data["restarted_at"] is None
+    assert activation.status == ActivationStatus.PENDING
+    assert (
+        activation.status_message
+        == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    )
+    assert data["sources"][0]["name"] == "test-source1"
+    assert data["sources"][1]["name"] == "test-source2"
+
+
+@pytest.mark.django_db
+def test_create_activation_with_bad_sources(client: APIClient):
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation["sources"] = [1492]
+
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        str(response.data["sources"][0])
+        == "Source with id 1492 does not exist"
     )
 
 
