@@ -45,6 +45,7 @@ ROLES = [
             "role": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "source": ["create", "read"],
         },
     },
     {
@@ -62,6 +63,7 @@ ROLES = [
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "source": ["create", "read"],
         },
     },
     {
@@ -91,6 +93,7 @@ ROLES = [
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "source": ["create", "read"],
         },
     },
     {
@@ -111,6 +114,7 @@ ROLES = [
             "rulebook": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "source": ["read"],
         },
     },
     {
@@ -130,6 +134,7 @@ ROLES = [
             "role": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "source": ["read"],
         },
     },
     {
@@ -146,6 +151,7 @@ ROLES = [
             "extra_var": ["read"],
             "rulebook": ["read"],
             "decision_environment": ["read"],
+            "source": ["read"],
         },
     },
 ]
