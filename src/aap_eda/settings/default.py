@@ -433,3 +433,6 @@ _DEFAULT_PG_NOTIFY_DSN = (
 
 
 PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
+PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get(
+    "PG_NOTIFY_TEMPLATE_RULEBOOK", "pg_notify_template.yml"
+)

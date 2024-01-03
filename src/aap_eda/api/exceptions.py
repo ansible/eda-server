@@ -95,3 +95,10 @@ class InvalidWebsocketHost(APIException):
     default_detail = (
         "Connection Error: WebSocket URL must have a valid host address."
     )
+
+
+class MissingListenerRulebook(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = (
+        "Configuration Error: Listener template rulebook not found"
+    )

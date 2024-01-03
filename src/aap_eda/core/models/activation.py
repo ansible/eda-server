@@ -101,6 +101,7 @@ class Activation(models.Model):
         Source,
         default=None,
     )
+    listener = models.BooleanField(null=True, default=False)
 
     def save(self, *args, **kwargs):
         # when creating

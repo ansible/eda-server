@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+
 from rest_framework import serializers
 
 from aap_eda.api.serializers.decision_environment import (
@@ -22,7 +24,10 @@ from aap_eda.api.serializers.project import (
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.api.serializers.source import SourceOutSerializer
+from aap_eda.api.serializers.utils import swap_sources
 from aap_eda.core import models, validators
+
+logger = logging.getLogger(__name__)
 
 
 class ActivationSerializer(serializers.ModelSerializer):
@@ -155,6 +160,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         child=serializers.IntegerField(),
         validators=[validators.check_if_sources_exists],
     )
+    listener = serializers.BooleanField(default=False)
 
     def validate(self, data):
         user = data["user"]
@@ -174,6 +180,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "sources",
+            "listener",
         ]
 
     def create(self, validated_data):
@@ -182,9 +189,48 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["user_id"] = validated_data["user"].id
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
+        if "sources" in validated_data and validated_data["sources"]:
+            if validated_data["listener"]:
+                validated_data[
+                    "rulebook_rulesets"
+                ] = self._updated_listener_ruleset(validated_data)
+            else:
+                validated_data["rulebook_rulesets"] = self._updated_ruleset(
+                    validated_data
+                )
+
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
         return super().create(validated_data)
+
+    def _updated_ruleset(self, validated_data):
+        logger.error("This is the fanout listener")
+        sources_info = []
+        for source_id in validated_data["sources"]:
+            source = models.Source.objects.get(id=source_id)
+            source_args = {
+                "dsn": source.listener_args["EDA_PG_NOTIFY_DSN"],
+                "channels": [source.listener_args["EDA_PG_NOTIFY_CHANNEL"]],
+            }
+            sources_info.append(
+                {
+                    "name": source.name,
+                    "type": "ansible.eda.pg_listener",
+                    "args": source_args,
+                }
+            )
+        return swap_sources(validated_data["rulebook_rulesets"], sources_info)
+
+    def _updated_listener_ruleset(self, validated_data):
+        logger.error("This is the listener")
+        sources_info = []
+        for source_id in validated_data["sources"]:
+            source = models.Source.objects.get(id=source_id)
+            sources_info.append(
+                {"name": source.name, "type": source.type, "args": source.args}
+            )
+        logger.error(sources_info)
+        return swap_sources(validated_data["rulebook_rulesets"], sources_info)
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):

@@ -19,10 +19,59 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.api.views.source import EDA_CHANNEL_PREFIX
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 from tests.integration.constants import api_url_v1
+
+PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
+
+TEST_PROJECT = {
+    "git_hash": PROJECT_GIT_HASH,
+    "name": "test-project-01",
+    "url": "https://git.example.com/acme/project-01",
+    "description": "test project",
+}
+
+TEST_RULEBOOK = {
+    "name": settings.PG_NOTIFY_TEMPLATE_RULEBOOK,
+    "description": "test rulebook",
+}
+TEST_RULESETS = """
+---
+- name: hello
+  hosts: localhost
+  gather_facts: false
+  sources:
+    - ansible.eda.range:
+        limit: 10
+        delay: 5
+  tasks:
+    - debug:
+        msg: hello
+"""
+
+
+def create_project(user, rulebook_name=""):
+    models.AwxToken.objects.create(
+        name="fred",
+        token="abc",
+        user=user,
+    )
+    project_id = models.Project.objects.create(
+        git_hash=TEST_PROJECT["git_hash"],
+        name=TEST_PROJECT["name"],
+        url=TEST_PROJECT["url"],
+        description=TEST_PROJECT["description"],
+    ).pk
+    if rulebook_name == "":
+        rulebook_name = TEST_RULEBOOK["name"]
+
+    models.Rulebook.objects.create(
+        name=rulebook_name,
+        rulesets=TEST_RULESETS,
+        description=TEST_RULEBOOK["description"],
+        project_id=project_id,
+    )
 
 
 @pytest.mark.django_db
@@ -98,6 +147,7 @@ def test_create_source(
     client: APIClient,
     check_permission_mock: mock.Mock,
     default_de: models.DecisionEnvironment,
+    admin_user: models.User,
 ):
     data_in = {
         "name": "test_source",
@@ -105,6 +155,7 @@ def test_create_source(
         "args": '{"limit": 1, "delay": 5}',
         "decision_environment_id": default_de.id,
     }
+    create_project(admin_user)
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     result = response.data
@@ -112,38 +163,6 @@ def test_create_source(
     assert result["type"] == "ansible.eda.generic"
     assert result["args"] == "delay: 5\nlimit: 1\n"
     assert result["user"] == "test.admin"
-
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
-    )
-
-
-@pytest.mark.django_db
-def test_create_source_listener_args(
-    client: APIClient,
-    check_permission_mock: mock.Mock,
-    default_de: models.DecisionEnvironment,
-):
-    data_in = {
-        "name": "test_source",
-        "type": "ansible.eda.generic",
-        "args": '{"limit": 1, "delay": 5}',
-        "decision_environment_id": default_de.id,
-    }
-
-    response = client.post(f"{api_url_v1}/sources/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-    result = response.data
-    assert result["name"] == "test_source"
-    assert result["type"] == "ansible.eda.generic"
-    assert result["args"] == "delay: 5\nlimit: 1\n"
-    assert result["user"] == "test.admin"
-    source = models.Source.objects.get(pk=result["id"])
-    assert source.listener_args["EDA_PG_NOTIFY_CHANNEL"] == (
-        f"{EDA_CHANNEL_PREFIX}" f"{str(source.uuid).replace('-', '_')}"
-    )
-
-    assert source.listener_args["EDA_PG_NOTIFY_DSN"] == settings.PG_NOTIFY_DSN
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
@@ -180,12 +199,14 @@ def test_create_source_empty_args(
     client: APIClient,
     check_permission_mock: mock.Mock,
     default_de: models.DecisionEnvironment,
+    admin_user: models.User,
 ):
     data_in = {
         "name": "test_source",
         "type": "ansible.eda.generic",
         "decision_environment_id": default_de.id,
     }
+    create_project(admin_user)
     response = client.post(f"{api_url_v1}/sources/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     check_permission_mock.assert_called_once_with(
@@ -230,6 +251,32 @@ def test_create_source_no_de(
     assert (
         str(result["decision_environment_id"][0]) == "This field is required."
     )
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
+def test_create_source_with_missing_rulebook(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    default_de: models.DecisionEnvironment,
+    admin_user: models.User,
+):
+    data_in = {
+        "name": "test_source",
+        "type": "ansible.eda.generic",
+        "args": '{"limit": 1, "delay": 5}',
+        "decision_environment_id": default_de.id,
+    }
+    create_project(admin_user, "something_else")
+    response = client.post(f"{api_url_v1}/sources/", data=data_in)
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert (
+        str(response.data["detail"])
+        == "Configuration Error: Listener template rulebook not found"
+    )
+
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.SOURCE, Action.CREATE
     )

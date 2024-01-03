@@ -22,6 +22,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
+from aap_eda.api.views.utils import ListenerActivation
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 
@@ -100,7 +101,7 @@ class SourceViewSet(
             ),
         }
         response.save(update_fields=["listener_args"])
-
+        ListenerActivation(response, request)()
         return Response(
             serializers.SourceOutSerializer(response).data,
             status=status.HTTP_201_CREATED,
