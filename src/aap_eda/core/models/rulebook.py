@@ -44,9 +44,10 @@ class Rulebook(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
-    # For instrospection purposes we need to return a dict
-    def get_rulesets_data(self) -> list:
-        """Return rulesets data as a dict."""
+    # For instrospection purposes we need to return
+    # rulesets data unserialized.
+    def get_rulesets_data(self) -> list[dict]:
+        """Return rulesets data as a list of dicts."""
         try:
             return yaml.safe_load(self.rulesets)
         except yaml.YAMLError as e:
