@@ -16,50 +16,68 @@ import typing as tp
 
 from django.db import models
 
-from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
+from aap_eda.core.enums import (
+    ACTIVATION_STATUS_MESSAGE_MAP,
+    ActivationStatus,
+    RestartPolicy,
+)
 from aap_eda.core.exceptions import (
     StatusRequiredError,
     UnknownStatusError,
     UpdateFieldsRequiredError,
 )
 
-from .base import BaseActivation
-from .source import Source
+from .user import User
 
-__all__ = (
-    "Activation",
-    "ActivationInstance",
-    "ActivationInstanceLog",
-)
+__all__ = ("BaseActivation",)
 
 
-class ActivationInstance(models.Model):
-    class Meta:
-        db_table = "core_activation_instance"
-        ordering = ("-started_at",)
+class BaseActivation(models.Model):
+    """Base model for activations."""
 
-    name = models.TextField(null=False, default="")
+    name = models.TextField(null=False, unique=True)
+    description = models.TextField(default="")
+    is_enabled = models.BooleanField(default=True)
+    # TODO(alex) Since local activations are no longer supported
+    # this field should be mandatory.
+    decision_environment = models.ForeignKey(
+        "DecisionEnvironment", on_delete=models.SET_NULL, null=True
+    )
+    restart_policy = models.TextField(
+        choices=RestartPolicy.choices(),
+        default=RestartPolicy.ON_FAILURE,
+    )
     status = models.TextField(
         choices=ActivationStatus.choices(),
         default=ActivationStatus.PENDING,
     )
-    git_hash = models.TextField(null=False, default="")
-    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
-    started_at = models.DateTimeField(auto_now_add=True, null=False)
-    updated_at = models.DateTimeField(null=True)
-    ended_at = models.DateTimeField(null=True)
-    activation_pod_id = models.TextField(null=True)
+    # TODO: this field should be no longer needed
+    current_job_id = models.TextField(null=True)
+    restart_count = models.IntegerField(default=0)
+    failure_count = models.IntegerField(default=0)  # internal, since last good
+    # TODO: this field should be no longer needed
+    is_valid = models.BooleanField(default=False)  # internal, passed first run
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
+    created_at = models.DateTimeField(auto_now_add=True, null=False)
+    modified_at = models.DateTimeField(auto_now=True, null=False)
+    status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
-    log_read_at = models.DateTimeField(null=True)
+    latest_instance = models.OneToOneField(
+        "ActivationInstance",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        abstract = True
 
     def save(self, *args, **kwargs):
         # when creating
         if self._state.adding:
             if self.status_message is None:
-                self.status_message = self._get_default_status_message()
-
-                # populate latest_instance of activation at creation
-                self.activation.latest_instance = self
+                self._set_status_message()
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
@@ -83,11 +101,16 @@ class ActivationInstance(models.Model):
                 "status" in kwargs["update_fields"]
                 and "status_message" not in kwargs["update_fields"]
             ):
-                self.status_message = self._get_default_status_message()
+                self._set_status_message()
                 kwargs["update_fields"].append("status_message")
 
         super().save(*args, **kwargs)
-        self.activation.save(update_fields=["latest_instance"])
+
+    def _set_status_message(self):
+        self.status_message = self._get_default_status_message()
+
+        if self.status == ActivationStatus.PENDING and not self.is_enabled:
+            self.status_message = "Activation is marked as disabled"
 
     def _get_default_status_message(self):
         try:
@@ -105,72 +128,15 @@ class ActivationInstance(models.Model):
         self, status: ActivationStatus, status_message: tp.Optional[str] = None
     ) -> None:
         self.status = status
-        self.updated_at = models.functions.Now()
+        self.status_updated_at = models.functions.Now()
         update_fields = [
             "status",
-            "updated_at",
+            "status_updated_at",
+            "modified_at",
         ]
         if status_message:
             self.status_message = status_message
             update_fields.append("status_message")
-
-        if status in [
-            ActivationStatus.STOPPED,
-            ActivationStatus.COMPLETED,
-            ActivationStatus.FAILED,
-            ActivationStatus.ERROR,
-        ]:
-            self.ended_at = models.functions.Now()
-            update_fields.append("ended_at")
-
         self.save(
             update_fields=update_fields,
         )
-
-
-class ActivationInstanceLog(models.Model):
-    class Meta:
-        db_table = "core_activation_instance_log"
-
-    activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
-    )
-    line_number = models.IntegerField()
-    log = models.TextField()
-
-
-class Activation(BaseActivation):
-    """Rulebook Activation model."""
-
-    git_hash = models.TextField(null=False, default="")
-    project = models.ForeignKey(
-        "Project", on_delete=models.SET_NULL, null=True
-    )
-    # TODO(alex): this field should be mandatory.
-    rulebook = models.ForeignKey(
-        "Rulebook", on_delete=models.SET_NULL, null=True
-    )
-    extra_var = models.ForeignKey(
-        "ExtraVar", on_delete=models.CASCADE, null=True
-    )
-    # TODO(alex): name and rulesets should be populated in the model, not in
-    # the serializer.
-    rulebook_name = models.TextField(
-        null=False,
-        help_text="Name of the referenced rulebook",
-    )
-    rulebook_rulesets = models.TextField(
-        null=False,
-        help_text="Content of the last referenced rulebook",
-    )
-    ruleset_stats = models.JSONField(default=dict)
-
-    sources = models.ManyToManyField(
-        Source,
-        default=None,
-    )
-
-    class Meta:
-        db_table = "core_activation"
-        indexes = [models.Index(fields=["name"], name="ix_activation_name")]
-        ordering = ("-created_at",)
