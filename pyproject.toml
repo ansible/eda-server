@@ -109,6 +109,7 @@ extend-ignore = [
     "S101",   # Asserts allowed in tests
     "ARG",    # Fixtures are not always used explicitly
     "SLF001", # Call private methods in tests
+    "D",      # Docstrings are not required in tests
 ]
 
 [tool.ruff.flake8-tidy-imports]
