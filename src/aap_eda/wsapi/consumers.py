@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import typing as tp
 from datetime import datetime
 from enum import Enum
 
@@ -111,14 +112,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             await self.send(text_data=extra_var_message.json())
 
-        controller_info = ControllerInfo(
-            url=settings.EDA_CONTROLLER_URL,
-            token=await self.get_awx_token(message),
-            ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
-        )
-
         await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=controller_info.json())
+        awx_token = await self.get_awx_token(message)
+        if awx_token:
+            controller_info = ControllerInfo(
+                url=settings.EDA_CONTROLLER_URL,
+                token=awx_token,
+                ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
+            )
+            await self.send(text_data=controller_info.json())
         await self.send(text_data=EndOfResponse().json())
 
         # TODO: add broadcasting later by channel groups
@@ -320,15 +322,11 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return activation.rulebook_rulesets, extra_var
 
     @database_sync_to_async
-    def get_awx_token(self, message):
-        # query for activation
+    def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
+        """Get AWX token from the worker message."""
         activation_instance = models.ActivationInstance.objects.get(
-            id=message.activation_id
+            id=message.activation_id,
         )
+        awx_token = activation_instance.activation.awx_token
 
-        # check/get AWX token
-        awx_token = models.AwxToken.objects.filter(
-            user_id=activation_instance.activation.user_id
-        ).first()
-
-        return awx_token.token.get_secret_value()
+        return awx_token.token.get_secret_value() if awx_token else None
