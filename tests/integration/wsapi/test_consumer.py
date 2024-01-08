@@ -5,9 +5,11 @@ import pytest
 import pytest_asyncio
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
+from django.conf import settings
 from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
+from aap_eda.asgi import application
 from aap_eda.core import models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
@@ -43,6 +45,42 @@ TEST_RULESETS = """
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
+
+
+@pytest.mark.parametrize("path", ["ws/unexpected", "unexpected"])
+async def test_invalid_websocket_route(path: str):
+    """Test that the websocket consumer rejects unsupported routes."""
+    communicator = WebsocketCommunicator(application, path)
+
+    connected, _ = await communicator.connect()
+    assert connected, "Connection failed"
+
+    response = await communicator.receive_from()
+    assert response == '{"error": "invalid path"}', "Invalid error message"
+    close_message = await communicator.receive_output()
+    assert (
+        close_message["type"] == "websocket.close"
+    ), "Did not receive close message"
+
+    await communicator.disconnect()
+
+
+async def test_valid_websocket_route_wrong_type():
+    """Test that the websocket consumer rejects unsupported types."""
+    communicator = WebsocketCommunicator(
+        application,
+        f"{settings.API_PREFIX}/ws/ansible-rulebook",
+    )
+    connected, _ = await communicator.connect()
+    assert connected, "Connection failed"
+    nothing = await communicator.receive_nothing()
+    assert nothing, "Received unexpected message"
+    await communicator.send_to(text_data='{"type": "unsuported_type"}')
+    close_message = await communicator.receive_output()
+    assert (
+        close_message["type"] == "websocket.close"
+    ), "Did not receive close message"
+    await communicator.disconnect()
 
 
 @pytest.mark.django_db(transaction=True)
