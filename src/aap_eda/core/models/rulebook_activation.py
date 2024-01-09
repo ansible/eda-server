@@ -12,20 +12,23 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import uuid
-
 from django.db import models
 
-from aap_eda.core.models.activation import Activation
+from .activation import Activation
+from .source import Source
 
-__all__ = ["Source"]
 
-
-class Source(Activation):
+class RulebookActivation(Activation):
     class Meta:
-        db_table = "core_source"
+        db_table = "core_rulebook_activation"
+        indexes = [models.Index(fields=["name"], name="ix_activation_name")]
+        ordering = ("-created_at",)
 
-    uuid = models.UUIDField(default=uuid.uuid4)
-    type = models.TextField(null=False)
-    args = models.JSONField(null=True, default=None)
-    listener_args = models.JSONField(null=True, default=None)
+    sources = models.ManyToManyField(
+        Source,
+        default=None,
+    )
+
+    # TODO: we can move here other fields only related with Rulebook
+    # activation like extra_vars and ruleset_stats, that would require
+    # to change other pieces of code like the manager and the serializer.
