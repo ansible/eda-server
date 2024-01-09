@@ -1,0 +1,46 @@
+apiVersion: eda.ansible.com/v1alpha1
+kind: EDA
+metadata:
+  name: eda
+spec:
+  admin_user: {{ eda_server.admin_user }}
+  admin_password_secret: {{ eda_server.admin_password_secret }}
+ 
+  route_tls_termination_mechanism: {{ tls_termination_mechanism }}
+  ingress_tls_secret: eda-secret-tls
+  ingress_type: {{ ingress_type }}
+  hostname: {{ eda_host }}
+  
+  automation_server_url: {{ eda_server.automation_server_url }}
+  automation_server_ssl_verify: {{ eda_server.automation_server_ssl_verify }}
+ 
+  image: {{ eda_server.image }}
+  image_version: {{ eda_server.image_version }}
+ 
+  image_web: {{ eda_server.image_web }}
+  image_web_version: {{ eda_server.image_web_version }}
+
+  api:
+    replicas: {{ eda_server.api.replicas }}
+    resource_requirements:
+      requests: {}
+  ui:
+    replicas: {{ eda_server.ui.replicas }}
+    resource_requirements:
+      requests: {}
+  worker:
+    replicas: {{ eda_server.worker.replicas }}
+    resource_requirements:
+      requests: {}
+  redis:
+    replicas: {{ eda_server.redis.replicas }}
+    resource_requirements:
+      requests: {}
+  database:
+    database_secret: {{ eda_server.database.database_secret }}
+    postgres_storage_class: {{ postgres_storage_class }}
+    storage_requirements:
+      requests:
+        storage: {{ eda_server.database.storage_requirements.requests.storage }}
+    resource_requirements:
+      requests: {}

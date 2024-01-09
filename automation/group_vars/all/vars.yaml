@@ -1,0 +1,94 @@
+---
+ansible_python_interpreter: /usr/bin/env python
+
+env_type: openshift #openshift
+eda_deploy_operator: "true"
+eda_deploy_server: "true"
+
+eda_namespace: aap-eda
+
+eda_operator:
+  api_version: kustomize.config.k8s.io/v1beta1
+  namespace: aap-eda
+  disable_name_suffix_hash: true
+  secret_generator_name: redhat-operators-pull-secret
+  operator_literal: eda
+  resource_url: github.com/ansible/eda-server-operator/config/default?ref=0.0.11
+  image_name: quay.io/ansible/eda-server-operator
+  image_new_tag: 0.0.11
+
+eda_operator_files_path: roles/eda-deploy-operator/files
+eda_server_files_path:  roles/eda-deploy-server/files
+
+eda_server:
+  pvc_name: eda-postgres-13-volume
+  access_modes: ReadWriteOnce
+  storage_request: 500Mi
+  namespace: aap-eda
+  admin_user: admin
+  admin_password_secret: eda-admin-password
+  automation_server_url: https://awx.local
+  automation_server_ssl_verify: "no"
+  image: quay.io/ansible/eda-server
+  image_version: sha-98eaec9
+  image_web: quay.io/ansible/eda-ui
+  image_web_version: 2.4.860
+  redis_image:
+  redis_image_version:
+  api:
+    replicas: 1
+  ui:
+    replicas: 1
+  worker:
+    replicas: 2
+  redis:
+    replicas: 1
+  database:
+    database_secret: eda-database-configuration
+    storage_requirements:
+      requests:
+        storage: 3Gi
+    resource_requirements:
+      requests: {}
+
+eda_server_kustomization:
+  eda_database_configuration_host: eda-postgres-13
+  eda_database_configuration_port: 5432
+  eda_database_configuration_database: eda
+  eda_database_configuration_username: eda
+  eda_database_configuration_password: testpass
+  eda_database_configuration_type: managed
+  eda_admin_password: testpass
+
+# AWX
+
+aws_deploy_operator: "false"
+aws_deploy_server: "false"
+awx_operator_files_path: roles/awx-deploy-operator/files
+awx_server_files_path:  roles/awx-deploy-server/files
+awx_namespace: aap-awx
+
+awx_operator:
+  disableNameSuffixHash: true
+  secretName: "redhat-operators-pull-secret"
+  operatorLiteral: "operator=awx"
+  awxOperatorConfigURL: "github.com/ansible/awx-operator/config/default?ref=2.10.0"
+  operatorImageName: "quay.io/ansible/awx-operator"
+  operatorImageTag: "2.10.0"
+
+awx_server:
+  pvc_name: awx-postgres-13-volume
+  access_modes: ReadWriteOnce
+  storage_request: 1000Mi
+  admin_user: admin
+  admin_password_secret: awx-admin-password
+
+awx_server_kustomization:
+  awx_database_configuration_host: awx-postgres-13
+  awx_database_configuration_port: 5432
+  awx_database_configuration_database: awx
+  awx_database_configuration_username: awx
+  awx_database_configuration_password: testpass
+  awx_database_configuration_type: managed
+  awx_admin_password: testpass
+

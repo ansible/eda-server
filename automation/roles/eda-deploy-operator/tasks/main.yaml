@@ -1,0 +1,35 @@
+---
+- name: Check {{ env_type }} connection
+  block:
+    - k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: default
+        name: ansible-check-pod
+        kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+      register: k8s_info_result
+  rescue:
+    - fail:
+        msg: "Failed to connect to Kubernetes cluster. Please check your configuration and try again."
+  always:
+    - debug:
+        var: k8s_info_result
+
+- name: Create {{ eda_namespace }} namespace
+  k8s:
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ eda_namespace }}"
+  when: k8s_info_result is succeeded
+
+- name: Generate EDA Operator kustomization file
+  template:
+    src: kustomization-eda-operator.yaml.j2
+    dest: "{{ eda_operator_files_path }}/kustomization.yaml"
+
+- name: Apply EDA Operator kustomization file
+  k8s:
+    definition: "{{ lookup('pipe', 'kustomize build {{ eda_operator_files_path }}') }}"
+    state: present

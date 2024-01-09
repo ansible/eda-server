@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ eda_server.pvc_name }}
+  namespace: {{ eda_server.namespace }}
+spec:
+  accessModes:
+    - "{{ eda_server.access_modes }}"
+  resources:
+    requests:
+      storage: {{ eda_server.storage_request }}
+status: {}

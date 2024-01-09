@@ -1,0 +1,18 @@
+apiVersion: {{ eda_operator.api_version }}
+kind: Kustomization
+namespace: {{ eda_operator.namespace }}
+
+generatorOptions:
+  disableNameSuffixHash: {{ eda_operator.disable_name_suffix_hash }}
+
+secretGenerator:
+  - name: {{ eda_operator.secret_generator_name }}
+    literals:
+      - operator={{ eda_operator.operator_literal }}
+
+resources:
+  - {{ eda_operator.resource_url }}
+
+images:
+  - name: {{ eda_operator.image_name }}
+    newTag: {{ eda_operator.image_new_tag }}

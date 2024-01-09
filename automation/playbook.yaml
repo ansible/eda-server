@@ -1,0 +1,14 @@
+- hosts: localhost
+  roles:
+
+    - name: eda-deploy-operator
+      when: eda_deploy_operator == "true"
+
+    - name: eda-deploy-server
+      when: eda_deploy_server == "true"
+
+    - name: awx-deploy-operator
+      when: aws_deploy_operator == "true"
+
+    - name: awx-deploy-server
+      when: aws_deploy_server == "true"
