@@ -102,4 +102,39 @@ def swap_sources(data: str, sources: list[dict]) -> str:
     for ruleset in rulesets:
         ruleset["sources"] = new_sources
 
-    return yaml.dump(rulesets)
+
+def swap_webhook_sources(data: str, webhook_sources: dict) -> list[dict]:
+    """Swap out the sources with webhook sources that match the name.
+
+    Preserve the filters if they exist for the source.
+    """
+    rulesets = yaml.safe_load(data)
+    for ruleset in rulesets:
+        new_sources = []
+        for source in ruleset["sources"]:
+            if "name" in source:
+                name = source["name"]
+                if name in webhook_sources:
+                    updated_source = {}
+                    updated_source["name"] = name
+
+                    source_type = next(iter(webhook_sources[name]))
+                    updated_source[source_type] = webhook_sources[name][
+                        source_type
+                    ]
+                    if "filters" in source:
+                        updated_source["filters"] = source["filters"]
+                    new_sources.append(updated_source)
+                    LOGGER.debug(f"Source {name} updated with Webhook Source")
+                else:
+                    LOGGER.debug(f"Source {name} left intact")
+                    new_sources.append(source)
+            else:
+                LOGGER.warning(
+                    "Source doesn't have a name and cannot be swapped"
+                )
+                new_sources.append(source)
+
+        ruleset["sources"] = new_sources
+
+    return yaml.dump(rulesets, sort_keys=False)

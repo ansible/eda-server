@@ -26,6 +26,7 @@ from aap_eda.services.activation.engine.common import ContainerableMixin
 from .base import BaseOrgModel, UniqueNamedModel
 from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 from .user import AwxToken, User
+from .webhook import Webhook
 
 __all__ = ("Activation",)
 
@@ -132,6 +133,7 @@ class Activation(
         blank=True,
         help_text="Name of the kubernetes service",
     )
+    webhooks = models.ManyToManyField(Webhook, default=None)
 
     def get_parent_type(self) -> str:
         return ProcessParentType.ACTIVATION
