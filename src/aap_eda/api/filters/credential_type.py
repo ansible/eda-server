@@ -23,7 +23,12 @@ class CredentialTypeFilter(django_filters.FilterSet):
         lookup_expr="istartswith",
         label="Filter by credential type name.",
     )
+    namespace = django_filters.CharFilter(
+        field_name="namespace",
+        lookup_expr="istartswith",
+        label="Filter by credential type namespace.",
+    )
 
     class Meta:
         model = models.CredentialType
-        fields = ["name"]
+        fields = ["name", "namespace"]

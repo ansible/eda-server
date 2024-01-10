@@ -53,6 +53,10 @@ pexpect = "^4.9.0"
 ansible-runner = ">=2.3"
 python-gnupg = "^0.5.2"
 autobahn = {git = "https://github.com/crossbario/autobahn-python.git", rev = "v24.4.2"}
+psycopg = "^3.1.17"
+xxhash = "*"
+pyjwt = { version="*", extras = ["cryptography"] }
+ecdsa = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
@@ -61,6 +65,7 @@ pytest-asyncio = "*"
 requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-lazy-fixture = "^0.6.3"
+requests-mock = "*"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"

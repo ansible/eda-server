@@ -53,6 +53,7 @@ class ResourceType(DjangoStrEnum):
     EVENT_STREAM = "event_stream"
     ORGANIZATION = "organization"
     TEAM = "team"
+    WEBHOOK = "webhook"
 
 
 class Action(DjangoStrEnum):
@@ -138,3 +139,39 @@ class RulebookProcessLogLevel(DjangoStrEnum):
     DEBUG = "debug"
     INFO = "info"
     ERROR = "error"
+
+
+class WebhookAuthType(DjangoStrEnum):
+    """Types of authentication for Webhook."""
+
+    HMAC = "hmac"
+    TOKEN = "token"
+    BASIC = "basic"
+    OAUTH2 = "oauth2"
+    OAUTH2JWT = "oauth2-jwt"
+    ECDSA = "ecdsa"
+    MTLS = "mtls"
+
+
+class SignatureEncodingType(DjangoStrEnum):
+    """Types of format for HMAC."""
+
+    BASE64 = "base64"
+    HEX = "hex"
+
+
+class WebhookCredentialType(DjangoStrEnum):
+    HMAC = "HMAC Webhook"
+    BASIC = "Basic Webhook"
+    TOKEN = "Token Webhook"
+    OAUTH2 = "Oauth2 Webhook"
+    OAUTH2_JWT = "Oauth2 JWT Webhook"
+    ECDSA = "ECDSA Webhook"
+    MTLS = "mTLS Webhook"
+
+
+class CustomWebhookCredentialType(DjangoStrEnum):
+    GITLAB = "GITLAB Webhook"
+    GITHUB = "GitHub Webhook"
+    SNOW = "Service Now Webhook"
+    DYNATRACE = "Dynatrace Webhook"
