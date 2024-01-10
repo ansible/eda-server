@@ -24,6 +24,7 @@ from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
+from .webhook import Webhook
 
 __all__ = ("Activation",)
 
@@ -112,3 +113,4 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         choices=RulebookProcessLogLevel.choices(),
         default=get_default_log_level,
     )
+    webhooks = models.ManyToManyField(Webhook, default=None)

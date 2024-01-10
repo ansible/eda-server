@@ -36,6 +36,7 @@ from .rulebook import (
 )
 from .rulebook_process import RulebookProcess, RulebookProcessLog
 from .user import AwxToken, User
+from .webhook import Webhook
 
 __all__ = [
     "ActivationInstanceJobInstance",
@@ -62,4 +63,5 @@ __all__ = [
     "DecisionEnvironment",
     "ActivationRequestQueue",
     "EventStream",
+    "Webhook",
 ]

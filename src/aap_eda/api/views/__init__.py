@@ -17,9 +17,11 @@ from .auth import RoleViewSet, SessionLoginView, SessionLogoutView
 from .credential import CredentialViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .event_stream import EventStreamViewSet
+from .external_webhook import ExternalWebhookViewSet
 from .project import ExtraVarViewSet, ProjectViewSet
 from .rulebook import AuditRuleViewSet, RulebookViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
+from .webhook import WebhookViewSet
 
 __all__ = (
     # auth
@@ -44,4 +46,8 @@ __all__ = (
     "DecisionEnvironmentViewSet",
     # event_stream
     "EventStreamViewSet",
+    # webhook
+    "WebhookViewSet",
+    # External webhook
+    "ExternalWebhookViewSet",
 )

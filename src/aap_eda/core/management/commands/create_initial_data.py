@@ -44,6 +44,7 @@ ROLES = [
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
             "event_stream": ["create", "read"],
+            "webhook": ["create", "read", "update", "delete"],
         },
     },
     {
@@ -60,6 +61,7 @@ ROLES = [
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
             "event_stream": ["create", "read"],
+            "webhook": ["create", "read", "update", "delete"],
         },
     },
     {
@@ -88,6 +90,7 @@ ROLES = [
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
             "event_stream": ["create", "read"],
+            "webhook": ["create", "read"],
         },
     },
     {
@@ -107,6 +110,7 @@ ROLES = [
             "decision_environment": ["read"],
             "credential": ["read"],
             "event_stream": ["read"],
+            "webhook": ["read"],
         },
     },
     {
@@ -125,6 +129,7 @@ ROLES = [
             "decision_environment": ["read"],
             "credential": ["read"],
             "event_stream": ["read"],
+            "webhook": ["read"],
         },
     },
     {
@@ -140,6 +145,7 @@ ROLES = [
             "rulebook": ["read"],
             "decision_environment": ["read"],
             "event_stream": ["read"],
+            "webhook": ["read"],
         },
     },
 ]

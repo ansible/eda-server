@@ -138,7 +138,6 @@ class RoleViewSet(
     def retrieve(self, _request, pk=None):
         # TODO: Optimization by querying to retrieve desired permission format
         role = get_object_or_404(self.queryset, pk=pk)
-
         detail_serialzer = self.get_serializer_class()
         role = detail_serialzer(role).data
         result = display_permissions(role)

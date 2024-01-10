@@ -71,6 +71,7 @@ from .user import (
     UserListSerializer,
     UserSerializer,
 )
+from .webhook import WebhookInSerializer, WebhookOutSerializer
 
 __all__ = (
     # auth
@@ -119,4 +120,7 @@ __all__ = (
     "EventStreamSerializer",
     "EventStreamCreateSerializer",
     "EventStreamOutSerializer",
+    # webhooks
+    "WebhookInSerializer",
+    "WebhookOutSerializer",
 )

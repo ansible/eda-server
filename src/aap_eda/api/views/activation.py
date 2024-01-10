@@ -13,6 +13,8 @@
 #  limitations under the License.
 import logging
 
+import yaml
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -84,6 +86,27 @@ class ActivationViewSet(
         serializer.is_valid(raise_exception=True)
 
         activation = serializer.create(serializer.validated_data)
+        if activation.webhooks:
+            extra_var = {}
+            if activation.extra_var_id:
+                extra_var_obj = models.ExtraVar.objects.get(
+                    pk=activation.extra_var_id
+                )
+                extra_var = yaml.safe_load(extra_var_obj.extra_var)
+
+            extra_var["EDA_WEBHOOK_CHANNELS"] = [
+                webhook.channel_name for webhook in activation.webhooks.all()
+            ]
+            extra_var["EDA_PG_NOTIFY_DSN"] = settings.PG_NOTIFY_DSN
+            if activation.extra_var_id and extra_var_obj:
+                extra_var_obj.extra_var = yaml.dump(extra_var)
+                extra_var_obj.save()
+            else:
+                extra_var_obj = models.ExtraVar.objects.create(
+                    extra_var=yaml.dump(extra_var)
+                )
+                activation.extra_var_id = extra_var_obj.id
+                activation.save(update_fields=["extra_var_id"])
 
         if activation.is_enabled:
             start_rulebook_process(

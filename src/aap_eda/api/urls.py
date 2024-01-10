@@ -44,6 +44,11 @@ router.register(
 )
 router.register("credentials", views.CredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
+router.register("webhooks", views.WebhookViewSet)
+router.register(
+    "external_webhook",
+    views.ExternalWebhookViewSet,
+)
 
 openapi_urls = [
     path(
