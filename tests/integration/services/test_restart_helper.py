@@ -12,20 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
 from unittest import mock
 
 import pytest
-
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.services.activation.restart_helper import (
     _queue_auto_start,
     system_restart_activation,
 )
+from pytest_lazyfixture import lazy_fixture
 
 
 @pytest.fixture()
-def activation():
+def proxy_with_instance():
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -33,29 +34,80 @@ def activation():
         email="luke.skywalker@example.com",
         password="secret",
     )
-    return models.Activation.objects.create(
+    instance = models.Activation.objects.create(
         name="test1",
         user=user,
     )
+    return models.ProcessParentProxy(instance)
 
 
+@pytest.fixture()
+def proxy_with_source():
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+    instance = models.Source.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-source",
+        type="ansible.eda.generic",
+        args='{"a": 1, "b": 2}',
+        user=user,
+    )
+    return models.ProcessParentProxy(instance)
+
+
+@pytest.mark.parametrize(
+    "process_parent",
+    [
+        pytest.param(
+            lazy_fixture("proxy_with_instance"),
+            id="stopped",
+        ),
+        pytest.param(
+            lazy_fixture("proxy_with_source"),
+            id="error",
+        ),
+    ],
+)
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.activation.restart_helper.enqueue_delay")
-def test_system_restart_activation(enqueue_mock, activation):
-    system_restart_activation(activation.id, 5)
+def test_system_restart_activation(enqueue_mock, process_parent):
+    system_restart_activation(process_parent, 5)
     enqueue_args = [
         "default",
         5,
         _queue_auto_start,
-        activation.id,
     ]
-    enqueue_mock.assert_called_once_with(*enqueue_args)
+    enqueue_mock.assert_called_once_with(
+        *enqueue_args,
+        process_parent_data=process_parent.to_dict(),
+    )
 
 
+@pytest.mark.parametrize(
+    "process_parent",
+    [
+        pytest.param(
+            lazy_fixture("proxy_with_instance"),
+            id="stopped",
+        ),
+        pytest.param(
+            lazy_fixture("proxy_with_source"),
+            id="error",
+        ),
+    ],
+)
 @pytest.mark.django_db
-def test_queue_auto_start(activation):
-    _queue_auto_start(activation.id)
-
+def test_queue_auto_start(process_parent):
+    _queue_auto_start(process_parent.to_dict())
     queued = models.ActivationRequestQueue.objects.first()
-    assert queued.activation == activation
+    if process_parent.is_activation:
+        assert queued.activation == process_parent.instance
+
+    else:
+        assert queued.source == process_parent.instance
     assert queued.request == ActivationRequest.AUTO_START

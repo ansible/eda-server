@@ -25,6 +25,7 @@ from .job import (
     JobInstanceHost,
 )
 from .project import ExtraVar, Project
+from .proxies import CombinedQuerySet, ProcessParentProxy
 from .queue import ActivationRequestQueue
 from .rulebook import (
     AuditAction,
@@ -63,4 +64,6 @@ __all__ = [
     "DecisionEnvironment",
     "ActivationRequestQueue",
     "Source",
+    "CombinedQuerySet",
+    "ProcessParentProxy",
 ]

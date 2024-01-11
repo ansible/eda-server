@@ -273,6 +273,11 @@ else:
             "PORT": settings.get("MQ_PORT", 6379),
             "DEFAULT_TIMEOUT": 300,
         },
+        # Rename the activation queue for "process parent"
+        # would require changes in the operator or the installer.
+        # we postpone the name change for now,
+        # we might even consider not renaming it
+        # to avoid breaking backward compatibility
         "activation": {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),

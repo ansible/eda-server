@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
+
 import pytest
 
 import aap_eda.tasks.activation_request_queue as queue
@@ -41,22 +43,65 @@ def activations():
     return [activation1, activation2]
 
 
+@pytest.fixture()
+def sources():
+    user = models.User.objects.create_user(
+        username="obi-wan.kenobi",
+        first_name="Obi-Wan",
+        last_name="Kenobi",
+        email="obi-wan@example.com",
+        password="secret",
+    )
+
+    source1 = models.Source.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-source1",
+        type="ansible.eda.generic",
+        args='{"a": 1, "b": 2}',
+        user=user,
+    )
+
+    source2 = models.Source.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-source2",
+        type="ansible.eda.generic",
+        args='{"a": 2, "b": 3}',
+        user=user,
+    )
+
+    return [source1, source2]
+
+
 @pytest.mark.django_db
-def test_queue(activations):
-    queue.push(activations[0].id, ActivationRequest.STOP)
-    queue.push(activations[1].id, ActivationRequest.DELETE)
-    queue.push(activations[0].id, ActivationRequest.START)
-    assert models.ActivationRequestQueue.objects.count() == 3
-    assert queue.list_activations() == [
-        activations[0].id,
-        activations[1].id,
+def test_queue(activations, sources):
+    proxy_activation_0 = models.ProcessParentProxy(activations[0])
+    proxy_activation_1 = models.ProcessParentProxy(activations[1])
+    proxy_source_0 = models.ProcessParentProxy(sources[0])
+    proxy_source_1 = models.ProcessParentProxy(sources[1])
+
+    queue.push(proxy_activation_0, ActivationRequest.STOP)
+    queue.push(proxy_activation_1, ActivationRequest.DELETE)
+    queue.push(proxy_activation_0, ActivationRequest.START)
+
+    queue.push(proxy_source_0, ActivationRequest.STOP)
+    queue.push(proxy_source_1, ActivationRequest.DELETE)
+    queue.push(proxy_source_0, ActivationRequest.START)
+
+    assert models.ActivationRequestQueue.objects.count() == 6
+    names = [item.name for item in queue.list_activations()]
+    assert len(names) == 4
+    assert names == [
+        item.name for group in [activations, sources] for item in group
     ]
 
-    requests = queue.peek_all(activations[0].id)
+    requests = queue.peek_all(proxy_activation_0)
     assert len(requests) == 2
 
-    queue.pop_until(activations[0].id, requests[1].id)
-    assert len(queue.peek_all(activations[0].id)) == 0
+    queue.pop_until(proxy_activation_0, requests[1].id)
+    assert models.ActivationRequestQueue.objects.count() == 4
+    assert len(queue.peek_all(proxy_activation_0)) == 0
+    assert len(queue.peek_all(proxy_source_0)) == 2
+    assert len(queue.list_activations()) == 3
 
 
 @pytest.mark.parametrize(
@@ -111,11 +156,12 @@ def test_queue(activations):
 )
 @pytest.mark.django_db
 def test_arbitrate(activations, requests):
+    proxy_activation = models.ProcessParentProxy(activations[0])
     for request in requests["queued"]:
-        queue.push(activations[0].id, request)
-    dequeued = queue.peek_all(activations[0].id)
+        queue.push(proxy_activation, request)
+    dequeued = queue.peek_all(proxy_activation)
     dequeued_requests = [entry.request for entry in dequeued]
     assert dequeued_requests == requests["dequeued"]
     assert models.ActivationRequestQueue.objects.count() == len(
-        requests["dequeued"]
+        requests["dequeued"],
     )
