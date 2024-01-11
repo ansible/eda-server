@@ -46,9 +46,8 @@ example use the uid 501 above and port 49473 from your enviornment in the next s
 
 2. Create a secure tunnel, and forward the local socket to the remote socket 
 ```
-RUN_USER_ID=501
-REMOTE_SSH_PORT=49473
-ssh -fnNT -L/tmp/podman.sock:/run/user/${RUN_USER_ID}/podman/podman.sock -i ~/.ssh/podman-machine-default ssh://core@localhost:${REMOTE_SSH_PORT} -o StreamLocalBindUnlink=yes
+ssh -fnNT -L/tmp/podman.sock:/run/user/{uid}/podman/podman.sock -i ~/.ssh/podman-machine-default ssh://core@localhost:{port} -o StreamLocalBindUnlink=yes
+
 ps aux | grep "ssh -fnNT" |grep -v color
 ```
 3. export DOCKER_HOST=unix:///tmp/podman.sock
