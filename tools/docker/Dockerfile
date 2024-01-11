@@ -14,6 +14,7 @@ RUN DNF=dnf \
     gcc \
     gettext \
     git-core \
+    ansible-core \
     java-17-openjdk-headless \
     # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
     openldap-devel xmlsec1-devel libtool-ltdl-devel" \
