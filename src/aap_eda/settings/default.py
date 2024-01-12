@@ -60,7 +60,7 @@ Redis queue settings:
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
 
-default_settings_file = "/etc/eda/settings.yaml"
+default_settings_file = "/etc/ansible-automation-platform/eda/settings.yaml"
 
 settings = dynaconf.Dynaconf(
     envvar="EDA_SETTINGS_FILE",
