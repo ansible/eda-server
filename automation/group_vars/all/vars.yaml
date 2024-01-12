@@ -2,8 +2,8 @@
 ansible_python_interpreter: /usr/bin/env python
 
 env_type: openshift #openshift
-eda_deploy_operator: "true"
-eda_deploy_server: "true"
+eda_deploy_operator: "false"
+eda_deploy_server: "false"
 
 eda_namespace: aap-eda
 
@@ -62,8 +62,8 @@ eda_server_kustomization:
 
 # AWX
 
-aws_deploy_operator: "false"
-aws_deploy_server: "false"
+aws_deploy_operator: "true"
+aws_deploy_server: "true"
 awx_operator_files_path: roles/awx-deploy-operator/files
 awx_server_files_path:  roles/awx-deploy-server/files
 awx_namespace: aap-awx
@@ -79,7 +79,7 @@ awx_operator:
 awx_server:
   pvc_name: awx-postgres-13-volume
   access_modes: ReadWriteOnce
-  storage_request: 1000Mi
+  storage_request: 3Gi
   admin_user: admin
   admin_password_secret: awx-admin-password
 
