@@ -28,7 +28,7 @@ from aap_eda.core.exceptions import (
 )
 
 from .source import Source
-from .user import User
+from .user import AwxToken, User
 
 __all__ = (
     "Activation",
@@ -96,6 +96,12 @@ class Activation(models.Model):
         default=None,
         on_delete=models.SET_NULL,
         related_name="+",
+    )
+    awx_token = models.ForeignKey(
+        AwxToken,
+        on_delete=models.SET_NULL,
+        null=True,
+        default=None,
     )
     sources = models.ManyToManyField(
         Source,

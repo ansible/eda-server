@@ -399,17 +399,18 @@ def test_engine_get_status(podman_engine):
 
     assert activation_status.status == ActivationStatus.FAILED
 
-    # when status in "paused"
-    container_mock.status = "paused"
-    activation_status = engine.get_status("container_id")
+    for unexpected_state in [
+        "paused",
+        "restarting",
+        "removing",
+        "dead",
+        "configured",
+        "unknown",
+    ]:
+        container_mock.status = unexpected_state
+        activation_status = engine.get_status("container_id")
 
-    assert activation_status.status == ActivationStatus.FAILED
-
-    # when status in "unknown"
-    container_mock.status = "unknown"
-    activation_status = engine.get_status("container_id")
-
-    assert activation_status.status == ActivationStatus.ERROR
+        assert activation_status.status == ActivationStatus.FAILED
 
     # when status in "exited"
     container_mock.status = "exited"
@@ -418,6 +419,14 @@ def test_engine_get_status(podman_engine):
         (1, ActivationStatus.FAILED),
     ]
 
+    for key, value in expects:
+        container_mock.attrs = {"State": {"ExitCode": key}}
+        activation_status = engine.get_status("container_id")
+
+        assert activation_status.status == value
+
+    # when status is stopped
+    container_mock.status = "stopped"
     for key, value in expects:
         container_mock.attrs = {"State": {"ExitCode": key}}
         activation_status = engine.get_status("container_id")
