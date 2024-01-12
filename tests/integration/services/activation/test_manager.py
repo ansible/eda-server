@@ -65,6 +65,30 @@ def default_rulebook() -> models.Rulebook:
 
 
 @pytest.fixture
+def rulebook_with_job_template() -> models.Rulebook:
+    """Return a default rulebook."""
+    rulesets = """
+---
+- name: Hello World
+  hosts: all
+  sources:
+    - ansible.eda.range:
+        limit: 5
+  rules:
+    - name: Say Hello
+      condition: event.i == 1
+      action:
+        run_job_template:
+          msg: "Hello World!"
+
+"""
+    return models.Rulebook.objects.create(
+        name="test-rulebook",
+        rulesets=rulesets,
+    )
+
+
+@pytest.fixture
 def eda_caplog(caplog_factory) -> LogCaptureFixture:
     """Fixture to capture logs from the EDA logger."""
     return caplog_factory(LOGGER)
@@ -77,10 +101,6 @@ def default_user() -> models.User:
         username="test.user",
         password="test.user.123",
         email="test.user@localhost",
-    )
-
-    models.AwxToken.objects.create(
-        name="test-token", user=user, token="supersecret"
     )
 
     return user
@@ -208,14 +228,16 @@ def test_start_disabled_activation(activation_with_instance, eda_caplog):
 
 
 @pytest.mark.django_db
-def test_start_no_awx_token(basic_activation):
+def test_start_no_awx_token(basic_activation, rulebook_with_job_template):
     """Test start verb when no AWX token is present."""
+    basic_activation.rulebook = rulebook_with_job_template
+    basic_activation.save(update_fields=["rulebook"])
     activation_manager = ActivationManager(basic_activation)
     basic_activation.user.awxtoken_set.all().delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
     assert basic_activation.status == ActivationStatus.ERROR
-    assert "No controller token specified" in str(exc.value)
+    assert "The rulebook requires an Awx Token." in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
 
 
