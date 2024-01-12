@@ -5,8 +5,8 @@ If you are developing on Mac with podman this document will guide you thru the s
 2. Make development changes and run product using your local changes
 
 # Pre Requisites
-1. podman
-2. docker-compose
+1. podman: [Podman for Mac](https://podman.io/getting-started/installation#macos)
+2. docker-compose: [Docker for Mac](https://www.docker.com/docker-mac)
 
 
 
@@ -44,7 +44,12 @@ podman-machine-default ssh://core@localhost:49473/run/user/501/podman/podman.soc
 ```
 example use the uid 501 above and port 49473 from your enviornment in the next step
 
-2. ssh -fnNT -L/tmp/podman.sock:/run/user/{uid}/podman/podman.sock -i ~/.ssh/podman-machine-default ssh://core@localhost:{port} -o StreamLocalBindUnlink=yes
+2. Create a secure tunnel, and forward the local socket to the remote socket 
+```
+ssh -fnNT -L/tmp/podman.sock:/run/user/{uid}/podman/podman.sock -i ~/.ssh/podman-machine-default ssh://core@localhost:{port} -o StreamLocalBindUnlink=yes
+
+ps aux | grep "ssh -fnNT" |grep -v color
+```
 3. export DOCKER_HOST=unix:///tmp/podman.sock
 
 
@@ -63,6 +68,7 @@ You can build an image with your changes and use that image in docker-compose
 2. export EDA_IMAGE=localhost/myserver:latest
 3. docker-compose -f ./tools/docker/docker-compose-mac.yml up
 
+You can now access the UI at <https://localhost:8443/eda/> with default login username and password(admin/testpass).
 
 ## Layout
 ![Alt_PodmanDeployment](./podman_deployment.png?raw=true)
