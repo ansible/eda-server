@@ -11,7 +11,7 @@ import aap_eda.core.enums
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0013_auditaction_status_message"),
+        ("core", "0015_alter_credential_secret"),
     ]
 
     operations = [

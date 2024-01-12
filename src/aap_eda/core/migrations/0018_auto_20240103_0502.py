@@ -30,7 +30,7 @@ def drop_permissions(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0015_activation_sources"),
+        ("core", "0017_activation_sources"),
     ]
 
     operations = [migrations.RunPython(insert_permissions, drop_permissions)]
