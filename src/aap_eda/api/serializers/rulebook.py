@@ -63,7 +63,7 @@ class RulesetSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Ruleset
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = ["id", "created_at", "modified_at", "rulebook_id"]
 
 
 class RulesetOutSerializer(serializers.Serializer):
@@ -102,6 +102,13 @@ class RulesetOutSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField(
         required=True,
         help_text="The modified_at timestamp of the ruleset",
+    )
+
+    rulebook_id = serializers.PrimaryKeyRelatedField(
+        required=False,
+        allow_null=True,
+        queryset=models.Rulebook.objects.all(),
+        help_text="ID of the rulebook",
     )
 
 

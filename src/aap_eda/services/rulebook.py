@@ -75,6 +75,7 @@ def build_ruleset_out_data(data: dict) -> dict:
         ruleset_id=ruleset_id
     ).count()
     data["fired_stats"] = build_fired_stats(data)
+    data["rulebook_id"] = data["rulebook"]
 
     for key in ["rulebook", "sources"]:
         data.pop(key)

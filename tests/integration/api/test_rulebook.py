@@ -194,6 +194,7 @@ def test_list_rulesets_from_rulebook(client: APIClient, init_db):
         "source_types",
         "rule_count",
         "fired_stats",
+        "rulebook_id",
     ]
 
 
@@ -229,6 +230,7 @@ def test_list_rulesets(client: APIClient, init_db):
         "source_types",
         "rule_count",
         "fired_stats",
+        "rulebook_id",
     ]
 
 
@@ -249,6 +251,7 @@ def test_rulesets_filter_name(client: APIClient, init_db):
         "source_types": ["range"],
         "rule_count": 0,
         "fired_stats": [{}],
+        "rulebook_id": test_ruleset.rulebook.id,
     }
 
 
