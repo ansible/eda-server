@@ -49,7 +49,10 @@ DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     activation_instance_with_extra_var = await _prepare_db_data()
     activation_instance_without_extra_var = (
-        await _prepare_acitvation_instance_without_extra_var()
+        await _prepare_activation_instance_without_extra_var()
+    )
+    activation_instance_no_token = (
+        await _prepare_activation_instance_no_token()
     )
 
     payload = {
@@ -66,6 +69,8 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
+        if type == "ControllerInfo":
+            assert response["token"] == "XXX"
 
     payload = {
         "type": "Worker",
@@ -76,6 +81,21 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     for type in [
         "Rulebook",
         "ControllerInfo",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "ControllerInfo":
+            assert response["token"] == "XXX"
+
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_no_token,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
         "EndOfResponse",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
@@ -411,7 +431,9 @@ def _prepare_db_data():
         password="secret",
     )
 
-    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+    token = models.AwxToken.objects.get_or_create(
+        user=user, name="token", token="XXX"
+    )
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de_test_name_1",
         image_url="de_test_image_url",
@@ -426,6 +448,7 @@ def _prepare_db_data():
         project=project,
         user=user,
         decision_environment=decision_environment,
+        awx_token=token[0],
     )
 
     activation_instance, _ = models.ActivationInstance.objects.get_or_create(
@@ -455,7 +478,7 @@ def _prepare_db_data():
 
 
 @database_sync_to_async
-def _prepare_acitvation_instance_without_extra_var():
+def _prepare_activation_instance_without_extra_var():
     project = models.Project.objects.create(
         name="test-project-no-extra_var",
         url="https://github.com/test/project",
@@ -476,7 +499,9 @@ def _prepare_acitvation_instance_without_extra_var():
         password="secret",
     )
 
-    models.AwxToken.objects.get_or_create(user=user, name="token", token="XXX")
+    token = models.AwxToken.objects.get_or_create(
+        user=user, name="token", token="XXX"
+    )
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de_test_name_2",
         image_url="de_test_image_url",
@@ -485,6 +510,51 @@ def _prepare_acitvation_instance_without_extra_var():
 
     activation = models.Activation.objects.create(
         name="test-activation-no-extra_var",
+        restart_policy="always",
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+        awx_token=token[0],
+    )
+
+    activation_instance = models.ActivationInstance.objects.create(
+        activation=activation,
+    )
+
+    return activation_instance.id
+
+
+@database_sync_to_async
+def _prepare_activation_instance_no_token():
+    project = models.Project.objects.create(
+        name="test-project-no-token",
+        url="https://github.com/test/project",
+        git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+    )
+
+    rulebook = models.Rulebook.objects.create(
+        name="test-rulebook",
+        rulesets=TEST_RULESETS,
+        project=project,
+    )
+
+    user = models.User.objects.create_user(
+        username="obiwan.kenobi",
+        first_name="ObiWan",
+        last_name="Kenobi",
+        email="obiwan@jedicouncil.com",
+        password="secret",
+    )
+
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_no_token",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
+
+    activation = models.Activation.objects.create(
+        name="test-activation-no-token",
         restart_policy="always",
         rulebook=rulebook,
         project=project,

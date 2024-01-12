@@ -37,6 +37,6 @@ class Credential(models.Model):
         default=CredentialType.REGISTRY,
     )
     username = models.TextField(null=True)
-    secret = EncryptedTextField(null=True)
+    secret = EncryptedTextField(null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)

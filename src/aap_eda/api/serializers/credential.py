@@ -35,6 +35,8 @@ class CredentialSerializer(serializers.ModelSerializer):
 
 
 class CredentialCreateSerializer(serializers.ModelSerializer):
+    secret = serializers.CharField(required=True, allow_null=False)
+
     class Meta:
         model = models.Credential
         fields = [

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+import typing as tp
 
 import yaml
 from rest_framework import serializers
@@ -58,17 +59,43 @@ def check_if_extra_var_exists(extra_var_id: int) -> int:
     return extra_var_id
 
 
-def check_awx_tokens(user_id: int) -> int:
-    tokens = models.AwxToken.objects.filter(user_id=user_id).count()
-    if tokens == 0:
-        raise serializers.ValidationError("No controller token specified")
-    elif tokens > 1:
+def check_if_awx_token_exists(awx_token_id: int) -> int:
+    try:
+        models.AwxToken.objects.get(pk=awx_token_id)
+    except models.AwxToken.DoesNotExist:
         raise serializers.ValidationError(
-            "More than one controller token found, "
-            "currently only 1 token is supported"
+            f"AwxToken with id {awx_token_id} does not exist"
         )
+    return awx_token_id
 
-    return user_id
+
+def check_rulesets_require_token(
+    rulesets_data: list[dict[str, tp.Any]],
+) -> bool:
+    """Inspect rulesets data to determine if a token is required.
+
+    Return True if any of the rules has an action that requires a token.
+    """
+    required_actions = {"run_job_template", "run_workflow_template"}
+
+    for ruleset in rulesets_data:
+        for rule in ruleset.get("rules", []):
+            # When it is a single action dict
+            if any(
+                action_key in required_actions
+                for action_key in rule.get("action", {})
+            ):
+                return True
+
+            # When it is a list of actions
+            if any(
+                action_arg in required_actions
+                for action in rule.get("actions", [])
+                for action_arg in action
+            ):
+                return True
+
+    return False
 
 
 def is_extra_var_dict(extra_var: str):
