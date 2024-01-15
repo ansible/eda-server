@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 USAGE_EXIT_CODE=3
 FIRST_ARG=$1
 FINAL_EXIT_CODE=0
@@ -102,24 +101,3 @@ case "$FIRST_ARG" in
 		;;
 esac
 exit
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
