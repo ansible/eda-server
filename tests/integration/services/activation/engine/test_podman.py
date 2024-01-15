@@ -95,7 +95,7 @@ def get_request(data: InitData):
         cmdline=get_ansible_rulebook_cmdline(data),
         ports=[("localhost", 8080)],
         mem_limit="8G",
-        mounts={"/dev": "/opt"},
+        mounts=[{"/dev": "/opt"}],
         env_vars={"a": 1},
         extra_args={"b": 2},
     )
@@ -243,7 +243,7 @@ def test_engine_start_with_credential(init_data, podman_engine):
         name=request.name,
         ports={"8080/tcp": 8080},
         mem_limit="8G",
-        mounts={"/dev": "/opt"},
+        mounts=request.mounts,
         environment={"a": 1},
         b=2,
     )
