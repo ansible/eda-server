@@ -63,7 +63,7 @@ class RulesetSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Ruleset
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "modified_at", "rulebook_id"]
+        read_only_fields = ["id", "created_at", "modified_at"]
 
 
 class RulesetOutSerializer(serializers.Serializer):
