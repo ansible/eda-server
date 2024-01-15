@@ -98,7 +98,6 @@ def get_request(data: InitData):
         credential=Credential(username="admin", secret="secret"),
         ports=[("localhost", 8080)],
         mem_limit="8G",
-        mounts={"/dev": "/opt"},
         env_vars={"a": 1},
         extra_args={"b": 2},
     )
