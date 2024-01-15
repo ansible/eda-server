@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from django.conf import settings
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 import aap_eda.services.activation.engine.exceptions as exceptions
 from aap_eda.core.enums import ActivationStatus
@@ -51,8 +51,12 @@ class AnsibleRulebookCmdLine(BaseModel):
     ws_url: str
     ws_ssl_verify: str
     heartbeat: int
-    id: str
+    id: tp.Union[str, int]  # casted to str
     log_level: tp.Optional[str] = None  # -v or -vv or None
+
+    @validator("id", pre=True)
+    def cast_to_str(cls, v):
+        return str(v)
 
     def command(self) -> str:
         return "ansible-rulebook"
@@ -95,7 +99,7 @@ class ContainerRequest(BaseModel):
     ports: tp.Optional[list[tuple]] = None
     pull_policy: str = settings.DEFAULT_PULL_POLICY  # Always by default
     mem_limit: tp.Optional[str] = None
-    mounts: tp.Optional[dict] = None
+    mounts: tp.Optional[list[dict]] = None
     env_vars: tp.Optional[dict] = None
     extra_args: tp.Optional[dict] = None
 
