@@ -56,6 +56,9 @@ jobs:
 
       - name: Run tests
         working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
+          EDAQA_ENV: authenticated
         run: pytest
 
       - name: Print EDA logs
