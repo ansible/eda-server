@@ -56,6 +56,18 @@ Redis queue settings:
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
 * MQ_DB - Redis queue database (default: 0)
+
+
+Podman settings:
+PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
+    the following keys: source, target, type.
+    Look at https://docs.podman.io/en/v4.4/markdown/options/mount.html
+    for more information.
+    Example:
+      export PODMAN_MOUNTS='@json [{"source": "/var/run/containers/storage",
+                             "target": "/var/run/containers/storage",
+                             "type": "bind"}]'
+
 """
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
