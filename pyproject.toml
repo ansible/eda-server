@@ -28,7 +28,7 @@ dev = ["psycopg2-binary"]
 python = ">=3.9,<3.12"
 django = ">=4.2,<4.3"
 djangorestframework = "*"
-dynaconf = ">=3"
+dynaconf = ">=3.2.2"
 drf-spectacular = "*"
 channels = { version = "*", extras = ["daphne"] }
 psycopg2 = { version = "*", optional = true }
@@ -44,7 +44,9 @@ rq-scheduler = "^0.10"
 # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
 # We are temporarily updating it to use latest from devel branch to keep consistency accross
 # other AAP components
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch="devel", extras=["authentication"] }
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", rev = "96072a16629e7d714a46b181d5fc3a7d314a6215", extras = [
+    "authentication",
+] }
 jinja2 = "*"
 
 [tool.poetry.group.test.dependencies]
