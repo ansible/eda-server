@@ -184,6 +184,8 @@ class GitExecutor:
         if timeout is None:
             timeout = self.DEFAULT_TIMEOUT
 
+        self._set_http_proxy()
+
         try:
             return subprocess.run(
                 [GIT_COMMAND, *args],
@@ -210,3 +212,15 @@ class GitExecutor:
             if e.stderr:
                 usr_msg += f" Error: {e.stderr}"
             raise GitError(usr_msg) from None
+
+    def _set_http_proxy(self) -> None:
+        """Set http proxy from environment variables."""
+        supported_env = (
+            "http_proxy",
+            "https_proxy",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+        )
+        for env in supported_env:
+            if env in os.environ:
+                self.ENVIRON[env] = os.environ[env]

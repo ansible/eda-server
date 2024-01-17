@@ -11,13 +11,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
 import re
 import shutil
 import subprocess
+import typing as tp
 from unittest import mock
 
 import pytest
-
 from aap_eda.core.models import Credential
 from aap_eda.services.project.git import (
     GitAuthenticationError,
@@ -25,6 +26,24 @@ from aap_eda.services.project.git import (
     GitExecutor,
     GitRepository,
 )
+
+
+@pytest.fixture(scope="function")
+def update_environment() -> tp.Generator[tp.Callable, None, None]:
+    """Fixture factory to update environment variables
+    Returns the updated environment variables,
+    and restores the original environment variables after the test
+    """
+    env_backup = os.environ.copy()
+
+    def _update_environment(env: tp.Optional[dict] = None) -> os._Environ:
+        if env:
+            os.environ.update(env)
+        return os.environ
+
+    yield _update_environment
+    os.environ.clear()
+    os.environ.update(env_backup)
 
 
 @pytest.fixture
@@ -228,3 +247,23 @@ def test_git_executor_error(run_mock: mock.Mock):
     )
     with pytest.raises(GitError, match=message):
         executor(["status"])
+
+
+@pytest.mark.parametrize(
+    "envvar",
+    [
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+    ],
+)
+def test_set_http_proxy(update_environment, envvar: str):
+    test_proxy = "http://example.com:8080"
+    update_environment({envvar: test_proxy})
+
+    executor = GitExecutor()
+    with mock.patch("subprocess.run"):
+        executor(["clone", "https://git.example.com/repo.git", "/test/repo"])
+
+    assert executor.ENVIRON["http_proxy"] == test_proxy
