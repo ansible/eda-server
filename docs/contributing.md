@@ -27,11 +27,11 @@ If you are proposing a feature:
 Before you submit a pull request, check that it meets these guidelines:
 
 1. The pull request should include tests.
-2. The pull request should work for Python 3.9
+2. The pull request should work for Python 3.11
 3. The pull request should pass all tests, linters and CI checks. You can run
    each of these locally in your [development environment](docs/development.md)
 
 ## Contact
 
 Also you can check the [Matrix chat](https://matrix.to/#/#eda:ansible.com), or via the
-event-driven-automation@redhat.com email.
+<event-driven-automation@redhat.com> email.
