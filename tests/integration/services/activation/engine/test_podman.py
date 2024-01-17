@@ -95,7 +95,7 @@ def get_request(data: InitData):
         cmdline=get_ansible_rulebook_cmdline(data),
         ports=[("localhost", 8080)],
         mem_limit="8G",
-        mounts={"/dev": "/opt"},
+        mounts=[{"/dev": "/opt"}],
         env_vars={"a": 1},
         extra_args={"b": 2},
     )
@@ -151,9 +151,15 @@ def test_get_podman_client(settings):
         assert client.api.base_url.netloc == "%2Frun%2Fpodman%2Fpodman.sock"
 
     client = get_podman_client()
+    xdg_runtime_dir = os.getenv(
+        "XDG_RUNTIME_DIR", f"%2Frun%2Fuser%2F{os.getuid()}"
+    )
+    # Replace any '/'s from XDG_RUNTIME_DIR.
+    xdg_runtime_dir = xdg_runtime_dir.replace("/", "%2F")
+
     assert (
         client.api.base_url.netloc
-        == f"%2Frun%2Fuser%2F{os.getuid()}%2Fpodman%2Fpodman.sock"
+        == f"{xdg_runtime_dir}%2Fpodman%2Fpodman.sock"
     )
 
 
@@ -243,7 +249,7 @@ def test_engine_start_with_credential(init_data, podman_engine):
         name=request.name,
         ports={"8080/tcp": 8080},
         mem_limit="8G",
-        mounts={"/dev": "/opt"},
+        mounts=request.mounts,
         environment={"a": 1},
         b=2,
     )
@@ -589,9 +595,11 @@ def test_set_auth_json(podman_engine):
     with mock.patch("os.path.dirname"):
         engine._set_auth_json_file()
 
-        assert (
-            engine.auth_file == f"/run/user/{os.getuid()}/containers/auth.json"
+        xdg_runtime_dir = os.getenv(
+            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
         )
+
+        assert engine.auth_file == f"{xdg_runtime_dir}/containers/auth.json"
 
 
 @pytest.mark.django_db

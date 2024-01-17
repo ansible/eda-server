@@ -13,6 +13,7 @@ env:
 
 jobs:
   build-and-push-image:
+    if: github.repository == 'ansible/eda-server'
     runs-on: ubuntu-latest
     permissions:
       contents: read
