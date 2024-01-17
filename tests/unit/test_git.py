@@ -19,6 +19,7 @@ import typing as tp
 from unittest import mock
 
 import pytest
+
 from aap_eda.core.models import Credential
 from aap_eda.services.project.git import (
     GitAuthenticationError,
