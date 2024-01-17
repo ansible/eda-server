@@ -28,7 +28,7 @@ dev = ["psycopg2-binary"]
 python = ">=3.9,<3.12"
 django = ">=4.2,<4.3"
 djangorestframework = "*"
-dynaconf = ">=3.2.2"
+dynaconf = ">=3.1"
 drf-spectacular = "*"
 channels = { version = "*", extras = ["daphne"] }
 psycopg2 = { version = "*", optional = true }
