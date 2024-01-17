@@ -7,9 +7,9 @@ RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && chmod 0775 /app /var/lib/eda
 
 RUN DNF=dnf \
-    INSTALL_PACKAGES="python3 \
-    python3-devel \
-    python3-pip \
+    INSTALL_PACKAGES="python3.11 \
+    python3.11-devel \
+    python3.11-pip \
     libpq-devel \
     gcc \
     gettext \
@@ -24,7 +24,7 @@ RUN DNF=dnf \
     && rm -rf /var/cache/dnf
 
 USER "$USER_ID"
-ENV POETRY_VERSION='1.4.0' \
+ENV POETRY_VERSION='1.7.1' \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -32,11 +32,12 @@ ENV POETRY_VERSION='1.4.0' \
     POETRY_NO_INTERACTION=1 \
     VIRTUAL_ENV=/app/venv \
     SOURCES_DIR=/app/src \
-    PATH="/app/.local/bin:$PATH"
+    PATH="/app/.local/bin:$PATH" \
+    PYTHON_BIN="python3.11"
 
 # Install poetry, create virtual environment
-RUN python3 -m pip install --user "poetry==${POETRY_VERSION}" \
-    && python3 -m venv "$VIRTUAL_ENV" \
+RUN ${PYTHON_BIN} -m pip install --user "poetry==${POETRY_VERSION}" \
+    && ${PYTHON_BIN} -m venv "$VIRTUAL_ENV" \
     && poetry config virtualenvs.create false
 
 WORKDIR $SOURCES_DIR
@@ -44,7 +45,7 @@ WORKDIR $SOURCES_DIR
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 COPY pyproject.toml poetry.lock $SOURCES_DIR/
 RUN poetry install -E all --no-root --no-cache \
-    && python3 -m pip install gunicorn
+    && ${PYTHON_BIN} -m pip install gunicorn
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 
