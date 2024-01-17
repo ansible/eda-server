@@ -11,7 +11,7 @@
 
 For running services locally:
 
-* Python >= 3.9
+* Python >= 3.11
 
 For standalone development tools written in Python, such as `pre-commit`,
 we recommend using your system package manager,
@@ -86,7 +86,7 @@ systemctl --user enable --now podman.socket
 On Linux and macOS, Poetry can be installed with the official installer:
 
 ```shell
-curl -sSL https://install.python-poetry.org | python3 -
+curl -sSL https://install.python-poetry.org | python3.11 -
 ```
 
 Alternatively, you can install it with manually with `pip` or `pipx`:
@@ -157,7 +157,7 @@ git clone git@github.com:ansible/eda-server.git
 
 ### Install dependencies
 
-**NOTE**: Since we added experimental [LDAP authentication](https://github.com/ansible/eda-server/pull/557), the following additional packages are required: `openldap-devel xmlsec1-devel libtool-ltdl-devel`. 
+**NOTE**: Since we added experimental [LDAP authentication](https://github.com/ansible/eda-server/pull/557), the following additional packages are required: `openldap-devel xmlsec1-devel libtool-ltdl-devel`.
 
 Go to your project directory and install dependencies for local development:
 
@@ -188,6 +188,7 @@ $ docker images
 REPOSITORY                                    TAG         IMAGE ID       CREATED        SIZE
 localhost/aap-eda                             latest      28fd94c8cf89   5 hours ago    611MB
 ```
+
 To override image name:(using short git hash for version here)
 
 ```shell
@@ -255,6 +256,7 @@ task docker:migrate
 ### Seeding the database
 
 Locally:
+
 ```shell
 task manage -- create_initial_data
 ```
@@ -314,8 +316,8 @@ task test -- tests/integration/api/test_activation.py::test_retrieve_activation
 
 With docker compose:
 
-```shell 
-task docker -- run api --rm python -m pytest  
+```shell
+task docker -- run api --rm python3.11 -m pytest  
 ```
 
 ### Running linters
