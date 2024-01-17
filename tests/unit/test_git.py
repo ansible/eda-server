@@ -267,4 +267,4 @@ def test_set_http_proxy(update_environment, envvar: str):
     with mock.patch("subprocess.run"):
         executor(["clone", "https://git.example.com/repo.git", "/test/repo"])
 
-    assert executor.ENVIRON["http_proxy"] == test_proxy
+    assert executor.ENVIRON[envvar] == test_proxy
