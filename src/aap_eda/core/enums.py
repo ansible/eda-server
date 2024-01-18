@@ -90,7 +90,7 @@ class CredentialType(DjangoStrEnum):
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
     EXTRA_VAR = "Extra Var"
-    VAULT_PASSWORD = "Ansible Vault Password"
+    VAULT_PASSWORD = "Vault"
 
 
 ACTIVATION_STATUS_MESSAGE_MAP = {

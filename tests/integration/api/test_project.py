@@ -481,6 +481,7 @@ def assert_project_data_details(data: Dict[str, Any], project: models.Project):
             "description": credential.description,
             "credential_type": credential.credential_type,
             "username": credential.username,
+            "key": None,
         }
         if credential
         else None
