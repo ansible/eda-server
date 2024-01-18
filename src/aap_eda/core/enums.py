@@ -89,6 +89,8 @@ class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
+    EXTRA_VAR = "Extra Var"
+    VAULT_PASSWORD = "Ansible Vault Password"
 
 
 ACTIVATION_STATUS_MESSAGE_MAP = {
