@@ -69,8 +69,11 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
                              "type": "bind"}]'
 
 """
+import os
+
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
+from split_settings.tools import include
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -434,3 +437,15 @@ AUTHENTICATION_BACKENDS = [
     "ansible_base.authentication.backend.AnsibleBaseAuth",
     "django.contrib.auth.backends.ModelBackend",
 ]
+ANSIBLE_BASE_FEATURES = {
+    "AUTHENTICATION": True,
+    "FILTERING": False,
+    "SWAGGER": False,
+}
+
+from ansible_base import settings  # noqa: E402
+
+settings_file = os.path.join(
+    os.path.dirname(settings.__file__), "dynamic_settings.py"
+)
+include(settings_file)
