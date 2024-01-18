@@ -51,6 +51,7 @@ django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.gi
 ] }
 jinja2 = "*"
 django-split-settings = "^1.2.0"
+ansible-core = "^2.16.2"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
