@@ -610,15 +610,16 @@ social-auth-app-django = {version = "*", optional = true, markers = "extra == \"
 tabulate = {version = "*", optional = true, markers = "extra == \"authentication\""}
 
 [package.extras]
-all = ["django-auth-ldap", "drf-spectacular", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
+all = ["channels", "django-auth-ldap", "drf-spectacular", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
 authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
+channel-auth = ["channels"]
 swagger = ["drf-spectacular"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "83c75f17b468cfb4949a52ccdef54cab266c9018"
+reference = "96072a16629e7d714a46b181d5fc3a7d314a6215"
+resolved_reference = "96072a16629e7d714a46b181d5fc3a7d314a6215"
 
 [[package]]
 name = "django-auth-ldap"
@@ -723,13 +724,13 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "dynaconf"
-version = "3.1.12"
+version = "3.2.4"
 description = "The dynamic configurator for your Python Project"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "dynaconf-3.1.12-py2.py3-none-any.whl", hash = "sha256:a79d7b3ad4a35af9b576c49f11cd3b23a1b04b87b63a4e9f92cc82f2b0cafeeb"},
-    {file = "dynaconf-3.1.12.tar.gz", hash = "sha256:11a60bcd735f82b8a47b288f99e4ffbbd08c6c130a7be93c5d03e93fc260a5e1"},
+    {file = "dynaconf-3.2.4-py2.py3-none-any.whl", hash = "sha256:858f9806fab2409c4f5442614c2605d4c4071d5e5153b0e7f24a225f27465aed"},
+    {file = "dynaconf-3.2.4.tar.gz", hash = "sha256:2e6adebaa587f4df9241a16a4bec3fda521154d26b15f3258fde753a592831b6"},
 ]
 
 [package.extras]
@@ -737,7 +738,7 @@ all = ["configobj", "hvac", "redis", "ruamel.yaml"]
 configobj = ["configobj"]
 ini = ["configobj"]
 redis = ["redis"]
-test = ["codecov", "configobj", "django", "flake8", "flake8-debugger", "flake8-print", "flake8-todo", "flask (>=0.12)", "hvac", "pep8-naming", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
+test = ["configobj", "django", "flake8", "flake8-debugger", "flake8-print", "flake8-todo", "flask (>=0.12)", "hvac (>=1.1.0)", "pep8-naming", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
 toml = ["toml"]
 vault = ["hvac"]
 yaml = ["ruamel.yaml"]
@@ -2676,4 +2677,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "91c3d85f08e5ffdd3153ef54b642c7b0c6be0e48aacd4a4f7403d657ccfc152a"
+content-hash = "1aa968498eec4bc756e6676e7fbe278151e35cd7fe23118f7b7ddaceaff8a3fa"
