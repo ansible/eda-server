@@ -1,1 +1,1 @@
-from ansible_base.authenticator_plugins.ldap import *  # noqa
+from ansible_base.authentication.authenticator_plugins.ldap import *  # noqa
