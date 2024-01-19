@@ -108,7 +108,7 @@ def _get_secret_key() -> str:
 
 SECRET_KEY = _get_secret_key()
 
-DEBUG = settings.get("DEBUG", True)
+DEBUG = settings.get("DEBUG", False)
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 ALLOWED_HOSTS = (
