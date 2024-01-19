@@ -619,7 +619,7 @@ authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-aut
 type = "git"
 url = "https://github.com/john-westcott-iv/django-ansible-base.git"
 reference = "app_split"
-resolved_reference = "073509705b8c1f014551745d77d52828194f898e"
+resolved_reference = "767e80dff93b66d7e18c10b949cc809dcc7f253d"
 
 [[package]]
 name = "django-auth-ldap"
