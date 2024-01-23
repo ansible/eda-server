@@ -69,8 +69,11 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
                              "type": "bind"}]'
 
 """
+import os
+
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
+from split_settings.tools import include
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -140,8 +143,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
-    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    "ansible_base",
+    # Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.authentication",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -153,10 +156,11 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # <- Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.authentication.middleware.AuthenticatorBackendMiddleware",
+    # ->
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    "ansible_base.utils.middleware.AuthenticatorBackendMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
@@ -434,3 +438,10 @@ AUTHENTICATION_BACKENDS = [
     "ansible_base.authentication.backend.AnsibleBaseAuth",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+from ansible_base.lib import dynamic_config  # noqa: E402
+
+dab_settings = os.path.join(
+    os.path.dirname(dynamic_config.__file__), "dynamic_settings.py"
+)
+include(dab_settings)

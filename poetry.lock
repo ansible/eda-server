@@ -618,8 +618,8 @@ swagger = ["drf-spectacular"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "96072a16629e7d714a46b181d5fc3a7d314a6215"
-resolved_reference = "96072a16629e7d714a46b181d5fc3a7d314a6215"
+reference = "devel"
+resolved_reference = "6d9febccf3f80c8dc6e0c18ec7dbc9674c6aebe9"
 
 [[package]]
 name = "django-auth-ldap"
@@ -683,6 +683,17 @@ rq = ">=1.2"
 [package.extras]
 sentry = ["raven (>=6.1.0)"]
 testing = ["mock (>=2.0.0)"]
+
+[[package]]
+name = "django-split-settings"
+version = "1.2.0"
+description = "Organize Django settings into multiple files and directories. Easily override and modify settings. Use wildcards and optional settings files."
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "django-split-settings-1.2.0.tar.gz", hash = "sha256:31415a618256b54c5cee8662cbaa72a890683b8b7465d64ba88fdd3affdd6c60"},
+    {file = "django_split_settings-1.2.0-py3-none-any.whl", hash = "sha256:4b3be146776d49c61bd9dcf89fad40edb1544f13ab27a87a0b1aecf5a0d636f4"},
+]
 
 [[package]]
 name = "djangorestframework"
@@ -2677,4 +2688,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "1aa968498eec4bc756e6676e7fbe278151e35cd7fe23118f7b7ddaceaff8a3fa"
+content-hash = "5b77ea2ab0e72c15def4df863515bba9caf9a7130b433652ef05ee6bfb44ddd1"
