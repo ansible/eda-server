@@ -276,3 +276,4 @@ class ActivationInstanceLog(models.Model):
     )
     line_number = models.IntegerField()
     log = models.TextField()
+    log_timestamp = models.BigIntegerField(null=False, default=0)
