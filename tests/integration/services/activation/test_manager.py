@@ -173,7 +173,8 @@ def test_build_cmdline(
         "RULEBOOK_LIVENESS_CHECK_SECONDS": 73,
     }
     apply_settings(settings, **override_settings)
-    activation_manager = ActivationManager(activation_with_instance)
+    proxy = models.ProcessParentProxy(activation_with_instance)
+    activation_manager = ActivationManager(proxy)
     cmdline = activation_manager._build_cmdline()
     assert isinstance(cmdline, AnsibleRulebookCmdLine)
     assert (
@@ -192,7 +193,8 @@ def test_build_cmdline(
 @pytest.mark.django_db
 def test_build_cmdline_no_instance(basic_activation):
     """Test build_cmdline when no instance exists."""
-    activation_manager = ActivationManager(basic_activation)
+    proxy = models.ProcessParentProxy(basic_activation)
+    activation_manager = ActivationManager(proxy)
     with pytest.raises(exceptions.ActivationManagerError):
         activation_manager._build_cmdline()
 
@@ -200,14 +202,16 @@ def test_build_cmdline_no_instance(basic_activation):
 @pytest.mark.django_db
 def test_build_credential_inexistent(basic_activation):
     """Test build_credential when no credential exists."""
-    activation_manager = ActivationManager(basic_activation)
+    proxy = models.ProcessParentProxy(basic_activation)
+    activation_manager = ActivationManager(proxy)
     assert activation_manager._build_credential() is None
 
 
 @pytest.mark.django_db
 def test_start_deleted_activation(activation_with_instance):
     """Test start verb when activation is deleted."""
-    activation_manager = ActivationManager(activation_with_instance)
+    proxy = models.ProcessParentProxy(activation_with_instance)
+    activation_manager = ActivationManager(proxy)
     activation_with_instance.delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
@@ -218,7 +222,8 @@ def test_start_deleted_activation(activation_with_instance):
 def test_start_disabled_activation(activation_with_instance, eda_caplog):
     """Test start verb when activation is deleted."""
     err_msg = "is disabled. Can not be started."
-    activation_manager = ActivationManager(activation_with_instance)
+    proxy = models.ProcessParentProxy(activation_with_instance)
+    activation_manager = ActivationManager(proxy)
     activation_with_instance.is_enabled = False
     activation_with_instance.save(update_fields=["is_enabled"])
     with pytest.raises(exceptions.ActivationStartError) as exc:
@@ -232,7 +237,8 @@ def test_start_no_awx_token(basic_activation, rulebook_with_job_template):
     """Test start verb when no AWX token is present."""
     basic_activation.rulebook = rulebook_with_job_template
     basic_activation.save(update_fields=["rulebook"])
-    activation_manager = ActivationManager(basic_activation)
+    proxy = models.ProcessParentProxy(basic_activation)
+    activation_manager = ActivationManager(proxy)
     basic_activation.user.awxtoken_set.all().delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
@@ -244,7 +250,8 @@ def test_start_no_awx_token(basic_activation, rulebook_with_job_template):
 @pytest.mark.django_db
 def test_start_no_decision_environment(basic_activation):
     """Test start verb when no decision environment is present."""
-    activation_manager = ActivationManager(basic_activation)
+    proxy = models.ProcessParentProxy(basic_activation)
+    activation_manager = ActivationManager(proxy)
     basic_activation.decision_environment.delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
@@ -261,8 +268,9 @@ def test_start_already_running(
     eda_caplog: LogCaptureFixture,
 ):
     """Test start verb when activation is already running."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
-        db_instance=running_activation,
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
     )
     container_engine_mock.get_status.return_value = MagicMock(
@@ -282,8 +290,9 @@ def test_start_first_run(
     eda_caplog: LogCaptureFixture,
 ):
     """Test start verb for a new activation."""
+    proxy = models.ProcessParentProxy(basic_activation)
     activation_manager = ActivationManager(
-        db_instance=basic_activation,
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
     )
     container_engine_mock.start.return_value = "test-pod-id"
@@ -304,8 +313,9 @@ def test_start_restart(
     eda_caplog: LogCaptureFixture,
 ):
     """Test start verb for a restarted activation."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
-        db_instance=running_activation,
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
     )
     container_engine_mock.start.return_value = "test-pod-id"
@@ -330,9 +340,10 @@ def test_stop_deleted_activation(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is deleted."""
+    proxy = models.ProcessParentProxy(activation_with_instance)
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
-        db_instance=activation_with_instance,
+        proxy_instance=proxy,
     )
     activation_with_instance.delete()
     with pytest.raises(exceptions.ActivationStopError) as exc:
@@ -349,9 +360,10 @@ def test_stop_already_stopped(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is stopped."""
+    proxy = models.ProcessParentProxy(activation_with_instance)
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
-        db_instance=activation_with_instance,
+        proxy_instance=proxy,
     )
 
     activation_with_instance.status = ActivationStatus.STOPPED
@@ -374,9 +386,10 @@ def test_stop_running(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is running."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
-        db_instance=running_activation,
     )
 
     activation_manager.stop()
@@ -399,9 +412,10 @@ def test_stop_no_pod(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is running but no pod is found."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
-        db_instance=running_activation,
     )
 
     container_engine_mock.get_status.side_effect = (
@@ -428,9 +442,10 @@ def test_stop_pending(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is pending."""
+    proxy = models.ProcessParentProxy(basic_activation)
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
-        db_instance=basic_activation,
+        proxy_instance=proxy,
     )
 
     activation_manager.stop()
@@ -449,9 +464,10 @@ def test_stop_stopped_instance_running(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is stopped but instance is running."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
-        db_instance=running_activation,
     )
 
     running_activation.status = ActivationStatus.STOPPED
@@ -475,9 +491,10 @@ def test_stop_stopped_pod_running(
     eda_caplog: LogCaptureFixture,
 ):
     """Test stop verb when activation is stopped but pod is running."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
-        db_instance=running_activation,
     )
 
     running_activation.status = ActivationStatus.STOPPED
@@ -506,9 +523,10 @@ def test_delete_already_deleted(
     eda_caplog: LogCaptureFixture,
 ):
     """Test delete verb when activation is deleted."""
+    proxy = models.ProcessParentProxy(activation_with_instance)
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
-        db_instance=activation_with_instance,
+        proxy_instance=proxy,
     )
     activation_with_instance.delete()
     with pytest.raises(exceptions.ActivationManagerError) as exc:
@@ -553,9 +571,10 @@ def test_delete_no_pod(
     """Test delete verb for any activation."""
     activation.status = status
     activation.save(update_fields=["status"])
+    proxy = models.ProcessParentProxy(activation)
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
-        db_instance=activation,
+        proxy_instance=proxy,
     )
 
     activation_manager.delete()
@@ -573,9 +592,10 @@ def test_delete_running(
     eda_caplog: LogCaptureFixture,
 ):
     """Test delete verb when activation is running."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
-        db_instance=running_activation,
     )
 
     activation_manager.delete()
@@ -595,9 +615,10 @@ def test_delete_with_exception(
     eda_caplog: LogCaptureFixture,
 ):
     """Test that the activation is deleted even if there is an error."""
+    proxy = models.ProcessParentProxy(running_activation)
     activation_manager = ActivationManager(
+        proxy_instance=proxy,
         container_engine=container_engine_mock,
-        db_instance=running_activation,
     )
     container_engine_mock.cleanup.side_effect = Exception("test")
     activation_manager.delete()

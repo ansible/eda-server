@@ -16,16 +16,40 @@ from django.db import models
 
 from aap_eda.core.enums import ActivationRequest
 
+from .mixins import ProcessParentValidatorMixin
+from .proxies import ParentProcessType
 
-class ActivationRequestQueue(models.Model):
+
+class ActivationRequestQueue(ProcessParentValidatorMixin, models.Model):
+    """Model for activation requests queue."""
+
+    request = models.TextField(
+        null=False,
+        choices=ActivationRequest.choices(),
+    )
+    activation = models.ForeignKey(
+        "Activation",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    source = models.ForeignKey(
+        "Source",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         db_table = "core_activation_request_queue"
         ordering = ["id"]
 
-    request = models.TextField(null=False, choices=ActivationRequest.choices())
-    activation = models.ForeignKey(
-        "Activation", on_delete=models.CASCADE, null=False
-    )
+    def __str__(self):
+        return f"{self.request} {self.activation or self.source}"
+
+    @property
+    def process_parent(self) -> ParentProcessType:
+        return self.activation or self.source
 
 
 __all__ = [

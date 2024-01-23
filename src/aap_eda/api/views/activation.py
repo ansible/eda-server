@@ -21,7 +21,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from rest_framework import exceptions, mixins, status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -81,7 +81,8 @@ class ActivationViewSet(
         response = serializer.create(serializer.validated_data)
 
         if response.is_enabled:
-            start_activation(activation_id=response.id)
+            process_parent = models.ProcessParentProxy(response)
+            start_activation(process_parent=process_parent)
 
         return Response(
             serializers.ActivationReadSerializer(response).data,
@@ -120,7 +121,7 @@ class ActivationViewSet(
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
-        delete_activation(activation_id=activation.id)
+        delete_activation(models.ProcessParentProxy(activation))
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -224,7 +225,9 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
-        start_activation(activation_id=pk)
+        start_activation(
+            process_parent=models.ProcessParentProxy(activation),
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -248,9 +251,9 @@ class ActivationViewSet(
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
             activation.save(
-                update_fields=["is_enabled", "status", "modified_at"]
+                update_fields=["is_enabled", "status", "modified_at"],
             )
-            stop_activation(activation_id=activation.id)
+            stop_activation(models.ProcessParentProxy(activation))
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -276,7 +279,7 @@ class ActivationViewSet(
 
         if not activation.is_enabled:
             raise api_exc.Forbidden(
-                detail="Activation is disabled and cannot be run."
+                detail="Activation is disabled and cannot be run.",
             )
 
         valid, error = is_activation_valid(activation)
@@ -287,10 +290,11 @@ class ActivationViewSet(
             logger.error(f"Failed to restart {activation.name}: {error}")
 
             return Response(
-                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+                {"errors": error},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        restart_activation(activation_id=activation.id)
+        restart_activation(models.ProcessParentProxy(activation))
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

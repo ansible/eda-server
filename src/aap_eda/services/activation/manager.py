@@ -92,7 +92,7 @@ class ActivationManager:
 
     def __init__(
         self,
-        db_instance: models.Activation,
+        proxy_instance: models.ProcessParentProxy,
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):
@@ -102,11 +102,12 @@ class ActivationManager:
             db_instance: The database instance of the activation.
             container_engine: The container engine to use.
         """
-        self.db_instance = db_instance
+        self.db_instance = proxy_instance.instance
+        self.proxy_instance = proxy_instance
         if container_engine:
             self.container_engine = container_engine
         else:
-            self.container_engine = new_container_engine(db_instance.id)
+            self.container_engine = new_container_engine(proxy_instance.id)
 
         self.container_logger_class = container_logger_class
 
@@ -465,7 +466,7 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(self.proxy_instance, delay_seconds=1)
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -490,7 +491,7 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(self.proxy_instance, delay_seconds=1)
 
         self._set_activation_status(
             ActivationStatus.FAILED,
@@ -532,7 +533,7 @@ class ActivationManager:
                 user_msg,
             )
             system_restart_activation(
-                self.db_instance.id,
+                self.proxy_instance,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
             )
         else:
@@ -667,7 +668,7 @@ class ActivationManager:
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
-                self.db_instance.id,
+                self.proxy_instance,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
 
@@ -805,7 +806,7 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(self.db_instance.id, delay_seconds=1)
+        system_restart_activation(self.proxy_instance, delay_seconds=1)
 
     def delete(self):
         """User requested delete."""

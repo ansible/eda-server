@@ -14,32 +14,51 @@
 
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.models import ActivationRequestQueue
+from aap_eda.core.models.proxies import ProcessParentProxy
 
 
-def push(activation_id: int, request: ActivationRequest) -> None:
-    ActivationRequestQueue.objects.create(
-        activation_id=activation_id, request=request
-    )
+def push(
+    process_parent: ProcessParentProxy,
+    request: ActivationRequest,
+) -> None:
+    """Push a process parent request to the queue."""
+    kwargs = _build_kwargs(process_parent) | {"request": request}
+    ActivationRequestQueue.objects.create(**kwargs)
 
 
-def peek_all(activation_id: int) -> list[ActivationRequestQueue]:
-    requests = ActivationRequestQueue.objects.filter(
-        activation_id=activation_id
-    ).all()
+def peek_all(
+    process_parent: ProcessParentProxy,
+) -> list[ActivationRequestQueue]:
+    kwargs = _build_kwargs(process_parent)
+    requests = ActivationRequestQueue.objects.filter(**kwargs).all()
     return _arbitrate(requests)
 
 
-def pop_until(activation_id: int, queue_id: int) -> None:
-    ActivationRequestQueue.objects.filter(
-        activation_id=activation_id, id__lte=queue_id
-    ).delete()
+def pop_until(process_parent: ProcessParentProxy, queue_id: int) -> None:
+    kwargs = _build_kwargs(process_parent) | {"id__lte": queue_id}
+    ActivationRequestQueue.objects.filter(**kwargs).delete()
 
 
-def list_activations() -> list[int]:
-    objs = ActivationRequestQueue.objects.order_by("activation_id").distinct(
-        "activation_id"
+def list_activations() -> list[ProcessParentProxy]:
+    activations = (
+        ActivationRequestQueue.objects.filter(activation_id__isnull=False)
+        .order_by("activation_id")
+        .distinct("activation_id")
     )
-    return [obj.activation_id for obj in objs]
+
+    sources = (
+        ActivationRequestQueue.objects.filter(source_id__isnull=False)
+        .order_by("source_id")
+        .distinct("source_id")
+    )
+
+    activation_results = [
+        ProcessParentProxy(obj.process_parent) for obj in activations
+    ]
+    source_results = [
+        ProcessParentProxy(obj.process_parent) for obj in sources
+    ]
+    return activation_results + source_results
 
 
 def _arbitrate(
@@ -94,3 +113,10 @@ def _arbitrate(
         qualified_requests.append(ref_request)
 
     return qualified_requests
+
+
+def _build_kwargs(process_parent: ProcessParentProxy) -> dict:
+    """Build kwargs based on the type of process parent."""
+    if process_parent.is_activation:
+        return {"activation_id": process_parent.id}
+    return {"source_id": process_parent.id}
