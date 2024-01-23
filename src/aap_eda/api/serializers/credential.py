@@ -32,7 +32,7 @@ class CredentialSerializer(serializers.ModelSerializer):
             "description",
             "username",
             "credential_type",
-            "key",
+            "identifier",
             *read_only_fields,
         ]
 
@@ -41,35 +41,16 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
     secret = serializers.CharField(required=True, allow_null=False)
 
     def validate(self, data):
-        key_required_types = [
-            CredentialType.EXTRA_VAR,
-            CredentialType.VAULT_PASSWORD,
-        ]
         credential_type = data.get("credential_type", CredentialType.REGISTRY)
-        # TODO: may need to change `key` to `variable_name` later
-        key = data.get("key")
-
-        if credential_type in key_required_types and key is None:
-            raise serializers.ValidationError(
-                f"Key field is required when type is {credential_type}"
-            )
+        identifier = data.get("identifier")
 
         if (
-            credential_type == CredentialType.VAULT_PASSWORD
-            and key == EDA_SERVER_VAULT_LABEL
+            credential_type == CredentialType.VAULT
+            and identifier == EDA_SERVER_VAULT_LABEL
         ):
             raise serializers.ValidationError(
-                f"{key} is reserved by EDA for vault labels"
+                f"{identifier} is reserved by EDA for vault labels"
             )
-
-        if credential_type == CredentialType.EXTRA_VAR:
-            credentials = models.Credential.objects.filter(
-                credential_type=credential_type
-            )
-            if key in [credential.key for credential in credentials]:
-                raise serializers.ValidationError(
-                    f"Duplicate {key} found in credentials"
-                )
 
         return data
 
@@ -80,7 +61,7 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "description",
             "credential_type",
             "username",
-            "key",
+            "identifier",
             "secret",
         ]
 
@@ -96,6 +77,6 @@ class CredentialRefSerializer(serializers.ModelSerializer):
             "description",
             "credential_type",
             "username",
-            "key",
+            "identifier",
         ]
         read_only_fields = ["id"]

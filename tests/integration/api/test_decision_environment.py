@@ -92,7 +92,7 @@ def test_retrieve_decision_environment(client: APIClient, init_db):
             "description": credential.description,
             "credential_type": credential.credential_type,
             "username": credential.username,
-            "key": None,
+            "identifier": None,
         },
     }
 

@@ -105,7 +105,7 @@ class Activation(models.Model):
     credentials = models.ManyToManyField(
         "Credential", related_name="activations", default=None
     )
-    system_credential = models.OneToOneField(
+    system_vault_credential = models.OneToOneField(
         "Credential",
         null=True,
         default=None,
