@@ -28,7 +28,7 @@ def test_list_credentials(client: APIClient):
         "username": "me",
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
-        "identifier": None,
+        "vault_identifier": None,
     }
 
 
@@ -52,7 +52,7 @@ def test_create_credential(client: APIClient):
         "username": "me",
         "credential_type": CredentialType.REGISTRY,
         "id": id_,
-        "identifier": None,
+        "vault_identifier": None,
     }
     obj = models.Credential.objects.filter(pk=id_).first()
     assert obj.username == "me"
@@ -78,7 +78,7 @@ def test_create_credential_with_reserved_error(client: APIClient):
         "name": "credential",
         "description": "desc here",
         "username": "me",
-        "identifier": EDA_SERVER_VAULT_LABEL,
+        "vault_identifier": EDA_SERVER_VAULT_LABEL,
         "secret": "mypassword",
         "credential_type": CredentialType.VAULT,
     }
@@ -106,14 +106,81 @@ def test_retrieve_credential(client: APIClient):
         "username": "me",
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
-        "identifier": None,
+        "vault_identifier": None,
     }
+
+
+@pytest.mark.django_db
+def test_retrieve_vault_credential(client: APIClient):
+    obj = models.Credential.objects.create(
+        name="credential1",
+        username="me",
+        secret="sec1",
+        credential_type=CredentialType.VAULT,
+    )
+    response = client.get(f"{api_url_v1}/credentials/{obj.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    result = response.data
+    result.pop("created_at")
+    result.pop("modified_at")
+    assert result == {
+        "name": "credential1",
+        "description": "",
+        "username": "me",
+        "credential_type": CredentialType.VAULT,
+        "id": obj.id,
+        "vault_identifier": None,
+    }
+
+
+@pytest.mark.django_db
+def test_retrieve_sytem_vault_credential(client: APIClient):
+    obj = models.Credential.objects.create(
+        name="credential1",
+        username="me",
+        secret="sec1",
+        credential_type=CredentialType.VAULT,
+        vault_identifier=EDA_SERVER_VAULT_LABEL,
+    )
+    response = client.get(f"{api_url_v1}/credentials/{obj.id}/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_retrieve_credential_not_exist(client: APIClient):
     response = client.get(f"{api_url_v1}/credentials/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_list_exclude_reserved_vault_credentials(client: APIClient):
+    credentials = models.Credential.objects.bulk_create(
+        [
+            models.Credential(
+                name="credential1",
+                username="me",
+                secret="sec1",
+            ),
+            models.Credential(
+                name="credential2",
+                username="me",
+                secret="sec2",
+                credential_type=CredentialType.VAULT,
+            ),
+            models.Credential(
+                name="credential3",
+                username="me",
+                secret="sec3",
+                vault_identifier=EDA_SERVER_VAULT_LABEL,
+                credential_type=CredentialType.VAULT,
+            ),
+        ]
+    )
+    response = client.get(f"{api_url_v1}/credentials/")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 2
+    assert response.data["results"][0]["name"] == credentials[0].name
+    assert response.data["results"][1]["name"] == credentials[1].name
 
 
 @pytest.mark.django_db
@@ -133,7 +200,7 @@ def test_partial_update_credential(client: APIClient):
         "username": "me",
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
-        "identifier": None,
+        "vault_identifier": None,
     }
     updated_obj = models.Credential.objects.filter(pk=obj.id).first()
     assert updated_obj.secret == "sec2"
@@ -147,10 +214,10 @@ def test_update_vault_credential(client: APIClient):
         secret="sec1",
         credential_type=CredentialType.VAULT,
     )
-    data = {"identifier": "EDA_SERVER_TEST"}
+    data = {"vault_identifier": "EDA_SERVER_TEST"}
     response = client.patch(f"{api_url_v1}/credentials/{obj.id}/", data=data)
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["identifier"] == "EDA_SERVER_TEST"
+    assert response.data["vault_identifier"] == "EDA_SERVER_TEST"
 
 
 @pytest.mark.django_db
@@ -190,6 +257,20 @@ def test_delete_credential_used_by_activation_forced(client: APIClient):
         f"{api_url_v1}/credentials/{credential_id}/?force=true",
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.django_db
+def test_delete_reserved_vault_credential(client: APIClient):
+    obj = models.Credential.objects.create(
+        name="credential1",
+        username="me",
+        secret="sec1",
+        credential_type=CredentialType.VAULT,
+        vault_identifier=EDA_SERVER_VAULT_LABEL,
+    )
+    response = client.delete(f"{api_url_v1}/credentials/{obj.id}/")
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.data["detail"] == f"Credential {obj.id} is internal used."
 
 
 @pytest.mark.django_db

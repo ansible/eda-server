@@ -12,5 +12,5 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# EDA_SERVER_VAULT_LABEL is reserved for vault password type of credential
+# EDA_SERVER_VAULT_LABEL is reserved for system vault password identifiers
 EDA_SERVER_VAULT_LABEL = "EDA_SERVER"
