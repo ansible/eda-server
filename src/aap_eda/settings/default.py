@@ -143,8 +143,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
-    # Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
-    "ansible_base.authentication",
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
+    "ansible_base",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -156,11 +156,10 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    # <- Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
-    "ansible_base.authentication.middleware.AuthenticatorBackendMiddleware",
-    # ->
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.utils.middleware.AuthenticatorBackendMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
@@ -438,10 +437,15 @@ AUTHENTICATION_BACKENDS = [
     "ansible_base.authentication.backend.AnsibleBaseAuth",
     "django.contrib.auth.backends.ModelBackend",
 ]
+ANSIBLE_BASE_FEATURES = {
+    "AUTHENTICATION": True,
+    "FILTERING": False,
+    "SWAGGER": False,
+}
 
-from ansible_base.lib import dynamic_config  # noqa: E402
+from ansible_base import settings  # noqa: E402
 
-dab_settings = os.path.join(
-    os.path.dirname(dynamic_config.__file__), "dynamic_settings.py"
+settings_file = os.path.join(
+    os.path.dirname(settings.__file__), "dynamic_settings.py"
 )
-include(dab_settings)
+include(settings_file)
