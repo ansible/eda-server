@@ -618,8 +618,8 @@ swagger = ["drf-spectacular"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "bfab25f642aed81df8c8e2e348e09484744871d1"
+reference = "96072a16629e7d714a46b181d5fc3a7d314a6215"
+resolved_reference = "96072a16629e7d714a46b181d5fc3a7d314a6215"
 
 [[package]]
 name = "django-auth-ldap"
@@ -2688,4 +2688,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "5b77ea2ab0e72c15def4df863515bba9caf9a7130b433652ef05ee6bfb44ddd1"
+content-hash = "a40f8684a0a0c9252c8a1c066c9b421fda61d157fc6741300ae072959f776f95"
