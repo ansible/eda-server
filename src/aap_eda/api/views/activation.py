@@ -37,6 +37,7 @@ from aap_eda.tasks.orchestrator import (
 )
 
 logger = logging.getLogger(__name__)
+KLASS_NAME = "aap_eda.core.models.Activation"
 
 
 @extend_schema_view(
@@ -81,7 +82,7 @@ class ActivationViewSet(
         response = serializer.create(serializer.validated_data)
 
         if response.is_enabled:
-            start_activation(activation_id=response.id)
+            start_activation(instance_id=response.id, name=KLASS_NAME)
 
         return Response(
             serializers.ActivationReadSerializer(response).data,
@@ -120,7 +121,7 @@ class ActivationViewSet(
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
-        delete_activation(activation_id=activation.id)
+        delete_activation(instance_id=activation.id, name=KLASS_NAME)
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -224,7 +225,7 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
-        start_activation(activation_id=pk)
+        start_activation(instance_id=pk, name=KLASS_NAME)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -250,7 +251,7 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
-            stop_activation(activation_id=activation.id)
+            stop_activation(instance_id=activation.id, name=KLASS_NAME)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -290,7 +291,7 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        restart_activation(activation_id=activation.id)
+        restart_activation(instance_id=activation.id, name=KLASS_NAME)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

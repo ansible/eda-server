@@ -23,8 +23,12 @@ class ActivationRequestQueue(models.Model):
         ordering = ["id"]
 
     request = models.TextField(null=False, choices=ActivationRequest.choices())
+    related_type = models.TextField(
+        null=True, default="aap_eda.core.models.Activation"
+    )
+    instance_id = models.BigIntegerField(null=True)
     activation = models.ForeignKey(
-        "Activation", on_delete=models.CASCADE, null=False
+        "Activation", on_delete=models.CASCADE, null=True
     )
 
 

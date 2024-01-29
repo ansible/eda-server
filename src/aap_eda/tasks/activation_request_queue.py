@@ -16,30 +16,30 @@ from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.models import ActivationRequestQueue
 
 
-def push(activation_id: int, request: ActivationRequest) -> None:
+def push(instance_id: int, klass: str, request: ActivationRequest) -> None:
     ActivationRequestQueue.objects.create(
-        activation_id=activation_id, request=request
+        related_type=klass, instance_id=instance_id, request=request
     )
 
 
-def peek_all(activation_id: int) -> list[ActivationRequestQueue]:
+def peek_all(instance_id: int, klass: str) -> list[ActivationRequestQueue]:
     requests = ActivationRequestQueue.objects.filter(
-        activation_id=activation_id
+        instance_id=instance_id, related_type=klass
     ).all()
     return _arbitrate(requests)
 
 
-def pop_until(activation_id: int, queue_id: int) -> None:
+def pop_until(instance_id: int, klass: str, queue_id: int) -> None:
     ActivationRequestQueue.objects.filter(
-        activation_id=activation_id, id__lte=queue_id
+        instance_id=instance_id, related_type=klass, id__lte=queue_id
     ).delete()
 
 
 def list_activations() -> list[int]:
-    objs = ActivationRequestQueue.objects.order_by("activation_id").distinct(
-        "activation_id"
+    objs = ActivationRequestQueue.objects.order_by("instance_id").distinct(
+        "instance_id", "related_type"
     )
-    return [obj.activation_id for obj in objs]
+    return [(obj.related_type, obj.instance_id) for obj in objs]
 
 
 def _arbitrate(
