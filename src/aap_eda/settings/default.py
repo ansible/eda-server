@@ -252,6 +252,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
+        "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -445,3 +446,13 @@ dab_settings = os.path.join(
     os.path.dirname(dynamic_config.__file__), "dynamic_settings.py"
 )
 include(dab_settings)
+
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE JWT SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_JWT_VALIDATE_CERT = settings.get(
+    "ANSIBLE_BASE_JWT_VALIDATE_CERT", False
+)
+ANSIBLE_BASE_JWT_KEY = settings.get(
+    "ANSIBLE_BASE_JWT_KEY", "https://localhost"
+)
