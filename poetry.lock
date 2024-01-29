@@ -616,7 +616,6 @@ cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-auth-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
 django-crum = "*"
-django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
 python-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
