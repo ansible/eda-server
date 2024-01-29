@@ -200,7 +200,7 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance Log model."""
 
     class Meta:
-        model = models.ActivationInstanceLog
+        model = models.RulebookProcessLog
         fields = "__all__"
         read_only_fields = ["id"]
 

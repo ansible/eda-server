@@ -32,7 +32,7 @@ from .user import AwxToken, User
 __all__ = (
     "Activation",
     "RulebookProcess",
-    "ActivationInstanceLog",
+    "RulebookProcessLog",
 )
 
 
@@ -267,10 +267,13 @@ class RulebookProcess(models.Model):
         )
 
 
-class ActivationInstanceLog(models.Model):
+class RulebookProcessLog(models.Model):
     class Meta:
-        db_table = "core_activation_instance_log"
+        db_table = "core_rulebook_process_log"
 
+    # TODO(alex): this field should be renamed to rulebook_process
+    # requires coordination with UI and QE teams.
+    # Keep the old field for backward compatibility.
     activation_instance = models.ForeignKey(
         "RulebookProcess", on_delete=models.CASCADE
     )
