@@ -113,7 +113,7 @@ class ActivationManager:
         self.container_logger_class = container_logger_class
 
     @property
-    def latest_instance(self) -> tp.Optional[models.ActivationInstance]:
+    def latest_instance(self) -> tp.Optional[models.RulebookProcess]:
         """Return the latest instance of the activation."""
         return self.db_instance.latest_instance
 
@@ -220,7 +220,7 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
-        instances = models.ActivationInstance.objects.filter(
+        instances = models.RulebookProcess.objects.filter(
             activation=self.db_instance,
         )
         for instance in instances:
@@ -1021,7 +1021,7 @@ class ActivationManager:
 
     def _create_activation_instance(self):
         try:
-            models.ActivationInstance.objects.create(
+            models.RulebookProcess.objects.create(
                 activation=self.db_instance,
                 name=self.db_instance.name,
                 status=ActivationStatus.STARTING,

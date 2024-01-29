@@ -57,7 +57,7 @@ class ActivationInstanceFilter(django_filters.FilterSet):
     )
 
     class Meta:
-        model = models.ActivationInstance
+        model = models.RulebookProcess
         fields = ["name", "status"]
 
 
