@@ -89,7 +89,7 @@ class DBLogger(LogHandler):
 
     def get_log_read_at(self) -> Optional[datetime]:
         try:
-            activation_instance = models.ActivationInstance.objects.get(
+            activation_instance = models.RulebookProcess.objects.get(
                 pk=self.activation_instance_id
             )
 
@@ -99,7 +99,7 @@ class DBLogger(LogHandler):
 
     def set_log_read_at(self, dt: datetime) -> None:
         try:
-            activation_instance = models.ActivationInstance.objects.get(
+            activation_instance = models.RulebookProcess.objects.get(
                 pk=self.activation_instance_id
             )
             activation_instance.log_read_at = dt

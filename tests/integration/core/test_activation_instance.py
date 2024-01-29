@@ -37,7 +37,7 @@ def init_data():
         name="activation",
         user=user,
     )
-    return models.ActivationInstance.objects.create(
+    return models.RulebookProcess.objects.create(
         name="test-instance",
         activation=activation,
     )

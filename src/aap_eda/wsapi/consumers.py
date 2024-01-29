@@ -141,7 +141,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
         logger.info(f"Start to handle heartbeat: {message}")
 
-        instance = models.ActivationInstance.objects.filter(
+        instance = models.RulebookProcess.objects.filter(
             id=message.activation_id
         ).first()
 
@@ -305,7 +305,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def get_resources(
         self, activation_instance_id: str
     ) -> tuple[str, models.ExtraVar]:
-        activation_instance = models.ActivationInstance.objects.get(
+        activation_instance = models.RulebookProcess.objects.get(
             id=activation_instance_id
         )
         activation = models.Activation.objects.get(
@@ -324,7 +324,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
         """Get AWX token from the worker message."""
-        activation_instance = models.ActivationInstance.objects.get(
+        activation_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
         awx_token = activation_instance.activation.awx_token

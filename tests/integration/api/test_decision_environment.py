@@ -17,7 +17,7 @@ class InitData:
     rulebook: models.Rulebook
     ruleset: models.Ruleset
     rule: models.Rule
-    activation_instance: models.ActivationInstance
+    activation_instance: models.RulebookProcess
 
 
 @pytest.mark.django_db
@@ -247,7 +247,7 @@ def init_db():
         user=user,
     )
 
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         activation=activation,
     )
 

@@ -182,7 +182,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
 
     class Meta:
-        model = models.ActivationInstance
+        model = models.RulebookProcess
         fields = [
             "id",
             "name",
@@ -270,7 +270,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.extra_var
             else None
         )
-        activation_instances = models.ActivationInstance.objects.filter(
+        activation_instances = models.RulebookProcess.objects.filter(
             activation_id=activation.id
         )
         rules_count, rules_fired_count = get_rules_count(

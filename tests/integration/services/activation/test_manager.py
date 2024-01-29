@@ -120,7 +120,7 @@ def activation_with_instance(
     basic_activation: models.Activation,
 ) -> models.Activation:
     """Return an activation with an instance."""
-    models.ActivationInstance.objects.create(activation=basic_activation)
+    models.RulebookProcess.objects.create(activation=basic_activation)
     return basic_activation
 
 

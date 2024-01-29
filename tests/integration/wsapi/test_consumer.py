@@ -352,7 +352,7 @@ async def test_multiple_rules_for_one_event(
 
 @database_sync_to_async
 def get_activation_instance(instance_id):
-    return models.ActivationInstance.objects.get(pk=instance_id)
+    return models.RulebookProcess.objects.get(pk=instance_id)
 
 
 @database_sync_to_async
@@ -451,7 +451,7 @@ def _prepare_db_data():
         awx_token=token[0],
     )
 
-    activation_instance, _ = models.ActivationInstance.objects.get_or_create(
+    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
     )
 
@@ -518,7 +518,7 @@ def _prepare_activation_instance_without_extra_var():
         awx_token=token[0],
     )
 
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         activation=activation,
     )
 
@@ -562,7 +562,7 @@ def _prepare_activation_instance_no_token():
         decision_environment=decision_environment,
     )
 
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         activation=activation,
     )
 
