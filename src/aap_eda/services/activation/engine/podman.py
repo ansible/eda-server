@@ -247,24 +247,36 @@ class Engine(ContainerEngine):
             since = None
             log_read_at = log_handler.get_log_read_at()
             if log_read_at:
-                since = int(log_handler.get_log_read_at().timestamp()) + 1
+                since = int(log_handler.get_log_read_at().timestamp())
 
-            container = self.client.containers.get(container_id)
             log_args = {"timestamps": True, "stderr": True}
+            last_timestamp = None
+            num_wrote_lines = 0
             if since:
                 log_args["since"] = since
-            timestamp = None
-            for logline in container.logs(**log_args):
+                num_wrote_lines = log_handler.num_log_write_from(since)
+
+            container = self.client.containers.get(container_id)
+
+            for i, logline in enumerate(container.logs(**log_args)):
+                if i < num_wrote_lines:
+                    continue
+
                 log = logline.decode("utf-8").strip()
                 log_parts = log.split(" ", 1)
-                timestamp = log_parts[0]
+                last_timestamp = log_parts[0]
                 if len(log_parts) > 1:
                     log_handler.write(
-                        lines=log_parts[1], flush=False, timestamp=False
+                        lines=log_parts[1],
+                        flush=False,
+                        timestamp=False,
+                        log_timestamp=int(
+                            parser.parse(last_timestamp).timestamp()
+                        ),
                     )
 
-            if timestamp:
-                dt = parser.parse(timestamp)
+            if last_timestamp:
+                dt = parser.parse(last_timestamp)
                 log_handler.flush()
                 log_handler.set_log_read_at(dt)
 
