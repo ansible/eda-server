@@ -48,7 +48,7 @@ DATA_DIR = Path(__file__).parent / "data"
 @dataclass
 class InitData:
     activation: models.Activation
-    activation_instance: models.ActivationInstance
+    activation_instance: models.RulebookProcess
 
 
 @pytest.fixture()
@@ -64,7 +64,7 @@ def init_data():
         name="activation",
         user=user,
     )
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         name="test-instance",
         log_read_at=parser.parse("2023-10-30T19:18:48.362883381Z"),
         activation=activation,

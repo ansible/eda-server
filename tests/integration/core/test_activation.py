@@ -121,14 +121,14 @@ def test_activation_latest_instance_field(init_data):
     activation = init_data
     assert activation.latest_instance is None
 
-    first_instance = models.ActivationInstance.objects.create(
+    first_instance = models.RulebookProcess.objects.create(
         activation=activation,
         name="instance",
         status=ActivationStatus.PENDING,
     )
     assert activation.latest_instance == first_instance
 
-    second_instance = models.ActivationInstance.objects.create(
+    second_instance = models.RulebookProcess.objects.create(
         activation=activation,
         name="instance",
         status=ActivationStatus.PENDING,
