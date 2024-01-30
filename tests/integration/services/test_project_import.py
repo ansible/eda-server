@@ -173,6 +173,34 @@ def test_project_import_rulebook_directory_missing(
     assert project.import_error == message_expected
 
 
+@pytest.mark.django_db
+def test_project_import_with_vaulted_data(
+    storage_save_patch, service_tempdir_patch
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-04"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    project = models.Project.objects.create(
+        name="test-project-04", url="https://git.example.com/repo.git"
+    )
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.import_project(project)
+
+    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+
+
 def _setup_project_sync():
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-02"

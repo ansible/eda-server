@@ -12,6 +12,16 @@ collections:
 - aap.eda  # 1.0.0
 """.strip()
 
+TEST_VAULT_EXTRA_VAR = """
+limit: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          32323466393537363831636134336565656265336564633366396632616431376363353231396562
+          6334646433623764383863656365386363616136633138390a656331383939323930383061363262
+          62376665646431376464653831633634356432323531613661346339643032356366613564386333
+          6433633539353862620a343931393734343437613666343039643764333162303436306434663737
+          3633
+""".strip()
+
 
 @pytest.mark.django_db
 def test_list_extra_var(client: APIClient):
@@ -39,6 +49,22 @@ def test_create_extra_var(client: APIClient):
         "extra_var": TEST_EXTRA_VAR,
     }
     assert models.ExtraVar.objects.filter(pk=id_).exists()
+
+
+@pytest.mark.django_db
+def test_create_vault_extra_var(client: APIClient):
+    data_in = {
+        "extra_var": TEST_VAULT_EXTRA_VAR,
+    }
+    response = client.post(f"{api_url_v1}/extra-vars/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    id = response.data["id"]
+    assert response.data == {
+        "id": id,
+        "extra_var": TEST_VAULT_EXTRA_VAR,
+    }
+    assert models.ExtraVar.objects.filter(pk=id).exists()
+    assert models.ExtraVar.objects.first().extra_var == TEST_VAULT_EXTRA_VAR
 
 
 @pytest.mark.django_db
