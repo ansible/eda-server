@@ -49,6 +49,9 @@ Database settings:
 * DB_PASSWORD - Database user password (default: None)
 * DB_NAME - Database name (default: "eda")
 
+Optionally you can define DATABASES as an object
+* DATABASES - A dict with django database settings
+
 Redis queue settings:
 
 * MQ_UNIX_SOCKET_PATH - Redis unix socket path, mutually exclusive with
@@ -82,6 +85,25 @@ settings = dynaconf.Dynaconf(
     envvar_prefix="EDA",
     settings_file=default_settings_file,
 )
+
+
+def _get_databases_settings() -> dict:
+    databases = settings.get("DATABASES", {})
+    if databases and "default" not in databases:
+        raise ImproperlyConfigured(
+            "DATABASES settings must contain a 'default' key"
+        )
+
+    if not databases:
+        databases["default"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "HOST": settings.get("DB_HOST", "127.0.0.1"),
+            "PORT": settings.get("DB_PORT", 5432),
+            "USER": settings.get("DB_USER", "postgres"),
+            "PASSWORD": settings.get("DB_PASSWORD"),
+            "NAME": settings.get("DB_NAME", "eda"),
+        }
+    return databases
 
 
 # ---------------------------------------------------------
@@ -188,16 +210,7 @@ ASGI_APPLICATION = "aap_eda.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "HOST": settings.get("DB_HOST", "127.0.0.1"),
-        "PORT": settings.get("DB_PORT", 5432),
-        "USER": settings.get("DB_USER", "postgres"),
-        "PASSWORD": settings.get("DB_PASSWORD"),
-        "NAME": settings.get("DB_NAME", "eda"),
-    }
-}
+DATABASES = _get_databases_settings()
 
 
 # Password validation
