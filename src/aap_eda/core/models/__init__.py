@@ -35,6 +35,10 @@ from .rulebook import (
     Ruleset,
 )
 from .user import AwxToken, User
+from .organization import Organization
+from .team import Team
+
+from ansible_base.rbac import permission_registry
 
 __all__ = [
     "ActivationInstanceJobInstance",
@@ -61,4 +65,8 @@ __all__ = [
     "Credential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
+    "Organization",
+    "Team"
 ]
+
+permission_registry.register(Activation, Team, Organization, Credential, Activation, DecisionEnvironment, parent_field_name=None)

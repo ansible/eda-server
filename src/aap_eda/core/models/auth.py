@@ -59,6 +59,13 @@ class Permission(models.Model):
     action = models.TextField(
         null=False, blank=False, choices=Action.choices()
     )
+    # name = models.CharField(_("name"), max_length=255)
+    # content_type = models.ForeignKey(
+    #     ContentType,
+    #     models.CASCADE,
+    #     verbose_name=_("content type"),
+    # )
+    # codename = models.CharField(_("codename"), max_length=100)
 
     def __repr__(self):
         return (

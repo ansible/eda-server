@@ -145,6 +145,7 @@ INSTALLED_APPS = [
     "django_filters",
     # Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
     "ansible_base.authentication",
+    "ansible_base.rbac",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -456,3 +457,11 @@ ANSIBLE_BASE_JWT_VALIDATE_CERT = settings.get(
 ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
+# ANSIBLE_BASE_ROLE_PRECREATE = {}
+
+# ANSIBLE_BASE_PERMISSION_MODEL = 'core.Permission'
+
+ANSIBLE_BASE_SERVICE_PREFIX = 'eda'
+
+ANSIBLE_BASE_TEAM_MODEL = 'core.Team'
+ANSIBLE_BASE_ORGANIZATION_MODEL = 'core.Organization'
