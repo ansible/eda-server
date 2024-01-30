@@ -35,6 +35,8 @@ __all__ = (
     "RulebookProcessLog",
 )
 
+from importlib import import_module
+
 
 class Activation(models.Model):
     class Meta:
@@ -193,22 +195,36 @@ class RulebookProcess(models.Model):
         default=ActivationStatus.PENDING,
     )
     git_hash = models.TextField(null=False, default="")
-    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
+
+    # TODO: remove this field
+    activation = models.ForeignKey(
+        "Activation", on_delete=models.CASCADE, null=True
+    )
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
+    parent_id = models.TextField(null=False)
+    parent_fqcn = models.TextField(null=False)
+
+    def get_parent(self):
+        module_name, class_name = self.parent_fqcn.rsplit(".", 1)
+        module = import_module(module_name)
+        parent_model = getattr(module, class_name)
+        return parent_model.objects.get(id=self.parent_id)
 
     def save(self, *args, **kwargs):
+        parent = self.get_parent()
         # when creating
         if self._state.adding:
             if self.status_message is None:
                 self.status_message = self._get_default_status_message()
 
                 # populate latest_instance of activation at creation
-                self.activation.latest_instance = self
+
+                parent.latest_instance = self
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
@@ -236,7 +252,7 @@ class RulebookProcess(models.Model):
                 kwargs["update_fields"].append("status_message")
 
         super().save(*args, **kwargs)
-        self.activation.save(update_fields=["latest_instance"])
+        parent.save(update_fields=["latest_instance"])
 
     def _get_default_status_message(self):
         try:

@@ -31,6 +31,7 @@ from pydantic import ValidationError
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.utils import get_fully_qualified_name
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
@@ -1018,12 +1019,14 @@ class ActivationManager:
             return
 
     def _create_activation_instance(self):
+        fqcn = get_fully_qualified_name(self.db_instance)
         try:
             models.RulebookProcess.objects.create(
-                activation=self.db_instance,
                 name=self.db_instance.name,
                 status=ActivationStatus.STARTING,
                 git_hash=self.db_instance.git_hash,
+                parent_id=self.db_instance.id,
+                parent_fqcn=fqcn,
             )
         except IntegrityError as exc:
             msg = (
