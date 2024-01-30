@@ -201,6 +201,30 @@ async def test_handle_actions_multiple_firing(
 
 
 @pytest.mark.django_db(transaction=True)
+async def test_handle_actions_with_empty_job_uuid(
+    ws_communicator: WebsocketCommunicator,
+):
+    activation_instance_id = await _prepare_db_data()
+    assert (await get_audit_rule_count()) == 0
+
+    # job uuid is empty string
+    payload = create_action_payload(
+        DUMMY_UUID,
+        activation_instance_id,
+        "",
+        DUMMY_UUID,
+        "2023-03-29T15:00:17.260803Z",
+        _matching_events(),
+    )
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
+
+    assert (await get_audit_rule_count()) == 1
+    assert (await get_audit_action_count()) == 1
+    assert (await get_audit_event_count()) == 2
+
+
+@pytest.mark.django_db(transaction=True)
 async def test_handle_actions(ws_communicator: WebsocketCommunicator):
     activation_instance_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
