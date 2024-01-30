@@ -193,14 +193,14 @@ def test_list_logs_from_activation_instance(client: APIClient):
         activation=activation,
     )
 
-    models.ActivationInstanceLog.objects.bulk_create(
+    models.RulebookProcessLog.objects.bulk_create(
         [
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-1",
                 line_number=1,
                 activation_instance=instance,
             ),
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-2",
                 line_number=2,
                 activation_instance=instance,
@@ -233,14 +233,14 @@ def test_list_activation_instance_logs_filter(client: APIClient):
         activation=activation,
     )
 
-    instance_logs = models.ActivationInstanceLog.objects.bulk_create(
+    instance_logs = models.RulebookProcessLog.objects.bulk_create(
         [
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-1",
                 line_number=1,
                 activation_instance=instance,
             ),
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-2",
                 line_number=2,
                 activation_instance=instance,

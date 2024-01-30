@@ -358,7 +358,7 @@ class ActivationInstanceViewSet(
     )
     @action(
         detail=False,
-        queryset=models.ActivationInstanceLog.objects.order_by("id"),
+        queryset=models.RulebookProcessLog.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceLogFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
@@ -371,7 +371,7 @@ class ActivationInstanceViewSet(
                 detail=f"Activation Instance with ID={id} does not exist.",
             )
 
-        activation_instance_logs = models.ActivationInstanceLog.objects.filter(
+        activation_instance_logs = models.RulebookProcessLog.objects.filter(
             activation_instance_id=id
         ).order_by("id")
         activation_instance_logs = self.filter_queryset(
