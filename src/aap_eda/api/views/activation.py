@@ -141,7 +141,7 @@ class ActivationViewSet(
     )
     @action(
         detail=False,
-        queryset=models.ActivationInstance.objects.order_by("id"),
+        queryset=models.RulebookProcess.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceFilter,
         rbac_resource_type=ResourceType.ACTIVATION_INSTANCE,
         rbac_action=Action.READ,
@@ -155,7 +155,7 @@ class ActivationViewSet(
                 detail=f"Activation with ID={id} does not exist.",
             )
 
-        activation_instances = models.ActivationInstance.objects.filter(
+        activation_instances = models.RulebookProcess.objects.filter(
             activation_id=id
         )
         filtered_instances = self.filter_queryset(activation_instances)
@@ -332,7 +332,7 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.ActivationInstance.objects.all()
+    queryset = models.RulebookProcess.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
@@ -364,9 +364,7 @@ class ActivationInstanceViewSet(
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
-        instance_exists = models.ActivationInstance.objects.filter(
-            pk=id
-        ).exists()
+        instance_exists = models.RulebookProcess.objects.filter(pk=id).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,

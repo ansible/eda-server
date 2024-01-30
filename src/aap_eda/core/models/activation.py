@@ -31,7 +31,7 @@ from .user import AwxToken, User
 
 __all__ = (
     "Activation",
-    "ActivationInstance",
+    "RulebookProcess",
     "ActivationInstanceLog",
 )
 
@@ -90,7 +90,7 @@ class Activation(models.Model):
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
     latest_instance = models.OneToOneField(
-        "ActivationInstance",
+        "RulebookProcess",
         null=True,
         default=None,
         on_delete=models.SET_NULL,
@@ -172,9 +172,9 @@ class Activation(models.Model):
         )
 
 
-class ActivationInstance(models.Model):
+class RulebookProcess(models.Model):
     class Meta:
-        db_table = "core_activation_instance"
+        db_table = "core_rulebook_process"
         ordering = ("-started_at",)
 
     name = models.TextField(null=False, default="")
@@ -272,7 +272,7 @@ class ActivationInstanceLog(models.Model):
         db_table = "core_activation_instance_log"
 
     activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
+        "RulebookProcess", on_delete=models.CASCADE
     )
     line_number = models.IntegerField()
     log = models.TextField()
