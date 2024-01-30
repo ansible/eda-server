@@ -102,6 +102,16 @@ class Activation(models.Model):
         null=True,
         default=None,
     )
+    credentials = models.ManyToManyField(
+        "Credential", related_name="activations", default=None
+    )
+    system_vault_credential = models.OneToOneField(
+        "Credential",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
     def save(self, *args, **kwargs):
         # when creating

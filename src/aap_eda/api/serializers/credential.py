@@ -14,7 +14,9 @@
 
 from rest_framework import serializers
 
+from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
+from aap_eda.core.enums import CredentialType
 
 
 class CredentialSerializer(serializers.ModelSerializer):
@@ -30,12 +32,27 @@ class CredentialSerializer(serializers.ModelSerializer):
             "description",
             "username",
             "credential_type",
+            "vault_identifier",
             *read_only_fields,
         ]
 
 
 class CredentialCreateSerializer(serializers.ModelSerializer):
     secret = serializers.CharField(required=True, allow_null=False)
+
+    def validate(self, data):
+        credential_type = data.get("credential_type", CredentialType.REGISTRY)
+        identifier = data.get("vault_identifier")
+
+        if (
+            credential_type == CredentialType.VAULT
+            and identifier == EDA_SERVER_VAULT_LABEL
+        ):
+            raise serializers.ValidationError(
+                f"{identifier} is reserved by EDA for vault labels"
+            )
+
+        return data
 
     class Meta:
         model = models.Credential
@@ -44,6 +61,7 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "description",
             "credential_type",
             "username",
+            "vault_identifier",
             "secret",
         ]
 
@@ -53,5 +71,12 @@ class CredentialRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Credential
-        fields = ["id", "name", "description", "credential_type", "username"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "credential_type",
+            "username",
+            "vault_identifier",
+        ]
         read_only_fields = ["id"]
