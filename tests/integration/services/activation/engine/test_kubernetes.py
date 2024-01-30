@@ -342,8 +342,8 @@ def test_engine_start(init_data, kubernetes_engine):
         f"{init_data.activation_instance.id}"
     )
 
-    assert models.ActivationInstanceLog.objects.count() == 5
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
+    assert models.RulebookProcessLog.objects.count() == 5
+    assert models.RulebookProcessLog.objects.last().log.endswith(
         f"Job {engine.job_name} is running"
     )
 
@@ -380,7 +380,7 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
             watcher.stream.return_value = get_stream_event(phase)
             engine.start(request, log_handler)
 
-            assert models.ActivationInstanceLog.objects.last().log.endswith(
+            assert models.RulebookProcessLog.objects.last().log.endswith(
                 f"Job {engine.job_name} is running"
             )
 
@@ -481,7 +481,7 @@ def test_delete_secret(init_data, kubernetes_engine):
         core_api_mock.delete_namespaced_secret.return_value = status_mock
         engine._delete_secret(log_handler)
 
-        assert models.ActivationInstanceLog.objects.last().log.endswith(
+        assert models.RulebookProcessLog.objects.last().log.endswith(
             f"Secret {engine.secret_name} is deleted."
         )
 
@@ -489,7 +489,7 @@ def test_delete_secret(init_data, kubernetes_engine):
         status_mock.reason = "Not found"
         engine._delete_secret(log_handler)
 
-        assert models.ActivationInstanceLog.objects.last().log.endswith(
+        assert models.RulebookProcessLog.objects.last().log.endswith(
             f"Failed to delete secret {engine.secret_name}: "
             f"status: {status_mock.status}"
             f"reason: {status_mock.reason}"
@@ -522,7 +522,7 @@ def test_delete_service(init_data, kubernetes_engine):
 
         core_api_mock.delete_namespaced_service.assert_called_once()
 
-        assert models.ActivationInstanceLog.objects.last().log.endswith(
+        assert models.RulebookProcessLog.objects.last().log.endswith(
             f"Service {service_name} is deleted."
         )
 
@@ -560,7 +560,7 @@ def test_delete_job(init_data, kubernetes_engine):
         batch_api_mock.list_namespaced_job.return_value.items = None
         engine._delete_job(log_handler)
 
-        assert models.ActivationInstanceLog.objects.last().log.endswith(
+        assert models.RulebookProcessLog.objects.last().log.endswith(
             f"Job for {job_name} has been removed."
         )
 
@@ -606,7 +606,7 @@ def test_cleanup(init_data, kubernetes_engine):
                 services_mock.assert_called_once()
                 job_mock.assert_called_once()
 
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
+    assert models.RulebookProcessLog.objects.last().log.endswith(
         f"Job {job_name} is cleaned up."
     )
 
@@ -644,9 +644,7 @@ def test_update_logs(init_data, kubernetes_engine):
             ]
             engine.update_logs(job_name, log_handler)
 
-            assert (
-                models.ActivationInstanceLog.objects.last().log == f"{message}"
-            )
+            assert models.RulebookProcessLog.objects.last().log == f"{message}"
             init_data.activation_instance.refresh_from_db()
             assert init_data.activation_instance.log_read_at > init_log_read_at
 
@@ -667,7 +665,7 @@ def test_update_logs(init_data, kubernetes_engine):
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
             engine.update_logs(job_name, log_handler)
             msg = f"Pod with label {job_name} has unhandled state:"
-            assert msg in models.ActivationInstanceLog.objects.last().log
+            assert msg in models.RulebookProcessLog.objects.last().log
 
 
 @pytest.mark.django_db

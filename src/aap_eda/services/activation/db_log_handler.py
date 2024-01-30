@@ -76,7 +76,7 @@ class DBLogger(LogHandler):
     def flush(self) -> None:
         try:
             if self.activation_instance_log_buffer:
-                models.ActivationInstanceLog.objects.bulk_create(
+                models.RulebookProcessLog.objects.bulk_create(
                     self.activation_instance_log_buffer
                 )
         except IntegrityError:
