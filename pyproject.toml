@@ -28,6 +28,7 @@ dev = ["psycopg2-binary"]
 python = ">=3.9,<3.12"
 django = ">=4.2,<4.3"
 djangorestframework = "*"
+djangorestframework_simplejwt = "*"
 dynaconf = ">=3.1"
 drf-spectacular = "*"
 channels = { version = "*", extras = ["daphne"] }
@@ -46,6 +47,7 @@ rq-scheduler = "^0.10"
 # other AAP components
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
     "authentication",
+    "channel_auth",
 ] }
 jinja2 = "*"
 django-split-settings = "^1.2.0"

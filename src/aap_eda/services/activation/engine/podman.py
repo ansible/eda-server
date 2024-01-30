@@ -122,11 +122,12 @@ class Engine(ContainerEngine):
 
             log_handler.write("Starting Container", True)
             command = request.cmdline.command_and_args()
-            log_handler.write(f"Container args {command}", True)
+            command_log = request.cmdline.command_and_args(sanitized=True)
+            log_handler.write(f"Container args {command_log}", True)
             pod_args = self._load_pod_args(request)
             LOGGER.info(
                 "Creating container: "
-                f"command: {command}, "
+                f"command: {command_log}, "
                 f"pod_args: {pod_args}"
             )
             container = self.client.containers.run(
@@ -145,7 +146,7 @@ class Engine(ContainerEngine):
                 f"id: {container.id}, "
                 f"ports: {container.ports}, "
                 f"status: {container.status}, "
-                f"command: {command}, "
+                f"command: {command_log}, "
                 f"pod_args: {pod_args}"
             )
 

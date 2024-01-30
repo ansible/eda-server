@@ -70,6 +70,7 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
 
 """
 import os
+from datetime import timedelta
 
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
@@ -129,6 +130,20 @@ CSRF_TRUSTED_ORIGINS = (
 # Session settings
 SESSION_COOKIE_AGE = settings.get("SESSION_COOKIE_AGE", 1800)
 SESSION_SAVE_EVERY_REQUEST = True
+
+# JWT token lifetime
+JWT_ACCESS_TOKEN_LIFETIME_SECONDS = settings.get(
+    "JWT_ACCESS_TOKEN_LIFETIME_SECONDS", 5
+)
+JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
+    "JWT_REFRESH_TOKEN_LIFETIME_DAYS", 2
+)
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=JWT_ACCESS_TOKEN_LIFETIME_SECONDS
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
+}
 
 # Application definition
 INSTALLED_APPS = [
@@ -252,6 +267,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -391,6 +407,9 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
+WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+    "ws://", "http://"
+).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
