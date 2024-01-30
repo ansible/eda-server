@@ -615,6 +615,7 @@ cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-auth-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
 django-crum = "*"
+django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
 python-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
@@ -623,16 +624,18 @@ social-auth-app-django = {version = "*", optional = true, markers = "extra == \"
 tabulate = {version = "*", optional = true, markers = "extra == \"authentication\""}
 
 [package.extras]
-all = ["channels", "django-auth-ldap", "drf-spectacular", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
+all = ["channels", "cryptography", "django-auth-ldap", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "requests", "social-auth-app-django", "tabulate"]
+api-documentation = ["drf-spectacular"]
 authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
 channel-auth = ["channels"]
-swagger = ["drf-spectacular"]
+jwt-consumer = ["pyjwt", "requests"]
+testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
 type = "git"
-url = "https://github.com/ansible/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "b84ee3a71490f6d842529c6814f2327e70fe55de"
+url = "https://github.com/alancoding/django-ansible-base.git"
+reference = "django_permissions"
+resolved_reference = "956289f741437b4bd728a056d95a7c5077719e8a"
 
 [[package]]
 name = "django-auth-ldap"
@@ -2688,4 +2691,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "6b8de97d18d1b89cc7783da63ba7f5584308e18c5b4887e7bbb50f20210a0aec"
+content-hash = "b38a2118bdc25e2f99455d2900d1da566d11d2a501807ea9d42ef0c59841907d"

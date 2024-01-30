@@ -145,6 +145,7 @@ INSTALLED_APPS = [
     "django_filters",
     # Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
     "ansible_base.authentication",
+    "ansible_base.rbac",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
