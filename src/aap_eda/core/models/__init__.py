@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation import Activation, ActivationInstanceLog, RulebookProcess
+from .activation import Activation, RulebookProcess, RulebookProcessLog
 from .auth import Permission, Role
 from .credential import Credential
 from .decision_environment import DecisionEnvironment
@@ -38,7 +38,7 @@ from .user import AwxToken, User
 
 __all__ = [
     "ActivationInstanceJobInstance",
-    "ActivationInstanceLog",
+    "RulebookProcessLog",
     "RulebookProcess",
     "Activation",
     "AuditAction",
