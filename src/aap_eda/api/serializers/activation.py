@@ -13,6 +13,7 @@
 #  limitations under the License.
 from rest_framework import serializers
 
+from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -26,6 +27,12 @@ from aap_eda.core import models, validators
 
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
+
+    credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=CredentialSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -49,6 +56,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
+            "credentials",
         ]
         read_only_fields = [
             "id",
@@ -63,6 +71,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
 
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
+    credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=CredentialSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -86,6 +99,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
+            "credentials",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -93,6 +107,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
+        credentials = [
+            CredentialSerializer(credential).data
+            for credential in activation.credentials.all()
+        ]
 
         return {
             "id": activation.id,
@@ -114,6 +132,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
+            "credentials": credentials,
         }
 
 
@@ -132,6 +151,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "awx_token_id",
+            "credentials",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -151,6 +171,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_if_awx_token_exists],
         required=False,
+    )
+    credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
     )
 
     def validate(self, data):
@@ -244,6 +269,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at",
             "status_message",
             "awx_token_id",
+            "credentials",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -284,6 +310,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if len(activation_instances) > 1 and activation.restart_count > 0
             else None
         )
+        credentials = [
+            CredentialSerializer(credential).data
+            for credential in activation.credentials.all()
+        ]
 
         return {
             "id": activation.id,
@@ -310,6 +340,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
+            "credentials": credentials,
         }
 
 
