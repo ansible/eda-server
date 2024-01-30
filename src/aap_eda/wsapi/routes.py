@@ -1,4 +1,4 @@
-from ansible_base.channels.middleware import DrfAuthMiddlewareStack
+from ansible_base.lib.channels.middleware import DrfAuthMiddlewareStack
 from channels.routing import URLRouter
 from channels.security.websocket import AllowedHostsOriginValidator
 from django.conf import settings
