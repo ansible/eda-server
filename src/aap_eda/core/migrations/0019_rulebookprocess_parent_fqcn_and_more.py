@@ -41,15 +41,6 @@ class Migration(migrations.Migration):
             field=models.BigIntegerField(default=None),
             preserve_default=False,
         ),
-        migrations.AlterField(
-            model_name="rulebookprocess",
-            name="activation",
-            field=models.ForeignKey(
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.activation",
-            ),
-        ),
         migrations.RunPython(
             populate_parent_fields,
             reverse_code=migrations.RunPython.noop,

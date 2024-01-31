@@ -1022,6 +1022,7 @@ class ActivationManager:
         fqcn = get_fully_qualified_name(self.db_instance)
         try:
             models.RulebookProcess.objects.create(
+                activation=self.db_instance,
                 name=self.db_instance.name,
                 status=ActivationStatus.STARTING,
                 git_hash=self.db_instance.git_hash,

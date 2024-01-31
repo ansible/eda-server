@@ -195,11 +195,7 @@ class RulebookProcess(models.Model):
         default=ActivationStatus.PENDING,
     )
     git_hash = models.TextField(null=False, default="")
-
-    # TODO: remove this field
-    activation = models.ForeignKey(
-        "Activation", on_delete=models.CASCADE, null=True
-    )
+    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
