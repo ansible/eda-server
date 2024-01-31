@@ -16,30 +16,30 @@ from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.models import ActivationRequestQueue
 
 
-def push(activation_id: int, request: ActivationRequest) -> None:
+def push(fqcn: str, parent_id: int, request: ActivationRequest) -> None:
     ActivationRequestQueue.objects.create(
-        activation_id=activation_id, request=request
+        process_parent_fqcn=fqcn, process_parent_id=parent_id, request=request
     )
 
 
-def peek_all(activation_id: int) -> list[ActivationRequestQueue]:
+def peek_all(fqcn: str, parent_id: int) -> list[ActivationRequestQueue]:
     requests = ActivationRequestQueue.objects.filter(
-        activation_id=activation_id
+        process_parent_fqcn=fqcn, process_parent_id=parent_id
     ).all()
     return _arbitrate(requests)
 
 
-def pop_until(activation_id: int, queue_id: int) -> None:
+def pop_until(fqcn: str, parent_id: int, queue_id: int) -> None:
     ActivationRequestQueue.objects.filter(
-        activation_id=activation_id, id__lte=queue_id
+        process_parent_fqcn=fqcn, process_parent_id=parent_id, id__lte=queue_id
     ).delete()
 
 
-def list_activations() -> list[int]:
-    objs = ActivationRequestQueue.objects.order_by("activation_id").distinct(
-        "activation_id"
-    )
-    return [obj.activation_id for obj in objs]
+def list_requests() -> list[str, int]:
+    objs = ActivationRequestQueue.objects.order_by(
+        "process_parent_id"
+    ).distinct("process_parent_fqcn", "process_parent_id")
+    return [(obj.process_parent_fqcn, obj.process_parent_id) for obj in objs]
 
 
 def _arbitrate(

@@ -23,8 +23,14 @@ class ActivationRequestQueue(models.Model):
         ordering = ["id"]
 
     request = models.TextField(null=False, choices=ActivationRequest.choices())
+    process_parent_fqcn = models.TextField(
+        null=False, default="aap_eda.core.models.activation.Activation"
+    )
+    process_parent_id = models.BigIntegerField(null=False)
+
+    # TODO: can be removed later
     activation = models.ForeignKey(
-        "Activation", on_delete=models.CASCADE, null=False
+        "Activation", on_delete=models.CASCADE, null=True
     )
 
 

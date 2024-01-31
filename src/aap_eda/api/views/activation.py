@@ -29,11 +29,12 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
+from aap_eda.core.utils import get_fully_qualified_name
 from aap_eda.tasks.orchestrator import (
-    delete_activation,
-    restart_activation,
-    start_activation,
-    stop_activation,
+    delete_rulebook_process,
+    restart_rulebook_process,
+    start_rulebook_process,
+    stop_rulebook_process,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,13 +79,16 @@ class ActivationViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        response = serializer.create(serializer.validated_data)
+        activation = serializer.create(serializer.validated_data)
 
-        if response.is_enabled:
-            start_activation(activation_id=response.id)
+        if activation.is_enabled:
+            start_rulebook_process(
+                process_parent_type=get_fully_qualified_name(activation),
+                id=activation.id,
+            )
 
         return Response(
-            serializers.ActivationReadSerializer(response).data,
+            serializers.ActivationReadSerializer(activation).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -120,7 +124,10 @@ class ActivationViewSet(
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
-        delete_activation(activation_id=activation.id)
+        delete_rulebook_process(
+            process_parent_type=get_fully_qualified_name(activation),
+            id=activation.id,
+        )
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -157,7 +164,7 @@ class ActivationViewSet(
 
         activation_instances = models.RulebookProcess.objects.filter(
             parent_id=id,
-            parent_fqcn="aap_eda.core.models.activation.Activation"
+            parent_fqcn="aap_eda.core.models.activation.Activation",
         )
         filtered_instances = self.filter_queryset(activation_instances)
         result = self.paginate_queryset(filtered_instances)
@@ -225,7 +232,10 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
-        start_activation(activation_id=pk)
+        start_rulebook_process(
+            process_parent_type=get_fully_qualified_name(activation),
+            id=pk,
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -251,7 +261,10 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
-            stop_activation(activation_id=activation.id)
+            stop_rulebook_process(
+                process_parent_type=get_fully_qualified_name(activation),
+                id=activation.id,
+            )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -291,7 +304,10 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        restart_activation(activation_id=activation.id)
+        restart_rulebook_process(
+            process_parent_type=get_fully_qualified_name(activation),
+            id=activation.id,
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
