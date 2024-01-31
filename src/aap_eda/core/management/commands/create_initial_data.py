@@ -45,6 +45,7 @@ ROLES = [
             "role": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -62,6 +63,7 @@ ROLES = [
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -91,6 +93,7 @@ ROLES = [
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -111,6 +114,7 @@ ROLES = [
             "rulebook": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "event_stream": ["read"],
         },
     },
     {
@@ -130,6 +134,7 @@ ROLES = [
             "role": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "event_stream": ["read"],
         },
     },
     {
@@ -146,6 +151,7 @@ ROLES = [
             "extra_var": ["read"],
             "rulebook": ["read"],
             "decision_environment": ["read"],
+            "event_stream": ["read"],
         },
     },
 ]
@@ -168,22 +174,25 @@ class Command(BaseCommand):
                 name=role_data["name"], description=role_data["description"]
             )
             total_permissions = 0
-            for resource_type, actions in role_data["permissions"].items():
+            for reevent_stream_type, actions in role_data[
+                "permissions"
+            ].items():
                 permissions = list(
                     models.Permission.objects.filter(
-                        resource_type=resource_type, action__in=actions
+                        reevent_stream_type=reevent_stream_type,
+                        action__in=actions,
                     )
                 )
                 if len(permissions) != len(actions):
                     raise ImproperlyConfigured(
-                        f'Permission "{resource_type}" and one of "{actions}" '
+                        f'Permission "{reevent_stream_type}" and one of "{actions}" '
                         f"actions is missing in the database."
                     )
                 role.permissions.add(*permissions)
                 total_permissions += len(actions)
             self.stdout.write(
                 'Added role "{0}" with {1} permissions '
-                "to {2} resources".format(
+                "to {2} reevent_streams".format(
                     role_data["name"],
                     total_permissions,
                     len(role_data["permissions"]),

@@ -9,6 +9,31 @@ from django.db import migrations, models
 import aap_eda.core.enums
 import aap_eda.core.models.mixins
 
+PERMISSIONS = {
+    "event_stream": ["create", "read"],
+}
+
+
+def insert_permissions(apps, schema_editor):
+    permission_model = apps.get_model("core", "Permission")
+    db_alias = schema_editor.connection.alias
+    permissions = []
+    for resource_type, actions in PERMISSIONS.items():
+        for action in actions:
+            permissions.append(
+                permission_model(resource_type=resource_type, action=action)
+            )
+    permission_model.objects.using(db_alias).bulk_create(permissions)
+
+
+def drop_permissions(apps, schema_editor):
+    permission_model = apps.get_model("core", "Permission")  # noqa: N806
+    db_alias = schema_editor.connection.alias
+    for resource_type, actions in PERMISSIONS.items():
+        permission_model.objects.using(db_alias).filter(
+            resource_type=resource_type, action__in=actions
+        ).delete()
+
 
 class Migration(migrations.Migration):
     dependencies = [
@@ -142,4 +167,5 @@ class Migration(migrations.Migration):
                 models.Model,
             ),
         ),
+        migrations.RunPython(insert_permissions, drop_permissions),
     ]
