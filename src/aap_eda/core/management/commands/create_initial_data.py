@@ -174,25 +174,23 @@ class Command(BaseCommand):
                 name=role_data["name"], description=role_data["description"]
             )
             total_permissions = 0
-            for reevent_stream_type, actions in role_data[
-                "permissions"
-            ].items():
+            for resource_type, actions in role_data["permissions"].items():
                 permissions = list(
                     models.Permission.objects.filter(
-                        reevent_stream_type=reevent_stream_type,
+                        resource_type=resource_type,
                         action__in=actions,
                     )
                 )
                 if len(permissions) != len(actions):
                     raise ImproperlyConfigured(
-                        f'Permission "{reevent_stream_type}" and one of "{actions}" '
+                        f'Permission "{resource_type}" and one of "{actions}" '
                         f"actions is missing in the database."
                     )
                 role.permissions.add(*permissions)
                 total_permissions += len(actions)
             self.stdout.write(
                 'Added role "{0}" with {1} permissions '
-                "to {2} reevent_streams".format(
+                "to {2} resources".format(
                     role_data["name"],
                     total_permissions,
                     len(role_data["permissions"]),
