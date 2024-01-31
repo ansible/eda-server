@@ -35,7 +35,7 @@ __all__ = (
     "RulebookProcessLog",
 )
 
-from importlib import import_module
+from django.utils.module_loading import import_string
 
 
 class Activation(models.Model):
@@ -206,13 +206,17 @@ class RulebookProcess(models.Model):
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
-    parent_id = models.TextField(null=False)
+    parent_id = models.BigIntegerField(null=False)
     parent_fqcn = models.TextField(null=False)
 
     def get_parent(self):
-        module_name, class_name = self.parent_fqcn.rsplit(".", 1)
-        module = import_module(module_name)
-        parent_model = getattr(module, class_name)
+        try:
+            parent_model = import_string(self.parent_fqcn)
+        except ImportError:
+            raise ImportError(
+                f"Parent class [{self.parent_fqcn}] not found"
+            ) from None
+
         return parent_model.objects.get(id=self.parent_id)
 
     def save(self, *args, **kwargs):
