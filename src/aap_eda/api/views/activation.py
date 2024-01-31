@@ -156,7 +156,8 @@ class ActivationViewSet(
             )
 
         activation_instances = models.RulebookProcess.objects.filter(
-            activation_id=id
+            parent_id=id,
+            parent_fqcn="aap_eda.core.models.activation.Activation"
         )
         filtered_instances = self.filter_queryset(activation_instances)
         result = self.paginate_queryset(filtered_instances)
