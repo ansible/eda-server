@@ -208,9 +208,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
-        job_id = message.job_id
-        job_instance = models.JobInstance.objects.filter(uuid=job_id).first()
-        job_instance_id = job_instance.id if job_instance else None
+        job_instance_id = None
+        if message.job_id:
+            job_instance = models.JobInstance.objects.filter(
+                uuid=message.job_id
+            ).first()
+            job_instance_id = job_instance.id if job_instance else None
 
         audit_rule = models.AuditRule.objects.filter(
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
