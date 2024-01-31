@@ -35,6 +35,8 @@ __all__ = (
     "RulebookProcessLog",
 )
 
+from django.utils.module_loading import import_string
+
 
 class Activation(models.Model):
     class Meta:
@@ -200,15 +202,29 @@ class RulebookProcess(models.Model):
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
+    parent_id = models.BigIntegerField(null=False)
+    parent_fqcn = models.TextField(null=False)
+
+    def get_parent(self):
+        try:
+            parent_model = import_string(self.parent_fqcn)
+        except ImportError:
+            raise ImportError(
+                f"Parent class [{self.parent_fqcn}] not found"
+            ) from None
+
+        return parent_model.objects.get(id=self.parent_id)
 
     def save(self, *args, **kwargs):
+        parent = self.get_parent()
         # when creating
         if self._state.adding:
             if self.status_message is None:
                 self.status_message = self._get_default_status_message()
 
                 # populate latest_instance of activation at creation
-                self.activation.latest_instance = self
+
+                parent.latest_instance = self
         else:
             if not bool(kwargs) or "update_fields" not in kwargs:
                 raise UpdateFieldsRequiredError(
@@ -236,7 +252,7 @@ class RulebookProcess(models.Model):
                 kwargs["update_fields"].append("status_message")
 
         super().save(*args, **kwargs)
-        self.activation.save(update_fields=["latest_instance"])
+        parent.save(update_fields=["latest_instance"])
 
     def _get_default_status_message(self):
         try:

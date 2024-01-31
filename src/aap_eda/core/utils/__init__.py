@@ -11,3 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+
+def get_fully_qualified_name(obj: object) -> str:
+    klass = obj.__class__
+    module = klass.__module__
+    name = klass.__name__
+    return f"{module}.{name}"
