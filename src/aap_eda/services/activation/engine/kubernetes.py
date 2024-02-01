@@ -91,6 +91,7 @@ class Engine(ContainerEngine):
             self.client = get_k8s_client()
 
         self._set_namespace()
+        self.activation_id = activation_id
         self.secret_name = f"activation-secret-{activation_id}"
         self.job_name = None
         self.pod_name = None
@@ -337,7 +338,11 @@ class Engine(ContainerEngine):
             spec=spec,
             metadata=k8sclient.V1ObjectMeta(
                 name=self.pod_name,
-                labels={"app": "eda", "job-name": self.job_name},
+                labels={
+                    "app": "eda",
+                    "job-name": self.job_name,
+                    "activation-id": str(self.activation_id),
+                },
             ),
         )
 
@@ -366,7 +371,11 @@ class Engine(ContainerEngine):
                     ),
                     metadata=k8sclient.V1ObjectMeta(
                         name=f"{service_name}",
-                        labels={"app": "eda", "job-name": self.job_name},
+                        labels={
+                            "app": "eda",
+                            "job-name": self.job_name,
+                            "activation-id": str(self.activation_id),
+                        },
                         namespace=self.namespace,
                     ),
                 )
@@ -413,8 +422,9 @@ class Engine(ContainerEngine):
         metadata = k8sclient.V1ObjectMeta(
             name=self.job_name,
             labels={
-                "job-name": self.job_name,
                 "app": "eda",
+                "job-name": self.job_name,
+                "activation-id": str(self.activation_id),
             },
         )
 
@@ -552,7 +562,10 @@ class Engine(ContainerEngine):
             metadata={
                 "name": self.secret_name,
                 "namespace": self.namespace,
-                "labels": {"aap": "eda"},
+                "labels": {
+                    "aap": "eda",
+                    "activation-id": str(self.activation_id),
+                },
             },
             type="kubernetes.io/dockerconfigjson",
         )
