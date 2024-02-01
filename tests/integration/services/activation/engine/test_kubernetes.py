@@ -24,12 +24,12 @@ from kubernetes.config.config_exception import ConfigException
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.db_log_handler import DBLogger
-from aap_eda.services.activation.engine.common import (
+from aap_eda.services.process.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
     Credential,
 )
-from aap_eda.services.activation.engine.exceptions import (
+from aap_eda.services.process.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineError,
     ContainerEngineInitError,
@@ -38,7 +38,7 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerStartError,
     ContainerUpdateLogsError,
 )
-from aap_eda.services.activation.engine.kubernetes import (
+from aap_eda.services.process.engine.kubernetes import (
     IMAGE_PULL_BACK_OFF,
     IMAGE_PULL_ERROR,
     INVALID_IMAGE_NAME,
@@ -327,7 +327,7 @@ def test_engine_start(init_data, kubernetes_engine):
     request = get_request(init_data)
     log_handler = DBLogger(init_data.activation_instance.id)
 
-    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+    with mock.patch("aap_eda.services.process.engine.kubernetes.watch"):
         engine.start(request, log_handler)
 
     assert engine.job_name == (
@@ -369,7 +369,7 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
     log_handler = DBLogger(init_data.activation_instance.id)
 
     with mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.watch"
+        "aap_eda.services.process.engine.kubernetes.watch"
     ) as watch_mock:
         watcher = mock.Mock()
         watch_mock.Watch.return_value = watcher
@@ -405,7 +405,7 @@ def test_engine_start_with_invalid_image_exception(
     log_handler = DBLogger(init_data.activation_instance.id)
 
     with mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.watch"
+        "aap_eda.services.process.engine.kubernetes.watch"
     ) as watch_mock:
         watcher = mock.Mock()
         watch_mock.Watch.return_value = watcher

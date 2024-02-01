@@ -26,13 +26,13 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.db_log_handler import DBLogger
-from aap_eda.services.activation.engine import messages
-from aap_eda.services.activation.engine.common import (
+from aap_eda.services.process.engine import messages
+from aap_eda.services.process.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
     Credential,
 )
-from aap_eda.services.activation.engine.exceptions import (
+from aap_eda.services.process.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineInitError,
     ContainerImagePullError,
@@ -40,7 +40,7 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerStartError,
     ContainerUpdateLogsError,
 )
-from aap_eda.services.activation.engine.podman import Engine, get_podman_client
+from aap_eda.services.process.engine.podman import Engine, get_podman_client
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -132,7 +132,7 @@ def use_dummy_socket_url(settings):
 def podman_engine(init_data):
     activation_id = init_data.activation.id
     with mock.patch(
-        "aap_eda.services.activation.engine.podman.PodmanClient"
+        "aap_eda.services.process.engine.podman.PodmanClient"
     ) as client_mock:
         engine = Engine(
             _activation_id=str(activation_id),
@@ -178,7 +178,7 @@ def test_get_podman_client_with_exception(settings):
 @pytest.mark.django_db
 def test_engine_init(init_data):
     activation_id = init_data.activation.id
-    with mock.patch("aap_eda.services.activation.engine.podman.PodmanClient"):
+    with mock.patch("aap_eda.services.process.engine.podman.PodmanClient"):
         engine = Engine(_activation_id=str(activation_id))
         engine.client.version.assert_called_once()
 

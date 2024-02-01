@@ -32,20 +32,20 @@ from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
-from aap_eda.services.activation.engine import exceptions as engine_exceptions
-from aap_eda.services.activation.engine.common import (
-    AnsibleRulebookCmdLine,
-    ContainerRequest,
-    Credential,
-)
 from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
+from aap_eda.services.process.engine import exceptions as engine_exceptions
+from aap_eda.services.process.engine.common import (
+    AnsibleRulebookCmdLine,
+    ContainerEngine,
+    ContainerRequest,
+    Credential,
+)
+from aap_eda.services.process.engine.factory import new_container_engine
+from aap_eda.services.process.engine.ports import find_ports
 
 from .db_log_handler import DBLogger
-from .engine.common import ContainerEngine
-from .engine.factory import new_container_engine
-from .engine.ports import find_ports
 
 LOGGER = logging.getLogger(__name__)
 ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
