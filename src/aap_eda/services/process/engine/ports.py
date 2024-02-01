@@ -6,7 +6,7 @@ import yaml
 from jinja2.exceptions import UndefinedError
 from jinja2.nativetypes import NativeTemplate
 
-from aap_eda.services.activation import exceptions
+from aap_eda.services.process import exceptions
 
 LOGGER = logging.getLogger(__name__)
 

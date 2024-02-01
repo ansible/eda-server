@@ -21,7 +21,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ActivationStatus
 from aap_eda.core.models import ActivationRequestQueue
 from aap_eda.core.tasking import unique_enqueue
-from aap_eda.services.activation.manager import ActivationManager
+from aap_eda.services.process.manager import ActivationManager
 
 LOGGER = logging.getLogger(__name__)
 

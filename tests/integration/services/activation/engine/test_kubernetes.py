@@ -23,7 +23,7 @@ from kubernetes.config.config_exception import ConfigException
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.activation.db_log_handler import DBLogger
+from aap_eda.services.process.db_log_handler import DBLogger
 from aap_eda.services.process.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,

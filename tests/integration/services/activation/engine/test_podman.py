@@ -25,7 +25,7 @@ from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.activation.db_log_handler import DBLogger
+from aap_eda.services.process.db_log_handler import DBLogger
 from aap_eda.services.process.engine import messages
 from aap_eda.services.process.engine.common import (
     AnsibleRulebookCmdLine,

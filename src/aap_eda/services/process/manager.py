@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Module for Activation Manager."""
+"""Module for Process Manager."""
 
 import contextlib
 import logging
@@ -31,10 +31,7 @@ from pydantic import ValidationError
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
-from aap_eda.services.activation import exceptions
-from aap_eda.services.activation.restart_helper import (
-    system_restart_activation,
-)
+from aap_eda.services.process import exceptions
 from aap_eda.services.process.engine import exceptions as engine_exceptions
 from aap_eda.services.process.engine.common import (
     AnsibleRulebookCmdLine,
@@ -44,6 +41,7 @@ from aap_eda.services.process.engine.common import (
 )
 from aap_eda.services.process.engine.factory import new_container_engine
 from aap_eda.services.process.engine.ports import find_ports
+from aap_eda.services.process.restart_helper import system_restart_activation
 
 from .db_log_handler import DBLogger
 
