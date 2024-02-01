@@ -45,6 +45,7 @@ ROLES = [
             "role": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -62,6 +63,7 @@ ROLES = [
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -91,6 +93,7 @@ ROLES = [
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -111,6 +114,7 @@ ROLES = [
             "rulebook": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "event_stream": ["read"],
         },
     },
     {
@@ -130,6 +134,7 @@ ROLES = [
             "role": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "event_stream": ["read"],
         },
     },
     {
@@ -146,6 +151,7 @@ ROLES = [
             "extra_var": ["read"],
             "rulebook": ["read"],
             "decision_environment": ["read"],
+            "event_stream": ["read"],
         },
     },
 ]
@@ -171,7 +177,8 @@ class Command(BaseCommand):
             for resource_type, actions in role_data["permissions"].items():
                 permissions = list(
                     models.Permission.objects.filter(
-                        resource_type=resource_type, action__in=actions
+                        resource_type=resource_type,
+                        action__in=actions,
                     )
                 )
                 if len(permissions) != len(actions):
