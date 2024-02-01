@@ -18,6 +18,8 @@ import aap_eda.tasks.activation_request_queue as queue
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest
 
+MODEL_NAME = "aap_eda.core.models.activation.Activation"
+
 
 @pytest.fixture()
 def activations():
@@ -43,20 +45,20 @@ def activations():
 
 @pytest.mark.django_db
 def test_queue(activations):
-    queue.push(activations[0].id, ActivationRequest.STOP)
-    queue.push(activations[1].id, ActivationRequest.DELETE)
-    queue.push(activations[0].id, ActivationRequest.START)
+    queue.push(MODEL_NAME, activations[0].id, ActivationRequest.STOP)
+    queue.push(MODEL_NAME, activations[1].id, ActivationRequest.DELETE)
+    queue.push(MODEL_NAME, activations[0].id, ActivationRequest.START)
     assert models.ActivationRequestQueue.objects.count() == 3
-    assert queue.list_activations() == [
-        activations[0].id,
-        activations[1].id,
+    assert queue.list_requests() == [
+        (MODEL_NAME, activations[0].id),
+        (MODEL_NAME, activations[1].id),
     ]
 
-    requests = queue.peek_all(activations[0].id)
+    requests = queue.peek_all(MODEL_NAME, activations[0].id)
     assert len(requests) == 2
 
-    queue.pop_until(activations[0].id, requests[1].id)
-    assert len(queue.peek_all(activations[0].id)) == 0
+    queue.pop_until(MODEL_NAME, activations[0].id, requests[1].id)
+    assert len(queue.peek_all(MODEL_NAME, activations[0].id)) == 0
 
 
 @pytest.mark.parametrize(
@@ -112,8 +114,8 @@ def test_queue(activations):
 @pytest.mark.django_db
 def test_arbitrate(activations, requests):
     for request in requests["queued"]:
-        queue.push(activations[0].id, request)
-    dequeued = queue.peek_all(activations[0].id)
+        queue.push(MODEL_NAME, activations[0].id, request)
+    dequeued = queue.peek_all(MODEL_NAME, activations[0].id)
     dequeued_requests = [entry.request for entry in dequeued]
     assert dequeued_requests == requests["dequeued"]
     assert models.ActivationRequestQueue.objects.count() == len(

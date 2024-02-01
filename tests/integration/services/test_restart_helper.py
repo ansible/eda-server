@@ -23,6 +23,8 @@ from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
 
+MODEL_NAME = "aap_eda.core.models.activation.Activation"
+
 
 @pytest.fixture()
 def activation():
@@ -42,11 +44,12 @@ def activation():
 @pytest.mark.django_db
 @mock.patch("aap_eda.services.activation.restart_helper.enqueue_delay")
 def test_system_restart_activation(enqueue_mock, activation):
-    system_restart_activation(activation.id, 5)
+    system_restart_activation(MODEL_NAME, activation.id, 5)
     enqueue_args = [
         "default",
         5,
         _queue_auto_start,
+        MODEL_NAME,
         activation.id,
     ]
     enqueue_mock.assert_called_once_with(*enqueue_args)
@@ -54,8 +57,9 @@ def test_system_restart_activation(enqueue_mock, activation):
 
 @pytest.mark.django_db
 def test_queue_auto_start(activation):
-    _queue_auto_start(activation.id)
+    _queue_auto_start(MODEL_NAME, activation.id)
 
     queued = models.ActivationRequestQueue.objects.first()
-    assert queued.activation == activation
+    assert queued.process_parent_fqcn == MODEL_NAME
+    assert queued.process_parent_id == activation.id
     assert queued.request == ActivationRequest.AUTO_START

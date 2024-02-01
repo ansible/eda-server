@@ -104,6 +104,7 @@ class ActivationManager:
             container_engine: The container engine to use.
         """
         self.db_instance = db_instance
+        self.db_instance_fqcn = get_fully_qualified_name(db_instance)
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -466,7 +467,9 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_fqcn, self.db_instance.id, delay_seconds=1
+            )
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -491,7 +494,9 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_fqcn, self.db_instance.id, delay_seconds=1
+            )
 
         self._set_activation_status(
             ActivationStatus.FAILED,
@@ -533,6 +538,7 @@ class ActivationManager:
                 user_msg,
             )
             system_restart_activation(
+                self.db_instance_fqcn,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
             )
@@ -668,6 +674,7 @@ class ActivationManager:
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
+                self.db_instance_fqcn,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
@@ -806,7 +813,9 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(self.db_instance.id, delay_seconds=1)
+        system_restart_activation(
+            self.db_instance_fqcn, self.db_instance.id, delay_seconds=1
+        )
 
     def delete(self):
         """User requested delete."""
@@ -1019,7 +1028,6 @@ class ActivationManager:
             return
 
     def _create_activation_instance(self):
-        fqcn = get_fully_qualified_name(self.db_instance)
         try:
             models.RulebookProcess.objects.create(
                 activation=self.db_instance,
@@ -1027,7 +1035,7 @@ class ActivationManager:
                 status=ActivationStatus.STARTING,
                 git_hash=self.db_instance.git_hash,
                 parent_id=self.db_instance.id,
-                parent_fqcn=fqcn,
+                parent_fqcn=self.db_instance_fqcn,
             )
         except IntegrityError as exc:
             msg = (
