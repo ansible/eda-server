@@ -77,9 +77,17 @@ class EventStream(StatusHandlerModelMixin, models.Model):
         related_name="+",
     )
     uuid = models.UUIDField(default=uuid.uuid4)
+    channel_name = models.TextField(null=False, default=None)
     source_type = models.TextField(null=False)
     args = models.JSONField(null=True, default=None)
     listener_args = models.JSONField(null=True, default=None)
+    # TODO: remove later when the serialzier is fixed
+    awx_token = models.ForeignKey(
+        "AwxToken",
+        on_delete=models.SET_NULL,
+        null=True,
+        default=None,
+    )
 
     class Meta:
         db_table = "core_event_stream"

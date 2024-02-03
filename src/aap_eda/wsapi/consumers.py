@@ -328,6 +328,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        awx_token = activation_instance.get_parent().awx_token
+        parent = activation_instance.get_parent()
+        if not hasattr(parent, "awx_token"):
+            return None
 
+        awx_token = parent.awx_token
         return awx_token.token.get_secret_value() if awx_token else None

@@ -114,6 +114,10 @@ class Activation(StatusHandlerModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    event_streams = models.ManyToManyField(
+        "EventStream",
+        default=None,
+    )
 
 
 class RulebookProcess(models.Model):
@@ -127,7 +131,6 @@ class RulebookProcess(models.Model):
         default=ActivationStatus.PENDING,
     )
     git_hash = models.TextField(null=False, default="")
-    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
