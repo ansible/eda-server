@@ -72,12 +72,31 @@ host_status_map = {
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
+class DefaultConsumer(AsyncWebsocketConsumer):
+    """Default consumer for websocket connections.
+
+    This is the consumer to handle all the unexpected paths, it will close the
+    connection with an error message.
+    """
+
+    async def connect(self):
+        await self.accept()
+        await self.send('{"error": "invalid path"}')
+        await self.close()
+
+
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         data = json.loads(text_data)
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
 
-        msg_type = MessageType(data.get("type"))
+        msg_type = data.get("type")
+        try:
+            msg_type = MessageType(data.get("type"))
+        except ValueError:
+            logger.error(f"Unsupported message type: {data}")
+            await self.close()
+            return
 
         try:
             if msg_type == MessageType.WORKER:
@@ -94,8 +113,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 logger.info("Websocket connection is closed.")
             elif msg_type == MessageType.SESSION_STATS:
                 await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
-            else:
-                logger.warning(f"Unsupported message received: {data}")
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
 
