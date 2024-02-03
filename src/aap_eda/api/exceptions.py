@@ -95,3 +95,18 @@ class InvalidWebsocketHost(APIException):
     default_detail = (
         "Connection Error: WebSocket URL must have a valid host address."
     )
+
+
+class MissingEventStreamRulebook(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = (
+        "Configuration Error: Event stream template rulebook not found"
+    )
+
+
+class MissingEventStreamRulebookKeys(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = (
+        "Configuration Error: Event stream template rulebook missed required "
+        "keys in complementary_source: type, name and args"
+    )

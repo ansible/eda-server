@@ -221,7 +221,8 @@ class ActivationManager:
 
     def _check_non_finalized_instances(self) -> None:
         instances = models.RulebookProcess.objects.filter(
-            activation=self.db_instance,
+            parent_id=self.db_instance.id,
+            parent_fqcn=self.db_instance_fqcn,
         )
         for instance in instances:
             if instance.status not in [
@@ -1028,12 +1029,16 @@ class ActivationManager:
             return
 
     def _create_activation_instance(self):
+        git_hash = (
+            self.db_instance.git_hash
+            if hasattr(self.db_instance, "git_hash")
+            else ""
+        )
         try:
             models.RulebookProcess.objects.create(
-                activation=self.db_instance,
                 name=self.db_instance.name,
                 status=ActivationStatus.STARTING,
-                git_hash=self.db_instance.git_hash,
+                git_hash=git_hash,
                 parent_id=self.db_instance.id,
                 parent_fqcn=self.db_instance_fqcn,
             )

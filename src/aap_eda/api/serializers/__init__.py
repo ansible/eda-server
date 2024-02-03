@@ -38,6 +38,7 @@ from .decision_environment import (
     DecisionEnvironmentRefSerializer,
     DecisionEnvironmentSerializer,
 )
+from .event_stream import EventStreamCreateSerializer, EventStreamSerializer
 from .project import (
     ExtraVarCreateSerializer,
     ExtraVarRefSerializer,
@@ -122,4 +123,7 @@ __all__ = (
     "RoleSerializer",
     "RoleListSerializer",
     "RoleDetailSerializer",
+    # event streams
+    "EventStreamSerializer",
+    "EventStreamCreateSerializer",
 )
