@@ -14,6 +14,11 @@
 
 import typing as tp
 
+from django.contrib.contenttypes.fields import (
+    GenericForeignKey,
+    GenericRelation,
+)
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from aap_eda.core.enums import (
@@ -35,8 +40,6 @@ __all__ = (
     "RulebookProcess",
     "RulebookProcessLog",
 )
-
-from django.utils.module_loading import import_string
 
 
 class Activation(StatusHandlerModelMixin, models.Model):
@@ -118,6 +121,7 @@ class Activation(StatusHandlerModelMixin, models.Model):
         "EventStream",
         default=None,
     )
+    instances = GenericRelation("RulebookProcess")
 
 
 class RulebookProcess(models.Model):
@@ -137,18 +141,23 @@ class RulebookProcess(models.Model):
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
-    parent_id = models.BigIntegerField(null=False)
-    parent_fqcn = models.TextField(null=False)
+    # parent_id = models.BigIntegerField(null=False)
+    # parent_fqcn = models.TextField(null=False)
+    # the required fields to enable a generic relation
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
 
     def get_parent(self):
-        try:
-            parent_model = import_string(self.parent_fqcn)
-        except ImportError:
-            raise ImportError(
-                f"Parent class [{self.parent_fqcn}] not found"
-            ) from None
+        return self.content_object
+        # try:
+        #    parent_model = import_string(self.parent_fqcn)
+        # except ImportError:
+        #    raise ImportError(
+        #        f"Parent class [{self.parent_fqcn}] not found"
+        #    ) from None
 
-        return parent_model.objects.get(id=self.parent_id)
+        # return parent_model.objects.get(id=self.parent_id)
 
     def save(self, *args, **kwargs):
         parent = self.get_parent()

@@ -24,6 +24,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ActivationStatus
 from aap_eda.core.models import ActivationRequestQueue
 from aap_eda.core.tasking import unique_enqueue
+from aap_eda.core.utils import get_fully_qualified_name
 from aap_eda.services.activation.manager import ActivationManager
 
 LOGGER = logging.getLogger(__name__)
@@ -172,7 +173,9 @@ def monitor_rulebook_processes() -> None:
     for process in models.RulebookProcess.objects.filter(
         status=ActivationStatus.RUNNING,
     ):
-        process_parent_type = process.parent_fqcn
-        id = process.parent_id
-        job_id = _manage_process_job_id(process_parent_type, id)
-        unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+        parent = process.get_parent()
+        process_parent_type = get_fully_qualified_name(parent)
+        job_id = _manage_process_job_id(process_parent_type, parent.id)
+        unique_enqueue(
+            "activation", job_id, _manage, process_parent_type, parent.id
+        )

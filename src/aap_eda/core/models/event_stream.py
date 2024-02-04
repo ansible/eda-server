@@ -14,9 +14,11 @@
 
 import uuid
 
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.models.activation import RulebookProcess
 
 from .mixins import StatusHandlerModelMixin
 
@@ -88,6 +90,7 @@ class EventStream(StatusHandlerModelMixin, models.Model):
         null=True,
         default=None,
     )
+    instances = GenericRelation(RulebookProcess)
 
     class Meta:
         db_table = "core_event_stream"

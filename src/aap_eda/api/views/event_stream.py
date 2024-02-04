@@ -167,10 +167,12 @@ class EventStreamViewSet(
                 detail=f"EventStream with ID={id} does not exist.",
             )
 
-        event_stream_instances = models.RulebookProcess.objects.filter(
-            parent_id=id,
-            parent_fqcn="aap_eda.core.models.event_stream.EventStream",
-        )
+        event_stream = models.EventStream.objects.get(id=id)
+        event_stream_instances = event_stream.instances.all()
+        # event_stream_instances = models.RulebookProcess.objects.filter(
+        #    parent_id=id,
+        #    parent_fqcn="aap_eda.core.models.event_stream.EventStream",
+        # )
         logger.info(f"====>event streams: {event_stream_instances} ")
         filtered_instances = self.filter_queryset(event_stream_instances)
         logger.info(f"====>filter instances: {filtered_instances} ")

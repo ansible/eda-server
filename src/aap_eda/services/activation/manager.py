@@ -220,11 +220,11 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
-        instances = models.RulebookProcess.objects.filter(
-            parent_id=self.db_instance.id,
-            parent_fqcn=self.db_instance_fqcn,
-        )
-        for instance in instances:
+        # instances = models.RulebookProcess.objects.filter(
+        #    parent_id=self.db_instance.id,
+        #    parent_fqcn=self.db_instance_fqcn,
+        # )
+        for instance in self.db_instance.instances.all():
             if instance.status not in [
                 ActivationStatus.STOPPED,
                 ActivationStatus.COMPLETED,
@@ -1039,8 +1039,9 @@ class ActivationManager:
                 name=self.db_instance.name,
                 status=ActivationStatus.STARTING,
                 git_hash=git_hash,
-                parent_id=self.db_instance.id,
-                parent_fqcn=self.db_instance_fqcn,
+                content_object=self.db_instance
+                # parent_id=self.db_instance.id,
+                # parent_fqcn=self.db_instance_fqcn,
             )
         except IntegrityError as exc:
             msg = (

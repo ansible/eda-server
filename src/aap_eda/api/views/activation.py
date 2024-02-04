@@ -162,10 +162,12 @@ class ActivationViewSet(
                 detail=f"Activation with ID={id} does not exist.",
             )
 
-        activation_instances = models.RulebookProcess.objects.filter(
-            parent_id=id,
-            parent_fqcn="aap_eda.core.models.activation.Activation",
-        )
+        activation = models.Activation.objects.get(id=id)
+        activation_instances = activation.instances.all()
+        # activation_instances = models.RulebookProcess.objects.filter(
+        #    parent_id=id,
+        #    parent_fqcn="aap_eda.core.models.activation.Activation",
+        # )
         filtered_instances = self.filter_queryset(activation_instances)
         result = self.paginate_queryset(filtered_instances)
         serializer = serializers.ActivationInstanceSerializer(

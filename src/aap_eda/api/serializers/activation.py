@@ -32,7 +32,6 @@ from aap_eda.api.serializers.utils import (
     swap_sources,
 )
 from aap_eda.core import models, validators
-from aap_eda.core.utils import get_fully_qualified_name
 
 logger = logging.getLogger(__name__)
 
@@ -279,14 +278,14 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "status_message",
             # for backward compatibility for UI
             "activation_id",
-            "parent_id",
+            "object_id",
             "started_at",
             "ended_at",
         ]
         read_only_fields = ["id", "started_at", "ended_at"]
 
     def get_activation_id(self, obj) -> int:
-        return obj.parent_id
+        return obj.object_id
 
 
 class ActivationInstanceLogSerializer(serializers.ModelSerializer):
@@ -365,10 +364,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.extra_var
             else None
         )
-        activation_instances = models.RulebookProcess.objects.filter(
-            parent_id=activation.id,
-            parent_fqcn=get_fully_qualified_name(activation),
-        )
+        # activation_instances = models.RulebookProcess.objects.filter(
+        #    parent_id=activation.id,
+        #    parent_fqcn=get_fully_qualified_name(activation),
+        # )
+        activation_instances = activation.instances.all()
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
