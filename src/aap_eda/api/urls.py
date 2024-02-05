@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from ansible_base.lib.dynamic_config.dynamic_urls import api_version_urls
+from ansible_base.resource_registry.urls import (
+    urlpatterns as resource_api_urls,
+)
 from django.urls import include, path
 from drf_spectacular.views import (
     SpectacularJSONAPIView,
@@ -70,6 +73,7 @@ v1_urls = [
     # <- Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
     path("", include(api_version_urls)),
     # ->
+    path("", include(resource_api_urls)),
     path("", include(openapi_urls)),
     path("auth/session/login/", views.SessionLoginView.as_view()),
     path("auth/session/logout/", views.SessionLogoutView.as_view()),
