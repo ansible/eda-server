@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
+from aap_eda.core.enums import CredentialType
 
 from .messages import (
     ActionMessage,
@@ -21,6 +22,8 @@ from .messages import (
     HeartbeatMessage,
     JobMessage,
     Rulebook,
+    VaultCollection,
+    VaultPassword,
     WorkerMessage,
 )
 
@@ -121,6 +124,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
             )
             await self.send(text_data=controller_info.json())
+
+        vault_data = await self.get_vault_passwords(message)
+        if vault_data:
+            vault_collection = VaultCollection(data=vault_data)
+            await self.send(text_data=vault_collection.json())
+
         await self.send(text_data=EndOfResponse().json())
 
         # TODO: add broadcasting later by channel groups
@@ -333,3 +342,35 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         awx_token = activation_instance.activation.awx_token
 
         return awx_token.token.get_secret_value() if awx_token else None
+
+    @database_sync_to_async
+    def get_vault_passwords(
+        self, message: WorkerMessage
+    ) -> tp.List[VaultPassword]:
+        """Get vault info from activation."""
+        activation_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        activation = activation_instance.activation
+        vault_passwords = []
+
+        if activation.system_vault_credential:
+            vault = models.Credential.objects.filter(
+                id=activation.system_vault_credential.id
+            )
+        else:
+            vault = models.Credential.objects.none()
+
+        for credential in activation.credentials.filter(
+            credential_type=CredentialType.VAULT
+        ).union(vault):
+            vault_passwords.append(
+                VaultPassword(
+                    label=credential.vault_identifier,
+                    # TODO: Use pydantic secret feature (available > 2.0)
+                    # https://docs.pydantic.dev/latest/examples/secrets/
+                    password=credential.secret.get_secret_value(),
+                )
+            )
+
+        return vault_passwords

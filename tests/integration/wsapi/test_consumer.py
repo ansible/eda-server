@@ -8,7 +8,9 @@ from channels.testing import WebsocketCommunicator
 from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
+from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
+from aap_eda.core.enums import CredentialType
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
 TIMEOUT = 5
@@ -46,7 +48,9 @@ DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_workers(ws_communicator: WebsocketCommunicator):
+async def test_handle_workers_without_credentials(
+    ws_communicator: WebsocketCommunicator,
+):
     activation_instance_with_extra_var = await _prepare_db_data()
     activation_instance_without_extra_var = (
         await _prepare_activation_instance_without_extra_var()
@@ -100,6 +104,98 @@ async def test_handle_workers(ws_communicator: WebsocketCommunicator):
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_system_vault_credential(
+    ws_communicator: WebsocketCommunicator,
+):
+    activation_instance_id = (
+        await _prepare_activation_instance_with_system_vault_credential()
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
+        "VaultCollection",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "VaultCollection":
+            data = response["data"]
+            assert len(data) == 1
+            assert data[0]["type"] == "VaultPassword"
+            assert data[0]["password"] == "system_secret"
+            assert data[0]["label"] == EDA_SERVER_VAULT_LABEL
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_vault_credentials(
+    ws_communicator: WebsocketCommunicator,
+):
+    activation_instance_id = (
+        await _prepare_activation_instance_with_vault_credentials()
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
+        "VaultCollection",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "VaultCollection":
+            data = response["data"]
+            assert len(data) == 1
+            assert data[0]["type"] == "VaultPassword"
+            assert data[0]["password"] == "sec1"
+            assert data[0]["label"] is None
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_all_credentials(
+    ws_communicator: WebsocketCommunicator,
+):
+    activation_instance_id = (
+        await _prepare_activation_instance_with_all_credentials()
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": activation_instance_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
+        "VaultCollection",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "VaultCollection":
+            data = response["data"]
+            assert len(data) == 2
+            assert data[0]["type"] == "VaultPassword"
+            assert data[1]["type"] == "VaultPassword"
+            if data[0]["label"] == EDA_SERVER_VAULT_LABEL:
+                assert data[0]["password"] == "system_secret"
+                assert data[1]["password"] == "sec1"
+            else:
+                assert data[0]["password"] == "sec1"
+                assert data[1]["password"] == "system_secret"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -425,6 +521,172 @@ def get_activation_instance_job_instance_count():
 @database_sync_to_async
 def get_job_instance_event_count():
     return models.JobInstanceEvent.objects.count()
+
+
+@database_sync_to_async
+def _prepare_activation_instance_with_vault_credentials():
+    project, _ = models.Project.objects.get_or_create(
+        name="test-project",
+        url="https://github.com/test/project",
+        git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+    )
+
+    rulebook, _ = models.Rulebook.objects.get_or_create(
+        name="test-rulebook",
+        rulesets=TEST_RULESETS,
+        project=project,
+    )
+
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_test_name_1",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
+
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+
+    credential = models.Credential.objects.create(
+        name="credential1",
+        username="me",
+        secret="sec1",
+        credential_type=CredentialType.VAULT,
+    )
+
+    activation, _ = models.Activation.objects.get_or_create(
+        name="test-activation",
+        restart_policy="always",
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+    )
+    activation.credentials.add(credential)
+
+    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+        activation=activation,
+    )
+
+    return activation_instance.id
+
+
+@database_sync_to_async
+def _prepare_activation_instance_with_system_vault_credential():
+    project, _ = models.Project.objects.get_or_create(
+        name="test-project",
+        url="https://github.com/test/project",
+        git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+    )
+
+    rulebook, _ = models.Rulebook.objects.get_or_create(
+        name="test-rulebook",
+        rulesets=TEST_RULESETS,
+        project=project,
+    )
+
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_test_name_1",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
+
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+
+    credential = models.Credential.objects.create(
+        name="credential1",
+        username="me",
+        secret="system_secret",
+        vault_identifier=EDA_SERVER_VAULT_LABEL,
+        credential_type=CredentialType.VAULT,
+    )
+
+    activation, _ = models.Activation.objects.get_or_create(
+        name="test-activation",
+        restart_policy="always",
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+        system_vault_credential=credential,
+    )
+
+    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+        activation=activation,
+    )
+
+    return activation_instance.id
+
+
+@database_sync_to_async
+def _prepare_activation_instance_with_all_credentials():
+    project, _ = models.Project.objects.get_or_create(
+        name="test-project",
+        url="https://github.com/test/project",
+        git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+    )
+
+    rulebook, _ = models.Rulebook.objects.get_or_create(
+        name="test-rulebook",
+        rulesets=TEST_RULESETS,
+        project=project,
+    )
+
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_test_name_1",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
+
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+
+    system_credential = models.Credential.objects.create(
+        name="system_credential",
+        username="me",
+        secret="system_secret",
+        vault_identifier=EDA_SERVER_VAULT_LABEL,
+        credential_type=CredentialType.VAULT,
+    )
+
+    credential = models.Credential.objects.create(
+        name="credential1",
+        username="me",
+        secret="sec1",
+        credential_type=CredentialType.VAULT,
+    )
+
+    activation, _ = models.Activation.objects.get_or_create(
+        name="test-activation",
+        restart_policy="always",
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+        system_vault_credential=system_credential,
+    )
+    activation.credentials.add(credential)
+
+    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+        activation=activation,
+    )
+
+    return activation_instance.id
 
 
 @database_sync_to_async
