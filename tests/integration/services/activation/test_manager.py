@@ -23,8 +23,6 @@ from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.activation.engine import exceptions as engine_exceptions
-from aap_eda.services.activation.engine.common import ContainerEngine
 from aap_eda.services.activation.manager import (
     ACTIVATION_PATH,
     LOGGER,
@@ -32,6 +30,8 @@ from aap_eda.services.activation.manager import (
     AnsibleRulebookCmdLine,
     exceptions,
 )
+from aap_eda.services.process.engine import exceptions as engine_exceptions
+from aap_eda.services.process.engine.common import ContainerEngine
 
 
 def apply_settings(settings: SettingsWrapper, **kwargs):

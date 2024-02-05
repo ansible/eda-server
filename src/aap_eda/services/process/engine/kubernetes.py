@@ -26,7 +26,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
 
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.services.activation.engine.exceptions import (
+from aap_eda.services.process.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineError,
     ContainerEngineInitError,
