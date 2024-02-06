@@ -8,7 +8,7 @@ import aap_eda.core.enums
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0016_rename_activationinstance_rulebookprocess_and_more"),
+        ("core", "0018_rename_activationinstance_rulebookprocess_and_more"),
     ]
 
     operations = [
