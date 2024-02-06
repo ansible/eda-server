@@ -603,7 +603,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "0.0.0"
+version = "2024.1.31"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -611,10 +611,12 @@ files = []
 develop = false
 
 [package.dependencies]
+channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-auth-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
 django-crum = "*"
+django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
 python-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
@@ -722,6 +724,30 @@ files = [
 [package.dependencies]
 django = ">=3.0"
 pytz = "*"
+
+[[package]]
+name = "djangorestframework-simplejwt"
+version = "5.3.1"
+description = "A minimal JSON Web Token authentication plugin for Django REST Framework"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "djangorestframework_simplejwt-5.3.1-py3-none-any.whl", hash = "sha256:381bc966aa46913905629d472cd72ad45faa265509764e20ffd440164c88d220"},
+    {file = "djangorestframework_simplejwt-5.3.1.tar.gz", hash = "sha256:6c4bd37537440bc439564ebf7d6085e74c5411485197073f508ebdfa34bc9fae"},
+]
+
+[package.dependencies]
+django = ">=3.2"
+djangorestframework = ">=3.12"
+pyjwt = ">=1.7.1,<3"
+
+[package.extras]
+crypto = ["cryptography (>=3.3.1)"]
+dev = ["Sphinx (>=1.6.5,<2)", "cryptography", "flake8", "freezegun", "ipython", "isort", "pep8", "pytest", "pytest-cov", "pytest-django", "pytest-watch", "pytest-xdist", "python-jose (==3.3.0)", "sphinx_rtd_theme (>=0.1.9)", "tox", "twine", "wheel"]
+doc = ["Sphinx (>=1.6.5,<2)", "sphinx_rtd_theme (>=0.1.9)"]
+lint = ["flake8", "isort", "pep8"]
+python-jose = ["python-jose (==3.3.0)"]
+test = ["cryptography", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-xdist", "tox"]
 
 [[package]]
 name = "drf-spectacular"

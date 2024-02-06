@@ -220,6 +220,7 @@ def test_list_logs_from_activation_instance(client: APIClient):
         "id",
         "line_number",
         "log",
+        "log_timestamp",
         "activation_instance",
     ]
 

@@ -80,6 +80,9 @@ def get_ansible_rulebook_cmdline(data: InitData):
     return AnsibleRulebookCmdLine(
         ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
         ws_ssl_verify="no",
+        ws_token_url="http://localhost:8000/api/eda/v1/auth/token/refresh",
+        ws_access_token="access",
+        ws_refresh_token="refresh",
         id=data.activation.id,
         log_level="-v",
         heartbeat=5,

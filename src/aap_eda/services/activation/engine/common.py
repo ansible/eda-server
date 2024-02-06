@@ -50,6 +50,9 @@ class LogHandler(ABC):
 class AnsibleRulebookCmdLine(BaseModel):
     ws_url: str
     ws_ssl_verify: str
+    ws_access_token: str
+    ws_refresh_token: str
+    ws_token_url: str
     heartbeat: int
     id: tp.Union[str, int]  # casted to str
     log_level: tp.Optional[str] = None  # -v or -vv or None
@@ -61,13 +64,19 @@ class AnsibleRulebookCmdLine(BaseModel):
     def command(self) -> str:
         return "ansible-rulebook"
 
-    def get_args(self) -> list[str]:
+    def get_args(self, sanitized=False) -> list[str]:
         args = [
             "--worker",
             "--websocket-ssl-verify",
             self.ws_ssl_verify,
-            "--websocket-address",
+            "--websocket-url",
             self.ws_url,
+            "--websocket-access-token",
+            "******" if sanitized else self.ws_access_token,
+            "--websocket-refresh-token",
+            "******" if sanitized else self.ws_refresh_token,
+            "--websocket-token-url",
+            self.ws_token_url,
             "--id",
             self.id,
             "--heartbeat",
@@ -78,8 +87,8 @@ class AnsibleRulebookCmdLine(BaseModel):
 
         return args
 
-    def command_and_args(self) -> list[str]:
-        args = self.get_args()
+    def command_and_args(self, sanitized=False) -> list[str]:
+        args = self.get_args(sanitized)
         args.insert(0, self.command())
         return args
 

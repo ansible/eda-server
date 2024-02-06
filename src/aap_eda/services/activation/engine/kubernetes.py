@@ -16,7 +16,6 @@
 import base64
 import json
 import logging
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -213,29 +212,42 @@ class Engine(ContainerEngine):
                     "timestamps": True,
                 }
 
-                if log_handler.get_log_read_at():
-                    current_dt = datetime.fromtimestamp(
-                        time.time_ns() / 1e9, timezone.utc
-                    )
-                    log_args["since_seconds"] = (
-                        current_dt - log_handler.get_log_read_at()
-                    ).seconds
+                log_at = log_handler.get_log_read_at()
 
-                since = log_args.get("since_seconds")
-                if since and since == 0:
-                    return
+                if log_at:
+                    current_dt = datetime.now(timezone.utc)
+
+                    # 'since_seconds' can only accept integer of seconds
+                    # read an extra second, the overlapped will be removed
+                    log_args["since_seconds"] = (
+                        current_dt - log_at
+                    ).seconds + 1
+                    log_handler.clear_log_write_from(int(log_at.timestamp()))
 
                 log = self.client.core_api.read_namespaced_pod_log(**log_args)
                 timestamp = None
 
                 for line in log.splitlines():
                     timestamp, content = line.split(" ", 1)
+
+                    # remove the overlapped lines
+                    if log_at and log_at.timestamp() > self._set_log_timestamp(
+                        timestamp
+                    ):
+                        continue
+
                     log_handler.write(
-                        lines=content, flush=False, timestamp=False
+                        lines=content,
+                        flush=False,
+                        timestamp=False,
+                        log_timestamp=self._set_log_timestamp(timestamp),
                     )
 
                 if timestamp:
-                    dt = parser.parse(timestamp)
+                    log_timestamp = self._set_log_timestamp(timestamp)
+                    dt = datetime.fromtimestamp(
+                        int(log_timestamp), timezone.utc  # remove millisecond
+                    )
                     log_handler.flush()
                     log_handler.set_log_read_at(dt)
             else:
@@ -249,6 +261,9 @@ class Engine(ContainerEngine):
         # ContainerUpdateLogsError handled by the manager
         except ApiException as e:
             raise ContainerUpdateLogsError(str(e)) from e
+
+    def _set_log_timestamp(self, log_timestamp: str) -> int:
+        return int(parser.isoparse(log_timestamp).timestamp())
 
     def _get_job_pod(self, job_name: str) -> k8sclient.V1Pod:
         job_label = f"job-name={job_name}"
@@ -289,10 +304,12 @@ class Engine(ContainerEngine):
         LOGGER.info(
             f"Created container: name: {container.name}, "
             f"image: {container.image} "
-            f"args: {container.args}"
+            f"args: {request.cmdline.get_args(sanitized=True)}"
         )
 
-        log_handler.write(f"Container args {container.args}", True)
+        log_handler.write(
+            f"Container args {request.cmdline.get_args(sanitized=True)}", True
+        )
 
         return container
 
