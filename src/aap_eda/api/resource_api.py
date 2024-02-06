@@ -18,7 +18,8 @@ from ansible_base.resource_registry.registry import (
     SharedResource,
 )
 from ansible_base.resource_registry.shared_types import UserType
-from django.contrib.auth import get_user_model
+
+from aap_eda.core import models
 
 
 class APIConfig(ServiceAPIConfig):
@@ -27,7 +28,7 @@ class APIConfig(ServiceAPIConfig):
 
 RESOURCE_LIST = (
     ResourceConfig(
-        get_user_model(),
+        models.User,
         shared_resource=SharedResource(serializer=UserType, is_provider=False),
         name_field="username",
     ),
