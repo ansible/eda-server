@@ -21,6 +21,7 @@ import aap_eda.tasks.activation_request_queue as queue
 import aap_eda.tasks.orchestrator as orchestrator
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ActivationStatus
+from aap_eda.tasks.job_control import ActivationControl
 
 
 @pytest.fixture()
@@ -112,18 +113,18 @@ def test_manage_not_start(manager_mock, activation, max_running_activations):
 @pytest.mark.parametrize(
     "command, queued_request",
     [
-        (orchestrator.start_activation, ActivationRequest.START),
-        (orchestrator.stop_activation, ActivationRequest.STOP),
-        (orchestrator.start_activation, ActivationRequest.START),
-        (orchestrator.delete_activation, ActivationRequest.DELETE),
-        (orchestrator.restart_activation, ActivationRequest.RESTART),
+        (orchestrator.start_job, ActivationRequest.START),
+        (orchestrator.stop_job, ActivationRequest.STOP),
+        (orchestrator.start_job, ActivationRequest.START),
+        (orchestrator.delete_job, ActivationRequest.DELETE),
+        (orchestrator.restart_job, ActivationRequest.RESTART),
     ],
 )
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
 def test_activation_requests(
     enqueue_mock, activation, command, queued_request
 ):
-    command(activation.id)
+    command(ActivationControl(activation.id))
     enqueue_args = [
         "activation",
         orchestrator._manage_activation_job_id(activation.id),

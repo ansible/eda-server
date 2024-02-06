@@ -23,6 +23,8 @@ from aap_eda.core.models import ActivationRequestQueue
 from aap_eda.core.tasking import unique_enqueue
 from aap_eda.services.activation.manager import ActivationManager
 
+from .job_control import JobControl
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -117,34 +119,28 @@ def _can_start_new_activation(activation: models.Activation) -> bool:
     return True
 
 
-def _make_user_request(
-    activation_id: int,
-    request_type: ActivationRequest,
-) -> None:
-    """Enqueue a task to manage the activation with the given id."""
-    requests_queue.push(activation_id, request_type)
-    job_id = _manage_activation_job_id(activation_id)
-    unique_enqueue("activation", job_id, _manage, activation_id)
+def delete_job(control: JobControl) -> None:
+    """Create a request to delete the specified job."""
+    control.make_delete_request()
+    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
 
 
-def start_activation(activation_id: int) -> None:
-    """Create a request to start the activation with the given id."""
-    _make_user_request(activation_id, ActivationRequest.START)
+def restart_job(control: JobControl) -> None:
+    """Create a request to restart the specified job."""
+    control.make_restart_request()
+    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
 
 
-def stop_activation(activation_id: int) -> None:
-    """Create a request to stop the activation with the given id."""
-    _make_user_request(activation_id, ActivationRequest.STOP)
+def start_job(control: JobControl) -> None:
+    """Create a request to start the specified job."""
+    control.make_start_request()
+    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
 
 
-def delete_activation(activation_id: int) -> None:
-    """Create a request to delete the activation with the given id."""
-    _make_user_request(activation_id, ActivationRequest.DELETE)
-
-
-def restart_activation(activation_id: int) -> None:
-    """Create a request to restart the activation with the given id."""
-    _make_user_request(activation_id, ActivationRequest.RESTART)
+def stop_job(control: JobControl) -> None:
+    """Create a request to stop the specified job."""
+    control.make_stop_request()
+    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
 
 
 def monitor_activations() -> None:

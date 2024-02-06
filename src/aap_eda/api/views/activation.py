@@ -29,11 +29,12 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ResourceType
+from aap_eda.tasks.job_control import ActivationControl
 from aap_eda.tasks.orchestrator import (
-    delete_activation,
-    restart_activation,
-    start_activation,
-    stop_activation,
+    delete_job,
+    restart_job,
+    start_job,
+    stop_job,
 )
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class ActivationViewSet(
         response = serializer.create(serializer.validated_data)
 
         if response.is_enabled:
-            start_activation(activation_id=response.id)
+            start_job(ActivationControl(response.id))
 
         return Response(
             serializers.ActivationReadSerializer(response).data,
@@ -120,7 +121,7 @@ class ActivationViewSet(
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
-        delete_activation(activation_id=activation.id)
+        delete_job(ActivationControl(activation.id))
 
     @extend_schema(
         description="List all instances for the Activation",
@@ -224,7 +225,7 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
-        start_activation(activation_id=pk)
+        start_job(ActivationControl(pk))
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -250,7 +251,7 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
-            stop_activation(activation_id=activation.id)
+            stop_job(ActivationControl(activation.id))
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -290,7 +291,7 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        restart_activation(activation_id=activation.id)
+        restart_job(ActivationControl(activation.id))
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
