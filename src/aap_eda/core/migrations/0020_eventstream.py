@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "core",
-            "0018_rename_activationinstancelog_rulebookprocesslog_and_more",
+            "0019_activation_credentials_and_more",
         ),
     ]
 
