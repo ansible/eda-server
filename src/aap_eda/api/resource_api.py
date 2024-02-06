@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ansible_base.authentication.models import Authenticator, AuthenticatorMap
 from ansible_base.resource_registry.registry import (
     ResourceConfig,
     ServiceAPIConfig,
@@ -20,8 +19,6 @@ from ansible_base.resource_registry.registry import (
 )
 from ansible_base.resource_registry.shared_types import UserType
 from django.contrib.auth import get_user_model
-
-from aap_eda.core import models
 
 
 class APIConfig(ServiceAPIConfig):
@@ -34,22 +31,4 @@ RESOURCE_LIST = (
         shared_resource=SharedResource(serializer=UserType, is_provider=False),
         name_field="username",
     ),
-    ResourceConfig(models.AwxToken),
-    ResourceConfig(models.Activation),
-    ResourceConfig(models.RulebookProcess),
-    ResourceConfig(models.RulebookProcessLog, name_field=None),
-    ResourceConfig(models.Credential),
-    ResourceConfig(models.DecisionEnvironment),
-    ResourceConfig(models.EventStream),
-    ResourceConfig(models.Project),
-    ResourceConfig(models.ExtraVar),
-    ResourceConfig(models.Rulebook),
-    ResourceConfig(models.Rule),
-    ResourceConfig(models.Ruleset),
-    ResourceConfig(models.AuditAction),
-    ResourceConfig(models.AuditRule),
-    ResourceConfig(models.AuditEvent, name_field="source_name"),
-    # resources imported from ansible_base
-    ResourceConfig(Authenticator),
-    ResourceConfig(AuthenticatorMap),
 )
