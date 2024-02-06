@@ -61,7 +61,7 @@ class DBLogger(LogHandler):
                 line = f"{dt} {line}"
 
             self.activation_instance_log_buffer.append(
-                models.ActivationInstanceLog(
+                models.RulebookProcessLog(
                     line_number=self.num_of_log_lines(),
                     log=line,
                     activation_instance_id=self.activation_instance_id,
@@ -108,19 +108,19 @@ class DBLogger(LogHandler):
             raise ContainerUpdateLogsError(str(e))
 
     def num_of_log_lines(self) -> int:
-        return models.ActivationInstanceLog.objects.filter(
+        return models.RulebookProcessLog.objects.filter(
             activation_instance_id=self.activation_instance_id,
         ).count()
 
     def num_log_write_from(self, log_timestamp: int) -> int:
-        return models.ActivationInstanceLog.objects.filter(
+        return models.RulebookProcessLog.objects.filter(
             activation_instance_id=self.activation_instance_id,
             log_timestamp=log_timestamp,
         ).count()
 
     def clear_log_write_from(self, log_timestamp: int) -> int:
         try:
-            models.ActivationInstanceLog.objects.filter(
+            models.RulebookProcessLog.objects.filter(
                 activation_instance_id=self.activation_instance_id,
                 log_timestamp=log_timestamp,
             ).delete()
