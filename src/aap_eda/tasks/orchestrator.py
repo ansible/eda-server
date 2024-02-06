@@ -12,154 +12,236 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import abc
 import logging
+import typing
 
 from django.conf import settings
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ActivationStatus
-from aap_eda.core.models import ActivationRequestQueue
 from aap_eda.core.tasking import unique_enqueue
 from aap_eda.services.activation.manager import ActivationManager
-
-from .job_control import JobControl
 
 LOGGER = logging.getLogger(__name__)
 
 
-def _manage_activation_job_id(activation_id: int) -> str:
-    """Return the unique job id for the activation manager task."""
-    return f"activation-{activation_id}"
+class Orchestrator(abc.ABC):
+    def __init__(self, id: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.id = id
 
+    def enqueue(self) -> None:
+        unique_enqueue(self._queue_name(), self.job_id, self.manage, self.id)
 
-def _manage(activation_id: int) -> None:
-    """Manage the activation with the given id.
+    @staticmethod
+    @abc.abstractmethod
+    def manage(object_id: int) -> None:
+        """Manage the requests for the given id.
 
-    It will run pending user requests or monitor the activation
-    if there are no pending requests.
-    """
-    try:
-        activation = models.Activation.objects.get(id=activation_id)
-    except models.Activation.DoesNotExist:
-        LOGGER.warning(
-            f"Activation {activation_id} no longer exists, "
-            "activation manager task will not be processed",
-        )
-        return
+        It will run pending user requests or monitor running requests
+        if there are no pending requests.
+        """
+        ...
 
-    has_request_processed = False
-    while_condition = True
-    while while_condition:
-        pending_requests = requests_queue.peek_all(activation_id)
-        while_condition = bool(pending_requests)
-        for request in pending_requests:
-            if _run_request(activation, request):
-                requests_queue.pop_until(activation_id, request.id)
-                has_request_processed = True
-            else:
-                while_condition = False
-                break
+    # TODO(jshimkus): create an abstract RequestQueue.
+    @classmethod
+    @abc.abstractmethod
+    def queue(cls) -> type[requests_queue]:
+        """Return the queue used for the requests."""
+        ...
 
-    if (
-        not has_request_processed
-        and activation.status == ActivationStatus.RUNNING
-    ):
-        LOGGER.info(
-            f"Processing monitor request for activation {activation_id}",
-        )
-        ActivationManager(activation).monitor()
+    @property
+    @abc.abstractmethod
+    def job_id(self) -> str:
+        """Return the unique request id."""
+        ...
 
+    @abc.abstractmethod
+    def delete_job(self) -> None:
+        """Create a request to delete the job."""
+        ...
 
-def _run_request(
-    activation: models.Activation,
-    request: ActivationRequestQueue,
-) -> bool:
-    """Attempt to run a request for an activation via the manager."""
-    LOGGER.info(
-        f"Processing request {request.request} for activation "
-        f"{activation.id}",
-    )
-    start_commands = [ActivationRequest.START, ActivationRequest.AUTO_START]
-    if request.request in start_commands and not _can_start_new_activation(
-        activation,
-    ):
-        return False
+    @abc.abstractmethod
+    def restart_job(self) -> None:
+        """Create a request to restart the job."""
+        ...
 
-    manager = ActivationManager(activation)
-    try:
-        if request.request in start_commands:
-            manager.start(
-                is_restart=request.request == ActivationRequest.AUTO_START,
+    @abc.abstractmethod
+    def start_job(self) -> None:
+        """Create a request to start the job."""
+        ...
+
+    @abc.abstractmethod
+    def stop_job(self) -> None:
+        """Create a request to stop the job."""
+        ...
+
+    @classmethod
+    @abc.abstractmethod
+    def _can_start_new_job(cls, object: typing.Any) -> bool:
+        ...
+        num_running_activations = models.Activation.objects.filter(
+            status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+        ).count()
+        if num_running_activations >= settings.MAX_RUNNING_ACTIVATIONS:
+            LOGGER.info(
+                "No capacity to start a new activation. "
+                f"Activation {object.id} is postponed",
             )
-        elif request.request == ActivationRequest.STOP:
-            manager.stop()
-        elif request.request == ActivationRequest.RESTART:
-            manager.restart()
-        elif request.request == ActivationRequest.DELETE:
-            manager.delete()
-    except Exception as e:
-        LOGGER.exception(
-            f"Failed to process request {request.request} for "
-            f"activation {activation.id}. Reason {str(e)}",
-        )
-    return True
+            return False
+        return True
+
+    # TODO(jshimkus) - Abstract the object type.
+    @classmethod
+    def _manage(cls, object: typing.Any) -> bool:
+        """Run pending user requests, if any.
+
+        Returns a boolean indicating if one or more pending requests
+        where run.
+        """
+        has_request_processed = False
+        while_condition = True
+        while while_condition:
+            pending_requests = cls.queue().peek_all(object.id)
+            while_condition = bool(pending_requests)
+            for request in pending_requests:
+                if cls._run_request(object, request):
+                    cls.queue().pop_until(object.id, request.id)
+                    has_request_processed = True
+                else:
+                    while_condition = False
+                    break
+        return has_request_processed
+
+    # TODO(jshimkus) - Abstract the request type.
+    def _make_request(self, request_type: ActivationRequest) -> None:
+        """Enqueue a task to run the job."""
+        self.queue().push(self.id, request_type)
+        self.enqueue()
+
+    @classmethod
+    @abc.abstractmethod
+    def _queue_name(cls) -> str:
+        """Return the name of the queue used for the requests."""
+        ...
+
+    @classmethod
+    @abc.abstractmethod
+    def _run_request(cls, object: typing.Any, request: typing.Any) -> bool:
+        ...
 
 
-def _can_start_new_activation(activation: models.Activation) -> bool:
-    num_running_activations = models.Activation.objects.filter(
-        status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
-    ).count()
-    if num_running_activations >= settings.MAX_RUNNING_ACTIVATIONS:
+class ActivationOrchestrator(Orchestrator):
+    @staticmethod
+    def manage(object_id: int) -> None:
+        try:
+            activation = models.Activation.objects.get(id=object_id)
+        except models.Activation.DoesNotExist:
+            LOGGER.warning(
+                f"Activation {object_id} no longer exists, "
+                "activation manager task will not be processed",
+            )
+            return
+
+        if (
+            not ActivationOrchestrator._manage(activation)
+            and activation.status == ActivationStatus.RUNNING
+        ):
+            LOGGER.info(
+                f"Processing monitor request for activation {activation.id}",
+            )
+            ActivationManager(activation).monitor()
+
+    @classmethod
+    def queue(cls) -> type[requests_queue]:
+        return requests_queue
+
+    @property
+    def job_id(self) -> str:
+        return f"activation-{self.id}"
+
+    def delete_job(self) -> None:
+        self._make_request(ActivationRequest.DELETE)
+
+    def restart_job(self) -> None:
+        self._make_request(ActivationRequest.RESTART)
+
+    def start_job(self) -> None:
+        self._make_request(ActivationRequest.START)
+
+    def stop_job(self: int) -> None:
+        self._make_request(ActivationRequest.STOP)
+
+    @classmethod
+    def _can_start_new_job(cls, object: typing.Any) -> bool:
+        num_running_activations = models.Activation.objects.filter(
+            status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+        ).count()
+        if num_running_activations >= settings.MAX_RUNNING_ACTIVATIONS:
+            LOGGER.info(
+                "No capacity to start a new activation. "
+                f"Activation {object.id} is postponed",
+            )
+            return False
+        return True
+
+    @classmethod
+    def _queue_name(cls) -> str:
+        return "activation"
+
+    @classmethod
+    def _run_request(cls, object: typing.Any, request: typing.Any) -> bool:
+        """Attempt to run a request for an activation via the manager."""
         LOGGER.info(
-            "No capacity to start a new activation. "
-            f"Activation {activation.id} is postponed",
+            f"Processing request {request.request} for activation "
+            f"{object.id}",
         )
-        return False
-    return True
+        start_commands = [
+            ActivationRequest.START,
+            ActivationRequest.AUTO_START,
+        ]
+        if request.request in start_commands and not cls._can_start_new_job(
+            object,
+        ):
+            return False
 
-
-def delete_job(control: JobControl) -> None:
-    """Create a request to delete the specified job."""
-    control.make_delete_request()
-    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
-
-
-def restart_job(control: JobControl) -> None:
-    """Create a request to restart the specified job."""
-    control.make_restart_request()
-    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
-
-
-def start_job(control: JobControl) -> None:
-    """Create a request to start the specified job."""
-    control.make_start_request()
-    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
-
-
-def stop_job(control: JobControl) -> None:
-    """Create a request to stop the specified job."""
-    control.make_stop_request()
-    unique_enqueue(control.queue_name(), control.job_id, _manage, control.id)
+        manager = ActivationManager(object)
+        try:
+            if request.request in start_commands:
+                manager.start(
+                    is_restart=request.request == ActivationRequest.AUTO_START,
+                )
+            elif request.request == ActivationRequest.STOP:
+                manager.stop()
+            elif request.request == ActivationRequest.RESTART:
+                manager.restart()
+            elif request.request == ActivationRequest.DELETE:
+                manager.delete()
+        except Exception as e:
+            LOGGER.exception(
+                f"Failed to process request {request.request} for "
+                f"activation {object.id}. Reason {str(e)}",
+            )
+        return True
 
 
 def monitor_activations() -> None:
     """Monitor activations scheduled task.
 
     Started by the scheduler, executed by the default worker.
-    It enqueues a task for each activation that needs to be managed.
-    Handles both user requests and monitoring of running activations.
+    It enqueues a task for each job that needs to be managed.
+    Handles both user requests and monitoring of running jobs.
     It will not enqueue a task if there is already one for the same
-    activation.
+    job.
     """
     # run pending user requests
-    for activation_id in requests_queue.list_activations():
-        job_id = _manage_activation_job_id(activation_id)
-        unique_enqueue("activation", job_id, _manage, activation_id)
+    for activation_id in ActivationOrchestrator.queue().list_activations():
+        ActivationOrchestrator(activation_id).enqueue()
 
     # monitor running instances
     for activation in models.Activation.objects.filter(
         status=ActivationStatus.RUNNING,
     ):
-        job_id = _manage_activation_job_id(activation.id)
-        unique_enqueue("activation", job_id, _manage, activation.id)
+        ActivationOrchestrator(activation.id).enqueue()
