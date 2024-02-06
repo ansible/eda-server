@@ -603,7 +603,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.1.31"
+version = "0.0.0"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -611,7 +611,6 @@ files = []
 develop = false
 
 [package.dependencies]
-channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-auth-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
@@ -625,16 +624,16 @@ social-auth-app-django = {version = "*", optional = true, markers = "extra == \"
 tabulate = {version = "*", optional = true, markers = "extra == \"authentication\""}
 
 [package.extras]
-all = ["channels", "django-auth-ldap", "drf-spectacular", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
+all = ["django-auth-ldap", "drf-spectacular", "pyjwt", "python-ldap", "python3-saml", "requests", "social-auth-app-django", "tabulate"]
+api-documentation = ["drf-spectacular"]
 authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
-channel-auth = ["channels"]
-swagger = ["drf-spectacular"]
+jwt-consumer = ["pyjwt", "requests"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "b84ee3a71490f6d842529c6814f2327e70fe55de"
+reference = "2024.1.31"
+resolved_reference = "62ff63d2abcc7d8d70799b7414e681c317ece335"
 
 [[package]]
 name = "django-auth-ldap"
@@ -2714,4 +2713,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "6b8de97d18d1b89cc7783da63ba7f5584308e18c5b4887e7bbb50f20210a0aec"
+content-hash = "69458175bdf3d4c6b2eca44d8e7cf506e9245a88493bc5739a65b43c275dc419"
