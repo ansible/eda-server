@@ -16,7 +16,7 @@ import pytest
 
 import aap_eda.tasks.activation_request_queue as queue
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationRequest
+from aap_eda.core.enums import ActivationRequest, ProcessParentType
 
 
 @pytest.fixture()
@@ -43,20 +43,35 @@ def activations():
 
 @pytest.mark.django_db
 def test_queue(activations):
-    queue.push(activations[0].id, ActivationRequest.STOP)
-    queue.push(activations[1].id, ActivationRequest.DELETE)
-    queue.push(activations[0].id, ActivationRequest.START)
-    assert models.ActivationRequestQueue.objects.count() == 3
-    assert queue.list_activations() == [
-        activations[0].id,
+    queue.push(
+        ProcessParentType.ACTIVATION, activations[0].id, ActivationRequest.STOP
+    )
+    queue.push(
+        ProcessParentType.ACTIVATION,
         activations[1].id,
+        ActivationRequest.DELETE,
+    )
+    queue.push(
+        ProcessParentType.ACTIVATION,
+        activations[0].id,
+        ActivationRequest.START,
+    )
+    assert models.ActivationRequestQueue.objects.count() == 3
+    assert queue.list_requests() == [
+        (ProcessParentType.ACTIVATION, activations[0].id),
+        (ProcessParentType.ACTIVATION, activations[1].id),
     ]
 
-    requests = queue.peek_all(activations[0].id)
+    requests = queue.peek_all(ProcessParentType.ACTIVATION, activations[0].id)
     assert len(requests) == 2
 
-    queue.pop_until(activations[0].id, requests[1].id)
-    assert len(queue.peek_all(activations[0].id)) == 0
+    queue.pop_until(
+        ProcessParentType.ACTIVATION, activations[0].id, requests[1].id
+    )
+    assert (
+        len(queue.peek_all(ProcessParentType.ACTIVATION, activations[0].id))
+        == 0
+    )
 
 
 @pytest.mark.parametrize(
@@ -112,8 +127,8 @@ def test_queue(activations):
 @pytest.mark.django_db
 def test_arbitrate(activations, requests):
     for request in requests["queued"]:
-        queue.push(activations[0].id, request)
-    dequeued = queue.peek_all(activations[0].id)
+        queue.push(ProcessParentType.ACTIVATION, activations[0].id, request)
+    dequeued = queue.peek_all(ProcessParentType.ACTIVATION, activations[0].id)
     dequeued_requests = [entry.request for entry in dequeued]
     assert dequeued_requests == requests["dequeued"]
     assert models.ActivationRequestQueue.objects.count() == len(
