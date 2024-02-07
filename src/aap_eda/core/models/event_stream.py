@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import uuid
-
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
@@ -76,10 +74,19 @@ class EventStream(StatusHandlerModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
-    uuid = models.UUIDField(default=uuid.uuid4)
+    channel_name = models.TextField(null=True, default=None)
     source_type = models.TextField(null=False)
     args = models.JSONField(null=True, default=None)
-    listener_args = models.JSONField(null=True, default=None)
+    system_vault_credential = models.OneToOneField(
+        "Credential",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    credentials = models.ManyToManyField(
+        "Credential", related_name="event_streams", default=None
+    )
 
     class Meta:
         db_table = "core_event_stream"

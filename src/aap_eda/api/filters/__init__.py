@@ -19,6 +19,7 @@ from .activation import (
 )
 from .credential import CredentialFilter
 from .decision_environment import DecisionEnvironmentFilter
+from .event_stream import EventStreamFilter
 from .project import ProjectFilter
 from .role import RoleFilter
 from .rulebook import (
@@ -51,4 +52,6 @@ __all__ = (
     "UserFilter",
     # role
     "RoleFilter",
+    # event_stream
+    "EventStreamFilter",
 )

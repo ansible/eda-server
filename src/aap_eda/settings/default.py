@@ -478,3 +478,18 @@ ANSIBLE_BASE_JWT_VALIDATE_CERT = settings.get(
 ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
+
+ACTIVATION_DB_HOST = settings.get(
+    "ACTIVATION_DB_HOST", "host.containers.internal"
+)
+
+_DEFAULT_PG_NOTIFY_DSN = (
+    f"host={ACTIVATION_DB_HOST} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
+    f"password={DATABASES['default']['PASSWORD']}"
+)
+
+PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
+PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
