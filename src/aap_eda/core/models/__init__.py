@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.rbac import permission_registry
+
 from .activation import Activation, RulebookProcess, RulebookProcessLog
 from .auth import Permission, Role
 from .credential import Credential
@@ -25,6 +27,7 @@ from .job import (
     JobInstanceEvent,
     JobInstanceHost,
 )
+from .organization import Organization
 from .project import ExtraVar, Project
 from .queue import ActivationRequestQueue
 from .rulebook import (
@@ -35,6 +38,7 @@ from .rulebook import (
     Rulebook,
     Ruleset,
 )
+from .team import Team
 from .user import AwxToken, User
 
 __all__ = [
@@ -63,4 +67,16 @@ __all__ = [
     "DecisionEnvironment",
     "ActivationRequestQueue",
     "EventStream",
+    "Organization",
+    "Team",
 ]
+
+permission_registry.register(
+    Activation,
+    Team,
+    Organization,
+    Credential,
+    Activation,
+    DecisionEnvironment,
+    parent_field_name=None,
+)
