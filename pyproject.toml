@@ -45,6 +45,7 @@ rq-scheduler = "^0.10"
 # temporarily pinning Alan's permissions branch for RBAC work
 django-ansible-base = { git = "https://github.com/alancoding/django-ansible-base.git", branch = "django_permissions", extras = [
     "authentication",
+    "channel_auth",
     "rbac",
 ] }
 jinja2 = "*"
