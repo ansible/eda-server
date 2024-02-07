@@ -12,29 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as tp
-
 from django.db import models
 
-from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
-    ActivationStatus,
-    RestartPolicy,
-)
-from aap_eda.core.exceptions import (
-    StatusRequiredError,
-    UnknownStatusError,
-    UpdateFieldsRequiredError,
-)
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
-__all__ = (
-    "Activation",
-    "RulebookProcess",
-    "RulebookProcessLog",
-)
+__all__ = ("Activation",)
 
 
 class Activation(StatusHandlerModelMixin, models.Model):
@@ -112,113 +97,3 @@ class Activation(StatusHandlerModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
-
-
-class RulebookProcess(models.Model):
-    class Meta:
-        db_table = "core_rulebook_process"
-        ordering = ("-started_at",)
-
-    name = models.TextField(null=False, default="")
-    status = models.TextField(
-        choices=ActivationStatus.choices(),
-        default=ActivationStatus.PENDING,
-    )
-    git_hash = models.TextField(null=False, default="")
-    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
-    started_at = models.DateTimeField(auto_now_add=True, null=False)
-    updated_at = models.DateTimeField(null=True)
-    ended_at = models.DateTimeField(null=True)
-    activation_pod_id = models.TextField(null=True)
-    status_message = models.TextField(null=True, default=None)
-    log_read_at = models.DateTimeField(null=True)
-
-    def save(self, *args, **kwargs):
-        # when creating
-        if self._state.adding:
-            if self.status_message is None:
-                self.status_message = self._get_default_status_message()
-
-                # populate latest_instance of activation at creation
-                self.activation.latest_instance = self
-        else:
-            if not bool(kwargs) or "update_fields" not in kwargs:
-                raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
-                )
-            else:
-                if "status" in kwargs["update_fields"]:
-                    self._is_valid_status()
-
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
-                raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
-                )
-            # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
-                self.status_message = self._get_default_status_message()
-                kwargs["update_fields"].append("status_message")
-
-        super().save(*args, **kwargs)
-        self.activation.save(update_fields=["latest_instance"])
-
-    def _get_default_status_message(self):
-        try:
-            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
-        except KeyError:
-            raise UnknownStatusError(f"Status [{self.status}] is invalid")
-
-    def _is_valid_status(self):
-        try:
-            ActivationStatus(self.status)
-        except ValueError as error:
-            raise UnknownStatusError(error)
-
-    def update_status(
-        self, status: ActivationStatus, status_message: tp.Optional[str] = None
-    ) -> None:
-        self.status = status
-        self.updated_at = models.functions.Now()
-        update_fields = [
-            "status",
-            "updated_at",
-        ]
-        if status_message:
-            self.status_message = status_message
-            update_fields.append("status_message")
-
-        if status in [
-            ActivationStatus.STOPPED,
-            ActivationStatus.COMPLETED,
-            ActivationStatus.FAILED,
-            ActivationStatus.ERROR,
-        ]:
-            self.ended_at = models.functions.Now()
-            update_fields.append("ended_at")
-
-        self.save(
-            update_fields=update_fields,
-        )
-
-
-class RulebookProcessLog(models.Model):
-    class Meta:
-        db_table = "core_rulebook_process_log"
-
-    # TODO(alex): this field should be renamed to rulebook_process
-    # requires coordination with UI and QE teams.
-    # Keep the old field for backward compatibility.
-    activation_instance = models.ForeignKey(
-        "RulebookProcess", on_delete=models.CASCADE
-    )
-    line_number = models.IntegerField()
-    log = models.TextField()
-    log_timestamp = models.BigIntegerField(null=False, default=0)

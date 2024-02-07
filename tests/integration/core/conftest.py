@@ -41,3 +41,19 @@ def new_event_stream(new_user):
         name="event_stream",
         user=new_user,
     )
+
+
+@pytest.fixture()
+def new_rulebook_process_with_activation(new_activation):
+    return models.RulebookProcess.objects.create(
+        name="test-instance",
+        activation=new_activation,
+    )
+
+
+@pytest.fixture()
+def new_rulebook_process_with_event_stream(new_event_stream):
+    return models.RulebookProcess.objects.create(
+        name="test-instance",
+        event_stream=new_event_stream,
+    )
