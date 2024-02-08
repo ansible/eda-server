@@ -39,7 +39,6 @@ jobs:
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
         run: |
-          docker-compose -p eda -f docker-compose-dev.yaml pull
           docker-compose -p eda -f docker-compose-dev.yaml build
           docker-compose -p eda -f docker-compose-dev.yaml up -d
           while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
