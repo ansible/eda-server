@@ -54,10 +54,7 @@ def add_resources_to_default_org(apps, schema_editor):
 
     for resource in resources_list:
         resource_model = apps.get_model("core", resource)
-        for obj in resource_model.objects.all():
-            if obj.organization is None:
-                obj.organization = default_org
-                obj.save(update_fields=["organization"])
+        resource_model.objects.update(organization=default_org)
 
 
 def remove_resources_from_default_org(apps, schema_editor):
@@ -88,11 +85,10 @@ def remove_resources_from_default_org(apps, schema_editor):
 
     for resource in resources_list:
         resource_model = apps.get_model("core", resource)
-        for obj in resource_model.objects.all(
+        default_org_resources = resource_model.objects.filter(
             organization=default_org
-        ).iterator():
-            obj.organization = None
-            obj.save(update_fields=["organization"])
+        )
+        default_org_resources.objects.update(organization=None)
 
 
 class Migration(migrations.Migration):
