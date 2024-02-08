@@ -20,7 +20,11 @@ from django.conf import settings
 import aap_eda.tasks.activation_request_queue as queue
 import aap_eda.tasks.orchestrator as orchestrator
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationRequest, ActivationStatus
+from aap_eda.core.enums import (
+    ActivationRequest,
+    ActivationStatus,
+    ProcessParentType,
+)
 
 
 @pytest.fixture()
@@ -39,7 +43,7 @@ def activation():
 
 
 @pytest.fixture()
-def max_running_activations():
+def max_running_processes():
     user = models.User.objects.create_user(
         username="luke.skywalker2",
         first_name="Luke",
@@ -47,19 +51,23 @@ def max_running_activations():
         email="luke.skywalker@example.com",
         password="secret",
     )
-    activations = []
+    activation = models.Activation.objects.create(
+        name="test",
+        user=user,
+    )
+    processes = []
     for i in range(settings.MAX_RUNNING_ACTIVATIONS):
         status = (
             ActivationStatus.STARTING if i == 0 else ActivationStatus.RUNNING
         )
-        activations.append(
-            models.Activation.objects.create(
+        processes.append(
+            models.RulebookProcess.objects.create(
                 name=f"running{i}",
-                user=user,
+                activation=activation,
                 status=status,
             )
         )
-    return activations
+    return processes
 
 
 @pytest.mark.django_db
@@ -75,11 +83,11 @@ def max_running_activations():
 )
 @mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
 def test_manage_request(manager_mock, activation, verb):
-    queue.push(activation.id, verb)
+    queue.push(ProcessParentType.ACTIVATION, activation.id, verb)
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
 
-    orchestrator._manage(activation.id)
+    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
 
     manager_mock.assert_called_once_with(activation)
     if verb == ActivationRequest.START:
@@ -92,77 +100,97 @@ def test_manage_request(manager_mock, activation, verb):
         manager_instance_mock.delete.assert_called_once()
     elif verb == ActivationRequest.AUTO_START:
         manager_instance_mock.start.assert_called_once_with(is_restart=True)
-    assert len(queue.peek_all(activation.id)) == 0
+    assert (
+        len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id)) == 0
+    )
 
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
-def test_manage_not_start(manager_mock, activation, max_running_activations):
-    queue.push(activation.id, ActivationRequest.START)
+def test_manage_not_start(manager_mock, activation, max_running_processes):
+    queue.push(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
+    )
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
 
-    orchestrator._manage(activation.id)
+    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
 
     manager_instance_mock.start.assert_not_called()
-    assert len(queue.peek_all(activation.id)) == 1
+    assert (
+        len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id)) == 1
+    )
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     "command, queued_request",
     [
-        (orchestrator.start_activation, ActivationRequest.START),
-        (orchestrator.stop_activation, ActivationRequest.STOP),
-        (orchestrator.start_activation, ActivationRequest.START),
-        (orchestrator.delete_activation, ActivationRequest.DELETE),
-        (orchestrator.restart_activation, ActivationRequest.RESTART),
+        (orchestrator.start_rulebook_process, ActivationRequest.START),
+        (orchestrator.stop_rulebook_process, ActivationRequest.STOP),
+        (orchestrator.start_rulebook_process, ActivationRequest.START),
+        (orchestrator.delete_rulebook_process, ActivationRequest.DELETE),
+        (orchestrator.restart_rulebook_process, ActivationRequest.RESTART),
     ],
 )
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
 def test_activation_requests(
     enqueue_mock, activation, command, queued_request
 ):
-    command(activation.id)
+    command(ProcessParentType.ACTIVATION, activation.id)
     enqueue_args = [
         "activation",
-        orchestrator._manage_activation_job_id(activation.id),
+        orchestrator._manage_process_job_id(
+            ProcessParentType.ACTIVATION, activation.id
+        ),
         orchestrator._manage,
+        ProcessParentType.ACTIVATION,
         activation.id,
     ]
     enqueue_mock.assert_called_once_with(*enqueue_args)
 
     queued = models.ActivationRequestQueue.objects.first()
-    assert queued.activation == activation
+    assert queued.process_parent_type == ProcessParentType.ACTIVATION
+    assert queued.process_parent_id == activation.id
     assert queued.request == queued_request
 
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
-def test_monitor_activations(
-    enqueue_mock, activation, max_running_activations
+def test_monitor_rulebook_processes(
+    enqueue_mock, activation, max_running_processes
 ):
     call_args = [
         mock.call(
             "activation",
-            orchestrator._manage_activation_job_id(activation.id),
+            orchestrator._manage_process_job_id(
+                ProcessParentType.ACTIVATION, activation.id
+            ),
             orchestrator._manage,
+            ProcessParentType.ACTIVATION,
             activation.id,
         )
     ]
-    for running in max_running_activations:
+    for running in max_running_processes:
         call_args.append(
             mock.call(
                 "activation",
-                orchestrator._manage_activation_job_id(running.id),
+                orchestrator._manage_process_job_id(
+                    ProcessParentType.ACTIVATION, running.id
+                ),
                 orchestrator._manage,
+                ProcessParentType.ACTIVATION,
                 running.id,
             )
         )
 
-    queue.push(activation.id, ActivationRequest.START)
-    for running in max_running_activations:
-        queue.push(running.id, ActivationRequest.START)
-    orchestrator.monitor_activations()
+    queue.push(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
+    )
+    for running in max_running_processes:
+        queue.push(
+            ProcessParentType.ACTIVATION, running.id, ActivationRequest.START
+        )
+    orchestrator.monitor_rulebook_processes()
 
     enqueue_mock.assert_has_calls(call_args, any_order=True)

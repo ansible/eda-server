@@ -11,11 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import yaml
 
-
-def construct_vault_encrypted_unicode(loader, node):
-    return loader.construct_scalar(node)
-
-
-yaml.SafeLoader.add_constructor("!vault", construct_vault_encrypted_unicode)
+# EDA_SERVER_VAULT_LABEL is reserved for system vault password identifiers
+EDA_SERVER_VAULT_LABEL = "EDA_SERVER"

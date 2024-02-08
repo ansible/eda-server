@@ -482,7 +482,7 @@ def test_retrieve_activation(client: APIClient, with_project):
     assert data["extra_var"] == {
         "id": activation.extra_var.id,
     }
-    activation_instances = models.ActivationInstance.objects.filter(
+    activation_instances = models.RulebookProcess.objects.filter(
         activation_id=activation.id
     )
     if activation_instances:
@@ -613,14 +613,14 @@ def test_disable_activation(client: APIClient):
 def test_list_activation_instances(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
-    instances = models.ActivationInstance.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-1",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
             ),
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-1",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
@@ -644,13 +644,13 @@ def test_list_activation_instances(client: APIClient):
 def test_list_activation_instances_filter_name(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
-    instances = models.ActivationInstance.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="activation-instance-1",
                 activation=activation,
             ),
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-2",
                 activation=activation,
             ),
@@ -671,14 +671,14 @@ def test_list_activation_instances_filter_name(client: APIClient):
 def test_list_activation_instances_filter_status(client: APIClient):
     fks = create_activation_related_data()
     activation = create_activation(fks)
-    instances = models.ActivationInstance.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="activation-instance-1",
                 status="completed",
                 activation=activation,
             ),
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-2",
                 status="failed",
                 activation=activation,

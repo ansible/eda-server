@@ -53,7 +53,7 @@ class ActivationInstanceJobInstance(models.Model):
         unique_together = ["activation_instance", "job_instance"]
 
     activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
+        "RulebookProcess", on_delete=models.CASCADE
     )
     job_instance = models.ForeignKey("JobInstance", on_delete=models.CASCADE)
 

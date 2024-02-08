@@ -85,6 +85,17 @@ class ControllerInfo(BaseModel):
     ssl_verify: str
 
 
+class VaultPassword(BaseModel):
+    type: str = "VaultPassword"
+    label: Optional[str]
+    password: str
+
+
+class VaultCollection(BaseModel):
+    type: str = "VaultCollection"
+    data: list[VaultPassword]
+
+
 class HeartbeatMessage(BaseModel):
     type: str = "SessionStats"
     activation_id: int

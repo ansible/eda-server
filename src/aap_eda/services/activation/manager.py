@@ -30,7 +30,11 @@ from pydantic import ValidationError
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    ProcessParentType,
+    RestartPolicy,
+)
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
@@ -94,7 +98,7 @@ class ActivationManager:
 
     def __init__(
         self,
-        db_instance: models.Activation,
+        db_instance: tp.Union[models.Activation, models.EventStream],
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):
@@ -105,6 +109,10 @@ class ActivationManager:
             container_engine: The container engine to use.
         """
         self.db_instance = db_instance
+        if isinstance(db_instance, models.Activation):
+            self.db_instance_type = ProcessParentType.ACTIVATION
+        else:
+            self.db_instance_type = ProcessParentType.EVENT_STREAM
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -113,7 +121,7 @@ class ActivationManager:
         self.container_logger_class = container_logger_class
 
     @property
-    def latest_instance(self) -> tp.Optional[models.ActivationInstance]:
+    def latest_instance(self) -> tp.Optional[models.RulebookProcess]:
         """Return the latest instance of the activation."""
         return self.db_instance.latest_instance
 
@@ -220,7 +228,7 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
-        instances = models.ActivationInstance.objects.filter(
+        instances = models.RulebookProcess.objects.filter(
             activation=self.db_instance,
         )
         for instance in instances:
@@ -467,7 +475,9 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_type, self.db_instance.id, delay_seconds=1
+            )
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -492,7 +502,9 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_type, self.db_instance.id, delay_seconds=1
+            )
 
         self._set_activation_status(
             ActivationStatus.FAILED,
@@ -534,6 +546,7 @@ class ActivationManager:
                 user_msg,
             )
             system_restart_activation(
+                self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
             )
@@ -669,6 +682,7 @@ class ActivationManager:
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
+                self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
@@ -807,7 +821,9 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(self.db_instance.id, delay_seconds=1)
+        system_restart_activation(
+            self.db_instance_type, self.db_instance.id, delay_seconds=1
+        )
 
     def delete(self):
         """User requested delete."""
@@ -1021,7 +1037,7 @@ class ActivationManager:
 
     def _create_activation_instance(self):
         try:
-            models.ActivationInstance.objects.create(
+            models.RulebookProcess.objects.create(
                 activation=self.db_instance,
                 name=self.db_instance.name,
                 status=ActivationStatus.STARTING,

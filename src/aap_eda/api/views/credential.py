@@ -15,6 +15,7 @@
 import logging
 
 from cryptography import fernet
+from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -26,7 +27,9 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
+from aap_eda.core.enums import CredentialType
 
 from .mixins import (
     CreateModelMixin,
@@ -38,24 +41,6 @@ logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
-    list=extend_schema(
-        description="List all credentials",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.CredentialSerializer,
-                description="Return a list of credential.",
-            ),
-        },
-    ),
-    retrieve=extend_schema(
-        description="Get credential by id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.CredentialSerializer,
-                description="Return a credential by id.",
-            ),
-        },
-    ),
     create=extend_schema(
         description="Create a new credential.",
         request=serializers.CredentialCreateSerializer,
@@ -127,6 +112,44 @@ class CredentialViewSet(
     def get_response_serializer_class(self):
         return serializers.CredentialSerializer
 
+    @extend_schema(
+        description="Get credential by id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.CredentialSerializer,
+                description="Return a credential by id.",
+            ),
+        },
+    )
+    def retrieve(self, request, pk: int):
+        queryset = models.Credential.objects.exclude(
+            credential_type=CredentialType.VAULT,
+            vault_identifier=EDA_SERVER_VAULT_LABEL,
+        )
+        credential = get_object_or_404(queryset, pk=pk)
+        return Response(serializers.CredentialSerializer(credential).data)
+
+    @extend_schema(
+        description="List all credentials",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.CredentialSerializer(many=True),
+                description="Return a list of credential.",
+            ),
+        },
+    )
+    def list(self, request):
+        credentials = models.Credential.objects.exclude(
+            credential_type=CredentialType.VAULT,
+            vault_identifier=EDA_SERVER_VAULT_LABEL,
+        )
+        credentials = self.filter_queryset(credentials)
+
+        serializer = serializers.CredentialSerializer(credentials, many=True)
+        result = self.paginate_queryset(serializer.data)
+
+        return self.get_paginated_response(result)
+
     def destroy(self, request, *args, **kwargs):
         force = request.query_params.get("force", "false").lower() in [
             "true",
@@ -134,6 +157,14 @@ class CredentialViewSet(
             "yes",
         ]
         credential = self.get_object()
+
+        if (
+            credential.credential_type == CredentialType.VAULT
+            and credential.vault_identifier == EDA_SERVER_VAULT_LABEL
+        ):
+            raise exceptions.Conflict(
+                f"Credential {credential.id} is internal used."
+            )
 
         # If the credential is in use and the 'force' flag
         # is not True, raise a PermissionDenied exception

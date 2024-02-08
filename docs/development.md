@@ -11,7 +11,7 @@
 
 For running services locally:
 
-* Python >= 3.9
+* Python >= 3.11
 
 For standalone development tools written in Python, such as `pre-commit`,
 we recommend using your system package manager,
@@ -86,7 +86,7 @@ systemctl --user enable --now podman.socket
 On Linux and macOS, Poetry can be installed with the official installer:
 
 ```shell
-curl -sSL https://install.python-poetry.org | python3 -
+curl -sSL https://install.python-poetry.org | python3.11 -
 ```
 
 Alternatively, you can install it with manually with `pip` or `pipx`:
@@ -317,7 +317,7 @@ task test -- tests/integration/api/test_activation.py::test_retrieve_activation
 With docker compose:
 
 ```shell
-task docker -- run --rm eda-api python -m pytest
+task docker -- run --rm eda-api python3.11 -m pytest
 ```
 
 ### Running linters

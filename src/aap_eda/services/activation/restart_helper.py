@@ -23,25 +23,35 @@ from aap_eda.core.tasking import enqueue_delay
 LOGGER = logging.getLogger(__name__)
 
 
-def system_restart_activation(activation_id: int, delay_seconds: int) -> None:
+def system_restart_activation(
+    process_parent_type: str, id: int, delay_seconds: int
+) -> None:
     """Create a request from the system to start the activation.
 
     This function is intended to be used by the manager to schedule
     a start of the activation for restart policies.
     """
     LOGGER.debug(
-        f"Queuing auto-start for activation {activation_id} "
+        f"Queuing auto-start for {process_parent_type} {id} "
         f"in {delay_seconds} seconds",
     )
-    enqueue_delay("default", delay_seconds, _queue_auto_start, activation_id)
+    enqueue_delay(
+        "default",
+        delay_seconds,
+        _queue_auto_start,
+        process_parent_type,
+        id,
+    )
 
 
-def _queue_auto_start(activation_id: int) -> None:
-    LOGGER.info(f"Requesting auto-start for activation {activation_id}")
+def _queue_auto_start(process_parent_type: str, id: int) -> None:
+    LOGGER.info(f"Requesting auto-start for {process_parent_type} {id}")
     try:
-        requests_queue.push(activation_id, ActivationRequest.AUTO_START)
+        requests_queue.push(
+            process_parent_type, id, ActivationRequest.AUTO_START
+        )
     except IntegrityError:
         LOGGER.warning(
-            f"Activation {activation_id} no longer exists, "
+            f"{process_parent_type} {id} no longer exists, "
             "auto-start request will not be processed",
         )

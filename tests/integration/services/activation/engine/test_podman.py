@@ -48,7 +48,7 @@ DATA_DIR = Path(__file__).parent / "data"
 @dataclass
 class InitData:
     activation: models.Activation
-    activation_instance: models.ActivationInstance
+    activation_instance: models.RulebookProcess
 
 
 @pytest.fixture()
@@ -64,7 +64,7 @@ def init_data():
         name="activation",
         user=user,
     )
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         name="test-instance",
         log_read_at=parser.parse("2023-10-30T19:18:48.362883381Z"),
         activation=activation,
@@ -205,10 +205,8 @@ def test_engine_start(init_data, podman_engine):
     engine.start(request, log_handler)
 
     engine.client.containers.run.assert_called_once()
-    assert models.ActivationInstanceLog.objects.count() == 4
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
-        "is started."
-    )
+    assert models.RulebookProcessLog.objects.count() == 4
+    assert models.RulebookProcessLog.objects.last().log.endswith("is started.")
 
 
 @pytest.mark.django_db
@@ -297,7 +295,7 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
     ):
         engine.start(request, log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
+    assert models.RulebookProcessLog.objects.last().log.endswith(
         f"Image {request.image_url} not found"
     )
 
@@ -342,7 +340,7 @@ def test_engine_start_with_image_pull_exception(init_data, podman_engine):
         with pytest.raises(ContainerImagePullError, match=msg):
             engine.start(request, log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log.endswith(msg)
+    assert models.RulebookProcessLog.objects.last().log.endswith(msg)
 
 
 @pytest.mark.django_db
@@ -370,7 +368,7 @@ def test_engine_start_with_containers_run_exception(init_data, podman_engine):
 
     assert (
         "Container Start Error:"
-        in models.ActivationInstanceLog.objects.last().log
+        in models.RulebookProcessLog.objects.last().log
     )
 
 
@@ -462,7 +460,7 @@ def test_engine_cleanup(init_data, podman_engine):
 
     engine.cleanup("100", log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
+    assert models.RulebookProcessLog.objects.last().log.endswith(
         "Container 100 is cleaned up."
     )
 
@@ -481,7 +479,7 @@ def test_engine_cleanup_with_not_found_exception(init_data, podman_engine):
 
     engine.cleanup("100", log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
+    assert models.RulebookProcessLog.objects.last().log.endswith(
         "Container 100 not found."
     )
 
@@ -555,10 +553,10 @@ def test_engine_update_logs(init_data, podman_engine):
 
     engine.update_logs("100", log_handler)
 
-    assert models.ActivationInstanceLog.objects.count() == len(
+    assert models.RulebookProcessLog.objects.count() == len(
         container_mock.logs.return_value
     )
-    assert models.ActivationInstanceLog.objects.last().log == f"{message}"
+    assert models.RulebookProcessLog.objects.last().log == f"{message}"
 
     init_data.activation_instance.refresh_from_db()
     assert init_data.activation_instance.log_read_at > init_log_read_at
@@ -572,7 +570,7 @@ def test_engine_update_logs_with_container_not_found(init_data, podman_engine):
     engine.client.containers.exists.return_value = None
     engine.update_logs("100", log_handler)
 
-    assert models.ActivationInstanceLog.objects.last().log.endswith(
+    assert models.RulebookProcessLog.objects.last().log.endswith(
         "Container 100 not found."
     )
 

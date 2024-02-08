@@ -70,6 +70,7 @@ class InventorySource(DjangoStrEnum):
     EXECUTION_ENV = "execution_env"
 
 
+# TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 class ActivationStatus(DjangoStrEnum):
     STARTING = "starting"
     RUNNING = "running"
@@ -89,8 +90,10 @@ class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
+    VAULT = "Vault"
 
 
+# TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.PENDING: "Wait for a worker to be available to start activation",  # noqa: E501
     ActivationStatus.STARTING: "Worker is starting activation",
@@ -105,9 +108,17 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
 }
 
 
+# TODO: rename to "RulebookProcessRequest"
 class ActivationRequest(DjangoStrEnum):
     START = "start"
     STOP = "stop"
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+
+
+class ProcessParentType(DjangoStrEnum):
+    """Types of parent objects for a rulebook process."""
+
+    ACTIVATION = "activation"
+    EVENT_STREAM = "event_stream"

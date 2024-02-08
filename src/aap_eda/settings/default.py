@@ -268,6 +268,7 @@ REST_FRAMEWORK = {
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -316,7 +317,10 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {"func": "aap_eda.tasks.orchestrator.monitor_activations", "interval": 5},
+    {
+        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
+        "interval": 5,
+    },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
@@ -464,3 +468,13 @@ dab_settings = os.path.join(
     os.path.dirname(dynamic_config.__file__), "dynamic_settings.py"
 )
 include(dab_settings)
+
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE JWT SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_JWT_VALIDATE_CERT = settings.get(
+    "ANSIBLE_BASE_JWT_VALIDATE_CERT", False
+)
+ANSIBLE_BASE_JWT_KEY = settings.get(
+    "ANSIBLE_BASE_JWT_KEY", "https://localhost"
+)
