@@ -100,7 +100,7 @@ pipx install poetry
 In ArchLinux, Poetry is available in the official distribution repositories:
 
 ```shell
-sudo pacman -S python-poetry 
+sudo pacman -S python-poetry
 ```
 
 In macOS, Poetry can be installed with Homebrew:
@@ -162,7 +162,7 @@ git clone git@github.com:ansible/eda-server.git
 Go to your project directory and install dependencies for local development:
 
 ```shell
-task dev:init 
+task dev:init
 ```
 
 Or if you want to customize installation options, you may run commands, executed by the `dev:init`
@@ -250,7 +250,7 @@ task manage -- migrate
 With docker compose:
 
 ```shell
-task docker:migrate 
+task docker:migrate
 ```
 
 ### Seeding the database
@@ -263,8 +263,8 @@ task manage -- create_initial_data
 
 With docker compose:
 
-```
-task docker -- run api --rm aap-eda-manage create_initial_data
+```shell
+task docker -- run --rm eda-api aap-eda-manage create_initial_data
 ```
 
 ### Create superuser
@@ -289,7 +289,7 @@ by running `task run:scheduler`
 With docker compose:
 
 ```shell
-task docker -- up -d api 
+task docker -- up -d eda-api
 ```
 
 ### Running tests
@@ -298,26 +298,26 @@ To run tests locally, you need to have a running instance of postgresql and redi
 
 Run all tests:
 
-```
+```shell
 task test
 ```
 
 Run a single module:
 
-```
+```shell
 task test -- tests/integration/api/test_activation.py
 ```
 
 Run a single test:
 
-```
+```shell
 task test -- tests/integration/api/test_activation.py::test_retrieve_activation
 ```
 
 With docker compose:
 
 ```shell
-task docker -- run api --rm python3.11 -m pytest  
+task docker -- run --rm eda-api python3.11 -m pytest
 ```
 
 ### Running linters
