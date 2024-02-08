@@ -7,6 +7,8 @@ on:
         description: 'ref of the eda-qa repository, default is main'
         required: false
         default: 'main'
+  pull_request_target:
+    types: [labeled]
 
 env:
   EDA_QA_PATH: "./eda-qa"
@@ -15,7 +17,10 @@ env:
 
 jobs:
   api-e2e-tests:
-    if: github.repository == 'ansible/eda-server'
+    if: >
+      (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
+      (github.repository == 'ansible/eda-server' && github.event_name == 'pull_request_target' &&
+        contains(github.event.pull_request.labels.*.name, 'run-e2e'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
