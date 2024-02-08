@@ -480,6 +480,8 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RBAC SETTINGS
 # ---------------------------------------------------------
+DEFAULT_ORGANIZATION_NAME = "Default"
+
 ANSIBLE_BASE_SERVICE_PREFIX = "eda"
 
 ANSIBLE_BASE_TEAM_MODEL = "core.Team"

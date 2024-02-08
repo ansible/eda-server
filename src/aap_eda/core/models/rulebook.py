@@ -15,6 +15,8 @@
 import yaml
 from django.db import models
 
+from .organization import Organization
+
 __all__ = (
     "Rulebook",
     "Ruleset",
@@ -41,6 +43,9 @@ class Rulebook(models.Model):
     # https://issues.redhat.com/browse/AAP-19202
     rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
@@ -57,6 +62,12 @@ class Rulebook(models.Model):
                     f" {self.id} - {self.name}: Error: {e}"
                 )
             )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])
 
 
 class Ruleset(models.Model):
@@ -105,6 +116,15 @@ class AuditRule(models.Model):
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.SET_NULL, null=True
     )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])
 
 
 class AuditAction(models.Model):
@@ -124,6 +144,15 @@ class AuditAction(models.Model):
     audit_rule = models.ForeignKey(
         "AuditRule", on_delete=models.CASCADE, null=True
     )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])
 
 
 class AuditEvent(models.Model):
@@ -141,3 +170,12 @@ class AuditEvent(models.Model):
     audit_actions = models.ManyToManyField(
         "AuditAction", related_name="audit_events"
     )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])

@@ -14,6 +14,8 @@
 
 from django.db import models
 
+from .organization import Organization
+
 __all__ = ("DecisionEnvironment",)
 
 
@@ -37,5 +39,14 @@ class DecisionEnvironment(models.Model):
         default=None,
         on_delete=models.SET_NULL,
     )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])
