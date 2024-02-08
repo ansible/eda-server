@@ -17,7 +17,7 @@ class InitData:
     rulebook: models.Rulebook
     ruleset: models.Ruleset
     rule: models.Rule
-    activation_instance: models.ActivationInstance
+    activation_instance: models.RulebookProcess
 
 
 @pytest.mark.django_db
@@ -92,6 +92,7 @@ def test_retrieve_decision_environment(client: APIClient, init_db):
             "description": credential.description,
             "credential_type": credential.credential_type,
             "username": credential.username,
+            "vault_identifier": None,
         },
     }
 
@@ -247,7 +248,7 @@ def init_db():
         user=user,
     )
 
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         activation=activation,
     )
 

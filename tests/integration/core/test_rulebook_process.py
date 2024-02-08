@@ -14,6 +14,7 @@
 
 
 import pytest
+from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import models
 from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
@@ -37,14 +38,14 @@ def init_data():
         name="activation",
         user=user,
     )
-    return models.ActivationInstance.objects.create(
+    return models.RulebookProcess.objects.create(
         name="test-instance",
         activation=activation,
     )
 
 
 @pytest.mark.django_db
-def test_activation_instance_save_with_errors(init_data):
+def test_rulebook_process_save_with_errors(init_data):
     instance = init_data
     with pytest.raises(UpdateFieldsRequiredError):
         instance.save()
@@ -57,7 +58,7 @@ def test_activation_instance_save_with_errors(init_data):
 
 
 @pytest.mark.django_db
-def test_activation_instance_save_with_invalid_status(init_data):
+def test_rulebook_process_save_with_invalid_status(init_data):
     instance = init_data
     instance.status = "invalid"
     with pytest.raises(UnknownStatusError):
@@ -65,7 +66,7 @@ def test_activation_instance_save_with_invalid_status(init_data):
 
 
 @pytest.mark.django_db
-def test_activation_instance_save(init_data):
+def test_rulebook_process_save(init_data):
     instance = init_data
 
     assert instance.status == ActivationStatus.PENDING
@@ -94,3 +95,47 @@ def test_activation_instance_save(init_data):
             instance.status_message
             == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
         )
+
+
+@pytest.mark.parametrize(
+    "instance",
+    [
+        pytest.param(
+            lazy_fixture("new_rulebook_process_with_activation"),
+            id="activation",
+        ),
+        pytest.param(
+            lazy_fixture("new_rulebook_process_with_event_stream"),
+            id="event_stream",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_rulebook_process_parent_type(instance):
+    """Test parent_type field is updated when a new instance is created."""
+    if instance.activation:
+        assert instance.parent_type == "activation"
+    else:
+        assert instance.parent_type == "event_stream"
+
+
+@pytest.mark.parametrize(
+    "instance",
+    [
+        pytest.param(
+            lazy_fixture("new_rulebook_process_with_activation"),
+            id="activation",
+        ),
+        pytest.param(
+            lazy_fixture("new_rulebook_process_with_event_stream"),
+            id="event_stream",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_rulebook_process_get_parent(instance):
+    """Test get_parent method returns the correct parent instance."""
+    if instance.activation:
+        assert instance.get_parent() == instance.activation
+    else:
+        assert instance.get_parent() == instance.event_stream

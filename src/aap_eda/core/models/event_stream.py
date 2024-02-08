@@ -1,4 +1,4 @@
-#  Copyright 2022 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,39 +12,35 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
+
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
 from .mixins import StatusHandlerModelMixin
-from .user import AwxToken, User
-
-__all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, models.Model):
-    class Meta:
-        db_table = "core_activation"
-        indexes = [models.Index(fields=["name"], name="ix_activation_name")]
-        ordering = ("-created_at",)
+class EventStream(StatusHandlerModelMixin, models.Model):
+    """Model representing an event stream."""
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
-    git_hash = models.TextField(null=False, default="")
-    # TODO(alex) Since local activations are no longer supported
-    # this field should be mandatory.
     decision_environment = models.ForeignKey(
-        "DecisionEnvironment", on_delete=models.SET_NULL, null=True
-    )
-    project = models.ForeignKey(
-        "Project", on_delete=models.SET_NULL, null=True
+        "DecisionEnvironment",
+        on_delete=models.SET_NULL,
+        null=True,
     )
     rulebook = models.ForeignKey(
-        "Rulebook", on_delete=models.SET_NULL, null=True
+        "Rulebook",
+        on_delete=models.SET_NULL,
+        null=True,
     )
     extra_var = models.ForeignKey(
-        "ExtraVar", on_delete=models.CASCADE, null=True
+        "ExtraVar",
+        on_delete=models.CASCADE,
+        null=True,
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
@@ -57,19 +53,18 @@ class Activation(StatusHandlerModelMixin, models.Model):
     current_job_id = models.TextField(null=True)
     restart_count = models.IntegerField(default=0)
     failure_count = models.IntegerField(default=0)  # internal, since last good
-    is_valid = models.BooleanField(default=False)  # internal, passed first run
-    # TODO(alex): name and rulesets should be populated in the model, not in
-    # the serializer.
     rulebook_name = models.TextField(
         null=False,
         help_text="Name of the referenced rulebook",
+        default="",
     )
     rulebook_rulesets = models.TextField(
         null=False,
         help_text="Content of the last referenced rulebook",
+        default="",
     )
     ruleset_stats = models.JSONField(default=dict)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
+    user = models.ForeignKey("User", on_delete=models.CASCADE, null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     status_updated_at = models.DateTimeField(null=True)
@@ -81,19 +76,17 @@ class Activation(StatusHandlerModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
-    awx_token = models.ForeignKey(
-        AwxToken,
-        on_delete=models.SET_NULL,
-        null=True,
-        default=None,
-    )
-    credentials = models.ManyToManyField(
-        "Credential", related_name="activations", default=None
-    )
-    system_vault_credential = models.OneToOneField(
-        "Credential",
-        null=True,
-        default=None,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
+    uuid = models.UUIDField(default=uuid.uuid4)
+    source_type = models.TextField(null=False)
+    args = models.JSONField(null=True, default=None)
+    listener_args = models.JSONField(null=True, default=None)
+
+    class Meta:
+        db_table = "core_event_stream"
+        indexes = [
+            models.Index(fields=["name"], name="ix_event_stream_name"),
+        ]
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"EventStream {self.name} ({self.id})"

@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
+from aap_eda.core.enums import CredentialType
 
 from .messages import (
     ActionMessage,
@@ -21,6 +22,8 @@ from .messages import (
     HeartbeatMessage,
     JobMessage,
     Rulebook,
+    VaultCollection,
+    VaultPassword,
     WorkerMessage,
 )
 
@@ -121,6 +124,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
             )
             await self.send(text_data=controller_info.json())
+
+        vault_data = await self.get_vault_passwords(message)
+        if vault_data:
+            vault_collection = VaultCollection(data=vault_data)
+            await self.send(text_data=vault_collection.json())
+
         await self.send(text_data=EndOfResponse().json())
 
         # TODO: add broadcasting later by channel groups
@@ -141,7 +150,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
         logger.info(f"Start to handle heartbeat: {message}")
 
-        instance = models.ActivationInstance.objects.filter(
+        instance = models.RulebookProcess.objects.filter(
             id=message.activation_id
         ).first()
 
@@ -208,9 +217,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
-        job_id = message.job_id
-        job_instance = models.JobInstance.objects.filter(uuid=job_id).first()
-        job_instance_id = job_instance.id if job_instance else None
+        job_instance_id = None
+        if message.job_id:
+            job_instance = models.JobInstance.objects.filter(
+                uuid=message.job_id
+            ).first()
+            job_instance_id = job_instance.id if job_instance else None
 
         audit_rule = models.AuditRule.objects.filter(
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
@@ -305,7 +317,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def get_resources(
         self, activation_instance_id: str
     ) -> tuple[str, models.ExtraVar]:
-        activation_instance = models.ActivationInstance.objects.get(
+        activation_instance = models.RulebookProcess.objects.get(
             id=activation_instance_id
         )
         activation = models.Activation.objects.get(
@@ -324,9 +336,41 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
         """Get AWX token from the worker message."""
-        activation_instance = models.ActivationInstance.objects.get(
+        activation_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
         awx_token = activation_instance.activation.awx_token
 
         return awx_token.token.get_secret_value() if awx_token else None
+
+    @database_sync_to_async
+    def get_vault_passwords(
+        self, message: WorkerMessage
+    ) -> tp.List[VaultPassword]:
+        """Get vault info from activation."""
+        activation_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        activation = activation_instance.activation
+        vault_passwords = []
+
+        if activation.system_vault_credential:
+            vault = models.Credential.objects.filter(
+                id=activation.system_vault_credential.id
+            )
+        else:
+            vault = models.Credential.objects.none()
+
+        for credential in activation.credentials.filter(
+            credential_type=CredentialType.VAULT
+        ).union(vault):
+            vault_passwords.append(
+                VaultPassword(
+                    label=credential.vault_identifier,
+                    # TODO: Use pydantic secret feature (available > 2.0)
+                    # https://docs.pydantic.dev/latest/examples/secrets/
+                    password=credential.secret.get_secret_value(),
+                )
+            )
+
+        return vault_passwords
