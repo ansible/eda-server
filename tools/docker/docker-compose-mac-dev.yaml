@@ -1,0 +1,194 @@
+x-environment:
+  &common-env
+  - EDA_DB_HOST=postgres
+  - EDA_MQ_HOST=redis
+  - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
+  - EDA_ALLOWED_HOSTS=['*']
+  - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
+  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-ws:8000}
+  - EDA_WEBSOCKET_SSL_VERIFY=no
+  - EDA_PODMAN_SOCKET_URL=tcp://podman:8888
+  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
+  - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
+  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
+  - EDA_PROTOCOL=http
+  - EDA_HOST=${EDA_HOST:-eda-api:8000}
+  - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
+  - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
+  - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
+  - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
+  - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
+  - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
+  - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
+
+services:
+  podman-pre-setup:
+    user: "0"
+    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    privileged: true
+    command: >-
+      chown -R podman /home/podman/.local/share/containers/storage
+    volumes:
+      - 'podman_data:/home/podman/.local/share/containers/storage'
+
+  podman:
+    user: "1000"
+    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    privileged: true
+    command: >-
+      podman system service --time=0 tcp://0.0.0.0:8888
+    ports:
+      - "${EDA_PODMAN_PORT:-8888}:8888"
+    volumes:
+      - 'podman_data:/home/podman/.local/share/containers/storage'
+    depends_on:
+     - podman-pre-setup
+
+  eda-ui:
+    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    environment: *common-env
+    ports:
+      - '${EDA_UI_PORT:-8443}:443'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+
+  eda-api:
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    build:
+      context: ../../
+      dockerfile: tools/docker/Dockerfile
+    environment: *common-env
+    security_opt:
+      - label=disable
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage migrate
+        && aap-eda-manage create_initial_data
+        && scripts/create_superuser.sh
+        && aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - "${EDA_API_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+
+  eda-ws:
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - "${EDA_WS_PORT:-8001}:8000"
+    depends_on:
+      eda-api:
+        condition: service_healthy
+
+  eda-scheduler:
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  eda-default-worker:
+    user: "${EDA_POD_USER_ID:-0}"
+    deploy:
+      replicas: ${EDA_DEFAULT_WORKERS:-1}
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    environment: *common-env
+    security_opt:
+      - label=disable
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.DefaultWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+    restart: always
+
+  eda-activation-worker:
+    user: "${EDA_POD_USER_ID:-0}"
+    deploy:
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    security_opt:
+      - label=disable
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.ActivationWorker
+    environment: *common-env
+    depends_on:
+      eda-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+    restart: always
+
+  postgres:
+    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    environment:
+      POSTGRESQL_USER: eda
+      POSTGRESQL_PASSWORD: secret
+      POSTGRESQL_ADMIN_PASSWORD: secret
+      POSTGRESQL_DATABASE: eda
+    ports:
+      - '${EDA_PG_PORT:-5432}:5432'
+    volumes:
+      - 'postgres_data:/var/lib/pgsql/data'
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  redis:
+    image: 'quay.io/sclorg/redis-6-c9s:latest'
+    ports:
+      - '${EDA_REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: [ 'CMD', 'redis-cli', 'ping' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_data: {}
+  podman_data: {}
