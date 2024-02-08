@@ -32,6 +32,9 @@ class Role(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(null=False, default="")
     is_default = models.BooleanField(null=True, default=False)
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
 
     permissions = models.ManyToManyField("Permission", related_name="roles")
     created_at = models.DateTimeField(auto_now_add=True, null=False)

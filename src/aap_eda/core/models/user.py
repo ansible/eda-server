@@ -17,6 +17,8 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
+from .organization import Organization
+
 
 class User(AbstractUser):
     """Custom user model.
@@ -32,6 +34,17 @@ class User(AbstractUser):
     roles = models.ManyToManyField("Role", related_name="users")
     modified_at = models.DateTimeField(auto_now=True, null=False)
     is_service_account = models.BooleanField(default=False)
+    organizations = models.ManyToManyField(
+        Organization,
+        related_name="users",
+        help_text="The list of organizations the user is in.",
+    )
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new:
+            self.organizations.add(Organization.objects.get_default())
 
 
 class AwxToken(models.Model):
