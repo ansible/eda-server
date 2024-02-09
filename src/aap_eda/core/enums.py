@@ -42,10 +42,8 @@ class ResourceType(DjangoStrEnum):
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
     AUDIT_EVENT = "audit_event"
-    TASK = "task"
     USER = "user"
     PROJECT = "project"
-    INVENTORY = "inventory"
     EXTRA_VAR = "extra_var"
     RULEBOOK = "rulebook"
     ROLE = "role"
@@ -61,13 +59,6 @@ class Action(DjangoStrEnum):
     ENABLE = "enable"
     DISABLE = "disable"
     RESTART = "restart"
-
-
-class InventorySource(DjangoStrEnum):
-    PROJECT = "project"
-    COLLECTION = "collection"
-    USER_DEFINED = "user_defined"
-    EXECUTION_ENV = "execution_env"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

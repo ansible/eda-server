@@ -17,15 +17,6 @@ TIMEOUT = 5
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-TEST_INVENTORY = """
----
-all:
-  hosts:
-    localhost:
-      ansible_connection: local
-      ansible_python_interpreter: /usr/bin/python3
-"""
-
 TEST_EXTRA_VAR = """
 ---
 collections:
