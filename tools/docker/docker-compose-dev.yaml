@@ -22,6 +22,7 @@ x-environment:
   - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
   - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
   - EDA_DEBUG=${EDA_DEBUG:-'True'}
+  - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
 
 services:
   podman-pre-setup:
