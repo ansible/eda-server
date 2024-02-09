@@ -16,11 +16,9 @@
 import contextlib
 import logging
 import typing as tp
-import uuid
 from datetime import timedelta
 from functools import wraps
 
-import yaml
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -50,7 +48,6 @@ from aap_eda.services.auth import create_jwt_token
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
 from .engine.factory import new_container_engine
-from .engine.ports import find_ports
 
 LOGGER = logging.getLogger(__name__)
 ACTIVATION_PATH = f"/{settings.API_PREFIX}/ws/ansible-rulebook"
@@ -1059,26 +1056,19 @@ class ActivationManager:
             raise exceptions.ActivationStartError(msg) from exc
 
     def _build_container_request(self) -> ContainerRequest:
-        if self.db_instance.extra_var:
-            context = yaml.safe_load(self.db_instance.extra_var.extra_var)
-        else:
-            context = {}
-
+        container_params = self.db_instance.get_container_parameters()
         return ContainerRequest(
-            credential=self._build_credential(),
+            credential=container_params["credential"],
             cmdline=self._build_cmdline(),
-            name=(
-                f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
-                f"-{uuid.uuid4()}"
-            ),
-            image_url=self.db_instance.decision_environment.image_url,
-            ports=find_ports(self.db_instance.rulebook_rulesets, context),
-            activation_id=self.db_instance.id,
-            activation_instance_id=self.latest_instance.id,
-            env_vars=settings.PODMAN_ENV_VARS,
-            extra_args=settings.PODMAN_EXTRA_ARGS,
-            mem_limit=settings.PODMAN_MEM_LIMIT,
-            mounts=settings.PODMAN_MOUNTS,
+            name=container_params["name"],
+            image_url=container_params["image_url"],
+            ports=container_params["ports"],
+            activation_id=container_params["activation_id"],
+            activation_instance_id=container_params["activation_instance_id"],
+            env_vars=container_params["env_vars"],
+            extra_args=container_params["extra_args"],
+            mem_limit=container_params["mem_limit"],
+            mounts=container_params["mounts"],
         )
 
     def _build_credential(self) -> tp.Optional[Credential]:
