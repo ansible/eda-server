@@ -30,7 +30,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             "git_hash",
             "import_state",
             "import_error",
-            "import_task_id",
             "created_at",
             "modified_at",
         ]
@@ -98,7 +97,6 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "git_hash",
             "import_state",
             "import_error",
-            "import_task_id",
             "created_at",
             "modified_at",
         ]
@@ -126,7 +124,6 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "credential": credential,
             "import_state": project["import_state"],
             "import_error": project["import_error"],
-            "import_task_id": project["import_task_id"],
             "created_at": project["created_at"],
             "modified_at": project["modified_at"],
         }

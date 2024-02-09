@@ -17,7 +17,6 @@ from .auth import Permission, Role
 from .credential import Credential
 from .decision_environment import DecisionEnvironment
 from .event_stream import EventStream
-from .inventory import Inventory
 from .job import (
     ActivationInstanceJobInstance,
     Job,
@@ -47,7 +46,6 @@ __all__ = [
     "AuditEvent",
     "AuditRule",
     "ExtraVar",
-    "Inventory",
     "JobInstanceEvent",
     "JobInstanceHost",
     "JobInstance",

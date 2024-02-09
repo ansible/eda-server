@@ -23,7 +23,6 @@ from .rulebook import (
     RulesetViewSet,
     RuleViewSet,
 )
-from .tasks import TaskViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
 
 __all__ = (
@@ -38,8 +37,6 @@ __all__ = (
     "RulebookViewSet",
     "RulesetViewSet",
     "RuleViewSet",
-    # tasks
-    "TaskViewSet",
     # activations
     "ActivationViewSet",
     "ActivationInstanceViewSet",
