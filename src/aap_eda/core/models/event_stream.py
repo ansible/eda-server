@@ -12,14 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import typing as tp
+import uuid
+
+import yaml
+from django.conf import settings
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.services.activation.engine.common import (
+    ContainerableMixin,
+    ContainerableNoLatestInstanceError,
+)
 
+from .credential import Credential
 from .mixins import StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, models.Model):
+class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     """Model representing an event stream."""
 
     name = models.TextField(null=False, unique=True)
@@ -97,3 +107,47 @@ class EventStream(StatusHandlerModelMixin, models.Model):
 
     def __str__(self) -> str:
         return f"EventStream {self.name} ({self.id})"
+
+    # Implementation of the ContainerableMixin.
+    def get_command_line_parameters(self) -> dict[str, tp.Any]:
+        params = super().get_command_line_parameters()
+        return params | {
+            "id": str(self.latest_instance.id),
+            "skip_audit_events": True,
+        }
+
+    def get_container_parameters(self) -> dict[str, tp.Any]:
+        params = super().get_container_parameters()
+        return params | {
+            "activation_id": self.id,
+            "activation_instance_id": self.latest_instance.id,
+        }
+
+    def get_restart_policy(self) -> str:
+        return self.restart_policy
+
+    def _get_container_name(self) -> str:
+        return (
+            f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
+            f"-{uuid.uuid4()}"
+        )
+
+    def _get_context(self) -> dict[str, tp.Any]:
+        if self.extra_var:
+            context = yaml.safe_load(self.extra_var.extra_var)
+        else:
+            context = {}
+        return context
+
+    def _get_image_credential(self) -> tp.Optional[Credential]:
+        return self.decision_environment.credential
+
+    def _get_image_url(self) -> str:
+        return self.decision_environment.image_url
+
+    def _get_rulebook_rulesets(self) -> str:
+        return self.rulebook_rulesets
+
+    def _validate(self):
+        if not self.latest_instance:
+            raise ContainerableNoLatestInstanceError
