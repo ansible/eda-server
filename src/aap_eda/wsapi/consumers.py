@@ -315,12 +315,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_resources(
-        self, activation_instance_id: str
+        self, rulebook_process_id: str
     ) -> tuple[str, models.ExtraVar]:
-        activation_instance = models.RulebookProcess.objects.get(
-            id=activation_instance_id
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=rulebook_process_id
         )
-        activation = activation_instance.get_parent()
+        activation = rulebook_process_instance.get_parent()
 
         if activation.extra_var_id:
             extra_var = models.ExtraVar.objects.filter(
@@ -334,10 +334,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
         """Get AWX token from the worker message."""
-        activation_instance = models.RulebookProcess.objects.get(
+        rulebook_process_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        parent = activation_instance.get_parent()
+        parent = rulebook_process_instance.get_parent()
         if not hasattr(parent, "awx_token"):
             return None
 
@@ -349,10 +349,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         self, message: WorkerMessage
     ) -> tp.List[VaultPassword]:
         """Get vault info from activation."""
-        activation_instance = models.RulebookProcess.objects.get(
+        rulebook_process_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        activation = activation_instance.get_parent()
+        activation = rulebook_process_instance.get_parent()
         vault_passwords = []
 
         if activation.system_vault_credential:
