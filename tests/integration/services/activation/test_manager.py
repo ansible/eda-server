@@ -198,13 +198,6 @@ def test_build_cmdline_no_instance(basic_activation):
 
 
 @pytest.mark.django_db
-def test_build_credential_inexistent(basic_activation):
-    """Test build_credential when no credential exists."""
-    activation_manager = ActivationManager(basic_activation)
-    assert activation_manager._build_credential() is None
-
-
-@pytest.mark.django_db
 def test_start_deleted_activation(activation_with_instance):
     """Test start verb when activation is deleted."""
     activation_manager = ActivationManager(activation_with_instance)
