@@ -603,7 +603,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.1.31"
+version = "2024.2.12"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -616,6 +616,7 @@ cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-auth-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
 django-crum = "*"
+django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
 python-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
@@ -634,8 +635,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2024.1.31"
-resolved_reference = "62ff63d2abcc7d8d70799b7414e681c317ece335"
+reference = "2024.2.12"
+resolved_reference = "dc5bbf57af4a323f6689093993044aa552cc1227"
 
 [[package]]
 name = "django-auth-ldap"
@@ -2715,4 +2716,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "aa31af276933dd07cfede3340a54eea4ce6096e69932707299a3e03f2bc0bb09"
+content-hash = "857667818988740def5b6ad21056423beaea60d2c17287e9f83d7e5d2da57ab3"
