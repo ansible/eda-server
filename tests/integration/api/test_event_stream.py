@@ -143,14 +143,14 @@ def test_list_event_streams(
             models.EventStream(
                 name="test-event_stream-1",
                 source_type="ansible.eda.range",
-                args={"limit": 5, "delay": 1},
+                source_args={"limit": 5, "delay": 1},
                 user=default_user,
                 decision_environment_id=default_de.id,
             ),
             models.EventStream(
                 name="test-event_stream-2",
                 source_type="ansible.eda.range",
-                args={"limit": 6, "delay": 2},
+                source_args={"limit": 6, "delay": 2},
                 user=default_user,
                 decision_environment_id=default_de.id,
             ),
@@ -193,7 +193,7 @@ def test_retrieve_event_stream(
     event_stream = models.EventStream.objects.create(
         name="test-event_stream-1",
         source_type="ansible.eda.range",
-        args=args,
+        source_args=args,
         user=default_user,
         decision_environment_id=default_de.id,
     )
@@ -204,7 +204,7 @@ def test_retrieve_event_stream(
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == event_stream.name
     assert response.data["source_type"] == event_stream.source_type
-    assert yaml.safe_load(response.data["args"]) == args
+    assert yaml.safe_load(response.data["source_args"]) == args
     assert response.data["user"] == "luke.skywalker"
     assert len(response.data["credentials"]) == 2
     assert response.data["credentials"][0]["name"] == credentials[0].name
@@ -230,7 +230,7 @@ def test_create_event_stream(
     data_in = {
         "name": "test_event_stream",
         "source_type": f"{source_type}",
-        "args": f"{args}",
+        "source_args": f"{args}",
         "decision_environment_id": default_de.id,
     }
     response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
@@ -239,7 +239,7 @@ def test_create_event_stream(
     assert result["name"] == "test_event_stream"
     assert result["source_type"] == source_type
     assert result["user"] == "test.admin"
-    assert yaml.safe_load(response.data["args"]) == args
+    assert yaml.safe_load(response.data["source_args"]) == args
 
     event_stream = models.EventStream.objects.first()
     rulesets = yaml.safe_load(event_stream.rulebook_rulesets)
@@ -265,7 +265,7 @@ def test_create_event_stream_with_credential(
     data_in = {
         "name": "test_event_stream",
         "source_type": "ansible.eda.range",
-        "args": f"{args}",
+        "source_args": f"{args}",
         "decision_environment_id": default_de.id,
         "credentials": [credential.id],
     }
@@ -275,7 +275,7 @@ def test_create_event_stream_with_credential(
     assert result["name"] == "test_event_stream"
     assert result["source_type"] == "ansible.eda.range"
     assert result["credentials"][0]["name"] == credential.name
-    assert yaml.safe_load(response.data["args"]) == args
+    assert yaml.safe_load(response.data["source_args"]) == args
 
 
 @pytest.mark.parametrize(
@@ -308,7 +308,7 @@ def test_create_event_stream_with_bad_rulebook(
         data_in = {
             "name": "test_event_stream",
             "source_type": "ansible.eda.range",
-            "args": f"{args}",
+            "source_args": f"{args}",
             "decision_environment_id": default_de.id,
         }
         response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
@@ -327,7 +327,7 @@ def test_create_event_stream_bad_channel_name(
     data_in = {
         "name": "test_event_stream",
         "source_type": "ansible.eda.range",
-        "args": f"{args}",
+        "source_args": f"{args}",
         "channel_name": "abc-def",
         "decision_environment_id": default_de.id,
     }
@@ -348,15 +348,15 @@ def test_create_event_stream_bad_args(
     data_in = {
         "name": "test_event_stream",
         "source_type": "ansible.eda.range",
-        "args": "gobbledegook",
+        "source_args": "gobbledegook",
         "decision_environment_id": default_de.id,
     }
     response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     result = response.data
     assert (
-        str(result["args"][0])
-        == "The 'args' field must be a YAML object (dictionary)"
+        str(result["source_args"][0])
+        == "The 'source_args' field must be a YAML object (dictionary)"
     )
 
 
@@ -372,7 +372,7 @@ def test_create_event_stream_empty_args(
     }
     response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["args"][0] == "This field is required."
+    assert response.data["source_args"][0] == "This field is required."
 
 
 @pytest.mark.django_db
@@ -415,7 +415,7 @@ def test_list_event_stream_instances(
     event_stream = models.EventStream.objects.create(
         name="test-event_stream-1",
         source_type="ansible.eda.range",
-        args=args,
+        source_args=args,
         user=default_user,
         decision_environment_id=default_de.id,
     )

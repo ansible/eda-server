@@ -76,7 +76,7 @@ class EventStream(StatusHandlerModelMixin, models.Model):
     )
     channel_name = models.TextField(null=True, default=None)
     source_type = models.TextField(null=False)
-    args = models.JSONField(null=True, default=None)
+    source_args = models.JSONField(null=True, default=None)
     system_vault_credential = models.OneToOneField(
         "Credential",
         null=True,
