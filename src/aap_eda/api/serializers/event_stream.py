@@ -90,7 +90,7 @@ def _updated_listener_ruleset(validated_data):
         {
             "name": validated_data["name"],
             "type": validated_data["source_type"],
-            "args": validated_data["args"],
+            "args": validated_data["source_args"],
         }
     ]
     return swap_sources(validated_data["rulebook_rulesets"], sources_info)
@@ -104,11 +104,12 @@ class YAMLSerializerField(serializers.Field):
             try:
                 parsed_args = yaml.safe_load(data)
             except yaml.YAMLError:
-                raise ValidationError("Invalid YAML format for 'args'")
+                raise ValidationError("Invalid YAML format for 'source_args'")
 
             if not isinstance(parsed_args, dict):
                 raise ValidationError(
-                    "The 'args' field must be a YAML object (dictionary)"
+                    "The 'source_args' field must be a YAML "
+                    "object (dictionary)"
                 )
 
             return parsed_args
@@ -123,7 +124,7 @@ class EventStreamSerializer(serializers.ModelSerializer):
         validators=[validators.check_if_de_exists]
     )
     user = serializers.SerializerMethodField()
-    args = YAMLSerializerField(required=False, allow_null=True)
+    source_args = YAMLSerializerField(required=False, allow_null=True)
     credentials = serializers.SerializerMethodField()
 
     class Meta:
@@ -135,7 +136,7 @@ class EventStreamSerializer(serializers.ModelSerializer):
         ]
         fields = [
             "name",
-            "args",
+            "source_args",
             "source_type",
             "channel_name",
             "is_enabled",
@@ -164,7 +165,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validators=[validators.check_if_de_exists]
     )
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    args = YAMLSerializerField()
+    source_args = YAMLSerializerField()
     channel_name = serializers.CharField(
         default=_get_default_channel_name(),
         validators=[
@@ -188,7 +189,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "description",
             "is_enabled",
             "source_type",
-            "args",
+            "source_args",
             "channel_name",
             "decision_environment_id",
             "rulebook_id",
