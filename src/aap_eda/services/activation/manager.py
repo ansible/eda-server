@@ -38,15 +38,13 @@ from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
-    Credential,
 )
 from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
-from aap_eda.services.auth import create_jwt_token
 
 from .db_log_handler import DBLogger
-from .engine.common import ContainerEngine
+from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
 
 LOGGER = logging.getLogger(__name__)
@@ -1056,10 +1054,18 @@ class ActivationManager:
             raise exceptions.ActivationStartError(msg) from exc
 
     def _build_container_request(self) -> ContainerRequest:
-        container_params = self.db_instance.get_container_parameters()
+        try:
+            container_params = self.db_instance.get_container_parameters()
+        except ContainerableInvalidError:
+            msg = (
+                f"Activation {self.db_instance.id} not valid, "
+                "container request cannot be built."
+            )
+            LOGGER.exception(msg)
+            raise exceptions.ActivationManagerError(msg)
+
         return ContainerRequest(
             credential=container_params["credential"],
-            cmdline=self._build_cmdline(),
             name=container_params["name"],
             image_url=container_params["image_url"],
             ports=container_params["ports"],
@@ -1069,34 +1075,30 @@ class ActivationManager:
             extra_args=container_params["extra_args"],
             mem_limit=container_params["mem_limit"],
             mounts=container_params["mounts"],
+            cmdline=self._build_cmdline(),
         )
 
-    def _build_credential(self) -> tp.Optional[Credential]:
-        credential = self.db_instance.decision_environment.credential
-        if credential:
-            return Credential(
-                username=credential.username,
-                secret=credential.secret.get_secret_value(),
-            )
-        return None
-
     def _build_cmdline(self) -> AnsibleRulebookCmdLine:
-        if not self.latest_instance:
+        try:
+            cmdline_params = self.db_instance.get_command_line_parameters()
+        except ContainerableInvalidError:
             msg = (
-                f"Activation {self.db_instance.id} does not have an instance, "
-                "cmdline can not be built."
+                f"Activation {self.db_instance.id} not valid, "
+                "cmdline cannot be built."
             )
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
 
-        access_token, refresh_token = create_jwt_token()
         return AnsibleRulebookCmdLine(
-            ws_url=settings.WEBSOCKET_BASE_URL + ACTIVATION_PATH,
-            log_level=settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
-            ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
-            ws_access_token=access_token,
-            ws_refresh_token=refresh_token,
-            ws_token_url=settings.WEBSOCKET_TOKEN_BASE_URL + TOKEN_RENEW_PATH,
-            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-            id=str(self.latest_instance.id),
+            ws_url=cmdline_params["ws_base_url"] + ACTIVATION_PATH,
+            log_level=cmdline_params["log_level"],
+            ws_ssl_verify=cmdline_params["ws_ssl_verify"],
+            ws_access_token=cmdline_params["ws_access_token"],
+            ws_refresh_token=cmdline_params["ws_refresh_token"],
+            ws_token_url=(
+                cmdline_params["ws_token_base_url"] + TOKEN_RENEW_PATH
+            ),
+            heartbeat=cmdline_params["heartbeat"],
+            id=cmdline_params["id"],
+            skip_audit_events=cmdline_params["skip_audit_events"],
         )

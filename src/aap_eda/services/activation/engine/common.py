@@ -23,6 +23,7 @@ from pydantic import BaseModel, validator
 import aap_eda.services.activation.engine.exceptions as exceptions
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.models.credential import Credential
+from aap_eda.services.auth import create_jwt_token
 
 from .ports import find_ports
 
@@ -33,20 +34,38 @@ class ContainerableMixinError(Exception):
     pass
 
 
-class ContainerableInvalidError(Exception):
+class ContainerableInvalidError(ContainerableMixinError):
+    pass
+
+
+class ContainerableNoLatestInstanceError(ContainerableMixinError):
     pass
 
 
 class ContainerableMixin:
     def get_command_line_parameters(self) -> dict[str, tp.Any]:
         """Return parameters for running ansible-rulebook."""
-        return {}
+        self.validate()
+
+        access_token, refresh_token = create_jwt_token()
+        return {
+            "ws_base_url": settings.WEBSOCKET_BASE_URL,
+            "log_level": settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
+            "ws_ssl_verify": settings.WEBSOCKET_SSL_VERIFY,
+            "ws_token_base_url": settings.WEBSOCKET_TOKEN_BASE_URL,
+            "ws_access_token": access_token,
+            "ws_refresh_token": refresh_token,
+            "heartbeat": settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
+            "skip_audit_events": False,
+        }
 
     def get_container_parameters(self) -> dict[str, tp.Any]:
         """Return parameters used to create a ContainerRquest."""
+        self.validate()
+
         return {
             "credential": self.get_image_credential(),
-            "name": self._get_name(),
+            "name": self._get_container_name(),
             "image_url": self._get_image_url(),
             "ports": self._get_ports(),
             "env_vars": settings.PODMAN_ENV_VARS,
@@ -65,42 +84,43 @@ class ContainerableMixin:
             )
         return None
 
-    @abstractmethod
     def get_restart_policy(self) -> str:
         """Return the restart policy for the implementer."""
-        ...
+        raise NotImplementedError
 
     def validate(self):
-        """Validate the the implementer is appropriate to be containerized.
+        """Validate the the implementer is appropriate to be containerized."""
+        try:
+            self._validate()
+        except ContainerableMixinError as e:
+            raise ContainerableInvalidError from e
 
-        By default no implementer is considered valid.
-        """
-        raise ContainerableInvalidError("invalid as a containerable")
+    def _get_container_name(self) -> str:
+        """Return the name to use for the ContainerRequest."""
+        raise NotImplementedError
 
-    @abstractmethod
     def _get_context(self) -> dict[str, tp.Any]:
         """Return the context dictionary used to create a ContainerRquest."""
-        ...
+        raise NotImplementedError
 
-    @abstractmethod
     def _get_image_credential(self) -> tp.Optional[Credential]:
-        ...
+        raise NotImplementedError
 
-    @abstractmethod
     def _get_image_url(self) -> str:
-        ...
+        raise NotImplementedError
 
-    @abstractmethod
-    def _get_name(self) -> str:
+    def _get_latest_instance(self) -> str:
         """Return the name to use for the ContainerRequest."""
-        ...
+        raise NotImplementedError
 
     def _get_ports(self) -> list[tuple]:
         return find_ports(self._get_rulebook_rulesets(), self._get_context())
 
-    @abstractmethod
     def _get_rulebook_rulesets(self) -> str:
-        ...
+        raise NotImplementedError
+
+    def _validate(self):
+        raise NotImplementedError
 
 
 class LogHandler(ABC):
@@ -135,6 +155,7 @@ class AnsibleRulebookCmdLine(BaseModel):
     heartbeat: int
     id: tp.Union[str, int]  # casted to str
     log_level: tp.Optional[str] = None  # -v or -vv or None
+    skip_audit_events: bool = False
 
     @validator("id", pre=True)
     def cast_to_str(cls, v):
@@ -161,6 +182,8 @@ class AnsibleRulebookCmdLine(BaseModel):
             "--heartbeat",
             str(self.heartbeat),
         ]
+        if self.skip_audit_events:
+            args.append("--skip-audit-events")
         if self.log_level:
             args.append(self.log_level)
 

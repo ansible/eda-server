@@ -20,7 +20,10 @@ from django.conf import settings
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
-from aap_eda.services.activation.engine.common import ContainerableMixin
+from aap_eda.services.activation.engine.common import (
+    ContainerableMixin,
+    ContainerableNoLatestInstanceError,
+)
 
 from .credential import Credential
 from .mixins import StatusHandlerModelMixin
@@ -112,7 +115,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     # Implementation of the ContainerableMixin.
     def get_command_line_parameters(self) -> dict[str, tp.Any]:
         params = super().get_command_line_parameters()
-        return params | {}
+        return params | {
+            "id": str(self.latest_instance.id),
+        }
 
     def get_container_parameters(self) -> dict[str, tp.Any]:
         params = super().get_container_parameters()
@@ -124,8 +129,11 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     def get_restart_policy(self) -> str:
         return self.restart_policy
 
-    def validate(self):
-        pass
+    def _get_container_name(self) -> str:
+        return (
+            f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
+            f"-{uuid.uuid4()}"
+        )
 
     def _get_context(self) -> dict[str, tp.Any]:
         if self.extra_var:
@@ -140,11 +148,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     def _get_image_url(self) -> str:
         return self.decision_environment.image_url
 
-    def _get_name(self) -> str:
-        return (
-            f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
-            f"-{uuid.uuid4()}"
-        )
-
     def _get_rulebook_rulesets(self) -> str:
         return self.rulebook_rulesets
+
+    def _validate(self):
+        if not self.latest_instance:
+            raise ContainerableNoLatestInstanceError

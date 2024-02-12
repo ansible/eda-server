@@ -17,7 +17,7 @@ from itertools import groupby
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from aap_eda.core.models import User
+from aap_eda.core.models.user import User
 
 
 def group_permission_resource(permission_data):
