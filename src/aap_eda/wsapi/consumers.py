@@ -158,7 +158,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             instance.updated_at = message.reported_at
             instance.save(update_fields=["updated_at"])
 
-            activation = instance.activation
+            activation = instance.get_parent()
             activation.ruleset_stats[
                 message.stats["ruleSetName"]
             ] = message.stats
@@ -320,9 +320,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation_instance = models.RulebookProcess.objects.get(
             id=activation_instance_id
         )
-        activation = models.Activation.objects.get(
-            id=activation_instance.activation_id
-        )
+        activation = activation_instance.get_parent()
 
         if activation.extra_var_id:
             extra_var = models.ExtraVar.objects.filter(
@@ -339,8 +337,11 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        awx_token = activation_instance.activation.awx_token
+        parent = activation_instance.get_parent()
+        if not hasattr(parent, "awx_token"):
+            return None
 
+        awx_token = parent.awx_token
         return awx_token.token.get_secret_value() if awx_token else None
 
     @database_sync_to_async
@@ -351,7 +352,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        activation = activation_instance.activation
+        activation = activation_instance.get_parent()
         vault_passwords = []
 
         if activation.system_vault_credential:

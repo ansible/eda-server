@@ -97,3 +97,7 @@ class Activation(StatusHandlerModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    event_streams = models.ManyToManyField(
+        "EventStream",
+        default=None,
+    )

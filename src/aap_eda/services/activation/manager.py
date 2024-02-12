@@ -228,9 +228,9 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
-        instances = models.RulebookProcess.objects.filter(
-            activation=self.db_instance,
-        )
+        args = {f"{self.db_instance_type}": self.db_instance}
+
+        instances = models.RulebookProcess.objects.filter(**args)
         for instance in instances:
             if instance.status not in [
                 ActivationStatus.STOPPED,
@@ -1036,13 +1036,20 @@ class ActivationManager:
             return
 
     def _create_activation_instance(self):
+        git_hash = (
+            self.db_instance.git_hash
+            if hasattr(self.db_instance, "git_hash")
+            else ""
+        )
         try:
-            models.RulebookProcess.objects.create(
-                activation=self.db_instance,
-                name=self.db_instance.name,
-                status=ActivationStatus.STARTING,
-                git_hash=self.db_instance.git_hash,
-            )
+            args = {
+                "name": self.db_instance.name,
+                "status": ActivationStatus.STARTING,
+                "git_hash": git_hash,
+            }
+            args[f"{self.db_instance_type}"] = self.db_instance
+
+            models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "

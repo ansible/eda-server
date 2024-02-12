@@ -16,6 +16,7 @@ from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import RoleViewSet, SessionLoginView, SessionLogoutView
 from .credential import CredentialViewSet
 from .decision_environment import DecisionEnvironmentViewSet
+from .event_stream import EventStreamViewSet
 from .project import ExtraVarViewSet, ProjectViewSet
 from .rulebook import (
     AuditRuleViewSet,
@@ -48,4 +49,6 @@ __all__ = (
     "CredentialViewSet",
     # decision_environment
     "DecisionEnvironmentViewSet",
+    # event_stream
+    "EventStreamViewSet",
 )
