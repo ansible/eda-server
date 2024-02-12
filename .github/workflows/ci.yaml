@@ -111,6 +111,7 @@ jobs:
         run: poetry run python -m pytest -vv --cov=./ --cov-report=xml
 
       - name: Build and run api server with docker
+        working-directory: tools/docker
         env:
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
