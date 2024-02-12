@@ -113,6 +113,8 @@ jobs:
       - name: Build and run api server with docker
         working-directory: tools/docker
         env:
+          EDA_PG_PORT: 5433
+          EDA_DB_PORT: 5433
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
         run: |

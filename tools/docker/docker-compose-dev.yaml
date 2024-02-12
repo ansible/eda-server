@@ -23,6 +23,7 @@ x-environment:
   - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
   - EDA_DEBUG=${EDA_DEBUG:-'True'}
   - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
+  - EDA_DB_PORT=${EDA_DB_PORT:-'5432'}
 
 services:
   podman-pre-setup:
