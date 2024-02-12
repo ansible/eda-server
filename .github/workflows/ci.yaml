@@ -115,6 +115,8 @@ jobs:
         env:
           EDA_PG_PORT: 5433
           EDA_DB_PORT: 5433
+          EDA_REDIS_PORT: 6380
+          EDA_MQ_PORT: 6380
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
         run: |
