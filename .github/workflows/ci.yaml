@@ -113,10 +113,10 @@ jobs:
       - name: Build and run api server with docker
         working-directory: tools/docker
         env:
+          # both ports are set just to avoid conflicts with GitHub services
+          # app pods still use the internal ports. See docker-compose-dev.yaml
           EDA_PG_PORT: 5433
-          EDA_DB_PORT: 5433
           EDA_REDIS_PORT: 6380
-          EDA_MQ_PORT: 6380
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
         run: |
