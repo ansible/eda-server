@@ -142,6 +142,12 @@ jobs:
           npm install -g swagger-cli
           swagger-cli validate http://localhost:8000/api/eda/v1/openapi.json
 
+      - name: Print EDA logs
+        if: always()
+        working-directory: tools/docker
+        run: |
+          docker-compose -p eda -f docker-compose-dev.yaml logs
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
