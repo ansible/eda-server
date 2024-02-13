@@ -92,6 +92,8 @@ def test_get_container_request(event_stream):
     """Test the construction of a ContainerRequest."""
     request = event_stream.get_container_request()
     assert isinstance(request, ContainerRequest)
+    assert request.cmdline.skip_audit_events
+    assert "--skip-audit-events" in request.cmdline.get_args()
 
 
 @pytest.mark.django_db

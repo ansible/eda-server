@@ -92,6 +92,8 @@ def test_get_container_request(activation):
     """Test the construction of a ContainerRequest."""
     request = activation.get_container_request()
     assert isinstance(request, ContainerRequest)
+    assert not request.cmdline.skip_audit_events
+    assert "--skip-audit-events" not in request.cmdline.get_args()
 
 
 @pytest.mark.django_db
