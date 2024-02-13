@@ -112,6 +112,28 @@ def basic_activation(
 
 
 @pytest.fixture
+def new_activation_with_instance(
+    default_user: models.User,
+    decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+) -> models.Activation:
+    """Return an activation with an instance."""
+    activation = models.Activation.objects.create(
+        name="new_activation_with_instance",
+        user=default_user,
+        decision_environment=decision_environment,
+        rulebook=default_rulebook,
+        # rulebook_rulesets is populated by the serializer
+        rulebook_rulesets=default_rulebook.rulesets,
+    )
+    models.RulebookProcess.objects.create(
+        activation=activation,
+        status=ActivationStatus.RUNNING,
+    )
+    return activation
+
+
+@pytest.fixture
 def container_engine_mock() -> MagicMock:
     return create_autospec(ContainerEngine, instance=True)
 
@@ -554,3 +576,19 @@ def test_delete_with_exception(
     assert (
         models.Activation.objects.filter(id=running_activation.id).count() == 0
     )
+
+
+@pytest.mark.django_db
+def test_start_max_running_activations(
+    new_activation_with_instance: models.Activation,
+    basic_activation: models.Activation,
+    settings: SettingsWrapper,
+    eda_caplog: LogCaptureFixture,
+):
+    """Test start verb when max running activations is reached."""
+    apply_settings(settings, MAX_RUNNING_ACTIVATIONS=1)
+    activation_manager = ActivationManager(basic_activation)
+
+    with pytest.raises(exceptions.MaxRunningProcessesError):
+        activation_manager.start()
+    assert "No capacity to start a new rulebook process" in eda_caplog.text

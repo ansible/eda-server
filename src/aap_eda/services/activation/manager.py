@@ -1033,6 +1033,17 @@ class ActivationManager:
             if hasattr(self.db_instance, "git_hash")
             else ""
         )
+        with transaction.atomic():
+            if not self.check_new_process_allowed(
+                self.db_instance_type,
+                self.db_instance.id,
+            ):
+                msg = (
+                    "Failed to create rulebook process. "
+                    "Reason: Max running processes reached."
+                )
+                self._set_activation_status(ActivationStatus.PENDING, msg)
+                raise exceptions.MaxRunningProcessesError
         try:
             args = {
                 "name": self.db_instance.name,
@@ -1060,3 +1071,17 @@ class ActivationManager:
             )
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
+
+    @staticmethod
+    def check_new_process_allowed(parent_type: str, parent_id: int) -> bool:
+        """Check if a new process is allowed."""
+        num_running_processes = models.RulebookProcess.objects.filter(
+            status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+        ).count()
+        if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
+            LOGGER.info(
+                "No capacity to start a new rulebook process. "
+                f"{parent_type} {parent_id} is postponed",
+            )
+            return False
+        return True
