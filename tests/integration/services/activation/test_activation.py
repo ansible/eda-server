@@ -44,13 +44,11 @@ def activation_no_instance(
 @pytest.fixture
 def activation(activation_no_instance) -> models.Activation:
     """Return an activation with associated RulebookProcess."""
-    process = models.RulebookProcess(
-        id=1,
+    models.RulebookProcess.objects.create(
         name="activation-instance-1",
         activation=activation_no_instance,
         git_hash=PROJECT_GIT_HASH,
     )
-    activation_no_instance.latest_instance = process
     return activation_no_instance
 
 

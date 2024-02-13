@@ -44,13 +44,11 @@ def event_stream_no_instance(
 @pytest.fixture
 def event_stream(event_stream_no_instance) -> models.EventStream:
     """Return an activation with associated RulebookProcess."""
-    process = models.RulebookProcess(
-        id=1,
+    models.RulebookProcess.objects.create(
         name="event-stream-instance-1",
         event_stream=event_stream_no_instance,
         git_hash=PROJECT_GIT_HASH,
     )
-    event_stream_no_instance.latest_instance = process
     return event_stream_no_instance
 
 
