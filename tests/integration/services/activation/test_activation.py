@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -11,8 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Activation Manager tests."""
-# TODO(alex) dedup code and fixtures across all the tests
+"""Activation Containerable Interface tests."""
 
 import pytest
 
@@ -22,61 +21,16 @@ PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
 
 
 @pytest.fixture
-def default_rulebook() -> models.Rulebook:
-    """Return a default rulebook."""
-    rulesets = """
----
-- name: Hello World
-  hosts: all
-  sources:
-    - ansible.eda.range:
-        limit: 5
-  rules:
-    - name: Say Hello
-      condition: event.i == 1
-      action:
-        debug:
-          msg: "Hello World!"
-
-"""
-    return models.Rulebook.objects.create(
-        name="test-rulebook",
-        rulesets=rulesets,
-    )
-
-
-@pytest.fixture
-def default_user() -> models.User:
-    """Return a default user."""
-    user = models.User.objects.create(
-        username="test.user",
-        password="test.user.123",
-        email="test.user@localhost",
-    )
-
-    return user
-
-
-@pytest.fixture
-def decision_environment() -> models.DecisionEnvironment:
-    """Return a default decision environment."""
-    return models.DecisionEnvironment.objects.create(
-        name="test-decision-environment",
-        image_url="localhost:14000/test-image-url",
-    )
-
-
-@pytest.fixture
 def activation(
     default_user: models.User,
-    decision_environment: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
 ) -> models.Activation:
     """Return an activation with associated RulebookProcess."""
     activation = models.Activation.objects.create(
         name="test-activation",
         user=default_user,
-        decision_environment=decision_environment,
+        decision_environment=default_decision_environment,
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,

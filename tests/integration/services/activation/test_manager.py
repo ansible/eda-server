@@ -41,30 +41,6 @@ def apply_settings(settings: SettingsWrapper, **kwargs):
 
 
 @pytest.fixture
-def default_rulebook() -> models.Rulebook:
-    """Return a default rulebook."""
-    rulesets = """
----
-- name: Hello World
-  hosts: all
-  sources:
-    - ansible.eda.range:
-        limit: 5
-  rules:
-    - name: Say Hello
-      condition: event.i == 1
-      action:
-        debug:
-          msg: "Hello World!"
-
-"""
-    return models.Rulebook.objects.create(
-        name="test-rulebook",
-        rulesets=rulesets,
-    )
-
-
-@pytest.fixture
 def rulebook_with_job_template() -> models.Rulebook:
     """Return a default rulebook."""
     rulesets = """
@@ -95,27 +71,6 @@ def eda_caplog(caplog_factory) -> LogCaptureFixture:
 
 
 @pytest.fixture
-def default_user() -> models.User:
-    """Return a default user."""
-    user = models.User.objects.create(
-        username="test.user",
-        password="test.user.123",
-        email="test.user@localhost",
-    )
-
-    return user
-
-
-@pytest.fixture
-def decision_environment() -> models.DecisionEnvironment:
-    """Return a default decision environment."""
-    return models.DecisionEnvironment.objects.create(
-        name="test-decision-environment",
-        image_url="localhost:14000/test-image-url",
-    )
-
-
-@pytest.fixture
 def activation_with_instance(
     basic_activation: models.Activation,
 ) -> models.Activation:
@@ -141,14 +96,14 @@ def running_activation(activation_with_instance: models.Activation):
 @pytest.fixture
 def basic_activation(
     default_user: models.User,
-    decision_environment: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
 ) -> models.Activation:
     """Return the minimal activation."""
     return models.Activation.objects.create(
         name="test-activation",
         user=default_user,
-        decision_environment=decision_environment,
+        decision_environment=default_decision_environment,
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
