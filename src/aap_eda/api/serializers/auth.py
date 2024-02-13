@@ -13,6 +13,8 @@
 #  limitations under the License.
 from rest_framework import serializers
 
+from ansible_base.rbac.models import RoleDefinition
+
 from aap_eda.core import models
 
 
@@ -27,37 +29,44 @@ class LoginSerializer(serializers.Serializer):
 # Permissions
 # -----------------------------------------------------
 class PermissionSerializer(serializers.ModelSerializer):
-    resource_type = serializers.CharField(
-        required=True,
-        help_text="Resource type of the permission",
-    )
-
-    action = serializers.CharField(
-        required=True,
-        help_text="Action granted by the permission.",
-    )
-
     class Meta:
         model = models.Permission
         fields = "__all__"
         read_only_fields = ["id"]
 
+    resource_type = serializers.SerializerMethodField()
+    action = serializers.SerializerMethodField()
+
+    def get_resource_type(self, obj):
+        return obj.get_model()
+
+    def get_action(self, obj):
+        return obj.get_action()
+
 
 class PermissionRefSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.Permission
+        model = models.DABPermission
         fields = ["resource_type", "action"]
         read_only_fields = ["resource_type", "action"]
+
+    resource_type = serializers.SerializerMethodField()
+    action = serializers.SerializerMethodField()
+
+    def get_resource_type(self, obj):
+        return obj.get_model()
+
+    def get_action(self, obj):
+        return obj.get_action()
 
 
 # -----------------------------------------------------
 # Roles
 # -----------------------------------------------------
 class RoleSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(
-        required=True, help_text="Unique UUID of the role"
+    id = serializers.IntegerField(
+        required=True, help_text="Unique id of the role"
     )
-
     name = serializers.CharField(
         required=True,
         help_text="Name of the rulebook",
@@ -72,18 +81,25 @@ class RoleSerializer(serializers.ModelSerializer):
     is_default = serializers.BooleanField(
         default=False, help_text="Indicates if the role is default"
     )
+    created_at = serializers.SerializerMethodField()
+    modified_at = serializers.SerializerMethodField()
+
+    def get_created_at(self, obj):
+        return obj.created_on
+
+    def get_modified_at(self, obj):
+        return obj.modified_on
+
 
     class Meta:
-        model = models.Role
+        model = RoleDefinition
         fields = "__all__"
-        read_only_fields = ["created_at", "modified_at"]
 
 
 class RoleListSerializer(serializers.Serializer):
-    id = serializers.UUIDField(
-        required=True, help_text="Unique UUID of the role"
+    id = serializers.IntegerField(
+        required=True, help_text="Unique id of the role"
     )
-
     name = serializers.CharField(
         required=True,
         help_text="Name of the rulebook",
@@ -97,10 +113,9 @@ class RoleListSerializer(serializers.Serializer):
 
 
 class RoleDetailSerializer(serializers.Serializer):
-    id = serializers.UUIDField(
-        required=True, help_text="Unique UUID of the role"
+    id = serializers.IntegerField(
+        required=True, help_text="Unique id of the role"
     )
-
     name = serializers.CharField(
         required=True,
         help_text="Name of the rulebook",
@@ -114,19 +129,18 @@ class RoleDetailSerializer(serializers.Serializer):
 
     permissions = PermissionRefSerializer(read_only=True, many=True)
 
-    created_at = serializers.DateTimeField(
-        required=True,
-        help_text="The created_at timestamp of the ruleset",
-    )
+    created_at = serializers.SerializerMethodField()
+    modified_at = serializers.SerializerMethodField()
 
-    modified_at = serializers.DateTimeField(
-        required=True,
-        help_text="The modified_at timestamp of the ruleset",
-    )
+    def get_created_at(self, obj):
+        return obj.created_on
+
+    def get_modified_at(self, obj):
+        return obj.modified_on
 
 
 class RoleRefSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.Role
+        model = RoleDefinition
         fields = ["id", "name"]
         read_only_fields = ["id", "name"]

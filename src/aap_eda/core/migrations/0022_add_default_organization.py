@@ -36,7 +36,6 @@ def add_resources_to_default_org(apps, schema_editor):
         "DecisionEnvironment",
         "ExtraVar",
         "Project",
-        "Role",
         "Rulebook",
         "RulebookProcess",
         "RulebookProcessLog",

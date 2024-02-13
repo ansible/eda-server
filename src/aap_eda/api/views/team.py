@@ -80,10 +80,12 @@ class TeamViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Team.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = TeamFilter
     rbac_resource_type = ResourceType.TEAM
+
+    def get_queryset(self):
+        return models.Team.access_qs(self.request.user).order_by("id")
 
     def get_serializer_class(self):
         if self.action == "create":

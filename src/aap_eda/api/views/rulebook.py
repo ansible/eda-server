@@ -56,12 +56,14 @@ from aap_eda.services.rulebook import build_fired_stats, build_ruleset_out_data
 class RulebookViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Rulebook.objects.order_by("id")
     serializer_class = serializers.RulebookSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulebookFilter
 
     rbac_action = None
+
+    def get_queryset(self):
+        return models.Rulebook.access_qs(self.request.user).order_by("id")
 
     @extend_schema(
         description="Ruleset list of a rulebook by its id",
@@ -204,7 +206,6 @@ class RulesetViewSet(
 class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.AuditRule.objects.all()
     filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
     filterset_class = filters.AuditRuleFilter
     ordering_fields = [
@@ -214,6 +215,9 @@ class AuditRuleViewSet(
         "activation_instance__name",
         "fired_at",
     ]
+
+    def get_queryset(self):
+        return models.AuditRule.access_qs(self.request.user)
 
     def get_serializer_class(self):
         if self.action == "retrieve":

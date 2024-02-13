@@ -87,6 +87,7 @@ class EventStream(StatusHandlerModelMixin, models.Model):
             models.Index(fields=["name"], name="ix_event_stream_name"),
         ]
         ordering = ("-created_at",)
+        default_permissions = ('add', 'view',)
 
     def __str__(self) -> str:
         return f"EventStream {self.name} ({self.id})"

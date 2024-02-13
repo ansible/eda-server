@@ -273,7 +273,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
-        "aap_eda.api.permissions.RoleBasedPermission",
+        "ansible_base.rbac.api.permissions.AnsibleBaseObjectPermissions",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
@@ -486,3 +486,7 @@ ANSIBLE_BASE_SERVICE_PREFIX = "eda"
 
 ANSIBLE_BASE_TEAM_MODEL = "core.Team"
 ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
+ANSIBLE_BASE_PERMISSION_MODEL = "core.DABPermission"
+
+# Organization and object roles will come from create_initial_data
+ANSIBLE_BASE_ROLE_PRECREATE = {}

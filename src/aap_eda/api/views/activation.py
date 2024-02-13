@@ -54,13 +54,15 @@ class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
 
     rbac_resource_type = None
     rbac_action = None
+
+    def get_queryset(self):
+        return models.Activation.access_qs(self.request.user)
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -332,12 +334,14 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.RulebookProcess.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
     rbac_resource_type = ResourceType.ACTIVATION_INSTANCE
     rbac_action = None
+
+    def get_queryset(self):
+        return models.RulebookProcess.access_qs(self.request.user)
 
     @extend_schema(
         description="List all logs for the Activation Instance",

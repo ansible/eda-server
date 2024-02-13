@@ -102,6 +102,7 @@ class AuditRule(models.Model):
             models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ]
         ordering = ("-fired_at",)
+        default_permissions = ('view',)
 
     name = models.TextField(null=False)
     status = models.TextField()
@@ -159,6 +160,7 @@ class AuditEvent(models.Model):
     class Meta:
         db_table = "core_audit_event"
         ordering = ("-received_at", "-rule_fired_at")
+        default_permissions = ('view',)
 
     id = models.UUIDField(primary_key=True)
     source_name = models.TextField()

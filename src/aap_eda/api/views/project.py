@@ -65,11 +65,13 @@ class ExtraVarViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.ExtraVar.objects.order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
 
     rbac_resource_type = ResourceType.EXTRA_VAR
+
+    def get_queryset(self):
+        return models.ExtraVar.access_qs(self.request.user).order_by("id")
 
 
 @extend_schema_view(
@@ -100,12 +102,14 @@ class ProjectViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
 
     rbac_action = None
+
+    def get_queryset(self):
+        return models.Project.access_qs(self.request.user).order_by("id")
 
     @extend_schema(
         description="Import a project.",

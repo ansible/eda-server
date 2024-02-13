@@ -15,12 +15,14 @@
 import uuid
 
 from django.db import models
+from django.contrib.contenttypes.models import ContentType
 
 from aap_eda.core.enums import Action, ResourceType
 
 __all__ = (
     "Role",
     "Permission",
+    "DABPermission"
 )
 
 
@@ -32,9 +34,6 @@ class Role(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(null=False, default="")
     is_default = models.BooleanField(null=True, default=False)
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
 
     permissions = models.ManyToManyField("Permission", related_name="roles")
     created_at = models.DateTimeField(auto_now_add=True, null=False)
@@ -67,3 +66,33 @@ class Permission(models.Model):
         return (
             f"<{self.__class__.__name__}: {self.resource_type}:{self.action}>"
         )
+
+
+class DABPermission(models.Model):
+    """
+    This is a partial copy of auth.Permission to be used by DAB RBAC lib
+    and in order to be consistent with other applications
+    """
+    name = models.CharField("name", max_length=255)
+    content_type = models.ForeignKey(ContentType, models.CASCADE, verbose_name="content type")
+    codename = models.CharField("codename", max_length=100)
+
+    class Meta:
+        verbose_name = "permission"
+        verbose_name_plural = "permissions"
+        unique_together = [["content_type", "codename"]]
+        ordering = ["content_type__model", "codename"]
+
+    def __str__(self):
+        return f"<{self.__class__.__name__}: {self.codename}>"
+
+    def natural_key(self):
+        return (self.codename,) + self.content_type.natural_key()
+
+    def get_action(self):
+        action, model = self.codename.split('_', 1)
+        return action
+
+    def get_model(self):
+        action, model = self.codename.split('_', 1)
+        return model

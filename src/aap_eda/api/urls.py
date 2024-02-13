@@ -25,26 +25,27 @@ from rest_framework_simplejwt import views as jwt_views
 from . import views
 
 router = routers.SimpleRouter()
-router.register("extra-vars", views.ExtraVarViewSet)
-router.register("projects", views.ProjectViewSet)
-router.register("rulebooks", views.RulebookViewSet)
-router.register("rulesets", views.RulesetViewSet)
-router.register("rules", views.RuleViewSet)
-router.register("roles", views.RoleViewSet)
+# basename has to be set when queryset is user-dependent, which is any model with permissions
+router.register("extra-vars", views.ExtraVarViewSet, basename='extravar')
+router.register("projects", views.ProjectViewSet, basename='project')
+router.register("rulebooks", views.RulebookViewSet, basename='rulebook')
+router.register("rulesets", views.RulesetViewSet, basename='ruleset')
+router.register("rules", views.RuleViewSet, basename='rule')
+router.register("roles", views.RoleViewSet, basename="role")  # deprecated, DAB RBAC uses roledefinition
 router.register("tasks", views.TaskViewSet, basename="task")
-router.register("activations", views.ActivationViewSet)
-router.register("activation-instances", views.ActivationInstanceViewSet)
-router.register("audit-rules", views.AuditRuleViewSet)
-router.register("users", views.UserViewSet)
+router.register("activations", views.ActivationViewSet, basename='activation')
+router.register("activation-instances", views.ActivationInstanceViewSet, basename='activationinstance')
+router.register("audit-rules", views.AuditRuleViewSet, basename='auditrule')
+router.register("users", views.UserViewSet, basename='user')
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,
     basename="controller-token",
 )
-router.register("credentials", views.CredentialViewSet)
-router.register("decision-environments", views.DecisionEnvironmentViewSet)
-router.register("organizations", views.OrganizationViewSet)
-router.register("teams", views.TeamViewSet)
+router.register("credentials", views.CredentialViewSet, basename='credential')
+router.register("decision-environments", views.DecisionEnvironmentViewSet, basename='decisionenvironment')
+router.register("organizations", views.OrganizationViewSet, basename='organization')
+router.register("teams", views.TeamViewSet, basename='team')
 
 openapi_urls = [
     path(

@@ -27,6 +27,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ansible_base.rbac.models import RoleDefinition
+
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers import LoginSerializer
 from aap_eda.core import models
@@ -116,9 +118,10 @@ class SessionLogoutView(APIView):
 class RoleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.Role.objects.order_by("id")
+    queryset = RoleDefinition.objects.order_by("id")
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.RoleFilter
+    deprecated = True
 
     def get_serializer_class(self):
         if self.action == "list":
