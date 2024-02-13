@@ -16,18 +16,22 @@
 import pytest
 
 from aap_eda.core import models
+from aap_eda.services.activation.engine.common import (
+    ContainerableInvalidError,
+    ContainerRequest,
+)
 
 PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
 
 
 @pytest.fixture
-def event_stream(
+def event_stream_no_instance(
     default_user: models.User,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
 ) -> models.EventStream:
-    """Return an activation with associated RulebookProcess."""
-    event_stream = models.EventStream.objects.create(
+    """Return an event stream without associated RulebookProcess."""
+    return models.EventStream.objects.create(
         name="test-event-stream",
         user=default_user,
         decision_environment=default_decision_environment,
@@ -35,22 +39,28 @@ def event_stream(
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
     )
+
+
+@pytest.fixture
+def event_stream(event_stream_no_instance) -> models.EventStream:
+    """Return an activation with associated RulebookProcess."""
     process = models.RulebookProcess(
+        id=1,
         name="event-stream-instance-1",
-        event_stream=event_stream,
+        event_stream=event_stream_no_instance,
         git_hash=PROJECT_GIT_HASH,
     )
-    event_stream.latest_instance = process
-    return event_stream
+    event_stream_no_instance.latest_instance = process
+    return event_stream_no_instance
 
 
 @pytest.mark.django_db
 def test_command_line_parameters(event_stream):
     params = event_stream.get_command_line_parameters()
-    assert params["ws_base_url"] is not None
+    assert params["ws_url"] is not None
     assert params["log_level"] is not None
     assert params["ws_ssl_verify"] is not None
-    assert params["ws_token_base_url"] is not None
+    assert params["ws_token_url"] is not None
     assert params["ws_access_token"] is not None
     assert params["ws_refresh_token"] is not None
     assert params["heartbeat"] is not None
@@ -77,3 +87,17 @@ def test_container_parameters_no_credential(event_stream):
     """Test container params when no credential exists."""
     params = event_stream.get_container_parameters()
     assert params["credential"] is None
+
+
+@pytest.mark.django_db
+def test_get_container_request(event_stream):
+    """Test the construction of a ContainerRequest."""
+    request = event_stream.get_container_request()
+    assert isinstance(request, ContainerRequest)
+
+
+@pytest.mark.django_db
+def test_get_container_request_no_instance(event_stream_no_instance):
+    """Test the construction of a ContainerRequest."""
+    with pytest.raises(ContainerableInvalidError):
+        event_stream_no_instance.get_container_request()

@@ -22,105 +22,9 @@ from pydantic import BaseModel, validator
 
 import aap_eda.services.activation.engine.exceptions as exceptions
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.core.models.credential import Credential
 from aap_eda.services.auth import create_jwt_token
 
 from .ports import find_ports
-
-
-class ContainerableMixinError(Exception):
-    """Base class for exceptions from implementers of ContainerableMixin."""
-
-    pass
-
-
-class ContainerableInvalidError(ContainerableMixinError):
-    pass
-
-
-class ContainerableNoLatestInstanceError(ContainerableMixinError):
-    pass
-
-
-class ContainerableMixin:
-    def get_command_line_parameters(self) -> dict[str, tp.Any]:
-        """Return parameters for running ansible-rulebook."""
-        self.validate()
-
-        access_token, refresh_token = create_jwt_token()
-        return {
-            "ws_base_url": settings.WEBSOCKET_BASE_URL,
-            "log_level": settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
-            "ws_ssl_verify": settings.WEBSOCKET_SSL_VERIFY,
-            "ws_token_base_url": settings.WEBSOCKET_TOKEN_BASE_URL,
-            "ws_access_token": access_token,
-            "ws_refresh_token": refresh_token,
-            "heartbeat": settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-            "skip_audit_events": False,
-        }
-
-    def get_container_parameters(self) -> dict[str, tp.Any]:
-        """Return parameters used to create a ContainerRquest."""
-        self.validate()
-
-        return {
-            "credential": self.get_image_credential(),
-            "name": self._get_container_name(),
-            "image_url": self._get_image_url(),
-            "ports": self._get_ports(),
-            "env_vars": settings.PODMAN_ENV_VARS,
-            "extra_args": settings.PODMAN_EXTRA_ARGS,
-            "mem_limit": settings.PODMAN_MEM_LIMIT,
-            "mounts": settings.PODMAN_MOUNTS,
-        }
-
-    def get_image_credential(self) -> tp.Optional[Credential]:
-        """Return a decrypted Credential or None for the implementer."""
-        credential = self._get_image_credential()
-        if credential:
-            return Credential(
-                username=credential.username,
-                secret=credential.secret.get_secret_value(),
-            )
-        return None
-
-    def get_restart_policy(self) -> str:
-        """Return the restart policy for the implementer."""
-        raise NotImplementedError
-
-    def validate(self):
-        """Validate the the implementer is appropriate to be containerized."""
-        try:
-            self._validate()
-        except ContainerableMixinError as e:
-            raise ContainerableInvalidError from e
-
-    def _get_container_name(self) -> str:
-        """Return the name to use for the ContainerRequest."""
-        raise NotImplementedError
-
-    def _get_context(self) -> dict[str, tp.Any]:
-        """Return the context dictionary used to create a ContainerRquest."""
-        raise NotImplementedError
-
-    def _get_image_credential(self) -> tp.Optional[Credential]:
-        raise NotImplementedError
-
-    def _get_image_url(self) -> str:
-        raise NotImplementedError
-
-    def _get_latest_instance(self) -> str:
-        """Return the name to use for the ContainerRequest."""
-        raise NotImplementedError
-
-    def _get_ports(self) -> list[tuple]:
-        return find_ports(self._get_rulebook_rulesets(), self._get_context())
-
-    def _get_rulebook_rulesets(self) -> str:
-        raise NotImplementedError
-
-    def _validate(self):
-        raise NotImplementedError
 
 
 class LogHandler(ABC):
@@ -213,6 +117,148 @@ class ContainerRequest(BaseModel):
     mounts: tp.Optional[list[dict]] = None
     env_vars: tp.Optional[dict] = None
     extra_args: tp.Optional[dict] = None
+
+
+class ContainerableMixinError(Exception):
+    """Base class for exceptions from implementers of ContainerableMixin."""
+
+    pass
+
+
+class ContainerableInvalidError(ContainerableMixinError):
+    pass
+
+
+class ContainerableNoLatestInstanceError(ContainerableMixinError):
+    pass
+
+
+class ContainerableMixin:
+    def get_command_line_parameters(self) -> dict[str, tp.Any]:
+        """Return parameters for running ansible-rulebook."""
+        self.validate()
+
+        access_token, refresh_token = create_jwt_token()
+        return {
+            "ws_url": self._get_ws_url(),
+            "log_level": settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
+            "ws_ssl_verify": settings.WEBSOCKET_SSL_VERIFY,
+            "ws_token_url": self._get_ws_token_url(),
+            "ws_access_token": access_token,
+            "ws_refresh_token": refresh_token,
+            "heartbeat": settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
+            "skip_audit_events": False,
+        }
+
+    def get_container_parameters(self) -> dict[str, tp.Any]:
+        """Return parameters used to create a ContainerRquest."""
+        self.validate()
+
+        return {
+            "credential": self.get_image_credential(),
+            "name": self._get_container_name(),
+            "image_url": self._get_image_url(),
+            "ports": self._get_ports(),
+            "env_vars": settings.PODMAN_ENV_VARS,
+            "extra_args": settings.PODMAN_EXTRA_ARGS,
+            "mem_limit": settings.PODMAN_MEM_LIMIT,
+            "mounts": settings.PODMAN_MOUNTS,
+            "cmdline": self._build_cmdline(),
+        }
+
+    def get_container_request(self) -> ContainerRequest:
+        """Return ContainerRequest used for creation."""
+        params = self.get_container_parameters()
+        return ContainerRequest(
+            credential=params["credential"],
+            name=params["name"],
+            image_url=params["image_url"],
+            ports=params["ports"],
+            activation_id=params["activation_id"],
+            activation_instance_id=params["activation_instance_id"],
+            env_vars=params["env_vars"],
+            extra_args=params["extra_args"],
+            mem_limit=params["mem_limit"],
+            mounts=params["mounts"],
+            cmdline=params["cmdline"],
+        )
+
+    def get_image_credential(self) -> tp.Optional[Credential]:
+        """Return a decrypted Credential or None for the implementer."""
+        credential = self._get_image_credential()
+        if credential:
+            return Credential(
+                username=credential.username,
+                secret=credential.secret.get_secret_value(),
+            )
+        return None
+
+    def get_restart_policy(self) -> str:
+        """Return the restart policy for the implementer."""
+        raise NotImplementedError
+
+    def validate(self):
+        """Validate the the implementer is appropriate to be containerized."""
+        try:
+            self._validate()
+        except ContainerableMixinError as e:
+            raise ContainerableInvalidError from e
+
+    def _build_cmdline(self) -> AnsibleRulebookCmdLine:
+        params = self.get_command_line_parameters()
+        return AnsibleRulebookCmdLine(
+            ws_url=params["ws_url"],
+            log_level=params["log_level"],
+            ws_ssl_verify=params["ws_ssl_verify"],
+            ws_access_token=params["ws_access_token"],
+            ws_refresh_token=params["ws_refresh_token"],
+            ws_token_url=params["ws_token_url"],
+            heartbeat=params["heartbeat"],
+            id=params["id"],
+            skip_audit_events=params["skip_audit_events"],
+        )
+
+    def _get_container_name(self) -> str:
+        """Return the name to use for the ContainerRequest."""
+        raise NotImplementedError
+
+    def _get_context(self) -> dict[str, tp.Any]:
+        """Return the context dictionary used to create a ContainerRquest."""
+        raise NotImplementedError
+
+    def _get_image_credential(self) -> tp.Optional[Credential]:
+        raise NotImplementedError
+
+    def _get_image_url(self) -> str:
+        raise NotImplementedError
+
+    def _get_latest_instance(self) -> str:
+        """Return the name to use for the ContainerRequest."""
+        raise NotImplementedError
+
+    def _get_ports(self) -> list[tuple]:
+        return find_ports(self._get_rulebook_rulesets(), self._get_context())
+
+    def _get_rulebook_rulesets(self) -> str:
+        raise NotImplementedError
+
+    def _get_ws_url(self) -> str:
+        return f"{settings.WEBSOCKET_BASE_URL}{self._get_ws_url_subpath()}"
+
+    def _get_ws_url_subpath(self) -> str:
+        return f"/{settings.API_PREFIX}/ws/ansible-rulebook"
+
+    def _get_ws_token_url(self) -> str:
+        return (
+            f"{settings.WEBSOCKET_TOKEN_BASE_URL}"
+            f"{self._get_ws_token_url_subpath()}"
+        )
+
+    def _get_ws_token_url_subpath(self) -> str:
+        return f"/{settings.API_PREFIX}/v1/auth/token/refresh/"
+
+    def _validate(self):
+        raise NotImplementedError
 
 
 class ContainerStatus(BaseModel):

@@ -35,10 +35,7 @@ from aap_eda.core.enums import (
 )
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
-from aap_eda.services.activation.engine.common import (
-    AnsibleRulebookCmdLine,
-    ContainerRequest,
-)
+from aap_eda.services.activation.engine.common import ContainerRequest
 from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
@@ -48,8 +45,6 @@ from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
 
 LOGGER = logging.getLogger(__name__)
-ACTIVATION_PATH = f"/{settings.API_PREFIX}/ws/ansible-rulebook"
-TOKEN_RENEW_PATH = f"/{settings.API_PREFIX}/v1/auth/token/refresh/"
 
 
 class HasDbInstance(tp.Protocol):
@@ -275,7 +270,7 @@ class ActivationManager:
 
         # start the container
         try:
-            container_request = self._build_container_request()
+            container_request = self._get_container_request()
             container_id = self.container_engine.start(
                 container_request,
                 log_handler,
@@ -1053,9 +1048,9 @@ class ActivationManager:
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-    def _build_container_request(self) -> ContainerRequest:
+    def _get_container_request(self) -> ContainerRequest:
         try:
-            container_params = self.db_instance.get_container_parameters()
+            return self.db_instance.get_container_request()
         except ContainerableInvalidError:
             msg = (
                 f"Activation {self.db_instance.id} not valid, "
@@ -1063,42 +1058,3 @@ class ActivationManager:
             )
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
-
-        return ContainerRequest(
-            credential=container_params["credential"],
-            name=container_params["name"],
-            image_url=container_params["image_url"],
-            ports=container_params["ports"],
-            activation_id=container_params["activation_id"],
-            activation_instance_id=container_params["activation_instance_id"],
-            env_vars=container_params["env_vars"],
-            extra_args=container_params["extra_args"],
-            mem_limit=container_params["mem_limit"],
-            mounts=container_params["mounts"],
-            cmdline=self._build_cmdline(),
-        )
-
-    def _build_cmdline(self) -> AnsibleRulebookCmdLine:
-        try:
-            cmdline_params = self.db_instance.get_command_line_parameters()
-        except ContainerableInvalidError:
-            msg = (
-                f"Activation {self.db_instance.id} not valid, "
-                "cmdline cannot be built."
-            )
-            LOGGER.exception(msg)
-            raise exceptions.ActivationManagerError(msg)
-
-        return AnsibleRulebookCmdLine(
-            ws_url=cmdline_params["ws_base_url"] + ACTIVATION_PATH,
-            log_level=cmdline_params["log_level"],
-            ws_ssl_verify=cmdline_params["ws_ssl_verify"],
-            ws_access_token=cmdline_params["ws_access_token"],
-            ws_refresh_token=cmdline_params["ws_refresh_token"],
-            ws_token_url=(
-                cmdline_params["ws_token_base_url"] + TOKEN_RENEW_PATH
-            ),
-            heartbeat=cmdline_params["heartbeat"],
-            id=cmdline_params["id"],
-            skip_audit_events=cmdline_params["skip_audit_events"],
-        )

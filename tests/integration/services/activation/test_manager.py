@@ -24,12 +24,13 @@ from pytest_lazyfixture import lazy_fixture
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
-from aap_eda.services.activation.engine.common import ContainerEngine
+from aap_eda.services.activation.engine.common import (
+    ContainerEngine,
+    ContainerRequest,
+)
 from aap_eda.services.activation.manager import (
-    ACTIVATION_PATH,
     LOGGER,
     ActivationManager,
-    AnsibleRulebookCmdLine,
     exceptions,
 )
 
@@ -116,7 +117,7 @@ def container_engine_mock() -> MagicMock:
 
 
 @pytest.mark.django_db
-def test_build_cmdline(
+def test_get_container_request(
     activation_with_instance: models.Activation,
     settings: SettingsWrapper,
 ):
@@ -129,12 +130,10 @@ def test_build_cmdline(
     }
     apply_settings(settings, **override_settings)
     activation_manager = ActivationManager(activation_with_instance)
-    cmdline = activation_manager._build_cmdline()
-    assert isinstance(cmdline, AnsibleRulebookCmdLine)
-    assert (
-        cmdline.ws_url
-        == override_settings["WEBSOCKET_BASE_URL"] + ACTIVATION_PATH
-    )
+    request = activation_manager._get_container_request()
+    assert isinstance(request, ContainerRequest)
+    cmdline = request.cmdline
+    assert cmdline.ws_url.startswith(override_settings["WEBSOCKET_BASE_URL"])
     assert cmdline.log_level == override_settings["ANSIBLE_RULEBOOK_LOG_LEVEL"]
     assert cmdline.ws_ssl_verify == override_settings["WEBSOCKET_SSL_VERIFY"]
     assert (
@@ -145,11 +144,11 @@ def test_build_cmdline(
 
 
 @pytest.mark.django_db
-def test_build_cmdline_no_instance(basic_activation):
+def test_get_container_request_no_instance(basic_activation):
     """Test build_cmdline when no instance exists."""
     activation_manager = ActivationManager(basic_activation)
     with pytest.raises(exceptions.ActivationManagerError):
-        activation_manager._build_cmdline()
+        activation_manager._get_container_request()
 
 
 @pytest.mark.django_db
