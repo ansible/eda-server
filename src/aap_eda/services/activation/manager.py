@@ -1041,6 +1041,7 @@ class ActivationManager:
                 msg = (
                     "Failed to create rulebook process. "
                     "Reason: Max running processes reached."
+                    "Waiting for a free slot."
                 )
                 self._set_activation_status(ActivationStatus.PENDING, msg)
                 raise exceptions.MaxRunningProcessesError
