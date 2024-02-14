@@ -26,13 +26,10 @@ class OrganizationSerializer(NamedCommonModelSerializer):
             "id",
             "name",
             "description",
-            "url",
             "created_on",
             "created_by",
             "modified_on",
             "modified_by",
-            "related",
-            "summary_fields",
         ]
 
 
