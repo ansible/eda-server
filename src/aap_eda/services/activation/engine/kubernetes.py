@@ -99,12 +99,12 @@ class Engine(ContainerEngine):
         # TODO : Should this be compatible with the previous version
         # Previous Version
         self.job_name = (
-            f"activation-job-{request.activation_id}"
-            f"-{request.activation_instance_id}"
+            f"activation-job-{request.resource_id}"
+            f"-{request.rulebook_process_id}"
         )
         self.pod_name = (
-            f"activation-pod-{request.activation_id}"
-            f"-{request.activation_instance_id}"
+            f"activation-pod-{request.resource_id}"
+            f"-{request.rulebook_process_id}"
         )
 
         # Should we switch to new format

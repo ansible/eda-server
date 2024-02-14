@@ -95,8 +95,8 @@ def get_request(data: InitData):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
-        activation_instance_id=data.activation_instance.id,
-        activation_id=data.activation.id,
+        rulebook_process_id=data.activation_instance.id,
+        resource_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         credential=Credential(username="admin", secret="secret"),
         ports=[("localhost", 8080)],

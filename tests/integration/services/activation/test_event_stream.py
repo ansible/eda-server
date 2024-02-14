@@ -76,8 +76,8 @@ def test_container_parameters(event_stream):
     assert params["extra_args"] is not None
     assert params["mem_limit"] is not None
     assert params["mounts"] is not None
-    assert params["activation_id"] == event_stream.id
-    assert params["activation_instance_id"] == event_stream.latest_instance.id
+    assert params["resource_id"] == event_stream.id
+    assert params["rulebook_process_id"] == event_stream.latest_instance.id
 
 
 @pytest.mark.django_db

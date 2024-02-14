@@ -119,8 +119,8 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     def get_container_parameters(self) -> dict[str, tp.Any]:
         params = super().get_container_parameters()
         return params | {
-            "activation_id": self.id,
-            "activation_instance_id": self.latest_instance.id,
+            "resource_id": self.id,
+            "rulebook_process_id": self.latest_instance.id,
         }
 
     def get_restart_policy(self) -> str:

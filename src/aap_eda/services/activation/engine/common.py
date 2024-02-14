@@ -108,8 +108,8 @@ class ContainerRequest(BaseModel):
     name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
     image_url: str  # quay.io/ansible/ansible-rulebook:main
     cmdline: AnsibleRulebookCmdLine
-    activation_instance_id: str
-    activation_id: str
+    rulebook_process_id: str
+    resource_id: str
     credential: tp.Optional[Credential] = None
     ports: tp.Optional[list[tuple]] = None
     pull_policy: str = settings.DEFAULT_PULL_POLICY  # Always by default
@@ -174,8 +174,8 @@ class ContainerableMixin:
             name=params["name"],
             image_url=params["image_url"],
             ports=params["ports"],
-            activation_id=params["activation_id"],
-            activation_instance_id=params["activation_instance_id"],
+            resource_id=params["resource_id"],
+            rulebook_process_id=params["rulebook_process_id"],
             env_vars=params["env_vars"],
             extra_args=params["extra_args"],
             mem_limit=params["mem_limit"],
