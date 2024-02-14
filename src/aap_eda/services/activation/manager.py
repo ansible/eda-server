@@ -1033,18 +1033,18 @@ class ActivationManager:
             if hasattr(self.db_instance, "git_hash")
             else ""
         )
-        with transaction.atomic():
-            if not self.check_new_process_allowed(
-                self.db_instance_type,
-                self.db_instance.id,
-            ):
-                msg = (
-                    "Failed to create rulebook process. "
-                    "Reason: Max running processes reached. "
-                    "Waiting for a free slot."
-                )
-                self._set_activation_status(ActivationStatus.PENDING, msg)
-                raise exceptions.MaxRunningProcessesError
+
+        if not self.check_new_process_allowed(
+            self.db_instance_type,
+            self.db_instance.id,
+        ):
+            msg = (
+                "Failed to create rulebook process. "
+                "Reason: Max running processes reached. "
+                "Waiting for a free slot."
+            )
+            self._set_activation_status(ActivationStatus.PENDING, msg)
+            raise exceptions.MaxRunningProcessesError
         args = {
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
@@ -1052,8 +1052,7 @@ class ActivationManager:
         }
         args[f"{self.db_instance_type}"] = self.db_instance
         try:
-            with transaction.atomic():
-                models.RulebookProcess.objects.create(**args)
+            models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
