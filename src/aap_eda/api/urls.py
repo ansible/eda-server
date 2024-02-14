@@ -43,6 +43,8 @@ router.register(
 )
 router.register("credentials", views.CredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
+router.register("organizations", views.OrganizationViewSet)
+router.register("teams", views.TeamViewSet)
 
 openapi_urls = [
     path(

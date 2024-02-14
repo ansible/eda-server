@@ -38,6 +38,11 @@ from .decision_environment import (
     DecisionEnvironmentRefSerializer,
     DecisionEnvironmentSerializer,
 )
+from .organization import (
+    OrganizationCreateSerializer,
+    OrganizationRefSerializer,
+    OrganizationSerializer,
+)
 from .project import (
     ExtraVarCreateSerializer,
     ExtraVarRefSerializer,
@@ -62,6 +67,12 @@ from .rulebook import (
     RulesetSerializer,
 )
 from .tasks import TaskRefSerializer, TaskSerializer
+from .team import (
+    TeamCreateSerializer,
+    TeamDetailSerializer,
+    TeamSerializer,
+    TeamUpdateSerializer,
+)
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
@@ -116,10 +127,20 @@ __all__ = (
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",
+    "CredentialRefSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # roles
     "RoleSerializer",
     "RoleListSerializer",
     "RoleDetailSerializer",
+    # organizations
+    "OrganizationSerializer",
+    "OrganizationCreateSerializer",
+    "OrganizationRefSerializer",
+    # teams
+    "TeamSerializer",
+    "TeamCreateSerializer",
+    "TeamUpdateSerializer",
+    "TeamDetailSerializer",
 )

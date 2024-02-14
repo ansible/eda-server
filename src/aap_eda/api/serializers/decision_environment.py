@@ -31,6 +31,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "description",
             "image_url",
             "credential_id",
+            "organization_id",
             *read_only_fields,
         ]
 
@@ -47,6 +48,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             "description",
             "image_url",
             "credential_id",
+            "organization_id",
         ]
 
 
@@ -63,6 +65,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "description",
             "image_url",
             "credential",
+            "organization_id",
             "created_at",
             "modified_at",
         ]
@@ -80,6 +83,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "description": decision_environment["description"],
             "image_url": decision_environment["image_url"],
             "credential": credential,
+            "organization_id": decision_environment["organization_id"],
             "created_at": decision_environment["created_at"],
             "modified_at": decision_environment["modified_at"],
         }
@@ -90,5 +94,5 @@ class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.DecisionEnvironment
-        fields = ["id", "name", "description", "image_url"]
+        fields = ["id", "name", "description", "image_url", "organization_id"]
         read_only_fields = ["id"]

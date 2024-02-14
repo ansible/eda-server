@@ -16,6 +16,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.credential import CredentialRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
 
 
@@ -38,6 +39,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "credential_id",
+            "organization_id",
             "verify_ssl",
             *read_only_fields,
         ]
@@ -48,7 +50,14 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Project
-        fields = ["url", "name", "description", "credential_id", "verify_ssl"]
+        fields = [
+            "url",
+            "name",
+            "description",
+            "credential_id",
+            "organization_id",
+            "verify_ssl",
+        ]
 
 
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
@@ -89,6 +98,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the Project with embedded objects."""
 
     credential = CredentialRefSerializer(required=False, allow_null=True)
+    organization = OrganizationRefSerializer()
 
     class Meta:
         model = models.Project()
@@ -106,6 +116,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "credential",
+            "organization",
             "verify_ssl",
             *read_only_fields,
         ]
@@ -116,6 +127,11 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             if project["credential"]
             else None
         )
+        organization = (
+            OrganizationRefSerializer(project["organization"]).data
+            if project["organization"]
+            else None
+        )
         return {
             "id": project["id"],
             "name": project["name"],
@@ -124,6 +140,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "git_hash": project["git_hash"],
             "verify_ssl": project["verify_ssl"],
             "credential": credential,
+            "organization": organization,
             "import_state": project["import_state"],
             "import_error": project["import_error"],
             "import_task_id": project["import_task_id"],
@@ -135,7 +152,14 @@ class ProjectReadSerializer(serializers.ModelSerializer):
 class ProjectRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
-        fields = ["id", "git_hash", "url", "name", "description"]
+        fields = [
+            "id",
+            "git_hash",
+            "url",
+            "name",
+            "description",
+            "organization_id",
+        ]
         read_only_fields = ["id"]
 
 
@@ -148,7 +172,7 @@ class ExtraVarSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ExtraVar
-        fields = ["id", "extra_var"]
+        fields = ["id", "extra_var", "organization_id"]
         read_only_fields = ["id"]
 
 
@@ -160,7 +184,7 @@ class ExtraVarCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ExtraVar
-        fields = ["extra_var"]
+        fields = ["extra_var", "organization_id"]
 
 
 class ExtraVarRefSerializer(serializers.ModelSerializer):
