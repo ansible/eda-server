@@ -8,7 +8,9 @@ on:
         required: false
         default: 'main'
   pull_request_target:
-    types: [labeled]
+    types:
+      - labeled
+      - synchronize
 
 env:
   EDA_QA_PATH: "./eda-qa"
