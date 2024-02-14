@@ -1,4 +1,4 @@
-#  Copyright 2022 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,6 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activate_rulesets import ActivateRulesets
+import django_filters
 
-__all__ = ("ActivateRulesets",)
+from aap_eda.core import models
+
+
+class EventStreamFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by event source name.",
+    )
+
+    class Meta:
+        model = models.EventStream
+        fields = ["name"]

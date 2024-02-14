@@ -12,31 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as tp
-
 from django.db import models
 
-from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
-    ActivationStatus,
-    RestartPolicy,
-)
-from aap_eda.core.exceptions import (
-    StatusRequiredError,
-    UnknownStatusError,
-    UpdateFieldsRequiredError,
-)
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 
+from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
-__all__ = (
-    "Activation",
-    "ActivationInstance",
-    "ActivationInstanceLog",
-)
+__all__ = ("Activation",)
 
 
-class Activation(models.Model):
+class Activation(StatusHandlerModelMixin, models.Model):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
@@ -54,7 +40,6 @@ class Activation(models.Model):
     project = models.ForeignKey(
         "Project", on_delete=models.SET_NULL, null=True
     )
-    # TODO(alex): this field should be mandatory.
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.SET_NULL, null=True
     )
@@ -90,7 +75,7 @@ class Activation(models.Model):
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
     latest_instance = models.OneToOneField(
-        "ActivationInstance",
+        "RulebookProcess",
         null=True,
         default=None,
         on_delete=models.SET_NULL,
@@ -102,177 +87,17 @@ class Activation(models.Model):
         null=True,
         default=None,
     )
-
-    def save(self, *args, **kwargs):
-        # when creating
-        if self._state.adding:
-            if self.status_message is None:
-                self._set_status_message()
-        else:
-            if not bool(kwargs) or "update_fields" not in kwargs:
-                raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
-                )
-            else:
-                if "status" in kwargs["update_fields"]:
-                    self._is_valid_status()
-
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
-                raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
-                )
-            # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
-                self._set_status_message()
-                kwargs["update_fields"].append("status_message")
-
-        super().save(*args, **kwargs)
-
-    def _set_status_message(self):
-        self.status_message = self._get_default_status_message()
-
-        if self.status == ActivationStatus.PENDING and not self.is_enabled:
-            self.status_message = "Activation is marked as disabled"
-
-    def _get_default_status_message(self):
-        try:
-            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
-        except KeyError:
-            raise UnknownStatusError(f"Status [{self.status}] is invalid")
-
-    def _is_valid_status(self):
-        try:
-            ActivationStatus(self.status)
-        except ValueError as error:
-            raise UnknownStatusError(error)
-
-    def update_status(
-        self, status: ActivationStatus, status_message: tp.Optional[str] = None
-    ) -> None:
-        self.status = status
-        self.status_updated_at = models.functions.Now()
-        update_fields = [
-            "status",
-            "status_updated_at",
-            "modified_at",
-        ]
-        if status_message:
-            self.status_message = status_message
-            update_fields.append("status_message")
-        self.save(
-            update_fields=update_fields,
-        )
-
-
-class ActivationInstance(models.Model):
-    class Meta:
-        db_table = "core_activation_instance"
-        ordering = ("-started_at",)
-
-    name = models.TextField(null=False, default="")
-    status = models.TextField(
-        choices=ActivationStatus.choices(),
-        default=ActivationStatus.PENDING,
+    credentials = models.ManyToManyField(
+        "Credential", related_name="activations", default=None
     )
-    git_hash = models.TextField(null=False, default="")
-    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
-    started_at = models.DateTimeField(auto_now_add=True, null=False)
-    updated_at = models.DateTimeField(null=True)
-    ended_at = models.DateTimeField(null=True)
-    activation_pod_id = models.TextField(null=True)
-    status_message = models.TextField(null=True, default=None)
-    log_read_at = models.DateTimeField(null=True)
-
-    def save(self, *args, **kwargs):
-        # when creating
-        if self._state.adding:
-            if self.status_message is None:
-                self.status_message = self._get_default_status_message()
-
-                # populate latest_instance of activation at creation
-                self.activation.latest_instance = self
-        else:
-            if not bool(kwargs) or "update_fields" not in kwargs:
-                raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
-                )
-            else:
-                if "status" in kwargs["update_fields"]:
-                    self._is_valid_status()
-
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
-                raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
-                )
-            # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
-                self.status_message = self._get_default_status_message()
-                kwargs["update_fields"].append("status_message")
-
-        super().save(*args, **kwargs)
-        self.activation.save(update_fields=["latest_instance"])
-
-    def _get_default_status_message(self):
-        try:
-            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
-        except KeyError:
-            raise UnknownStatusError(f"Status [{self.status}] is invalid")
-
-    def _is_valid_status(self):
-        try:
-            ActivationStatus(self.status)
-        except ValueError as error:
-            raise UnknownStatusError(error)
-
-    def update_status(
-        self, status: ActivationStatus, status_message: tp.Optional[str] = None
-    ) -> None:
-        self.status = status
-        self.updated_at = models.functions.Now()
-        update_fields = [
-            "status",
-            "updated_at",
-        ]
-        if status_message:
-            self.status_message = status_message
-            update_fields.append("status_message")
-
-        if status in [
-            ActivationStatus.STOPPED,
-            ActivationStatus.COMPLETED,
-            ActivationStatus.FAILED,
-            ActivationStatus.ERROR,
-        ]:
-            self.ended_at = models.functions.Now()
-            update_fields.append("ended_at")
-
-        self.save(
-            update_fields=update_fields,
-        )
-
-
-class ActivationInstanceLog(models.Model):
-    class Meta:
-        db_table = "core_activation_instance_log"
-
-    activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
+    system_vault_credential = models.OneToOneField(
+        "Credential",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
     )
-    line_number = models.IntegerField()
-    log = models.TextField()
+    event_streams = models.ManyToManyField(
+        "EventStream",
+        default=None,
+    )

@@ -56,9 +56,25 @@ Redis queue settings:
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
 * MQ_DB - Redis queue database (default: 0)
+
+
+Podman settings:
+PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
+    the following keys: source, target, type.
+    Look at https://docs.podman.io/en/v4.4/markdown/options/mount.html
+    for more information.
+    Example:
+      export PODMAN_MOUNTS='@json [{"source": "/var/run/containers/storage",
+                             "target": "/var/run/containers/storage",
+                             "type": "bind"}]'
+
 """
+import os
+from datetime import timedelta
+
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
+from split_settings.tools import include
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -115,6 +131,20 @@ CSRF_TRUSTED_ORIGINS = (
 SESSION_COOKIE_AGE = settings.get("SESSION_COOKIE_AGE", 1800)
 SESSION_SAVE_EVERY_REQUEST = True
 
+# JWT token lifetime
+JWT_ACCESS_TOKEN_LIFETIME_SECONDS = settings.get(
+    "JWT_ACCESS_TOKEN_LIFETIME_SECONDS", 5
+)
+JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
+    "JWT_REFRESH_TOKEN_LIFETIME_DAYS", 2
+)
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=JWT_ACCESS_TOKEN_LIFETIME_SECONDS
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
+}
+
 # Application definition
 INSTALLED_APPS = [
     "daphne",
@@ -128,8 +158,9 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
-    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    "ansible_base",
+    # Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.authentication",
+    "ansible_base.resource_registry",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -141,10 +172,11 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # <- Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
+    "ansible_base.authentication.middleware.AuthenticatorBackendMiddleware",
+    # ->
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    "ansible_base.utils.middleware.AuthenticatorBackendMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
@@ -236,6 +268,8 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -284,7 +318,10 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {"func": "aap_eda.tasks.orchestrator.monitor_activations", "interval": 5},
+    {
+        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
+        "interval": 5,
+    },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
@@ -375,6 +412,9 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
+WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+    "ws://", "http://"
+).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
@@ -422,3 +462,40 @@ AUTHENTICATION_BACKENDS = [
     "ansible_base.authentication.backend.AnsibleBaseAuth",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+from ansible_base.lib import dynamic_config  # noqa: E402
+
+dab_settings = os.path.join(
+    os.path.dirname(dynamic_config.__file__), "dynamic_settings.py"
+)
+include(dab_settings)
+
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE JWT SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_JWT_VALIDATE_CERT = settings.get(
+    "ANSIBLE_BASE_JWT_VALIDATE_CERT", False
+)
+ANSIBLE_BASE_JWT_KEY = settings.get(
+    "ANSIBLE_BASE_JWT_KEY", "https://localhost"
+)
+
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_RESOURCE_CONFIG_MODULE = "aap_eda.api.resource_api"
+
+ACTIVATION_DB_HOST = settings.get(
+    "ACTIVATION_DB_HOST", "host.containers.internal"
+)
+
+_DEFAULT_PG_NOTIFY_DSN = (
+    f"host={ACTIVATION_DB_HOST} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
+    f"password={DATABASES['default']['PASSWORD']}"
+)
+
+PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
+PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)

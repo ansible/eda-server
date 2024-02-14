@@ -143,7 +143,6 @@ def test_retrieve_project_failed_state(client: APIClient):
     data = response.json()
 
     assert data["import_state"] == "failed"
-    assert data["import_task_id"] == "3677eb4a-de4a-421a-a73b-411aa502484d"
     assert data["import_error"] == "Unexpected error. Please contact support."
 
     assert_project_data_details(data, project)
@@ -481,6 +480,7 @@ def assert_project_data_details(data: Dict[str, Any], project: models.Project):
             "description": credential.description,
             "credential_type": credential.credential_type,
             "username": credential.username,
+            "vault_identifier": None,
         }
         if credential
         else None
@@ -495,10 +495,6 @@ def assert_project_data_details(data: Dict[str, Any], project: models.Project):
 
 
 def model_to_data_common(project: models.Project):
-    import_task_id = project.import_task_id
-    if import_task_id is not None:
-        import_task_id = str(import_task_id)
-
     return {
         "id": project.id,
         "url": project.url,
@@ -506,7 +502,6 @@ def model_to_data_common(project: models.Project):
         "description": project.description,
         "git_hash": project.git_hash,
         "import_state": project.import_state,
-        "import_task_id": import_task_id,
         "import_error": project.import_error,
         "created_at": project.created_at.strftime(DATETIME_FORMAT),
         "modified_at": project.modified_at.strftime(DATETIME_FORMAT),

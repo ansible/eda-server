@@ -11,21 +11,81 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+from typing import Union
+
+import yaml
 from rest_framework import serializers
 
+from aap_eda.api.constants import PG_NOTIFY_TEMPLATE_RULEBOOK_DATA
+from aap_eda.api.exceptions import InvalidEventStreamRulebook
+from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
+from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
     ProjectRefSerializer,
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
+from aap_eda.api.serializers.utils import (
+    substitute_extra_vars,
+    substitute_source_args,
+    swap_sources,
+)
 from aap_eda.core import models, validators
+from aap_eda.core.enums import ProcessParentType
+
+logger = logging.getLogger(__name__)
+
+
+def _updated_ruleset(validated_data):
+    try:
+        sources_info = []
+
+        for event_stream_id in validated_data["event_streams"]:
+            event_stream = models.EventStream.objects.get(id=event_stream_id)
+
+            if event_stream.rulebook:
+                rulesets = yaml.safe_load(event_stream.rulebook.rulesets)
+            else:
+                rulesets = yaml.safe_load(PG_NOTIFY_TEMPLATE_RULEBOOK_DATA)
+
+            extra_vars = rulesets[0]["sources"][0].get("extra_vars", {})
+            encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
+
+            # TODO: encrypt password when engine is ready for vaulted data
+            extra_vars = substitute_extra_vars(
+                event_stream.__dict__, extra_vars, encrypt_vars, "password"
+            )
+
+            source = rulesets[0]["sources"][0]["complementary_source"]
+            source = substitute_source_args(
+                event_stream.__dict__, source, extra_vars
+            )
+            sources_info.append(source)
+
+        return swap_sources(validated_data["rulebook_rulesets"], sources_info)
+    except Exception as e:
+        logger.error(f"Failed to update rulesets: {e}")
+        raise InvalidEventStreamRulebook(e)
 
 
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
+
+    credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=CredentialSerializer(),
+    )
+
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EventStreamOutSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -49,6 +109,8 @@ class ActivationSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
+            "credentials",
+            "event_streams",
         ]
         read_only_fields = [
             "id",
@@ -63,6 +125,17 @@ class ActivationListSerializer(serializers.ModelSerializer):
 
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
+    credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=CredentialSerializer(),
+    )
+
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EventStreamOutSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -86,6 +159,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
+            "credentials",
+            "event_streams",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -93,6 +168,14 @@ class ActivationListSerializer(serializers.ModelSerializer):
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
+        credentials = [
+            CredentialSerializer(credential).data
+            for credential in activation.credentials.all()
+        ]
+        event_streams = [
+            EventStreamOutSerializer(event_stream).data
+            for event_stream in activation.event_streams.all()
+        ]
 
         return {
             "id": activation.id,
@@ -114,6 +197,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
+            "credentials": credentials,
+            "event_streams": event_streams,
         }
 
 
@@ -132,6 +217,8 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "awx_token_id",
+            "credentials",
+            "event_streams",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -151,6 +238,17 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_if_awx_token_exists],
         required=False,
+    )
+    credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
+    )
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
+        validators=[validators.check_if_event_streams_exists],
     )
 
     def validate(self, data):
@@ -175,6 +273,10 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
+        if validated_data.get("event_streams"):
+            validated_data["rulebook_rulesets"] = _updated_ruleset(
+                validated_data
+            )
         return super().create(validated_data)
 
 
@@ -182,7 +284,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
 
     class Meta:
-        model = models.ActivationInstance
+        model = models.RulebookProcess
         fields = [
             "id",
             "name",
@@ -190,6 +292,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "git_hash",
             "status_message",
             "activation_id",
+            "event_stream_id",
             "started_at",
             "ended_at",
         ]
@@ -200,7 +303,7 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance Log model."""
 
     class Meta:
-        model = models.ActivationInstanceLog
+        model = models.RulebookProcessLog
         fields = "__all__"
         read_only_fields = ["id"]
 
@@ -218,6 +321,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EventStreamOutSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -244,6 +352,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at",
             "status_message",
             "awx_token_id",
+            "credentials",
+            "event_streams",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -270,8 +380,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.extra_var
             else None
         )
-        activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=activation.id
+        activation_instances = models.RulebookProcess.objects.filter(
+            activation_id=activation.id,
+            parent_type=ProcessParentType.ACTIVATION,
         )
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
@@ -284,6 +395,15 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if len(activation_instances) > 1 and activation.restart_count > 0
             else None
         )
+        credentials = [
+            CredentialSerializer(credential).data
+            for credential in activation.credentials.all()
+        ]
+
+        event_streams = [
+            EventStreamOutSerializer(event_stream).data
+            for event_stream in activation.event_streams.all()
+        ]
 
         return {
             "id": activation.id,
@@ -310,6 +430,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
+            "credentials": credentials,
+            "event_streams": event_streams,
         }
 
 
@@ -325,7 +447,9 @@ class PostActivationSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_if_extra_var_exists],
     )
+    # TODO: is_activation_valid needs to tell event stream/activation
     awx_token_id = serializers.IntegerField(
+        required=False,
         allow_null=True,
         validators=[validators.check_if_awx_token_exists],
     )
@@ -387,8 +511,11 @@ def parse_validation_errors(errors: dict) -> str:
     return str(messages)
 
 
-def validate_rulebook_token(rulebook_id: int) -> None:
+def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
     """Validate if the rulebook requires an Awx Token."""
+    if rulebook_id is None:
+        return
+
     rulebook = models.Rulebook.objects.get(id=rulebook_id)
 
     # TODO: rulesets are stored as a string in the rulebook model

@@ -675,11 +675,11 @@ def init_db():
         project=project,
         user=user,
     )
-    activation_instance = models.ActivationInstance.objects.create(
+    activation_instance = models.RulebookProcess.objects.create(
         name=activation.name,
         activation=activation,
     )
-    activation_instance_2 = models.ActivationInstance.objects.create(
+    activation_instance_2 = models.RulebookProcess.objects.create(
         name=activation_2.name, activation=activation_2
     )
     audit_rule_1 = models.AuditRule.objects.create(

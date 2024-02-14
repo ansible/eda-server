@@ -30,7 +30,11 @@ from pydantic import ValidationError
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    ProcessParentType,
+    RestartPolicy,
+)
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
@@ -41,6 +45,7 @@ from aap_eda.services.activation.engine.common import (
 from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
+from aap_eda.services.auth import create_jwt_token
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerEngine
@@ -48,7 +53,8 @@ from .engine.factory import new_container_engine
 from .engine.ports import find_ports
 
 LOGGER = logging.getLogger(__name__)
-ACTIVATION_PATH = "/api/eda/ws/ansible-rulebook"
+ACTIVATION_PATH = f"/{settings.API_PREFIX}/ws/ansible-rulebook"
+TOKEN_RENEW_PATH = f"/{settings.API_PREFIX}/v1/auth/token/refresh/"
 
 
 class HasDbInstance(tp.Protocol):
@@ -92,7 +98,7 @@ class ActivationManager:
 
     def __init__(
         self,
-        db_instance: models.Activation,
+        db_instance: tp.Union[models.Activation, models.EventStream],
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):
@@ -103,6 +109,10 @@ class ActivationManager:
             container_engine: The container engine to use.
         """
         self.db_instance = db_instance
+        if isinstance(db_instance, models.Activation):
+            self.db_instance_type = ProcessParentType.ACTIVATION
+        else:
+            self.db_instance_type = ProcessParentType.EVENT_STREAM
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -111,7 +121,7 @@ class ActivationManager:
         self.container_logger_class = container_logger_class
 
     @property
-    def latest_instance(self) -> tp.Optional[models.ActivationInstance]:
+    def latest_instance(self) -> tp.Optional[models.RulebookProcess]:
         """Return the latest instance of the activation."""
         return self.db_instance.latest_instance
 
@@ -218,9 +228,9 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
-        instances = models.ActivationInstance.objects.filter(
-            activation=self.db_instance,
-        )
+        args = {f"{self.db_instance_type}": self.db_instance}
+
+        instances = models.RulebookProcess.objects.filter(**args)
         for instance in instances:
             if instance.status not in [
                 ActivationStatus.STOPPED,
@@ -465,7 +475,9 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_type, self.db_instance.id, delay_seconds=1
+            )
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -490,7 +502,9 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_type, self.db_instance.id, delay_seconds=1
+            )
 
         self._set_activation_status(
             ActivationStatus.FAILED,
@@ -532,6 +546,7 @@ class ActivationManager:
                 user_msg,
             )
             system_restart_activation(
+                self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
             )
@@ -667,6 +682,7 @@ class ActivationManager:
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
+                self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
@@ -805,7 +821,9 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(self.db_instance.id, delay_seconds=1)
+        system_restart_activation(
+            self.db_instance_type, self.db_instance.id, delay_seconds=1
+        )
 
     def delete(self):
         """User requested delete."""
@@ -1018,13 +1036,20 @@ class ActivationManager:
             return
 
     def _create_activation_instance(self):
+        git_hash = (
+            self.db_instance.git_hash
+            if hasattr(self.db_instance, "git_hash")
+            else ""
+        )
         try:
-            models.ActivationInstance.objects.create(
-                activation=self.db_instance,
-                name=self.db_instance.name,
-                status=ActivationStatus.STARTING,
-                git_hash=self.db_instance.git_hash,
-            )
+            args = {
+                "name": self.db_instance.name,
+                "status": ActivationStatus.STARTING,
+                "git_hash": git_hash,
+            }
+            args[f"{self.db_instance_type}"] = self.db_instance
+
+            models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
@@ -1074,10 +1099,14 @@ class ActivationManager:
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
 
+        access_token, refresh_token = create_jwt_token()
         return AnsibleRulebookCmdLine(
             ws_url=settings.WEBSOCKET_BASE_URL + ACTIVATION_PATH,
             log_level=settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+            ws_access_token=access_token,
+            ws_refresh_token=refresh_token,
+            ws_token_url=settings.WEBSOCKET_TOKEN_BASE_URL + TOKEN_RENEW_PATH,
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             id=str(self.latest_instance.id),
         )

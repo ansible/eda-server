@@ -38,6 +38,11 @@ from .decision_environment import (
     DecisionEnvironmentRefSerializer,
     DecisionEnvironmentSerializer,
 )
+from .event_stream import (
+    EventStreamCreateSerializer,
+    EventStreamOutSerializer,
+    EventStreamSerializer,
+)
 from .project import (
     ExtraVarCreateSerializer,
     ExtraVarRefSerializer,
@@ -61,7 +66,6 @@ from .rulebook import (
     RulesetOutSerializer,
     RulesetSerializer,
 )
-from .tasks import TaskRefSerializer, TaskSerializer
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
@@ -94,9 +98,6 @@ __all__ = (
     "RulesetSerializer",
     "RuleOutSerializer",
     "RuleSerializer",
-    # tasks
-    "TaskRefSerializer",
-    "TaskSerializer",
     # activations
     "ActivationSerializer",
     "ActivationListSerializer",
@@ -122,4 +123,8 @@ __all__ = (
     "RoleSerializer",
     "RoleListSerializer",
     "RoleDetailSerializer",
+    # event streams
+    "EventStreamSerializer",
+    "EventStreamCreateSerializer",
+    "EventStreamOutSerializer",
 )

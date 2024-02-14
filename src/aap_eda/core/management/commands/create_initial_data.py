@@ -36,15 +36,14 @@ ROLES = [
             "activation_instance": ["read", "delete"],
             "audit_rule": ["read"],
             "audit_event": ["read"],
-            "task": ["read"],
             "user": ["create", "read", "update", "delete"],
             "project": ["create", "read", "update", "delete"],
-            "inventory": ["create", "read", "update", "delete"],
             "extra_var": ["create", "read", "update", "delete"],
             "rulebook": ["create", "read", "update", "delete"],
             "role": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -55,13 +54,12 @@ ROLES = [
             "activation_instance": ["read"],
             "audit_rule": ["read"],
             "audit_event": ["read"],
-            "task": ["read"],
             "project": ["create", "read", "update", "delete"],
-            "inventory": ["create", "read", "update", "delete"],
             "extra_var": ["create", "read", "update", "delete"],
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -84,13 +82,12 @@ ROLES = [
             "activation_instance": ["read", "delete"],
             "audit_rule": ["read"],
             "audit_event": ["read"],
-            "task": ["read"],
             "project": ["create", "read", "update", "delete"],
-            "inventory": ["create", "read", "update", "delete"],
             "extra_var": ["create", "read", "update", "delete"],
             "rulebook": ["create", "read", "update", "delete"],
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
+            "event_stream": ["create", "read"],
         },
     },
     {
@@ -104,13 +101,12 @@ ROLES = [
             "activation_instance": ["read"],
             "audit_rule": ["read"],
             "audit_event": ["read"],
-            "task": ["read"],
             "project": ["read"],
-            "inventory": ["read"],
             "extra_var": ["read"],
             "rulebook": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "event_stream": ["read"],
         },
     },
     {
@@ -121,15 +117,14 @@ ROLES = [
             "activation_instance": ["read"],
             "audit_rule": ["read"],
             "audit_event": ["read"],
-            "task": ["read"],
             "user": ["read"],
             "project": ["read"],
-            "inventory": ["read"],
             "extra_var": ["read"],
             "rulebook": ["read"],
             "role": ["read"],
             "decision_environment": ["read"],
             "credential": ["read"],
+            "event_stream": ["read"],
         },
     },
     {
@@ -140,12 +135,11 @@ ROLES = [
             "activation_instance": ["read"],
             "audit_rule": ["read"],
             "audit_event": ["read"],
-            "task": ["read"],
             "project": ["read"],
-            "inventory": ["read"],
             "extra_var": ["read"],
             "rulebook": ["read"],
             "decision_environment": ["read"],
+            "event_stream": ["read"],
         },
     },
 ]
@@ -171,7 +165,8 @@ class Command(BaseCommand):
             for resource_type, actions in role_data["permissions"].items():
                 permissions = list(
                     models.Permission.objects.filter(
-                        resource_type=resource_type, action__in=actions
+                        resource_type=resource_type,
+                        action__in=actions,
                     )
                 )
                 if len(permissions) != len(actions):
