@@ -17,6 +17,7 @@ from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
     ProjectRefSerializer,
@@ -47,6 +48,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -89,6 +91,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -122,6 +125,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
             "extra_var_id": activation.extra_var_id,
+            "organization_id": activation.organization_id,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -148,6 +152,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "decision_environment_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "user",
             "restart_policy",
             "awx_token_id",
@@ -215,6 +220,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "git_hash",
             "status_message",
             "activation_id",
+            "organization_id",
             "started_at",
             "ended_at",
         ]
@@ -240,6 +246,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer(required=False, allow_null=True)
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
+    organization = OrganizationRefSerializer()
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
@@ -257,6 +264,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project",
             "rulebook",
             "extra_var",
+            "organization",
             "instances",
             "restart_policy",
             "restart_count",
@@ -314,6 +322,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             CredentialSerializer(credential).data
             for credential in activation.credentials.all()
         ]
+        organization = (
+            OrganizationRefSerializer(activation.organization).data
+            if activation.organization
+            else None
+        )
 
         return {
             "id": activation.id,
@@ -326,6 +339,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project": project,
             "rulebook": rulebook,
             "extra_var": extra_var,
+            "organization": organization,
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True
             ).data,
@@ -378,6 +392,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "status",
             "decision_environment_id",
             "extra_var_id",
+            "organization_id",
             "user_id",
             "created_at",
             "modified_at",

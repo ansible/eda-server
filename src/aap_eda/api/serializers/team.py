@@ -11,36 +11,59 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from rest_framework import serializers
 
-from ansible_base.lib.serializers.common import NamedCommonModelSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.core import models
 
-from aap_eda.core.models import Team
 
-
-class TeamSerializer(NamedCommonModelSerializer):
-    reverse_url_name = "team-detail"
-
+class TeamSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Team
-        fields = NamedCommonModelSerializer.Meta.fields + [
-            "organization",
+        model = models.Team
+        fields = [
+            "id",
+            "name",
             "description",
+            "organization_id",
+            "created_on",
+            "created_by",
+            "modified_on",
+            "modified_by",
         ]
 
 
-class TeamCreateSerializer(NamedCommonModelSerializer):
+class TeamCreateSerializer(serializers.ModelSerializer):
+    organization_id = serializers.IntegerField()
+
     class Meta:
-        model = Team
+        model = models.Team
         fields = [
             "name",
             "description",
-            "organization",
+            "organization_id",
         ]
 
 
-class TeamUpdateSerializer(NamedCommonModelSerializer):
+class TeamDetailSerializer(serializers.ModelSerializer):
+    organization = OrganizationRefSerializer()
+
     class Meta:
-        model = Team
+        model = models.Team
+        fields = [
+            "id",
+            "name",
+            "description",
+            "organization",
+            "created_on",
+            "created_by",
+            "modified_on",
+            "modified_by",
+        ]
+
+
+class TeamUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Team
         fields = [
             "name",
             "description",

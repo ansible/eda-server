@@ -36,6 +36,16 @@ class OrganizationSerializer(NamedCommonModelSerializer):
         ]
 
 
+class OrganizationRefSerializer(NamedCommonModelSerializer):
+    class Meta:
+        model = Organization
+        fields = [
+            "id",
+            "name",
+            "description",
+        ]
+
+
 class OrganizationCreateSerializer(NamedCommonModelSerializer):
     class Meta:
         model = Organization

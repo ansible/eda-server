@@ -153,6 +153,11 @@ class ProjectViewSet(
             if project.data["credential_id"]
             else None
         )
+        project.data["organization"] = (
+            models.Organization.objects.get(pk=project.data["organization_id"])
+            if project.data["organization_id"]
+            else None
+        )
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
 

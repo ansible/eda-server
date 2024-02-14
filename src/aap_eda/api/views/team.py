@@ -23,6 +23,7 @@ from rest_framework import mixins, status, viewsets
 from aap_eda.api.filters import TeamFilter
 from aap_eda.api.serializers import (
     TeamCreateSerializer,
+    TeamDetailSerializer,
     TeamSerializer,
     TeamUpdateSerializer,
 )
@@ -52,6 +53,14 @@ from .mixins import PartialUpdateOnlyModelMixin
             ),
         },
     ),
+    retrieve=extend_schema(
+        description="Get team by its id",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                TeamDetailSerializer, description="Return a team by its id."
+            ),
+        },
+    ),
     partial_update=extend_schema(
         description="Partially update a team",
         request=TeamUpdateSerializer,
@@ -77,6 +86,12 @@ class TeamViewSet(
     rbac_resource_type = ResourceType.TEAM
 
     def get_serializer_class(self):
+        if self.action == "create":
+            return TeamCreateSerializer
+        elif self.action == "update":
+            return TeamUpdateSerializer
+        elif self.action == "retrieve":
+            return TeamDetailSerializer
         return TeamSerializer
 
     def get_response_serializer_class(self):
