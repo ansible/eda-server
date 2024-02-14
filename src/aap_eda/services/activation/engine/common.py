@@ -14,9 +14,11 @@
 
 
 import typing as tp
+import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+import yaml
 from django.conf import settings
 from pydantic import BaseModel, validator
 
@@ -133,6 +135,17 @@ class ContainerableNoLatestInstanceError(ContainerableMixinError):
     pass
 
 
+# To use ContainerableMixin the model class adding the mixin is required to
+# have the following attributes (or property getters):
+#
+#   Attribute               Type
+#   ---------               ----
+#   decision_environment    DecisionEnvironment
+#   extra_var               ExtraVar
+#   latest_instance         RulebookProcess
+#   restart_policy          str
+#   rulebook_rulesets       str
+#
 class ContainerableMixin:
     def get_command_line_parameters(self) -> dict[str, tp.Any]:
         """Return parameters for running ansible-rulebook."""
@@ -140,6 +153,7 @@ class ContainerableMixin:
 
         access_token, refresh_token = create_jwt_token()
         return {
+            "id": str(self.latest_instance.id),
             "ws_url": self._get_ws_url(),
             "log_level": settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
             "ws_ssl_verify": settings.WEBSOCKET_SSL_VERIFY,
@@ -155,14 +169,16 @@ class ContainerableMixin:
         self.validate()
 
         return {
-            "credential": self.get_image_credential(),
+            "credential": self._get_image_credential(),
             "name": self._get_container_name(),
-            "image_url": self._get_image_url(),
+            "image_url": self.decision_environment.image_url,
             "ports": self._get_ports(),
             "env_vars": settings.PODMAN_ENV_VARS,
             "extra_args": settings.PODMAN_EXTRA_ARGS,
             "mem_limit": settings.PODMAN_MEM_LIMIT,
             "mounts": settings.PODMAN_MOUNTS,
+            "resource_id": self.id,
+            "rulebook_process_id": self.latest_instance.id,
             "cmdline": self._build_cmdline(),
         }
 
@@ -183,19 +199,14 @@ class ContainerableMixin:
             cmdline=params["cmdline"],
         )
 
-    def get_image_credential(self) -> tp.Optional[Credential]:
-        """Return a decrypted Credential or None for the implementer."""
-        credential = self._get_image_credential()
-        if credential:
-            return Credential(
-                username=credential.username,
-                secret=credential.secret.get_secret_value(),
-            )
-        return None
-
     def get_restart_policy(self) -> str:
-        """Return the restart policy for the implementer."""
-        raise NotImplementedError
+        """Return the restart policy for the implementer.
+
+        We don't validate here as validation is for use to create a new
+        container and the value of the restart policy is not a determinate of
+        that.
+        """
+        return self.restart_policy
 
     def validate(self):
         """Validate the the implementer is appropriate to be containerized."""
@@ -220,27 +231,31 @@ class ContainerableMixin:
 
     def _get_container_name(self) -> str:
         """Return the name to use for the ContainerRequest."""
-        raise NotImplementedError
+        return (
+            f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
+            f"-{uuid.uuid4()}"
+        )
 
     def _get_context(self) -> dict[str, tp.Any]:
         """Return the context dictionary used to create a ContainerRquest."""
-        raise NotImplementedError
+        if self.extra_var:
+            context = yaml.safe_load(self.extra_var.extra_var)
+        else:
+            context = {}
+        return context
 
     def _get_image_credential(self) -> tp.Optional[Credential]:
-        raise NotImplementedError
-
-    def _get_image_url(self) -> str:
-        raise NotImplementedError
-
-    def _get_latest_instance(self) -> str:
-        """Return the name to use for the ContainerRequest."""
-        raise NotImplementedError
+        """Return a decrypted Credential or None for the implementer."""
+        credential = self.decision_environment.credential
+        if credential:
+            return Credential(
+                username=credential.username,
+                secret=credential.secret.get_secret_value(),
+            )
+        return None
 
     def _get_ports(self) -> list[tuple]:
-        return find_ports(self._get_rulebook_rulesets(), self._get_context())
-
-    def _get_rulebook_rulesets(self) -> str:
-        raise NotImplementedError
+        return find_ports(self.rulebook_rulesets, self._get_context())
 
     def _get_ws_url(self) -> str:
         return f"{settings.WEBSOCKET_BASE_URL}{self._get_ws_url_subpath()}"
@@ -258,7 +273,8 @@ class ContainerableMixin:
         return f"/{settings.API_PREFIX}/v1/auth/token/refresh/"
 
     def _validate(self):
-        raise NotImplementedError
+        if not self.latest_instance:
+            raise ContainerableNoLatestInstanceError
 
 
 class ContainerStatus(BaseModel):
