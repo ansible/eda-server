@@ -8,7 +8,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "aap-eda"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
@@ -34,13 +34,13 @@ drf-spectacular = ">=0.26.5,<0.27"
 channels = { version = "4.0.*", extras = ["daphne"] }
 psycopg2 = { version = "2.9.*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
-django-rq = ">=2.5,<2.8"
+django-rq = ">=2.5,<2.9"
 rq = ">=1.10.1,<1.14"
 django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
-cryptography = ">=38,<41"
+cryptography = ">=38,<42"
 kubernetes = "26.1.*"
-podman = "4.5.*"
+podman = "4.9.*"
 rq-scheduler = "^0.10"
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2024.2.12", extras = [
     "authentication",

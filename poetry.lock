@@ -1512,19 +1512,22 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "podman"
-version = "4.5.0"
+version = "4.9.0"
 description = "Bindings for Podman RESTful API"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "podman-4.5.0-py3-none-any.whl", hash = "sha256:307428e60df9704e2e3bca0ead93babe05fd397e62a3e3a02a2e05d3a779122c"},
-    {file = "podman-4.5.0.tar.gz", hash = "sha256:62ff5f89168f348afc39b5efabe388789a4372305e9da67b09b4c4e0eac2bb06"},
+    {file = "podman-4.9.0-py3-none-any.whl", hash = "sha256:0613314edb8f51b791e2818438e4b386da3937ae73cf0187b27a1f8bb096ac64"},
+    {file = "podman-4.9.0.tar.gz", hash = "sha256:48683485a5bbcb3f6b2e9e93aa8647faadc5c27918f8b86e04bff1d0822691af"},
 ]
 
 [package.dependencies]
 pyxdg = ">=0.26"
 requests = ">=2.24"
-urllib3 = ">=1.26.5"
+urllib3 = "*"
+
+[package.extras]
+progress-bar = ["rich (>=12.5.1)"]
 
 [[package]]
 name = "port-for"
@@ -2681,4 +2684,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "6bd0827434c740bf992dd7a3e600f6c581333aa11fd0e350a7b2fed9400dc50c"
+content-hash = "806efeb8382429133f7cf98efd11c2108a70b5e2588393ff7158ef958b92f600"
