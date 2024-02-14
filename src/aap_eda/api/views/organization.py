@@ -99,7 +99,7 @@ class OrganizationViewSet(
     @action(
         detail=False,
         queryset=models.Team.objects.order_by("id"),
-        filterset_class=filters.TeamFilter,
+        filterset_class=filters.OrganizationTeamFilter,
         rbac_resource_type=ResourceType.TEAM,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/teams",

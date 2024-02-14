@@ -29,7 +29,7 @@ from .rulebook import (
     RulebookFilter,
     RulesetFilter,
 )
-from .team import TeamFilter
+from .team import OrganizationTeamFilter, TeamFilter
 from .user import UserFilter
 
 __all__ = (
@@ -57,4 +57,5 @@ __all__ = (
     "OrganizationFilter",
     # team
     "TeamFilter",
+    "OrganizationTeamFilter",
 )

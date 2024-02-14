@@ -23,7 +23,34 @@ class TeamFilter(django_filters.FilterSet):
         lookup_expr="istartswith",
         label="Filter by team name.",
     )
+    organization_id = django_filters.NumberFilter(
+        field_name="organization_id",
+        lookup_expr="exact",
+        label="Filter by organization ID.",
+    )
+    description = django_filters.CharFilter(
+        field_name="description",
+        lookup_expr="icontains",
+        label="Filter by team description.",
+    )
 
     class Meta:
         model = Team
-        fields = ["name"]
+        fields = ["name", "organization_id", "description"]
+
+
+class OrganizationTeamFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by team name.",
+    )
+    description = django_filters.CharFilter(
+        field_name="description",
+        lookup_expr="icontains",
+        label="Filter by team description.",
+    )
+
+    class Meta:
+        model = Team
+        fields = ["name", "description"]

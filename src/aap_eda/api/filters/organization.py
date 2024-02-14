@@ -23,7 +23,12 @@ class OrganizationFilter(django_filters.FilterSet):
         lookup_expr="istartswith",
         label="Filter by organization name.",
     )
+    description = django_filters.CharFilter(
+        field_name="description",
+        lookup_expr="icontains",
+        label="Filter by organization description.",
+    )
 
     class Meta:
         model = Organization
-        fields = ["name"]
+        fields = ["name", "description"]
