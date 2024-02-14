@@ -259,5 +259,5 @@ def test_max_running_activation_after_start_job(
     assert start_mock.call_count == 1
     running_processes = models.RulebookProcess.objects.filter(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
-    )
-    assert len(running_processes) == settings.MAX_RUNNING_ACTIVATIONS
+    ).count()
+    assert running_processes == settings.MAX_RUNNING_ACTIVATIONS

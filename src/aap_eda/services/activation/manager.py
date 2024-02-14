@@ -1044,15 +1044,15 @@ class ActivationManager:
                 )
                 self._set_activation_status(ActivationStatus.PENDING, msg)
                 raise exceptions.MaxRunningProcessesError
+        args = {
+            "name": self.db_instance.name,
+            "status": ActivationStatus.STARTING,
+            "git_hash": git_hash,
+        }
+        args[f"{self.db_instance_type}"] = self.db_instance
         try:
-            args = {
-                "name": self.db_instance.name,
-                "status": ActivationStatus.STARTING,
-                "git_hash": git_hash,
-            }
-            args[f"{self.db_instance_type}"] = self.db_instance
-
-            models.RulebookProcess.objects.create(**args)
+            with transaction.atomic():
+                models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
