@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import secrets
 from itertools import groupby
 
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -41,10 +40,12 @@ def create_jwt_token() -> tuple[str, str]:
 
     They can be sent to rulebook clients through command line arguments.
     """
-    user, _ = User.objects.get_or_create(
+    user, new = User.objects.get_or_create(
         username="_token_service_user",
         is_service_account=True,
-        defaults={"password": secrets.token_urlsafe()},
     )
+    if new:
+        user.set_unusable_password()
+        user.save(update_fields=["password"])
     rf = RefreshToken.for_user(user)
     return (str(rf.access_token), str(rf))
