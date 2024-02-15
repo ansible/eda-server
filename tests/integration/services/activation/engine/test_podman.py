@@ -94,7 +94,7 @@ def get_request(data: InitData):
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
         rulebook_process_id=data.activation_instance.id,
-        resource_id=data.activation.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         ports=[("localhost", 8080)],
         mem_limit="8G",
@@ -109,7 +109,7 @@ def get_request_with_never_pull_policy(data: InitData):
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
         rulebook_process_id=data.activation_instance.id,
-        resource_id=data.activation.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         pull_policy="Never",
     )
@@ -120,7 +120,7 @@ def get_request_with_credential(data: InitData):
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
         rulebook_process_id=data.activation_instance.id,
-        resource_id=data.activation.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         credential=Credential(username="me", secret="secret"),
     )

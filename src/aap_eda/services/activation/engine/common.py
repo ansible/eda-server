@@ -111,7 +111,7 @@ class ContainerRequest(BaseModel):
     image_url: str  # quay.io/ansible/ansible-rulebook:main
     cmdline: AnsibleRulebookCmdLine
     rulebook_process_id: int
-    resource_id: int
+    process_parent_id: int
     credential: tp.Optional[Credential] = None
     ports: tp.Optional[list[tuple]] = None
     pull_policy: str = settings.DEFAULT_PULL_POLICY  # Always by default
@@ -177,7 +177,7 @@ class ContainerableMixin:
             "extra_args": settings.PODMAN_EXTRA_ARGS,
             "mem_limit": settings.PODMAN_MEM_LIMIT,
             "mounts": settings.PODMAN_MOUNTS,
-            "resource_id": self.id,
+            "process_parent_id": self.id,
             "rulebook_process_id": self.latest_instance.id,
             "cmdline": self._build_cmdline(),
         }
@@ -190,7 +190,7 @@ class ContainerableMixin:
             name=params["name"],
             image_url=params["image_url"],
             ports=params["ports"],
-            resource_id=params["resource_id"],
+            process_parent_id=params["process_parent_id"],
             rulebook_process_id=params["rulebook_process_id"],
             env_vars=params["env_vars"],
             extra_args=params["extra_args"],

@@ -76,7 +76,7 @@ def test_container_parameters(activation):
     assert params["extra_args"] is not None
     assert params["mem_limit"] is not None
     assert params["mounts"] is not None
-    assert params["resource_id"] == activation.id
+    assert params["process_parent_id"] == activation.id
     assert params["rulebook_process_id"] == activation.latest_instance.id
 
 
