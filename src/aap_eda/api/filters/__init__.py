@@ -27,7 +27,6 @@ from .rulebook import (
     AuditRuleEventFilter,
     AuditRuleFilter,
     RulebookFilter,
-    RulesetFilter,
 )
 from .user import UserFilter
 
@@ -36,7 +35,6 @@ __all__ = (
     "ProjectFilter",
     # rulebook
     "RulebookFilter",
-    "RulesetFilter",
     "AuditRuleFilter",
     "AuditRuleActionFilter",
     "AuditRuleEventFilter",
