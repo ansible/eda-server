@@ -249,6 +249,43 @@ def test_create_event_stream(
 
 
 @pytest.mark.django_db
+def test_create_event_stream_with_different_default_channel_names(
+    client: APIClient,
+    default_de: models.DecisionEnvironment,
+):
+    models.Rulebook.objects.create(
+        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
+        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    )
+
+    args = {"limit": 5, "delay": 1}
+    source_type = "ansible.eda.range"
+    data_in_1 = {
+        "name": "test_event_stream",
+        "source_type": f"{source_type}",
+        "source_args": f"{args}",
+        "decision_environment_id": default_de.id,
+    }
+    response = client.post(f"{api_url_v1}/event-streams/", data=data_in_1)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    data_in_2 = {
+        "name": "test_event_stream_2",
+        "source_type": f"{source_type}",
+        "source_args": f"{args}",
+        "decision_environment_id": default_de.id,
+    }
+    response = client.post(f"{api_url_v1}/event-streams/", data=data_in_2)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert models.EventStream.objects.count() == 2
+    assert (
+        models.EventStream.objects.first().channel_name
+        != models.EventStream.objects.last().channel_name
+    )
+
+
+@pytest.mark.django_db
 def test_create_event_stream_with_credential(
     client: APIClient,
     default_de: models.DecisionEnvironment,

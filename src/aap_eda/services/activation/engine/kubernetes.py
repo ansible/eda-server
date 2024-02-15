@@ -83,6 +83,7 @@ class Engine(ContainerEngine):
     def __init__(
         self,
         activation_id: str,
+        resource_prefix: str,
         client=None,
     ) -> None:
         if client:
@@ -91,7 +92,8 @@ class Engine(ContainerEngine):
             self.client = get_k8s_client()
 
         self._set_namespace()
-        self.secret_name = f"activation-secret-{activation_id}"
+        self.resource_prefix = resource_prefix.replace("_", "-")
+        self.secret_name = f"{self.resource_prefix}-secret-{activation_id}"
         self.job_name = None
         self.pod_name = None
 
@@ -99,11 +101,11 @@ class Engine(ContainerEngine):
         # TODO : Should this be compatible with the previous version
         # Previous Version
         self.job_name = (
-            f"activation-job-{request.resource_id}"
+            f"{self.resource_prefix}-job-{request.resource_id}"
             f"-{request.rulebook_process_id}"
         )
         self.pod_name = (
-            f"activation-pod-{request.resource_id}"
+            f"{self.resource_prefix}-pod-{request.resource_id}"
             f"-{request.rulebook_process_id}"
         )
 

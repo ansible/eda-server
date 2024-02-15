@@ -167,7 +167,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     source_args = YAMLSerializerField()
     channel_name = serializers.CharField(
-        default=_get_default_channel_name(),
+        default=_get_default_channel_name,
         validators=[
             RegexValidator(
                 regex=r"^\w+$",
