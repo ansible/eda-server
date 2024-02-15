@@ -63,6 +63,7 @@ class Engine(ContainerEngine):
     def __init__(
         self,
         _activation_id: str,
+        _resource_prefix: str = None,
         client=None,
     ) -> None:
         try:

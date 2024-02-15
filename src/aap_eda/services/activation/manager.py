@@ -116,7 +116,9 @@ class ActivationManager:
         if container_engine:
             self.container_engine = container_engine
         else:
-            self.container_engine = new_container_engine(db_instance.id)
+            self.container_engine = new_container_engine(
+                db_instance.id, self.db_instance_type
+            )
 
         self.container_logger_class = container_logger_class
 
