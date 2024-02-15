@@ -61,10 +61,6 @@ from .rulebook import (
     AuditRuleSerializer,
     RulebookRefSerializer,
     RulebookSerializer,
-    RuleOutSerializer,
-    RuleSerializer,
-    RulesetOutSerializer,
-    RulesetSerializer,
 )
 from .user import (
     AwxTokenCreateSerializer,
@@ -94,10 +90,6 @@ __all__ = (
     "AuditRuleListSerializer",
     "RulebookSerializer",
     "RulebookRefSerializer",
-    "RulesetOutSerializer",
-    "RulesetSerializer",
-    "RuleOutSerializer",
-    "RuleSerializer",
     # activations
     "ActivationSerializer",
     "ActivationListSerializer",
