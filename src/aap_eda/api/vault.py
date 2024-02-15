@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
 import shutil
 import tempfile
 
@@ -36,6 +37,7 @@ if VAULT_COMMAND is None:
 
 def encrypt_string(password: str, plaintext: str, vault_id: str) -> str:
     tmp = tempfile.NamedTemporaryFile("w+t")
+    os.chmod(tmp.name, 0o600)
     tmp.write(password)
     tmp.flush()
     label = f"{vault_id}@{tmp.name}"
