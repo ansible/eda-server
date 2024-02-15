@@ -110,8 +110,8 @@ class ContainerRequest(BaseModel):
     name: str  # f"eda-{activation_instance.id}-{uuid.uuid4()}"
     image_url: str  # quay.io/ansible/ansible-rulebook:main
     cmdline: AnsibleRulebookCmdLine
-    rulebook_process_id: str
-    resource_id: str
+    rulebook_process_id: int
+    resource_id: int
     credential: tp.Optional[Credential] = None
     ports: tp.Optional[list[tuple]] = None
     pull_policy: str = settings.DEFAULT_PULL_POLICY  # Always by default
