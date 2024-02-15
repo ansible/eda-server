@@ -18,7 +18,7 @@ import pytest
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest
-from aap_eda.services.activation.restart_helper import (
+from aap_eda.services.process.restart_helper import (
     _queue_auto_start,
     system_restart_activation,
 )
@@ -40,7 +40,7 @@ def activation():
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.services.activation.restart_helper.enqueue_delay")
+@mock.patch("aap_eda.services.process.restart_helper.enqueue_delay")
 def test_system_restart_activation(enqueue_mock, activation):
     system_restart_activation(activation.id, 5)
     enqueue_args = [

@@ -15,7 +15,7 @@
 import pytest
 
 from aap_eda.services.activation import exceptions
-from aap_eda.services.activation.engine.ports import find_ports
+from aap_eda.services.process.engine.ports import find_ports
 
 
 def test_ports():

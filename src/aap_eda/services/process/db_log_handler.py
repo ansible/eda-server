@@ -20,10 +20,8 @@ from django.conf import settings
 from django.db import IntegrityError
 
 from aap_eda.core import models
-from aap_eda.services.activation.engine.common import LogHandler
-from aap_eda.services.activation.engine.exceptions import (
-    ContainerUpdateLogsError,
-)
+from aap_eda.services.process.engine.common import LogHandler
+from aap_eda.services.process.engine.exceptions import ContainerUpdateLogsError
 
 logger = logging.getLogger(__name__)
 

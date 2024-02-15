@@ -20,8 +20,9 @@ from datetime import datetime
 from django.conf import settings
 from pydantic import BaseModel, validator
 
-import aap_eda.services.activation.engine.exceptions as exceptions
 from aap_eda.core.enums import ActivationStatus
+
+from . import exceptions
 
 
 class LogHandler(ABC):
