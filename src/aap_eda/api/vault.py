@@ -46,17 +46,32 @@ def encrypt_string(password: str, plaintext: str, vault_id: str) -> str:
     child.expect("Reading plaintext input from stdin*")
     child.sendline(plaintext)
     child.sendcontrol("D")
-    i = child.expect(["Encryption successful", "ERROR"])
-    if i == 0:
-        child.readline()
-        return "".join(
-            line.decode().lstrip()
-            for line in child
-            if not line.decode().startswith("!vault")
-        )
+
+    encrypted_successful_found = False
+    encrypted_start = False
+    encrypted_str = ""
+
+    # Different versions of ansible-core output the "Encryption Successful"
+    # either at the beginning or at the end, right after the data.
+    # This logic accounts for all the variants we have seen so far in the
+    # output of ansible-vault.
+
+    for line in child.readlines():
+        out = line.decode().lstrip()
+        if out.startswith("!vault"):
+            encrypted_start = True
+            continue
+
+        if "Encryption successful" in out:
+            encrypted_successful_found = True
+
+        if encrypted_start:
+            encrypted_str += out.split("Encryption successful")[0]
+
+    if encrypted_successful_found and encrypted_start:
+        return encrypted_str
     else:
-        error_msg = child.readline()
-        raise AnsibleVaultEncryptionFailed(error_msg)
+        raise AnsibleVaultEncryptionFailed("Failed to encrypt string")
 
 
 def decrypt(password: str, vault_string: str) -> str:
