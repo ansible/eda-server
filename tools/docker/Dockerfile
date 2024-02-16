@@ -13,6 +13,7 @@ RUN DNF=dnf \
     libpq-devel \
     gcc \
     gettext \
+    ansible-core \
     git-core \
     java-17-openjdk-headless \
     # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
