@@ -15,6 +15,7 @@
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
@@ -22,7 +23,7 @@ from .user import AwxToken, User
 __all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, models.Model):
+class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]

@@ -24,12 +24,13 @@ from pytest_lazyfixture import lazy_fixture
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
-from aap_eda.services.activation.engine.common import ContainerEngine
+from aap_eda.services.activation.engine.common import (
+    ContainerEngine,
+    ContainerRequest,
+)
 from aap_eda.services.activation.manager import (
-    ACTIVATION_PATH,
     LOGGER,
     ActivationManager,
-    AnsibleRulebookCmdLine,
     exceptions,
 )
 
@@ -38,30 +39,6 @@ def apply_settings(settings: SettingsWrapper, **kwargs):
     """Apply settings."""
     for key, value in kwargs.items():
         setattr(settings, key, value)
-
-
-@pytest.fixture
-def default_rulebook() -> models.Rulebook:
-    """Return a default rulebook."""
-    rulesets = """
----
-- name: Hello World
-  hosts: all
-  sources:
-    - ansible.eda.range:
-        limit: 5
-  rules:
-    - name: Say Hello
-      condition: event.i == 1
-      action:
-        debug:
-          msg: "Hello World!"
-
-"""
-    return models.Rulebook.objects.create(
-        name="test-rulebook",
-        rulesets=rulesets,
-    )
 
 
 @pytest.fixture
@@ -95,27 +72,6 @@ def eda_caplog(caplog_factory) -> LogCaptureFixture:
 
 
 @pytest.fixture
-def default_user() -> models.User:
-    """Return a default user."""
-    user = models.User.objects.create(
-        username="test.user",
-        password="test.user.123",
-        email="test.user@localhost",
-    )
-
-    return user
-
-
-@pytest.fixture
-def decision_environment() -> models.DecisionEnvironment:
-    """Return a default decision environment."""
-    return models.DecisionEnvironment.objects.create(
-        name="test-decision-environment",
-        image_url="localhost:14000/test-image-url",
-    )
-
-
-@pytest.fixture
 def activation_with_instance(
     basic_activation: models.Activation,
 ) -> models.Activation:
@@ -141,14 +97,14 @@ def running_activation(activation_with_instance: models.Activation):
 @pytest.fixture
 def basic_activation(
     default_user: models.User,
-    decision_environment: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
 ) -> models.Activation:
     """Return the minimal activation."""
     return models.Activation.objects.create(
         name="test-activation",
         user=default_user,
-        decision_environment=decision_environment,
+        decision_environment=default_decision_environment,
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
@@ -161,7 +117,7 @@ def container_engine_mock() -> MagicMock:
 
 
 @pytest.mark.django_db
-def test_build_cmdline(
+def test_get_container_request(
     activation_with_instance: models.Activation,
     settings: SettingsWrapper,
 ):
@@ -174,12 +130,10 @@ def test_build_cmdline(
     }
     apply_settings(settings, **override_settings)
     activation_manager = ActivationManager(activation_with_instance)
-    cmdline = activation_manager._build_cmdline()
-    assert isinstance(cmdline, AnsibleRulebookCmdLine)
-    assert (
-        cmdline.ws_url
-        == override_settings["WEBSOCKET_BASE_URL"] + ACTIVATION_PATH
-    )
+    request = activation_manager._get_container_request()
+    assert isinstance(request, ContainerRequest)
+    cmdline = request.cmdline
+    assert cmdline.ws_url.startswith(override_settings["WEBSOCKET_BASE_URL"])
     assert cmdline.log_level == override_settings["ANSIBLE_RULEBOOK_LOG_LEVEL"]
     assert cmdline.ws_ssl_verify == override_settings["WEBSOCKET_SSL_VERIFY"]
     assert (
@@ -190,18 +144,11 @@ def test_build_cmdline(
 
 
 @pytest.mark.django_db
-def test_build_cmdline_no_instance(basic_activation):
+def test_get_container_request_no_instance(basic_activation):
     """Test build_cmdline when no instance exists."""
     activation_manager = ActivationManager(basic_activation)
     with pytest.raises(exceptions.ActivationManagerError):
-        activation_manager._build_cmdline()
-
-
-@pytest.mark.django_db
-def test_build_credential_inexistent(basic_activation):
-    """Test build_credential when no credential exists."""
-    activation_manager = ActivationManager(basic_activation)
-    assert activation_manager._build_credential() is None
+        activation_manager._get_container_request()
 
 
 @pytest.mark.django_db

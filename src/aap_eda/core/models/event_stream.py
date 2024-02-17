@@ -12,14 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import typing as tp
+
 from django.db import models
 
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, models.Model):
+class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     """Model representing an event stream."""
 
     name = models.TextField(null=False, unique=True)
@@ -97,3 +100,10 @@ class EventStream(StatusHandlerModelMixin, models.Model):
 
     def __str__(self) -> str:
         return f"EventStream {self.name} ({self.id})"
+
+    # Implementation of the ContainerableMixin.
+    def get_command_line_parameters(self) -> dict[str, tp.Any]:
+        params = super().get_command_line_parameters()
+        return params | {
+            "skip_audit_events": True,
+        }
