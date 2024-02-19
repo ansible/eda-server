@@ -56,7 +56,7 @@ def activation(activation_no_instance) -> models.Activation:
 def test_command_line_parameters(activation):
     params = activation.get_command_line_parameters()
     assert params["ws_url"] is not None
-    assert params["log_level"] is not None
+    assert params["log_level"] is None
     assert params["ws_ssl_verify"] is not None
     assert params["ws_token_url"] is not None
     assert params["ws_access_token"] is not None
@@ -101,3 +101,19 @@ def test_get_container_request_no_instance(activation_no_instance):
     """Test the construction of a ContainerRequest."""
     with pytest.raises(ContainerableInvalidError):
         activation_no_instance.get_container_request()
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("debug", "-vv"),
+        ("info", "-v"),
+        ("error", None),
+    ],
+)
+@pytest.mark.django_db
+def test_log_level_param_activation(activation, value, expected):
+    activation.log_level = value
+    activation.save(update_fields=["log_level"])
+    request = activation.get_container_request()
+    assert request.cmdline.log_level == expected

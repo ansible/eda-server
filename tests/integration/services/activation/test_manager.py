@@ -108,6 +108,7 @@ def basic_activation(
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
+        log_level="info",
     )
 
 
@@ -124,7 +125,6 @@ def test_get_container_request(
     """Test build_cmdline."""
     override_settings = {
         "WEBSOCKET_BASE_URL": "ws://localhost:8000",
-        "ANSIBLE_RULEBOOK_LOG_LEVEL": "-vv",
         "WEBSOCKET_SSL_VERIFY": "no",
         "RULEBOOK_LIVENESS_CHECK_SECONDS": 73,
     }
@@ -134,7 +134,7 @@ def test_get_container_request(
     assert isinstance(request, ContainerRequest)
     cmdline = request.cmdline
     assert cmdline.ws_url.startswith(override_settings["WEBSOCKET_BASE_URL"])
-    assert cmdline.log_level == override_settings["ANSIBLE_RULEBOOK_LOG_LEVEL"]
+    assert cmdline.log_level == "-v"
     assert cmdline.ws_ssl_verify == override_settings["WEBSOCKET_SSL_VERIFY"]
     assert (
         cmdline.heartbeat
