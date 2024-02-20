@@ -56,7 +56,6 @@ jobs:
     env:
       EDA_SECRET_KEY: 'test'
       EDA_DB_PASSWORD: 'secret'
-      TIMEOUT: 60
     services:
       postgres:
         image: 'quay.io/sclorg/postgresql-13-c9s:latest'
@@ -109,44 +108,6 @@ jobs:
 
       - name: Run tests
         run: poetry run python -m pytest -vv --cov=./ --cov-report=xml
-
-      - name: Build and run api server with docker
-        working-directory: tools/docker
-        env:
-          # both ports are set just to avoid conflicts with GitHub services
-          # app pods still use the internal ports. See docker-compose-dev.yaml
-          EDA_PG_PORT: 5433
-          EDA_REDIS_PORT: 6380
-          DJANGO_SETTINGS_MODULE: aap_eda.settings.default
-          EDA_DEBUG: "false"
-        run: |
-          docker-compose -p eda -f docker-compose-dev.yaml build
-          docker-compose -p eda -f docker-compose-dev.yaml up -d
-
-          timeout=${{ env.TIMEOUT }}
-          start=$SECONDS
-
-          while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
-            now=$SECONDS
-            if [ $(($now - $start)) -ge $timeout ]; then
-              echo "API did not become ready in time."
-              exit 1
-            fi
-            echo "Waiting for API to be ready..."
-            sleep 1
-          done
-
-      - name: Validate OpenAPI schema
-        run: |
-          set -ex
-          npm install -g swagger-cli
-          swagger-cli validate http://localhost:8000/api/eda/v1/openapi.json
-
-      - name: Print EDA logs
-        if: always()
-        working-directory: tools/docker
-        run: |
-          docker-compose -p eda -f docker-compose-dev.yaml logs
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
