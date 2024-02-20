@@ -457,7 +457,7 @@ MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 # For backwards compatibility, from the old value "-v" to the new value "info"
 def _get_rulebook_process_log_level() -> RulebookProcessLogLevel:
     log_level = settings.get(
-        "RULEBOOK_PROCESS_LOG_LEVEL",
+        "ANSIBLE_RULEBOOK_LOG_LEVEL",
         RulebookProcessLogLevel.ERROR,
     ).lower()
     if log_level == "-v":
@@ -466,7 +466,7 @@ def _get_rulebook_process_log_level() -> RulebookProcessLogLevel:
         return RulebookProcessLogLevel.DEBUG
     if log_level not in RulebookProcessLogLevel.values():
         raise ImproperlyConfigured(
-            f"Invalid log level '{log_level}' for RULEBOOK_PROCESS_LOG_LEVEL"
+            f"Invalid log level '{log_level}' for ANSIBLE_RULEBOOK_LOG_LEVEL"
             f" setting. Valid values are: {RulebookProcessLogLevel.values()}"
         )
     return log_level
