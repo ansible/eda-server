@@ -455,7 +455,7 @@ MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 
 
 # For backwards compatibility, from the old value "-v" to the new value "info"
-def _get_rulebook_process_log_level() -> RulebookProcessLogLevel:
+def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
     log_level = settings.get(
         "ANSIBLE_RULEBOOK_LOG_LEVEL",
         RulebookProcessLogLevel.ERROR,
@@ -472,7 +472,7 @@ def _get_rulebook_process_log_level() -> RulebookProcessLogLevel:
     return log_level
 
 
-ANSIBLE_RULEBOOK_LOG_LEVEL = _get_rulebook_process_log_level()
+ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
 
 # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938

@@ -19,7 +19,7 @@ import pytest
 from aap_eda.settings.default import (
     ImproperlyConfigured,
     RulebookProcessLogLevel,
-    _get_rulebook_process_log_level,
+    get_rulebook_process_log_level,
 )
 
 
@@ -37,7 +37,7 @@ from aap_eda.settings.default import (
 def test_rulebook_log_level(mock_settings, value, expected):
     mock_settings.get.return_value = value
 
-    result = _get_rulebook_process_log_level()
+    result = get_rulebook_process_log_level()
 
     assert result == expected
 
@@ -46,4 +46,4 @@ def test_rulebook_log_level(mock_settings, value, expected):
 def test_rulebook_log_level_invalid(mock_settings):
     mock_settings.get.return_value = "invalid"
     with pytest.raises(ImproperlyConfigured):
-        _get_rulebook_process_log_level()
+        get_rulebook_process_log_level()
