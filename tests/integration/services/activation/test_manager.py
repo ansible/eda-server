@@ -114,14 +114,14 @@ def basic_activation(
 @pytest.fixture
 def new_activation_with_instance(
     default_user: models.User,
-    decision_environment: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
 ) -> models.Activation:
     """Return an activation with an instance."""
     activation = models.Activation.objects.create(
         name="new_activation_with_instance",
         user=default_user,
-        decision_environment=decision_environment,
+        decision_environment=default_decision_environment,
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
