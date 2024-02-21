@@ -18,17 +18,41 @@ import pytest
 from django.conf import settings
 
 import aap_eda.tasks.activation_request_queue as queue
-import aap_eda.tasks.orchestrator as orchestrator
 from aap_eda.core import models
 from aap_eda.core.enums import (
     ActivationRequest,
     ActivationStatus,
     ProcessParentType,
 )
+from aap_eda.tasks import orchestrator
+
+
+@pytest.fixture
+def default_rulebook() -> models.Rulebook:
+    """Return a default rulebook."""
+    rulesets = """
+---
+- name: Hello World
+  hosts: all
+  sources:
+    - ansible.eda.range:
+        limit: 5
+  rules:
+    - name: Say Hello
+      condition: event.i == 1
+      action:
+        debug:
+          msg: "Hello World!"
+
+"""
+    return models.Rulebook.objects.create(
+        name="test-rulebook",
+        rulesets=rulesets,
+    )
 
 
 @pytest.fixture()
-def activation():
+def activation(default_rulebook):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -36,9 +60,16 @@ def activation():
         email="luke.skywalker@example.com",
         password="secret",
     )
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="test-decision-environment",
+        image_url="localhost:14000/test-image-url",
+    )
     return models.Activation.objects.create(
         name="test1",
         user=user,
+        decision_environment=decision_environment,
+        rulebook=default_rulebook,
+        rulebook_rulesets=default_rulebook.rulesets,
     )
 
 
@@ -106,17 +137,15 @@ def test_manage_request(manager_mock, activation, verb):
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
-def test_manage_not_start(manager_mock, activation, max_running_processes):
+@mock.patch.object(orchestrator.ActivationManager, "start", autospec=True)
+def test_manage_not_start(start_mock, activation, max_running_processes):
     queue.push(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
-    manager_instance_mock = mock.Mock()
-    manager_mock.return_value = manager_instance_mock
 
     orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
 
-    manager_instance_mock.start.assert_not_called()
+    start_mock.assert_not_called()
     assert (
         len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id)) == 1
     )
@@ -194,3 +223,41 @@ def test_monitor_rulebook_processes(
     orchestrator.monitor_rulebook_processes()
 
     enqueue_mock.assert_has_calls(call_args, any_order=True)
+
+
+original_start_method = orchestrator.ActivationManager.start
+
+
+@pytest.mark.django_db
+@mock.patch.object(orchestrator.ActivationManager, "start", autospec=True)
+def test_max_running_activation_after_start_job(
+    start_mock,
+    activation,
+    max_running_processes,
+):
+    """Check if the max running processes error is handled correctly
+    when the limit is reached after the request is started."""
+
+    def side_effect(*args, **kwargs):
+        # Recreate the process and run the original start method
+        instance = args[0]
+        models.RulebookProcess.objects.create(
+            name="running",
+            activation=max_running_processes[0].activation,
+            status=ActivationStatus.RUNNING,
+        )
+        original_start_method(instance, *args[1:], **kwargs)
+
+    start_mock.side_effect = side_effect
+
+    max_running_processes[0].delete()
+
+    queue.push(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
+    )
+    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+    assert start_mock.call_count == 1
+    running_processes = models.RulebookProcess.objects.filter(
+        status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
+    ).count()
+    assert running_processes == settings.MAX_RUNNING_ACTIVATIONS

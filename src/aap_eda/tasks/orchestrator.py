@@ -15,7 +15,6 @@
 import logging
 from typing import Union
 
-from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 import aap_eda.tasks.activation_request_queue as requests_queue
@@ -27,6 +26,7 @@ from aap_eda.core.enums import (
 )
 from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
 from aap_eda.core.tasking import unique_enqueue
+from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.manager import ActivationManager
 
 LOGGER = logging.getLogger(__name__)
@@ -90,8 +90,12 @@ def _run_request(
         f"{process_parent.id}",
     )
     start_commands = [ActivationRequest.START, ActivationRequest.AUTO_START]
-    if request.request in start_commands and not _can_start_new_process(
-        process_parent,
+    if (
+        request.request in start_commands
+        and not ActivationManager.check_new_process_allowed(
+            process_parent_type,
+            process_parent.id,
+        )
     ):
         return False
 
@@ -107,27 +111,13 @@ def _run_request(
             manager.restart()
         elif request.request == ActivationRequest.DELETE:
             manager.delete()
+    except exceptions.MaxRunningProcessesError:
+        return False
     except Exception as e:
         LOGGER.exception(
             f"Failed to process request {request.request} for "
             f"{process_parent_type} {process_parent.id}. Reason {str(e)}",
         )
-    return True
-
-
-def _can_start_new_process(
-    process_parent: Union[Activation, EventStream]
-) -> bool:
-    num_running_processes = models.RulebookProcess.objects.filter(
-        status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
-    ).count()
-    if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
-        process_parent_type = type(process_parent).__name__
-        LOGGER.info(
-            "No capacity to start a new rulebook process. "
-            f"{process_parent_type} {process_parent.id} is postponed",
-        )
-        return False
     return True
 
 
