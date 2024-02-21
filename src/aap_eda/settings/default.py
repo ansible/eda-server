@@ -459,12 +459,14 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
     log_level = settings.get(
         "ANSIBLE_RULEBOOK_LOG_LEVEL",
         RulebookProcessLogLevel.ERROR,
-    ).lower()
-    if log_level == "-v":
+    )
+    if log_level is None:
+        return RulebookProcessLogLevel.ERROR
+    if log_level.lower() == "-v":
         return RulebookProcessLogLevel.INFO
-    if log_level == "-vv":
+    if log_level.lower() == "-vv":
         return RulebookProcessLogLevel.DEBUG
-    if log_level not in RulebookProcessLogLevel.values():
+    if log_level.lower() not in RulebookProcessLogLevel.values():
         raise ImproperlyConfigured(
             f"Invalid log level '{log_level}' for ANSIBLE_RULEBOOK_LOG_LEVEL"
             f" setting. Valid values are: {RulebookProcessLogLevel.values()}"
