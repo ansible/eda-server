@@ -458,7 +458,7 @@ MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
     log_level = settings.get(
         "ANSIBLE_RULEBOOK_LOG_LEVEL",
-        RulebookProcessLogLevel.ERROR,
+        "error",
     )
     if log_level is None:
         return RulebookProcessLogLevel.ERROR
@@ -471,7 +471,7 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
             f"Invalid log level '{log_level}' for ANSIBLE_RULEBOOK_LOG_LEVEL"
             f" setting. Valid values are: {RulebookProcessLogLevel.values()}"
         )
-    return log_level
+    return RulebookProcessLogLevel(log_level)
 
 
 ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
