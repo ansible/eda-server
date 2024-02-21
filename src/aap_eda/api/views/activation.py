@@ -94,7 +94,7 @@ class ActivationViewSet(
         responses={status.HTTP_200_OK: serializers.ActivationReadSerializer},
     )
     def retrieve(self, request, pk: int):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
