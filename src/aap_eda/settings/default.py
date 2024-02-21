@@ -466,7 +466,7 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
         return RulebookProcessLogLevel.INFO
     if log_level.lower() == "-vv":
         return RulebookProcessLogLevel.DEBUG
-    if log_level.lower() not in RulebookProcessLogLevel.values():
+    if log_level not in RulebookProcessLogLevel.values():
         raise ImproperlyConfigured(
             f"Invalid log level '{log_level}' for ANSIBLE_RULEBOOK_LOG_LEVEL"
             f" setting. Valid values are: {RulebookProcessLogLevel.values()}"
