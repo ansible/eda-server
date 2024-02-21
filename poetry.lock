@@ -611,6 +611,7 @@ files = []
 develop = false
 
 [package.dependencies]
+channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-auth-ldap = {version = "*", optional = true, markers = "extra == \"authentication\""}
@@ -635,7 +636,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/alancoding/django-ansible-base.git"
 reference = "django_permissions"
-resolved_reference = "efc6470c92b08b23eed6bba8d49f6dc978af9153"
+resolved_reference = "d660e3b9772be4100395a0af0d94662688cbd283"
 
 [[package]]
 name = "django-auth-ldap"
