@@ -108,8 +108,7 @@ class ActivationViewSet(
         },
     )
     def list(self, request):
-        activations = models.Activation.objects.all()
-        activations = self.filter_queryset(activations)
+        activations = self.filter_queryset(self.get_queryset())
 
         serializer = serializers.ActivationListSerializer(
             activations, many=True
@@ -150,7 +149,7 @@ class ActivationViewSet(
         url_path="(?P<id>[^/.]+)/instances",
     )
     def instances(self, request, id):
-        activation_exists = models.Activation.objects.filter(id=id).exists()
+        activation_exists = self.get_queryset().filter(id=id).exists()
         if not activation_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,

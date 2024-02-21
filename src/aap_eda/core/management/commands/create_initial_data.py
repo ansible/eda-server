@@ -26,7 +26,7 @@ CRUD = ["add", "view", "change", "delete"]
 
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
-ROLES = [
+ORG_ROLES = [
     {
         "name": "Admin",
         "description": "Has all permissions",
@@ -51,6 +51,13 @@ ROLES = [
             "decision_environment": CRUD,
             "credential": CRUD,
             "event_stream": ["add", "view"],
+        },
+    },
+    {
+        "name": "Organization Member",
+        "description": "Users who are a part of the organization",
+        "permissions": {
+            "organization": ["view", "member"],
         },
     },
     {
@@ -160,7 +167,7 @@ class Command(BaseCommand):
 
     def _create_org_roles(self):
         org_ct = ContentType.objects.get(model='organization')
-        for role_data in ROLES:
+        for role_data in ORG_ROLES:
             role, _ = RoleDefinition.objects.get_or_create(
                 name=role_data["name"], description=role_data["description"],
                 content_type=org_ct, managed=True
@@ -187,25 +194,39 @@ class Command(BaseCommand):
                     len(role_data["permissions"]),
                 )
             )
-        self.stdout.write(f"Added {len(ROLES)} roles.")
+        self.stdout.write(f"Added {len(ORG_ROLES)} roles.")
 
     def _create_obj_roles(self):
-        org_ct = ContentType.objects.get(model='organization')
-        if RoleDefinition.objects.exclude(content_type__in=[org_ct, None]).exists():
-            self.stdout.write("Organization roles already exist. Not creating.")
-            return
-
         for cls in permission_registry.all_registered_models:
             ct = ContentType.objects.get_for_model(cls)
             if ct._meta.model_name == 'organization':
                 continue  # covered by org roles
-            permissions = list(DABPermission.objects.filter(content_type=ct))
-            role = RoleDefinition.objects.create(
+            permissions = [p for p in DABPermission.objects.filter(content_type=ct) if not p.codename.startswith('add_')]
+            role, created = RoleDefinition.objects.get_or_create(
                 name=f'{cls._meta.verbose_name.title()} Admin',
-                description=f'Has all permissions to a single {cls._meta.verbose_name}',
-                content_type=ct, managed=True
+                defaults=dict(
+                    description=f'Has all permissions to a single {cls._meta.verbose_name}',
+                    content_type=ct, managed=True
+                )
             )
             role.permissions.set(permissions)
-            self.stdout.write(
-                f'Added role {role.name} with {len(permissions)} permissions to itself'
-            )
+            if created:
+                self.stdout.write(
+                    f'Added role {role.name} with {len(permissions)} permissions to itself'
+                )
+
+            # Special case to create team member role
+            if cls._meta.model_name == 'team':
+                member_permissions = [p for p in permissions if p.codename in ('view_team', 'member_team')]
+                role, created = RoleDefinition.objects.get_or_create(
+                    name=f'Team Member',
+                    defaults=dict(
+                        description='Inherits permissions assigned to this team',
+                        content_type=ct, managed=True
+                    )
+                )
+                role.permissions.set(member_permissions)
+                if created:
+                    self.stdout.write(
+                        f'Added role {role.name} with {len(permissions)} permissions to itself'
+                    )
