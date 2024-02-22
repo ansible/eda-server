@@ -124,7 +124,7 @@ class CredentialViewSet(
         },
     )
     def retrieve(self, request, pk: int):
-        queryset = models.Credential.access_qs(request.user).exclude(
+        queryset = self.get_queryset().exclude(
             credential_type=CredentialType.VAULT,
             vault_identifier=EDA_SERVER_VAULT_LABEL,
         )
@@ -141,7 +141,7 @@ class CredentialViewSet(
         },
     )
     def list(self, request):
-        credentials = models.Credential.objects.exclude(
+        credentials = self.get_queryset().exclude(
             credential_type=CredentialType.VAULT,
             vault_identifier=EDA_SERVER_VAULT_LABEL,
         )

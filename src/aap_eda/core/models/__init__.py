@@ -15,7 +15,7 @@
 from ansible_base.rbac import permission_registry
 
 from .activation import Activation, RulebookProcess, RulebookProcessLog
-from .auth import Permission, DABPermission, Role
+from .auth import DABPermission, Permission, Role
 from .credential import Credential
 from .decision_environment import DecisionEnvironment
 from .event_stream import EventStream
@@ -81,11 +81,10 @@ permission_registry.register(
     DecisionEnvironment,
     RulebookProcess,
     AuditRule,
-    AuditEvent,
     Project,
     ExtraVar,
     Rulebook,
-    parent_field_name='organization',
+    parent_field_name="organization",
 )
 permission_registry.register(
     EventStream,

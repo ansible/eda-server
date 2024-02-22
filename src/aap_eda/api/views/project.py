@@ -184,7 +184,7 @@ class ProjectViewSet(
         },
     )
     def partial_update(self, request, pk):
-        project = get_object_or_404(models.Project, pk=pk)
+        project = get_object_or_404(self.get_queryset(), pk=pk)
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )
@@ -235,7 +235,7 @@ class ProjectViewSet(
     @transaction.atomic
     def sync(self, request, pk):
         try:
-            project = models.Project.objects.select_for_update().get(pk=pk)
+            project = self.get_queryset().select_for_update().get(pk=pk)
         except models.Project.DoesNotExist:
             raise api_exc.NotFound
 

@@ -187,7 +187,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
 
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -241,7 +241,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
 
         self._check_deleting(activation)
 
@@ -271,7 +271,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
 
         self._check_deleting(activation)
 
@@ -367,7 +367,7 @@ class ActivationInstanceViewSet(
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
-        instance_exists = models.RulebookProcess.objects.filter(pk=id).exists()
+        instance_exists = self.get_queryset().filter(pk=id).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,

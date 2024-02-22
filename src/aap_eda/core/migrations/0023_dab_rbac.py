@@ -2,14 +2,18 @@
 
 from django.db import migrations, models
 
-from aap_eda.core.migrations._dab_rbac import create_permissions_as_operation, migrate_roles_to_dab, remove_dab_models
+from aap_eda.core.migrations._dab_rbac import (
+    create_permissions_as_operation,
+    migrate_roles_to_dab,
+    remove_dab_models,
+)
 
 
 class Migration(migrations.Migration):
     dependencies = [
         ("contenttypes", "0002_remove_content_type_name"),
         ("core", "0022_add_default_organization"),
-        ("dab_rbac", "__first__")
+        ("dab_rbac", "__first__"),
     ]
 
     operations = [
@@ -22,13 +26,6 @@ class Migration(migrations.Migration):
                     ("disable_activation", "Can disable an activation"),
                     ("restart_activation", "Can restart an activation"),
                 ],
-            },
-        ),
-        migrations.AlterModelOptions(
-            name="auditevent",
-            options={
-                "default_permissions": ("view",),
-                "ordering": ("-received_at", "-rule_fired_at"),
             },
         ),
         migrations.AlterModelOptions(
@@ -76,9 +73,7 @@ class Migration(migrations.Migration):
         migrations.RunPython(
             create_permissions_as_operation, migrations.RunPython.noop
         ),
-        migrations.RunPython(
-            migrate_roles_to_dab, remove_dab_models
-        ),
+        migrations.RunPython(migrate_roles_to_dab, remove_dab_models),
         # Temporary - allow creating a user without providing role
         # as long as this relationship refers to the old, now unused, roles
         migrations.AlterField(
