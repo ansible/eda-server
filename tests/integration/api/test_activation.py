@@ -43,6 +43,7 @@ TEST_ACTIVATION = {
     "restart_policy": RestartPolicy.ON_FAILURE,
     "restart_count": 0,
     "status_message": "",
+    "log_level": "debug",
 }
 
 TEST_AWX_TOKEN = {
@@ -220,6 +221,7 @@ def create_activation(fks: dict):
     activation_data["rulebook_id"] = fks["rulebook_id"]
     activation_data["extra_var_id"] = fks["extra_var_id"]
     activation_data["user_id"] = fks["user_id"]
+    activation_data["log_level"] = "debug"
     activation = models.Activation(**activation_data)
     activation.save()
 
@@ -268,6 +270,7 @@ def test_create_activation(client: APIClient):
         data,
         activation,
     )
+    assert data["log_level"] == "debug"
     if activation.project:
         assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
     else:

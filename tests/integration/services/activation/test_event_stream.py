@@ -56,7 +56,7 @@ def event_stream(event_stream_no_instance) -> models.EventStream:
 def test_command_line_parameters(event_stream):
     params = event_stream.get_command_line_parameters()
     assert params["ws_url"] is not None
-    assert params["log_level"] is not None
+    assert params["log_level"] is None
     assert params["ws_ssl_verify"] is not None
     assert params["ws_token_url"] is not None
     assert params["ws_access_token"] is not None
@@ -101,3 +101,19 @@ def test_get_container_request_no_instance(event_stream_no_instance):
     """Test the construction of a ContainerRequest."""
     with pytest.raises(ContainerableInvalidError):
         event_stream_no_instance.get_container_request()
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("debug", "-vv"),
+        ("info", "-v"),
+        ("error", None),
+    ],
+)
+@pytest.mark.django_db
+def test_log_level_param_event_stream(event_stream, value, expected):
+    event_stream.log_level = value
+    event_stream.save(update_fields=["log_level"])
+    request = event_stream.get_container_request()
+    assert request.cmdline.log_level == expected
