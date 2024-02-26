@@ -76,6 +76,8 @@ import dynaconf
 from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
+from aap_eda.core.enums import RulebookProcessLogLevel
+
 default_settings_file = "/etc/eda/settings.yaml"
 
 settings = dynaconf.Dynaconf(
@@ -450,7 +452,29 @@ MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL
 # ---------------------------------------------------------
-ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
+
+
+# For backwards compatibility, from the old value "-v" to the new value "info"
+def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
+    log_level = settings.get(
+        "ANSIBLE_RULEBOOK_LOG_LEVEL",
+        "error",
+    )
+    if log_level is None:
+        return RulebookProcessLogLevel.ERROR
+    if log_level.lower() == "-v":
+        return RulebookProcessLogLevel.INFO
+    if log_level.lower() == "-vv":
+        return RulebookProcessLogLevel.DEBUG
+    if log_level not in RulebookProcessLogLevel.values():
+        raise ImproperlyConfigured(
+            f"Invalid log level '{log_level}' for ANSIBLE_RULEBOOK_LOG_LEVEL"
+            f" setting. Valid values are: {RulebookProcessLogLevel.values()}"
+        )
+    return RulebookProcessLogLevel(log_level)
+
+
+ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
 
 # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938

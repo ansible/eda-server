@@ -15,6 +15,7 @@
 from enum import Enum
 
 
+# TODO(alex): migrate to django.db.models.TextChoices
 class DjangoStrEnum(str, Enum):
     @classmethod
     def choices(cls):
@@ -114,3 +115,11 @@ class ProcessParentType(DjangoStrEnum):
 
     ACTIVATION = "activation"
     EVENT_STREAM = "event_stream"
+
+
+class RulebookProcessLogLevel(DjangoStrEnum):
+    """Types of log levels for a rulebook process."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    ERROR = "error"
