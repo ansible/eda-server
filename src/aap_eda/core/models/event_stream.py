@@ -16,7 +16,12 @@ import typing as tp
 
 from django.db import models
 
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    RestartPolicy,
+    RulebookProcessLogLevel,
+)
+from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
@@ -89,6 +94,11 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     )
     credentials = models.ManyToManyField(
         "Credential", related_name="event_streams", default=None
+    )
+    log_level = models.CharField(
+        max_length=20,
+        choices=RulebookProcessLogLevel.choices(),
+        default=get_default_log_level,
     )
 
     class Meta:

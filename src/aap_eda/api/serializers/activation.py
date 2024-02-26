@@ -111,6 +111,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "credentials",
             "event_streams",
+            "log_level",
         ]
         read_only_fields = [
             "id",
@@ -161,6 +162,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "credentials",
             "event_streams",
+            "log_level",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -199,6 +201,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "awx_token_id": activation.awx_token_id,
             "credentials": credentials,
             "event_streams": event_streams,
+            "log_level": activation.log_level,
         }
 
 
@@ -219,6 +222,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "credentials",
             "event_streams",
+            "log_level",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -354,6 +358,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "credentials",
             "event_streams",
+            "log_level",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -432,6 +437,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "awx_token_id": activation.awx_token_id,
             "credentials": credentials,
             "event_streams": event_streams,
+            "log_level": activation.log_level,
         }
 
 

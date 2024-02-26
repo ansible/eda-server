@@ -11,3 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+from django.conf import settings
+
+from aap_eda.core.enums import RulebookProcessLogLevel
+
+
+def get_default_log_level() -> RulebookProcessLogLevel:
+    return settings.ANSIBLE_RULEBOOK_LOG_LEVEL

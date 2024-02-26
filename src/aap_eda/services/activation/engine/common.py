@@ -155,7 +155,7 @@ class ContainerableMixin:
         return {
             "id": str(self.latest_instance.id),
             "ws_url": self._get_ws_url(),
-            "log_level": settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
+            "log_level": self._get_log_level(),
             "ws_ssl_verify": settings.WEBSOCKET_SSL_VERIFY,
             "ws_token_url": self._get_ws_token_url(),
             "ws_access_token": access_token,
@@ -228,6 +228,15 @@ class ContainerableMixin:
             id=params["id"],
             skip_audit_events=params["skip_audit_events"],
         )
+
+    def _get_log_level(self) -> tp.Optional[str]:
+        """Return the log level to use by ansible-rulebook."""
+        level_map = {
+            "debug": "-vv",
+            "info": "-v",
+            "error": None,
+        }
+        return level_map[self.log_level]
 
     def _get_container_name(self) -> str:
         """Return the name to use for the ContainerRequest."""
