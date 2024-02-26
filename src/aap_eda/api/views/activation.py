@@ -54,13 +54,15 @@ class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
 
     rbac_resource_type = None
     rbac_action = None
+
+    def get_queryset(self):
+        return models.Activation.access_qs(self.request.user)
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -92,7 +94,7 @@ class ActivationViewSet(
         responses={status.HTTP_200_OK: serializers.ActivationReadSerializer},
     )
     def retrieve(self, request, pk: int):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
@@ -106,8 +108,7 @@ class ActivationViewSet(
         },
     )
     def list(self, request):
-        activations = models.Activation.objects.all()
-        activations = self.filter_queryset(activations)
+        activations = self.filter_queryset(self.get_queryset())
 
         serializer = serializers.ActivationListSerializer(
             activations, many=True
@@ -148,7 +149,7 @@ class ActivationViewSet(
         url_path="(?P<id>[^/.]+)/instances",
     )
     def instances(self, request, id):
-        activation_exists = models.Activation.objects.filter(id=id).exists()
+        activation_exists = self.get_queryset().filter(id=id).exists()
         if not activation_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
@@ -186,7 +187,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
 
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -240,7 +241,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
 
         self._check_deleting(activation)
 
@@ -270,7 +271,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
-        activation = get_object_or_404(models.Activation, pk=pk)
+        activation = get_object_or_404(self.get_queryset(), pk=pk)
 
         self._check_deleting(activation)
 
@@ -332,12 +333,14 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.RulebookProcess.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
     rbac_resource_type = ResourceType.ACTIVATION_INSTANCE
     rbac_action = None
+
+    def get_queryset(self):
+        return models.RulebookProcess.access_qs(self.request.user)
 
     @extend_schema(
         description="List all logs for the Activation Instance",
@@ -364,7 +367,7 @@ class ActivationInstanceViewSet(
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
-        instance_exists = models.RulebookProcess.objects.filter(pk=id).exists()
+        instance_exists = self.get_queryset().filter(pk=id).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,

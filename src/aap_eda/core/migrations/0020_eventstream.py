@@ -9,6 +9,9 @@ from django.db import migrations, models
 import aap_eda.core.enums
 import aap_eda.core.models.mixins
 
+# The source of truth for permissions data changed since this migration
+# - actions available for model is defined in model Meta properties
+# - models tracked by role permissions added to permission_registry.register()
 PERMISSIONS = {
     "event_stream": ["create", "read"],
 }

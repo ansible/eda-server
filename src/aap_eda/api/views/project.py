@@ -65,11 +65,13 @@ class ExtraVarViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
-    queryset = models.ExtraVar.objects.order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
 
     rbac_resource_type = ResourceType.EXTRA_VAR
+
+    def get_queryset(self):
+        return models.ExtraVar.access_qs(self.request.user).order_by("id")
 
 
 @extend_schema_view(
@@ -100,12 +102,14 @@ class ProjectViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.ProjectFilter
 
     rbac_action = None
+
+    def get_queryset(self):
+        return models.Project.access_qs(self.request.user).order_by("id")
 
     @extend_schema(
         description="Import a project.",
@@ -180,7 +184,7 @@ class ProjectViewSet(
         },
     )
     def partial_update(self, request, pk):
-        project = get_object_or_404(models.Project, pk=pk)
+        project = get_object_or_404(self.get_queryset(), pk=pk)
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )
@@ -231,7 +235,7 @@ class ProjectViewSet(
     @transaction.atomic
     def sync(self, request, pk):
         try:
-            project = models.Project.objects.select_for_update().get(pk=pk)
+            project = self.get_queryset().select_for_update().get(pk=pk)
         except models.Project.DoesNotExist:
             raise api_exc.NotFound
 

@@ -58,7 +58,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
     credential = CredentialRefSerializer(required=False, allow_null=True)
 
     class Meta:
-        model = models.DecisionEnvironment()
+        model = models.DecisionEnvironment
         fields = [
             "id",
             "name",

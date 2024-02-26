@@ -102,6 +102,7 @@ class AuditRule(models.Model):
             models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ]
         ordering = ("-fired_at",)
+        default_permissions = ("view",)
 
     name = models.TextField(null=False)
     status = models.TextField()

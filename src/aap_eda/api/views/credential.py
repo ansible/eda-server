@@ -87,9 +87,11 @@ class CredentialViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Credential.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialFilter
+
+    def get_queryset(self):
+        return models.Credential.access_qs(self.request.user).order_by("id")
 
     def handle_exception(self, exc):
         if isinstance(exc, fernet.InvalidToken):
@@ -122,7 +124,7 @@ class CredentialViewSet(
         },
     )
     def retrieve(self, request, pk: int):
-        queryset = models.Credential.objects.exclude(
+        queryset = self.get_queryset().exclude(
             credential_type=CredentialType.VAULT,
             vault_identifier=EDA_SERVER_VAULT_LABEL,
         )
@@ -139,7 +141,7 @@ class CredentialViewSet(
         },
     )
     def list(self, request):
-        credentials = models.Credential.objects.exclude(
+        credentials = self.get_queryset().exclude(
             credential_type=CredentialType.VAULT,
             vault_identifier=EDA_SERVER_VAULT_LABEL,
         )

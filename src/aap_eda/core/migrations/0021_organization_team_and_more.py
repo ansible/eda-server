@@ -2,14 +2,7 @@
 
 import django.db.models.deletion
 from django.conf import settings
-from django.contrib.auth.management import create_permissions
 from django.db import migrations, models
-
-
-def create_permissions_as_operation(apps, schema_editor):
-    from django.apps.registry import apps as global_apps
-
-    create_permissions(global_apps.get_app_config("core"))
 
 
 class Migration(migrations.Migration):
@@ -166,15 +159,6 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AddField(
-            model_name="role",
-            name="organization",
-            field=models.ForeignKey(
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
-        migrations.AddField(
             model_name="rulebook",
             name="organization",
             field=models.ForeignKey(
@@ -283,7 +267,64 @@ class Migration(migrations.Migration):
                 "unique_together": {("organization", "name")},
             },
         ),
-        migrations.RunPython(
-            create_permissions_as_operation, migrations.RunPython.noop
+        # The DABPermission is used by DAB RBAC, so it needs to be created before dab_rbac migrations run
+        migrations.CreateModel(
+            name="DABPermission",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=255, verbose_name="name"),
+                ),
+                (
+                    "codename",
+                    models.CharField(max_length=100, verbose_name="codename"),
+                ),
+                (
+                    "content_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                        verbose_name="content type",
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "permission",
+                "verbose_name_plural": "permissions",
+                "ordering": ["content_type__model", "codename"],
+                "unique_together": {("content_type", "codename")},
+            },
+        ),
+        migrations.AlterField(
+            model_name="permission",
+            name="resource_type",
+            field=models.TextField(
+                choices=[
+                    ("activation", "activation"),
+                    ("activation_instance", "activation_instance"),
+                    ("audit_rule", "audit_rule"),
+                    ("audit_event", "audit_event"),
+                    ("task", "task"),
+                    ("user", "user"),
+                    ("project", "project"),
+                    ("inventory", "inventory"),
+                    ("extra_var", "extra_var"),
+                    ("rulebook", "rulebook"),
+                    ("role", "role"),
+                    ("decision_environment", "decision_environment"),
+                    ("credential", "credential"),
+                    ("organization", "organization"),
+                    ("team", "team"),
+                ]
+            ),
         ),
     ]

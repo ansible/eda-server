@@ -13,8 +13,7 @@
 #  limitations under the License.
 
 import django_filters
-
-from aap_eda.core import models
+from ansible_base.rbac.models import RoleDefinition
 
 
 class RoleFilter(django_filters.FilterSet):
@@ -25,5 +24,5 @@ class RoleFilter(django_filters.FilterSet):
     )
 
     class Meta:
-        model = models.Role
+        model = RoleDefinition
         fields = ["name"]
