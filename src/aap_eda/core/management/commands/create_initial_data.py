@@ -11,16 +11,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac import permission_registry
+from ansible_base.rbac.models import RoleDefinition
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 
-from ansible_base.rbac.models import RoleDefinition
-from ansible_base.rbac import permission_registry
-
 from aap_eda.core.models import DABPermission
-
 
 CRUD = ["add", "view", "change", "delete"]
 
@@ -160,23 +158,29 @@ class Command(BaseCommand):
         self._create_obj_roles()
 
     def _create_org_roles(self):
-        org_ct = ContentType.objects.get(model='organization')
+        org_ct = ContentType.objects.get(model="organization")
         for role_data in ORG_ROLES:
             role, _ = RoleDefinition.objects.get_or_create(
-                name=role_data["name"], description=role_data["description"],
-                content_type=org_ct, managed=True
+                name=role_data["name"],
+                description=role_data["description"],
+                content_type=org_ct,
+                managed=True,
             )
             permissions = []
             for resource_type, actions in role_data["permissions"].items():
                 model_permissions = list(
                     DABPermission.objects.filter(
-                        codename__in=[f'{action}_{resource_type.replace("_", "")}' for action in actions],
+                        codename__in=[
+                            f'{action}_{resource_type.replace("_", "")}'
+                            for action in actions
+                        ],
                     )
                 )
                 if len(model_permissions) != len(actions):
                     raise ImproperlyConfigured(
                         f'Permission "{resource_type}" and one of "{actions}" '
-                        f"actions is missing in the database, found {[p.codename for p in model_permissions]}."
+                        "actions is missing in the database, "
+                        f"found {[p.codename for p in model_permissions]}."
                     )
                 permissions.extend(model_permissions)
             role.permissions.set(permissions)
@@ -193,34 +197,48 @@ class Command(BaseCommand):
     def _create_obj_roles(self):
         for cls in permission_registry.all_registered_models:
             ct = ContentType.objects.get_for_model(cls)
-            if ct._meta.model_name == 'organization':
+            if ct._meta.model_name == "organization":
                 continue  # covered by org roles
-            permissions = [p for p in DABPermission.objects.filter(content_type=ct) if not p.codename.startswith('add_')]
+            permissions = [
+                p
+                for p in DABPermission.objects.filter(content_type=ct)
+                if not p.codename.startswith("add_")
+            ]
+            desc = f"Has all permissions to a single {cls._meta.verbose_name}"
             role, created = RoleDefinition.objects.get_or_create(
-                name=f'{cls._meta.verbose_name.title()} Admin',
-                defaults=dict(
-                    description=f'Has all permissions to a single {cls._meta.verbose_name}',
-                    content_type=ct, managed=True
-                )
+                name=f"{cls._meta.verbose_name.title()} Admin",
+                defaults={
+                    "description": desc,
+                    "content_type": ct,
+                    "managed": True,
+                },
             )
             role.permissions.set(permissions)
             if created:
                 self.stdout.write(
-                    f'Added role {role.name} with {len(permissions)} permissions to itself'
+                    f"Added role {role.name} with {len(permissions)} "
+                    "permissions to itself"
                 )
 
             # Special case to create team member role
-            if cls._meta.model_name == 'team':
-                member_permissions = [p for p in permissions if p.codename in ('view_team', 'member_team')]
+            if cls._meta.model_name == "team":
+                member_permissions = [
+                    p
+                    for p in permissions
+                    if p.codename in ("view_team", "member_team")
+                ]
+                desc = "Inherits permissions assigned to this team"
                 role, created = RoleDefinition.objects.get_or_create(
-                    name=f'Team Member',
-                    defaults=dict(
-                        description='Inherits permissions assigned to this team',
-                        content_type=ct, managed=True
-                    )
+                    name="Team Member",
+                    defaults={
+                        "description": desc,
+                        "content_type": ct,
+                        "managed": True,
+                    },
                 )
                 role.permissions.set(member_permissions)
                 if created:
                     self.stdout.write(
-                        f'Added role {role.name} with {len(permissions)} permissions to itself'
+                        f"Added role {role.name} with {len(permissions)} "
+                        "permissions to itself"
                     )

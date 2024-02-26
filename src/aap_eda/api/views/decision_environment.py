@@ -78,7 +78,9 @@ class DecisionEnvironmentViewSet(
     rbac_resource_type = ResourceType.DECISION_ENVIRONMENT
 
     def get_queryset(self):
-        return models.DecisionEnvironment.access_qs(self.request.user).order_by("id")
+        return models.DecisionEnvironment.access_qs(
+            self.request.user
+        ).order_by("id")
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:

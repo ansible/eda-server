@@ -11,9 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from rest_framework import serializers
-
 from ansible_base.rbac.models import RoleDefinition
+from rest_framework import serializers
 
 from aap_eda.core import models
 
@@ -89,7 +88,6 @@ class RoleSerializer(serializers.ModelSerializer):
 
     def get_modified_at(self, obj):
         return obj.modified_on
-
 
     class Meta:
         model = RoleDefinition

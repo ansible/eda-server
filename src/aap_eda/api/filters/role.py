@@ -13,10 +13,7 @@
 #  limitations under the License.
 
 import django_filters
-
 from ansible_base.rbac.models import RoleDefinition
-
-from aap_eda.core import models
 
 
 class RoleFilter(django_filters.FilterSet):

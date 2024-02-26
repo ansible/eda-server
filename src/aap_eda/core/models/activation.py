@@ -44,9 +44,9 @@ class Activation(StatusHandlerModelMixin, models.Model):
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
         ordering = ("-created_at",)
         permissions = [
-            ('enable_activation', 'Can enable an activation'),
-            ('disable_activation', 'Can disable an activation'),
-            ('restart_activation', 'Can restart an activation'),
+            ("enable_activation", "Can enable an activation"),
+            ("disable_activation", "Can disable an activation"),
+            ("restart_activation", "Can restart an activation"),
         ]
 
     name = models.TextField(null=False, unique=True)
@@ -133,7 +133,7 @@ class RulebookProcess(models.Model):
     class Meta:
         db_table = "core_rulebook_process"
         ordering = ("-started_at",)
-        default_permissions = ('view', 'delete')
+        default_permissions = ("view", "delete")
 
     name = models.TextField(null=False, default="")
     status = models.TextField(

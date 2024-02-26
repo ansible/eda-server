@@ -101,7 +101,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
     organization = OrganizationRefSerializer()
 
     class Meta:
-        model = models.Project()
+        model = models.Project
         read_only_fields = [
             "id",
             "url",

@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac.models import RoleDefinition
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -27,11 +28,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ansible_base.rbac.models import RoleDefinition
-
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers import LoginSerializer
-from aap_eda.core import models
 from aap_eda.services.auth import display_permissions
 
 

@@ -14,16 +14,12 @@
 
 import uuid
 
-from django.db import models
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 
 from aap_eda.core.enums import Action, ResourceType
 
-__all__ = (
-    "Role",
-    "Permission",
-    "DABPermission"
-)
+__all__ = ("Role", "Permission", "DABPermission")
 
 
 class Role(models.Model):
@@ -69,12 +65,16 @@ class Permission(models.Model):
 
 
 class DABPermission(models.Model):
-    """
+    """Custom permission model for DAB RBAC.
+
     This is a partial copy of auth.Permission to be used by DAB RBAC lib
     and in order to be consistent with other applications
     """
+
     name = models.CharField("name", max_length=255)
-    content_type = models.ForeignKey(ContentType, models.CASCADE, verbose_name="content type")
+    content_type = models.ForeignKey(
+        ContentType, models.CASCADE, verbose_name="content type"
+    )
     codename = models.CharField("codename", max_length=100)
 
     class Meta:
@@ -90,9 +90,9 @@ class DABPermission(models.Model):
         return (self.codename,) + self.content_type.natural_key()
 
     def get_action(self):
-        action, model = self.codename.split('_', 1)
+        action, model = self.codename.split("_", 1)
         return action
 
     def get_model(self):
-        action, model = self.codename.split('_', 1)
+        action, model = self.codename.split("_", 1)
         return model

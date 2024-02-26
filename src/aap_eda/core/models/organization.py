@@ -12,8 +12,15 @@ class Organization(AbstractOrganization):
     objects = OrganizationManager()
 
     class Meta:
-        app_label = 'core'
+        app_label = "core"
         permissions = [
-            ('member_organization', 'Basic participation permissions for organization'),
+            (
+                "member_organization",
+                "Basic participation permissions for organization",
+            ),
         ]
-        default_permissions = ('change', 'delete', 'view')  # add permission pending system roles
+        default_permissions = (
+            "change",
+            "delete",
+            "view",
+        )  # add permission pending system roles
