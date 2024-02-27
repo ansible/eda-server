@@ -34,7 +34,6 @@ class RulebookSerializer(serializers.ModelSerializer):
             "description",
             "rulesets",
             "project_id",
-            "organization_id",
             "created_at",
             "modified_at",
         ]
@@ -46,7 +45,7 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = ["id", "name", "description", "organization_id"]
+        fields = ["id", "name", "description"]
         read_only_fields = ["id"]
 
 

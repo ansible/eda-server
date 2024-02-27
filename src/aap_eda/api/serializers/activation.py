@@ -220,7 +220,6 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "git_hash",
             "status_message",
             "activation_id",
-            "organization_id",
             "started_at",
             "ended_at",
         ]

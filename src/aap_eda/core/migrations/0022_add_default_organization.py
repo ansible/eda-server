@@ -36,9 +36,6 @@ def add_resources_to_default_org(apps, schema_editor):
         "DecisionEnvironment",
         "ExtraVar",
         "Project",
-        "Rulebook",
-        "RulebookProcess",
-        "RulebookProcessLog",
     )
 
     Organization = apps.get_model("core", "Organization")  # noqa: N806
@@ -66,9 +63,6 @@ def remove_resources_from_default_org(apps, schema_editor):
         "ExtraVar",
         "Project",
         "Role",
-        "Rulebook",
-        "RulebookProcess",
-        "RulebookProcessLog",
     )
 
     Organization = apps.get_model("core", "Organization")  # noqa: N806
