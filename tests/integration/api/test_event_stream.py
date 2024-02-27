@@ -393,7 +393,7 @@ def test_create_event_stream_bad_args(
     result = response.data
     assert (
         str(result["source_args"][0])
-        == "The 'source_args' field must be a YAML object (dictionary)"
+        == "The input field must be a YAML object (dictionary)"
     )
 
 

@@ -19,7 +19,6 @@ import yaml
 from django.conf import settings
 from django.core.validators import RegexValidator
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 
 from aap_eda.api.constants import (
     PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
@@ -31,7 +30,11 @@ from aap_eda.api.exceptions import (
     MissingEventStreamRulebookSource,
 )
 from aap_eda.api.serializers.credential import CredentialSerializer
-from aap_eda.api.serializers.utils import substitute_extra_vars, swap_sources
+from aap_eda.api.serializers.utils import (
+    YAMLSerializerField,
+    substitute_extra_vars,
+    swap_sources,
+)
 from aap_eda.core import models, validators
 
 logger = logging.getLogger(__name__)
@@ -94,29 +97,6 @@ def _updated_listener_ruleset(validated_data):
         }
     ]
     return swap_sources(validated_data["rulebook_rulesets"], sources_info)
-
-
-class YAMLSerializerField(serializers.Field):
-    """Serializer for YAML a superset of JSON."""
-
-    def to_internal_value(self, data) -> dict:
-        if data:
-            try:
-                parsed_args = yaml.safe_load(data)
-            except yaml.YAMLError:
-                raise ValidationError("Invalid YAML format for 'source_args'")
-
-            if not isinstance(parsed_args, dict):
-                raise ValidationError(
-                    "The 'source_args' field must be a YAML "
-                    "object (dictionary)"
-                )
-
-            return parsed_args
-        return data
-
-    def to_representation(self, value) -> str:
-        return yaml.dump(value)
 
 
 class EventStreamSerializer(serializers.ModelSerializer):
