@@ -15,6 +15,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from aap_eda.api.serializers.utils import YAMLSerializerField
 from aap_eda.core import models
 
 
@@ -254,8 +255,9 @@ class AuditEventSerializer(serializers.ModelSerializer):
         help_text="The received timestamp of the event",
     )
 
-    payload = serializers.JSONField(
+    payload = YAMLSerializerField(
         required=False,
+        allow_null=True,
         help_text="The payload in the event",
     )
 
