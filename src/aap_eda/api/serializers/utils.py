@@ -19,32 +19,8 @@ import jinja2
 import yaml
 from django.conf import settings
 from jinja2.nativetypes import NativeTemplate
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 
 LOGGER = logging.getLogger(__name__)
-
-
-class YAMLSerializerField(serializers.Field):
-    """Serializer for YAML a superset of JSON."""
-
-    def to_internal_value(self, data) -> dict:
-        if data:
-            try:
-                parsed_args = yaml.safe_load(data)
-            except yaml.YAMLError:
-                raise ValidationError("Invalid YAML format for input data")
-
-            if not isinstance(parsed_args, dict):
-                raise ValidationError(
-                    "The input field must be a YAML object (dictionary)"
-                )
-
-            return parsed_args
-        return data
-
-    def to_representation(self, value) -> str:
-        return yaml.dump(value)
 
 
 def _render_string(value: str, context: dict) -> str:

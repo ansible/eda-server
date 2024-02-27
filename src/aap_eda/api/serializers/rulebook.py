@@ -15,7 +15,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from aap_eda.api.serializers.utils import YAMLSerializerField
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.core import models
 
 
