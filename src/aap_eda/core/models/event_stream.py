@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as tp
-
 from django.db import models
 
 from aap_eda.core.enums import (
@@ -112,8 +110,6 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         return f"EventStream {self.name} ({self.id})"
 
     # Implementation of the ContainerableMixin.
-    def get_command_line_parameters(self) -> dict[str, tp.Any]:
-        params = super().get_command_line_parameters()
-        return params | {
-            "skip_audit_events": True,
-        }
+    def _get_skip_audit_events(self) -> bool:
+        """Event stream skips audit events."""
+        return True
