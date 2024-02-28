@@ -78,7 +78,6 @@ permission_registry.register(
     Organization,
     Credential,
     DecisionEnvironment,
-    AuditRule,
     Project,
     ExtraVar,
     parent_field_name="organization",
@@ -90,6 +89,9 @@ permission_registry.register(
 permission_registry.register(
     RulebookProcess,
     parent_field_name="activation",
+)
+permission_registry.register(
+    AuditRule, parent_field_name="activation_instance"
 )
 permission_registry.register(
     EventStream,
