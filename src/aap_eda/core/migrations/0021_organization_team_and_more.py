@@ -158,33 +158,6 @@ class Migration(migrations.Migration):
                 to="core.organization",
             ),
         ),
-        migrations.AddField(
-            model_name="rulebook",
-            name="organization",
-            field=models.ForeignKey(
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
-        migrations.AddField(
-            model_name="rulebookprocess",
-            name="organization",
-            field=models.ForeignKey(
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
-        migrations.AddField(
-            model_name="rulebookprocesslog",
-            name="organization",
-            field=models.ForeignKey(
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
         migrations.CreateModel(
             name="Team",
             fields=[

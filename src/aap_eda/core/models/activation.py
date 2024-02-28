@@ -142,9 +142,6 @@ class RulebookProcess(models.Model):
     )
     git_hash = models.TextField(null=False, default="")
     activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
     started_at = models.DateTimeField(auto_now_add=True, null=False)
     updated_at = models.DateTimeField(null=True)
     ended_at = models.DateTimeField(null=True)
@@ -188,10 +185,6 @@ class RulebookProcess(models.Model):
 
         super().save(*args, **kwargs)
         self.activation.save(update_fields=["latest_instance"])
-
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
     def _get_default_status_message(self):
         try:
@@ -242,15 +235,6 @@ class RulebookProcessLog(models.Model):
     activation_instance = models.ForeignKey(
         "RulebookProcess", on_delete=models.CASCADE
     )
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
     line_number = models.IntegerField()
     log = models.TextField()
     log_timestamp = models.BigIntegerField(null=False, default=0)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])

@@ -43,9 +43,6 @@ class Rulebook(models.Model):
     # https://issues.redhat.com/browse/AAP-19202
     rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
@@ -62,12 +59,6 @@ class Rulebook(models.Model):
                     f" {self.id} - {self.name}: Error: {e}"
                 )
             )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
 
 class Ruleset(models.Model):
