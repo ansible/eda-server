@@ -151,11 +151,6 @@ ORG_ROLES = [
 
 class Command(BaseCommand):
     help = "Seed database with initial roles."
-    parent_child_models = {
-        "project": "rulebook",
-        "activation": "rulebookprocess",
-        "activationinstance": "auditrule",
-    }
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -210,25 +205,27 @@ class Command(BaseCommand):
         for cls in permission_registry.all_registered_models:
             ct = ContentType.objects.get_for_model(cls)
             model_name = cls._meta.model_name
+            parent_model = permission_registry.get_parent_model(model_name)
             # ignore if the model is organization, covered by org roles
             # or child model, inherits permissions from parent model
-            if (
-                model_name == "organization"
-                or model_name in self.parent_child_models.values()
+            if model_name == "organization" or (
+                parent_model
+                and parent_model._meta.model_name != "organization"
             ):
                 continue
             permissions = self._create_permissions_for_content_type(ct)
             desc = f"Has all permissions to a single {cls._meta.verbose_name}"
             # parent model should add permissions related to its child models
-            if model_name in self.parent_child_models.keys():
-                child_model = permission_registry._name_to_model[
-                    self.parent_child_models[model_name]
-                ]
+            child_models = permission_registry.get_child_models(model_name)
+            child_names = []
+            for _, child_model in child_models:
                 child_ct = ContentType.objects.get_for_model(child_model)
                 permissions.extend(
                     self._create_permissions_for_content_type(child_ct)
                 )
-                desc += f" and its child resources - {child_model._meta.verbose_name}"  # noqa: E501
+                child_names.append(child_model._meta.verbose_name)
+            if child_names:
+                desc += f" and its child resources - {', '.join(child_names)}"  # noqa: E501
             role, created = RoleDefinition.objects.get_or_create(
                 name=f"{cls._meta.verbose_name.title()} Admin",
                 defaults={
