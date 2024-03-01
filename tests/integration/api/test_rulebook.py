@@ -404,6 +404,8 @@ def test_list_events_from_audit_rule(client: APIClient, init_db):
     events = response.data["results"]
     assert len(events) == 2
     assert events[0]["received_at"] > events[1]["received_at"]
+    assert events[0]["payload"] == events[1]["payload"]
+    assert events[0]["payload"] == "key: value\n"
 
 
 @pytest.mark.parametrize(
@@ -585,6 +587,7 @@ def init_db():
         source_type="ansible.eda.range",
         rule_fired_at="2023-12-14T15:19:02.313122Z",
         received_at="2023-12-14T15:19:02.289549Z",
+        payload={"key": "value"},
     )
     audit_event_2 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
@@ -592,6 +595,7 @@ def init_db():
         source_type="ansible.eda.range",
         rule_fired_at="2023-12-14T15:19:02.323704Z",
         received_at="2023-12-14T15:19:02.313063Z",
+        payload={"key": "value"},
     )
     audit_event_3 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
@@ -599,6 +603,7 @@ def init_db():
         source_type="ansible.eda.range",
         rule_fired_at="2023-12-14T15:19:02.323704Z",
         received_at="2023-12-14T15:19:02.321472Z",
+        payload={"key": "value"},
     )
     audit_event_1.audit_actions.add(action_1)
     audit_event_2.audit_actions.add(action_2)
