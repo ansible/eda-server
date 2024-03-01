@@ -16,7 +16,7 @@ import logging
 
 from aap_eda.core import models
 from aap_eda.core.tasking import get_queue, job, unique_enqueue
-from aap_eda.services.project import ProjectImportService
+from aap_eda.services.project import ProjectImportError, ProjectImportService
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
@@ -27,7 +27,10 @@ def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
     project = models.Project.objects.get(pk=project_id)
-    ProjectImportService().import_project(project)
+    try:
+        ProjectImportService().import_project(project)
+    except ProjectImportError as e:
+        logger.exception(e)
 
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
@@ -37,7 +40,10 @@ def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
 
     project = models.Project.objects.get(pk=project_id)
-    ProjectImportService().sync_project(project)
+    try:
+        ProjectImportService().sync_project(project)
+    except ProjectImportError as e:
+        logger.exception(e)
 
     logger.info(f"Task complete: Sync project ( project_id={project.id} )")
 

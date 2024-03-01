@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
+import logging
 import os
 import re
 import shutil
@@ -293,6 +294,50 @@ def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
     for rulebook, expected in zip(rulebooks, expected_rulebooks):
         assert_rulebook_is_valid(rulebook, expected)
     storage_save_patch.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_project_import_with_invalid_rulebooks(
+    storage_save_patch, service_tempdir_patch, caplog
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-05"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    project = models.Project.objects.create(
+        name="test-project-04", url="https://git.example.com/repo.git"
+    )
+
+    logger = logging.getLogger("aap_eda")
+    propagate = logger.propagate
+    logger.propagate = True
+    caplog.set_level(logging.WARNING)
+    try:
+        service = ProjectImportService(git_cls=git_mock)
+        service.import_project(project)
+    finally:
+        logger.propagate = propagate
+
+    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+    assert caplog.text.count("WARNING") == 10
+
+    rulebooks = list(project.rulebook_set.order_by("name"))
+    assert len(rulebooks) == 1
+
+    with open(DATA_DIR / "project-05-import.json") as fp:
+        expected_rulebooks = json.load(fp)
+    for rulebook, expected in zip(rulebooks, expected_rulebooks):
+        assert_rulebook_is_valid(rulebook, expected)
 
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):
