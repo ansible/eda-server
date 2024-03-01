@@ -84,6 +84,7 @@ class CredentialType(DjangoStrEnum):
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
     VAULT = "Vault"
+    SCM = "Generic SCM Credential"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

@@ -24,10 +24,59 @@ class Credential(models.Model):
     class Meta:
         db_table = "core_credential"
         constraints = [
+            # This applies to all credentials.
             models.CheckConstraint(
-                check=~models.Q(name=""),
                 name="ck_empty_credential_name",
-            )
+                check=~models.Q(name=""),
+            ),
+            # This applies to non-SCM credentials.
+            models.CheckConstraint(
+                name="ck_empty_secret",
+                check=(
+                    models.Q(credential_type=CredentialType.SCM)
+                    | ~models.Q(secret="")
+                ),
+            ),
+            # This applies only to SCM credentials.
+            # User/secret is the scm user/password.
+            models.CheckConstraint(
+                name="ck_scm_credential",
+                check=(
+                    ~models.Q(credential_type=CredentialType.SCM)
+                    | (
+                        # Either or both of the user/secret and ssh
+                        # key/password must be specified.
+                        (
+                            (
+                                models.Q(username__isnull=False)
+                                & ~models.Q(username="")
+                            )
+                            & (
+                                (
+                                    models.Q(scm_ssh_key__isnull=False)
+                                    & ~models.Q(scm_ssh_key="")
+                                )
+                                | (
+                                    models.Q(scm_ssh_key__isnull=True)
+                                    | models.Q(scm_ssh_key="")
+                                )
+                            )
+                        )
+                        | (
+                            (
+                                models.Q(username__isnull=True)
+                                | models.Q(username="")
+                            )
+                            & (
+                                (
+                                    models.Q(scm_ssh_key__isnull=False)
+                                    & ~models.Q(scm_ssh_key="")
+                                )
+                            )
+                        )
+                    )
+                ),
+            ),
         ]
 
     name = models.TextField(null=False, unique=True)
@@ -37,7 +86,10 @@ class Credential(models.Model):
         default=CredentialType.REGISTRY,
     )
     username = models.TextField(null=True)
-    secret = EncryptedTextField(null=False)
+    secret = EncryptedTextField(null=True)
     vault_identifier = models.TextField(null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    scm_ssh_key = EncryptedTextField(null=True)
+    scm_ssh_key_password = EncryptedTextField(null=True)

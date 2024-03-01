@@ -33,13 +33,13 @@ class CredentialSerializer(serializers.ModelSerializer):
             "username",
             "credential_type",
             "vault_identifier",
+            "scm_ssh_key",
+            "scm_ssh_key_password",
             *read_only_fields,
         ]
 
 
 class CredentialCreateSerializer(serializers.ModelSerializer):
-    secret = serializers.CharField(required=True, allow_null=False)
-
     def validate(self, data):
         credential_type = data.get("credential_type", CredentialType.REGISTRY)
         identifier = data.get("vault_identifier")
@@ -61,8 +61,10 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "description",
             "credential_type",
             "username",
-            "vault_identifier",
             "secret",
+            "vault_identifier",
+            "scm_ssh_key",
+            "scm_ssh_key_password",
         ]
 
 
@@ -78,5 +80,7 @@ class CredentialRefSerializer(serializers.ModelSerializer):
             "credential_type",
             "username",
             "vault_identifier",
+            "scm_ssh_key",
+            "scm_ssh_key_password",
         ]
         read_only_fields = ["id"]

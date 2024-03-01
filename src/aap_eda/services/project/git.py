@@ -150,6 +150,7 @@ class GitRepository:
             cmd.extend(["--depth", str(depth)])
         cmd.extend([final_url, os.fspath(path)])
         logger.info("Cloning repository: %s", url)
+        logger.warning(f"JBS: Cloning command: {cmd}")
         try:
             _executor(cmd)
         except GitError as e:
