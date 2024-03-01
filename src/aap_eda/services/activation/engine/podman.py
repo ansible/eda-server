@@ -96,6 +96,11 @@ class Engine(ContainerEngine):
         # ContainerCleanupError handled by the manager
         except APIError as e:
             raise exceptions.ContainerCleanupError(str(e)) from e
+        finally:
+            # Ensure volumes are purged due to a bug in podman
+            # ref: https://github.com/containers/podman-py/issues/328
+            pruned_volumes = self.client.volumes.prune()
+            LOGGER.info(f"Pruned volumes: {pruned_volumes}")
 
     def _image_exists(self, image_url: str) -> bool:
         try:
