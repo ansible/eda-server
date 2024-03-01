@@ -98,7 +98,18 @@ def max_running_processes():
                 status=status,
             )
         )
+        models.RulebookProcessQueue.objects.create(
+            process=processes[-1],
+            queue_name="queue_name_test",
+        )
     return processes
+
+
+@pytest.fixture
+def job_mock():
+    mock_job = mock.MagicMock()
+    mock_job.origin = "queue_name_test"
+    return mock_job
 
 
 @pytest.mark.django_db
@@ -138,12 +149,21 @@ def test_manage_request(manager_mock, activation, verb):
 
 @pytest.mark.django_db
 @mock.patch.object(orchestrator.ActivationManager, "start", autospec=True)
-def test_manage_not_start(start_mock, activation, max_running_processes):
+def test_manage_not_start(
+    start_mock,
+    job_mock,
+    activation,
+    max_running_processes,
+):
     queue.push(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
 
-    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+    with mock.patch(
+        "aap_eda.services.activation.manager.get_current_job",
+        return_value=job_mock,
+    ):
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
 
     start_mock.assert_not_called()
     assert (
@@ -232,6 +252,7 @@ original_start_method = orchestrator.ActivationManager.start
 @mock.patch.object(orchestrator.ActivationManager, "start", autospec=True)
 def test_max_running_activation_after_start_job(
     start_mock,
+    job_mock,
     activation,
     max_running_processes,
 ):
@@ -255,7 +276,11 @@ def test_max_running_activation_after_start_job(
     queue.push(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
-    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+    with mock.patch(
+        "aap_eda.services.activation.manager.get_current_job",
+        return_value=job_mock,
+    ):
+        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
     assert start_mock.call_count == 1
     running_processes = models.RulebookProcess.objects.filter(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
