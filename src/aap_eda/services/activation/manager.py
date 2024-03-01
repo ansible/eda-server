@@ -1075,9 +1075,13 @@ class ActivationManager:
     @staticmethod
     def check_new_process_allowed(parent_type: str, parent_id: int) -> bool:
         """Check if a new process is allowed."""
+        if settings.MAX_RUNNING_ACTIVATIONS < 0:
+            return True
+
         num_running_processes = models.RulebookProcess.objects.filter(
             status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
         ).count()
+
         if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
             LOGGER.info(
                 "No capacity to start a new rulebook process. "
