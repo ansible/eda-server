@@ -1,0 +1,7 @@
+FROM quay.io/ansible/eda-ui
+
+COPY ca.cer /etc/ssl/certs/
+
+RUN apk --no-cache add ca-certificates && update-ca-certificates
+
+CMD ["nginx", "-g", "daemon off;"]

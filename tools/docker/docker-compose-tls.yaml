@@ -17,12 +17,12 @@ x-environment:
   - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
   - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
   - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
-  - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
-  - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
-  - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
-  - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
-  - EDA_DEBUG=${EDA_DEBUG:-'True'}
-  - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
+  - EDA_PGSSLMODE=${EDA_PGSSLMODE:-require}
+  - EDA_PGSSLCERT=${EDA_PGSSLCERT:-./postgres_ssl_config/certs/eda-lab.crt}
+  - EDA_PGSSLKEY=${EDA_PGSSLKEY:-./postgres_ssl_config/certs/eda-lab.key}
+  - EDA_PGSSLROOTCERT=${EDA_PGSSLROOTCERT:-./postgres_ssl_config/certs/ca.cer}
+  - SSL_CERTIFICATE=/certs/eda-lab.crt
+  - SSL_CERTIFICATE_KEY=/certs/eda-lab.key
 
 services:
   podman-pre-setup:
@@ -41,7 +41,7 @@ services:
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
-      - "${EDA_PODMAN_PORT:-8888}:8888"
+      - 8888:8888
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
     depends_on:
@@ -52,10 +52,12 @@ services:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     environment: *common-env
     ports:
-      - '${EDA_UI_PORT:-8443}:443'
+      - '8443:443'
     depends_on:
       eda-api:
         condition: service_healthy
+    volumes:
+      - "/home/mmagnani/Workspace/redhat/eda-server/tools/docker/postgres_ssl_config/certs:/certs:z"
 
   eda-api:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
@@ -72,7 +74,7 @@ services:
         && scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
-      - "${EDA_API_PORT:-8000}:8000"
+      - '8000:8000'
     depends_on:
       redis:
         condition: service_healthy
@@ -95,7 +97,7 @@ services:
       - >-
         aap-eda-manage runserver 0.0.0.0:8000
     ports:
-      - "${EDA_WS_PORT:-8001}:8000"
+      - '8001:8000'
     depends_on:
       eda-api:
         condition: service_healthy
@@ -168,10 +170,13 @@ services:
       POSTGRESQL_PASSWORD: secret
       POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - '${EDA_PG_PORT:-5432}:5432'
+      - '5432:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
+      - "${EDA_PGSSL_PATHCONFIG:-./postgres_ssl_config/postgresql-cfg}:/opt/app-root/src/postgresql-cfg:z"
+      - "${EDA_PGSSL_PATHCERT:-./postgres_ssl_config/certs}:/opt/app-root/src/certs:z"
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
@@ -182,7 +187,7 @@ services:
   redis:
     image: 'quay.io/sclorg/redis-6-c9s:latest'
     ports:
-      - '${EDA_REDIS_PORT:-6379}:6379'
+      - '6379:6379'
     healthcheck:
       test: [ 'CMD', 'redis-cli', 'ping' ]
       interval: 5s
