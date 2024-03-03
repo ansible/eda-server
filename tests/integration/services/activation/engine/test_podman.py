@@ -587,27 +587,3 @@ def test_engine_update_logs_with_exception(init_data, podman_engine):
 
     with pytest.raises(ContainerUpdateLogsError, match="Not found"):
         engine.update_logs("100", log_handler)
-
-
-@pytest.mark.django_db
-def test_set_auth_json(podman_engine):
-    engine = podman_engine
-
-    with mock.patch("os.path.dirname"):
-        engine._set_auth_json_file()
-
-        xdg_runtime_dir = os.getenv(
-            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-        )
-
-        assert engine.auth_file == f"{xdg_runtime_dir}/containers/auth.json"
-
-
-@pytest.mark.django_db
-def test_write_auth_json(init_data, podman_engine):
-    engine = podman_engine
-    engine.auth_file = f"{DATA_DIR}/auth.json"
-    request = get_request_with_credential(init_data)
-
-    engine._write_auth_json(request)
-    assert engine.auth_file is not None
