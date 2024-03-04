@@ -29,6 +29,8 @@ def test_list_credentials(client: APIClient):
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
         "vault_identifier": None,
+        "scm_ssh_key": None,
+        "scm_ssh_key_password": None,
     }
 
 
@@ -53,6 +55,8 @@ def test_create_credential(client: APIClient):
         "credential_type": CredentialType.REGISTRY,
         "id": id_,
         "vault_identifier": None,
+        "scm_ssh_key": None,
+        "scm_ssh_key_password": None,
     }
     obj = models.Credential.objects.filter(pk=id_).first()
     assert obj.username == "me"
@@ -107,6 +111,8 @@ def test_retrieve_credential(client: APIClient):
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
         "vault_identifier": None,
+        "scm_ssh_key": None,
+        "scm_ssh_key_password": None,
     }
 
 
@@ -130,6 +136,8 @@ def test_retrieve_vault_credential(client: APIClient):
         "credential_type": CredentialType.VAULT,
         "id": obj.id,
         "vault_identifier": None,
+        "scm_ssh_key": None,
+        "scm_ssh_key_password": None,
     }
 
 
@@ -201,6 +209,8 @@ def test_partial_update_credential(client: APIClient):
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
         "vault_identifier": None,
+        "scm_ssh_key": None,
+        "scm_ssh_key_password": None,
     }
     updated_obj = models.Credential.objects.filter(pk=obj.id).first()
     assert updated_obj.secret == "sec2"
