@@ -90,6 +90,7 @@ class UserCreateUpdateSerializer(UserUpdateSerializerBase):
             "last_name",
             "email",
             "password",
+            "is_superuser",
             "roles",
         ]
 
