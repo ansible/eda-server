@@ -129,6 +129,7 @@ class EventStreamSerializer(serializers.ModelSerializer):
             "decision_environment_id",
             "user",
             "log_level",
+            "k8s_service_name",
             *read_only_fields,
         ]
 
@@ -170,6 +171,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "log_level",
+            "k8s_service_name",
         ]
 
     def create(self, validated_data):
