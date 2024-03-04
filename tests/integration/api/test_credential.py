@@ -57,6 +57,20 @@ def test_list_credentials(client: APIClient):
             "in": {
                 "name": "credential1",
                 "description": "desc here",
+                "secret": "mypassword",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {
+                "username": None,
+                "scm_ssh_key": None,
+                "scm_ssh_key_password": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
                 "username": "me",
                 "secret": "mypassword",
                 "credential_type": CredentialType.SCM,
@@ -78,6 +92,20 @@ def test_list_credentials(client: APIClient):
             "out": {
                 "username": None,
                 "secret": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_password": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {
+                "username": None,
                 "vault_identifier": None,
             },
         },
@@ -116,9 +144,8 @@ def test_create_credential(client: APIClient, params):
     assert obj.username == username
     assert obj.secret == secret
     if data_out["credential_type"] == CredentialType.SCM:
-        assert ((username is None) and (secret is None)) or (
-            (username is not None) and (secret is not None)
-        )
+        if username is not None:
+            assert secret is not None
         assert (
             (data_out["scm_ssh_key"] is None)
             and (data_out["scm_ssh_key_password"] is None)
@@ -126,10 +153,10 @@ def test_create_credential(client: APIClient, params):
             (data_out["scm_ssh_key"] is not None)
             and (data_out["scm_ssh_key_password"] is not None)
         )
-        if username is None:
+        if secret is None:
             assert data_out["scm_ssh_key"] is not None
         if data_out["scm_ssh_key"] is None:
-            assert username is not None
+            assert secret is not None
 
 
 @pytest.mark.django_db

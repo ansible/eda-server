@@ -34,7 +34,7 @@ class Credential(models.Model):
                 name="ck_empty_secret",
                 check=(
                     models.Q(credential_type=CredentialType.SCM)
-                    | ~models.Q(secret="")
+                    | (models.Q(secret__isnull=False) & ~models.Q(secret=""))
                 ),
             ),
             # This applies only to SCM credentials.
@@ -44,34 +44,33 @@ class Credential(models.Model):
                 check=(
                     ~models.Q(credential_type=CredentialType.SCM)
                     | (
-                        # Either or both of the user/secret and ssh
-                        # key/password must be specified.
+                        # There are three basic valid scenarios:
+                        #   1. a secret by itself
+                        #   2. a secret with a username
+                        #   3. an ssh key with a password
+                        # Additionally, #3 can be combined with #1 or #2.
                         (
                             (
-                                models.Q(username__isnull=False)
-                                & ~models.Q(username="")
+                                models.Q(scm_ssh_key__isnull=True)
+                                | models.Q(scm_ssh_key="")
                             )
                             & (
-                                (
-                                    models.Q(scm_ssh_key__isnull=False)
-                                    & ~models.Q(scm_ssh_key="")
-                                )
-                                | (
-                                    models.Q(scm_ssh_key__isnull=True)
-                                    | models.Q(scm_ssh_key="")
-                                )
+                                models.Q(scm_ssh_key_password__isnull=True)
+                                | models.Q(scm_ssh_key_password="")
+                            )
+                            & (
+                                models.Q(secret__isnull=False)
+                                & ~models.Q(secret="")
                             )
                         )
                         | (
                             (
-                                models.Q(username__isnull=True)
-                                | models.Q(username="")
+                                models.Q(scm_ssh_key__isnull=False)
+                                & ~models.Q(scm_ssh_key="")
                             )
                             & (
-                                (
-                                    models.Q(scm_ssh_key__isnull=False)
-                                    & ~models.Q(scm_ssh_key="")
-                                )
+                                models.Q(scm_ssh_key_password__isnull=False)
+                                & ~models.Q(scm_ssh_key_password="")
                             )
                         )
                     )
