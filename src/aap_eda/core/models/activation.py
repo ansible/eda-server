@@ -19,7 +19,10 @@ from aap_eda.core.enums import (
     RestartPolicy,
     RulebookProcessLogLevel,
 )
-from aap_eda.core.utils import get_default_log_level
+from aap_eda.core.utils import (
+    get_default_k8s_service_name,
+    get_default_log_level,
+)
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
@@ -111,4 +114,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         default=None,
         on_delete=models.CASCADE,
         related_name="+",
+    )
+    k8s_service_name = models.TextField(
+        null=False,
+        default=get_default_k8s_service_name,
+        help_text="Name of the kubernetes service",
     )
