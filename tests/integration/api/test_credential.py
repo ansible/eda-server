@@ -34,33 +34,102 @@ def test_list_credentials(client: APIClient):
     }
 
 
+@pytest.mark.parametrize(
+    # The "out" params are combined with the "in" params for
+    # checking.
+    "params",
+    [
+        {
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+            },
+            "out": {
+                "credential_type": CredentialType.REGISTRY,
+                "scm_ssh_key": None,
+                "scm_ssh_key_password": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {
+                "scm_ssh_key": None,
+                "scm_ssh_key_password": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_password": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {
+                "username": None,
+                "secret": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_password": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {
+                "vault_identifier": None,
+            },
+        },
+    ],
+)
 @pytest.mark.django_db
-def test_create_credential(client: APIClient):
-    data_in = {
-        "name": "credential1",
-        "description": "desc here",
-        "username": "me",
-        "secret": "mypassword",
-    }
+def test_create_credential(client: APIClient, params):
+    data_in = params["in"]
+    data_out = data_in | params["out"]
+    username = data_out.get("username", None)
+    secret = data_out.pop("secret", None)
+
     response = client.post(f"{api_url_v1}/credentials/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     id_ = response.data["id"]
     result = response.data
     result.pop("created_at")
     result.pop("modified_at")
-    assert result == {
-        "name": "credential1",
-        "description": "desc here",
-        "username": "me",
-        "credential_type": CredentialType.REGISTRY,
-        "id": id_,
-        "vault_identifier": None,
-        "scm_ssh_key": None,
-        "scm_ssh_key_password": None,
-    }
+    assert result == (data_out | {"id": id_})
+
     obj = models.Credential.objects.filter(pk=id_).first()
-    assert obj.username == "me"
-    assert obj.secret == "mypassword"
+    assert obj.username == username
+    assert obj.secret == secret
+    if data_out["credential_type"] == CredentialType.SCM:
+        assert ((username is None) and (secret is None)) or (
+            (username is not None) and (secret is not None)
+        )
+        assert (
+            (data_out["scm_ssh_key"] is None)
+            and (data_out["scm_ssh_key_password"] is None)
+        ) or (
+            (data_out["scm_ssh_key"] is not None)
+            and (data_out["scm_ssh_key_password"] is not None)
+        )
+        if username is None:
+            assert data_out["scm_ssh_key"] is not None
+        if data_out["scm_ssh_key"] is None:
+            assert username is not None
 
 
 @pytest.mark.django_db
