@@ -94,7 +94,7 @@ def test_retrieve_decision_environment(client: APIClient, init_db):
             "username": credential.username,
             "vault_identifier": None,
             "scm_ssh_key": None,
-            "scm_ssh_key_password": None,
+            "scm_ssh_key_passphrase": None,
         },
     }
 

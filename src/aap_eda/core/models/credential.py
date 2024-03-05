@@ -55,8 +55,8 @@ class Credential(models.Model):
                                 | models.Q(scm_ssh_key="")
                             )
                             & (
-                                models.Q(scm_ssh_key_password__isnull=True)
-                                | models.Q(scm_ssh_key_password="")
+                                models.Q(scm_ssh_key_passphrase__isnull=True)
+                                | models.Q(scm_ssh_key_passphrase="")
                             )
                             & (
                                 models.Q(secret__isnull=False)
@@ -69,8 +69,8 @@ class Credential(models.Model):
                                 & ~models.Q(scm_ssh_key="")
                             )
                             & (
-                                models.Q(scm_ssh_key_password__isnull=False)
-                                & ~models.Q(scm_ssh_key_password="")
+                                models.Q(scm_ssh_key_passphrase__isnull=False)
+                                & ~models.Q(scm_ssh_key_passphrase="")
                             )
                         )
                     )
@@ -91,4 +91,4 @@ class Credential(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
     scm_ssh_key = EncryptedTextField(null=True)
-    scm_ssh_key_password = EncryptedTextField(null=True)
+    scm_ssh_key_passphrase = EncryptedTextField(null=True)

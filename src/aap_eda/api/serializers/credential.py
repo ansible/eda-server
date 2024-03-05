@@ -34,7 +34,7 @@ class CredentialSerializer(serializers.ModelSerializer):
             "credential_type",
             "vault_identifier",
             "scm_ssh_key",
-            "scm_ssh_key_password",
+            "scm_ssh_key_passphrase",
             *read_only_fields,
         ]
 
@@ -64,7 +64,7 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "secret",
             "vault_identifier",
             "scm_ssh_key",
-            "scm_ssh_key_password",
+            "scm_ssh_key_passphrase",
         ]
 
 
@@ -81,6 +81,6 @@ class CredentialRefSerializer(serializers.ModelSerializer):
             "username",
             "vault_identifier",
             "scm_ssh_key",
-            "scm_ssh_key_password",
+            "scm_ssh_key_passphrase",
         ]
         read_only_fields = ["id"]

@@ -482,7 +482,7 @@ def assert_project_data_details(data: Dict[str, Any], project: models.Project):
             "username": credential.username,
             "vault_identifier": None,
             "scm_ssh_key": None,
-            "scm_ssh_key_password": None,
+            "scm_ssh_key_passphrase": None,
         }
         if credential
         else None
