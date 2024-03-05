@@ -22,6 +22,12 @@ x-environment:
   - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
   - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
   - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
+  - EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
+  - EDA_PG_NOTIFY_DSN_CLIENT="host=host.containers.internal port=5432 dbname=eda user=postgres password=secret"
+  - EDA_PG_NOTIFY_DSN="host=postgres port=5432 dbname=eda user=postgres password=secret"
+  - EDA_WEBHOOK_URL_PREFIX=${EDA_WEBHOOK_URL_PREFIX:-https://my_nginix_server/edgecafe-beef-feed-fade-decadeedgecafe/api/eda/v1/external_webhook}
+  - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
 
 services:
   podman-pre-setup:
@@ -52,7 +58,7 @@ services:
     ports:
       - '8443:443'
     depends_on:
-      eda-api:
+      eda-webhook-api:
         condition: service_healthy
 
   eda-api:
@@ -177,6 +183,24 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+  eda-webhook-api:
+    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - '8555:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data: {}

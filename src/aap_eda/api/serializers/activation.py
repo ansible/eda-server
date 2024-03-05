@@ -34,6 +34,7 @@ from aap_eda.api.serializers.utils import (
     substitute_source_args,
     swap_sources,
 )
+from aap_eda.api.serializers.webhook import WebhookOutSerializer
 from aap_eda.core import models, validators
 from aap_eda.core.enums import ProcessParentType
 
@@ -44,7 +45,7 @@ def _updated_ruleset(validated_data):
     try:
         sources_info = []
 
-        for event_stream_id in validated_data["event_streams"]:
+        for event_stream_id in validated_data.get("event_streams", []):
             event_stream = models.EventStream.objects.get(id=event_stream_id)
 
             if event_stream.rulebook:
@@ -66,6 +67,18 @@ def _updated_ruleset(validated_data):
             )
             sources_info.append(source)
 
+        if validated_data.get("webhooks", []):
+            sources_info = [
+                {
+                    "name": "webhook_event_stream",
+                    "type": "ansible.eda.pg_listener",
+                    "args": {
+                        "dsn": "{{ EDA_PG_NOTIFY_DSN }}",
+                        "channels": "{{ EDA_WEBHOOK_CHANNELS }}",
+                    },
+                }
+            ]
+
         return swap_sources(validated_data["rulebook_rulesets"], sources_info)
     except Exception as e:
         logger.error(f"Failed to update rulesets: {e}")
@@ -85,6 +98,12 @@ class ActivationSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         child=EventStreamOutSerializer(),
+    )
+
+    webhooks = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=WebhookOutSerializer(),
     )
 
     class Meta:
@@ -112,6 +131,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "credentials",
             "event_streams",
             "log_level",
+            "webhooks",
         ]
         read_only_fields = [
             "id",
@@ -136,6 +156,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         child=EventStreamOutSerializer(),
+    )
+    webhooks = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=WebhookOutSerializer(),
     )
 
     class Meta:
@@ -163,6 +188,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "credentials",
             "event_streams",
             "log_level",
+            "webhooks",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -177,6 +203,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
         event_streams = [
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
+        ]
+        webhooks = [
+            WebhookOutSerializer(webhook).data
+            for webhook in activation.webhooks.all()
         ]
 
         return {
@@ -202,6 +232,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "credentials": credentials,
             "event_streams": event_streams,
             "log_level": activation.log_level,
+            "webhooks": webhooks,
         }
 
 
@@ -223,6 +254,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "credentials",
             "event_streams",
             "log_level",
+            "webhooks",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -254,6 +286,12 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         child=serializers.IntegerField(),
         validators=[validators.check_if_event_streams_exists],
     )
+    webhooks = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
+        validators=[validators.check_if_webhooks_exists],
+    )
 
     def validate(self, data):
         user = data["user"]
@@ -277,7 +315,9 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
-        if validated_data.get("event_streams"):
+        if validated_data.get("event_streams") or validated_data.get(
+            "webhooks"
+        ):
             validated_data["rulebook_rulesets"] = _updated_ruleset(
                 validated_data
             )
@@ -359,6 +399,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "credentials",
             "event_streams",
             "log_level",
+            "webhooks",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -409,6 +450,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
         ]
+        webhooks = [
+            WebhookOutSerializer(webhook).data
+            for webhook in activation.webhooks.all()
+        ]
 
         return {
             "id": activation.id,
@@ -438,6 +483,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "credentials": credentials,
             "event_streams": event_streams,
             "log_level": activation.log_level,
+            "webhooks": webhooks,
         }
 
 
