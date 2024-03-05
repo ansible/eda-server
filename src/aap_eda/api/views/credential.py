@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
                 serializers.CredentialSerializer,
                 description="Return the new credential.",
             ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                description="Invalid data to create credential."
+            ),
         },
     ),
     partial_update=extend_schema(

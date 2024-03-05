@@ -52,6 +52,37 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
                 f"{identifier} is reserved by EDA for vault labels"
             )
 
+        if credential_type == CredentialType.SCM:
+            # There are three basic valid scenarios:
+            #   1. a secret by itself
+            #   2. a secret with a username
+            #   3. an ssh key with a passphrase
+            # Additionally, #3 can be combined with #1 or #2.
+            secret = data.get("secret", None)
+            ssh_key = data.get("scm_ssh_key", None)
+            ssh_key_passphrase = data.get("scm_ssh_key_passphrase", None)
+
+            if (
+                ((secret is None) or (secret == ""))
+                and ((ssh_key is None) or (ssh_key == ""))
+                and (
+                    (ssh_key_passphrase is None) or (ssh_key_passphrase == "")
+                )
+            ):
+                raise serializers.ValidationError(
+                    "missing scm credential content"
+                )
+
+            if ((ssh_key is not None) and (ssh_key != "")) and (
+                (ssh_key_passphrase is None) or (ssh_key_passphrase == "")
+            ):
+                raise serializers.ValidationError("missing scm key passphrase")
+
+            if ((ssh_key is None) or (ssh_key == "")) and (
+                (ssh_key_passphrase is not None) and (ssh_key_passphrase != "")
+            ):
+                raise serializers.ValidationError("missing scm key")
+
         return data
 
     class Meta:

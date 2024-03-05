@@ -123,40 +123,69 @@ def test_list_credentials(client: APIClient):
                 "vault_identifier": None,
             },
         },
+        {
+            "status": status.HTTP_400_BAD_REQUEST,
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {},
+        },
+        {
+            "status": status.HTTP_400_BAD_REQUEST,
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "scm_ssh_key": "bogus-key",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {},
+        },
+        {
+            "status": status.HTTP_400_BAD_REQUEST,
+            "in": {
+                "name": "credential1",
+                "description": "desc here",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "out": {},
+        },
     ],
 )
 @pytest.mark.django_db
 def test_create_credential(client: APIClient, params):
+    expected_status = params.get("status", status.HTTP_201_CREATED)
     data_in = params["in"]
     data_out = data_in | params["out"]
     username = data_out.get("username", None)
     secret = data_out.pop("secret", None)
 
     response = client.post(f"{api_url_v1}/credentials/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-    id_ = response.data["id"]
-    result = response.data
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == (data_out | {"id": id_})
+    assert response.status_code == expected_status
+    if response.status_code == status.HTTP_201_CREATED:
+        id_ = response.data["id"]
+        result = response.data
+        result.pop("created_at")
+        result.pop("modified_at")
+        assert result == (data_out | {"id": id_})
 
-    obj = models.Credential.objects.filter(pk=id_).first()
-    assert obj.username == username
-    assert obj.secret == secret
-    if data_out["credential_type"] == CredentialType.SCM:
-        if username is not None:
-            assert secret is not None
-        assert (
-            (data_out["scm_ssh_key"] is None)
-            and (data_out["scm_ssh_key_passphrase"] is None)
-        ) or (
-            (data_out["scm_ssh_key"] is not None)
-            and (data_out["scm_ssh_key_passphrase"] is not None)
-        )
-        if secret is None:
-            assert data_out["scm_ssh_key"] is not None
-        if data_out["scm_ssh_key"] is None:
-            assert secret is not None
+        obj = models.Credential.objects.filter(pk=id_).first()
+        assert obj.username == username
+        assert obj.secret == secret
+        if data_out["credential_type"] == CredentialType.SCM:
+            assert (
+                (data_out["scm_ssh_key"] is None)
+                and (data_out["scm_ssh_key_passphrase"] is None)
+            ) or (
+                (data_out["scm_ssh_key"] is not None)
+                and (data_out["scm_ssh_key_passphrase"] is not None)
+            )
+            if secret is None:
+                assert data_out["scm_ssh_key"] is not None
+            if data_out["scm_ssh_key"] is None:
+                assert secret is not None
 
 
 @pytest.mark.django_db

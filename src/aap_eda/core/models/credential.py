@@ -37,45 +37,6 @@ class Credential(models.Model):
                     | (models.Q(secret__isnull=False) & ~models.Q(secret=""))
                 ),
             ),
-            # This applies only to SCM credentials.
-            # User/secret is the scm user/password.
-            models.CheckConstraint(
-                name="ck_scm_credential",
-                check=(
-                    ~models.Q(credential_type=CredentialType.SCM)
-                    | (
-                        # There are three basic valid scenarios:
-                        #   1. a secret by itself
-                        #   2. a secret with a username
-                        #   3. an ssh key with a password
-                        # Additionally, #3 can be combined with #1 or #2.
-                        (
-                            (
-                                models.Q(scm_ssh_key__isnull=True)
-                                | models.Q(scm_ssh_key="")
-                            )
-                            & (
-                                models.Q(scm_ssh_key_passphrase__isnull=True)
-                                | models.Q(scm_ssh_key_passphrase="")
-                            )
-                            & (
-                                models.Q(secret__isnull=False)
-                                & ~models.Q(secret="")
-                            )
-                        )
-                        | (
-                            (
-                                models.Q(scm_ssh_key__isnull=False)
-                                & ~models.Q(scm_ssh_key="")
-                            )
-                            & (
-                                models.Q(scm_ssh_key_passphrase__isnull=False)
-                                & ~models.Q(scm_ssh_key_passphrase="")
-                            )
-                        )
-                    )
-                ),
-            ),
         ]
 
     name = models.TextField(null=False, unique=True)
