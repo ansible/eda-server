@@ -15,9 +15,7 @@ RUN DNF=dnf \
     gettext \
     ansible-core \
     git-core \
-    java-17-openjdk-headless \
-    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    openldap-devel xmlsec1-devel libtool-ltdl-devel" \
+    java-17-openjdk-headless" \
     && $DNF -y install dnf-plugins-core \
     && $DNF -y config-manager --set-enabled crb \
     && $DNF -y install $INSTALL_PACKAGES \
