@@ -103,3 +103,38 @@ def swap_sources(data: str, sources: list[dict]) -> str:
         ruleset["sources"] = new_sources
 
     return yaml.dump(rulesets)
+
+
+ENCRYPTED = "$encrypted$"
+
+
+def inputs_to_display(schema: dict, inputs: str) -> dict:
+    secret_fields = get_secret_fields(schema)
+    decoded_inputs = inputs_from_store(inputs)
+
+    for key in decoded_inputs.keys():
+        if key in secret_fields:
+            decoded_inputs[key] = ENCRYPTED
+
+    return decoded_inputs
+
+
+def get_secret_fields(schema: dict) -> list[str]:
+    return [
+        field["id"]
+        for field in schema["fields"]
+        if "secret" in field and bool(field["secret"])
+    ]
+
+
+def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
+    old_inputs = inputs_from_store(old_inputs_str) if old_inputs_str else {}
+
+    inputs.update(
+        (k, old_inputs[k]) for k, v in inputs.items() if v == ENCRYPTED
+    )
+    return yaml.dump(inputs)
+
+
+def inputs_from_store(inputs: str) -> dict:
+    return yaml.safe_load(inputs)
