@@ -39,6 +39,19 @@ class CredentialSerializer(serializers.ModelSerializer):
         ]
 
 
+def _validate_scm_ssh_key_params(ssh_key, ssh_key_passphrase):
+    """Both, or neither, of ssh key-related values must be specified."""
+    if ((ssh_key is not None) and (ssh_key != "")) and (
+        (ssh_key_passphrase is None) or (ssh_key_passphrase == "")
+    ):
+        raise serializers.ValidationError("missing scm key passphrase")
+
+    if ((ssh_key is None) or (ssh_key == "")) and (
+        (ssh_key_passphrase is not None) and (ssh_key_passphrase != "")
+    ):
+        raise serializers.ValidationError("missing scm key")
+
+
 class CredentialCreateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         credential_type = data.get("credential_type", CredentialType.REGISTRY)
@@ -73,15 +86,7 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
                     "missing scm credential content"
                 )
 
-            if ((ssh_key is not None) and (ssh_key != "")) and (
-                (ssh_key_passphrase is None) or (ssh_key_passphrase == "")
-            ):
-                raise serializers.ValidationError("missing scm key passphrase")
-
-            if ((ssh_key is None) or (ssh_key == "")) and (
-                (ssh_key_passphrase is not None) and (ssh_key_passphrase != "")
-            ):
-                raise serializers.ValidationError("missing scm key")
+            _validate_scm_ssh_key_params(ssh_key, ssh_key_passphrase)
 
         return data
 
@@ -91,6 +96,28 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "credential_type",
+            "username",
+            "secret",
+            "vault_identifier",
+            "scm_ssh_key",
+            "scm_ssh_key_passphrase",
+        ]
+
+
+class CredentialPartialUpdateSerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        ssh_key = data.get("scm_ssh_key", None)
+        ssh_key_passphrase = data.get("scm_ssh_key_passphrase", None)
+
+        _validate_scm_ssh_key_params(ssh_key, ssh_key_passphrase)
+
+        return data
+
+    class Meta:
+        model = models.Credential
+        fields = [
+            "name",
+            "description",
             "username",
             "secret",
             "vault_identifier",

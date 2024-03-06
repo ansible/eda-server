@@ -29,6 +29,7 @@ from .auth import (
 )
 from .credential import (
     CredentialCreateSerializer,
+    CredentialPartialUpdateSerializer,
     CredentialRefSerializer,
     CredentialSerializer,
 )
@@ -109,6 +110,7 @@ __all__ = (
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",
+    "CredentialPartialUpdateSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # roles

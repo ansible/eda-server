@@ -56,12 +56,15 @@ logger = logging.getLogger(__name__)
     ),
     partial_update=extend_schema(
         description="Partial update of a credential",
-        request=serializers.CredentialCreateSerializer,
+        request=serializers.CredentialPartialUpdateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.CredentialSerializer,
                 description="Update successful. Return an updated credential.",
-            )
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                description="Invalid data to update credential."
+            ),
         },
     ),
     destroy=extend_schema(
@@ -108,8 +111,10 @@ class CredentialViewSet(
         return super().handle_exception(exc)
 
     def get_serializer_class(self):
-        if self.action in ["create", "partial_update"]:
+        if self.action == "create":
             return serializers.CredentialCreateSerializer
+        elif self.action == "partial_update":
+            return serializers.CredentialPartialUpdateSerializer
         return serializers.CredentialSerializer
 
     def get_response_serializer_class(self):

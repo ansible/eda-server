@@ -35,18 +35,18 @@ def test_list_credentials(client: APIClient):
 
 
 @pytest.mark.parametrize(
-    # The "out" params are combined with the "in" params for
+    # The "response" params are combined with the "create" params for
     # checking.
     "params",
     [
         {
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "username": "me",
                 "secret": "mypassword",
             },
-            "out": {
+            "response": {
                 "credential_type": CredentialType.REGISTRY,
                 "scm_ssh_key": None,
                 "scm_ssh_key_passphrase": None,
@@ -54,13 +54,13 @@ def test_list_credentials(client: APIClient):
             },
         },
         {
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "secret": "mypassword",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {
+            "response": {
                 "username": None,
                 "scm_ssh_key": None,
                 "scm_ssh_key_passphrase": None,
@@ -68,35 +68,35 @@ def test_list_credentials(client: APIClient):
             },
         },
         {
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "username": "me",
                 "secret": "mypassword",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {
+            "response": {
                 "scm_ssh_key": None,
                 "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
         {
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "scm_ssh_key": "bogus-key",
                 "scm_ssh_key_passphrase": "bogus-key-password",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {
+            "response": {
                 "username": None,
                 "secret": None,
                 "vault_identifier": None,
             },
         },
         {
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "secret": "mypassword",
@@ -104,13 +104,13 @@ def test_list_credentials(client: APIClient):
                 "scm_ssh_key_passphrase": "bogus-key-password",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {
+            "response": {
                 "username": None,
                 "vault_identifier": None,
             },
         },
         {
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "username": "me",
@@ -119,72 +119,72 @@ def test_list_credentials(client: APIClient):
                 "scm_ssh_key_passphrase": "bogus-key-password",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {
+            "response": {
                 "vault_identifier": None,
             },
         },
         {
             "status": status.HTTP_400_BAD_REQUEST,
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {},
+            "response": {},
         },
         {
             "status": status.HTTP_400_BAD_REQUEST,
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "scm_ssh_key": "bogus-key",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {},
+            "response": {},
         },
         {
             "status": status.HTTP_400_BAD_REQUEST,
-            "in": {
+            "create": {
                 "name": "credential1",
                 "description": "desc here",
                 "scm_ssh_key_passphrase": "bogus-key-password",
                 "credential_type": CredentialType.SCM,
             },
-            "out": {},
+            "response": {},
         },
     ],
 )
 @pytest.mark.django_db
 def test_create_credential(client: APIClient, params):
     expected_status = params.get("status", status.HTTP_201_CREATED)
-    data_in = params["in"]
-    data_out = data_in | params["out"]
-    username = data_out.get("username", None)
-    secret = data_out.pop("secret", None)
+    create_data = params["create"]
+    response_data = create_data | params["response"]
+    username = response_data.get("username", None)
+    secret = response_data.pop("secret", None)
 
-    response = client.post(f"{api_url_v1}/credentials/", data=data_in)
+    response = client.post(f"{api_url_v1}/credentials/", data=create_data)
     assert response.status_code == expected_status
     if response.status_code == status.HTTP_201_CREATED:
         id_ = response.data["id"]
         result = response.data
         result.pop("created_at")
         result.pop("modified_at")
-        assert result == (data_out | {"id": id_})
+        assert result == (response_data | {"id": id_})
 
         obj = models.Credential.objects.filter(pk=id_).first()
         assert obj.username == username
         assert obj.secret == secret
-        if data_out["credential_type"] == CredentialType.SCM:
+        if response_data["credential_type"] == CredentialType.SCM:
             assert (
-                (data_out["scm_ssh_key"] is None)
-                and (data_out["scm_ssh_key_passphrase"] is None)
+                (response_data["scm_ssh_key"] is None)
+                and (response_data["scm_ssh_key_passphrase"] is None)
             ) or (
-                (data_out["scm_ssh_key"] is not None)
-                and (data_out["scm_ssh_key_passphrase"] is not None)
+                (response_data["scm_ssh_key"] is not None)
+                and (response_data["scm_ssh_key_passphrase"] is not None)
             )
             if secret is None:
-                assert data_out["scm_ssh_key"] is not None
-            if data_out["scm_ssh_key"] is None:
+                assert response_data["scm_ssh_key"] is not None
+            if response_data["scm_ssh_key"] is None:
                 assert secret is not None
 
 
@@ -316,29 +316,231 @@ def test_list_exclude_reserved_vault_credentials(client: APIClient):
     assert response.data["results"][1]["name"] == credentials[1].name
 
 
+@pytest.mark.parametrize(
+    # The "response" params are combined with the "create" and "update" params
+    # for checking.
+    "params",
+    [
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "sec1",
+            },
+            "update": {
+                "secret": "sec2",
+            },
+            "response": {
+                "credential_type": CredentialType.REGISTRY,
+                "scm_ssh_key": None,
+                "scm_ssh_key_passphrase": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "secret": "mypassword",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "secret": "sec2",
+            },
+            "response": {
+                "username": None,
+                "scm_ssh_key": None,
+                "scm_ssh_key_passphrase": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "secret": "another-secret",
+            },
+            "response": {
+                "scm_ssh_key": None,
+                "scm_ssh_key_passphrase": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "scm_ssh_key": "another-bogus-key",
+                "scm_ssh_key_passphrase": "another-bogus-key-password",
+            },
+            "response": {
+                "username": None,
+                "secret": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "secret": "another-secret",
+                "scm_ssh_key": "another-bogus-key",
+                "scm_ssh_key_passphrase": "another-bogus-key-password",
+            },
+            "response": {
+                "username": None,
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "secret": "another-secret",
+            },
+            "response": {
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "secret": None,
+            },
+            "response": {
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "scm_ssh_key": "another-bogus-key",
+                "scm_ssh_key_passphrase": "another-bogus-key-password",
+            },
+            "response": {
+                "vault_identifier": None,
+            },
+        },
+        {
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "scm_ssh_key": None,
+                "scm_ssh_key_passphrase": None,
+            },
+            "response": {
+                "vault_identifier": None,
+            },
+        },
+        {
+            "status": status.HTTP_400_BAD_REQUEST,
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "scm_ssh_key": "another-bogus-key",
+            },
+            "response": {},
+        },
+        {
+            "status": status.HTTP_400_BAD_REQUEST,
+            "create": {
+                "name": "credential1",
+                "description": "desc here",
+                "username": "me",
+                "secret": "mypassword",
+                "scm_ssh_key": "bogus-key",
+                "scm_ssh_key_passphrase": "bogus-key-password",
+                "credential_type": CredentialType.SCM,
+            },
+            "update": {
+                "scm_ssh_key_passphrase": "another-bogus-key-password",
+            },
+            "response": {},
+        },
+    ],
+)
 @pytest.mark.django_db
-def test_partial_update_credential(client: APIClient):
-    obj = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
+def test_partial_update_credential(client: APIClient, params):
+    expected_status = params.get("status", status.HTTP_200_OK)
+    create_data = params["create"]
+    update_data = params["update"]
+    response_data = create_data | params["update"] | params["response"]
+    secret = response_data.pop("secret", None)
+    ssh_key = response_data.pop("scm_ssh_key", None)
+    ssh_key_passphrase = response_data.pop("scm_ssh_key_passphrase", None)
+
+    obj = models.Credential.objects.create(**create_data)
+
+    response = client.patch(
+        f"{api_url_v1}/credentials/{obj.id}/", data=update_data
     )
-    data = {"secret": "sec2"}
-    response = client.patch(f"{api_url_v1}/credentials/{obj.id}/", data=data)
-    assert response.status_code == status.HTTP_200_OK
-    result = response.data
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == {
-        "name": "credential1",
-        "description": "",
-        "username": "me",
-        "credential_type": CredentialType.REGISTRY,
-        "id": obj.id,
-        "vault_identifier": None,
-        "scm_ssh_key": None,
-        "scm_ssh_key_passphrase": None,
-    }
-    updated_obj = models.Credential.objects.filter(pk=obj.id).first()
-    assert updated_obj.secret == "sec2"
+    assert response.status_code == expected_status
+    if response.status_code == status.HTTP_200_OK:
+        result = response.data
+        result.pop("created_at")
+        result.pop("modified_at")
+        result.pop("scm_ssh_key")
+        result.pop("scm_ssh_key_passphrase")
+        assert result == (response_data | {"id": obj.id})
+
+        updated_obj = models.Credential.objects.filter(pk=obj.id).first()
+        assert updated_obj.secret == secret
+        assert updated_obj.scm_ssh_key == ssh_key
+        assert updated_obj.scm_ssh_key_passphrase == ssh_key_passphrase
 
 
 @pytest.mark.django_db
