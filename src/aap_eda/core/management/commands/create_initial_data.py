@@ -44,6 +44,8 @@ ROLES = [
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
             "event_stream": ["create", "read"],
+            "credential_type": ["create", "read", "update", "delete"],
+            "eda_credential": ["create", "read", "update", "delete"],
         },
     },
     {
@@ -60,6 +62,8 @@ ROLES = [
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
             "event_stream": ["create", "read"],
+            "credential_type": ["create", "read"],
+            "eda_credential": ["create", "read"],
         },
     },
     {
@@ -88,6 +92,8 @@ ROLES = [
             "decision_environment": ["create", "read", "update", "delete"],
             "credential": ["create", "read", "update", "delete"],
             "event_stream": ["create", "read"],
+            "credential_type": ["create", "read"],
+            "eda_credential": ["create", "read"],
         },
     },
     {
@@ -107,6 +113,8 @@ ROLES = [
             "decision_environment": ["read"],
             "credential": ["read"],
             "event_stream": ["read"],
+            "credential_type": ["read"],
+            "eda_credential": ["read"],
         },
     },
     {
@@ -125,6 +133,8 @@ ROLES = [
             "decision_environment": ["read"],
             "credential": ["read"],
             "event_stream": ["read"],
+            "credential_type": ["read"],
+            "eda_credential": ["read"],
         },
     },
     {
@@ -140,17 +150,133 @@ ROLES = [
             "rulebook": ["read"],
             "decision_environment": ["read"],
             "event_stream": ["read"],
+            "credential_type": ["read"],
+            "eda_credential": ["read"],
         },
+    },
+]
+
+CREDENTIAL_TYPES = [
+    {
+        "name": "Source Control",
+        "inputs": {
+            "fields": [
+                {"id": "username", "label": "Username", "type": "string"},
+                {
+                    "id": "password",
+                    "label": "Password",
+                    "type": "string",
+                    "secret": True,
+                },
+                {
+                    "id": "ssh_key_data",
+                    "label": "SCM Private Key",
+                    "type": "string",
+                    "format": "ssh_private_key",
+                    "secret": True,
+                    "multiline": True,
+                },
+                {
+                    "id": "ssh_key_unlock",
+                    "label": "Private Key Passphrase",
+                    "type": "string",
+                    "secret": True,
+                },
+            ]
+        },
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": "Container Registry",
+        "inputs": {
+            "fields": [
+                {
+                    "id": "host",
+                    "label": "Authentication URL",
+                    "type": "string",
+                    "help_text": (
+                        "Authentication endpoint for the container registry."
+                    ),
+                    "default": "quay.io",
+                },
+                {"id": "username", "label": "Username", "type": "string"},
+                {
+                    "id": "password",
+                    "label": "Password or Token",
+                    "type": "string",
+                    "secret": True,
+                    "help_text": (
+                        "A password or token used to authenticate with"
+                    ),
+                },
+                {
+                    "id": "verify_ssl",
+                    "label": "Verify SSL",
+                    "type": "boolean",
+                    "default": True,
+                },
+            ],
+            "required": ["host"],
+        },
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": "GPG Public Key",
+        "inputs": {
+            "fields": [
+                {
+                    "id": "gpg_public_key",
+                    "label": "GPG Public Key",
+                    "type": "string",
+                    "secret": True,
+                    "multiline": True,
+                    "help_text": (
+                        "GPG Public Key used to validate content signatures."
+                    ),
+                },
+            ],
+            "required": ["gpg_public_key"],
+        },
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": "Vault",
+        "inputs": {
+            "fields": [
+                {
+                    "id": "vault_id",
+                    "label": "Vault Identifier",
+                    "type": "string",
+                    "help_text": (
+                        "Vault identifier to use use with vaulted strings"
+                    ),
+                },
+                {
+                    "id": "vault_password",
+                    "label": "Vault Password",
+                    "type": "string",
+                    "secret": True,
+                    "help_text": "Vault Password",
+                },
+            ],
+            "required": ["vault_password"],
+        },
+        "injectors": {},
+        "managed": True,
     },
 ]
 
 
 class Command(BaseCommand):
-    help = "Seed database with initial roles."
+    help = "Seed database with initial data."
 
     @transaction.atomic
     def handle(self, *args, **options):
         self._create_roles()
+        self._preload_credential_types()
 
     def _create_roles(self):
         if models.Role.objects.exists():
@@ -185,3 +311,17 @@ class Command(BaseCommand):
                 )
             )
         self.stdout.write(f"Added {len(ROLES)} roles.")
+
+    def _preload_credential_types(self):
+        for credential_type_data in CREDENTIAL_TYPES:
+            new_type, created = models.CredentialType.objects.get_or_create(
+                name=credential_type_data["name"],
+                description=credential_type_data.get("description", ""),
+                inputs=credential_type_data.get("inputs", {}),
+                injectors=credential_type_data.get("injectors", {}),
+                managed=credential_type_data.get("managed", True),
+            )
+            if created:
+                self.stdout.write(
+                    f"New credential type {new_type.name} is added."
+                )
