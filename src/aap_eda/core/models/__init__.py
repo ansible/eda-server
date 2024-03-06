@@ -79,7 +79,6 @@ permission_registry.register(
     Credential,
     DecisionEnvironment,
     Project,
-    ExtraVar,
     parent_field_name="organization",
 )
 permission_registry.register(
@@ -90,6 +89,7 @@ permission_registry.register(
     RulebookProcess,
     parent_field_name="activation",
 )
+permission_registry.register(ExtraVar, parent_field_name="activation")
 permission_registry.register(
     AuditRule, parent_field_name="activation_instance"
 )
