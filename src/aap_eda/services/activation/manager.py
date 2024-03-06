@@ -43,6 +43,8 @@ from aap_eda.services.activation.restart_helper import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
+from rq import get_current_job
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1034,9 +1036,12 @@ class ActivationManager:
             else ""
         )
 
+        queue_name = self._get_queue_name()
+
         if not self.check_new_process_allowed(
             self.db_instance_type,
             self.db_instance.id,
+            queue_name,
         ):
             msg = (
                 "Failed to create rulebook process. "
@@ -1052,7 +1057,7 @@ class ActivationManager:
         }
         args[f"{self.db_instance_type}"] = self.db_instance
         try:
-            models.RulebookProcess.objects.create(**args)
+            rulebook_process = models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
@@ -1060,6 +1065,15 @@ class ActivationManager:
             )
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
+        queue_name = self._get_queue_name()
+        models.RulebookProcessQueue.objects.create(
+            process=rulebook_process,
+            queue_name=queue_name,
+        )
+
+    def _get_queue_name(self) -> str:
+        this_job = get_current_job()
+        return this_job.origin
 
     def _get_container_request(self) -> ContainerRequest:
         try:
@@ -1073,16 +1087,19 @@ class ActivationManager:
             raise exceptions.ActivationManagerError(msg)
 
     @staticmethod
-    def check_new_process_allowed(parent_type: str, parent_id: int) -> bool:
+    def check_new_process_allowed(
+        parent_type: str, parent_id: int, queue_name: str
+    ) -> bool:
         """Check if a new process is allowed."""
         if settings.MAX_RUNNING_ACTIVATIONS < 0:
             return True
 
-        num_running_processes = models.RulebookProcess.objects.filter(
-            status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+        running_processes_count = models.RulebookProcess.objects.filter(
+            status=ActivationStatus.RUNNING,
+            rulebookprocessqueue__queue_name=queue_name,
         ).count()
 
-        if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
+        if running_processes_count >= settings.MAX_RUNNING_ACTIVATIONS:
             LOGGER.info(
                 "No capacity to start a new rulebook process. "
                 f"{parent_type} {parent_id} is postponed",

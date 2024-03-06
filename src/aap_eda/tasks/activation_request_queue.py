@@ -14,6 +14,7 @@
 
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.models import ActivationRequestQueue
+from django.db.models.query import QuerySet
 
 
 def push(parent_type: str, parent_id: int, request: ActivationRequest) -> None:
@@ -39,11 +40,10 @@ def pop_until(parent_type: str, parent_id: int, queue_id: int) -> None:
     ).delete()
 
 
-def list_requests() -> list[str, int]:
-    objs = ActivationRequestQueue.objects.order_by(
-        "process_parent_id"
+def list_requests() -> QuerySet[ActivationRequestQueue]:
+    return ActivationRequestQueue.objects.order_by(
+        "process_parent_id",
     ).distinct("process_parent_type", "process_parent_id")
-    return [(obj.process_parent_type, obj.process_parent_id) for obj in objs]
 
 
 def _arbitrate(

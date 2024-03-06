@@ -88,7 +88,7 @@ class ActivationViewSet(
         if activation.is_enabled:
             start_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
-                id=activation.id,
+                process_parent_id=activation.id,
             )
 
         return Response(
@@ -130,7 +130,7 @@ class ActivationViewSet(
         logger.info(f"Now deleting {activation.name} ...")
         delete_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
-            id=activation.id,
+            process_parent_id=activation.id,
         )
 
     @extend_schema(
@@ -238,7 +238,7 @@ class ActivationViewSet(
         )
         start_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
-            id=pk,
+            process_parent_id=pk,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -267,7 +267,7 @@ class ActivationViewSet(
             )
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
-                id=activation.id,
+                process_parent_id=activation.id,
             )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -310,7 +310,7 @@ class ActivationViewSet(
 
         restart_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
-            id=activation.id,
+            process_parent_id=activation.id,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)

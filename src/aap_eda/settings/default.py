@@ -284,6 +284,25 @@ REST_FRAMEWORK = {
 }
 
 # ---------------------------------------------------------
+# DEPLOYMENT SETTINGS
+# ---------------------------------------------------------
+
+DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
+WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
+WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
+WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+    "ws://", "http://"
+).replace("wss://", "https://")
+PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
+PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
+PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
+PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
+DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
+CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
+
+
+# ---------------------------------------------------------
 # TASKING SETTINGS
 # ---------------------------------------------------------
 RQ = {
@@ -291,34 +310,86 @@ RQ = {
     "JOB_CLASS": "aap_eda.core.tasking.Job",
 }
 
+# This only takes effect if RULEBOOK_WORKER_QUEUES is not defined or
+# or it has only one queue
 RQ_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
 
-if RQ_UNIX_SOCKET_PATH:
-    RQ_QUEUES = {
-        "default": {
+# A list of queues to be used in multinode mode
+# If the list is empty, use the default singlenode queue name
+RULEBOOK_WORKER_QUEUES = settings.get("RULEBOOK_WORKER_QUEUES", [])
+if isinstance(RULEBOOK_WORKER_QUEUES, str):
+    RULEBOOK_WORKER_QUEUES = RULEBOOK_WORKER_QUEUES.split(",")
+
+if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
+    raise ImproperlyConfigured(
+        "The RULEBOOK_WORKER_QUEUES setting must not contain duplicates."
+    )
+
+# If the list is empty, use the default queue name for single node mode
+if not RULEBOOK_WORKER_QUEUES:
+    RULEBOOK_WORKER_QUEUES = ["activation"]
+
+DEFAULT_QUEUE_TIMEOUT = 300
+DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
+
+
+# TODO(alex): remove two types of queues, it is no longer needed
+# Requires coordination with installer and operator
+def get_rq_queues() -> dict:
+    """Construct the RQ_QUEUES dictionary based on the settings.
+
+    If there is no multinode enabled, the default and activation queues
+    are used. Otherwise, constructs the queues based on the
+    WORKERS_RULEBOOK_QUEUES list.
+    """
+    queues = {}
+
+    # Configures the default queue
+    if RQ_UNIX_SOCKET_PATH:
+        queues["default"] = {
             "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 300,
-        },
-        "activation": {
-            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 120,
-        },
-    }
-else:
-    RQ_QUEUES = {
-        "default": {
+            "DEFAULT_TIMEOUT": DEFAULT_QUEUE_TIMEOUT,
+        }
+    else:
+        queues["default"] = {
             "HOST": settings.get("MQ_HOST", "localhost"),
             "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": 300,
-        },
-        "activation": {
-            "HOST": settings.get("MQ_HOST", "localhost"),
-            "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": 120,
-        },
-    }
-RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
-RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
+            "DEFAULT_TIMEOUT": DEFAULT_QUEUE_TIMEOUT,
+        }
+
+    # Configures the activation queue for single node mode
+    if len(RULEBOOK_WORKER_QUEUES) == 1:
+        if RQ_UNIX_SOCKET_PATH:
+            queues[RULEBOOK_WORKER_QUEUES[0]] = {
+                "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
+            }
+        else:
+            queues[RULEBOOK_WORKER_QUEUES[0]] = {
+                "HOST": settings.get("MQ_HOST", "localhost"),
+                "PORT": settings.get("MQ_PORT", 6379),
+                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
+            }
+    # Configure the queues for multinode mode
+    else:
+        for queue in RULEBOOK_WORKER_QUEUES:
+            queues[queue] = {
+                "HOST": settings.get("MQ_HOST", "localhost"),
+                "PORT": settings.get("MQ_PORT", 6379),
+                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
+            }
+
+    for queue in queues.values():
+        queue["DB"] = settings.get("MQ_DB", 0)
+
+    return queues
+
+
+RQ_QUEUES = get_rq_queues()
+
+# Queue name for the rulebook workers. To be used in multinode mode
+# Otherwise, the default name is used
+RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
@@ -408,24 +479,6 @@ EDA_CONTROLLER_TOKEN = settings.get(
     "CONTROLLER_TOKEN", "default_controller_token"
 )
 EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
-
-# ---------------------------------------------------------
-# DEPLOYMENT SETTINGS
-# ---------------------------------------------------------
-
-DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
-WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
-WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
-WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
-    "ws://", "http://"
-).replace("wss://", "https://")
-PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
-PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
-PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
-PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
-PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
-DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
-CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS

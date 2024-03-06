@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
 from rq import Connection, Queue as _Queue, Worker as _Worker
 from rq.defaults import (
@@ -175,8 +176,10 @@ class ActivationWorker(_Worker):
         if serializer is None:
             serializer = JSONSerializer
 
+        queue_name = settings.RULEBOOK_QUEUE_NAME
+
         super().__init__(
-            [Queue(name="activation", connection=connection)],
+            [Queue(name=queue_name, connection=connection)],
             name,
             default_result_ttl,
             connection,
@@ -207,14 +210,15 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     Detects if a job with the same id is already enqueued and if it is
     it will return it instead of enqueuing a new one.
     """
-    queue = get_queue(queue_name)
-    job = job_from_queue(queue, job_id)
-    if job:
-        logger.info(
-            f"Skip enqueing job: {job_id} because it is already enqueued"
-        )
-        return job
+    for name in settings.RQ_QUEUES:
+        job = job_from_queue(name, job_id)
+        if job:
+            logger.info(
+                f"Skip enqueing job: {job_id} because it is already enqueued"
+            )
+            return job
     else:
+        queue = get_queue(name=queue_name)
         kwargs["job_id"] = job_id
         logger.info(f"Enqueing unique job: {job_id}")
         return queue.enqueue(*args, **kwargs)
