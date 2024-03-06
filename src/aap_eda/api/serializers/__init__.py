@@ -32,6 +32,7 @@ from .credential import (
     CredentialRefSerializer,
     CredentialSerializer,
 )
+from .credential_type import CredentialTypeSerializer
 from .decision_environment import (
     DecisionEnvironmentCreateSerializer,
     DecisionEnvironmentReadSerializer,
@@ -109,6 +110,8 @@ __all__ = (
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",
+    # credential type
+    "CredentialTypeSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # roles
