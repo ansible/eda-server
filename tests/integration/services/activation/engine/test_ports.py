@@ -57,10 +57,10 @@ def test_ports_with_multi_sources():
 - name: Run a webhook service
   hosts: all
   sources:
-    - ansible.eda.webhook1:
+    - ansible.eda.webhook:
         host: 0.0.0.0
         port: 5555
-    - ansible.eda.webhook2:
+    - ansible.eda.webhook:
         host: 127.0.0.1
         port: 8888
 """
@@ -173,3 +173,33 @@ def test_ports_with_extra_vars_without_default():
 
     with pytest.raises(exceptions.ActivationStartError):
         find_ports(rulebook, context)
+
+
+def test_ports_non_webhook_source():
+    rulebook = """
+---
+- name: Run a kafka source
+  hosts: all
+  sources:
+    - ansible.eda.kafka:
+        host: 0.0.0.0
+        port: 5555
+"""
+    ports = find_ports(rulebook, {})
+
+    assert not ports
+
+
+def test_ports_alertmanager_source():
+    rulebook = """
+---
+- name: Run a alertmanager source
+  hosts: all
+  sources:
+    - ansible.eda.alertmanager:
+        host: 0.0.0.0
+        port: 5555
+"""
+    ports = find_ports(rulebook, {})
+
+    assert ports == [("0.0.0.0", 5555)]
