@@ -50,6 +50,8 @@ class ResourceType(DjangoStrEnum):
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
     CREDENTIAL = "credential"
+    CREDENTIAL_TYPE = "credential_type"
+    EDA_CREDENTIAL = "eda_credential"
     EVENT_STREAM = "event_stream"
 
 
