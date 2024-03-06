@@ -12,6 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .imports import ProjectImportService
+from .imports import ProjectImportError, ProjectImportService
 
-__all__ = ("ProjectImportService",)
+__all__ = ("ProjectImportService", "ProjectImportError")
