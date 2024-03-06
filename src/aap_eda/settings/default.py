@@ -527,3 +527,8 @@ _DEFAULT_PG_NOTIFY_DSN = (
 
 PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
 PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
+
+SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
+    "SAFE_PLUGINS_FOR_PORT_FORWARD",
+    ["ansible.eda.webhook", "ansible.eda.alertmanager"],
+)
