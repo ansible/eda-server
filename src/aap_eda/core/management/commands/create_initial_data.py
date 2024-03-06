@@ -204,11 +204,10 @@ class Command(BaseCommand):
     def _create_obj_roles(self):
         for cls in permission_registry.all_registered_models:
             ct = ContentType.objects.get_for_model(cls)
-            model_name = cls._meta.model_name
-            parent_model = permission_registry.get_parent_model(model_name)
+            parent_model = permission_registry.get_parent_model(cls)
             # ignore if the model is organization, covered by org roles
             # or child model, inherits permissions from parent model
-            if model_name == "organization" or (
+            if cls._meta.model_name == "organization" or (
                 parent_model
                 and parent_model._meta.model_name != "organization"
             ):
@@ -216,7 +215,7 @@ class Command(BaseCommand):
             permissions = self._create_permissions_for_content_type(ct)
             desc = f"Has all permissions to a single {cls._meta.verbose_name}"
             # parent model should add permissions related to its child models
-            child_models = permission_registry.get_child_models(model_name)
+            child_models = permission_registry.get_child_models(cls)
             child_names = []
             for _, child_model in child_models:
                 child_ct = ContentType.objects.get_for_model(child_model)
