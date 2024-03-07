@@ -22,6 +22,7 @@ from dateutil import parser
 from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
+from rq.timeouts import JobTimeoutException
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -316,6 +317,28 @@ def test_engine_start_with_image_api_exception(init_data, podman_engine):
     engine.client.images.pull.side_effect = raise_api_error
 
     with pytest.raises(ContainerStartError, match="Image not found"):
+        engine.start(request, log_handler)
+
+
+@pytest.mark.django_db
+def test_engine_start_with_image_pull_timeout_exception(
+    init_data, podman_engine
+):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+    engine = podman_engine
+    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(init_data)
+    request.credential = credential
+    error = "Task exceeded maximum timeout value 120 seconds"
+
+    def raise_timeout_error(*args, **kwargs):
+        raise JobTimeoutException(error)
+
+    engine.client.images.pull.side_effect = raise_timeout_error
+
+    with pytest.raises(ContainerImagePullError, match=error):
         engine.start(request, log_handler)
 
 
