@@ -17,6 +17,7 @@ import pytest
 
 from aap_eda.core import models
 from aap_eda.services.activation.engine.common import (
+    AnsibleRulebookCmdLine,
     ContainerableInvalidError,
     ContainerRequest,
 )
@@ -53,47 +54,42 @@ def activation(activation_no_instance) -> models.Activation:
 
 
 @pytest.mark.django_db
-def test_command_line_parameters(activation):
-    params = activation.get_command_line_parameters()
-    assert params["ws_url"] is not None
-    assert params["log_level"] is None
-    assert params["ws_ssl_verify"] is not None
-    assert params["ws_token_url"] is not None
-    assert params["ws_access_token"] is not None
-    assert params["ws_refresh_token"] is not None
-    assert params["heartbeat"] is not None
-    assert not params["skip_audit_events"]
-    assert params["id"] == str(activation.latest_instance.id)
-
-
-@pytest.mark.django_db
-def test_container_parameters(activation):
-    params = activation.get_container_parameters()
-    assert params["name"] is not None
-    assert params["image_url"] is not None
-    assert params["ports"] is not None
-    assert params["env_vars"] is not None
-    assert params["extra_args"] is not None
-    assert params["mem_limit"] is not None
-    assert params["mounts"] is not None
-    assert params["process_parent_id"] == activation.id
-    assert params["rulebook_process_id"] == activation.latest_instance.id
-
-
-@pytest.mark.django_db
-def test_container_parameters_no_credential(activation):
+def test_container_request_no_credential(activation):
     """Test container params when no credential exists."""
-    params = activation.get_container_parameters()
-    assert params["credential"] is None
+    request = activation.get_container_request()
+    assert request.credential is None
 
 
 @pytest.mark.django_db
 def test_get_container_request(activation):
     """Test the construction of a ContainerRequest."""
     request = activation.get_container_request()
+
     assert isinstance(request, ContainerRequest)
-    assert not request.cmdline.skip_audit_events
-    assert "--skip-audit-events" not in request.cmdline.get_args()
+    assert request.name is not None
+    assert request.image_url is not None
+    assert request.ports is not None
+    assert request.env_vars is not None
+    assert request.extra_args is not None
+    assert request.mem_limit is not None
+    assert request.mounts is not None
+    assert request.process_parent_id == activation.id
+    assert request.rulebook_process_id == activation.latest_instance.id
+
+    cmdline = request.cmdline
+    assert (cmdline is not None) and isinstance(
+        cmdline, AnsibleRulebookCmdLine
+    )
+    assert cmdline.id == str(activation.latest_instance.id)
+    assert cmdline.ws_url is not None
+    assert cmdline.log_level is None
+    assert cmdline.ws_ssl_verify is not None
+    assert cmdline.ws_token_url is not None
+    assert cmdline.ws_access_token is not None
+    assert cmdline.ws_refresh_token is not None
+    assert cmdline.heartbeat is not None
+    assert not cmdline.skip_audit_events
+    assert "--skip-audit-events" not in cmdline.get_args()
 
 
 @pytest.mark.django_db
