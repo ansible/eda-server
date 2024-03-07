@@ -17,6 +17,7 @@ from .auth import RoleViewSet, SessionLoginView, SessionLogoutView
 from .credential import CredentialViewSet
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
+from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
 from .project import ExtraVarViewSet, ProjectViewSet
 from .rulebook import AuditRuleViewSet, RulebookViewSet
@@ -42,6 +43,7 @@ __all__ = (
     # credential
     "CredentialViewSet",
     "CredentialTypeViewSet",
+    "EdaCredentialViewSet",
     # decision_environment
     "DecisionEnvironmentViewSet",
     # event_stream
