@@ -20,6 +20,9 @@ import yaml
 from django.conf import settings
 from jinja2.nativetypes import NativeTemplate
 
+from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
+from aap_eda.api.vault import encrypt_string
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -77,11 +80,15 @@ def substitute_extra_vars(
         "event_stream": event_stream,
     }
     extra_vars = substitute_variables(extra_vars, context)
-    # Encrypt any of the extra_vars
+
     for key in encrypt_keys:
         if key in extra_vars:
-            # extra_vars[key] = encrypt with password
-            pass
+            extra_vars[key] = encrypt_string(
+                password=password,
+                plaintext=extra_vars[key],
+                vault_id=EDA_SERVER_VAULT_LABEL,
+            )
+
     return extra_vars
 
 
