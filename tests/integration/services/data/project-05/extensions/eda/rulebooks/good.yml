@@ -10,4 +10,10 @@
       action:
         run_playbook:
           name: ansible.eda.hello
+    - name: Debug
+      condition: event.i == 2
+      actions:
+        - print_event:
+        - debug:
+            msg: "Rule fired correctly"
 ...
