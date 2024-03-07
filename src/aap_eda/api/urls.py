@@ -44,6 +44,7 @@ router.register(
 )
 router.register("credentials", views.CredentialViewSet)
 router.register("credential-types", views.CredentialTypeViewSet)
+router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
 
 openapi_urls = [
