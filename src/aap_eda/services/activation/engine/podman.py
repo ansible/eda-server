@@ -21,6 +21,7 @@ from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
+from rq.timeouts import JobTimeoutException
 
 from aap_eda.core.enums import ActivationStatus
 
@@ -352,12 +353,17 @@ class Engine(ContainerEngine):
             return image
         except ImageNotFound as e:
             msg = f"Image {request.image_url} not found"
-            LOGGER.exception(msg)
+            LOGGER.error(msg)
             log_handler.write(msg, True)
             raise exceptions.ContainerImagePullError(msg) from e
         except APIError as e:
-            LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
+            LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
+        except JobTimeoutException as e:
+            msg = f"Timeout: {e}"
+            LOGGER.error(msg)
+            log_handler.write(msg, True)
+            raise exceptions.ContainerImagePullError(msg) from e
 
     def _load_pod_args(self, request: ContainerRequest) -> dict:
         pod_args = {"name": request.name}
