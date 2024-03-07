@@ -23,7 +23,12 @@ from aap_eda.api.constants import (
     PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
 )
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ProcessParentType, ResourceType
+from aap_eda.core.enums import (
+    Action,
+    CredentialType,
+    ProcessParentType,
+    ResourceType,
+)
 from tests.integration.constants import api_url_v1
 
 BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_TYPE = """
@@ -246,6 +251,11 @@ def test_create_event_stream(
     source = rulesets[0]["sources"][0]
     assert source[source_type] == args
     assert source["name"] == "test_event_stream"
+    assert event_stream.system_vault_credential is not None
+    assert (
+        event_stream.system_vault_credential.credential_type
+        == CredentialType.VAULT
+    )
 
 
 @pytest.mark.django_db

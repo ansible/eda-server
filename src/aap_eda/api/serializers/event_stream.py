@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import secrets
 import uuid
 
 import yaml
@@ -21,6 +22,7 @@ from django.core.validators import RegexValidator
 from rest_framework import serializers
 
 from aap_eda.api.constants import (
+    EDA_SERVER_VAULT_LABEL,
     PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
     PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
 )
@@ -33,6 +35,7 @@ from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.api.serializers.utils import substitute_extra_vars, swap_sources
 from aap_eda.core import models, validators
+from aap_eda.core.enums import CredentialType
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +77,30 @@ def _get_default_channel_name():
     return f"{EDA_CHANNEL_PREFIX}{stream_uuid.replace('-','_')}"
 
 
-def _get_extra_var_id(validated_data: dict) -> dict:
+def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
     rulesets = yaml.safe_load(validated_data["rulebook_rulesets"])
     extra_vars = rulesets[0]["sources"][0]["extra_vars"]
+    encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
+
+    credential_id = None
+    password = ""
+
+    if bool(encrypt_vars):
+        password = secrets.token_urlsafe()
+
+        credential_id = models.Credential.objects.create(
+            name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
+            credential_type=CredentialType.VAULT,
+            vault_identifier=EDA_SERVER_VAULT_LABEL,
+            secret=password,
+        ).pk
+
     extra_vars = substitute_extra_vars(
-        validated_data, extra_vars, [], "password"
+        validated_data, extra_vars, encrypt_vars, password
     )
 
     extra_var = models.ExtraVar.objects.create(extra_var=yaml.dump(extra_vars))
-    return extra_var.id
+    return extra_var.id, credential_id
 
 
 def _updated_listener_ruleset(validated_data):
@@ -195,7 +213,11 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()
         )
-        validated_data["extra_var_id"] = _get_extra_var_id(validated_data)
+        extra_var_id, credential_id = _get_extra_var_and_credential_ids(
+            validated_data
+        )
+        validated_data["extra_var_id"] = extra_var_id
+        validated_data["system_vault_credential_id"] = credential_id
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
         )
