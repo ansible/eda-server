@@ -12,12 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+import secrets
+import uuid
 from typing import Union
 
 import yaml
 from rest_framework import serializers
 
-from aap_eda.api.constants import PG_NOTIFY_TEMPLATE_RULEBOOK_DATA
+from aap_eda.api.constants import (
+    EDA_SERVER_VAULT_LABEL,
+    PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+)
 from aap_eda.api.exceptions import InvalidEventStreamRulebook
 from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.decision_environment import (
@@ -35,7 +40,7 @@ from aap_eda.api.serializers.utils import (
     swap_sources,
 )
 from aap_eda.core import models, validators
-from aap_eda.core.enums import ProcessParentType
+from aap_eda.core.enums import CredentialType, ProcessParentType
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +60,21 @@ def _updated_ruleset(validated_data):
             extra_vars = rulesets[0]["sources"][0].get("extra_vars", {})
             encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
 
-            # TODO: encrypt password when engine is ready for vaulted data
+            password = ""
+            if bool(encrypt_vars):
+                password = secrets.token_urlsafe()
+
+                validated_data[
+                    "system_vault_credential"
+                ] = models.Credential.objects.create(
+                    name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
+                    credential_type=CredentialType.VAULT,
+                    vault_identifier=EDA_SERVER_VAULT_LABEL,
+                    secret=password,
+                )
+
             extra_vars = substitute_extra_vars(
-                event_stream.__dict__, extra_vars, encrypt_vars, "password"
+                event_stream.__dict__, extra_vars, encrypt_vars, password
             )
 
             source = rulesets[0]["sources"][0]["complementary_source"]
