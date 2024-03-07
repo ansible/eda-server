@@ -147,56 +147,22 @@ class ContainerableNoLatestInstanceError(ContainerableMixinError):
 #   rulebook_rulesets       str
 #
 class ContainerableMixin:
-    def get_command_line_parameters(self) -> dict[str, tp.Any]:
-        """Return parameters for running ansible-rulebook."""
-        self.validate()
-
-        access_token, refresh_token = create_jwt_token()
-        return {
-            "id": str(self.latest_instance.id),
-            "ws_url": self._get_ws_url(),
-            "log_level": self._get_log_level(),
-            "ws_ssl_verify": settings.WEBSOCKET_SSL_VERIFY,
-            "ws_token_url": self._get_ws_token_url(),
-            "ws_access_token": access_token,
-            "ws_refresh_token": refresh_token,
-            "heartbeat": settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-            "skip_audit_events": False,
-        }
-
-    def get_container_parameters(self) -> dict[str, tp.Any]:
-        """Return parameters used to create a ContainerRquest."""
-        self.validate()
-
-        return {
-            "credential": self._get_image_credential(),
-            "name": self._get_container_name(),
-            "image_url": self.decision_environment.image_url,
-            "ports": self._get_ports(),
-            "env_vars": settings.PODMAN_ENV_VARS,
-            "extra_args": settings.PODMAN_EXTRA_ARGS,
-            "mem_limit": settings.PODMAN_MEM_LIMIT,
-            "mounts": settings.PODMAN_MOUNTS,
-            "process_parent_id": self.id,
-            "rulebook_process_id": self.latest_instance.id,
-            "cmdline": self._build_cmdline(),
-        }
-
     def get_container_request(self) -> ContainerRequest:
         """Return ContainerRequest used for creation."""
-        params = self.get_container_parameters()
+        self.validate()
+
         return ContainerRequest(
-            credential=params["credential"],
-            name=params["name"],
-            image_url=params["image_url"],
-            ports=params["ports"],
-            process_parent_id=params["process_parent_id"],
-            rulebook_process_id=params["rulebook_process_id"],
-            env_vars=params["env_vars"],
-            extra_args=params["extra_args"],
-            mem_limit=params["mem_limit"],
-            mounts=params["mounts"],
-            cmdline=params["cmdline"],
+            credential=self._get_image_credential(),
+            name=self._get_container_name(),
+            image_url=self.decision_environment.image_url,
+            ports=self._get_ports(),
+            process_parent_id=self.id,
+            rulebook_process_id=self.latest_instance.id,
+            env_vars=settings.PODMAN_ENV_VARS,
+            extra_args=settings.PODMAN_EXTRA_ARGS,
+            mem_limit=settings.PODMAN_MEM_LIMIT,
+            mounts=settings.PODMAN_MOUNTS,
+            cmdline=self._build_cmdline(),
         )
 
     def get_restart_policy(self) -> str:
@@ -216,17 +182,17 @@ class ContainerableMixin:
             raise ContainerableInvalidError from e
 
     def _build_cmdline(self) -> AnsibleRulebookCmdLine:
-        params = self.get_command_line_parameters()
+        access_token, refresh_token = create_jwt_token()
         return AnsibleRulebookCmdLine(
-            ws_url=params["ws_url"],
-            log_level=params["log_level"],
-            ws_ssl_verify=params["ws_ssl_verify"],
-            ws_access_token=params["ws_access_token"],
-            ws_refresh_token=params["ws_refresh_token"],
-            ws_token_url=params["ws_token_url"],
-            heartbeat=params["heartbeat"],
-            id=params["id"],
-            skip_audit_events=params["skip_audit_events"],
+            ws_url=self._get_ws_url(),
+            log_level=self._get_log_level(),
+            ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
+            ws_access_token=access_token,
+            ws_refresh_token=refresh_token,
+            ws_token_url=self._get_ws_token_url(),
+            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
+            id=str(self.latest_instance.id),
+            skip_audit_events=self._get_skip_audit_events(),
         )
 
     def _get_log_level(self) -> tp.Optional[str]:
@@ -265,6 +231,10 @@ class ContainerableMixin:
 
     def _get_ports(self) -> list[tuple]:
         return find_ports(self.rulebook_rulesets, self._get_context())
+
+    def _get_skip_audit_events(self) -> bool:
+        """Return not skipping audit events as default."""
+        return False
 
     def _get_ws_url(self) -> str:
         return f"{settings.WEBSOCKET_BASE_URL}{self._get_ws_url_subpath()}"
