@@ -29,8 +29,6 @@ def test_list_credentials(client: APIClient):
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
         "vault_identifier": None,
-        "scm_ssh_key": None,
-        "scm_ssh_key_passphrase": None,
     }
 
 
@@ -48,8 +46,6 @@ def test_list_credentials(client: APIClient):
             },
             "response": {
                 "credential_type": CredentialType.REGISTRY,
-                "scm_ssh_key": None,
-                "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
@@ -62,8 +58,6 @@ def test_list_credentials(client: APIClient):
             },
             "response": {
                 "username": None,
-                "scm_ssh_key": None,
-                "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
@@ -76,8 +70,6 @@ def test_list_credentials(client: APIClient):
                 "credential_type": CredentialType.SCM,
             },
             "response": {
-                "scm_ssh_key": None,
-                "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
@@ -161,6 +153,8 @@ def test_create_credential(client: APIClient, params):
     response_data = create_data | params["response"]
     username = response_data.get("username", None)
     secret = response_data.pop("secret", None)
+    ssh_key = response_data.pop("scm_ssh_key", None)
+    ssh_key_passphrase = response_data.pop("scm_ssh_key_passphrase", None)
 
     response = client.post(f"{api_url_v1}/credentials/", data=create_data)
     assert response.status_code == expected_status
@@ -174,18 +168,8 @@ def test_create_credential(client: APIClient, params):
         obj = models.Credential.objects.filter(pk=id_).first()
         assert obj.username == username
         assert obj.secret == secret
-        if response_data["credential_type"] == CredentialType.SCM:
-            assert (
-                (response_data["scm_ssh_key"] is None)
-                and (response_data["scm_ssh_key_passphrase"] is None)
-            ) or (
-                (response_data["scm_ssh_key"] is not None)
-                and (response_data["scm_ssh_key_passphrase"] is not None)
-            )
-            if secret is None:
-                assert response_data["scm_ssh_key"] is not None
-            if response_data["scm_ssh_key"] is None:
-                assert secret is not None
+        assert obj.scm_ssh_key == ssh_key
+        assert obj.scm_ssh_key_passphrase == ssh_key_passphrase
 
 
 @pytest.mark.django_db
@@ -236,8 +220,6 @@ def test_retrieve_credential(client: APIClient):
         "credential_type": CredentialType.REGISTRY,
         "id": obj.id,
         "vault_identifier": None,
-        "scm_ssh_key": None,
-        "scm_ssh_key_passphrase": None,
     }
 
 
@@ -261,8 +243,6 @@ def test_retrieve_vault_credential(client: APIClient):
         "credential_type": CredentialType.VAULT,
         "id": obj.id,
         "vault_identifier": None,
-        "scm_ssh_key": None,
-        "scm_ssh_key_passphrase": None,
     }
 
 
@@ -333,8 +313,6 @@ def test_list_exclude_reserved_vault_credentials(client: APIClient):
             },
             "response": {
                 "credential_type": CredentialType.REGISTRY,
-                "scm_ssh_key": None,
-                "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
@@ -350,8 +328,6 @@ def test_list_exclude_reserved_vault_credentials(client: APIClient):
             },
             "response": {
                 "username": None,
-                "scm_ssh_key": None,
-                "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
@@ -367,8 +343,6 @@ def test_list_exclude_reserved_vault_credentials(client: APIClient):
                 "secret": "another-secret",
             },
             "response": {
-                "scm_ssh_key": None,
-                "scm_ssh_key_passphrase": None,
                 "vault_identifier": None,
             },
         },
@@ -376,8 +350,6 @@ def test_list_exclude_reserved_vault_credentials(client: APIClient):
             "create": {
                 "name": "credential1",
                 "description": "desc here",
-                "scm_ssh_key": "bogus-key",
-                "scm_ssh_key_passphrase": "bogus-key-password",
                 "credential_type": CredentialType.SCM,
             },
             "update": {
@@ -533,8 +505,6 @@ def test_partial_update_credential(client: APIClient, params):
         result = response.data
         result.pop("created_at")
         result.pop("modified_at")
-        result.pop("scm_ssh_key")
-        result.pop("scm_ssh_key_passphrase")
         assert result == (response_data | {"id": obj.id})
 
         updated_obj = models.Credential.objects.filter(pk=obj.id).first()
