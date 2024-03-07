@@ -26,7 +26,7 @@ spec:
               value: secret
             - name: POSTGRESQL_ADMIN_PASSWORD
               value: secret
-          image: quay.io/sclorg/postgresql-13-c9s:latest
+          image: quay.io/sclorg/postgresql-15-c9s:latest
           name: postgres
           ports:
             - containerPort: 5432
