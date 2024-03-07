@@ -85,6 +85,9 @@ services:
       retries: 10
     volumes:
       - '../../:/app/src:z'
+    networks:
+      - service-mesh
+      - default
 
   eda-ws:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
@@ -193,3 +196,7 @@ services:
 volumes:
   postgres_data: {}
   podman_data: {}
+
+networks:
+  service-mesh:
+    name: service-mesh
