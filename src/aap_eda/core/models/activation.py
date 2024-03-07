@@ -112,3 +112,13 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         choices=RulebookProcessLogLevel.choices(),
         default=get_default_log_level,
     )
+    eda_credentials = models.ManyToManyField(
+        "EdaCredential", related_name="activations", default=None
+    )
+    eda_system_vault_credential = models.OneToOneField(
+        "EdaCredential",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
