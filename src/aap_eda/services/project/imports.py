@@ -251,7 +251,7 @@ class ProjectImportService:
     def _validate_rulebook_file(self, data: Any) -> None:
         if not isinstance(data, list):
             raise MalformedError("rulebook must contain a list of rulesets")
-        required_keys = ["name", "condition", "action"]
+        required_keys = ["name", "condition", "action|actions"]
         for ruleset in data:
             if "rules" not in ruleset:
                 raise MalformedError("no rules in a ruleset")
@@ -259,11 +259,21 @@ class ProjectImportService:
             if not isinstance(rules, list):
                 raise MalformedError("ruleset must contain a list of rules")
             for rule in rules:
-                if not all(key in rule for key in required_keys):
+                if not all(
+                    any(any_key in rule for any_key in key.split("|"))
+                    for key in required_keys
+                ):
                     raise MalformedError(
                         f"ruleset must contain {required_keys}"
                     )
-                if not all(rule.get(key) is not None for key in required_keys):
+
+                if not all(
+                    any(
+                        rule.get(any_key) is not None
+                        for any_key in key.split("|")
+                    )
+                    for key in required_keys
+                ):
                     raise MalformedError(
                         f"rule's {required_keys} must have non empty values"
                     )

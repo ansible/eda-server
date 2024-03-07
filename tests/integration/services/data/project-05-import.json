@@ -12,6 +12,17 @@
                                 "name": "ansible.eda.hello"
                             }
                         }
+                    },
+                    {
+                        "name": "Debug",
+                        "action": [
+                            { "print_event": null },
+                            {
+                                "debug": {
+                                    "msg": "Rule fired correctly"
+                                }
+                            }
+                        ]
                     }
                 ]
             }
