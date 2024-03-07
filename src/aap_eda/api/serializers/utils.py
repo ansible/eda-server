@@ -121,12 +121,14 @@ def get_secret_fields(schema: dict) -> list[str]:
 
 
 def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
-    old_inputs = inputs_from_store(old_inputs_str) if old_inputs_str else {}
-
-    inputs.update(
-        (k, old_inputs[k]) for k, v in inputs.items() if v == ENCRYPTED
+    old_inputs = (
+        inputs_from_store(old_inputs_str.get_secret_value())
+        if old_inputs_str
+        else {}
     )
-    return yaml.dump(inputs)
+
+    old_inputs.update((k, inputs[k]) for k, v in inputs.items())
+    return yaml.dump(old_inputs)
 
 
 def inputs_from_store(inputs: str) -> dict:

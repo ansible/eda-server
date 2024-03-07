@@ -20,6 +20,7 @@ from .activation import (
 from .credential import CredentialFilter
 from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
+from .eda_credential import EdaCredentialFilter
 from .event_stream import EventStreamFilter
 from .project import ProjectFilter
 from .role import RoleFilter
@@ -43,6 +44,7 @@ __all__ = (
     "CredentialFilter",
     # credential type
     "CredentialTypeFilter",
+    "EdaCredentialFilter",
     # decision_environment
     "DecisionEnvironmentFilter",
     # activation instance
