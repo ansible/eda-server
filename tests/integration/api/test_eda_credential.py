@@ -53,7 +53,7 @@ def test_create_eda_credential(
     response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "eda-credential"
-    assert response.data["managed"] is True
+    assert response.data["managed"] is False
 
 
 @pytest.mark.django_db
@@ -68,7 +68,7 @@ def test_create_eda_credential_with_type(
     response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "eda-credential"
-    assert response.data["managed"] is True
+    assert response.data["managed"] is False
     assert response.data["inputs"] == {
         "password": "$encrypted$",
         "username": "adam",
@@ -111,6 +111,12 @@ def test_list_eda_credentials(
                 inputs={"username": "bearny", "password": "secret"},
                 credential_type_id=credential_type.id,
             ),
+            models.EdaCredential(
+                name="credential-3",
+                inputs={"username": "christ", "password": "secret"},
+                credential_type_id=credential_type.id,
+                managed=True,
+            ),
         ]
     )
     response = client.get(f"{api_url_v1}/eda-credentials/")
@@ -133,11 +139,24 @@ def test_delete_eda_credential(client: APIClient):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
-        managed=True,
     )
     response = client.delete(f"{api_url_v1}/eda-credentials/{obj.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert models.EdaCredential.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_managed_eda_credential(client: APIClient):
+    obj = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret"},
+        managed=True,
+    )
+    response = client.delete(f"{api_url_v1}/eda-credentials/{obj.id}/")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.data["errors"] == "Managed EDA credential cannot be deleted"
+    )
 
 
 @pytest.mark.django_db
