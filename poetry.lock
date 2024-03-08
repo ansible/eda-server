@@ -603,7 +603,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "24.3.6.1.dev189+g176c8a0"
+version = "24.3.7.0.dev198+gc682db1"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -637,7 +637,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/alancoding/django-ansible-base.git"
 reference = "django_permissions"
-resolved_reference = "176c8a07127d381cef22fd21c1600495e6e2631f"
+resolved_reference = "c682db1cad0f668d0b33e67b420c6874cbb3fc0d"
 
 [[package]]
 name = "django-auth-ldap"
