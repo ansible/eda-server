@@ -53,12 +53,13 @@ class ModelFactory():
     def get_sclar_data(self, cls):
         data = {}
         for field in cls._meta.concrete_fields:
-            if field.name == 'extra_var':
-                data['extra_var'] = '{"a": "b"}'
-            elif hasattr(field, 'choices') and field.choices:
+            if hasattr(field, 'choices') and field.choices:
                 data[field.name] = field.choices[0][0]
             elif isinstance(field, (TextField, CharField)):
-                data[field.name] = self.make_name()
+                if field.name == 'extra_var':
+                    data['extra_var'] = '{"a": "b"}'
+                else:
+                    data[field.name] = self.make_name()
             elif isinstance(field, UUIDField):
                 data[field.name] = uuid4()
             elif isinstance(field, DateTimeField):
