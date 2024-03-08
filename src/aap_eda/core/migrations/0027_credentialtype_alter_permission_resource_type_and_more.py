@@ -154,5 +154,27 @@ class Migration(migrations.Migration):
                 name="ck_empty_eda_credential_name",
             ),
         ),
+        migrations.AddField(
+            model_name="decisionenvironment",
+            name="eda_credential",
+            field=models.ForeignKey(
+                blank=True,
+                default=None,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="core.edacredential",
+            ),
+        ),
+        migrations.AddField(
+            model_name="project",
+            name="eda_credential",
+            field=models.ForeignKey(
+                blank=True,
+                default=None,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="core.edacredential",
+            ),
+        ),
         migrations.RunPython(insert_permissions, drop_permissions),
     ]
