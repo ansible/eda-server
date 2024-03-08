@@ -15,7 +15,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import inputs_to_store
 
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
@@ -277,6 +278,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self._create_roles()
         self._preload_credential_types()
+        self._copy_registry_credentials()
+        self._copy_scm_credentials()
 
     def _create_roles(self):
         if models.Role.objects.exists():
@@ -325,3 +328,68 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"New credential type {new_type.name} is added."
                 )
+
+    def _copy_registry_credentials(self):
+        credentials = models.Credential.objects.filter(
+            credential_type=enums.CredentialType.REGISTRY
+        ).all()
+        if not credentials:
+            return
+
+        cred_type = models.CredentialType.objects.filter(
+            name="Container Registry"
+        ).first()
+        for cred in credentials:
+            inputs = {
+                "username": cred.username,
+                "password": cred.secret.get_secret_value(),
+            }
+            eda_cred = models.EdaCredential.objects.create(
+                name=cred.name,
+                description=cred.description,
+                managed=cred_type.managed,
+                credential_type=cred_type,
+                inputs=inputs_to_store(inputs),
+            )
+            models.DecisionEnvironment.objects.filter(credential=cred).update(
+                eda_credential=eda_cred, credential=None
+            )
+            cred.delete()
+
+        self.stdout.write(
+            "All REGISTRY credentials are converted to Container Registry "
+            "eda-credentials"
+        )
+
+    def _copy_scm_credentials(self):
+        types = [enums.CredentialType.GITHUB, enums.CredentialType.GITLAB]
+        credentials = models.Credential.objects.filter(
+            credential_type__in=types
+        ).all()
+        if not credentials:
+            return
+
+        cred_type = models.CredentialType.objects.filter(
+            name="Source Control"
+        ).first()
+        for cred in credentials:
+            inputs = {
+                "username": cred.username,
+                "password": cred.secret.get_secret_value(),
+            }
+            eda_cred = models.EdaCredential.objects.create(
+                name=cred.name,
+                description=cred.description,
+                managed=cred_type.managed,
+                credential_type=cred_type,
+                inputs=inputs_to_store(inputs),
+            )
+            models.Project.objects.filter(credential=cred).update(
+                eda_credential=eda_cred, credential=None
+            )
+            cred.delete()
+
+        self.stdout.write(
+            "All GITHUB and GITLAB credentials are converted to Source "
+            "Control eda-credentials"
+        )

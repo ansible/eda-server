@@ -37,5 +37,12 @@ class DecisionEnvironment(models.Model):
         default=None,
         on_delete=models.SET_NULL,
     )
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
