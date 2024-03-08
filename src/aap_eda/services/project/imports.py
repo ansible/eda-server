@@ -99,7 +99,7 @@ class ProjectImportService:
             repo = self._git_cls.clone(
                 project.url,
                 repo_dir,
-                credential=project.credential,
+                credential=project.eda_credential,
                 depth=1,
                 verify_ssl=project.verify_ssl,
             )
@@ -115,7 +115,7 @@ class ProjectImportService:
             repo = self._git_cls.clone(
                 project.url,
                 repo_dir,
-                credential=project.credential,
+                credential=project.eda_credential,
                 depth=1,
                 verify_ssl=project.verify_ssl,
             )
