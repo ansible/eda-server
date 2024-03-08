@@ -164,8 +164,7 @@ def test_add_permissions(model, cls_factory, user, user_api_client):
             DABPermission.objects.get(codename=f'add_{model._meta.model_name}')
         )
         add_rd.give_permission(user, parent_obj)
-        assert user.has_obj_perm(parent_obj, f'add_{model._meta.model_name}')
-        pn = f'add_{model._meta.model_name}'
+        assert user.has_obj_perm(parent_obj, f'add_{model._meta.model_name}')  # sanity
     else:
         # otherwise give global add permission for this model
         add_rd = RoleDefinition.objects.create(name=f'add-{model._meta.model_name}-global', content_type=None)
@@ -179,7 +178,6 @@ def test_add_permissions(model, cls_factory, user, user_api_client):
 @pytest.mark.parametrize('model', permission_registry.all_registered_models)
 def test_change_permissions(model, cls_factory, user, user_api_client):
     obj = cls_factory.create(model)
-    ct = ContentType.objects.get_for_model(model)
     if 'change' not in obj._meta.default_permissions:
         pytest.skip('Model has no change permission')
 
@@ -204,7 +202,6 @@ def test_change_permissions(model, cls_factory, user, user_api_client):
 @pytest.mark.parametrize('model', permission_registry.all_registered_models)
 def test_delete_permissions(model, cls_factory, user, user_api_client):
     obj = cls_factory.create(model)
-    ct = ContentType.objects.get_for_model(model)
     if 'delete' not in obj._meta.default_permissions:
         pytest.skip('Model has no delete permission')
 
