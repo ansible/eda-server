@@ -61,6 +61,13 @@ class Project(models.Model):
         default=None,
         on_delete=models.SET_NULL,
     )
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
     archive_file = models.FileField(upload_to=PROJECT_ARCHIVE_DIR)
 
     import_state = models.TextField(
