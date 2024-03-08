@@ -14,8 +14,8 @@
 
 from rest_framework import serializers
 
-from aap_eda.api.serializers.utils import inputs_to_display
 from aap_eda.core import models
+from aap_eda.core.utils.credentials import inputs_to_display
 from aap_eda.core.utils.crypto.base import SecretValue
 
 
