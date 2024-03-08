@@ -15,12 +15,14 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from aap_eda.api.serializers.credential import CredentialRefSerializer
+from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.core import models, validators
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
+    eda_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project
@@ -36,18 +38,26 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
-            "credential_id",
+            "eda_credential_id",
             "verify_ssl",
             *read_only_fields,
         ]
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
+    eda_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project
-        fields = ["url", "name", "description", "credential_id", "verify_ssl"]
+        fields = [
+            "url",
+            "name",
+            "description",
+            "eda_credential_id",
+            "verify_ssl",
+        ]
 
 
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
@@ -69,10 +79,10 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Description of the project",
     )
-    credential_id = serializers.IntegerField(
+    eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        help_text="Credential id of the project",
+        help_text="EdaCredential id of the project",
     )
     verify_ssl = serializers.BooleanField(
         required=False,
@@ -81,13 +91,15 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Project
-        fields = ["name", "description", "credential_id", "verify_ssl"]
+        fields = ["name", "description", "eda_credential_id", "verify_ssl"]
 
 
 class ProjectReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the Project with embedded objects."""
 
-    credential = CredentialRefSerializer(required=False, allow_null=True)
+    eda_credential = EdaCredentialRefSerializer(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project()
@@ -103,15 +115,15 @@ class ProjectReadSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
-            "credential",
+            "eda_credential",
             "verify_ssl",
             *read_only_fields,
         ]
 
     def to_representation(self, project):
-        credential = (
-            CredentialRefSerializer(project["credential"]).data
-            if project["credential"]
+        eda_credential = (
+            EdaCredentialRefSerializer(project["eda_credential"]).data
+            if project["eda_credential"]
             else None
         )
         return {
@@ -121,7 +133,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "url": project["url"],
             "git_hash": project["git_hash"],
             "verify_ssl": project["verify_ssl"],
-            "credential": credential,
+            "eda_credential": eda_credential,
             "import_state": project["import_state"],
             "import_error": project["import_error"],
             "created_at": project["created_at"],
