@@ -187,7 +187,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
-        activation = get_object_or_404(self.get_queryset(), pk=pk)
+        activation = self.get_object()
 
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -241,7 +241,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        activation = get_object_or_404(self.get_queryset(), pk=pk)
+        activation = self.get_object()
 
         self._check_deleting(activation)
 
@@ -271,7 +271,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
-        activation = get_object_or_404(self.get_queryset(), pk=pk)
+        activation = self.get_object()
 
         self._check_deleting(activation)
 
