@@ -184,7 +184,7 @@ class ProjectViewSet(
         },
     )
     def partial_update(self, request, pk):
-        project = get_object_or_404(self.get_queryset(), pk=pk)
+        project = self.get_object()
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )
