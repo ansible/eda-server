@@ -39,15 +39,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
         ]
 
     def get_inputs(self, obj) -> str:
-        inputs = (
-            obj.inputs.get_secret_value()
-            if isinstance(obj.inputs, SecretValue)
-            else obj.inputs
-        )
-        return inputs_to_display(
-            obj.credential_type.inputs,
-            inputs,
-        )
+        return _get_inputs(obj)
 
 
 class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
@@ -95,3 +87,36 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
             "credential_type_id",
             *read_only_fields,
         ]
+
+
+class EdaCredentialRefSerializer(serializers.ModelSerializer):
+    """Serializer for EdaCredential reference."""
+
+    inputs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.EdaCredential
+        fields = [
+            "id",
+            "name",
+            "description",
+            "inputs",
+            "managed",
+            "credential_type_id",
+        ]
+        read_only_fields = ["id"]
+
+    def get_inputs(self, obj) -> str:
+        return _get_inputs(obj)
+
+
+def _get_inputs(obj) -> str:
+    inputs = (
+        obj.inputs.get_secret_value()
+        if isinstance(obj.inputs, SecretValue)
+        else obj.inputs
+    )
+    return inputs_to_display(
+        obj.credential_type.inputs,
+        inputs,
+    )
