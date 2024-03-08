@@ -74,12 +74,12 @@ __all__ = [
 
 permission_registry.register(
     Activation,
-    Team,
-    Organization,
     Credential,
     DecisionEnvironment,
-    Project,
     ExtraVar,
+    Project,
+    Organization,
+    Team,
     parent_field_name="organization",
 )
 permission_registry.register(
@@ -92,8 +92,4 @@ permission_registry.register(
 )
 permission_registry.register(
     AuditRule, parent_field_name="activation_instance"
-)
-permission_registry.register(
-    EventStream,
-    parent_field_name=None,
 )

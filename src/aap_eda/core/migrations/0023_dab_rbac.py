@@ -43,6 +43,14 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AlterModelOptions(
+            name="extravar",
+            options={"default_permissions": ("add", "view")},
+        ),
+        migrations.AlterModelOptions(
+            name="rulebook",
+            options={"default_permissions": ("view",)},
+        ),
+        migrations.AlterModelOptions(
             name="rulebookprocess",
             options={
                 "default_permissions": ("view", "delete"),

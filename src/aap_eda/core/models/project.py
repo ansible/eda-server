@@ -90,6 +90,10 @@ class Project(models.Model):
 class ExtraVar(models.Model):
     class Meta:
         db_table = "core_extra_var"
+        default_permissions = (
+            "add",
+            "view",
+        )
 
     name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()

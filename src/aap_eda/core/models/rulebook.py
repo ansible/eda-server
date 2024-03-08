@@ -35,6 +35,7 @@ class Rulebook(models.Model):
                 name="ck_rulebook_name_not_empty",
             ),
         ]
+        default_permissions = ("view",)
 
     name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
