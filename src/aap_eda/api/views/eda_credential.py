@@ -24,9 +24,9 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
-from aap_eda.api.serializers.utils import inputs_to_store
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
+from aap_eda.core.utils.credentials import inputs_to_store
 
 from .mixins import (
     CreateModelMixin,
