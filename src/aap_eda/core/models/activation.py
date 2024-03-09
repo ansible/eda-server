@@ -119,6 +119,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         "EdaCredential",
         null=True,
         default=None,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="+",
     )
