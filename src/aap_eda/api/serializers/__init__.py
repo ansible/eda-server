@@ -32,7 +32,10 @@ from .credential import (
     CredentialRefSerializer,
     CredentialSerializer,
 )
-from .credential_type import CredentialTypeSerializer
+from .credential_type import (
+    CredentialTypeRefSerializer,
+    CredentialTypeSerializer,
+)
 from .decision_environment import (
     DecisionEnvironmentCreateSerializer,
     DecisionEnvironmentReadSerializer,
@@ -117,6 +120,7 @@ __all__ = (
     "CredentialCreateSerializer",
     # credential type
     "CredentialTypeSerializer",
+    "CredentialTypeRefSerializer",
     "EdaCredentialSerializer",
     "EdaCredentialCreateSerializer",
     "EdaCredentialUpdateSerializer",

@@ -5,6 +5,7 @@ import typing as tp
 from datetime import datetime
 from enum import Enum
 
+import yaml
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
@@ -128,6 +129,11 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         vault_data = await self.get_vault_passwords(message)
         if vault_data:
             vault_collection = VaultCollection(data=vault_data)
+            await self.send(text_data=vault_collection.json())
+
+        eda_vault_data = await self.get_eda_system_vault_passwords(message)
+        if eda_vault_data:
+            vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
 
         await self.send(text_data=EndOfResponse().json())
@@ -371,6 +377,39 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                     # TODO: Use pydantic secret feature (available > 2.0)
                     # https://docs.pydantic.dev/latest/examples/secrets/
                     password=credential.secret.get_secret_value(),
+                )
+            )
+
+        return vault_passwords
+
+    @database_sync_to_async
+    def get_eda_system_vault_passwords(
+        self, message: WorkerMessage
+    ) -> tp.List[VaultPassword]:
+        """Get vault info from activation."""
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        activation = rulebook_process_instance.get_parent()
+        vault_passwords = []
+
+        if activation.eda_system_vault_credential:
+            vault = models.EdaCredential.objects.filter(
+                id=activation.eda_system_vault_credential.id
+            )
+        else:
+            vault = models.EdaCredential.objects.none()
+
+        vault_credential_type = models.CredentialType.objects.get(name="Vault")
+        for credential in activation.eda_credentials.filter(
+            credential_type_id=vault_credential_type.id
+        ).union(vault):
+            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+            vault_passwords.append(
+                VaultPassword(
+                    label=inputs["vault_id"],
+                    password=inputs["vault_password"],
                 )
             )
 
