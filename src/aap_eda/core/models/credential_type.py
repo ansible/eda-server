@@ -31,6 +31,6 @@ class CredentialType(models.Model):
     description = models.TextField(default="", blank=True, null=False)
     inputs = models.JSONField(default=dict)
     injectors = models.JSONField(default=dict)
-    managed = models.BooleanField(default=True)
+    managed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
