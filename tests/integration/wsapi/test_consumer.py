@@ -36,7 +36,39 @@ TEST_RULESETS = """
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
+VAULT_INPUTS = {
+    "fields": [
+        {
+            "id": "vault_id",
+            "label": "Vault Identifier",
+            "type": "string",
+            "help_text": ("Vault identifier to use use with vaulted strings"),
+        },
+        {
+            "id": "vault_password",
+            "label": "Vault Password",
+            "type": "string",
+            "secret": True,
+            "help_text": "Vault Password",
+        },
+    ],
+    "required": ["vault_password"],
+}
 
+
+@pytest.fixture(autouse=True)
+def vault_credential_type() -> models.CredentialType:
+    credential_type = models.CredentialType.objects.create(
+        name="Vault",
+        inputs=VAULT_INPUTS,
+        injectors={},
+        managed=True,
+    )
+    credential_type.refresh_from_db()
+    return credential_type
+
+
+@pytest.fixture
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_without_credentials(
     ws_communicator: WebsocketCommunicator,

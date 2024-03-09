@@ -32,7 +32,7 @@ class EdaCredential(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="", blank=True, null=False)
     inputs = EncryptedTextField(default="", blank=True, null=False)
-    managed = models.BooleanField(default=True)
+    managed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
