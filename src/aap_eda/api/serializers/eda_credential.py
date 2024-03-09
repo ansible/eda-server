@@ -14,6 +14,7 @@
 
 from rest_framework import serializers
 
+from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
 from aap_eda.core import models
 from aap_eda.core.utils.credentials import inputs_to_display
 from aap_eda.core.utils.crypto.base import SecretValue
@@ -21,6 +22,9 @@ from aap_eda.core.utils.crypto.base import SecretValue
 
 class EdaCredentialSerializer(serializers.ModelSerializer):
     inputs = serializers.SerializerMethodField()
+    credential_type = CredentialTypeRefSerializer(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.EdaCredential
@@ -28,18 +32,35 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "managed",
         ]
         fields = [
             "name",
             "description",
             "inputs",
-            "managed",
-            "credential_type_id",
+            "credential_type",
             *read_only_fields,
         ]
 
     def get_inputs(self, obj) -> str:
         return _get_inputs(obj)
+
+    def to_representation(self, eda_credential):
+        credential_type = (
+            CredentialTypeRefSerializer(eda_credential.credential_type).data
+            if eda_credential.credential_type
+            else None
+        )
+        return {
+            "id": eda_credential.id,
+            "name": eda_credential.name,
+            "description": eda_credential.description,
+            "managed": eda_credential.managed,
+            "inputs": self.get_inputs(eda_credential),
+            "credential_type": credential_type,
+            "created_at": eda_credential.created_at,
+            "modified_at": eda_credential.modified_at,
+        }
 
 
 class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
@@ -49,16 +70,18 @@ class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
         model = models.EdaCredential
         read_only_fields = [
             "id",
+            "managed",
             "created_at",
             "modified_at",
         ]
         fields = [
+            "id",
             "name",
             "description",
             "inputs",
-            "managed",
             "credential_type_id",
-            *read_only_fields,
+            "created_at",
+            "modified_at",
         ]
 
 
@@ -76,16 +99,18 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
         model = models.EdaCredential
         read_only_fields = [
             "id",
+            "managed",
             "created_at",
             "modified_at",
         ]
         fields = [
+            "id",
             "name",
             "description",
             "inputs",
-            "managed",
             "credential_type_id",
-            *read_only_fields,
+            "created_at",
+            "modified_at",
         ]
 
 
