@@ -24,12 +24,18 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "managed",
         ]
         fields = [
             "name",
             "description",
             "inputs",
             "injectors",
-            "managed",
             *read_only_fields,
         ]
+
+
+class CredentialTypeRefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.CredentialType
+        fields = ["id", "name"]

@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import json
 import logging
 import secrets
 import uuid
@@ -28,6 +29,7 @@ from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
+from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
@@ -37,10 +39,13 @@ from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.api.serializers.utils import (
     substitute_extra_vars,
     substitute_source_args,
+    substitute_variables,
     swap_sources,
 )
+from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import CredentialType, ProcessParentType
+from aap_eda.core.utils.credentials import get_secret_fields
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +94,75 @@ def _updated_ruleset(validated_data):
         raise InvalidEventStreamRulebook(e)
 
 
+def _handle_eda_credentials(validated_data: dict):
+    try:
+        system_vault_credential_needed = False
+        password = secrets.token_urlsafe()
+        vault = _get_vault_credential_type()
+
+        for eda_credential_id in validated_data["eda_credentials"]:
+            eda_credential = models.EdaCredential.objects.get(
+                id=eda_credential_id
+            )
+            if eda_credential.credential_type.id == vault.id:
+                continue
+
+            schema_inputs = eda_credential.credential_type.inputs
+            injectors = eda_credential.credential_type.injectors
+            secret_fields = get_secret_fields(schema_inputs)
+
+            user_inputs = yaml.safe_load(
+                eda_credential.inputs.get_secret_value()
+            )
+
+            for key, value in user_inputs.items():
+                if key in secret_fields:
+                    user_inputs[key] = encrypt_string(
+                        password=password,
+                        plaintext=value,
+                        vault_id=EDA_SERVER_VAULT_LABEL,
+                    )
+                    system_vault_credential_needed = True
+
+            # TODO: check duplicate keys later
+            data = substitute_variables(injectors, user_inputs)
+            # TODO: check if user already have extra var,
+            # use it instead of creating new one
+            extra_var = models.ExtraVar.objects.create(
+                extra_var=data["extra_vars"]
+            )
+            validated_data["extra_var_id"] = extra_var.id
+
+        if system_vault_credential_needed:
+            validated_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(password, vault)
+
+    except Exception as e:
+        logger.error(f"Failed to process credential data: {e}")
+        raise e
+
+
+def _create_system_eda_credential(
+    password: str, vault: models.CredentialType
+) -> models.EdaCredential:
+    inputs = {
+        "vault_id": EDA_SERVER_VAULT_LABEL,
+        "vault_password": password,
+    }
+
+    return models.EdaCredential.objects.create(
+        name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
+        managed=True,
+        inputs=json.dumps(inputs),
+        credential_type=vault,
+    )
+
+
+def _get_vault_credential_type():
+    return models.CredentialType.objects.get(name="Vault")
+
+
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
@@ -102,6 +176,12 @@ class ActivationSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         child=EventStreamOutSerializer(),
+    )
+
+    eda_credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EdaCredentialSerializer(),
     )
 
     class Meta:
@@ -128,6 +208,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "credentials",
             "event_streams",
+            "eda_credentials",
             "log_level",
         ]
         read_only_fields = [
@@ -153,6 +234,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         child=EventStreamOutSerializer(),
+    )
+    eda_credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EdaCredentialSerializer(),
     )
 
     class Meta:
@@ -180,6 +266,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "credentials",
             "event_streams",
             "log_level",
+            "eda_credentials",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -194,6 +281,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
         event_streams = [
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
+        ]
+        eda_credentials = [
+            EdaCredentialSerializer(credential).data
+            for credential in activation.eda_credentials.all()
         ]
 
         return {
@@ -219,6 +310,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "credentials": credentials,
             "event_streams": event_streams,
             "log_level": activation.log_level,
+            "eda_credentials": eda_credentials,
         }
 
 
@@ -240,6 +332,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "credentials",
             "event_streams",
             "log_level",
+            "eda_credentials",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -271,6 +364,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         child=serializers.IntegerField(),
         validators=[validators.check_if_event_streams_exists],
     )
+    eda_credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
+    )
 
     def validate(self, data):
         user = data["user"]
@@ -298,6 +396,10 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             validated_data["rulebook_rulesets"] = _updated_ruleset(
                 validated_data
             )
+
+        if validated_data.get("eda_credentials"):
+            _handle_eda_credentials(validated_data)
+
         return super().create(validated_data)
 
 
@@ -347,6 +449,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    eda_credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EdaCredentialSerializer(),
+    )
 
     class Meta:
         model = models.Activation
@@ -374,6 +481,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "status_message",
             "awx_token_id",
             "credentials",
+            "eda_credentials",
             "event_streams",
             "log_level",
         ]
@@ -426,6 +534,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
         ]
+        eda_credentials = [
+            EdaCredentialSerializer(credential).data
+            for credential in activation.eda_credentials.all()
+        ]
 
         return {
             "id": activation.id,
@@ -455,6 +567,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "credentials": credentials,
             "event_streams": event_streams,
             "log_level": activation.log_level,
+            "eda_credentials": eda_credentials,
         }
 
 

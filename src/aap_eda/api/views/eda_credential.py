@@ -47,23 +47,6 @@ logger = logging.getLogger(__name__)
             ),
         },
     ),
-    list=extend_schema(
-        description="List all EDA credentials",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.EdaCredentialSerializer(many=True),
-                description="Return a list of EDA credentials.",
-            ),
-        },
-    ),
-    destroy=extend_schema(
-        description="Delete an EDA credential by id",
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                None, description="Delete successful."
-            )
-        },
-    ),
 )
 class EdaCredentialViewSet(
     ResponseSerializerMixin,
@@ -109,6 +92,28 @@ class EdaCredentialViewSet(
         )
 
     @extend_schema(
+        description="List all EDA credentials",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.EdaCredentialSerializer(many=True),
+                description="Return a list of EDA credentials.",
+            ),
+        },
+    )
+    def list(self, request):
+        credentials = models.EdaCredential.objects.exclude(
+            managed=True,
+        )
+        credentials = self.filter_queryset(credentials)
+
+        serializer = serializers.EdaCredentialSerializer(
+            credentials, many=True
+        )
+        result = self.paginate_queryset(serializer.data)
+
+        return self.get_paginated_response(result)
+
+    @extend_schema(
         description="Partial update of an EDA credential",
         request=serializers.EdaCredentialUpdateSerializer,
         responses={
@@ -142,3 +147,22 @@ class EdaCredentialViewSet(
             serializers.EdaCredentialSerializer(eda_credential).data,
             status=status.HTTP_206_PARTIAL_CONTENT,
         )
+
+    @extend_schema(
+        description="Delete an eda credential by id",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None, description="Delete successful."
+            )
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        eda_credential = self.get_object()
+        if eda_credential.managed:
+            error = "Managed EDA credential cannot be deleted"
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        self.perform_destroy(eda_credential)
+        return Response(status=status.HTTP_204_NO_CONTENT)
