@@ -93,6 +93,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
     for project in projects:
         service = ProjectImportService(git_cls=git_mock)
         service.import_project(project)
+        project.refresh_from_db()
 
         git_mock.clone.assert_called_with(
             project.url,
@@ -138,6 +139,7 @@ def test_project_import_with_new_layout(
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -197,6 +199,7 @@ def test_project_import_with_vaulted_data(
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -220,6 +223,7 @@ def _setup_project_sync():
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -250,6 +254,7 @@ def test_project_sync(storage_save_patch, service_tempdir_patch):
 
     service = ProjectImportService(git_cls=git_mock)
     service.sync_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -282,6 +287,7 @@ def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
 
     service = ProjectImportService(git_cls=git_mock)
     service.sync_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -324,6 +330,7 @@ def test_project_import_with_invalid_rulebooks(
     try:
         service = ProjectImportService(git_cls=git_mock)
         service.import_project(project)
+        project.refresh_from_db()
     finally:
         logger.propagate = propagate
 
