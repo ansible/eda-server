@@ -28,6 +28,30 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
         ]
         fields = [
             "name",
+            "namespace",
+            "kind",
+            "description",
+            "inputs",
+            "injectors",
+            *read_only_fields,
+        ]
+
+
+class CredentialTypeCreateSerializer(serializers.ModelSerializer):
+    inputs = serializers.JSONField()
+
+    class Meta:
+        model = models.CredentialType
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+            "managed",
+            "kind",
+            "namespace",
+        ]
+        fields = [
+            "name",
             "description",
             "inputs",
             "injectors",
@@ -38,4 +62,4 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
 class CredentialTypeRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CredentialType
-        fields = ["id", "name"]
+        fields = ["id", "name", "namespace", "kind"]

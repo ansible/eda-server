@@ -135,6 +135,64 @@ def test_list_eda_credentials(
 
 
 @pytest.mark.django_db
+def test_list_eda_credentials_with_kind_filter(
+    client: APIClient, credential_type: models.CredentialType
+):
+    registry_type = models.CredentialType.objects.create(
+        name="registry", inputs=INPUTS, injectors={}, kind="registry"
+    )
+    scm_type = models.CredentialType.objects.create(
+        name="scm", inputs=INPUTS, injectors={}, kind="scm"
+    )
+    models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"username": "adam", "password": "secret"},
+                credential_type_id=registry_type.id,
+            ),
+            models.EdaCredential(
+                name="credential-2",
+                inputs={"username": "bearny", "password": "secret"},
+                credential_type_id=scm_type.id,
+            ),
+            models.EdaCredential(
+                name="credential-3",
+                inputs={"username": "christ", "password": "secret"},
+                credential_type_id=scm_type.id,
+            ),
+        ]
+    )
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
+    )
+    assert len(response.data["results"]) == 2
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=registry"
+    )
+    assert len(response.data["results"]) == 1
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=vault"
+    )
+    assert len(response.data["results"]) == 0
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
+        "&credential_type__kind=vault",
+    )
+    assert len(response.data["results"]) == 2
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
+        "&credential_type__kind=registry",
+    )
+    assert len(response.data["results"]) == 3
+
+
+@pytest.mark.django_db
 def test_delete_eda_credential(client: APIClient):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
