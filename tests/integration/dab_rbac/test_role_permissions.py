@@ -16,7 +16,7 @@ def view_activation_rd():
 
 
 @pytest.mark.django_db
-def test_view_assignments_non_admin(user, user_api_client, cls_factory):
+def test_view_assignments_non_admin(user, user_api_client, cls_factory, view_activation_rd):
     activation = cls_factory.create(models.Activation)
     assignment = view_activation_rd.give_permission(user, activation)
     url = reverse("roleuserassignment-list")
@@ -26,7 +26,7 @@ def test_view_assignments_non_admin(user, user_api_client, cls_factory):
     assert r.data["results"][0]["id"] == assignment.id
 
 
-@pytest.mark.skip(reason='Not fixed in DAB')
+@pytest.mark.skip(reason="Not fixed in DAB")
 @pytest.mark.django_db
 def test_delete_user_after_assignment(user, view_activation_rd, cls_factory):
     activation = cls_factory.create(models.Activation)

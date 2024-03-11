@@ -40,6 +40,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the DecisionEnvironment."""
 
     credential_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = models.DecisionEnvironment

@@ -47,7 +47,8 @@ class ModelFactory:
     def cls_is_ready(self, cls):
         "True or False, this class can be created with existing dependencies"
         for field in self.fk_fields(cls):
-            if field.null is True:
+            # Organization is technically null but we do not want it to be
+            if (field.null is True) and (field.name != 'organization'):
                 continue
             if not any(
                 isinstance(existing_obj, field.related_model)

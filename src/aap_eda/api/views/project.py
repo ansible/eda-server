@@ -73,6 +73,11 @@ class ExtraVarViewSet(
     def get_queryset(self):
         return models.ExtraVar.access_qs(self.request.user).order_by("id")
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.ExtraVarCreateSerializer
+        return super().get_serializer_class()
+
 
 @extend_schema_view(
     list=extend_schema(
