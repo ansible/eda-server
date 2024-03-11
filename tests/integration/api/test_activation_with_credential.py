@@ -232,6 +232,8 @@ def test_create_activation_with_eda_credential(
     assert data["eda_credentials"][0]["credential_type"] == {
         "id": kafka_credential_type.id,
         "name": kafka_credential_type.name,
+        "namespace": None,
+        "kind": "cloud",
     }
     activation = models.Activation.objects.filter(id=data["id"]).first()
 
