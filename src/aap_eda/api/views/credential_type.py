@@ -37,16 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
-    create=extend_schema(
-        description="Create a new credential type.",
-        request=serializers.CredentialTypeSerializer,
-        responses={
-            status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.CredentialTypeSerializer,
-                description="Return the new credential type.",
-            ),
-        },
-    ),
     retrieve=extend_schema(
         description="Get credential type by id",
         responses={
@@ -91,9 +81,34 @@ class CredentialTypeViewSet(
     serializer_class = serializers.CredentialTypeSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialTypeFilter
+    ordering_fields = ["name"]
 
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
+
+    @extend_schema(
+        description="Create a new credential type.",
+        request=serializers.CredentialTypeSerializer,
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                serializers.CredentialTypeSerializer,
+                description="Return the new credential type.",
+            ),
+        },
+    )
+    def create(self, request):
+        serializer = serializers.CredentialTypeCreateSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.validated_data["kind"] = "cloud"
+        credential_type = serializer.create(serializer.validated_data)
+
+        return Response(
+            serializers.CredentialTypeSerializer(credential_type).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @extend_schema(
         description="Delete a credential type by id",
