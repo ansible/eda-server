@@ -94,7 +94,7 @@ def _updated_ruleset(validated_data):
         raise InvalidEventStreamRulebook(e)
 
 
-def _handle_eda_credentials(validated_data: dict):
+def _handle_eda_credentials(validated_data: dict, extra_var_obj):
     try:
         system_vault_credential_needed = False
         password = secrets.token_urlsafe()
@@ -124,14 +124,28 @@ def _handle_eda_credentials(validated_data: dict):
                     )
                     system_vault_credential_needed = True
 
-            # TODO: check duplicate keys later
             data = substitute_variables(injectors, user_inputs)
-            # TODO: check if user already have extra var,
-            # use it instead of creating new one
-            extra_var = models.ExtraVar.objects.create(
-                extra_var=data["extra_vars"]
-            )
-            validated_data["extra_var_id"] = extra_var.id
+
+            if extra_var_obj:
+                existing_data = yaml.safe_load(extra_var_obj.extra_var)
+                for key in data["extra_vars"]:
+                    if key in existing_data:
+                        message = (
+                            f"Key: {key} already exists in extra var. "
+                            f"It conflicts with credential type: "
+                            f"{eda_credential.credential_type.name}. "
+                            f"Please check injectors."
+                        )
+                        raise serializers.ValidationError(message)
+                    existing_data[key] = data["extra_vars"][key]
+
+                extra_var_obj.extra_var = yaml.dump(existing_data)
+                extra_var_obj.save(update_fields=["extra_var"])
+            else:
+                extra_var = models.ExtraVar.objects.create(
+                    extra_var=yaml.dump(data["extra_vars"])
+                )
+                validated_data["extra_var_id"] = extra_var.id
 
         if system_vault_credential_needed:
             validated_data[
@@ -397,8 +411,13 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
                 validated_data
             )
 
+        extra_var_obj = None
+        if validated_data.get("extra_var_id"):
+            extra_var_obj = models.ExtraVar.objects.get(
+                id=validated_data["extra_var_id"]
+            )
         if validated_data.get("eda_credentials"):
-            _handle_eda_credentials(validated_data)
+            _handle_eda_credentials(validated_data, extra_var_obj)
 
         return super().create(validated_data)
 
