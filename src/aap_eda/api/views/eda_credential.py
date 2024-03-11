@@ -16,11 +16,13 @@ import logging
 
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
@@ -35,6 +37,14 @@ from .mixins import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class KindFilterBackend(BaseFilterBackend):
+    def filter_queryset(self, request, queryset, _view):
+        kinds = request.GET.getlist("credential_type__kind")
+        if bool(kinds):
+            return queryset.filter(credential_type__kind__in=kinds)
+        return queryset
 
 
 @extend_schema_view(
@@ -59,8 +69,12 @@ class EdaCredentialViewSet(
 ):
     queryset = models.EdaCredential.objects.all()
     serializer_class = serializers.EdaCredentialSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
+    filter_backends = (
+        KindFilterBackend,
+        defaultfilters.DjangoFilterBackend,
+    )
     filterset_class = filters.EdaCredentialFilter
+    ordering_fields = ["name"]
 
     rbac_resource_type = ResourceType.EDA_CREDENTIAL
     rbac_action = None
@@ -93,6 +107,13 @@ class EdaCredentialViewSet(
 
     @extend_schema(
         description="List all EDA credentials",
+        parameters=[
+            OpenApiParameter(
+                "credential_type__kind",
+                type=str,
+                description="Kind of CredentialType",
+            ),
+        ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EdaCredentialSerializer(many=True),
