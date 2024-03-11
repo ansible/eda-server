@@ -67,9 +67,14 @@ TEST_RULESETS = """
 
 TEST_EXTRA_VAR = """
 ---
-collections:
-  - community.general
-  - benthomasson.eda
+var_1: demo
+var_2: test
+"""
+
+OVERLAP_EXTRA_VAR = """
+---
+sasl_plain_username: demo
+sasl_plain_password: secret
 """
 
 RULESET_WITH_JOB_TEMPLATE = """
@@ -132,11 +137,11 @@ VAULT_INPUTS = {
 
 INJECTORS = {
     "extra_vars": {
-        "keyfile": "{{ keyfile }}",
-        "certfile": "{{ certfile }}",
-        "password": "{{ password }}",
-        "sasl_plain_password": "{{ sasl_password }}",
-        "sasl_plain_username": "{{ sasl_username }}",
+        "keyfile": "{{ keyfile |default(None)}}",
+        "certfile": "{{ certfile|default(None) }}",
+        "password": "{{ password |default(None)}}",
+        "sasl_plain_password": "{{ sasl_password |default(None)}}",
+        "sasl_plain_username": "{{ sasl_username |default(None)}}",
     }
 }
 
@@ -154,7 +159,7 @@ def kafka_credential_type() -> models.CredentialType:
     return credential_type
 
 
-def create_activation_related_data(with_project=True):
+def create_activation_related_data(extra_var, with_project=True):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -189,7 +194,7 @@ def create_activation_related_data(with_project=True):
         if with_project
         else None
     )
-    extra_var_id = models.ExtraVar.objects.create(extra_var=TEST_EXTRA_VAR).pk
+    extra_var_id = models.ExtraVar.objects.create(extra_var=extra_var).pk
 
     return {
         "user_id": user_id,
@@ -204,7 +209,7 @@ def create_activation_related_data(with_project=True):
 def test_create_activation_with_eda_credential(
     client: APIClient, kafka_credential_type: models.CredentialType
 ):
-    fks = create_activation_related_data()
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
@@ -242,3 +247,32 @@ def test_create_activation_with_eda_credential(
     assert activation.eda_system_vault_credential.credential_type is not None
     credential_type = activation.eda_system_vault_credential.credential_type
     assert credential_type.name == "Vault"
+
+
+@pytest.mark.django_db
+def test_create_activation_with_key_conflict(
+    client: APIClient, kafka_credential_type: models.CredentialType
+):
+    fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+
+    test_eda_credential = {
+        "name": "eda-credential",
+        "inputs": {"sasl_username": "adam", "sasl_password": "secret"},
+        "credential_type_id": kafka_credential_type.id,
+    }
+    response = client.post(
+        f"{api_url_v1}/eda-credentials/", data=test_eda_credential
+    )
+    test_activation["eda_credentials"] = [response.data["id"]]
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert str(response.data[0]) == (
+        "Key: sasl_plain_password already exists "
+        "in extra var. It conflicts with credential type: type1. "
+        "Please check injectors."
+    )
