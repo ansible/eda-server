@@ -20,6 +20,7 @@ from aap_eda.settings.default import (
     ImproperlyConfigured,
     RulebookProcessLogLevel,
     get_rulebook_process_log_level,
+    get_safe_plugins_for_port_forward,
 )
 
 
@@ -47,3 +48,33 @@ def test_rulebook_log_level_invalid(mock_settings):
     mock_settings.get.return_value = "invalid"
     with pytest.raises(ImproperlyConfigured):
         get_rulebook_process_log_level()
+
+
+@patch("aap_eda.settings.default.settings")
+def test_get_safe_plugins_for_port_forwarding_not_list(mock_settings):
+    mock_settings.get.return_value = "plugin1"
+    with pytest.raises(ImproperlyConfigured):
+        get_safe_plugins_for_port_forward()
+
+
+DEFAULT_SAFE_PLUGINS = ["ansible.eda.webhook", "ansible.eda.alertmanager"]
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (["plugin1"], ["plugin1"] + DEFAULT_SAFE_PLUGINS),
+        (
+            ["plugin1"] + DEFAULT_SAFE_PLUGINS,
+            ["plugin1"] + DEFAULT_SAFE_PLUGINS,
+        ),
+        (DEFAULT_SAFE_PLUGINS, DEFAULT_SAFE_PLUGINS),
+    ],
+)
+@patch("aap_eda.settings.default.settings")
+def test_get_safe_plugins_for_port_forwarding(mock_settings, value, expected):
+    mock_settings.get.return_value = value
+
+    result = get_safe_plugins_for_port_forward()
+
+    assert result == expected

@@ -528,7 +528,24 @@ _DEFAULT_PG_NOTIFY_DSN = (
 PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
 PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
 
-SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
-    "SAFE_PLUGINS_FOR_PORT_FORWARD",
-    ["ansible.eda.webhook", "ansible.eda.alertmanager"],
-)
+
+def get_safe_plugins_for_port_forward() -> list:
+    default_plugins = ["ansible.eda.webhook", "ansible.eda.alertmanager"]
+    safe_plugins = settings.get(
+        "SAFE_PLUGINS_FOR_PORT_FORWARD",
+        default_plugins,
+    )
+
+    if not isinstance(safe_plugins, list):
+        raise ImproperlyConfigured(
+            "The SAFE_PLUGINS_FOR_PORT_FORWARD setting must be a list."
+        )
+
+    for plugin in default_plugins:
+        if plugin not in safe_plugins:
+            safe_plugins.append(plugin)
+
+    return safe_plugins
+
+
+SAFE_PLUGINS_FOR_PORT_FORWARD = get_safe_plugins_for_port_forward()
