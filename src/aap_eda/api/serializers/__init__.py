@@ -33,6 +33,7 @@ from .credential import (
     CredentialSerializer,
 )
 from .credential_type import (
+    CredentialTypeCreateSerializer,
     CredentialTypeRefSerializer,
     CredentialTypeSerializer,
 )
@@ -120,6 +121,7 @@ __all__ = (
     "CredentialCreateSerializer",
     # credential type
     "CredentialTypeSerializer",
+    "CredentialTypeCreateSerializer",
     "CredentialTypeRefSerializer",
     "EdaCredentialSerializer",
     "EdaCredentialCreateSerializer",
