@@ -160,6 +160,8 @@ ROLES = [
 CREDENTIAL_TYPES = [
     {
         "name": "Source Control",
+        "namespace": "scm",
+        "kind": "scm",
         "inputs": {
             "fields": [
                 {"id": "username", "label": "Username", "type": "string"},
@@ -190,6 +192,8 @@ CREDENTIAL_TYPES = [
     },
     {
         "name": "Container Registry",
+        "kind": "registry",
+        "namespace": "registry",
         "inputs": {
             "fields": [
                 {
@@ -225,6 +229,8 @@ CREDENTIAL_TYPES = [
     },
     {
         "name": "GPG Public Key",
+        "kind": "cryptography",
+        "namespace": "gpg_public_key",
         "inputs": {
             "fields": [
                 {
@@ -245,6 +251,8 @@ CREDENTIAL_TYPES = [
     },
     {
         "name": "Red Hat Ansible Automation Platform",
+        "kind": "cloud",
+        "namespace": "controller",
         "inputs": {
             "fields": [
                 {
@@ -310,22 +318,28 @@ CREDENTIAL_TYPES = [
     },
     {
         "name": "Vault",
+        "namespace": "vault",
+        "kind": "vault",
         "inputs": {
             "fields": [
-                {
-                    "id": "vault_id",
-                    "label": "Vault Identifier",
-                    "type": "string",
-                    "help_text": (
-                        "Vault identifier to use use with vaulted strings"
-                    ),
-                },
                 {
                     "id": "vault_password",
                     "label": "Vault Password",
                     "type": "string",
                     "secret": True,
-                    "help_text": "Vault Password",
+                    "ask_at_runtime": True,
+                },
+                {
+                    "id": "vault_id",
+                    "label": "Vault Identifier",
+                    "type": "string",
+                    "format": "vault_id",
+                    "help_text": (
+                        "Specify an (optional) Vault ID. This is equivalent "
+                        "to specifying the --vault-id Ansible parameter for "
+                        "providing multiple Vault passwords.  Note: this "
+                        " feature only works in Ansible 2.4+."
+                    ),
                 },
             ],
             "required": ["vault_password"],
@@ -385,6 +399,8 @@ class Command(BaseCommand):
             new_type, created = models.CredentialType.objects.get_or_create(
                 name=credential_type_data["name"],
                 description=credential_type_data.get("description", ""),
+                namespace=credential_type_data.get("namespace"),
+                kind=credential_type_data.get("kind", "cloud"),
                 inputs=credential_type_data.get("inputs", {}),
                 injectors=credential_type_data.get("injectors", {}),
                 managed=credential_type_data.get("managed", True),
