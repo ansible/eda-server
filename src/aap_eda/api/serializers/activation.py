@@ -94,67 +94,50 @@ def _updated_ruleset(validated_data):
         raise InvalidEventStreamRulebook(e)
 
 
-def _handle_eda_credentials(validated_data: dict, extra_var_obj):
-    try:
-        system_vault_credential_needed = False
-        password = secrets.token_urlsafe()
-        vault = _get_vault_credential_type()
+def _handle_eda_credentials(
+    validated_data: dict,
+    extra_var_obj: models.ExtraVar,
+    vault: models.CredentialType,
+    password: str,
+) -> bool:
+    system_vault_credential_needed = False
 
-        for eda_credential_id in validated_data["eda_credentials"]:
-            eda_credential = models.EdaCredential.objects.get(
-                id=eda_credential_id
-            )
-            if eda_credential.credential_type.id == vault.id:
-                continue
+    for eda_credential_id in validated_data["eda_credentials"]:
+        eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
+        if eda_credential.credential_type.id == vault.id:
+            continue
 
-            schema_inputs = eda_credential.credential_type.inputs
-            injectors = eda_credential.credential_type.injectors
-            secret_fields = get_secret_fields(schema_inputs)
+        schema_inputs = eda_credential.credential_type.inputs
+        injectors = eda_credential.credential_type.injectors
+        secret_fields = get_secret_fields(schema_inputs)
 
-            user_inputs = yaml.safe_load(
-                eda_credential.inputs.get_secret_value()
-            )
+        user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
 
-            for key, value in user_inputs.items():
-                if key in secret_fields:
-                    user_inputs[key] = encrypt_string(
-                        password=password,
-                        plaintext=value,
-                        vault_id=EDA_SERVER_VAULT_LABEL,
-                    )
-                    system_vault_credential_needed = True
-
-            data = substitute_variables(injectors, user_inputs)
-
-            if extra_var_obj:
-                existing_data = yaml.safe_load(extra_var_obj.extra_var)
-                for key in data["extra_vars"]:
-                    if key in existing_data:
-                        message = (
-                            f"Key: {key} already exists in extra var. "
-                            f"It conflicts with credential type: "
-                            f"{eda_credential.credential_type.name}. "
-                            f"Please check injectors."
-                        )
-                        raise serializers.ValidationError(message)
-                    existing_data[key] = data["extra_vars"][key]
-
-                extra_var_obj.extra_var = yaml.dump(existing_data)
-                extra_var_obj.save(update_fields=["extra_var"])
-            else:
-                extra_var = models.ExtraVar.objects.create(
-                    extra_var=yaml.dump(data["extra_vars"])
+        for key, value in user_inputs.items():
+            if key in secret_fields:
+                user_inputs[key] = encrypt_string(
+                    password=password,
+                    plaintext=value,
+                    vault_id=EDA_SERVER_VAULT_LABEL,
                 )
-                validated_data["extra_var_id"] = extra_var.id
+                system_vault_credential_needed = True
 
-        if system_vault_credential_needed:
-            validated_data[
-                "eda_system_vault_credential"
-            ] = _create_system_eda_credential(password, vault)
+        data = substitute_variables(injectors, user_inputs)
 
-    except Exception as e:
-        logger.error(f"Failed to process credential data: {e}")
-        raise e
+        if extra_var_obj:
+            existing_data = yaml.safe_load(extra_var_obj.extra_var)
+            for key in data["extra_vars"]:
+                existing_data[key] = data["extra_vars"][key]
+
+            extra_var_obj.extra_var = yaml.dump(existing_data)
+            extra_var_obj.save(update_fields=["extra_var"])
+        else:
+            extra_var = models.ExtraVar.objects.create(
+                extra_var=yaml.dump(data["extra_vars"])
+            )
+            validated_data["extra_var_id"] = extra_var.id
+
+    return system_vault_credential_needed
 
 
 def _create_system_eda_credential(
@@ -396,6 +379,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         if not awx_token:
             validate_rulebook_token(data["rulebook_id"])
 
+        if data.get("eda_credentials") and data.get("extra_var_id"):
+            validate_eda_credentails(
+                data.get("eda_credentials"), data.get("extra_var_id")
+            )
+
         return data
 
     def create(self, validated_data):
@@ -412,12 +400,25 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             )
 
         extra_var_obj = None
+        password = secrets.token_urlsafe()
+        system_vault_credential_needed = False
+
         if validated_data.get("extra_var_id"):
             extra_var_obj = models.ExtraVar.objects.get(
                 id=validated_data["extra_var_id"]
             )
+
+        vault = _get_vault_credential_type()
+
         if validated_data.get("eda_credentials"):
-            _handle_eda_credentials(validated_data, extra_var_obj)
+            system_vault_credential_needed = _handle_eda_credentials(
+                validated_data, extra_var_obj, vault, password
+            )
+
+        if system_vault_credential_needed:
+            validated_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(password, vault)
 
         return super().create(validated_data)
 
@@ -687,3 +688,49 @@ def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
         raise serializers.ValidationError(
             "The rulebook requires an Awx Token.",
         )
+
+
+def validate_eda_credentails(
+    eda_credential_ids: list[int], extra_var_id: int
+) -> None:
+    try:
+        vault = _get_vault_credential_type()
+        extra_var = models.ExtraVar.objects.get(id=extra_var_id)
+        existing_data = yaml.safe_load(extra_var.extra_var)
+    except models.CredentialType.DoesNotExist:
+        raise serializers.ValidationError(
+            "CredentialType with name 'Vault' does not exist"
+        )
+    except models.ExtraVar.DoesNotExist:
+        raise serializers.ValidationError(
+            f"ExtraVar with id {extra_var_id} does not exist"
+        )
+
+    existing_keys = [*existing_data.keys()]
+
+    for eda_credential_id in eda_credential_ids:
+        try:
+            eda_credential = models.EdaCredential.objects.get(
+                id=eda_credential_id
+            )
+
+            if eda_credential.credential_type.id == vault.id:
+                continue
+
+            injectors = eda_credential.credential_type.injectors
+
+            for key in injectors["extra_vars"]:
+                if key in existing_keys or key in existing_data:
+                    message = (
+                        f"Key: {key} already exists in extra var. "
+                        f"It conflicts with credential type: "
+                        f"{eda_credential.credential_type.name}. "
+                        f"Please check injectors."
+                    )
+                    raise serializers.ValidationError(message)
+
+                existing_keys.append(key)
+        except models.EdaCredential.DoesNotExist:
+            raise serializers.ValidationError(
+                f"EdaCredential with id {eda_credential_id} does not exist"
+            )
