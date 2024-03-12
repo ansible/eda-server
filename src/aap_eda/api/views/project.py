@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from django.db import IntegrityError, transaction
-from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -28,7 +27,11 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 
-from .mixins import ResponseSerializerMixin
+from .mixins import ResponseSerializerMixin, CreateModelMixin
+
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.forms import model_to_dict
 
 
 @extend_schema_view(
@@ -62,7 +65,7 @@ from .mixins import ResponseSerializerMixin
     ),
 )
 class ExtraVarViewSet(
-    mixins.CreateModelMixin,
+    CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
     serializer_class = serializers.ExtraVarSerializer
@@ -77,6 +80,9 @@ class ExtraVarViewSet(
         if self.action == "create":
             return serializers.ExtraVarCreateSerializer
         return super().get_serializer_class()
+
+    def get_response_serializer_class(self):
+        return serializers.ExtraVarSerializer
 
 
 @extend_schema_view(
@@ -131,7 +137,17 @@ class ProjectViewSet(
             data=request.data
         )
         serializer.is_valid(raise_exception=True)
-        project = serializer.save()
+        with transaction.atomic():
+            project = serializer.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(serializer.instance),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, serializer.instance
+            )
 
         job = tasks.import_project.delay(project_id=project.id)
 
@@ -210,6 +226,7 @@ class ProjectViewSet(
             credential_id = None  # for credential = 0
 
         try:
+            old_data = model_to_dict(project)
             project.credential_id = credential_id
             project.name = request.data.get("name", project.name)
             project.description = request.data.get(
@@ -218,7 +235,14 @@ class ProjectViewSet(
             project.verify_ssl = request.data.get(
                 "verify_ssl", project.verify_ssl
             )
-            project.save()
+            with transaction.atomic():
+                project.save()
+                check_related_permissions(
+                    request.user,
+                    serializer.Meta.model,
+                    old_data,
+                    model_to_dict(project),
+                )
         except IntegrityError as e:
             return Response(
                 {"errors": str(e)},

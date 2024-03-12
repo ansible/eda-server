@@ -27,7 +27,9 @@ def test_add_permissions(
     url = reverse(f"{model._meta.model_name}-list")
 
     response = user_api_client.post(url, data=data)
+    prior_ct = model.objects.count()
     assert response.status_code == 403, response.data
+    assert model.objects.count() == prior_ct  # assure nothing was created
 
     # Figure out the parent object if we can
     parent_field_name = permission_registry.get_parent_fd_name(model)
@@ -51,8 +53,39 @@ def test_add_permissions(
         )
         add_rd.give_global_permission(user)
 
+    # give user permission to related objects
+    # so it does not block the create
+    model_names = [
+        cls._meta.model_name
+        for cls in permission_registry.all_registered_models
+    ]
+    for field in model._meta.concrete_fields:
+        if field.name == parent_field_name:
+            continue
+        from django.db.models import ForeignKey
+
+        if (
+            isinstance(field, ForeignKey)
+            and field.related_model._meta.model_name in model_names
+        ):
+            related_obj = create_data[field.name]
+            related_perm = "change"
+            if "change" not in related_obj._meta.default_permissions:
+                related_perm = "view"
+            give_obj_perm(user, related_obj, related_perm)
+
     response = user_api_client.post(url, data=data, format="json")
     assert response.status_code == 201, response.data
+
+    if model.objects.count() == 1:
+        obj = model.objects.first()
+    else:
+        obj = model.objects.get(pk=response.data["id"])
+    if parent_field_name:
+        assert obj.organization_id == parent_obj.id
+
+    # Assure that user gets some creator permissions
+    assert user.has_obj_perm(obj, "view")
 
 
 def get_detail_url(obj, skip_if_not_found=False):

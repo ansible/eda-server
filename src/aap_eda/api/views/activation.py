@@ -36,6 +36,11 @@ from aap_eda.tasks.orchestrator import (
     stop_activation,
 )
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.forms import model_to_dict
+from django.db import transaction
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,7 +85,17 @@ class ActivationViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        response = serializer.create(serializer.validated_data)
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
 
         if response.is_enabled:
             start_activation(activation_id=response.id)
