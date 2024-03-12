@@ -162,6 +162,12 @@ def create_activation_related_data(with_project=True):
         token=TEST_AWX_TOKEN["token"],
         user=user,
     )
+    models.CredentialType.objects.create(
+        name="Vault",
+        inputs={"fields": [{"a": "b"}]},
+        injectors={},
+        managed=False,
+    )
     credential_id = models.Credential.objects.create(
         name="test-credential",
         description="test credential",
