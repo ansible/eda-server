@@ -273,8 +273,90 @@ def test_create_activation_with_key_conflict(
 
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert str(response.data[0]) == (
+    assert (
         "Key: sasl_plain_password already exists "
         "in extra var. It conflicts with credential type: type1. "
-        "Please check injectors."
+        "Please check injectors." in response.data["non_field_errors"]
     )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_conflict_credentials(
+    client: APIClient, kafka_credential_type: models.CredentialType
+):
+    fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+
+    eda_credentials = models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"sasl_username": "adam", "sasl_password": "secret"},
+                credential_type_id=kafka_credential_type.id,
+            ),
+            models.EdaCredential(
+                name="credential-2",
+                inputs={"sasl_username": "bearny", "sasl_password": "demo"},
+                credential_type_id=kafka_credential_type.id,
+            ),
+        ]
+    )
+
+    eda_credential_ids = [credential.id for credential in eda_credentials]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Key: sasl_plain_password already exists "
+        "in extra var. It conflicts with credential type: type1. "
+        "Please check injectors." in response.data["non_field_errors"]
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_compatible_credentials(
+    client: APIClient, kafka_credential_type: models.CredentialType
+):
+    fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+
+    credential_types = models.CredentialType.objects.bulk_create(
+        [
+            models.CredentialType(
+                name="user_type",
+                inputs={"fields": [{"a": "b"}]},
+                injectors={"extra_vars": {"username": "adam"}},
+            ),
+            models.CredentialType(
+                name="password_type",
+                inputs={"fields": [{"1": "2"}]},
+                injectors={"extra_vars": {"password": "secret"}},
+            ),
+        ]
+    )
+
+    eda_credentials = models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"sasl_username": "adam", "sasl_password": "secret"},
+                credential_type_id=credential_types[0].id,
+            ),
+            models.EdaCredential(
+                name="credential-2",
+                inputs={"sasl_username": "bearny", "sasl_password": "demo"},
+                credential_type_id=credential_types[1].id,
+            ),
+        ]
+    )
+
+    eda_credential_ids = [credential.id for credential in eda_credentials]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
