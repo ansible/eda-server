@@ -66,7 +66,9 @@ def _project_import_wrapper(
             error = e
         finally:
             try:
-                project.save(update_fields=["import_state", "import_error"])
+                project.save(
+                    update_fields=["import_state", "import_error", "git_hash"]
+                )
             except exceptions.ObjectDoesNotExist:
                 raise ProjectImportError(
                     "Project may have been deleted"
