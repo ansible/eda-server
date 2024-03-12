@@ -241,7 +241,7 @@ clean-deployment() {
     log-debug "${NAMESPACE} does not exist"
   fi
 
-  for image in  redis:7 postgres:13 aap-eda:latest eda-ui:latest; do
+  for image in  redis:7 postgres:15 aap-eda:latest eda-ui:latest; do
     remove-image "${image}"
   done
 

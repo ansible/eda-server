@@ -58,7 +58,7 @@ jobs:
       EDA_DB_PASSWORD: 'secret'
     services:
       postgres:
-        image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+        image: 'quay.io/sclorg/postgresql-15-c9s:latest'
         env:
           POSTGRESQL_USER: eda
           POSTGRESQL_PASSWORD: secret
