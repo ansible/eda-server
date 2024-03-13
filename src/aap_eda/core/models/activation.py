@@ -122,7 +122,7 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         choices=RulebookProcessLogLevel.choices(),
         default=get_default_log_level,
     )
-    
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         if not self.organization:
