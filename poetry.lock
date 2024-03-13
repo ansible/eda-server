@@ -603,7 +603,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "24.3.7.0.dev198+gc682db1"
+version = "24.2.26.1.dev198+gaea97da"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -623,12 +623,11 @@ python-ldap = {version = "*", optional = true, markers = "extra == \"authenticat
 python3-saml = {version = "*", optional = true, markers = "extra == \"authentication\""}
 social-auth-app-django = {version = "*", optional = true, markers = "extra == \"authentication\""}
 tabulate = {version = "*", optional = true, markers = "extra == \"authentication\""}
-tacacs_plus = {version = "*", optional = true, markers = "extra == \"authentication\""}
 
 [package.extras]
-all = ["channels", "cryptography", "django-auth-ldap", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "requests", "social-auth-app-django", "tabulate", "tacacs_plus"]
+all = ["channels", "cryptography", "django-auth-ldap", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "requests", "social-auth-app-django", "tabulate"]
 api-documentation = ["drf-spectacular"]
-authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate", "tacacs_plus"]
+authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
 channel-auth = ["channels"]
 jwt-consumer = ["pyjwt", "requests"]
 testing = ["cryptography", "pytest", "pytest-django"]
@@ -637,7 +636,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/alancoding/django-ansible-base.git"
 reference = "django_permissions"
-resolved_reference = "c682db1cad0f668d0b33e67b420c6874cbb3fc0d"
+resolved_reference = "7def380559380fbb13d74a8d572665eee01fcb71"
 
 [[package]]
 name = "django-auth-ldap"
@@ -2464,20 +2463,6 @@ files = [
 
 [package.extras]
 widechars = ["wcwidth"]
-
-[[package]]
-name = "tacacs-plus"
-version = "2.6"
-description = "A client for TACACS+ authentication"
-optional = false
-python-versions = "*"
-files = [
-    {file = "tacacs_plus-2.6-py2.py3-none-any.whl", hash = "sha256:55aa4e733b0c4366cf5ab2d36deb03729466554319b239b9221b509b256128ff"},
-    {file = "tacacs_plus-2.6.tar.gz", hash = "sha256:f5e3a6e13760656aa69a4e98fc3da3e4728553375569fad757b1800c020dcb36"},
-]
-
-[package.dependencies]
-six = "*"
 
 [[package]]
 name = "traitlets"
