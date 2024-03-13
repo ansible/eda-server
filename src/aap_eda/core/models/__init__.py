@@ -75,7 +75,6 @@ permission_registry.register(
     Activation,
     Credential,
     DecisionEnvironment,
-    EventStream,
     ExtraVar,
     Project,
     Organization,

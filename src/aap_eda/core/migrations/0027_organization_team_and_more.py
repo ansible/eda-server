@@ -141,15 +141,6 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AddField(
-            model_name="eventstream",
-            name="organization",
-            field=models.ForeignKey(
-                null=True,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
-        migrations.AddField(
             model_name="extravar",
             name="organization",
             field=models.ForeignKey(
