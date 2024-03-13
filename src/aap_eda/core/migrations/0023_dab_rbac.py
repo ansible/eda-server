@@ -20,6 +20,7 @@ class Migration(migrations.Migration):
         migrations.AlterModelOptions(
             name="activation",
             options={
+                "default_permissions": ["add", "view", "delete"],
                 "ordering": ("-created_at",),
                 "permissions": [
                     ("enable_activation", "Can enable an activation"),

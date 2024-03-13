@@ -13,6 +13,10 @@
 #  limitations under the License.
 import logging
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -80,7 +84,17 @@ class ActivationViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        response = serializer.create(serializer.validated_data)
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
 
         if response.is_enabled:
             start_activation(activation_id=response.id)
@@ -187,7 +201,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
-        activation = get_object_or_404(self.get_queryset(), pk=pk)
+        activation = self.get_object()
 
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -241,7 +255,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
-        activation = get_object_or_404(self.get_queryset(), pk=pk)
+        activation = self.get_object()
 
         self._check_deleting(activation)
 
@@ -271,7 +285,7 @@ class ActivationViewSet(
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
-        activation = get_object_or_404(self.get_queryset(), pk=pk)
+        activation = self.get_object()
 
         self._check_deleting(activation)
 

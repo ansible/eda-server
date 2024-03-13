@@ -143,6 +143,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = models.Activation
         fields = [

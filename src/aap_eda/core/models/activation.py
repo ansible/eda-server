@@ -48,6 +48,7 @@ class Activation(StatusHandlerModelMixin, models.Model):
             ("disable_activation", "Can disable an activation"),
             ("restart_activation", "Can restart an activation"),
         ]
+        default_permissions = ["add", "view", "delete"]
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")

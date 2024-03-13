@@ -30,7 +30,7 @@ from aap_eda.api.serializers import (
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 
-from .mixins import PartialUpdateOnlyModelMixin
+from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
 
 
 @extend_schema_view(
@@ -74,7 +74,7 @@ from .mixins import PartialUpdateOnlyModelMixin
 )
 class TeamViewSet(
     PartialUpdateOnlyModelMixin,
-    mixins.CreateModelMixin,
+    CreateModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,

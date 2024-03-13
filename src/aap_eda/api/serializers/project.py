@@ -47,6 +47,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
     credential_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = models.Project
@@ -181,6 +182,7 @@ class ExtraVarCreateSerializer(serializers.ModelSerializer):
         required=True,
         help_text="Content of the extra_var",
     )
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = models.ExtraVar
