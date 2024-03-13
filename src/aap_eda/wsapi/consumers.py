@@ -158,7 +158,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             instance.updated_at = message.reported_at
             instance.save(update_fields=["updated_at"])
 
-            activation = instance.activation
+            activation = instance.get_parent()
             activation.ruleset_stats[
                 message.stats["ruleSetName"]
             ] = message.stats
@@ -315,14 +315,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_resources(
-        self, activation_instance_id: str
+        self, rulebook_process_id: str
     ) -> tuple[str, models.ExtraVar]:
-        activation_instance = models.RulebookProcess.objects.get(
-            id=activation_instance_id
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=rulebook_process_id
         )
-        activation = models.Activation.objects.get(
-            id=activation_instance.activation_id
-        )
+        activation = rulebook_process_instance.get_parent()
 
         if activation.extra_var_id:
             extra_var = models.ExtraVar.objects.filter(
@@ -336,11 +334,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
         """Get AWX token from the worker message."""
-        activation_instance = models.RulebookProcess.objects.get(
+        rulebook_process_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        awx_token = activation_instance.activation.awx_token
+        parent = rulebook_process_instance.get_parent()
+        if not hasattr(parent, "awx_token"):
+            return None
 
+        awx_token = parent.awx_token
         return awx_token.token.get_secret_value() if awx_token else None
 
     @database_sync_to_async
@@ -348,10 +349,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         self, message: WorkerMessage
     ) -> tp.List[VaultPassword]:
         """Get vault info from activation."""
-        activation_instance = models.RulebookProcess.objects.get(
+        rulebook_process_instance = models.RulebookProcess.objects.get(
             id=message.activation_id,
         )
-        activation = activation_instance.activation
+        activation = rulebook_process_instance.get_parent()
         vault_passwords = []
 
         if activation.system_vault_credential:

@@ -22,6 +22,7 @@ from dateutil import parser
 from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
+from rq.timeouts import JobTimeoutException
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
@@ -93,8 +94,8 @@ def get_request(data: InitData):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
-        activation_instance_id=data.activation_instance.id,
-        activation_id=data.activation.id,
+        rulebook_process_id=data.activation_instance.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         ports=[("localhost", 8080)],
         mem_limit="8G",
@@ -108,8 +109,8 @@ def get_request_with_never_pull_policy(data: InitData):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
-        activation_instance_id=data.activation_instance.id,
-        activation_id=data.activation.id,
+        rulebook_process_id=data.activation_instance.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         pull_policy="Never",
     )
@@ -119,8 +120,8 @@ def get_request_with_credential(data: InitData):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
-        activation_instance_id=data.activation_instance.id,
-        activation_id=data.activation.id,
+        rulebook_process_id=data.activation_instance.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         credential=Credential(username="me", secret="secret"),
     )
@@ -316,6 +317,28 @@ def test_engine_start_with_image_api_exception(init_data, podman_engine):
     engine.client.images.pull.side_effect = raise_api_error
 
     with pytest.raises(ContainerStartError, match="Image not found"):
+        engine.start(request, log_handler)
+
+
+@pytest.mark.django_db
+def test_engine_start_with_image_pull_timeout_exception(
+    init_data, podman_engine
+):
+    credential = models.Credential.objects.create(
+        name="credential1", username="me", secret="sec1"
+    )
+    engine = podman_engine
+    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(init_data)
+    request.credential = credential
+    error = "Task exceeded maximum timeout value 120 seconds"
+
+    def raise_timeout_error(*args, **kwargs):
+        raise JobTimeoutException(error)
+
+    engine.client.images.pull.side_effect = raise_timeout_error
+
+    with pytest.raises(ContainerImagePullError, match=error):
         engine.start(request, log_handler)
 
 
@@ -587,27 +610,3 @@ def test_engine_update_logs_with_exception(init_data, podman_engine):
 
     with pytest.raises(ContainerUpdateLogsError, match="Not found"):
         engine.update_logs("100", log_handler)
-
-
-@pytest.mark.django_db
-def test_set_auth_json(podman_engine):
-    engine = podman_engine
-
-    with mock.patch("os.path.dirname"):
-        engine._set_auth_json_file()
-
-        xdg_runtime_dir = os.getenv(
-            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-        )
-
-        assert engine.auth_file == f"{xdg_runtime_dir}/containers/auth.json"
-
-
-@pytest.mark.django_db
-def test_write_auth_json(init_data, podman_engine):
-    engine = podman_engine
-    engine.auth_file = f"{DATA_DIR}/auth.json"
-    request = get_request_with_credential(init_data)
-
-    engine._write_auth_json(request)
-    assert engine.auth_file is not None

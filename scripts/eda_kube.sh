@@ -22,6 +22,11 @@ source "${SCRIPTS_DIR}"/common/utils.sh
 
 trap handle_errors ERR
 
+export EDA_IMAGE=${EDA_IMAGE:-'quay.io/ansible/eda-server:main'}
+export EDA_UI_IMAGE=${EDA_UI_IMAGE:-'quay.io/ansible/eda-ui:main'}
+export EDA_IMAGE_PULL_POLICY=${EDA_IMAGE_PULL_POLICY:-'Always'}
+export EDA_UI_IMAGE_PULL_POLICY=${EDA_UI_IMAGE_PULL_POLICY:-'Always'}
+
 handle_errors() {
   log-err "An error occurred on or around line ${BASH_LINENO[0]}. Unable to continue."
   exit 1
@@ -76,6 +81,41 @@ build-deployment() {
   kustomize build "${DEPLOY_DIR}" -o "${DEPLOY_DIR}/temp"
 }
 
+build-quay-deployment() {
+  local _temp_dir="${DEPLOY_DIR}"/temp
+  declare -a app_dirs=("eda-api" "eda-activation-worker" "eda-default-worker" "eda-scheduler")
+
+  log-info "Using Deployment Directory: ${DEPLOY_DIR}/temp"
+
+  if [ -d "${_temp_dir}" ]; then
+    rm -rf "${_temp_dir}"
+  fi
+  mkdir "${_temp_dir}"
+
+  for app_dir in "${app_dirs[@]}"
+   do
+       cd "${DEPLOY_DIR}"/"$app_dir"
+       log-debug "kustomize edit set image aap-eda=${EDA_IMAGE}"
+       kustomize edit set image aap-eda="${EDA_IMAGE}"
+       kustomize edit add patch --group apps --version v1  --name "$app_dir" --kind Deployment --patch "[{\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/imagePullPolicy\", \"value\": \""${EDA_IMAGE_PULL_POLICY}"\"}]"
+   done
+
+  cd "${DEPLOY_DIR}"/eda-ui
+  log-debug "kustomize edit set image eda-ui=${EDA_UI_IMAGE}"
+  kustomize edit set image eda-ui="${EDA_UI_IMAGE}"
+  kustomize edit add patch --group apps --version v1  --name eda-ui --kind Deployment --patch "[{\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/imagePullPolicy\", \"value\": \""${EDA_UI_IMAGE_PULL_POLICY}"\"}]"
+
+  cd "${PROJECT_DIR}"
+  log-debug "kustomize build ${DEPLOY_DIR} -o ${DEPLOY_DIR}/temp"
+  kustomize build "${DEPLOY_DIR}" -o "${DEPLOY_DIR}/temp"
+
+  for app_dir in "${app_dirs[@]}"
+   do
+       git checkout -- "${DEPLOY_DIR}/${app_dir}/kustomization.yaml"
+   done
+  git checkout -- "${DEPLOY_DIR}/eda-ui/kustomization.yaml"
+}
+
 build-deployment-api() {
   local _api_image="aap-eda:${1}"
   local _temp_dir="${DEPLOY_DIR}"/temp
@@ -124,9 +164,18 @@ build-all() {
   build-deployment "${1}"
 }
 
+quay-deploy() {
+  build-quay-deployment "${1}"
+  deploy "${1}"
+}
+
 build-api() {
   build-eda-api-image "${1}"
   build-deployment-api "${1}"
+}
+
+build-ui() {
+  build-eda-ui-image "${1}"
 }
 
 remove-image() {
@@ -192,7 +241,7 @@ clean-deployment() {
     log-debug "${NAMESPACE} does not exist"
   fi
 
-  for image in  redis:7 postgres:13 aap-eda:latest eda-ui:latest; do
+  for image in  redis:7 postgres:15 aap-eda:latest eda-ui:latest; do
     remove-image "${image}"
   done
 
@@ -217,9 +266,9 @@ port-forward() {
 }
 
 port-forward-ui() {
-  local _local_port=${PORT:-"8080"}
+  local _local_port=${PORT:-"8443"}
   local _svc_name=eda-ui
-  local _svc_port=8080
+  local _svc_port=8443
 
   log-debug "port-forward ${_svc_name} ${_local_port} ${_svc_port}"
   port-forward "${_svc_name}" "${_local_port}" "${_svc_port}"
@@ -255,9 +304,11 @@ get-eda-logs() {
 case ${CMD} in
   "build") build-all "${VERSION}" ;;
   "build-api") build-api "${VERSION}" ;;
+  "build-ui") build-ui "${VERSION}" ;;
   "clean") clean-deployment "${VERSION}";;
   "clean-api") clean-api-deployment "${VERSION}";;
   "deploy") deploy "${VERSION}" ;;
+  "quay-deploy") quay-deploy "${VERSION}" ;;
   "port-forward-api") port-forward-api ${PORT} ;;
   "port-forward-ui") port-forward-ui ${PORT} ;;
   "port-forward-pg") port-forward-pg 5432 ;;

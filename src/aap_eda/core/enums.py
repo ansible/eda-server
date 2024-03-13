@@ -15,6 +15,7 @@
 from enum import Enum
 
 
+# TODO(alex): migrate to django.db.models.TextChoices
 class DjangoStrEnum(str, Enum):
     @classmethod
     def choices(cls):
@@ -42,15 +43,14 @@ class ResourceType(DjangoStrEnum):
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
     AUDIT_EVENT = "audit_event"
-    TASK = "task"
     USER = "user"
     PROJECT = "project"
-    INVENTORY = "inventory"
     EXTRA_VAR = "extra_var"
     RULEBOOK = "rulebook"
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
     CREDENTIAL = "credential"
+    EVENT_STREAM = "event_stream"
     ORGANIZATION = "organization"
     TEAM = "team"
 
@@ -65,13 +65,7 @@ class Action(DjangoStrEnum):
     RESTART = "restart"
 
 
-class InventorySource(DjangoStrEnum):
-    PROJECT = "project"
-    COLLECTION = "collection"
-    USER_DEFINED = "user_defined"
-    EXECUTION_ENV = "execution_env"
-
-
+# TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 class ActivationStatus(DjangoStrEnum):
     STARTING = "starting"
     RUNNING = "running"
@@ -94,6 +88,7 @@ class CredentialType(DjangoStrEnum):
     VAULT = "Vault"
 
 
+# TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.PENDING: "Wait for a worker to be available to start activation",  # noqa: E501
     ActivationStatus.STARTING: "Worker is starting activation",
@@ -108,9 +103,25 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
 }
 
 
+# TODO: rename to "RulebookProcessRequest"
 class ActivationRequest(DjangoStrEnum):
     START = "start"
     STOP = "stop"
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+
+
+class ProcessParentType(DjangoStrEnum):
+    """Types of parent objects for a rulebook process."""
+
+    ACTIVATION = "activation"
+    EVENT_STREAM = "event_stream"
+
+
+class RulebookProcessLogLevel(DjangoStrEnum):
+    """Types of log levels for a rulebook process."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    ERROR = "error"

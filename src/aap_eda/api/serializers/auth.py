@@ -116,12 +116,12 @@ class RoleDetailSerializer(serializers.Serializer):
     )
     name = serializers.CharField(
         required=True,
-        help_text="Name of the rulebook",
+        help_text="Name of the role",
     )
 
     description = serializers.CharField(
         default="",
-        help_text="Description of the rulebook",
+        help_text="Description of the role",
         allow_null=True,
     )
 

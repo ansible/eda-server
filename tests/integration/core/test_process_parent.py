@@ -14,32 +14,47 @@
 
 
 import pytest
+from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 
 
+@pytest.mark.parametrize(
+    "instance",
+    [
+        pytest.param(
+            lazy_fixture("new_activation"),
+            id="activation",
+        ),
+        pytest.param(
+            lazy_fixture("new_event_stream"),
+            id="event_stream",
+        ),
+    ],
+)
 @pytest.mark.django_db
-def test_activation_latest_instance_field(new_activation):
+def test_latest_instance_field(instance):
     """Test latest_instance field is updated when a new instance is created."""
-    activation = new_activation
-    assert activation.latest_instance is None
+    assert instance.latest_instance is None
 
-    first_instance = models.RulebookProcess.objects.create(
-        activation=activation,
-        name="instance",
-        status=ActivationStatus.PENDING,
-    )
-    assert activation.latest_instance == first_instance
+    kwargs = {
+        "name": "test-instance",
+        "status": ActivationStatus.PENDING,
+    }
 
-    second_instance = models.RulebookProcess.objects.create(
-        activation=activation,
-        name="instance",
-        status=ActivationStatus.PENDING,
-    )
-    assert activation.latest_instance == second_instance
+    if isinstance(instance, models.Activation):
+        kwargs["activation"] = instance
+    else:
+        kwargs["event_stream"] = instance
+
+    first_instance = models.RulebookProcess.objects.create(**kwargs)
+    assert instance.latest_instance == first_instance
+
+    second_instance = models.RulebookProcess.objects.create(**kwargs)
+    assert instance.latest_instance == second_instance
 
     # ensure latest instance is returned when a previous instance is updated
     first_instance.status = ActivationStatus.COMPLETED
     first_instance.save(update_fields=["status"])
-    assert activation.latest_instance == second_instance
+    assert instance.latest_instance == second_instance

@@ -19,6 +19,7 @@ from .activation import (
 )
 from .credential import CredentialFilter
 from .decision_environment import DecisionEnvironmentFilter
+from .event_stream import EventStreamFilter
 from .organization import OrganizationFilter
 from .project import ProjectFilter
 from .role import RoleFilter
@@ -27,7 +28,6 @@ from .rulebook import (
     AuditRuleEventFilter,
     AuditRuleFilter,
     RulebookFilter,
-    RulesetFilter,
 )
 from .team import OrganizationTeamFilter, TeamFilter
 from .user import UserFilter
@@ -37,7 +37,6 @@ __all__ = (
     "ProjectFilter",
     # rulebook
     "RulebookFilter",
-    "RulesetFilter",
     "AuditRuleFilter",
     "AuditRuleActionFilter",
     "AuditRuleEventFilter",
@@ -53,6 +52,8 @@ __all__ = (
     "UserFilter",
     # role
     "RoleFilter",
+    # event_stream
+    "EventStreamFilter",
     # organization
     "OrganizationFilter",
     # team

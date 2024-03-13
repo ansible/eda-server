@@ -176,27 +176,6 @@ def test_retrieve_json_rulebook_not_exist(client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.django_db
-def test_list_rulesets_from_rulebook(client: APIClient, init_db):
-    rulebook_id = init_db.rulebook.id
-
-    response = client.get(f"{api_url_v1}/rulebooks/{rulebook_id}/rulesets/")
-    assert response.status_code == status.HTTP_200_OK
-    response_rulesets = response.data["results"]
-
-    assert len(response_rulesets) == 2
-    assert response_rulesets[0]["name"] == "test-ruleset"
-    assert list(response_rulesets[0]) == [
-        "id",
-        "name",
-        "created_at",
-        "modified_at",
-        "source_types",
-        "rule_count",
-        "fired_stats",
-    ]
-
-
 def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
     assert data == {
         "id": rulebook.id,
@@ -207,129 +186,6 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
         "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
         "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
     }
-
-
-# ------------------------------------------
-# Test Ruleset:
-# ------------------------------------------
-@pytest.mark.django_db
-def test_list_rulesets(client: APIClient, init_db):
-    response = client.get(f"{api_url_v1}/rulesets/")
-    assert response.status_code == status.HTTP_200_OK
-    rulesets = response.data["results"]
-
-    assert len(rulesets) == 3
-    assert rulesets[0]["name"] == "test-ruleset"
-    assert rulesets[0]["rule_count"] == 1
-    assert list(rulesets[0]) == [
-        "id",
-        "name",
-        "created_at",
-        "modified_at",
-        "source_types",
-        "rule_count",
-        "fired_stats",
-    ]
-
-
-@pytest.mark.django_db
-def test_rulesets_filter_name(client: APIClient, init_db):
-    test_ruleset = init_db.ruleset_2
-    filter_name = "filter"
-    response = client.get(f"{api_url_v1}/rulesets/?name={filter_name}")
-    assert response.status_code == status.HTTP_200_OK
-    ruleset = response.json()["results"]
-
-    assert len(ruleset) == 1
-    assert ruleset[0] == {
-        "id": test_ruleset.id,
-        "name": test_ruleset.name,
-        "created_at": test_ruleset.created_at.strftime(DATETIME_FORMAT),
-        "modified_at": test_ruleset.modified_at.strftime(DATETIME_FORMAT),
-        "source_types": ["range"],
-        "rule_count": 0,
-        "fired_stats": [{}],
-    }
-
-
-@pytest.mark.django_db
-def test_rulesets_filter_name_none_exist(client: APIClient, init_db):
-    filter_name = "not in existance"
-    response = client.get(f"{api_url_v1}/rulesets/?name={filter_name}")
-    assert response.status_code == status.HTTP_200_OK
-    rulesets = response.data["results"]
-    assert rulesets == []
-
-
-@pytest.mark.django_db
-def test_retrieve_ruleset(client: APIClient, init_db):
-    ruleset_id = init_db.ruleset.id
-    response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/")
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["name"] == "test-ruleset"
-
-
-@pytest.mark.django_db
-def test_list_rules_from_ruleset(client: APIClient, init_db):
-    ruleset_id = init_db.ruleset.id
-
-    response = client.get(f"{api_url_v1}/rulesets/{ruleset_id}/rules/")
-    assert response.status_code == status.HTTP_200_OK
-
-    rules = response.data["results"]
-    assert len(rules) == 1
-    assert rules[0]["name"] == "say hello"
-    assert list(rules[0]) == [
-        "id",
-        "name",
-        "action",
-        "ruleset_id",
-    ]
-
-
-@pytest.mark.django_db
-def test_retrieve_ruleset_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/rulesets/42/")
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
-# ------------------------------------------
-# Test Rule:
-# ------------------------------------------
-@pytest.mark.django_db
-def test_list_rules(client: APIClient, init_db):
-    response = client.get(f"{api_url_v1}/rules/")
-    assert response.status_code == status.HTTP_200_OK
-    rules = response.data["results"]
-
-    assert len(rules) == 1
-    assert rules[0]["name"] == "say hello"
-    assert list(rules[0]) == [
-        "id",
-        "name",
-        "action",
-        "ruleset_id",
-        "fired_stats",
-        "rulebook_id",
-        "project_id",
-    ]
-
-
-@pytest.mark.django_db
-def test_retrieve_rule(client: APIClient, init_db):
-    rule_id = init_db.rule.id
-
-    response = client.get(f"{api_url_v1}/rules/{rule_id}/")
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["name"] == "say hello"
-
-
-@pytest.mark.django_db
-def test_retrieve_rule_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/rules/42/")
-    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 # ------------------------------------------
@@ -548,6 +404,8 @@ def test_list_events_from_audit_rule(client: APIClient, init_db):
     events = response.data["results"]
     assert len(events) == 2
     assert events[0]["received_at"] > events[1]["received_at"]
+    assert events[0]["payload"] == events[1]["payload"]
+    assert events[0]["payload"] == "key: value\n"
 
 
 @pytest.mark.parametrize(
@@ -729,6 +587,7 @@ def init_db():
         source_type="ansible.eda.range",
         rule_fired_at="2023-12-14T15:19:02.313122Z",
         received_at="2023-12-14T15:19:02.289549Z",
+        payload={"key": "value"},
     )
     audit_event_2 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
@@ -736,6 +595,7 @@ def init_db():
         source_type="ansible.eda.range",
         rule_fired_at="2023-12-14T15:19:02.323704Z",
         received_at="2023-12-14T15:19:02.313063Z",
+        payload={"key": "value"},
     )
     audit_event_3 = models.AuditEvent.objects.create(
         id=str(uuid.uuid4()),
@@ -743,6 +603,7 @@ def init_db():
         source_type="ansible.eda.range",
         rule_fired_at="2023-12-14T15:19:02.323704Z",
         received_at="2023-12-14T15:19:02.321472Z",
+        payload={"key": "value"},
     )
     audit_event_1.audit_actions.add(action_1)
     audit_event_2.audit_actions.add(action_2)

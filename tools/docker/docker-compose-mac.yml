@@ -137,7 +137,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret

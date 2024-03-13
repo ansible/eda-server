@@ -78,3 +78,4 @@ jobs:
             Scheduled tests for eda-server failed.
             Id: ${{ github.run_id }}"
             Workflow: ${{ github.workflow }}
+            Ping @eda-qe

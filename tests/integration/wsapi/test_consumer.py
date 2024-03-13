@@ -17,15 +17,6 @@ TIMEOUT = 5
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-TEST_INVENTORY = """
----
-all:
-  hosts:
-    localhost:
-      ansible_connection: local
-      ansible_python_interpreter: /usr/bin/python3
-"""
-
 TEST_EXTRA_VAR = """
 ---
 collections:
@@ -51,17 +42,15 @@ DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 async def test_handle_workers_without_credentials(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_with_extra_var = await _prepare_db_data()
-    activation_instance_without_extra_var = (
+    rulebook_process_with_extra_var = await _prepare_db_data()
+    rulebook_process_without_extra_var = (
         await _prepare_activation_instance_without_extra_var()
     )
-    activation_instance_no_token = (
-        await _prepare_activation_instance_no_token()
-    )
+    rulebook_process_no_token = await _prepare_activation_instance_no_token()
 
     payload = {
         "type": "Worker",
-        "activation_id": activation_instance_with_extra_var,
+        "activation_id": rulebook_process_with_extra_var,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -78,7 +67,7 @@ async def test_handle_workers_without_credentials(
 
     payload = {
         "type": "Worker",
-        "activation_id": activation_instance_without_extra_var,
+        "activation_id": rulebook_process_without_extra_var,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -94,7 +83,7 @@ async def test_handle_workers_without_credentials(
 
     payload = {
         "type": "Worker",
-        "activation_id": activation_instance_no_token,
+        "activation_id": rulebook_process_no_token,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -110,13 +99,13 @@ async def test_handle_workers_without_credentials(
 async def test_handle_workers_with_system_vault_credential(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = (
+    rulebook_process_id = (
         await _prepare_activation_instance_with_system_vault_credential()
     )
 
     payload = {
         "type": "Worker",
-        "activation_id": activation_instance_id,
+        "activation_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -139,13 +128,13 @@ async def test_handle_workers_with_system_vault_credential(
 async def test_handle_workers_with_vault_credentials(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = (
+    rulebook_process_id = (
         await _prepare_activation_instance_with_vault_credentials()
     )
 
     payload = {
         "type": "Worker",
-        "activation_id": activation_instance_id,
+        "activation_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -168,13 +157,13 @@ async def test_handle_workers_with_vault_credentials(
 async def test_handle_workers_with_all_credentials(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = (
+    rulebook_process_id = (
         await _prepare_activation_instance_with_all_credentials()
     )
 
     payload = {
         "type": "Worker",
-        "activation_id": activation_instance_id,
+        "activation_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
 
@@ -206,11 +195,11 @@ async def test_handle_workers_with_validation_errors():
     connected, _ = await communicator.connect(timeout=3)
     assert connected
 
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
 
     payload = {
         "type": "Worker",
-        "invalid_activation_id": activation_instance_id,
+        "invalid_activation_id": rulebook_process_id,
     }
 
     with pytest.raises(ValidationError):
@@ -220,7 +209,7 @@ async def test_handle_workers_with_validation_errors():
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_jobs(ws_communicator: WebsocketCommunicator):
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
 
     assert (await get_job_instance_count()) == 0
     assert (await get_activation_instance_job_instance_count()) == 0
@@ -228,7 +217,7 @@ async def test_handle_jobs(ws_communicator: WebsocketCommunicator):
     payload = {
         "type": "Job",
         "job_id": "940730a1-8b6f-45f3-84c9-bde8f04390e0",
-        "ansible_rulebook_id": activation_instance_id,
+        "ansible_rulebook_id": rulebook_process_id,
         "name": "ansible.eda.hello",
         "ruleset": "ruleset",
         "rule": "rule",
@@ -267,13 +256,13 @@ async def test_handle_events(ws_communicator: WebsocketCommunicator):
 async def test_handle_actions_multiple_firing(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
     assert (await get_audit_rule_count()) == 0
     payload1 = create_action_payload(
         DUMMY_UUID,
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
@@ -281,7 +270,7 @@ async def test_handle_actions_multiple_firing(
     )
     payload2 = create_action_payload(
         DUMMY_UUID2,
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:27.260803Z",
@@ -300,13 +289,13 @@ async def test_handle_actions_multiple_firing(
 async def test_handle_actions_with_empty_job_uuid(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
     assert (await get_audit_rule_count()) == 0
 
     # job uuid is empty string
     payload = create_action_payload(
         DUMMY_UUID,
-        activation_instance_id,
+        rulebook_process_id,
         "",
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
@@ -322,13 +311,13 @@ async def test_handle_actions_with_empty_job_uuid(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions(ws_communicator: WebsocketCommunicator):
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
     assert (await get_audit_rule_count()) == 0
     payload = create_action_payload(
         DUMMY_UUID,
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
@@ -364,12 +353,12 @@ async def test_handle_actions(ws_communicator: WebsocketCommunicator):
 async def test_rule_status_with_multiple_failed_actions(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
     action1 = create_action_payload(
         DUMMY_UUID,
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
@@ -377,7 +366,7 @@ async def test_rule_status_with_multiple_failed_actions(
     )
     action2 = create_action_payload(
         DUMMY_UUID2,
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         DUMMY_UUID,
         "2023-03-29T15:00:17.260803Z",
@@ -397,14 +386,14 @@ async def test_rule_status_with_multiple_failed_actions(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
-    activation_instance_id = await _prepare_db_data()
-    activation_instance = await get_activation_instance(activation_instance_id)
+    rulebook_process_id = await _prepare_db_data()
+    rulebook_process = await get_rulebook_process(rulebook_process_id)
 
     payload = {
         "type": "SessionStats",
-        "activation_id": activation_instance_id,
+        "activation_id": rulebook_process_id,
         "stats": {
-            "start": activation_instance.started_at.strftime(DATETIME_FORMAT),
+            "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
             "end": None,
             "numberOfRules": 1,
             "numberOfDisabledRules": 0,
@@ -424,11 +413,9 @@ async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
     await ws_communicator.send_json_to(payload)
     await ws_communicator.wait()
 
-    updated_activation_instance = await get_activation_instance(
-        activation_instance_id
-    )
+    updated_rulebook_process = await get_rulebook_process(rulebook_process_id)
     assert (
-        updated_activation_instance.updated_at.strftime(DATETIME_FORMAT)
+        updated_rulebook_process.updated_at.strftime(DATETIME_FORMAT)
     ) == payload["reported_at"]
 
 
@@ -436,14 +423,14 @@ async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
 async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
 ):
-    activation_instance_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
     matching_events = _matching_events()
 
     action1 = create_action_payload(
         str(uuid.uuid4()),
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         str(uuid.uuid4()),
         "2023-03-29T15:00:17.260803Z",
@@ -451,7 +438,7 @@ async def test_multiple_rules_for_one_event(
     )
     action2 = create_action_payload(
         str(uuid.uuid4()),
-        activation_instance_id,
+        rulebook_process_id,
         job_instance.uuid,
         str(uuid.uuid4()),
         "2023-03-29T15:00:17.260803Z",
@@ -471,7 +458,7 @@ async def test_multiple_rules_for_one_event(
 
 
 @database_sync_to_async
-def get_activation_instance(instance_id):
+def get_rulebook_process(instance_id):
     return models.RulebookProcess.objects.get(pk=instance_id)
 
 
@@ -568,11 +555,11 @@ def _prepare_activation_instance_with_vault_credentials():
     )
     activation.credentials.add(credential)
 
-    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
     )
 
-    return activation_instance.id
+    return rulebook_process.id
 
 
 @database_sync_to_async
@@ -621,11 +608,11 @@ def _prepare_activation_instance_with_system_vault_credential():
         system_vault_credential=credential,
     )
 
-    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
     )
 
-    return activation_instance.id
+    return rulebook_process.id
 
 
 @database_sync_to_async
@@ -682,11 +669,11 @@ def _prepare_activation_instance_with_all_credentials():
     )
     activation.credentials.add(credential)
 
-    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
     )
 
-    return activation_instance.id
+    return rulebook_process.id
 
 
 @database_sync_to_async
@@ -737,7 +724,7 @@ def _prepare_db_data():
         awx_token=token[0],
     )
 
-    activation_instance, _ = models.RulebookProcess.objects.get_or_create(
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
     )
 
@@ -760,7 +747,7 @@ def _prepare_db_data():
         ruleset=ruleset,
     )
 
-    return activation_instance.id
+    return rulebook_process.id
 
 
 @database_sync_to_async
@@ -804,11 +791,11 @@ def _prepare_activation_instance_without_extra_var():
         awx_token=token[0],
     )
 
-    activation_instance = models.RulebookProcess.objects.create(
+    rulebook_process = models.RulebookProcess.objects.create(
         activation=activation,
     )
 
-    return activation_instance.id
+    return rulebook_process.id
 
 
 @database_sync_to_async
@@ -848,11 +835,11 @@ def _prepare_activation_instance_no_token():
         decision_environment=decision_environment,
     )
 
-    activation_instance = models.RulebookProcess.objects.create(
+    rulebook_process = models.RulebookProcess.objects.create(
         activation=activation,
     )
 
-    return activation_instance.id
+    return rulebook_process.id
 
 
 @database_sync_to_async

@@ -16,11 +16,9 @@
 import contextlib
 import logging
 import typing as tp
-import uuid
 from datetime import timedelta
 from functools import wraps
 
-import yaml
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -30,27 +28,23 @@ from pydantic import ValidationError
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    ProcessParentType,
+    RestartPolicy,
+)
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
-from aap_eda.services.activation.engine.common import (
-    AnsibleRulebookCmdLine,
-    ContainerRequest,
-    Credential,
-)
+from aap_eda.services.activation.engine.common import ContainerRequest
 from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
-from aap_eda.services.auth import create_jwt_token
 
 from .db_log_handler import DBLogger
-from .engine.common import ContainerEngine
+from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
-from .engine.ports import find_ports
 
 LOGGER = logging.getLogger(__name__)
-ACTIVATION_PATH = f"/{settings.API_PREFIX}/ws/ansible-rulebook"
-TOKEN_RENEW_PATH = f"/{settings.API_PREFIX}/v1/auth/token/refresh/"
 
 
 class HasDbInstance(tp.Protocol):
@@ -94,7 +88,7 @@ class ActivationManager:
 
     def __init__(
         self,
-        db_instance: models.Activation,
+        db_instance: tp.Union[models.Activation, models.EventStream],
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):
@@ -105,10 +99,16 @@ class ActivationManager:
             container_engine: The container engine to use.
         """
         self.db_instance = db_instance
+        if isinstance(db_instance, models.Activation):
+            self.db_instance_type = ProcessParentType.ACTIVATION
+        else:
+            self.db_instance_type = ProcessParentType.EVENT_STREAM
         if container_engine:
             self.container_engine = container_engine
         else:
-            self.container_engine = new_container_engine(db_instance.id)
+            self.container_engine = new_container_engine(
+                db_instance.id, self.db_instance_type
+            )
 
         self.container_logger_class = container_logger_class
 
@@ -220,9 +220,9 @@ class ActivationManager:
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
-        instances = models.RulebookProcess.objects.filter(
-            activation=self.db_instance,
-        )
+        args = {f"{self.db_instance_type}": self.db_instance}
+
+        instances = models.RulebookProcess.objects.filter(**args)
         for instance in instances:
             if instance.status not in [
                 ActivationStatus.STOPPED,
@@ -272,7 +272,7 @@ class ActivationManager:
 
         # start the container
         try:
-            container_request = self._build_container_request()
+            container_request = self._get_container_request()
             container_id = self.container_engine.start(
                 container_request,
                 log_handler,
@@ -467,7 +467,9 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_type, self.db_instance.id, delay_seconds=1
+            )
 
     def _missing_container_policy(self):
         LOGGER.info(
@@ -492,7 +494,9 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(self.db_instance.id, delay_seconds=1)
+            system_restart_activation(
+                self.db_instance_type, self.db_instance.id, delay_seconds=1
+            )
 
         self._set_activation_status(
             ActivationStatus.FAILED,
@@ -534,6 +538,7 @@ class ActivationManager:
                 user_msg,
             )
             system_restart_activation(
+                self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
             )
@@ -669,6 +674,7 @@ class ActivationManager:
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
             system_restart_activation(
+                self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
             )
@@ -807,7 +813,9 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(self.db_instance.id, delay_seconds=1)
+        system_restart_activation(
+            self.db_instance_type, self.db_instance.id, delay_seconds=1
+        )
 
     def delete(self):
         """User requested delete."""
@@ -1020,13 +1028,31 @@ class ActivationManager:
             return
 
     def _create_activation_instance(self):
-        try:
-            models.RulebookProcess.objects.create(
-                activation=self.db_instance,
-                name=self.db_instance.name,
-                status=ActivationStatus.STARTING,
-                git_hash=self.db_instance.git_hash,
+        git_hash = (
+            self.db_instance.git_hash
+            if hasattr(self.db_instance, "git_hash")
+            else ""
+        )
+
+        if not self.check_new_process_allowed(
+            self.db_instance_type,
+            self.db_instance.id,
+        ):
+            msg = (
+                "Failed to create rulebook process. "
+                "Reason: Max running processes reached. "
+                "Waiting for a free slot."
             )
+            self._set_activation_status(ActivationStatus.PENDING, msg)
+            raise exceptions.MaxRunningProcessesError
+        args = {
+            "name": self.db_instance.name,
+            "status": ActivationStatus.STARTING,
+            "git_hash": git_hash,
+        }
+        args[f"{self.db_instance_type}"] = self.db_instance
+        try:
+            models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
@@ -1035,55 +1061,31 @@ class ActivationManager:
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-    def _build_container_request(self) -> ContainerRequest:
-        if self.db_instance.extra_var:
-            context = yaml.safe_load(self.db_instance.extra_var.extra_var)
-        else:
-            context = {}
-
-        return ContainerRequest(
-            credential=self._build_credential(),
-            cmdline=self._build_cmdline(),
-            name=(
-                f"{settings.CONTAINER_NAME_PREFIX}-{self.latest_instance.id}"
-                f"-{uuid.uuid4()}"
-            ),
-            image_url=self.db_instance.decision_environment.image_url,
-            ports=find_ports(self.db_instance.rulebook_rulesets, context),
-            activation_id=self.db_instance.id,
-            activation_instance_id=self.latest_instance.id,
-            env_vars=settings.PODMAN_ENV_VARS,
-            extra_args=settings.PODMAN_EXTRA_ARGS,
-            mem_limit=settings.PODMAN_MEM_LIMIT,
-            mounts=settings.PODMAN_MOUNTS,
-        )
-
-    def _build_credential(self) -> tp.Optional[Credential]:
-        credential = self.db_instance.decision_environment.credential
-        if credential:
-            return Credential(
-                username=credential.username,
-                secret=credential.secret.get_secret_value(),
-            )
-        return None
-
-    def _build_cmdline(self) -> AnsibleRulebookCmdLine:
-        if not self.latest_instance:
+    def _get_container_request(self) -> ContainerRequest:
+        try:
+            return self.db_instance.get_container_request()
+        except ContainerableInvalidError:
             msg = (
-                f"Activation {self.db_instance.id} does not have an instance, "
-                "cmdline can not be built."
+                f"Activation {self.db_instance.id} not valid, "
+                "container request cannot be built."
             )
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
 
-        access_token, refresh_token = create_jwt_token()
-        return AnsibleRulebookCmdLine(
-            ws_url=settings.WEBSOCKET_BASE_URL + ACTIVATION_PATH,
-            log_level=settings.ANSIBLE_RULEBOOK_LOG_LEVEL,
-            ws_ssl_verify=settings.WEBSOCKET_SSL_VERIFY,
-            ws_access_token=access_token,
-            ws_refresh_token=refresh_token,
-            ws_token_url=settings.WEBSOCKET_TOKEN_BASE_URL + TOKEN_RENEW_PATH,
-            heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
-            id=str(self.latest_instance.id),
-        )
+    @staticmethod
+    def check_new_process_allowed(parent_type: str, parent_id: int) -> bool:
+        """Check if a new process is allowed."""
+        if settings.MAX_RUNNING_ACTIVATIONS < 0:
+            return True
+
+        num_running_processes = models.RulebookProcess.objects.filter(
+            status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+        ).count()
+
+        if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
+            LOGGER.info(
+                "No capacity to start a new rulebook process. "
+                f"{parent_type} {parent_id} is postponed",
+            )
+            return False
+        return True

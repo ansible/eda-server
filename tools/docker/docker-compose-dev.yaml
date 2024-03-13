@@ -20,6 +20,9 @@ x-environment:
   - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
   - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
   - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
+  - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
+  - EDA_DEBUG=${EDA_DEBUG:-'True'}
+  - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
 
 services:
   podman-pre-setup:
@@ -82,6 +85,9 @@ services:
       retries: 10
     volumes:
       - '../../:/app/src:z'
+    networks:
+      - service-mesh
+      - default
 
   eda-ws:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
@@ -159,7 +165,7 @@ services:
     restart: always
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
@@ -190,3 +196,7 @@ services:
 volumes:
   postgres_data: {}
   podman_data: {}
+
+networks:
+  service-mesh:
+    name: service-mesh

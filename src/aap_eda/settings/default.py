@@ -76,6 +76,8 @@ import dynaconf
 from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
+from aap_eda.core.enums import RulebookProcessLogLevel
+
 default_settings_file = "/etc/eda/settings.yaml"
 
 settings = dynaconf.Dynaconf(
@@ -132,15 +134,17 @@ SESSION_COOKIE_AGE = settings.get("SESSION_COOKIE_AGE", 1800)
 SESSION_SAVE_EVERY_REQUEST = True
 
 # JWT token lifetime
-JWT_ACCESS_TOKEN_LIFETIME_SECONDS = settings.get(
-    "JWT_ACCESS_TOKEN_LIFETIME_SECONDS", 5
+JWT_ACCESS_TOKEN_LIFETIME_MINUTES = settings.get(
+    "JWT_ACCESS_TOKEN_LIFETIME_MINUTES",
+    60,
 )
 JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
-    "JWT_REFRESH_TOKEN_LIFETIME_DAYS", 2
+    "JWT_REFRESH_TOKEN_LIFETIME_DAYS",
+    365,
 )
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=JWT_ACCESS_TOKEN_LIFETIME_SECONDS
+        minutes=JWT_ACCESS_TOKEN_LIFETIME_MINUTES,
     ),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
 }
@@ -319,7 +323,10 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {"func": "aap_eda.tasks.orchestrator.monitor_activations", "interval": 5},
+    {
+        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
+        "interval": 5,
+    },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
@@ -441,12 +448,36 @@ ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(
 ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
     settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5)
 )
+
+# -1 means no limit
 MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))
 
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL
 # ---------------------------------------------------------
-ANSIBLE_RULEBOOK_LOG_LEVEL = settings.get("ANSIBLE_RULEBOOK_LOG_LEVEL", "-v")
+
+
+# For backwards compatibility, from the old value "-v" to the new value "info"
+def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
+    log_level = settings.get(
+        "ANSIBLE_RULEBOOK_LOG_LEVEL",
+        "error",
+    )
+    if log_level is None:
+        return RulebookProcessLogLevel.ERROR
+    if log_level.lower() == "-v":
+        return RulebookProcessLogLevel.INFO
+    if log_level.lower() == "-vv":
+        return RulebookProcessLogLevel.DEBUG
+    if log_level not in RulebookProcessLogLevel.values():
+        raise ImproperlyConfigured(
+            f"Invalid log level '{log_level}' for ANSIBLE_RULEBOOK_LOG_LEVEL"
+            f" setting. Valid values are: {RulebookProcessLogLevel.values()}"
+        )
+    return RulebookProcessLogLevel(log_level)
+
+
+ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
 
 # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
@@ -478,13 +509,10 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
 
+# ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
 # ---------------------------------------------------------
 ANSIBLE_BASE_RESOURCE_CONFIG_MODULE = "aap_eda.api.resource_api"
-
-ACTIVATION_DB_HOST = settings.get(
-    "ACTIVATION_DB_HOST", "host.containers.internal"
-)
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RBAC SETTINGS
@@ -499,3 +527,23 @@ ANSIBLE_BASE_PERMISSION_MODEL = "core.DABPermission"
 
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}
+
+ACTIVATION_DB_HOST = settings.get(
+    "ACTIVATION_DB_HOST", "host.containers.internal"
+)
+
+_DEFAULT_PG_NOTIFY_DSN = (
+    f"host={ACTIVATION_DB_HOST} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
+    f"password={DATABASES['default']['PASSWORD']}"
+)
+
+PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
+PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
+
+SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
+    "SAFE_PLUGINS_FOR_PORT_FORWARD",
+    ["ansible.eda.webhook", "ansible.eda.alertmanager"],
+)

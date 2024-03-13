@@ -59,3 +59,25 @@ def check_permission_mock():
         wraps=RoleBasedPermission._check_permission,
     ) as m:
         yield m
+
+
+@pytest.fixture
+def default_de() -> models.DecisionEnvironment:
+    """Return a default DE."""
+    return models.DecisionEnvironment.objects.create(
+        name="default_de",
+        image_url="quay.io/ansible/ansible-rulebook:latest",
+        description="Default DE",
+    )
+
+
+@pytest.fixture
+def default_user() -> models.User:
+    """Return a default User."""
+    return models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )

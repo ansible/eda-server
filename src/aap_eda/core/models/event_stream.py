@@ -12,16 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import uuid
-
 from django.db import models
 
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    RestartPolicy,
+    RulebookProcessLogLevel,
+)
+from aap_eda.core.utils import get_default_log_level
+from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, models.Model):
+class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     """Model representing an event stream."""
 
     name = models.TextField(null=False, unique=True)
@@ -76,10 +80,24 @@ class EventStream(StatusHandlerModelMixin, models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
-    uuid = models.UUIDField(default=uuid.uuid4)
+    channel_name = models.TextField(null=True, default=None)
     source_type = models.TextField(null=False)
-    args = models.JSONField(null=True, default=None)
-    listener_args = models.JSONField(null=True, default=None)
+    source_args = models.JSONField(null=True, default=None)
+    system_vault_credential = models.OneToOneField(
+        "Credential",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    credentials = models.ManyToManyField(
+        "Credential", related_name="event_streams", default=None
+    )
+    log_level = models.CharField(
+        max_length=20,
+        choices=RulebookProcessLogLevel.choices(),
+        default=get_default_log_level,
+    )
 
     class Meta:
         db_table = "core_event_stream"
@@ -94,3 +112,8 @@ class EventStream(StatusHandlerModelMixin, models.Model):
 
     def __str__(self) -> str:
         return f"EventStream {self.name} ({self.id})"
+
+    # Implementation of the ContainerableMixin.
+    def _get_skip_audit_events(self) -> bool:
+        """Event stream skips audit events."""
+        return True

@@ -14,12 +14,11 @@
 
 from ansible_base.rbac import permission_registry
 
-from .activation import Activation, RulebookProcess, RulebookProcessLog
+from .activation import Activation
 from .auth import DABPermission, Permission, Role
 from .credential import Credential
 from .decision_environment import DecisionEnvironment
 from .event_stream import EventStream
-from .inventory import Inventory
 from .job import (
     ActivationInstanceJobInstance,
     Job,
@@ -38,6 +37,7 @@ from .rulebook import (
     Rulebook,
     Ruleset,
 )
+from .rulebook_process import RulebookProcess, RulebookProcessLog
 from .team import Team
 from .user import AwxToken, User
 
@@ -50,7 +50,6 @@ __all__ = [
     "AuditEvent",
     "AuditRule",
     "ExtraVar",
-    "Inventory",
     "JobInstanceEvent",
     "JobInstanceHost",
     "JobInstance",

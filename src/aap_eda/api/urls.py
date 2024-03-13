@@ -33,12 +33,9 @@ router = routers.SimpleRouter()
 router.register("extra-vars", views.ExtraVarViewSet, basename="extravar")
 router.register("projects", views.ProjectViewSet, basename="project")
 router.register("rulebooks", views.RulebookViewSet, basename="rulebook")
-router.register("rulesets", views.RulesetViewSet, basename="ruleset")
-router.register("rules", views.RuleViewSet, basename="rule")
 router.register(
     "roles", views.RoleViewSet, basename="role"
 )  # deprecated, DAB RBAC uses roledefinition
-router.register("tasks", views.TaskViewSet, basename="task")
 router.register("activations", views.ActivationViewSet, basename="activation")
 router.register(
     "activation-instances",
@@ -47,6 +44,7 @@ router.register(
 )
 router.register("audit-rules", views.AuditRuleViewSet, basename="auditrule")
 router.register("users", views.UserViewSet, basename="user")
+router.register("event-streams", views.EventStreamViewSet, basename="eventstream")
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,

@@ -25,12 +25,10 @@ from drf_spectacular.utils import (
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
-from rest_framework.response import Response
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
-from aap_eda.services.rulebook import build_fired_stats, build_ruleset_out_data
 
 
 @extend_schema_view(
@@ -66,44 +64,6 @@ class RulebookViewSet(
         return models.Rulebook.access_qs(self.request.user).order_by("id")
 
     @extend_schema(
-        description="Ruleset list of a rulebook by its id",
-        request=None,
-        responses={
-            status.HTTP_200_OK: serializers.RulesetOutSerializer(many=True)
-        },
-        parameters=[
-            OpenApiParameter(
-                name="id",
-                type=int,
-                location=OpenApiParameter.PATH,
-                description="A unique integer value identifying this rulebook.",  # noqa: E501
-            )
-        ],
-    )
-    @action(
-        detail=False,
-        queryset=models.Ruleset.objects.order_by("id"),
-        filterset_class=filters.RulesetFilter,
-        rbac_action=Action.READ,
-        url_path="(?P<id>[^/.]+)/rulesets",
-    )
-    def rulesets(self, request, id):
-        rulebook = get_object_or_404(models.Rulebook, id=id)
-        rulesets = models.Ruleset.objects.filter(rulebook=rulebook)
-
-        rulesets = self.filter_queryset(rulesets)
-
-        result = []
-        for ruleset in rulesets:
-            ruleset_data = serializers.RulesetSerializer(ruleset).data
-            data = build_ruleset_out_data(ruleset_data)
-            result.append(data)
-
-        result = self.paginate_queryset(result)
-
-        return self.get_paginated_response(result)
-
-    @extend_schema(
         description="Get the JSON format of a rulebook by its id",
         request=None,
         responses={status.HTTP_200_OK: serializers.RulebookSerializer},
@@ -115,72 +75,6 @@ class RulebookViewSet(
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
         return JsonResponse(data)
-
-
-class RulesetViewSet(
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.Ruleset.objects.order_by("id")
-    serializer_class = serializers.RulesetSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.RulesetFilter
-
-    rbac_action = None
-    rbac_resource_type = ResourceType.RULEBOOK
-
-    @extend_schema(
-        description="Get the ruleset by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulesetOutSerializer,
-                description="Return the ruleset by its id.",
-            ),
-        },
-    )
-    def retrieve(self, request, pk=None):
-        ruleset = get_object_or_404(models.Ruleset, pk=pk)
-        ruleset_data = serializers.RulesetSerializer(ruleset).data
-        data = build_ruleset_out_data(ruleset_data)
-
-        return Response(data)
-
-    @extend_schema(
-        description="List all rulesets",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RulesetOutSerializer(many=True),
-                description="Return a list of rulesets.",
-            ),
-        },
-    )
-    def list(self, _request):
-        rulesets = models.Ruleset.objects.all()
-        rulesets = self.filter_queryset(rulesets)
-
-        result = []
-        for ruleset in rulesets:
-            ruleset_data = serializers.RulesetSerializer(ruleset).data
-            data = build_ruleset_out_data(ruleset_data)
-            result.append(data)
-
-        result = self.paginate_queryset(result)
-
-        return self.get_paginated_response(result)
-
-    @extend_schema(
-        description="Rule list of a ruleset by its id",
-        request=None,
-        responses={status.HTTP_200_OK: serializers.RuleSerializer(many=True)},
-    )
-    @action(detail=True, rbac_action=Action.READ)
-    def rules(self, _request, pk):
-        ruleset = get_object_or_404(models.Ruleset, pk=pk)
-        rules = models.Rule.objects.filter(ruleset=ruleset).order_by("id")
-
-        results = self.paginate_queryset(rules)
-        serializer = serializers.RuleSerializer(results, many=True)
-
-        return self.get_paginated_response(serializer.data)
 
 
 @extend_schema_view(
@@ -319,61 +213,3 @@ class AuditRuleViewSet(
         serializer = serializers.AuditEventSerializer(results, many=True)
 
         return self.get_paginated_response(serializer.data)
-
-
-class RuleViewSet(
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.Rule.objects.order_by("id")
-    serializer_class = serializers.RuleSerializer
-
-    rbac_resource_type = ResourceType.RULEBOOK
-
-    @extend_schema(
-        description="Get the rule by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RuleOutSerializer(many=False),
-                description="Return the rule by its id.",
-            ),
-        },
-    )
-    def retrieve(self, _request, pk=None):
-        rule = get_object_or_404(models.Rule, pk=pk)
-        data = self._build_rule_out_data(rule)
-
-        return Response(data)
-
-    @extend_schema(
-        description="List all rules",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RuleOutSerializer(many=True),
-                description="Return a list of rules.",
-            ),
-        },
-    )
-    def list(self, _request):
-        rules = models.Rule.objects.order_by("id")
-
-        result = []
-        for rule in rules:
-            data = self._build_rule_out_data(rule)
-            result.append(data)
-
-        result = self.paginate_queryset(result)
-
-        return self.get_paginated_response(result)
-
-    def _build_rule_out_data(self, rule: models.Rule) -> dict:
-        data = serializers.RuleSerializer(rule).data
-
-        ruleset = models.Ruleset.objects.get(id=rule.ruleset_id)
-        rulebook = models.Rulebook.objects.get(id=ruleset.rulebook_id)
-        project = models.Project.objects.get(id=rulebook.project_id)
-
-        data["fired_stats"] = build_fired_stats(data)
-        data["rulebook_id"] = rulebook.id
-        data["project_id"] = project.id
-
-        return data

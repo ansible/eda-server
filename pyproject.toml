@@ -8,7 +8,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "aap-eda"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
@@ -27,20 +27,20 @@ dev = ["psycopg2-binary"]
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
 django = ">=4.2,<4.3"
-djangorestframework = "*"
-djangorestframework_simplejwt = "*"
-dynaconf = ">=3.1"
-drf-spectacular = "*"
-channels = { version = "*", extras = ["daphne"] }
-psycopg2 = { version = "*", optional = true }
+djangorestframework = "3.14.*"
+djangorestframework_simplejwt = "5.3.*"
+dynaconf = ">=3.1.12,<3.3"
+drf-spectacular = ">=0.26.5,<0.27"
+channels = { version = "4.0.*", extras = ["daphne"] }
+psycopg2 = { version = "2.9.*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
-django-rq = "*"
-rq = "*"
-django-filter = "*"
-pydantic = "*"
-cryptography = "*"
-kubernetes = "*"
-podman = ">=4.5"
+django-rq = ">=2.5,<2.9"
+rq = ">=1.10.1,<1.14"
+django-filter = ">23.2,<24"
+pydantic = ">=1.8.1,<1.11"
+cryptography = ">=38,<42"
+kubernetes = "26.1.*"
+podman = "4.9.*"
 rq-scheduler = "^0.10"
 # temporarily pinning Alan's permissions branch for RBAC work
 django-ansible-base = { git = "https://github.com/alancoding/django-ansible-base.git", branch = "django_permissions", extras = [
@@ -48,9 +48,9 @@ django-ansible-base = { git = "https://github.com/alancoding/django-ansible-base
     "channel_auth",
     "rbac",
 ] }
-jinja2 = "*"
+jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
-ansible-core = "^2.16.2"
+pexpect = "^4.9.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
