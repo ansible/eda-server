@@ -155,6 +155,13 @@ class ProjectViewSet(
             if project.data["eda_credential_id"]
             else None
         )
+        project.data["signature_validation_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["signature_validation_credential_id"]
+            )
+            if project.data["signature_validation_credential_id"]
+            else None
+        )
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
 
@@ -182,24 +189,29 @@ class ProjectViewSet(
             instance=project, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        eda_credential_id = request.data.get("eda_credential_id")
+
+        credential_ids = [
+            request.data.get("eda_credential_id"),
+            request.data.get("signature_validation_credential_id"),
+        ]
 
         # Validate eda_credential_id if has meaningful value
-        if eda_credential_id is not None and int(eda_credential_id) > 0:
-            eda_credential = models.EdaCredential.objects.filter(
-                id=eda_credential_id
+        for credential_id in credential_ids:
+            if credential_id is None:
+                continue
+            credential = models.EdaCredential.objects.filter(
+                id=credential_id
             ).first()
-            if not eda_credential:
-                msg = f"EdaCredential [{eda_credential_id}] not found"
+            if not credential:
+                msg = f"EdaCredential [{credential_id}] not found"
                 return Response(
                     {"errors": msg},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        else:
-            eda_credential_id = None  # for eda_credential = 0
 
         try:
-            project.eda_credential_id = eda_credential_id
+            project.eda_credential_id = credential_ids[0]
+            project.signature_validation_credential_id = credential_ids[1]
             project.name = request.data.get("name", project.name)
             project.description = request.data.get(
                 "description", project.description

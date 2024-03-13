@@ -178,5 +178,32 @@ class Migration(migrations.Migration):
                 to="core.edacredential",
             ),
         ),
+        migrations.AddField(
+            model_name="project",
+            name="scm_branch",
+            field=models.TextField(blank=True, default=""),
+        ),
+        migrations.AddField(
+            model_name="project",
+            name="scm_refspec",
+            field=models.TextField(blank=True, default=""),
+        ),
+        migrations.AddField(
+            model_name="project",
+            name="scm_type",
+            field=models.TextField(choices=[("git", "Git")], default="git"),
+        ),
+        migrations.AddField(
+            model_name="project",
+            name="signature_validation_credential",
+            field=models.ForeignKey(
+                blank=True,
+                default=None,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="%(class)ss_signature_validation",
+                to="core.edacredential",
+            ),
+        ),
         migrations.RunPython(insert_permissions, drop_permissions),
     ]
