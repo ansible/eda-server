@@ -8,6 +8,22 @@ from rest_framework.reverse import reverse
 from aap_eda.core.models import DABPermission
 
 
+def get_basename(obj):
+    "Return the base of viewset view names for a given object or model"
+    if obj._meta.model_name == 'rulebookprocess':
+        return 'activationinstance'
+    return obj._meta.model_name
+
+
+def get_detail_url(obj, skip_if_not_found=False):
+    try:
+        return reverse(f"{get_basename(obj)}-detail", kwargs={"pk": obj.pk})
+    except NoReverseMatch:
+        if skip_if_not_found:
+            pytest.skip("Missing view is reported in test_view_permissions")
+        raise
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_factory_sanity(model, cls_factory):
@@ -24,7 +40,7 @@ def test_add_permissions(
     if "add" not in model._meta.default_permissions:
         pytest.skip("Model has no add permission")
 
-    url = reverse(f"{model._meta.model_name}-list")
+    url = reverse(f"{get_basename(model)}-list")
 
     response = user_api_client.post(url, data=data)
     prior_ct = model.objects.count()
@@ -86,15 +102,6 @@ def test_add_permissions(
 
     # Assure that user gets some creator permissions
     assert user.has_obj_perm(obj, "view")
-
-
-def get_detail_url(obj, skip_if_not_found=False):
-    try:
-        return reverse(f"{obj._meta.model_name}-detail", kwargs={"pk": obj.pk})
-    except NoReverseMatch:
-        if skip_if_not_found:
-            pytest.skip("Missing view is reported in test_view_permissions")
-        raise
 
 
 @pytest.mark.django_db
