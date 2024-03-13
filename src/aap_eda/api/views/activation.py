@@ -101,14 +101,14 @@ class ActivationViewSet(
                 request.user, response
             )
 
-        if activation.is_enabled:
+        if response.is_enabled:
             start_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
-                id=activation.id,
+                id=response.id,
             )
 
         return Response(
-            serializers.ActivationReadSerializer(activation).data,
+            serializers.ActivationReadSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 
