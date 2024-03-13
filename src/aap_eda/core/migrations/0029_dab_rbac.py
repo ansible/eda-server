@@ -12,7 +12,7 @@ from aap_eda.core.migrations._dab_rbac import (
 class Migration(migrations.Migration):
     dependencies = [
         ("contenttypes", "0002_remove_content_type_name"),
-        ("core", "0022_add_default_organization"),
+        ("core", "0028_add_default_organization"),
         ("dab_rbac", "__first__"),
     ]
 

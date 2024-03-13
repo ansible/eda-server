@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("auth", "0012_alter_user_first_name_max_length"),
-        ("core", "0020_eventstream"),
+        ("core", "0026_activation_log_level_eventstream_log_level"),
     ]
     run_before = [("dab_rbac", "__first__")]
 
@@ -133,6 +133,15 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name="decisionenvironment",
+            name="organization",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+            ),
+        ),
+        migrations.AddField(
+            model_name="eventstream",
             name="organization",
             field=models.ForeignKey(
                 null=True,
@@ -285,16 +294,14 @@ class Migration(migrations.Migration):
                     ("activation", "activation"),
                     ("activation_instance", "activation_instance"),
                     ("audit_rule", "audit_rule"),
-                    ("audit_event", "audit_event"),
-                    ("task", "task"),
                     ("user", "user"),
                     ("project", "project"),
-                    ("inventory", "inventory"),
                     ("extra_var", "extra_var"),
                     ("rulebook", "rulebook"),
                     ("role", "role"),
                     ("decision_environment", "decision_environment"),
                     ("credential", "credential"),
+                    ("event_stream", "event_stream"),
                     ("organization", "organization"),
                     ("team", "team"),
                 ]

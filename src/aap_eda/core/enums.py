@@ -42,7 +42,6 @@ class ResourceType(DjangoStrEnum):
     ACTIVATION = "activation"
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
-    AUDIT_EVENT = "audit_event"
     USER = "user"
     PROJECT = "project"
     EXTRA_VAR = "extra_var"

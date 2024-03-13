@@ -23,6 +23,7 @@ from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
+from .organization import Organization
 
 
 class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
@@ -45,6 +46,9 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         "ExtraVar",
         on_delete=models.CASCADE,
         null=True,
+    )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
@@ -117,3 +121,9 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     def _get_skip_audit_events(self) -> bool:
         """Event stream skips audit events."""
         return True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])

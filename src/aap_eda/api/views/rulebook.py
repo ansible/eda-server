@@ -192,7 +192,6 @@ class AuditRuleViewSet(
             "source_type",
             "received_at",
         ],
-        rbac_resource_type=ResourceType.AUDIT_EVENT,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/events",
     )
