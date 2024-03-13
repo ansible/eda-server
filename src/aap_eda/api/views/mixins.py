@@ -12,14 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
-
-from ansible_base.rbac.api.related import check_related_permissions
-from ansible_base.rbac.models import RoleDefinition
-from django.forms import model_to_dict
-from django.db import transaction
 
 
 # TODO: need revisit from cuwater

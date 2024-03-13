@@ -30,7 +30,7 @@ from aap_eda.api.serializers import (
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 
-from .mixins import PartialUpdateOnlyModelMixin, CreateModelMixin
+from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
 
 
 @extend_schema_view(

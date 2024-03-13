@@ -13,6 +13,10 @@
 #  limitations under the License.
 import logging
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -35,11 +39,6 @@ from aap_eda.tasks.orchestrator import (
     start_activation,
     stop_activation,
 )
-
-from ansible_base.rbac.api.related import check_related_permissions
-from ansible_base.rbac.models import RoleDefinition
-from django.forms import model_to_dict
-from django.db import transaction
 
 logger = logging.getLogger(__name__)
 

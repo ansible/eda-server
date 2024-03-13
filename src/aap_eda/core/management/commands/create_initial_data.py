@@ -32,7 +32,6 @@ ORG_ROLES = [
             "activation": [
                 "add",
                 "view",
-                "change",
                 "delete",
                 "enable",
                 "disable",
@@ -60,7 +59,7 @@ ORG_ROLES = [
         "name": "Editor",
         "description": "Has create and edit permissions.",
         "permissions": {
-            "activation": CRUD,
+            "activation": ["add", "view", "delete"],
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
             "organization": ["view"],
@@ -80,7 +79,14 @@ ORG_ROLES = [
             "Has enable and disable rulebook activation permissions."
         ),
         "permissions": {
-            "activation": CRUD + ["enable", "disable", "restart"],
+            "activation": [
+                "add",
+                "view",
+                "delete",
+                "enable",
+                "disable",
+                "restart",
+            ],
             "rulebook_process": ["view", "delete"],
             "audit_rule": ["view"],
             "organization": ["view"],

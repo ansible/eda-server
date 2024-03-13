@@ -10,8 +10,8 @@ from aap_eda.core.models import DABPermission
 
 def get_basename(obj):
     "Return the base of viewset view names for a given object or model"
-    if obj._meta.model_name == 'rulebookprocess':
-        return 'activationinstance'
+    if obj._meta.model_name == "rulebookprocess":
+        return "activationinstance"
     return obj._meta.model_name
 
 

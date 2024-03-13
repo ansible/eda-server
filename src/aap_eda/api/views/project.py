@@ -11,7 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
 from django.db import IntegrityError, transaction
+from django.forms import model_to_dict
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -27,11 +30,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
 
-from .mixins import ResponseSerializerMixin, CreateModelMixin
-
-from ansible_base.rbac.api.related import check_related_permissions
-from ansible_base.rbac.models import RoleDefinition
-from django.forms import model_to_dict
+from .mixins import CreateModelMixin, ResponseSerializerMixin
 
 
 @extend_schema_view(
