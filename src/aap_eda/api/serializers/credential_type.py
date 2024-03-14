@@ -14,7 +14,8 @@
 
 from rest_framework import serializers
 
-from aap_eda.core import models
+from aap_eda.core import models, validators
+from aap_eda.core.utils.credentials import validate_injectors
 
 
 class CredentialTypeSerializer(serializers.ModelSerializer):
@@ -38,7 +39,24 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
 
 
 class CredentialTypeCreateSerializer(serializers.ModelSerializer):
-    inputs = serializers.JSONField()
+    inputs = serializers.JSONField(
+        required=True,
+        allow_null=False,
+        help_text="Name of the project",
+        validators=[
+            validators.check_if_schema_valid,
+        ],
+    )
+
+    def validate(self, data):
+        if data.get("injectors") and data.get("inputs"):
+            errors = validate_injectors(
+                data.get("inputs"), data.get("injectors")
+            )
+            if bool(errors):
+                raise serializers.ValidationError(errors)
+
+        return data
 
     class Meta:
         model = models.CredentialType
