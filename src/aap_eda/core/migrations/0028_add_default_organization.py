@@ -34,7 +34,6 @@ def add_resources_to_default_org(apps, schema_editor):
         "AuditRule",
         "Credential",
         "DecisionEnvironment",
-        "EventStream",
         "ExtraVar",
         "Project",
     )
@@ -61,7 +60,6 @@ def remove_resources_from_default_org(apps, schema_editor):
         "AuditRule",
         "Credential",
         "DecisionEnvironment",
-        "EventStream",
         "ExtraVar",
         "Project",
         "Role",

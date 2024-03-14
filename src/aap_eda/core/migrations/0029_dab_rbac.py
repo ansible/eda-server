@@ -37,13 +37,6 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AlterModelOptions(
-            name="eventstream",
-            options={
-                "default_permissions": ("add", "view"),
-                "ordering": ("-created_at",),
-            },
-        ),
-        migrations.AlterModelOptions(
             name="extravar",
             options={"default_permissions": ("add", "view")},
         ),

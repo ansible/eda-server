@@ -46,7 +46,6 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "credential": CRUD,
-            "event_stream": ["add", "view"],
         },
     },
     {
@@ -70,7 +69,6 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "credential": CRUD,
-            "event_stream": ["add", "view"],
         },
     },
     {
@@ -97,7 +95,6 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "credential": CRUD,
-            "event_stream": ["add", "view"],
         },
     },
     {
@@ -116,7 +113,6 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "credential": ["view"],
-            "event_stream": ["view"],
         },
     },
     {
@@ -133,7 +129,6 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "credential": ["view"],
-            "event_stream": ["view"],
         },
     },
     {
@@ -149,7 +144,6 @@ ORG_ROLES = [
             "extra_var": ["view"],
             "rulebook": ["view"],
             "decision_environment": ["view"],
-            "event_stream": ["view"],
         },
     },
 ]
