@@ -428,7 +428,7 @@ class Command(BaseCommand):
             eda_cred = models.EdaCredential.objects.create(
                 name=cred.name,
                 description=cred.description,
-                managed=cred_type.managed,
+                managed=False,
                 credential_type=cred_type,
                 inputs=inputs_to_store(inputs),
             )
@@ -461,7 +461,7 @@ class Command(BaseCommand):
             eda_cred = models.EdaCredential.objects.create(
                 name=cred.name,
                 description=cred.description,
-                managed=cred_type.managed,
+                managed=False,
                 credential_type=cred_type,
                 inputs=inputs_to_store(inputs),
             )
