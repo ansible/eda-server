@@ -33,9 +33,9 @@ from aap_eda.api.exceptions import (
 )
 from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
-from aap_eda.api.serializers.utils import substitute_extra_vars, swap_sources
 from aap_eda.core import models, validators
 from aap_eda.core.enums import CredentialType
+from aap_eda.core.utils.strings import substitute_extra_vars, swap_sources
 
 logger = logging.getLogger(__name__)
 
