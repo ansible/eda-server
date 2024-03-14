@@ -88,10 +88,10 @@ class RoleSerializer(serializers.ModelSerializer):
     modified_at = serializers.SerializerMethodField()
 
     def get_created_at(self, obj):
-        return obj.created_on
+        return obj.created
 
     def get_modified_at(self, obj):
-        return obj.modified_on
+        return obj.modified
 
     class Meta:
         model = RoleDefinition
@@ -135,10 +135,10 @@ class RoleDetailSerializer(serializers.Serializer):
     modified_at = serializers.SerializerMethodField()
 
     def get_created_at(self, obj):
-        return obj.created_on
+        return obj.created
 
     def get_modified_at(self, obj):
-        return obj.modified_on
+        return obj.modified
 
 
 class RoleRefSerializer(serializers.ModelSerializer):

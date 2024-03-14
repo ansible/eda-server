@@ -26,9 +26,9 @@ class OrganizationSerializer(NamedCommonModelSerializer):
             "id",
             "name",
             "description",
-            "created_on",
+            "created",
             "created_by",
-            "modified_on",
+            "modified",
             "modified_by",
         ]
 

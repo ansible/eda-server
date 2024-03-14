@@ -25,9 +25,9 @@ class TeamSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "organization_id",
-            "created_on",
+            "created",
             "created_by",
-            "modified_on",
+            "modified",
             "modified_by",
         ]
 
@@ -54,9 +54,9 @@ class TeamDetailSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "organization",
-            "created_on",
+            "created",
             "created_by",
-            "modified_on",
+            "modified",
             "modified_by",
         ]
 

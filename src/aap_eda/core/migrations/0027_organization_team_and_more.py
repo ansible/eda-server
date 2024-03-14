@@ -26,18 +26,16 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "created_on",
+                    "created",
                     models.DateTimeField(
-                        default=None,
-                        editable=False,
+                        auto_now_add=True,
                         help_text="The date/time this resource was created",
                     ),
                 ),
                 (
-                    "modified_on",
+                    "modified",
                     models.DateTimeField(
-                        default=None,
-                        editable=False,
+                        auto_now=True,
                         help_text="The date/time this resource was created",
                     ),
                 ),
@@ -171,18 +169,16 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "created_on",
+                    "created",
                     models.DateTimeField(
-                        default=None,
-                        editable=False,
+                        auto_now_add=True,
                         help_text="The date/time this resource was created",
                     ),
                 ),
                 (
-                    "modified_on",
+                    "modified",
                     models.DateTimeField(
-                        default=None,
-                        editable=False,
+                        auto_now=True,
                         help_text="The date/time this resource was created",
                     ),
                 ),

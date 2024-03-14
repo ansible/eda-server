@@ -12,8 +12,8 @@ def create_default_org(apps, schema_editor):
     Organization.objects.using(db_alias).get_or_create(
         name=settings.DEFAULT_ORGANIZATION_NAME,
         description="The default organization",
-        created_on=now,
-        modified_on=now,
+        created=now,
+        modified=now,
     )
 
 
