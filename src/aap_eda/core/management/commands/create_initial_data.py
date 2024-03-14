@@ -18,7 +18,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 
-from aap_eda.core.models import DABPermission
+from ansible_base.rbac.models import DABPermission
 
 CRUD = ["add", "view", "change", "delete"]
 

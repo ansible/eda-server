@@ -15,7 +15,7 @@
 from ansible_base.rbac import permission_registry
 
 from .activation import Activation
-from .auth import DABPermission, Permission, Role
+from .auth import Permission, Role
 from .credential import Credential
 from .decision_environment import DecisionEnvironment
 from .event_stream import EventStream
@@ -56,7 +56,6 @@ __all__ = [
     "Job",
     "Project",
     "Permission",
-    "DABPermission",
     "Role",
     "Rule",
     "Rulebook",

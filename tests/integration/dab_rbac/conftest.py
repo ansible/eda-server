@@ -9,7 +9,7 @@ from ansible_base.lib.testing.fixtures import (  # noqa: F401
     user,
     user_api_client,
 )
-from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rbac.models import RoleDefinition, DABPermission
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import (
@@ -20,8 +20,6 @@ from django.db.models import (
     UUIDField,
 )
 from django.utils.timezone import now
-
-from aap_eda.core.models import DABPermission
 
 
 class ModelFactory:

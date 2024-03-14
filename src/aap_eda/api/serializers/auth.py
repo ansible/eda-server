@@ -14,6 +14,8 @@
 from ansible_base.rbac.models import RoleDefinition
 from rest_framework import serializers
 
+from ansible_base.rbac.models import DABPermission
+
 from aap_eda.core import models
 
 
@@ -37,15 +39,17 @@ class PermissionSerializer(serializers.ModelSerializer):
     action = serializers.SerializerMethodField()
 
     def get_resource_type(self, obj):
-        return obj.get_model()
+        action, model = obj.codename.split("_", 1)
+        return model
 
     def get_action(self, obj):
-        return obj.get_action()
+        action, model = obj.codename.split("_", 1)
+        return action
 
 
 class PermissionRefSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.DABPermission
+        model = DABPermission
         fields = ["resource_type", "action"]
         read_only_fields = ["resource_type", "action"]
 
