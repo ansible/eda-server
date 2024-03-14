@@ -12,9 +12,23 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import yaml
+import re
 
-ENCRYPTED = "$encrypted$"
+import jinja2
+import yaml
+from django.core.exceptions import ValidationError
+from jinja2.nativetypes import NativeTemplate
+
+from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
+from aap_eda.core.utils.awx import validate_ssh_private_key
+
+ENCRYPTED_TO_DISPLAY = "$encrypted$"
+EDA_PREFIX = "EDA_"
+SUPPORT_KEYS_IN_INJECTORS = ["extra_vars"]
+
+
+class InjectorMissingKeyException(Exception):
+    pass
 
 
 def inputs_to_display(schema: dict, inputs: str) -> dict:
@@ -23,7 +37,7 @@ def inputs_to_display(schema: dict, inputs: str) -> dict:
 
     for key in decoded_inputs.keys():
         if key in secret_fields:
-            decoded_inputs[key] = ENCRYPTED
+            decoded_inputs[key] = ENCRYPTED_TO_DISPLAY
 
     return decoded_inputs
 
@@ -43,7 +57,9 @@ def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
         else {}
     )
 
-    old_inputs.update((k, inputs[k]) for k, v in inputs.items())
+    old_inputs.update(
+        (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_TO_DISPLAY
+    )
     return yaml.dump(old_inputs)
 
 
@@ -64,32 +80,35 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
     Return an empty dict if no error.
     """
     errors = {}
-    required_fields = schema["required"]
-    for field in schema["fields"]:
-        field_id = field["id"]
-        required = field_id in required_fields
-        default = field.get("default")
-        user_input = inputs.get(field_id)
+    required_fields = schema.get("required", [])
+
+    for data in schema.get("fields", []):
+        field = data["id"]
+        required = field in required_fields
+        default = data.get("default")
+        user_input = inputs.get(field)
+        display_field = f"inputs.{field}"
 
         if user_input is None:
             if default:
-                inputs[field_id] = default
+                inputs[field] = default
             elif required:
-                errors[field_id] = ["Cannot be blank"]
+                errors[display_field] = ["Cannot be blank"]
+                continue
+
+        if data.get("format") and user_input:
+            result = _validate_format(data.get("format"), user_input, inputs)
+            if bool(result):
+                errors[display_field] = result
+
+        if data.get("type") == "boolean":
+            if user_input and not isinstance(user_input, bool):
+                errors[display_field] = ["Must be a boolean"]
             continue
 
-        if field.get("type") == "boolean":
-            if not isinstance(user_input, bool):
-                errors[field_id] = ["Must be a boolean"]
-            continue
-
-        choices = field.get("choices")
-        if choices and user_input not in choices:
-            errors[field_id] = ["Must be one of the choices"]
-            continue
-
-        if not isinstance(user_input, str):
-            errors[field_id] = ["Must be a string"]
+        choices = data.get("choices")
+        if choices and user_input and user_input not in choices:
+            errors[display_field] = [f"Must be one of the choices: {choices}"]
             continue
 
     return errors
@@ -107,19 +126,44 @@ def validate_schema(schema: dict) -> list[str]:
     Return an empty list if no errors.
     """
     errors = []
-    field_ids = []
+    if not isinstance(schema, dict):
+        errors.append("schema must be in dict format")
+        return errors
+
     fields = schema.get("fields")
 
     if not fields:
-        errors.append("fields must exist and non empty")
+        errors.append("'fields' must exist and non empty")
+    elif not isinstance(fields, list):
+        errors.append("'fields' must be a list")
     else:
+        id_fields = [field.get("id") for field in fields if field.get("id")]
+        duplicates = []
+        uniqs = []
+        for id in id_fields:
+            if id in uniqs:
+                duplicates.append(id)
+            else:
+                uniqs.append(id)
+
+        if len(duplicates) > 0:
+            errors.append(f"Duplicate fields: {set(duplicates)} found")
+
+        for id in id_fields:
+            if id.upper().startswith(EDA_PREFIX):
+                errors.append(f"{id} should not start with {EDA_PREFIX}")
+
+            if not bool(re.match(r"^\w+$", id)):
+                errors.append(
+                    f"{id} can only contain alphanumeric and "
+                    "underscore characters"
+                )
+
         for field in fields:
             for option in ["id", "label"]:
                 value = field.get(option)
                 if not value or not isinstance(value, str):
                     errors.append(f"{option} must exist and be a string")
-                elif option == "id":
-                    field_ids.append(value)
 
             field_type = field.get("type")
             if field_type and field_type not in ["string", "boolean"]:
@@ -148,7 +192,128 @@ def validate_schema(schema: dict) -> list[str]:
             errors.append("required must be a list of strings")
         else:
             for field_id in required_fields:
-                if field_id not in field_ids:
+                if field_id not in id_fields:
                     errors.append(f"required field {field_id} does not exist")
+
+    return errors
+
+
+def validate_injectors(schema: dict, injectors: dict) -> dict:
+    errors = []
+    context = _default_context(schema)
+
+    if not isinstance(injectors, dict):
+        errors.append(
+            "injectors must be a dict type and defines keys"
+            f" in {SUPPORT_KEYS_IN_INJECTORS}"
+        )
+
+    if not any(
+        support_key in injectors.keys()
+        for support_key in SUPPORT_KEYS_IN_INJECTORS
+    ):
+        errors.append(
+            "injectors must have keys defined in the"
+            f" {SUPPORT_KEYS_IN_INJECTORS}"
+        )
+
+    for field in SUPPORT_KEYS_IN_INJECTORS:
+        input_data = injectors.get(field)
+        if not input_data:
+            continue
+
+        if not isinstance(input_data, dict):
+            errors.append(f"{field} must be a dict type")
+            continue
+
+        for k, v in input_data.items():
+            try:
+                _check_jinja_string(v, context)
+            except InjectorMissingKeyException as e:
+                errors.append(
+                    f"Injector key: {k} has a value which refers to an"
+                    f" undefined key error: {e}"
+                )
+
+    return {"injectors": errors} if bool(errors) else {}
+
+
+def _default_context(schema: dict) -> dict:
+    results = {}
+
+    fields = schema.get("fields")
+
+    for field in fields:
+        field_type = field.get("type")
+        if field_type == "boolean":
+            results[field["id"]] = True
+        else:
+            results[field["id"]] = ""
+
+        default = field.get("default")
+        if default:
+            results[field["id"]] = default
+
+        choices = field.get("choices")
+        if choices:
+            if isinstance(choices, list):
+                results[field["id"]] = choices[0]
+
+    return results
+
+
+def _check_jinja_string(value: str, context: dict) -> str:
+    try:
+        if "{{" in value and "}}" in value:
+            result = NativeTemplate(
+                value, undefined=jinja2.StrictUndefined
+            ).render(context)
+            if isinstance(result, jinja2.runtime.StrictUndefined):
+                raise InjectorMissingKeyException(f"{value} is undefined")
+    except jinja2.exceptions.UndefinedError:
+        raise InjectorMissingKeyException(f"{value} is undefined")
+
+
+def _validate_format(data_type: str, data: str, inputs: dict) -> list[str]:
+    errors = []
+
+    if data_type == "vault_id":
+        return _validate_vault_id(data)
+
+    elif data_type == "ssh_private_key":
+        return _validate_ssh_key(data, inputs)
+
+    return errors
+
+
+def _validate_vault_id(data: str) -> list[str]:
+    errors = []
+
+    if not bool(re.match(r"^\w+$", data)):
+        errors.append(
+            "vault_id can only contain alphanumeric and "
+            "underscore characters"
+        )
+
+    if data == EDA_SERVER_VAULT_LABEL:
+        errors.append(f"vault_id can not be {EDA_SERVER_VAULT_LABEL}")
+
+    return errors
+
+
+def _validate_ssh_key(data: str, inputs: dict) -> list[str]:
+    errors = []
+    try:
+        result = validate_ssh_private_key(data)
+
+        if result[0]["type"] != "PRIVATE KEY":
+            errors.append("Data is not a private key")
+
+        if result[0]["key_enc"] and not inputs.get("ssh_key_unlock"):
+            errors.append(
+                "The key is passphrase protected, please provide passphrase."
+            )
+    except ValidationError as e:
+        errors.append(str(e))
 
     return errors
