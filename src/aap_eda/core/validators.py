@@ -18,6 +18,7 @@ import yaml
 from rest_framework import serializers
 
 from aap_eda.core import models
+from aap_eda.core.utils.credentials import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -120,3 +121,10 @@ def check_if_event_streams_exists(event_stream_ids: list[int]) -> list[int]:
                 f"EventStream with id {event_stream_id} does not exist"
             )
     return event_stream_ids
+
+
+def check_if_schema_valid(schema: dict):
+    errors = validate_schema(schema)
+
+    if bool(errors):
+        raise serializers.ValidationError(errors)

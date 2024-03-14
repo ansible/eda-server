@@ -18,7 +18,7 @@ from unittest import mock
 
 import pytest
 
-from aap_eda.core.models import Credential
+from aap_eda.core.models import EdaCredential
 from aap_eda.services.project.git import (
     GitAuthenticationError,
     GitError,
@@ -28,16 +28,17 @@ from aap_eda.services.project.git import (
 
 
 @pytest.fixture
-def credential() -> Credential:
-    credential = Credential.objects.create(
-        name="name", username="me", secret="supersecret"
+def credential() -> EdaCredential:
+    credential = EdaCredential.objects.create(
+        name="test-eda-credential",
+        inputs={"username": "adam", "password": "secret"},
     )
     credential.refresh_from_db()
     return credential
 
 
 @pytest.mark.django_db
-def test_git_clone(credential: Credential):
+def test_git_clone(credential: EdaCredential):
     executor = mock.MagicMock(ENVIRON={})
     repository = GitRepository.clone(
         "https://git.example.com/repo.git",
@@ -49,7 +50,7 @@ def test_git_clone(credential: Credential):
         [
             "clone",
             "--quiet",
-            "https://me:supersecret@git.example.com/repo.git",
+            "https://adam:secret@git.example.com/repo.git",
             "/path/to/repository",
         ],
     )
@@ -62,7 +63,7 @@ def test_git_clone(credential: Credential):
 @pytest.mark.django_db
 def test_git_clone_leak_password(
     subprocess_run_mock: mock.Mock,
-    credential: Credential,
+    credential: EdaCredential,
 ):
     executor = GitExecutor()
 
@@ -91,7 +92,7 @@ def test_git_clone_leak_password(
 @pytest.mark.django_db
 def test_git_clone_auth_error(
     subprocess_run_mock: mock.Mock,
-    credential: Credential,
+    credential: EdaCredential,
 ):
     executor = GitExecutor()
 
