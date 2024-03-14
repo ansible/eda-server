@@ -52,6 +52,9 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
     eda_credential_id = serializers.IntegerField(
         required=False, allow_null=True
     )
+    signature_validation_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project
@@ -173,7 +176,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             EdaCredentialRefSerializer(
                 project["signature_validation_credential"]
             ).data
-            if project["eda_credential"]
+            if project["signature_validation_credential"]
             else None
         )
         return {
