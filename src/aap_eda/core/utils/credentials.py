@@ -97,7 +97,12 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                 continue
 
         if data.get("format") and user_input:
-            result = _validate_format(data.get("format"), user_input, inputs)
+            result = _validate_format(
+                schema=schema,
+                data_type=data.get("format"),
+                data=user_input,
+                inputs=inputs,
+            )
             if bool(result):
                 errors[display_field] = result
 
@@ -137,7 +142,7 @@ def validate_schema(schema: dict) -> list[str]:
     elif not isinstance(fields, list):
         errors.append("'fields' must be a list")
     else:
-        id_fields = [field.get("id") for field in fields if field.get("id")]
+        id_fields = _get_id_fields(schema)
         duplicates = []
         uniqs = []
         for id in id_fields:
@@ -239,6 +244,12 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     return {"injectors": errors} if bool(errors) else {}
 
 
+def _get_id_fields(schema: dict) -> list[str]:
+    fields = schema.get("fields", [])
+
+    return [field.get("id") for field in fields if field.get("id")]
+
+
 def _default_context(schema: dict) -> dict:
     results = {}
 
@@ -275,14 +286,16 @@ def _check_jinja_string(value: str, context: dict) -> str:
         raise InjectorMissingKeyException(f"{value} is undefined")
 
 
-def _validate_format(data_type: str, data: str, inputs: dict) -> list[str]:
+def _validate_format(
+    schema: dict, data_type: str, data: str, inputs: dict
+) -> list[str]:
     errors = []
 
     if data_type == "vault_id":
         return _validate_vault_id(data)
 
     elif data_type == "ssh_private_key":
-        return _validate_ssh_key(data, inputs)
+        return _validate_ssh_key(schema, data, inputs)
 
     return errors
 
@@ -302,18 +315,22 @@ def _validate_vault_id(data: str) -> list[str]:
     return errors
 
 
-def _validate_ssh_key(data: str, inputs: dict) -> list[str]:
+def _validate_ssh_key(schema: dict, data: str, inputs: dict) -> list[str]:
     errors = []
     try:
-        result = validate_ssh_private_key(data)
+        results = validate_ssh_private_key(data)
 
-        if result[0]["type"] != "PRIVATE KEY":
+        if results[0]["type"] != "PRIVATE KEY":
             errors.append("Data is not a private key")
 
-        if result[0]["key_enc"] and not inputs.get("ssh_key_unlock"):
-            errors.append(
-                "The key is passphrase protected, please provide passphrase."
-            )
+        id_fields = _get_id_fields(schema)
+
+        if "ssh_key_unlock" in id_fields and "ssh_key_data" in id_fields:
+            if results[0]["key_enc"] and not inputs.get("ssh_key_unlock"):
+                errors.append(
+                    "The key is passphrase protected, please "
+                    "provide passphrase."
+                )
     except ValidationError as e:
         errors.append(str(e))
 
