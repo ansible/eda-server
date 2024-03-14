@@ -474,9 +474,7 @@ def test_validate_ssh_keys(phrase, key_file, data, decision):
         ]
     }
 
-    inputs = {
-        "ssh_key_data": data,
-    }
+    inputs = {"ssh_key_data": data}
 
     if phrase:
         inputs["ssh_key_unlock"] = phrase
@@ -487,3 +485,27 @@ def test_validate_ssh_keys(phrase, key_file, data, decision):
         assert errors == {}
     else:
         assert bool(errors) is True
+
+
+def test_validate_ssh_keys_without_phrase():
+    schema = {
+        "fields": [
+            {
+                "id": "ssh_key_data",
+                "type": "string",
+                "label": "SCM Private Key",
+                "format": "ssh_private_key",
+                "secret": True,
+                "multiline": True,
+            },
+        ]
+    }
+
+    key_file = DATA_DIR / "demo1"
+
+    with open(key_file) as f:
+        data = f.read()
+
+    inputs = {"ssh_key_data": data}
+    errors = validate_inputs(schema, inputs)
+    assert errors == {}
