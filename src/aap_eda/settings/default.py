@@ -523,7 +523,6 @@ ANSIBLE_BASE_SERVICE_PREFIX = "eda"
 
 ANSIBLE_BASE_TEAM_MODEL = "core.Team"
 ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
-ANSIBLE_BASE_PERMISSION_MODEL = "core.DABPermission"
 
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}

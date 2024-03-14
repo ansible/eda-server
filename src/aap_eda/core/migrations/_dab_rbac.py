@@ -1,9 +1,7 @@
 import logging
 
-from ansible_base.rbac.migrations._utils import (
-    create_custom_permissions,
-    give_permissions,
-)
+from ansible_base.rbac.management import create_dab_permissions
+from ansible_base.rbac.migrations._utils import give_permissions
 from django.apps import apps as global_apps
 from django.conf import settings
 from django.utils.timezone import now
@@ -12,7 +10,7 @@ logger = logging.getLogger("aap_eda.core.migrations._dab_rbac")
 
 
 def create_permissions_as_operation(apps, schema_editor):
-    create_custom_permissions(global_apps.get_app_config("core"))
+    create_dab_permissions(global_apps.get_app_config("core"), apps=apps)
 
 
 # this maps action names from prior permission model to the Django names
@@ -25,7 +23,7 @@ def migrate_roles_to_dab(apps, schema_editor):
     RoleDefinition = apps.get_model("dab_rbac", "RoleDefinition")  # noqa: N806
     Organization = apps.get_model("core", "Organization")  # noqa: N806
     ContentType = apps.get_model("contenttypes", "ContentType")  # noqa: N806
-    DABPermission = apps.get_model("core", "DABPermission")  # noqa: N806
+    DABPermission = apps.get_model("dab_rbac", "DABPermission")  # noqa: N806
 
     default_org = Organization.objects.get(
         name=settings.DEFAULT_ORGANIZATION_NAME

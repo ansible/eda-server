@@ -1,11 +1,9 @@
 import pytest
 from ansible_base.rbac import permission_registry
-from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rbac.models import RoleDefinition, DABPermission
 from django.contrib.contenttypes.models import ContentType
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse
-
-from aap_eda.core.models import DABPermission
 
 
 def get_basename(obj):
