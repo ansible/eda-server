@@ -1,6 +1,6 @@
 import pytest
 from ansible_base.rbac import permission_registry
-from ansible_base.rbac.models import RoleDefinition, DABPermission
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse

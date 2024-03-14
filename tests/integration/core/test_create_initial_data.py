@@ -1,8 +1,7 @@
 import pytest
-from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 
 from aap_eda.core.management.commands.create_initial_data import Command
-from ansible_base.rbac.models import DABPermission
 
 
 @pytest.mark.django_db
