@@ -57,8 +57,8 @@ def migrate_roles_to_dab(apps, schema_editor):
             defaults={
                 "description": role.description,
                 "content_type": org_ct,
-                "created_on": migration_now,
-                "modified_on": migration_now,
+                "created": migration_now,
+                "modified": migration_now,
             },
         )
         new_role.permissions.add(*new_permissions)
