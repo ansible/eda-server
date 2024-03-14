@@ -16,7 +16,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
 from aap_eda.core import models
-from aap_eda.core.utils.credentials import inputs_to_display
+from aap_eda.core.utils.credentials import inputs_to_display, validate_inputs
 from aap_eda.core.utils.crypto.base import SecretValue
 
 
@@ -63,28 +63,6 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
         }
 
 
-class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
-    inputs = serializers.JSONField()
-
-    class Meta:
-        model = models.EdaCredential
-        read_only_fields = [
-            "id",
-            "managed",
-            "created_at",
-            "modified_at",
-        ]
-        fields = [
-            "id",
-            "name",
-            "description",
-            "inputs",
-            "credential_type_id",
-            "created_at",
-            "modified_at",
-        ]
-
-
 class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     credential_type_id = serializers.IntegerField(
         required=True, allow_null=True
@@ -92,7 +70,19 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     inputs = serializers.JSONField()
 
     def validate(self, data):
-        # TODO: add validation later
+        credential_type_id = data.get("credential_type_id")
+        if credential_type_id:
+            credential_type = models.CredentialType.objects.get(
+                id=credential_type_id
+            )
+        else:
+            # for update
+            credential_type = self.instance.credential_type
+
+        errors = validate_inputs(credential_type.inputs, data["inputs"])
+        if bool(errors):
+            raise serializers.ValidationError(errors)
+
         return data
 
     class Meta:
