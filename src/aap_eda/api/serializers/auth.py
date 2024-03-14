@@ -11,10 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 from rest_framework import serializers
-
-from ansible_base.rbac.models import DABPermission
 
 from aap_eda.core import models
 
@@ -57,10 +55,12 @@ class PermissionRefSerializer(serializers.ModelSerializer):
     action = serializers.SerializerMethodField()
 
     def get_resource_type(self, obj):
-        return obj.get_model()
+        action, model = obj.codename.split("_", 1)
+        return model
 
     def get_action(self, obj):
-        return obj.get_action()
+        action, model = obj.codename.split("_", 1)
+        return action
 
 
 # -----------------------------------------------------

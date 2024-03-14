@@ -14,7 +14,6 @@
 
 import uuid
 
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from aap_eda.core.enums import Action, ResourceType

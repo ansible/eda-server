@@ -1,7 +1,7 @@
 import logging
 
-from ansible_base.rbac.migrations._utils import give_permissions
 from ansible_base.rbac.management import create_dab_permissions
+from ansible_base.rbac.migrations._utils import give_permissions
 from django.apps import apps as global_apps
 from django.conf import settings
 from django.utils.timezone import now

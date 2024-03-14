@@ -12,13 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from ansible_base.rbac import permission_registry
-from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
-
-from ansible_base.rbac.models import DABPermission
 
 CRUD = ["add", "view", "change", "delete"]
 
