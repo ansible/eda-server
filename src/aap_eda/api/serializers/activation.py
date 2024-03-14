@@ -36,16 +36,16 @@ from aap_eda.api.serializers.project import (
     ProjectRefSerializer,
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
-from aap_eda.api.serializers.utils import (
+from aap_eda.api.vault import encrypt_string
+from aap_eda.core import models, validators
+from aap_eda.core.enums import CredentialType, ProcessParentType
+from aap_eda.core.utils.credentials import get_secret_fields
+from aap_eda.core.utils.strings import (
     substitute_extra_vars,
     substitute_source_args,
     substitute_variables,
     swap_sources,
 )
-from aap_eda.api.vault import encrypt_string
-from aap_eda.core import models, validators
-from aap_eda.core.enums import CredentialType, ProcessParentType
-from aap_eda.core.utils.credentials import get_secret_fields
 
 logger = logging.getLogger(__name__)
 

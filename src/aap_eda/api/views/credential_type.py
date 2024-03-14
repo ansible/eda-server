@@ -55,18 +55,6 @@ logger = logging.getLogger(__name__)
             ),
         },
     ),
-    partial_update=extend_schema(
-        description="Partial update of a credential type",
-        request=serializers.CredentialTypeSerializer,
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.CredentialTypeSerializer,
-                description=(
-                    "Update successful. Return an updated credential type."
-                ),
-            )
-        },
-    ),
 )
 class CredentialTypeViewSet(
     ResponseSerializerMixin,
@@ -109,6 +97,36 @@ class CredentialTypeViewSet(
             serializers.CredentialTypeSerializer(credential_type).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @extend_schema(
+        description="Partial update of a credential type",
+        request=serializers.CredentialTypeSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.CredentialTypeSerializer,
+                description=(
+                    "Update successful. Return an updated credential type."
+                ),
+            )
+        },
+    )
+    def partial_update(self, request, pk):
+        credential_type = self.get_object()
+        serializer = serializers.CredentialTypeCreateSerializer(
+            credential_type, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+
+        for key, value in serializer.validated_data.items():
+            setattr(credential_type, key, value)
+
+        credential_type.save()
+
+        return Response(
+            serializers.CredentialTypeSerializer(credential_type).data,
+            status=status.HTTP_206_PARTIAL_CONTENT,
+        )
+        pass
 
     @extend_schema(
         description="Delete a credential type by id",
