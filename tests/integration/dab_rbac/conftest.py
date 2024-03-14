@@ -21,6 +21,13 @@ from django.db.models import (
 )
 from django.utils.timezone import now
 
+from aap_eda.core.management.commands.create_initial_data import Command
+
+
+@pytest.fixture
+def initial_data():
+    Command().handle()
+
 
 class ModelFactory:
     """Factory to create objects using an internal dependency store"""
