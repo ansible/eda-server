@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from aap_eda.core.utils.credentials import (
-    SUPPORT_KEYS_IN_INJECTORS,
+    SUPPORTED_KEYS_IN_INJECTORS,
     validate_injectors,
     validate_inputs,
     validate_schema,
@@ -431,11 +431,11 @@ def test_validate_injectors():
     bad_injectors = {"name": "fred"}
     errors = validate_injectors(inputs, bad_injectors)
     assert (
-        f"injectors must have keys defined in the {SUPPORT_KEYS_IN_INJECTORS}"
+        f"Injectors must have keys defined in {SUPPORTED_KEYS_IN_INJECTORS}"
         in errors["injectors"]
     )
 
-    for key in SUPPORT_KEYS_IN_INJECTORS:
+    for key in SUPPORTED_KEYS_IN_INJECTORS:
         valid_injectors = {key: {"name": "fred"}}
         errors = validate_injectors(inputs, valid_injectors)
         assert errors == {}

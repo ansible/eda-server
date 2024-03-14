@@ -22,9 +22,9 @@ from jinja2.nativetypes import NativeTemplate
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
-ENCRYPTED_TO_DISPLAY = "$encrypted$"
+ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
-SUPPORT_KEYS_IN_INJECTORS = ["extra_vars"]
+SUPPORTED_KEYS_IN_INJECTORS = ["extra_vars"]
 
 
 class InjectorMissingKeyException(Exception):
@@ -37,7 +37,7 @@ def inputs_to_display(schema: dict, inputs: str) -> dict:
 
     for key in decoded_inputs.keys():
         if key in secret_fields:
-            decoded_inputs[key] = ENCRYPTED_TO_DISPLAY
+            decoded_inputs[key] = ENCRYPTED_STRING
 
     return decoded_inputs
 
@@ -58,7 +58,7 @@ def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
     )
 
     old_inputs.update(
-        (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_TO_DISPLAY
+        (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_STRING
     )
     return yaml.dump(old_inputs)
 
@@ -204,20 +204,20 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
 
     if not isinstance(injectors, dict):
         errors.append(
-            "injectors must be a dict type and defines keys"
-            f" in {SUPPORT_KEYS_IN_INJECTORS}"
+            "Injectors must be a dict type and defines keys"
+            f" in {SUPPORTED_KEYS_IN_INJECTORS}"
         )
 
     if not any(
         support_key in injectors.keys()
-        for support_key in SUPPORT_KEYS_IN_INJECTORS
+        for support_key in SUPPORTED_KEYS_IN_INJECTORS
     ):
         errors.append(
-            "injectors must have keys defined in the"
-            f" {SUPPORT_KEYS_IN_INJECTORS}"
+            "Injectors must have keys defined in"
+            f" {SUPPORTED_KEYS_IN_INJECTORS}"
         )
 
-    for field in SUPPORT_KEYS_IN_INJECTORS:
+    for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
         if not input_data:
             continue
@@ -228,7 +228,8 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
 
         for k, v in input_data.items():
             try:
-                _check_jinja_string(v, context)
+                if isinstance(v, str):
+                    _check_jinja_string(v, context)
             except InjectorMissingKeyException as e:
                 errors.append(
                     f"Injector key: {k} has a value which refers to an"

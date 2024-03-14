@@ -51,10 +51,12 @@ INPUT = {
 @pytest.mark.django_db
 def test_create_credential_type(client: APIClient):
     injectors = {
-        "host": "localhost",
-        "username": "adam",
-        "password": "password",
-        "verify_ssl": False,
+        "extra_vars": {
+            "host": "localhost",
+            "username": "adam",
+            "password": "password",
+            "verify_ssl": False,
+        }
     }
     data_in = {
         "name": "credential_type_1",

@@ -63,6 +63,7 @@ PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
 
 TEST_PROJECT = {
     "git_hash": PROJECT_GIT_HASH,
+    "scm_type": "git",
     "name": "test-project-01",
     "url": "https://git.example.com/acme/project-01",
     "description": "test project",
