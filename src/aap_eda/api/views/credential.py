@@ -78,6 +78,7 @@ logger = logging.getLogger(__name__)
         ],
     ),
 )
+@extend_schema(exclude=True)
 class CredentialViewSet(
     ResponseSerializerMixin,
     CreateModelMixin,
