@@ -16,7 +16,9 @@
                     {
                         "name": "Debug",
                         "action": [
-                            { "print_event": null },
+                            {
+                                "print_event": null
+                            },
                             {
                                 "debug": {
                                     "msg": "Rule fired correctly"
