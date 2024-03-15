@@ -55,6 +55,7 @@ logger = logging.getLogger(__name__)
         },
     ),
 )
+@extend_schema(exclude=True)
 class EventStreamViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
