@@ -16,8 +16,7 @@
 import pytest
 from pytest_lazyfixture import lazy_fixture
 
-from aap_eda.core import models
-from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
+from aap_eda.core import enums, models
 from aap_eda.core.exceptions import (
     StatusRequiredError,
     UnknownStatusError,
@@ -69,23 +68,23 @@ def test_rulebook_process_save_with_invalid_status(init_data):
 def test_rulebook_process_save(init_data):
     instance = init_data
 
-    assert instance.status == ActivationStatus.PENDING
+    assert instance.status == enums.ActivationStatus.PENDING
     assert (
         instance.status_message
-        == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
+        == enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
     )
 
     for status in [
-        ActivationStatus.STARTING,
-        ActivationStatus.RUNNING,
-        ActivationStatus.STOPPING,
-        ActivationStatus.DELETING,
-        ActivationStatus.COMPLETED,
-        ActivationStatus.FAILED,
-        ActivationStatus.STOPPED,
-        ActivationStatus.UNRESPONSIVE,
-        ActivationStatus.ERROR,
-        ActivationStatus.PENDING,
+        enums.ActivationStatus.STARTING,
+        enums.ActivationStatus.RUNNING,
+        enums.ActivationStatus.STOPPING,
+        enums.ActivationStatus.DELETING,
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.FAILED,
+        enums.ActivationStatus.STOPPED,
+        enums.ActivationStatus.UNRESPONSIVE,
+        enums.ActivationStatus.ERROR,
+        enums.ActivationStatus.PENDING,
     ]:
         instance.status = status
         instance.save(update_fields=["status"])
@@ -93,7 +92,7 @@ def test_rulebook_process_save(init_data):
         instance.refresh_from_db()
         assert (
             instance.status_message
-            == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
+            == enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
         )
 
 
@@ -114,9 +113,9 @@ def test_rulebook_process_save(init_data):
 def test_rulebook_process_parent_type(instance):
     """Test parent_type field is updated when a new instance is created."""
     if instance.activation:
-        assert instance.parent_type == "activation"
+        assert instance.parent_type == enums.ProcessParentType.ACTIVATION
     else:
-        assert instance.parent_type == "event_stream"
+        assert instance.parent_type == enums.ProcessParentType.EVENT_STREAM
 
 
 @pytest.mark.parametrize(
