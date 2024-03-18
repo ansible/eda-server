@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
-from aap_eda.core.enums import RestartPolicy
+from aap_eda.core.enums import CredentialType, RestartPolicy
 from aap_eda.core.utils.crypto.base import SecretValue
 from tests.integration.constants import api_url_v1
 
@@ -149,7 +149,10 @@ INJECTORS = {
 @pytest.fixture
 def kafka_credential_type() -> models.CredentialType:
     vault_credential_type = models.CredentialType.objects.create(
-        name="Vault", inputs=VAULT_INPUTS, injectors={}, managed=True
+        name=CredentialType.VAULT,
+        inputs=VAULT_INPUTS,
+        injectors={},
+        managed=True,
     )
     credential_type = models.CredentialType.objects.create(
         name="type1", inputs=KAFKA_INPUTS, injectors=INJECTORS
@@ -248,7 +251,7 @@ def test_create_activation_with_eda_credential(
 
     assert activation.eda_system_vault_credential.credential_type is not None
     credential_type = activation.eda_system_vault_credential.credential_type
-    assert credential_type.name == "Vault"
+    assert credential_type.name == CredentialType.VAULT
 
 
 @pytest.mark.django_db
