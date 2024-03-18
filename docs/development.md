@@ -157,8 +157,6 @@ git clone git@github.com:ansible/eda-server.git
 
 ### Install dependencies
 
-**NOTE**: Since we added experimental [LDAP authentication](https://github.com/ansible/eda-server/pull/557), the following additional packages are required: `openldap-devel xmlsec1-devel libtool-ltdl-devel`.
-
 Go to your project directory and install dependencies for local development:
 
 ```shell
