@@ -42,8 +42,8 @@ cryptography = ">=38,<42"
 kubernetes = "26.1.*"
 podman = "4.9.*"
 rq-scheduler = "^0.10"
-# temporarily pinning Alan's permissions branch for RBAC work
-django-ansible-base = { git = "https://github.com/alancoding/django-ansible-base.git", branch = "django_permissions", extras = [
+# temporarily pinning to devel branch to use RBAC libary
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
     "authentication",
     "channel_auth",
     "rbac",
