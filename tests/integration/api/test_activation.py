@@ -22,7 +22,7 @@ from aap_eda.api.serializers.activation import (
     get_rules_count,
     is_activation_valid,
 )
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
     Action,
@@ -180,7 +180,7 @@ def create_activation_related_data(with_project=True):
     credential_id = models.Credential.objects.create(
         name="test-credential",
         description="test credential",
-        credential_type="Container Registry",
+        credential_type=enums.CredentialType.REGISTRY,
         username="dummy-user",
         secret="dummy-password",
     ).pk

@@ -400,7 +400,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         else:
             vault = models.EdaCredential.objects.none()
 
-        vault_credential_type = models.CredentialType.objects.get(name="Vault")
+        vault_credential_type = models.CredentialType.objects.get(
+            name=CredentialType.VAULT
+        )
         for credential in activation.eda_credentials.filter(
             credential_type_id=vault_credential_type.id
         ).union(vault):
