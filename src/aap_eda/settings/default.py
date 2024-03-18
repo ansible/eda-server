@@ -162,8 +162,6 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
-    # Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
-    "ansible_base.authentication",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
     # Local apps
@@ -177,9 +175,6 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    # <- Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
-    "ansible_base.authentication.middleware.AuthenticatorBackendMiddleware",
-    # ->
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -390,8 +385,6 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
-        # Experimental LDAP Integration
-        # https://issues.redhat.com/browse/AAP-16938
         "ansible_base": {
             "handlers": ["console"],
             "level": "INFO",
@@ -480,18 +473,9 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
 ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
 ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
 
-# Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE SETTINGS
 # ---------------------------------------------------------
-ANSIBLE_BASE_AUTHENTICATOR_CLASS_PREFIXES = [
-    "aap_eda.core.authenticator_plugins"
-]
-AUTHENTICATION_BACKENDS = [
-    "ansible_base.authentication.backend.AnsibleBaseAuth",
-    "django.contrib.auth.backends.ModelBackend",
-]
-
 from ansible_base.lib import dynamic_config  # noqa: E402
 
 dab_settings = os.path.join(

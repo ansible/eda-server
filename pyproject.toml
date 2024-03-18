@@ -44,7 +44,6 @@ podman = "4.9.*"
 rq-scheduler = "^0.10"
 # temporarily pinning to devel branch to use RBAC libary
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
-    "authentication",
     "channel_auth",
     "rbac",
 ] }
