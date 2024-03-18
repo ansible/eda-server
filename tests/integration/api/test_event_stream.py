@@ -212,6 +212,11 @@ def test_retrieve_event_stream(
     assert yaml.safe_load(response.data["source_args"]) == args
     assert response.data["user"] == "luke.skywalker"
     assert len(response.data["credentials"]) == 2
+
+    # Force the input and output credentials into id order.
+    credentials.sort(key=lambda x: x.id)
+    response.data["credentials"].sort(key=lambda x: x["id"])
+
     assert response.data["credentials"][0]["name"] == credentials[0].name
     assert response.data["credentials"][1]["name"] == credentials[1].name
 
