@@ -15,6 +15,7 @@
 
 import contextlib
 import logging
+import os
 import typing as tp
 from datetime import timedelta
 from functools import wraps
@@ -1046,6 +1047,7 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.PENDING, msg)
             raise exceptions.MaxRunningProcessesError
         args = {
+            "worker": os.environ["HOSTNAME"],
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
