@@ -914,22 +914,6 @@ class ActivationManager:
             LOGGER.info(msg)
             return
 
-        # Detect unresponsive activation instance
-        # TODO: we should decrease the default timeout/livecheck
-        # in the future might be configurable per activation
-        if self._is_unresponsive():
-            msg = (
-                "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
-                "Applicable restart policy will be applied."
-            )
-            LOGGER.info(
-                f"Monitor operation: activation id: {self.db_instance.id} "
-                f"{msg}",
-            )
-            self._unresponsive_policy()
-            return
-
         # get the status of the container
         container_status = None
         with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
@@ -958,6 +942,22 @@ class ActivationManager:
         if container_status.status == ActivationStatus.FAILED:  # RC != 0
             self._cleanup()
             self._failed_policy(container_status.message)
+            return
+
+        # Detect unresponsive activation instance
+        # TODO: we should decrease the default timeout/livecheck
+        # in the future might be configurable per activation
+        if self._is_unresponsive():
+            msg = (
+                "Activation is unresponsive. "
+                "Liveness check for ansible rulebook timed out. "
+                "Applicable restart policy will be applied."
+            )
+            LOGGER.info(
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                f"{msg}",
+            )
+            self._unresponsive_policy()
             return
 
         if container_status.status == ActivationStatus.RUNNING:
