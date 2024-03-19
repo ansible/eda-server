@@ -94,13 +94,10 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
             "modified_at",
         ]
         fields = [
-            "id",
             "name",
             "description",
             "inputs",
             "credential_type_id",
-            "created_at",
-            "modified_at",
         ]
 
 
