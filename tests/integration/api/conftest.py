@@ -14,13 +14,10 @@
 from unittest import mock
 
 import pytest
-
-from django.contrib.contenttypes.models import ContentType
-from django.conf import settings
-
-from rest_framework.test import APIClient
-
 from ansible_base.rbac.models import DABPermission, RoleDefinition
+from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from rest_framework.test import APIClient
 
 from aap_eda.core import models
 
