@@ -42,7 +42,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             *read_only_fields,
         ]
 
-    def get_inputs(self, obj) -> str:
+    def get_inputs(self, obj) -> dict:
         return _get_inputs(obj)
 
     def to_representation(self, eda_credential):
@@ -118,11 +118,11 @@ class EdaCredentialRefSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id"]
 
-    def get_inputs(self, obj) -> str:
+    def get_inputs(self, obj) -> dict:
         return _get_inputs(obj)
 
 
-def _get_inputs(obj) -> str:
+def _get_inputs(obj) -> dict:
     inputs = (
         obj.inputs.get_secret_value()
         if isinstance(obj.inputs, SecretValue)
