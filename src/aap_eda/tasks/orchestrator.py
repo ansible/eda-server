@@ -367,9 +367,6 @@ def is_rulebook_queue_healthy(queue_name: str) -> bool:
     """
     queue = get_queue(queue_name)
 
-    if Worker.count(queue=queue) <= 0:
-        return False
-
     all_workers_dead = True
     for worker in Worker.all(queue=queue):
         last_heartbeat = worker.last_heartbeat
