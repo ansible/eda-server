@@ -9,8 +9,7 @@ from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
-from aap_eda.core import models
-from aap_eda.core.enums import CredentialType
+from aap_eda.core import enums, models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
 TIMEOUT = 5
@@ -574,12 +573,12 @@ def _prepare_activation_instance_with_vault_credentials():
         name="credential1",
         username="me",
         secret="sec1",
-        credential_type=CredentialType.VAULT,
+        credential_type=enums.CredentialType.VAULT,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
-        restart_policy="always",
+        restart_policy=enums.RestartPolicy.ALWAYS,
         rulebook=rulebook,
         project=project,
         user=user,
@@ -627,12 +626,12 @@ def _prepare_activation_instance_with_system_vault_credential():
         username="me",
         secret="system_secret",
         vault_identifier=EDA_SERVER_VAULT_LABEL,
-        credential_type=CredentialType.VAULT,
+        credential_type=enums.CredentialType.VAULT,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
-        restart_policy="always",
+        restart_policy=enums.RestartPolicy.ALWAYS,
         rulebook=rulebook,
         project=project,
         user=user,
@@ -680,19 +679,19 @@ def _prepare_activation_instance_with_all_credentials():
         username="me",
         secret="system_secret",
         vault_identifier=EDA_SERVER_VAULT_LABEL,
-        credential_type=CredentialType.VAULT,
+        credential_type=enums.CredentialType.VAULT,
     )
 
     credential = models.Credential.objects.create(
         name="credential1",
         username="me",
         secret="sec1",
-        credential_type=CredentialType.VAULT,
+        credential_type=enums.CredentialType.VAULT,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
-        restart_policy="always",
+        restart_policy=enums.RestartPolicy.ALWAYS,
         rulebook=rulebook,
         project=project,
         user=user,
@@ -747,7 +746,7 @@ def _prepare_db_data():
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
-        restart_policy="always",
+        restart_policy=enums.RestartPolicy.ALWAYS,
         extra_var=extra_var,
         rulebook=rulebook,
         project=project,
@@ -815,7 +814,7 @@ def _prepare_activation_instance_without_extra_var():
 
     activation = models.Activation.objects.create(
         name="test-activation-no-extra_var",
-        restart_policy="always",
+        restart_policy=enums.RestartPolicy.ALWAYS,
         rulebook=rulebook,
         project=project,
         user=user,
@@ -860,7 +859,7 @@ def _prepare_activation_instance_no_token():
 
     activation = models.Activation.objects.create(
         name="test-activation-no-token",
-        restart_policy="always",
+        restart_policy=enums.RestartPolicy.ALWAYS,
         rulebook=rulebook,
         project=project,
         user=user,

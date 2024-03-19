@@ -19,8 +19,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
-from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -141,7 +140,7 @@ def test_list_activation_instances_filter_status(client: APIClient):
         ]
     )
 
-    filter_name = "failed"
+    filter_name = enums.ActivationStatus.FAILED
     response = client.get(
         f"{api_url_v1}/activation-instances/?status={filter_name}"
     )
@@ -287,7 +286,7 @@ def assert_activation_instance_data(
         "activation_id": instance.activation.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
-        "status_message": ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
+        "status_message": enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
         "event_stream_id": None,
     }
 
