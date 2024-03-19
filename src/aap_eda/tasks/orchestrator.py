@@ -127,9 +127,20 @@ def _make_user_request(
     request_type: ActivationRequest,
 ) -> None:
     """Enqueue a task to manage the activation with the given id."""
+    print('_make_user_request', process_parent_type, id, request_type)
     requests_queue.push(process_parent_type, id, request_type)
     job_id = _manage_process_job_id(process_parent_type, id)
     unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+
+
+def _make_user_request_directed(
+    process_parent_type: ProcessParentType,
+    id: int,
+    request_type: ActivationRequest,
+) -> None:
+    """Enqueue a task to manage the activation with the given id."""
+    print('_make_user_request', process_parent_type, id, request_type)
+    requests_queue.push(process_parent_type, id, request_type)
 
 
 def start_rulebook_process(
@@ -143,21 +154,21 @@ def stop_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to stop the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.STOP)
+    _make_user_request_directed(process_parent_type, id, ActivationRequest.STOP)
 
 
 def delete_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to delete the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.DELETE)
+    _make_user_request_directed(process_parent_type, id, ActivationRequest.DELETE)
 
 
 def restart_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to restart the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.RESTART)
+    _make_user_request_directed(process_parent_type, id, ActivationRequest.RESTART)
 
 
 def monitor_rulebook_processes() -> None:
