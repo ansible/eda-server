@@ -11,6 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.lib.dynamic_config.dynamic_urls import (
+    api_version_urls as dab_urls,
+)
 from ansible_base.resource_registry.urls import (
     urlpatterns as resource_api_urls,
 )
@@ -86,6 +89,7 @@ openapi_urls = [
 ]
 
 v1_urls = [
+    path("", include(dab_urls)),
     path("", include(resource_api_urls)),
     path("", include(openapi_urls)),
     path("auth/session/login/", views.SessionLoginView.as_view()),
