@@ -29,7 +29,9 @@ def user():
 
 
 @pytest.fixture
-def admin_api_client(client):
+def admin_api_client(admin_user):
+    client = APIClient()
+    client.force_authenticate(user=admin_user)
     return client
 
 
