@@ -14,9 +14,14 @@
 from unittest import mock
 
 import pytest
+
+from django.contrib.contenttypes.models import ContentType
+from django.conf import settings
+
 from rest_framework.test import APIClient
 
-from aap_eda.api.permissions import RoleBasedPermission
+from ansible_base.rbac.models import DABPermission, RoleDefinition
+
 from aap_eda.core import models
 
 ADMIN_USERNAME = "test.admin"
@@ -24,15 +29,28 @@ ADMIN_PASSWORD = "test.admin.123"
 
 
 @pytest.fixture
-def admin_user():
+def default_organization():
+    "Corresponds to migration add_default_organization"
+    return models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )
+
+
+@pytest.fixture
+def admin_user(default_organization):
     user = models.User.objects.create_user(
         username=ADMIN_USERNAME,
         password=ADMIN_PASSWORD,
         email="admin@localhost",
     )
-    admin_role = models.Role.objects.create(name="Test Admin")
-    admin_role.permissions.add(*models.Permission.objects.all())
-    user.roles.add(admin_role)
+    organization = models.Organization.objects.get_default()
+    admin_role = RoleDefinition.objects.create(
+        name="Test Admin",
+        content_type=ContentType.objects.get_for_model(organization),
+    )
+    admin_role.permissions.add(*DABPermission.objects.all())
+    admin_role.give_permission(user, organization)
     return user
 
 
@@ -53,10 +71,10 @@ def client(base_client: APIClient, admin_user: models.User) -> APIClient:
 @pytest.fixture
 def check_permission_mock():
     with mock.patch.object(
-        RoleBasedPermission,
-        "_check_permission",
+        models.User,
+        "has_obj_perm",
         autospec=True,
-        wraps=RoleBasedPermission._check_permission,
+        wraps=models.User.has_obj_perm,
     ) as m:
         yield m
 

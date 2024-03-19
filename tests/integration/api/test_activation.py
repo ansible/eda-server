@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from typing import Any, Dict
-from unittest import mock
 
 import pytest
 from rest_framework import status
@@ -25,10 +24,8 @@ from aap_eda.api.serializers.activation import (
 from aap_eda.core import models
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
-    Action,
     ActivationStatus,
     CredentialType,
-    ResourceType,
     RestartPolicy,
 )
 from tests.integration.constants import api_url_v1
@@ -377,7 +374,7 @@ def test_create_activation_bad_entity(client: APIClient):
 )
 @pytest.mark.django_db(transaction=True)
 def test_create_activation_with_bad_entity(
-    client: APIClient, dependent_object, check_permission_mock: mock.Mock
+    client: APIClient, dependent_object
 ):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
@@ -397,9 +394,8 @@ def test_create_activation_with_bad_entity(
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data[f"{key}_id"][0] == f"{dependent_object[key]}"
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.ACTIVATION, Action.CREATE
-    )
+    # Since responses are 400 errors, these checks can happen before
+    # permission checks, which is why check_permission_mock is not checked here
 
 
 @pytest.mark.django_db
