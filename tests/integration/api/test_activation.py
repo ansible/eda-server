@@ -22,15 +22,7 @@ from aap_eda.api.serializers.activation import (
     get_rules_count,
     is_activation_valid,
 )
-from aap_eda.core import models
-from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
-    Action,
-    ActivationStatus,
-    CredentialType,
-    ResourceType,
-    RestartPolicy,
-)
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
@@ -41,10 +33,10 @@ TEST_ACTIVATION = {
     "project_id": 1,
     "rulebook_id": 1,
     "extra_var_id": 1,
-    "restart_policy": RestartPolicy.ON_FAILURE,
+    "restart_policy": enums.RestartPolicy.ON_FAILURE,
     "restart_count": 0,
     "status_message": "",
-    "log_level": "debug",
+    "log_level": enums.RulebookProcessLogLevel.DEBUG,
 }
 
 TEST_AWX_TOKEN = {
@@ -173,7 +165,7 @@ def create_activation_related_data(with_project=True):
     credential_id = models.Credential.objects.create(
         name="test-credential",
         description="test credential",
-        credential_type="Container Registry",
+        credential_type=enums.CredentialType.REGISTRY,
         username="dummy-user",
         secret="dummy-password",
     ).pk
@@ -222,7 +214,7 @@ def create_activation(fks: dict):
     activation_data["rulebook_id"] = fks["rulebook_id"]
     activation_data["extra_var_id"] = fks["extra_var_id"]
     activation_data["user_id"] = fks["user_id"]
-    activation_data["log_level"] = "debug"
+    activation_data["log_level"] = enums.RulebookProcessLogLevel.DEBUG
     activation = models.Activation(**activation_data)
     activation.save()
 
@@ -231,7 +223,10 @@ def create_activation(fks: dict):
 
 def create_multiple_activations(fks: dict):
     activation_names = ["test-activation", "filter-test-activation"]
-    statuses = [ActivationStatus.COMPLETED, ActivationStatus.FAILED]
+    statuses = [
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.FAILED,
+    ]
     activations = []
     for name, _status in zip(activation_names, statuses):
         activation_data = {
@@ -244,7 +239,7 @@ def create_multiple_activations(fks: dict):
             "extra_var_id": fks["project_id"],
             "user_id": fks["user_id"],
             "status": _status,
-            "restart_policy": RestartPolicy.ON_FAILURE,
+            "restart_policy": enums.RestartPolicy.ON_FAILURE,
             "restart_count": 0,
         }
         activation = models.Activation(**activation_data)
@@ -271,7 +266,7 @@ def test_create_activation(client: APIClient):
         data,
         activation,
     )
-    assert data["log_level"] == "debug"
+    assert data["log_level"] == enums.RulebookProcessLogLevel.DEBUG
     if activation.project:
         assert data["project"] == {"id": activation.project.id, **TEST_PROJECT}
     else:
@@ -293,10 +288,10 @@ def test_create_activation(client: APIClient):
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
     assert data["restarted_at"] is None
-    assert activation.status == ActivationStatus.PENDING
+    assert activation.status == enums.ActivationStatus.PENDING
     assert (
         activation.status_message
-        == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
     )
 
 
@@ -325,7 +320,7 @@ def test_create_activation_with_system_vault_credential(client: APIClient):
     assert activation.system_vault_credential is not None
     assert (
         activation.system_vault_credential.credential_type
-        == CredentialType.VAULT
+        == enums.CredentialType.VAULT
     )
 
 
@@ -346,7 +341,7 @@ def test_create_activation_disabled(client: APIClient):
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == TEST_RULEBOOK["name"]
     assert activation.rulebook_rulesets == TEST_RULESETS
-    assert activation.status == ActivationStatus.PENDING
+    assert activation.status == enums.ActivationStatus.PENDING
     assert activation.status_message == "Activation is marked as disabled"
     assert not data["instances"]
 
@@ -398,7 +393,7 @@ def test_create_activation_with_bad_entity(
         assert response.data[f"{key}_id"][0] == f"{dependent_object[key]}"
 
     check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.ACTIVATION, Action.CREATE
+        mock.ANY, mock.ANY, enums.ResourceType.ACTIVATION, enums.Action.CREATE
     )
 
 
@@ -439,7 +434,7 @@ def test_list_activations_filter_name_none_exist(client: APIClient):
 
 @pytest.mark.django_db
 def test_list_activations_filter_status(client: APIClient):
-    filter_status = "failed"
+    filter_status = enums.ActivationStatus.FAILED
     fks = create_activation_related_data()
     activations = create_multiple_activations(fks)
 
@@ -554,11 +549,11 @@ def test_restart_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("action", ["restart", "enable"])
+@pytest.mark.parametrize("action", [enums.Action.RESTART, enums.Action.ENABLE])
 def test_restart_activation_without_de(client: APIClient, action):
     fks = create_activation_related_data()
     activation = create_activation(fks)
-    if action == "enable":
+    if action == enums.Action.ENABLE:
         activation.is_enabled = False
         activation.save(update_fields=["is_enabled"])
 
@@ -575,7 +570,7 @@ def test_restart_activation_without_de(client: APIClient, action):
         == "{'decision_environment_id': 'This field may not be null.'}"
     )
     activation.refresh_from_db()
-    assert activation.status == ActivationStatus.ERROR
+    assert activation.status == enums.ActivationStatus.ERROR
     assert (
         activation.status_message
         == "{'decision_environment_id': 'This field may not be null.'}"
@@ -588,11 +583,11 @@ def test_enable_activation(client: APIClient):
     activation = create_activation(fks)
 
     for state in [
-        ActivationStatus.STARTING,
-        ActivationStatus.STOPPING,
-        ActivationStatus.DELETING,
-        ActivationStatus.RUNNING,
-        ActivationStatus.UNRESPONSIVE,
+        enums.ActivationStatus.STARTING,
+        enums.ActivationStatus.STOPPING,
+        enums.ActivationStatus.DELETING,
+        enums.ActivationStatus.RUNNING,
+        enums.ActivationStatus.UNRESPONSIVE,
     ]:
         activation.is_enabled = False
         activation.status = state
@@ -605,14 +600,14 @@ def test_enable_activation(client: APIClient):
         assert response.status_code == status.HTTP_409_CONFLICT
         assert (
             activation.status_message
-            == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+            == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
         )
 
     for state in [
-        ActivationStatus.COMPLETED,
-        ActivationStatus.PENDING,
-        ActivationStatus.STOPPED,
-        ActivationStatus.FAILED,
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.PENDING,
+        enums.ActivationStatus.STOPPED,
+        enums.ActivationStatus.FAILED,
     ]:
         activation.is_enabled = False
         activation.status = state
@@ -626,7 +621,7 @@ def test_enable_activation(client: APIClient):
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert (
             activation.status_message
-            == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+            == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
         )
 
 
@@ -719,7 +714,7 @@ def test_list_activation_instances_filter_status(client: APIClient):
         ]
     )
 
-    filter_status = "failed"
+    filter_status = enums.ActivationStatus.FAILED
     response = client.get(
         f"{api_url_v1}/activations/{activation.id}"
         f"/instances/?status={filter_status}"

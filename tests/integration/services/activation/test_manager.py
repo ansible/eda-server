@@ -21,8 +21,7 @@ from _pytest.logging import LogCaptureFixture
 from pytest_django.fixtures import SettingsWrapper
 from pytest_lazyfixture import lazy_fixture
 
-from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core import enums, models
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
     ContainerEngine,
@@ -84,9 +83,9 @@ def activation_with_instance(
 def running_activation(activation_with_instance: models.Activation):
     """Return a running activation."""
     activation = activation_with_instance
-    activation.status = ActivationStatus.RUNNING
+    activation.status = enums.ActivationStatus.RUNNING
     activation.save(update_fields=["status"])
-    activation.latest_instance.status = ActivationStatus.RUNNING
+    activation.latest_instance.status = enums.ActivationStatus.RUNNING
     activation.latest_instance.activation_pod_id = "test-pod-id"
     activation.latest_instance.save(
         update_fields=["status", "activation_pod_id"],
@@ -108,7 +107,7 @@ def basic_activation(
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
-        log_level="info",
+        log_level=enums.RulebookProcessLogLevel.INFO,
     )
 
 
@@ -129,7 +128,7 @@ def new_activation_with_instance(
     )
     models.RulebookProcess.objects.create(
         activation=activation,
-        status=ActivationStatus.RUNNING,
+        status=enums.ActivationStatus.RUNNING,
     )
     return activation
 
@@ -205,7 +204,7 @@ def test_start_no_awx_token(basic_activation, rulebook_with_job_template):
     basic_activation.user.awxtoken_set.all().delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
-    assert basic_activation.status == ActivationStatus.ERROR
+    assert basic_activation.status == enums.ActivationStatus.ERROR
     assert "The rulebook requires an Awx Token." in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
 
@@ -217,7 +216,7 @@ def test_start_no_decision_environment(basic_activation):
     basic_activation.decision_environment.delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
-    assert basic_activation.status == ActivationStatus.ERROR
+    assert basic_activation.status == enums.ActivationStatus.ERROR
     assert "decision_environment" in str(exc.value)
     assert "This field may not be null" in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
@@ -235,13 +234,13 @@ def test_start_already_running(
         container_engine=container_engine_mock,
     )
     container_engine_mock.get_status.return_value = MagicMock(
-        status=ActivationStatus.RUNNING,
+        status=enums.ActivationStatus.RUNNING,
     )
 
     activation_manager.start()
     assert container_engine_mock.get_status.called
     assert "already running" in eda_caplog.text
-    assert running_activation.status == ActivationStatus.RUNNING
+    assert running_activation.status == enums.ActivationStatus.RUNNING
 
 
 @pytest.mark.django_db
@@ -260,8 +259,11 @@ def test_start_first_run(
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert basic_activation.status == ActivationStatus.RUNNING
-    assert basic_activation.latest_instance.status == ActivationStatus.RUNNING
+    assert basic_activation.status == enums.ActivationStatus.RUNNING
+    assert (
+        basic_activation.latest_instance.status
+        == enums.ActivationStatus.RUNNING
+    )
     assert basic_activation.latest_instance.activation_pod_id == "test-pod-id"
     assert basic_activation.restart_count == 0
 
@@ -282,9 +284,10 @@ def test_start_restart(
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert running_activation.status == ActivationStatus.RUNNING
+    assert running_activation.status == enums.ActivationStatus.RUNNING
     assert (
-        running_activation.latest_instance.status == ActivationStatus.RUNNING
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.RUNNING
     )
     assert (
         running_activation.latest_instance.activation_pod_id == "test-pod-id"
@@ -323,8 +326,10 @@ def test_stop_already_stopped(
         db_instance=activation_with_instance,
     )
 
-    activation_with_instance.status = ActivationStatus.STOPPED
-    activation_with_instance.latest_instance.status = ActivationStatus.STOPPED
+    activation_with_instance.status = enums.ActivationStatus.STOPPED
+    activation_with_instance.latest_instance.status = (
+        enums.ActivationStatus.STOPPED
+    )
     activation_with_instance.latest_instance.save(
         update_fields=["status"],
     )
@@ -352,9 +357,10 @@ def test_stop_running(
     assert "Stopping" in eda_caplog.text
     assert "Cleanup operation requested" in eda_caplog.text
     assert "Activation stopped." in eda_caplog.text
-    assert running_activation.status == ActivationStatus.STOPPED
+    assert running_activation.status == enums.ActivationStatus.STOPPED
     assert (
-        running_activation.latest_instance.status == ActivationStatus.STOPPED
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
     assert running_activation.status_message == "Stop requested by user."
@@ -381,9 +387,10 @@ def test_stop_no_pod(
     assert "Stopping" in eda_caplog.text
     assert "Cleanup operation requested" in eda_caplog.text
     assert "Activation stopped." in eda_caplog.text
-    assert running_activation.status == ActivationStatus.STOPPED
+    assert running_activation.status == enums.ActivationStatus.STOPPED
     assert (
-        running_activation.latest_instance.status == ActivationStatus.STOPPED
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
     assert running_activation.status_message == "Stop requested by user."
@@ -407,7 +414,7 @@ def test_stop_pending(
     assert not container_engine_mock.get_status.called
     assert not container_engine_mock.cleanup.called
     assert "No instance found" in eda_caplog.text
-    assert basic_activation.status == ActivationStatus.STOPPED
+    assert basic_activation.status == enums.ActivationStatus.STOPPED
     assert basic_activation.latest_instance is None
 
 
@@ -423,16 +430,17 @@ def test_stop_stopped_instance_running(
         db_instance=running_activation,
     )
 
-    running_activation.status = ActivationStatus.STOPPED
+    running_activation.status = enums.ActivationStatus.STOPPED
     running_activation.save(update_fields=["status"])
 
     activation_manager.stop()
     assert "Stopping" in eda_caplog.text
     assert container_engine_mock.get_status.called
     assert container_engine_mock.cleanup.called
-    assert running_activation.status == ActivationStatus.STOPPED
+    assert running_activation.status == enums.ActivationStatus.STOPPED
     assert (
-        running_activation.latest_instance.status == ActivationStatus.STOPPED
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
 
@@ -449,22 +457,23 @@ def test_stop_stopped_pod_running(
         db_instance=running_activation,
     )
 
-    running_activation.status = ActivationStatus.STOPPED
+    running_activation.status = enums.ActivationStatus.STOPPED
     running_activation.save(update_fields=["status"])
-    running_activation.latest_instance.status = ActivationStatus.STOPPED
+    running_activation.latest_instance.status = enums.ActivationStatus.STOPPED
     running_activation.latest_instance.save(update_fields=["status"])
 
     container_engine_mock.get_status.return_value = MagicMock(
-        status=ActivationStatus.RUNNING,
+        status=enums.ActivationStatus.RUNNING,
     )
 
     activation_manager.stop()
     assert "Stopping" in eda_caplog.text
     assert container_engine_mock.get_status.called
     assert container_engine_mock.cleanup.called
-    assert running_activation.status == ActivationStatus.STOPPED
+    assert running_activation.status == enums.ActivationStatus.STOPPED
     assert (
-        running_activation.latest_instance.status == ActivationStatus.STOPPED
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
 
@@ -492,22 +501,22 @@ def test_delete_already_deleted(
     [
         pytest.param(
             lazy_fixture("activation_with_instance"),
-            ActivationStatus.STOPPED,
+            enums.ActivationStatus.STOPPED,
             id="stopped",
         ),
         pytest.param(
             lazy_fixture("activation_with_instance"),
-            ActivationStatus.ERROR,
+            enums.ActivationStatus.ERROR,
             id="error",
         ),
         pytest.param(
             lazy_fixture("activation_with_instance"),
-            ActivationStatus.FAILED,
+            enums.ActivationStatus.FAILED,
             id="failed",
         ),
         pytest.param(
             lazy_fixture("activation_with_instance"),
-            ActivationStatus.COMPLETED,
+            enums.ActivationStatus.COMPLETED,
             id="completed",
         ),
     ],
@@ -515,7 +524,7 @@ def test_delete_already_deleted(
 @pytest.mark.django_db
 def test_delete_no_pod(
     activation: models.Activation,
-    status: ActivationStatus,
+    status: enums.ActivationStatus,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
 ):
