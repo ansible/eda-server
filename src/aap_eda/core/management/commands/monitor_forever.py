@@ -8,6 +8,7 @@ from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine.podman import Engine as PodmanEngine
 from aap_eda.services.activation.manager import ActivationManager
 
+from aap_eda.tasks.orchestrator import system_restart_activation
 
 class Command(BaseCommand):
     help = "Runs the monitoring code"
@@ -26,6 +27,7 @@ class Command(BaseCommand):
                 podman = PodmanEngine(process["activation_id"])
                 manager = ActivationManager(
                     models.Activation.objects.get(id=process["activation_id"]),
+                    system_restart_activation,
                     podman,
                     DBLogger,
                 )
