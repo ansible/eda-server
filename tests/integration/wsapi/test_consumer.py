@@ -59,7 +59,7 @@ VAULT_INPUTS = {
 @pytest.fixture(autouse=True)
 def vault_credential_type() -> models.CredentialType:
     credential_type = models.CredentialType.objects.create(
-        name="Vault",
+        name=enums.DefaultCredentialType.VAULT,
         inputs=VAULT_INPUTS,
         injectors={},
         managed=True,

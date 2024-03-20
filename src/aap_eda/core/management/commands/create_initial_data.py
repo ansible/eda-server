@@ -418,7 +418,7 @@ class Command(BaseCommand):
             return
 
         cred_type = models.CredentialType.objects.filter(
-            name="Container Registry"
+            name=enums.CredentialType.REGISTRY
         ).first()
         for cred in credentials:
             inputs = {

@@ -157,7 +157,7 @@ def _create_system_eda_credential(
 
 
 def _get_vault_credential_type():
-    return models.CredentialType.objects.get(name="Vault")
+    return models.CredentialType.objects.get(name=CredentialType.VAULT)
 
 
 class ActivationSerializer(serializers.ModelSerializer):
@@ -699,7 +699,7 @@ def validate_eda_credentails(
         existing_data = yaml.safe_load(extra_var.extra_var)
     except models.CredentialType.DoesNotExist:
         raise serializers.ValidationError(
-            "CredentialType with name 'Vault' does not exist"
+            f"CredentialType with name '{CredentialType.VAULT}' does not exist"
         )
     except models.ExtraVar.DoesNotExist:
         raise serializers.ValidationError(
