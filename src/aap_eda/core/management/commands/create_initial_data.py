@@ -159,7 +159,7 @@ ROLES = [
 
 CREDENTIAL_TYPES = [
     {
-        "name": "Source Control",
+        "name": enums.DefaultCredentialType.SOURCE_CONTROL,
         "namespace": "scm",
         "kind": "scm",
         "inputs": {
@@ -191,7 +191,7 @@ CREDENTIAL_TYPES = [
         "managed": True,
     },
     {
-        "name": "Container Registry",
+        "name": enums.DefaultCredentialType.REGISTRY,
         "kind": "registry",
         "namespace": "registry",
         "inputs": {
@@ -228,7 +228,7 @@ CREDENTIAL_TYPES = [
         "managed": True,
     },
     {
-        "name": "GPG Public Key",
+        "name": enums.DefaultCredentialType.GPG,
         "kind": "cryptography",
         "namespace": "gpg_public_key",
         "inputs": {
@@ -250,7 +250,7 @@ CREDENTIAL_TYPES = [
         "managed": True,
     },
     {
-        "name": "Red Hat Ansible Automation Platform",
+        "name": enums.DefaultCredentialType.AAP,
         "kind": "cloud",
         "namespace": "controller",
         "inputs": {
@@ -317,7 +317,7 @@ CREDENTIAL_TYPES = [
         "managed": True,
     },
     {
-        "name": "Vault",
+        "name": enums.DefaultCredentialType.VAULT,
         "namespace": "vault",
         "kind": "vault",
         "inputs": {
@@ -418,7 +418,7 @@ class Command(BaseCommand):
             return
 
         cred_type = models.CredentialType.objects.filter(
-            name=enums.CredentialType.REGISTRY
+            name=enums.DefaultCredentialType.REGISTRY
         ).first()
         for cred in credentials:
             inputs = {
@@ -451,7 +451,7 @@ class Command(BaseCommand):
             return
 
         cred_type = models.CredentialType.objects.filter(
-            name="Source Control"
+            name=enums.DefaultCredentialType.SOURCE_CONTROL
         ).first()
         for cred in credentials:
             inputs = {
