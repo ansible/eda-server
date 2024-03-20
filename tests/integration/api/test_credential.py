@@ -5,10 +5,6 @@ from rest_framework.test import APIClient
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
-from tests.integration.api.test_activation import (
-    create_activation,
-    create_activation_related_data,
-)
 from tests.integration.constants import api_url_v1
 
 
@@ -238,21 +234,19 @@ def test_delete_credential_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation(client: APIClient):
-    # TODO(alex) presetup should be a reusable fixture
-    activation_dependencies = create_activation_related_data()
-    create_activation(activation_dependencies)
-    credential_id = activation_dependencies["credential_id"]
+def test_delete_credential_used_by_activation(
+    default_activation: models.Activation, client: APIClient
+):
+    credential_id = default_activation.credentials.first().id
     response = client.delete(f"{api_url_v1}/credentials/{credential_id}/")
     assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation_forced(client: APIClient):
-    # TODO(alex) presetup should be a reusable fixture
-    activation_dependencies = create_activation_related_data()
-    create_activation(activation_dependencies)
-    credential_id = activation_dependencies["credential_id"]
+def test_delete_credential_used_by_activation_forced(
+    default_activation: models.Activation, client: APIClient
+):
+    credential_id = default_activation.credentials.first().id
     response = client.delete(
         f"{api_url_v1}/credentials/{credential_id}/?force=true",
     )
