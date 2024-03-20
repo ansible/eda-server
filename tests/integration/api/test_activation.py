@@ -164,13 +164,13 @@ def create_activation_related_data(with_project=True):
         user=user,
     )
     models.CredentialType.objects.create(
-        name="Vault",
+        name=enums.DefaultCredentialType.VAULT,
         inputs={"fields": [{"a": "b"}]},
         injectors={},
         managed=False,
     )
     registry_type = models.CredentialType.objects.create(
-        name="Container Registry",
+        name=enums.DefaultCredentialType.REGISTRY,
         inputs={
             "fields": [
                 {"id": "username", "label": "Username"},
