@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import List
 from unittest import mock
 
 import pytest
@@ -20,6 +21,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
@@ -267,6 +269,56 @@ def new_activation(
         organization=default_organization,
         user=default_user,
         log_level="debug",
+    )
+
+
+@pytest.fixture
+def default_activation_instances(
+    default_activation: models.Activation, default_project: models.Project
+) -> models.RulebookProcess:
+    """Return a list of Activation Instances"""
+    return models.RulebookProcess.objects.bulk_create(
+        [
+            models.RulebookProcess(
+                name="default-activation-instance-1",
+                activation=default_activation,
+                git_hash=default_project.git_hash,
+                status=ActivationStatus.COMPLETED,
+                status_message=ACTIVATION_STATUS_MESSAGE_MAP[
+                    ActivationStatus.COMPLETED
+                ],
+            ),
+            models.RulebookProcess(
+                name="default-activation-instance-2",
+                activation=default_activation,
+                git_hash=default_project.git_hash,
+                status=ActivationStatus.FAILED,
+                status_message=ACTIVATION_STATUS_MESSAGE_MAP[
+                    ActivationStatus.FAILED
+                ],
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def default_activation_instance_logs(
+    default_activation_instances: List[models.RulebookProcess],
+) -> List[models.RulebookProcessLog]:
+    """Return a list of Activation Instance logs"""
+    return models.RulebookProcessLog.objects.bulk_create(
+        [
+            models.RulebookProcessLog(
+                log="activation-instance-log-1",
+                line_number=1,
+                activation_instance=default_activation_instances[0],
+            ),
+            models.RulebookProcessLog(
+                log="activation-instance-log-2",
+                line_number=2,
+                activation_instance=default_activation_instances[0],
+            ),
+        ]
     )
 
 
