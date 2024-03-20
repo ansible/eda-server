@@ -28,6 +28,7 @@ from aap_eda.core.enums import (
     Action,
     ActivationStatus,
     CredentialType,
+    DefaultCredentialType,
     ResourceType,
     RestartPolicy,
 )
@@ -172,13 +173,13 @@ def create_activation_related_data(with_project=True):
         user=user,
     )
     models.CredentialType.objects.create(
-        name="Vault",
+        name=DefaultCredentialType.VAULT,
         inputs={"fields": [{"a": "b"}]},
         injectors={},
         managed=False,
     )
     registry_type = models.CredentialType.objects.create(
-        name="Container Registry",
+        name=DefaultCredentialType.REGISTRY,
         inputs={
             "fields": [
                 {"id": "username", "label": "Username"},

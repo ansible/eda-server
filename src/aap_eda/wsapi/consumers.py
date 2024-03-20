@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
-from aap_eda.core.enums import CredentialType
+from aap_eda.core.enums import CredentialType, DefaultCredentialType
 
 from .messages import (
     ActionMessage,
@@ -401,7 +401,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             vault = models.EdaCredential.objects.none()
 
         vault_credential_type = models.CredentialType.objects.get(
-            name=CredentialType.VAULT
+            name=DefaultCredentialType.VAULT
         )
         for credential in activation.eda_credentials.filter(
             credential_type_id=vault_credential_type.id
