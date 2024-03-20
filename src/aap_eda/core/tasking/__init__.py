@@ -124,24 +124,22 @@ class DefaultWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
 
         super().__init__(
-            queues,
-            name,
-            default_result_ttl,
-            connection,
-            exc_handler,
-            exception_handlers,
-            default_worker_ttl,
-            job_class,
-            queue_class,
-            log_job_description,
-            job_monitoring_interval,
-            disable_default_exception_handler,
-            prepare_for_work,
-            serializer,
+            queues=queues,
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=default_worker_ttl,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
         )
 
 
@@ -172,24 +170,22 @@ class ActivationWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
 
         super().__init__(
-            [Queue(name="activation", connection=connection)],
-            name,
-            default_result_ttl,
-            connection,
-            exc_handler,
-            exception_handlers,
-            default_worker_ttl,
-            job_class,
-            queue_class,
-            log_job_description,
-            job_monitoring_interval,
-            disable_default_exception_handler,
-            prepare_for_work,
-            serializer,
+            queues=[Queue(name="activation", connection=connection)],
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=default_worker_ttl,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
         )
 
 
