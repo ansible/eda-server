@@ -3,11 +3,7 @@ from uuid import uuid4
 
 import pytest
 from ansible_base.lib.testing.fixtures import (  # noqa: F401
-    admin_api_client,
-    local_authenticator,
     unauthenticated_api_client,
-    user,
-    user_api_client,
 )
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
@@ -20,8 +16,30 @@ from django.db.models import (
     UUIDField,
 )
 from django.utils.timezone import now
+from rest_framework.test import APIClient
 
 from aap_eda.core.management.commands.create_initial_data import Command
+from aap_eda.core.models import User
+
+
+# Fixtures copied from DAB because authenticator app is not yet used here
+@pytest.fixture
+def user():
+    return User.objects.create(username="ordinary-user")
+
+
+@pytest.fixture
+def admin_api_client(admin_user):
+    client = APIClient()
+    client.force_authenticate(user=admin_user)
+    return client
+
+
+@pytest.fixture
+def user_api_client(db, user):
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client
 
 
 @pytest.fixture
