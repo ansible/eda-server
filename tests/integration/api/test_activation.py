@@ -174,7 +174,7 @@ def create_activation_related_data(with_project=True):
         inputs={
             "fields": [
                 {"id": "username", "label": "UserName"},
-                {"id": "password", "label": "Password"},
+                {"id": "password", "label": "Password", "secret": True},
             ]
         },
         injectors={},
