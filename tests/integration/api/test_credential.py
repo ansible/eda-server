@@ -238,6 +238,7 @@ def test_delete_credential_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
+@pytest.mark.skip(reason="not needed by the new eda-credential")
 def test_delete_credential_used_by_activation(client: APIClient):
     # TODO(alex) presetup should be a reusable fixture
     activation_dependencies = create_activation_related_data()
@@ -248,6 +249,7 @@ def test_delete_credential_used_by_activation(client: APIClient):
 
 
 @pytest.mark.django_db
+@pytest.mark.skip(reason="not needed by the new eda-credential")
 def test_delete_credential_used_by_activation_forced(client: APIClient):
     # TODO(alex) presetup should be a reusable fixture
     activation_dependencies = create_activation_related_data()

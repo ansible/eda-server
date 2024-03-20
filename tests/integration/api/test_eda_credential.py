@@ -3,6 +3,10 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from tests.integration.api.test_activation import (
+    create_activation,
+    create_activation_related_data,
+)
 from tests.integration.constants import api_url_v1
 
 INPUTS = {
@@ -262,3 +266,27 @@ def test_partial_update_eda_credential_name(
         "key": "private",
     }
     assert result["name"] == "demo2"
+
+
+@pytest.mark.django_db
+def test_delete_credential_used_by_activation(client: APIClient):
+    # TODO(alex) presetup should be a reusable fixture
+    activation_dependencies = create_activation_related_data()
+    create_activation(activation_dependencies)
+    eda_credential_id = activation_dependencies["eda_credential_id"]
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential_id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+
+
+@pytest.mark.django_db
+def test_delete_credential_used_by_activation_forced(client: APIClient):
+    # TODO(alex) presetup should be a reusable fixture
+    activation_dependencies = create_activation_related_data()
+    create_activation(activation_dependencies)
+    eda_credential_id = activation_dependencies["eda_credential_id"]
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential_id}/?force=true",
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
