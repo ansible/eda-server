@@ -16,6 +16,7 @@ import logging
 from typing import Union
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.utils import IntegrityError
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models
@@ -25,7 +26,7 @@ from aap_eda.core.enums import (
     ProcessParentType,
 )
 from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
-from aap_eda.core.tasking import unique_enqueue
+from aap_eda.core.tasking import enqueue_delay, unique_enqueue
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.manager import ActivationManager
 
@@ -76,7 +77,7 @@ def _manage(process_parent_type: str, id: int) -> None:
         LOGGER.info(
             f"Processing monitor request for {process_parent_type} {id}",
         )
-        ActivationManager(process_parent).monitor()
+        ActivationManager(process_parent, system_restart_activation).monitor()
 
 
 def _run_request(
@@ -99,7 +100,7 @@ def _run_request(
     ):
         return False
 
-    manager = ActivationManager(process_parent)
+    manager = ActivationManager(process_parent, system_restart_activation)
     try:
         if request.request in start_commands:
             manager.start(
@@ -127,7 +128,6 @@ def _make_user_request(
     request_type: ActivationRequest,
 ) -> None:
     """Enqueue a task to manage the activation with the given id."""
-    print('_make_user_request', process_parent_type, id, request_type)
     requests_queue.push(process_parent_type, id, request_type)
     job_id = _manage_process_job_id(process_parent_type, id)
     unique_enqueue("activation", job_id, _manage, process_parent_type, id)
@@ -139,7 +139,6 @@ def _make_user_request_directed(
     request_type: ActivationRequest,
 ) -> None:
     """Enqueue a task to manage the activation with the given id."""
-    print('_make_user_request', process_parent_type, id, request_type)
     requests_queue.push(process_parent_type, id, request_type)
 
 
@@ -154,21 +153,27 @@ def stop_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to stop the activation with the given id."""
-    _make_user_request_directed(process_parent_type, id, ActivationRequest.STOP)
+    _make_user_request_directed(
+        process_parent_type, id, ActivationRequest.STOP
+    )
 
 
 def delete_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to delete the activation with the given id."""
-    _make_user_request_directed(process_parent_type, id, ActivationRequest.DELETE)
+    _make_user_request_directed(
+        process_parent_type, id, ActivationRequest.DELETE
+    )
 
 
 def restart_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to restart the activation with the given id."""
-    _make_user_request_directed(process_parent_type, id, ActivationRequest.RESTART)
+    _make_user_request_directed(
+        process_parent_type, id, ActivationRequest.RESTART
+    )
 
 
 def monitor_rulebook_processes() -> None:
@@ -196,3 +201,39 @@ def monitor_rulebook_processes() -> None:
             id = process.event_stream_id
         job_id = _manage_process_job_id(process_parent_type, id)
         unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+
+
+def system_restart_activation(
+    process_parent_type: str, id: int, delay_seconds: int
+) -> None:
+    """Create a request from the system to start the activation.
+
+    This function is intended to be used by the manager to schedule
+    a start of the activation for restart policies.
+    """
+    LOGGER.debug(
+        f"Queuing auto-start for {process_parent_type} {id} "
+        f"in {delay_seconds} seconds",
+    )
+    enqueue_delay(
+        "default",
+        delay_seconds,
+        _queue_auto_start,
+        process_parent_type,
+        id,
+    )
+
+
+def _queue_auto_start(process_parent_type: str, id: int) -> None:
+    LOGGER.info(f"Requesting auto-start for {process_parent_type} {id}")
+    try:
+        requests_queue.push(
+            process_parent_type, id, ActivationRequest.AUTO_START
+        )
+        job_id = _manage_process_job_id(process_parent_type, id)
+        unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+    except IntegrityError:
+        LOGGER.warning(
+            f"{process_parent_type} {id} no longer exists, "
+            "auto-start request will not be processed",
+        )
