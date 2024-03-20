@@ -238,3 +238,27 @@ def test_partial_update_eda_credential(
         "username": "bearny",
         "key": "private",
     }
+
+
+@pytest.mark.django_db
+def test_partial_update_eda_credential_name(
+    client: APIClient, credential_type: models.CredentialType
+):
+    obj = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret", "key": "private"},
+        credential_type_id=credential_type.id,
+        managed=True,
+    )
+    data = {"name": "demo2"}
+    response = client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_206_PARTIAL_CONTENT
+    result = response.data
+    assert result["inputs"] == {
+        "password": "$encrypted$",
+        "username": "adam",
+        "key": "private",
+    }
+    assert result["name"] == "demo2"
