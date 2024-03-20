@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
 from django_rq import enqueue, get_queue, get_scheduler, job
-from rq import Connection, Queue as _Queue, Worker as _Worker
+from django_rq.queues import Queue as _Queue
+from rq import Connection, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
     DEFAULT_RESULT_TTL,
