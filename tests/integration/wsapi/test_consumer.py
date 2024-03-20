@@ -10,7 +10,7 @@ from pydantic.error_wrappers import ValidationError
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
-from aap_eda.core.enums import CredentialType
+from aap_eda.core.enums import CredentialType, DefaultCredentialType
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
 TIMEOUT = 5
@@ -60,7 +60,7 @@ VAULT_INPUTS = {
 @pytest.fixture(autouse=True)
 def vault_credential_type() -> models.CredentialType:
     credential_type = models.CredentialType.objects.create(
-        name=CredentialType.VAULT,
+        name=DefaultCredentialType.VAULT,
         inputs=VAULT_INPUTS,
         injectors={},
         managed=True,
