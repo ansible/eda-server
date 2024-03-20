@@ -35,23 +35,12 @@ login_url = f"{auth_url}/login/"
 logout_url = f"{auth_url}/logout/"
 
 
-@pytest.fixture
-def user() -> models.User:
-    return models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
-
-
 @pytest.fixture(scope="module")
 def live_server(live_server):
     return live_server
 
 
-def test_session_login_logout(live_server, user: models.User):
+def test_session_login_logout(live_server, default_user: models.User):
     client = RequestsClient()
     response = client.get(login_url)
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -84,7 +73,7 @@ def test_session_login_logout(live_server, user: models.User):
 
 @pytest.mark.django_db
 def test_session_login_invalid_credentials(
-    base_client: APIClient, user: models.User
+    base_client: APIClient, default_user: models.User
 ):
     response = base_client.post(
         login_url,
@@ -118,6 +107,7 @@ def _get_crsf_token(client: RequestsClient):
 # -----------------------------------------------------
 # Roles
 # -----------------------------------------------------
+@pytest.mark.skip("Roles are deprecated in favor of DAB RBAC")
 @pytest.mark.django_db
 def test_list_roles(client: APIClient, init_db):
     response = client.get(f"{api_url_v1}/roles/")
@@ -132,6 +122,7 @@ def test_list_roles(client: APIClient, init_db):
     }
 
 
+@pytest.mark.skip("Roles are deprecated in favor of DAB RBAC")
 @pytest.mark.django_db
 def test_retrieve_role(client: APIClient, init_db):
     test_uuid = init_db.role.id
@@ -158,6 +149,7 @@ def test_retrieve_role(client: APIClient, init_db):
     }
 
 
+@pytest.mark.skip("Roles are deprecated in favor of DAB RBAC")
 @pytest.mark.django_db
 def test_list_role_filter_name(client: APIClient, init_db):
     test_role_name = init_db.role.name
@@ -173,6 +165,7 @@ def test_list_role_filter_name(client: APIClient, init_db):
     }
 
 
+@pytest.mark.skip("Roles are deprecated in favor of DAB RBAC")
 @pytest.mark.django_db
 def test_list_role_filter_name_non_exist(client: APIClient, init_db):
     response = client.get(f"{api_url_v1}/roles/?name=nonexist")
@@ -192,20 +185,20 @@ def init_role():
     return roles
 
 
-def init_role_permissions(role_data, user: models.User):
+def init_role_permissions(role_data, default_user: models.User):
     resource_types = ["activation_instance", "user"]
     permission_data = models.Permission.objects.filter(
         resource_type__in=resource_types
     )
 
     role_data.permissions.set(list(permission_data))
-    role_data.users.add(user)
+    role_data.users.add(default_user)
 
 
 @pytest.fixture
-def init_db(user: models.User):
+def init_db(default_user: models.User):
     role = init_role()
-    init_role_permissions(role, user)
+    init_role_permissions(role, default_user)
 
     return InitData(
         role=role,
