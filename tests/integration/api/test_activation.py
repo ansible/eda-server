@@ -366,16 +366,17 @@ def test_list_activation_instances(
     default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
 ):
-    instances = default_activation_instances
+    instances = sorted(
+        default_activation_instances, key=lambda x: x.started_at
+    )
     response = client.get(
         f"{api_url_v1}/activations/{default_activation.id}/instances/"
     )
-    data = response.data["results"]
+    data = sorted(response.data["results"], key=lambda x: x["started_at"])
     assert response.status_code == status.HTTP_200_OK
     assert len(data) == len(instances)
-    # invert the indices because response data is descending by default
-    assert data[0]["name"] == instances[1].name
-    assert data[1]["name"] == instances[0].name
+    assert data[0]["name"] == instances[0].name
+    assert data[1]["name"] == instances[1].name
     assert (
         data[0]["git_hash"] == instances[0].git_hash == instances[1].git_hash
     )
