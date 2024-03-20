@@ -25,7 +25,7 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import exceptions, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 from aap_eda.core.utils.credentials import inputs_to_store
@@ -176,8 +176,21 @@ class EdaCredentialViewSet(
                 None, description="Delete successful."
             )
         },
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force deletion if there are dependent objects",
+                required=False,
+                type=bool,
+            )
+        ],
     )
     def destroy(self, request, *args, **kwargs):
+        force = request.query_params.get("force", "false").lower() in [
+            "true",
+            "1",
+            "yes",
+        ]
         eda_credential = self.get_object()
         if eda_credential.managed:
             error = "Managed EDA credential cannot be deleted"
@@ -185,5 +198,17 @@ class EdaCredentialViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        # If the credential is in use and the 'force' flag
+        # is not True, raise a PermissionDenied exception
+        is_used = models.Activation.objects.filter(
+            decision_environment__eda_credential=eda_credential
+        ).exists()
+
+        if is_used and not force:
+            raise exceptions.Conflict(
+                "Credential is being used by Activations "
+                "and cannot be deleted. If you want to force delete, "
+                "please add /?force=true query param."
+            )
         self.perform_destroy(eda_credential)
         return Response(status=status.HTTP_204_NO_CONTENT)
