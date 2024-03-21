@@ -12,6 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import enum
+
+from django.conf import settings
+from django.core import validators
 from django.db import models
 
 from aap_eda.core.enums import (
@@ -26,6 +30,25 @@ from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
+
+
+class RestartCompletionInterval(enum.IntEnum):
+    MINIMUM = 0
+    SETTINGS = MINIMUM
+    DEFAULT = SETTINGS
+
+
+class RestartFailureInterval(enum.IntEnum):
+    MINIMUM = 0
+    SETTINGS = MINIMUM
+    DEFAULT = SETTINGS
+
+
+class RestartFailureLimit(enum.IntEnum):
+    MINIMUM = -1
+    SETTINGS = 0
+    DEFAULT = SETTINGS
+    UNLIMITED = MINIMUM
 
 
 class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
@@ -51,6 +74,52 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     )
     extra_var = models.ForeignKey(
         "ExtraVar", on_delete=models.CASCADE, null=True
+    )
+    restart_completion_interval = models.IntegerField(
+        validators=[
+            validators.MinValueValidator(
+                limit_value=RestartCompletionInterval.MINIMUM,
+                message="The restart interval for completions specifies"
+                " the delay, in seconds, between restarts"
+                "; it must be an integer greater than or equal to"
+                f" {RestartCompletionInterval.MINIMUM}"
+                " indicating the delay, in seconds, between restarts"
+                f"; system settings = {RestartCompletionInterval.SETTINGS}"
+                f", default = {RestartCompletionInterval.DEFAULT}",
+            ),
+        ],
+        default=RestartCompletionInterval.DEFAULT,
+    )
+    restart_failure_interval = models.IntegerField(
+        validators=[
+            validators.MinValueValidator(
+                limit_value=RestartFailureInterval.MINIMUM,
+                message="The restart interval for failures specifies"
+                " the delay, in seconds, between restarts"
+                "; it must be an integer greater than or equal to "
+                f" {RestartFailureInterval.MINIMUM}"
+                " indicating the delay, in seconds, between restarts"
+                f"; system settings = {RestartFailureInterval.SETTINGS}"
+                f", default = {RestartFailureInterval.DEFAULT}",
+            ),
+        ],
+        default=RestartFailureInterval.DEFAULT,
+    )
+    restart_failure_limit = models.IntegerField(
+        validators=[
+            validators.MinValueValidator(
+                limit_value=RestartFailureLimit.MINIMUM,
+                message="The restart limit for failiures specifies"
+                " the limit on repeated attempts to start an activation"
+                " in the face of failures to do so"
+                "; it must be an integer greater than or equal to"
+                f" {RestartFailureLimit.MINIMUM}"
+                f"; system settings = {RestartFailureLimit.SETTINGS}"
+                f", unlimited restarts = {RestartFailureLimit.UNLIMITED}"
+                f", default = {RestartFailureLimit.DEFAULT}",
+            ),
+        ],
+        default=RestartFailureLimit.DEFAULT,
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
@@ -112,3 +181,28 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="+",
     )
+
+    @property
+    def effective_restart_completion_interval(self):
+        effective = self.restart_completion_interval
+        if effective == RestartCompletionInterval.SETTINGS:
+            effective = settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
+        return effective
+
+    @property
+    def effective_restart_failure_interval(self):
+        effective = self.restart_failure_interval
+        if effective == RestartFailureInterval.SETTINGS:
+            effective = settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
+        return effective
+
+    @property
+    def effective_restart_failure_limit(self):
+        effective = self.restart_failure_limit
+        if effective == RestartFailureLimit.SETTINGS:
+            effective = settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+        return effective
+
+    @property
+    def unlimited_restart_failures(self):
+        return self.restart_failure_limit == RestartFailureLimit.UNLIMITED

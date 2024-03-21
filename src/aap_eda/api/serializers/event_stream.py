@@ -168,6 +168,9 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "rulebook_id",
             "extra_var_id",
             "user",
+            "restart_completion_interval",
+            "restart_failure_interval",
+            "restart_failure_limit",
             "restart_policy",
             "log_level",
         ]
