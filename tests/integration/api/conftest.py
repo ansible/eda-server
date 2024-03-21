@@ -130,15 +130,37 @@ def default_user_awx_token(default_user: models.User):
 
 @pytest.fixture
 def default_project(
+    default_credential: models.Credential,
     default_organization: models.Organization,
 ) -> models.Project:
     """Return a default Project."""
     return models.Project.objects.create(
-        git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
         name="default-project",
-        url="https://git.example.com/acme/project-01",
         description="Default Project",
+        url="https://git.example.com/acme/project-01",
+        git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
+        credential=default_credential,
         organization=default_organization,
+        import_state=models.Project.ImportState.COMPLETED,
+        import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
+    )
+
+
+@pytest.fixture
+def new_project(
+    default_organization: models.Organization,
+) -> models.Project:
+    """Return a new Project."""
+    return models.Project.objects.create(
+        name="new-project",
+        description="New Project",
+        url="https://git.example.com/acme/project-02",
+        git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+        organization=default_organization,
+        verify_ssl=False,
+        import_state=models.Project.ImportState.FAILED,
+        import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
+        import_error="Unexpected error. Please contact support.",
     )
 
 
