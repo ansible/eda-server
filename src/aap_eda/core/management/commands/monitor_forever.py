@@ -4,11 +4,12 @@ from django.core.management import BaseCommand
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.models import ActivationRequestQueue
 from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine.podman import Engine as PodmanEngine
 from aap_eda.services.activation.manager import ActivationManager
-
 from aap_eda.tasks.orchestrator import system_restart_activation
+
 
 class Command(BaseCommand):
     help = "Runs the monitoring code"
@@ -20,16 +21,52 @@ class Command(BaseCommand):
     def handle(self, *args, **options) -> None:
         worker = options["worker"]
         while True:
-            q = models.RulebookProcess.objects.filter(
-                status=ActivationStatus.RUNNING, worker=worker
-            )
-            for process in q.values():
-                podman = PodmanEngine(process["activation_id"])
-                manager = ActivationManager(
-                    models.Activation.objects.get(id=process["activation_id"]),
-                    system_restart_activation,
-                    podman,
-                    DBLogger,
-                )
-                manager.monitor()
+            self.monitor(worker)
+            self.process_requests(worker)
             time.sleep(options["delay"])
+
+    def monitor(self, worker):
+        q = models.RulebookProcess.objects.filter(
+            status=ActivationStatus.RUNNING, worker=worker
+        )
+        for process in q.values():
+            podman = PodmanEngine(process["activation_id"])
+            manager = ActivationManager(
+                models.Activation.objects.get(id=process["activation_id"]),
+                system_restart_activation,
+                podman,
+                DBLogger,
+            )
+            manager.monitor()
+
+    def process_requests(self, worker):
+        my_activations = models.Activation.objects.filter(
+            latest_instance__worker=worker
+        )
+        my_activation_ids = my_activations.values_list("id")
+        requests = models.ActivationRequestQueue.objects.filter(
+            process_parent_type="activation",
+            process_parent_id__in=my_activation_ids,
+        ).values()
+        for request in list(requests):
+            podman = PodmanEngine(request["process_parent_id"])
+            manager = ActivationManager(
+                models.Activation.objects.get(id=request["process_parent_id"]),
+                podman,
+                DBLogger,
+            )
+            if request["request"] == "stop":
+                manager.stop()
+                ActivationRequestQueue.objects.filter(
+                    id=request["id"]
+                ).delete()
+            if request["request"] == "delete":
+                manager.delete()
+                ActivationRequestQueue.objects.filter(
+                    id=request["id"]
+                ).delete()
+            if request["request"] == "restart":
+                manager.restart()
+                ActivationRequestQueue.objects.filter(
+                    id=request["id"]
+                ).delete()
