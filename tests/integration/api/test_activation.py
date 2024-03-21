@@ -23,6 +23,11 @@ from aap_eda.api.serializers.activation import (
     is_activation_valid,
 )
 from aap_eda.core import enums, models
+from aap_eda.core.models.activation import (
+    RestartCompletionInterval,
+    RestartFailureInterval,
+    RestartFailureLimit,
+)
 from tests.integration.constants import api_url_v1
 
 TEST_ACTIVATION = {
@@ -253,7 +258,7 @@ def create_multiple_activations(fks: dict):
 
 
 @pytest.mark.django_db
-def test_create_activation(client: APIClient, preseed_credential_types):
+def test_create_activation(client: APIClient, settings, preseed_credential_types):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
@@ -296,6 +301,206 @@ def test_create_activation(client: APIClient, preseed_credential_types):
         activation.status_message
         == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
     )
+
+    assert (
+        activation.restart_completion_interval
+        == RestartCompletionInterval.DEFAULT
+    )
+    if RestartCompletionInterval.DEFAULT == RestartCompletionInterval.SETTINGS:
+        assert (
+            activation.effective_restart_completion_interval
+            == settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
+        )
+
+    assert (
+        activation.restart_failure_interval == RestartFailureInterval.DEFAULT
+    )
+    if RestartFailureInterval.DEFAULT == RestartFailureInterval.SETTINGS:
+        assert (
+            activation.effective_restart_failure_interval
+            == settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
+        )
+
+    assert activation.restart_failure_limit == RestartFailureLimit.DEFAULT
+    if RestartFailureLimit.DEFAULT == RestartFailureLimit.SETTINGS:
+        assert (
+            activation.effective_restart_failure_limit
+            == settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+        )
+
+
+@pytest.mark.parametrize(
+    "param_data",
+    [
+        {
+            "param": "restart_completion_interval",
+            "value": RestartCompletionInterval.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RestartCompletionInterval.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "restart_completion_interval",
+            "value": RestartCompletionInterval.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_completion_interval",
+            "value": RestartCompletionInterval.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_restart_completion_interval",
+                    "setting": "ACTIVATION_RESTART_SECONDS_ON_COMPLETE",
+                },
+            },
+        },
+        {
+            "param": "restart_completion_interval",
+            "value": RestartCompletionInterval.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_completion_interval",
+            "value": RestartCompletionInterval.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_interval",
+            "value": RestartFailureInterval.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RestartFailureInterval.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "restart_failure_interval",
+            "value": RestartFailureInterval.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_interval",
+            "value": RestartFailureInterval.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_restart_failure_interval",
+                    "setting": "ACTIVATION_RESTART_SECONDS_ON_FAILURE",
+                },
+            },
+        },
+        {
+            "param": "restart_failure_interval",
+            "value": RestartFailureInterval.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_interval",
+            "value": RestartFailureInterval.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_limit",
+            "value": RestartFailureLimit.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RestartFailureLimit.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "restart_failure_limit",
+            "value": RestartFailureLimit.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_limit",
+            "value": RestartFailureLimit.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_restart_failure_limit",
+                    "setting": "ACTIVATION_MAX_RESTARTS_ON_FAILURE",
+                },
+            },
+        },
+        {
+            "param": "restart_failure_limit",
+            "value": RestartFailureLimit.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_limit",
+            "value": RestartFailureLimit.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "restart_failure_limit",
+            "value": RestartFailureLimit.UNLIMITED + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_restart_params(
+    client: APIClient,
+    param_data: dict,
+    settings,
+):
+    param = param_data["param"]
+    value = param_data["value"]
+
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation[param] = value
+
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == param_data["expect"]["status"]
+    if response.status_code == status.HTTP_201_CREATED:
+        activation = models.Activation.objects.filter(
+            id=response.data["id"]
+        ).first()
+        assert getattr(activation, param) == value
+        effective = param_data["expect"].get("effective", None)
+        if effective:
+            assert getattr(activation, effective["property"]) == getattr(
+                settings, effective["setting"]
+            )
+    else:
+        assert response.data[param][0] == param_data["expect"]["message"]
 
 
 @pytest.mark.django_db
