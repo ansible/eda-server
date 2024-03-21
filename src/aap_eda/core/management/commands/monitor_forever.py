@@ -1,10 +1,13 @@
 import time
+from datetime import timedelta
 
 from django.core.management import BaseCommand
+from django.utils import timezone
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.models import ActivationRequestQueue
+from aap_eda.core.models.rulebook_process import RulebookProcess
 from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine.podman import Engine as PodmanEngine
 from aap_eda.services.activation.manager import ActivationManager
@@ -23,6 +26,7 @@ class Command(BaseCommand):
         while True:
             self.monitor(worker)
             self.process_requests(worker)
+            self.find_lost_activations()
             time.sleep(options["delay"])
 
     def monitor(self, worker):
@@ -71,3 +75,18 @@ class Command(BaseCommand):
                 ActivationRequestQueue.objects.filter(
                     id=request["id"]
                 ).delete()
+
+    def find_lost_activations(self):
+        lost_processes = RulebookProcess.objects.filter(
+            status="running",
+            updated_at__lte=timezone.now() - timedelta(seconds=600),
+        ).values()
+        for process in lost_processes:
+            podman = PodmanEngine(process["activation_id"])
+            manager = ActivationManager(
+                models.Activation.objects.get(id=process["activation_id"]),
+                system_restart_activation,
+                podman,
+                DBLogger,
+            )
+            manager._unresponsive_policy()
