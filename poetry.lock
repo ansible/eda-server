@@ -602,7 +602,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "063df572ccea25e0011f831c18d9eeb293436ca5"
+resolved_reference = "bf798a2547961a5649a5d8df9656e3433e541994"
 
 [[package]]
 name = "django-crum"
