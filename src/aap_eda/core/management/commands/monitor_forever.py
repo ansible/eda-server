@@ -1,11 +1,12 @@
 import time
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils import timezone
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationRequest, ActivationStatus
 from aap_eda.core.models import ActivationRequestQueue
 from aap_eda.core.models.rulebook_process import RulebookProcess
 from aap_eda.services.activation.db_log_handler import DBLogger
@@ -60,17 +61,17 @@ class Command(BaseCommand):
                 podman,
                 DBLogger,
             )
-            if request["request"] == "stop":
+            if request["request"] == ActivationRequest.STOP:
                 manager.stop()
                 ActivationRequestQueue.objects.filter(
                     id=request["id"]
                 ).delete()
-            if request["request"] == "delete":
+            if request["request"] == ActivationRequest.DELETE:
                 manager.delete()
                 ActivationRequestQueue.objects.filter(
                     id=request["id"]
                 ).delete()
-            if request["request"] == "restart":
+            if request["request"] == ActivationRequest.RESTART:
                 manager.restart()
                 ActivationRequestQueue.objects.filter(
                     id=request["id"]
@@ -78,8 +79,9 @@ class Command(BaseCommand):
 
     def find_lost_activations(self):
         lost_processes = RulebookProcess.objects.filter(
-            status="running",
-            updated_at__lte=timezone.now() - timedelta(seconds=600),
+            status=ActivationStatus.RUNNING,
+            updated_at__lte=timezone.now()
+            - timedelta(seconds=settings.NODE_LIVENESS_TIMEOUT_SECONDS),
         ).values()
         for process in lost_processes:
             podman = PodmanEngine(process["activation_id"])
