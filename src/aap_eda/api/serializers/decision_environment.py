@@ -15,6 +15,7 @@
 from rest_framework import serializers
 
 from aap_eda.api.serializers.credential import CredentialRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models
 
 
@@ -57,6 +58,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the DecisionEnvironment with embedded objects."""
 
     credential = CredentialRefSerializer(required=False, allow_null=True)
+    organization = OrganizationRefSerializer()
 
     class Meta:
         model = models.DecisionEnvironment
@@ -66,7 +68,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "description",
             "image_url",
             "credential",
-            "organization_id",
+            "organization",
             "created_at",
             "modified_at",
         ]
@@ -78,13 +80,20 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             if decision_environment["credential"]
             else None
         )
+        organization = (
+            OrganizationRefSerializer(
+                decision_environment["organization"]
+            ).data
+            if decision_environment["organization"]
+            else None
+        )
         return {
             "id": decision_environment["id"],
             "name": decision_environment["name"],
             "description": decision_environment["description"],
             "image_url": decision_environment["image_url"],
             "credential": credential,
-            "organization_id": decision_environment["organization_id"],
+            "organization": organization,
             "created_at": decision_environment["created_at"],
             "modified_at": decision_environment["modified_at"],
         }
