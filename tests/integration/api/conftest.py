@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import uuid
 from typing import Any, Dict, List
 from unittest import mock
 
@@ -30,6 +31,7 @@ from aap_eda.core.enums import (
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
+DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
 
 @pytest.fixture
@@ -168,12 +170,35 @@ def new_project(
 def default_rulesets() -> str:
     return """
 ---
-- name: hello
-  hosts: localhost
-  gather_facts: false
-  tasks:
-    - debug:
-        msg: hello
+- name: Test sample 001
+  hosts: all
+  sources:
+    - ansible.eda.range:
+        limit: 5
+        delay: 1
+      filters:
+        - noop:
+  rules:
+    - name: r1
+      condition: event.i == 1
+      action:
+        debug:
+    - name: r2
+      condition: event.i == 2
+      action:
+        debug:
+
+- name: Test sample 002
+  hosts: all
+  sources:
+    - ansible.eda.range:
+        limit: 5
+        delay: 1
+  rules:
+    - name: r3
+      condition: event.i == 2
+      action:
+        debug:
 """
 
 
@@ -219,6 +244,172 @@ def rulebook_with_job_template(
         project=default_project,
     )
     return rulebook
+
+
+@pytest.fixture
+def source_list() -> List[dict]:
+    return [
+        {
+            "name": "<unnamed>",
+            "type": "range",
+            "config": {"limit": 5},
+            "source": "ansible.eda.range",
+        }
+    ]
+
+
+@pytest.fixture
+def ruleset_1(
+    default_rulebook: models.Rulebook, source_list: List[dict]
+) -> models.Ruleset:
+    return models.Ruleset.objects.create(
+        name="ruleset-1",
+        sources=source_list,
+        rulebook=default_rulebook,
+    )
+
+
+@pytest.fixture
+def ruleset_2(
+    default_rulebook: models.Rulebook, source_list: List[dict]
+) -> models.Ruleset:
+    return models.Ruleset.objects.create(
+        name="ruleset-2",
+        sources=source_list,
+        rulebook=default_rulebook,
+    )
+
+
+@pytest.fixture
+def ruleset_3(
+    rulebook_with_job_template: models.Rulebook, source_list: List[dict]
+) -> models.Ruleset:
+    return models.Ruleset.objects.create(
+        name="ruleset-3",
+        sources=source_list,
+        rulebook=rulebook_with_job_template,
+    )
+
+
+@pytest.fixture
+def default_rule(ruleset_1: models.Ruleset) -> models.Rule:
+    return models.Rule.objects.create(
+        name="say hello",
+        action={"run_playbook": {"name": "ansible.eda.hello"}},
+        ruleset=ruleset_1,
+    )
+
+
+@pytest.fixture
+def audit_rule_1(
+    default_activation_instances: List[models.RulebookProcess],
+) -> models.AuditRule:
+    return models.AuditRule.objects.create(
+        name="rule with 1 action",
+        fired_at="2023-12-14T15:19:02.313122Z",
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
+        ruleset_name="test-audit-ruleset-name-1",
+        activation_instance=default_activation_instances[0],
+    )
+
+
+@pytest.fixture
+def audit_rule_2(
+    new_activation_instance: models.RulebookProcess,
+) -> models.AuditRule:
+    return models.AuditRule.objects.create(
+        name="rule with 2 actions/events",
+        fired_at="2023-12-14T15:19:02.323704Z",
+        rule_uuid=DUMMY_UUID,
+        ruleset_uuid=DUMMY_UUID,
+        ruleset_name="test-audit-ruleset-name-2",
+        activation_instance=new_activation_instance,
+    )
+
+
+@pytest.fixture
+def audit_action_1(audit_rule_1: models.AuditRule) -> models.AuditAction:
+    return models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="debug",
+        audit_rule=audit_rule_1,
+        status="successful",
+        rule_fired_at="2023-12-14T15:19:02.313122Z",
+        fired_at="2023-12-14T15:19:02.319506Z",
+    )
+
+
+@pytest.fixture
+def audit_action_2(audit_rule_2: models.AuditRule) -> models.AuditAction:
+    return models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="debug",
+        audit_rule=audit_rule_2,
+        status="successful",
+        rule_fired_at="2023-12-14T15:19:02.323704Z",
+        fired_at="2023-12-14T15:19:02.326503Z",
+    )
+
+
+@pytest.fixture
+def audit_action_3(audit_rule_2: models.AuditRule) -> models.AuditAction:
+    return models.AuditAction.objects.create(
+        id=str(uuid.uuid4()),
+        name="print_event",
+        audit_rule=audit_rule_2,
+        status="successful",
+        rule_fired_at="2023-12-14T15:19:02.323704Z",
+        fired_at="2023-12-14T15:19:02.327547Z",
+    )
+
+
+@pytest.fixture
+def audit_event_1(audit_action_1: models.AuditAction) -> models.AuditEvent:
+    audit_event = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="my test source",
+        source_type="ansible.eda.range",
+        rule_fired_at="2023-12-14T15:19:02.313122Z",
+        received_at="2023-12-14T15:19:02.289549Z",
+        payload={"key": "value"},
+    )
+    audit_event.audit_actions.add(audit_action_1)
+    return audit_event
+
+
+@pytest.fixture
+def audit_event_2(
+    audit_action_2: models.AuditAction, audit_action_3: models.AuditAction
+) -> models.AuditEvent:
+    audit_event = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="my test source",
+        source_type="ansible.eda.range",
+        rule_fired_at="2023-12-14T15:19:02.323704Z",
+        received_at="2023-12-14T15:19:02.313063Z",
+        payload={"key": "value"},
+    )
+    audit_event.audit_actions.add(audit_action_2)
+    audit_event.audit_actions.add(audit_action_3)
+    return audit_event
+
+
+@pytest.fixture
+def audit_event_3(
+    audit_action_2: models.AuditAction, audit_action_3: models.AuditAction
+) -> models.AuditEvent:
+    audit_event = models.AuditEvent.objects.create(
+        id=str(uuid.uuid4()),
+        source_name="my test source",
+        source_type="ansible.eda.range",
+        rule_fired_at="2023-12-14T15:19:02.323704Z",
+        received_at="2023-12-14T15:19:02.321472Z",
+        payload={"key": "value"},
+    )
+    audit_event.audit_actions.add(audit_action_2)
+    audit_event.audit_actions.add(audit_action_3)
+    return audit_event
 
 
 @pytest.fixture
@@ -335,6 +526,22 @@ def default_activation_instances(
                 ],
             ),
         ]
+    )
+
+
+@pytest.fixture
+def new_activation_instance(
+    new_activation: models.Activation, default_project: models.Project
+) -> models.RulebookProcess:
+    """Return an Activation Instance for new_activation fixture"""
+    return models.RulebookProcess.objects.create(
+        name=new_activation.name,
+        activation=new_activation,
+        git_hash=default_project.git_hash,
+        status=ActivationStatus.COMPLETED,
+        status_message=ACTIVATION_STATUS_MESSAGE_MAP[
+            ActivationStatus.COMPLETED
+        ],
     )
 
 
