@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import List
+from typing import Any, Dict, List
 from unittest import mock
 
 import pytest
@@ -20,8 +20,13 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 
+from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
-from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
+from aap_eda.core.enums import (
+    ACTIVATION_STATUS_MESSAGE_MAP,
+    ActivationStatus,
+    CredentialType,
+)
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
@@ -88,12 +93,16 @@ def check_permission_mock():
 
 
 @pytest.fixture
-def default_de(default_organization) -> models.DecisionEnvironment:
+def default_de(
+    default_organization: models.Organization,
+    default_credential: models.Credential,
+) -> models.DecisionEnvironment:
     """Return a default DE."""
     return models.DecisionEnvironment.objects.create(
         name="default_de",
         image_url="quay.io/ansible/ansible-rulebook:latest",
         description="Default DE",
+        credential=default_credential,
         organization=default_organization,
     )
 
@@ -111,7 +120,7 @@ def default_user() -> models.User:
 
 
 @pytest.fixture
-def default_user_awx_token(default_user):
+def default_user_awx_token(default_user: models.User):
     return models.AwxToken.objects.create(
         name="admin-awx-token",
         token="maytheforcebewithyou",
@@ -120,7 +129,9 @@ def default_user_awx_token(default_user):
 
 
 @pytest.fixture
-def default_project(default_organization) -> models.Project:
+def default_project(
+    default_organization: models.Organization,
+) -> models.Project:
     """Return a default Project."""
     return models.Project.objects.create(
         git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
@@ -145,7 +156,9 @@ def default_rulesets() -> str:
 
 
 @pytest.fixture
-def default_rulebook(default_project, default_rulesets) -> models.Rulebook:
+def default_rulebook(
+    default_project: models.Project, default_rulesets: str
+) -> models.Rulebook:
     """Return a default Rulebook"""
     return models.Rulebook.objects.create(
         name="default-rulebook.yml",
@@ -175,7 +188,7 @@ def ruleset_with_job_template() -> str:
 
 @pytest.fixture
 def rulebook_with_job_template(
-    default_project, ruleset_with_job_template
+    default_project: models.Project, ruleset_with_job_template: str
 ) -> models.Rulebook:
     rulebook = models.Rulebook.objects.create(
         name="job-template.yml",
@@ -187,7 +200,9 @@ def rulebook_with_job_template(
 
 
 @pytest.fixture
-def default_extra_var(default_organization) -> models.ExtraVar:
+def default_extra_var(
+    default_organization: models.Organization,
+) -> models.ExtraVar:
     """Return a default ExtraVar"""
     return models.ExtraVar.objects.create(
         extra_var="""
@@ -202,12 +217,12 @@ def default_extra_var(default_organization) -> models.ExtraVar:
 
 @pytest.fixture
 def activation_payload(
-    default_de,
-    default_project,
-    default_rulebook,
-    default_extra_var,
-    default_organization,
-    default_user,
+    default_de: models.DecisionEnvironment,
+    default_project: models.Project,
+    default_rulebook: models.Rulebook,
+    default_extra_var: models.ExtraVar,
+    default_organization: models.Organization,
+    default_user: models.User,
 ) -> dict:
     return {
         "name": "test-activation",
@@ -225,13 +240,13 @@ def activation_payload(
 
 @pytest.fixture
 def default_activation(
-    default_de,
-    default_project,
-    default_rulebook,
-    default_extra_var,
-    default_organization,
-    default_user,
-    default_credential,
+    default_de: models.DecisionEnvironment,
+    default_project: models.Project,
+    default_rulebook: models.Rulebook,
+    default_extra_var: models.ExtraVar,
+    default_organization: models.Organization,
+    default_user: models.User,
+    default_credential: models.Credential,
 ) -> models.Activation:
     """Return a default Activation"""
     activation = models.Activation.objects.create(
@@ -251,12 +266,12 @@ def default_activation(
 
 @pytest.fixture
 def new_activation(
-    default_de,
-    default_project,
-    default_rulebook,
-    default_extra_var,
-    default_organization,
-    default_user,
+    default_de: models.DecisionEnvironment,
+    default_project: models.Project,
+    default_rulebook: models.Rulebook,
+    default_extra_var: models.ExtraVar,
+    default_organization: models.Organization,
+    default_user: models.User,
 ) -> models.Activation:
     """Return a new Activation"""
     return models.Activation.objects.create(
@@ -323,13 +338,61 @@ def default_activation_instance_logs(
 
 
 @pytest.fixture
-def default_credential(default_organization) -> models.Credential:
+def default_credential(
+    default_organization: models.Organization,
+) -> models.Credential:
     """Return a default Credential"""
     return models.Credential.objects.create(
         name="default-credential",
         description="Default Credential",
-        credential_type="Container Registry",
+        credential_type=CredentialType.REGISTRY,
         username="dummy-user",
         secret="dummy-password",
         organization=default_organization,
     )
+
+
+@pytest.fixture
+def default_vault_credential(
+    default_organization: models.Organization,
+) -> models.Credential:
+    """Return a default Vault Credential"""
+    return models.Credential.objects.create(
+        name="default-vault-credential",
+        description="Default Vault Credential",
+        credential_type=CredentialType.VAULT,
+        username="dummy-vault-user",
+        secret="dummy-password",
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def default_eda_vault_credential(
+    default_organization: models.Organization,
+) -> models.Credential:
+    """Return a default EDA Vault Credential"""
+    return models.Credential.objects.create(
+        name="default-eda-vault-credential",
+        description="Default EDA Vault Credential",
+        vault_identifier=EDA_SERVER_VAULT_LABEL,
+        credential_type=CredentialType.VAULT,
+        username="dummy-eda-vault-user",
+        secret="dummy-password",
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def credential_payload(
+    default_organization: models.Organization,
+) -> Dict[str, Any]:
+    """Return the payload for creating a new Credential"""
+    return {
+        "name": "test-credential",
+        "description": "Test Credential",
+        "credential_type": CredentialType.REGISTRY,
+        "username": "test-user",
+        "secret": "test-password",
+        "organization_id": default_organization.id,
+    }
