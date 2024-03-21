@@ -52,6 +52,7 @@ class Command(BaseCommand):
             podman = PodmanEngine(request["process_parent_id"])
             manager = ActivationManager(
                 models.Activation.objects.get(id=request["process_parent_id"]),
+                system_restart_activation,
                 podman,
                 DBLogger,
             )
