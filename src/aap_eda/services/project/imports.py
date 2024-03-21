@@ -25,7 +25,7 @@ from django.core import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
-from aap_eda.services.project.git import GitRepository
+from aap_eda.services.project.scm import ScmRepository
 from aap_eda.services.rulebook import insert_rulebook_related_data
 
 logger = logging.getLogger(__name__)
@@ -88,22 +88,24 @@ def _project_import_wrapper(
 #   similar operations. Current implementation has some code duplication.
 #   This needs to be refactored in the future.
 class ProjectImportService:
-    def __init__(self, git_cls: Optional[Type[GitRepository]] = None):
-        if git_cls is None:
-            git_cls = GitRepository
-        self._git_cls = git_cls
+    def __init__(self, scm_cls: Optional[Type[ScmRepository]] = None):
+        if scm_cls is None:
+            scm_cls = ScmRepository
+        self._scm_cls = scm_cls
 
     @_project_import_wrapper
     def import_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
-            repo = self._git_cls.clone(
+            repo = self._scm_cls.clone(
                 project.url,
                 repo_dir,
                 credential=project.eda_credential,
                 depth=1,
                 verify_ssl=project.verify_ssl,
+                branch=project.scm_branch,
+                refspec=project.scm_refspec,
             )
             project.git_hash = repo.rev_parse("HEAD")
 
@@ -114,12 +116,14 @@ class ProjectImportService:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
-            repo = self._git_cls.clone(
+            repo = self._scm_cls.clone(
                 project.url,
                 repo_dir,
                 credential=project.eda_credential,
                 depth=1,
                 verify_ssl=project.verify_ssl,
+                branch=project.scm_branch,
+                refspec=project.scm_refspec,
             )
             git_hash = repo.rev_parse("HEAD")
 
