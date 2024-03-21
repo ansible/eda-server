@@ -178,6 +178,9 @@ class ActivationSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "restart_completion_interval",
+            "restart_failure_interval",
+            "restart_failure_limit",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -228,6 +231,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "restart_completion_interval",
+            "restart_failure_interval",
+            "restart_failure_limit",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -267,6 +273,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
             "extra_var_id": activation.extra_var_id,
+            "restart_completion_interval": (
+                activation.restart_completion_interval
+            ),
+            "restart_failure_interval": activation.restart_failure_interval,
+            "restart_failure_limit": activation.restart_failure_limit,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -296,6 +307,9 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "rulebook_id",
             "extra_var_id",
             "user",
+            "restart_completion_interval",
+            "restart_failure_interval",
+            "restart_failure_limit",
             "restart_policy",
             "awx_token_id",
             "event_streams",
@@ -455,6 +469,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "rulebook",
             "extra_var",
             "instances",
+            "restart_completion_interval",
+            "restart_failure_interval",
+            "restart_failure_limit",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -534,6 +551,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True
             ).data,
+            "restart_completion_interval": (
+                activation.restart_completion_interval
+            ),
+            "restart_failure_interval": activation.restart_failure_interval,
+            "restart_failure_limit": activation.restart_failure_limit,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
