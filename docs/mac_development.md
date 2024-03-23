@@ -53,20 +53,28 @@ ps aux | grep "ssh -fnNT" |grep -v color
 3. export DOCKER_HOST=unix:///tmp/podman.sock
 
 
-## Start the app with available images in quay.io
+## There are three options for working with the app
+
+### 1. Use only images available from quay.io
 
 1. podman login quay.io
 2. export EDA_CONTROLLER_URL="your_controller_url"
 3. export EDA_CONTROLLER_SSL_VERIFY=no
 4. docker-compose -f ./tools/docker/docker-compose-mac.yml up
 
-## Start the app with your local changes
-
-You can build an image with your changes and use that image in docker-compose
+### 2. Use a local EDA image and everything else from quay.io
 
 1. podman build -t localhost/myserver -f tools/docker/Dockerfile .
 2. export EDA_IMAGE=localhost/myserver:latest
 3. docker-compose -f ./tools/docker/docker-compose-mac.yml up
+
+### 3. Use a closely matching environment of ./tools/docker/docker-compose-dev.yaml
+
+*   *Step 2 is optional as docker-compose-mac-dev.yaml defaults to using localhost/aap-eda*
+
+1. podman build -t localhost/aap-eda -f tools/docker/Dockerfile .
+2. [optional] export EDA_IMAGE=localhost/aap-eda :latest
+3. podman-compose -f ./tools/docker/docker-compose-mac-dev.yaml up
 
 You can now access the UI at <https://localhost:8443/eda/> with default login username and password(admin/testpass).
 
