@@ -317,10 +317,6 @@ RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
-    {
-        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
-        "interval": 5,
-    },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
 RQ_CRON_JOBS = []
@@ -440,6 +436,7 @@ ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(
 ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
     settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5)
 )
+NODE_LIVENESS_TIMEOUT_SECONDS = 600
 
 # -1 means no limit
 MAX_RUNNING_ACTIVATIONS = int(settings.get("MAX_RUNNING_ACTIVATIONS", 5))

@@ -15,6 +15,7 @@
 
 import contextlib
 import logging
+import os
 import typing as tp
 from datetime import timedelta
 from functools import wraps
@@ -36,9 +37,6 @@ from aap_eda.core.enums import (
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerRequest
-from aap_eda.services.activation.restart_helper import (
-    system_restart_activation,
-)
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
@@ -89,6 +87,7 @@ class ActivationManager:
     def __init__(
         self,
         db_instance: tp.Union[models.Activation, models.EventStream],
+        system_restart_activation: tp.Callable,
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):
@@ -99,6 +98,7 @@ class ActivationManager:
             container_engine: The container engine to use.
         """
         self.db_instance = db_instance
+        self.system_restart_activation = system_restart_activation
         if isinstance(db_instance, models.Activation):
             self.db_instance_type = ProcessParentType.ACTIVATION
         else:
@@ -467,7 +467,7 @@ class ActivationManager:
                 ActivationStatus.FAILED,
                 user_msg,
             )
-            system_restart_activation(
+            self.system_restart_activation(
                 self.db_instance_type, self.db_instance.id, delay_seconds=1
             )
 
@@ -494,7 +494,7 @@ class ActivationManager:
             msg += " Restart policy not applicable."
         else:
             msg += " Restart policy is applied."
-            system_restart_activation(
+            self.system_restart_activation(
                 self.db_instance_type, self.db_instance.id, delay_seconds=1
             )
 
@@ -537,7 +537,7 @@ class ActivationManager:
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-            system_restart_activation(
+            self.system_restart_activation(
                 self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
@@ -673,7 +673,7 @@ class ActivationManager:
                 f"Scheduling restart in "
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
             )
-            system_restart_activation(
+            self.system_restart_activation(
                 self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
@@ -813,7 +813,7 @@ class ActivationManager:
         user_msg = "Restart requested by user. "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
-        system_restart_activation(
+        self.system_restart_activation(
             self.db_instance_type, self.db_instance.id, delay_seconds=1
         )
 
@@ -1046,6 +1046,7 @@ class ActivationManager:
             self._set_activation_status(ActivationStatus.PENDING, msg)
             raise exceptions.MaxRunningProcessesError
         args = {
+            "worker": os.environ["HOSTNAME"],
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
