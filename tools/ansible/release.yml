@@ -1,0 +1,80 @@
+---
+- name: Release eda-server
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    repo_identifier: "ansible/eda-server"
+    api_repo_prefix: "https://api.github.com/repos/{{ repo_identifier }}"
+
+  # Note:
+  #    When this playbook runs it will run in the directory of the playbook so ../../ would be a reference to the eda-server root
+
+  tasks:
+    - name: Generate calver release number
+      set_fact:
+        # setuptools-scm will strip leading 0's off the date format so we need to do that too
+        release_number: "{{ (ansible_date_time.date | to_datetime('%Y-%m-%d')).strftime('%Y.%m.%d') | regex_replace('\\.0', '.') }}"
+
+    - name: Tag the repo
+      command:
+        cmd: "git tag -f {{ release_number }}"
+
+    - name: Get the build number from setuptools-scm
+      command:
+        cmd: python -m setuptools_scm
+      register: setuptools_command_version
+
+    - name: Make sure the selected release number and setuptools_scm agree
+      assert:
+        that:
+          release_number == setuptools_command_version.stdout
+        msg: "We expected the release number to be {{ release_number }} but setuptools-scm wanted it to be {{ setuptools_command_version.stdout }}"
+
+    - name: Build eda-server
+      command:
+        cmd: task build:release
+      args:
+        chdir: '../../'
+      tags:
+        - build
+
+    - name: Create release in github
+      uri:
+        url: "{{ api_repo_prefix }}/releases"
+        method: POST
+        body_format: json
+        body:
+          tag_name: "{{ release_number }}"
+          name: "v{{ release_number }}"
+          draft: False
+          generate_release_notes: True
+        status_code:
+          - 201
+        headers:
+          Accept: 'application/vnd.github.v3+json'
+          Authorization: 'bearer {{ github_token }}'
+      register: new_release_response
+      tags:
+        - github
+
+    - name: Upload the build files
+      uri:
+        # For some reason the upload_url ends with eda-server/releases/138751035/assets{?name,label}
+        # We have to strip that off before adding our args to the URLs
+        url: "{{ new_release_response.json['upload_url'] | regex_replace('{.*}', '') }}?name={{ file_name }}"
+        method: POST
+        src: "{{ item }}"
+        status_code:
+          - 201
+        headers:
+          Accept: 'application/vnd.github.v3+json'
+          Authorization: 'bearer {{ github_token }}'
+          Content-Type: "{{ file_name.endswith('tar.gz') | ternary('application/gzip', 'application/x-wheel+zip') }}"
+      vars:
+        file_name: "{{ item | basename }}"
+      loop: "{{ lookup('ansible.builtin.fileglob', '../../dist/*', wantlist=True) }}"
+      loop_control:
+        label: "{{ item | basename }}"
+      tags:
+        - github
