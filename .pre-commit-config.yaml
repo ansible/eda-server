@@ -28,9 +28,20 @@ repos:
         types: [python]
         pass_filenames: false
         entry: task lint:migrations
+
   - repo: https://github.com/python-poetry/poetry
     rev: '1.4.0'
     hooks:
       - id: poetry-check
       - id: poetry-lock
         args: ["--check"]
+
+# requires to execute the api server
+  - repo: https://github.com/APIDevTools/swagger-cli
+    rev: "v4.0.4"
+    hooks:
+      - id: swagger-validation
+        always_run: true
+        args:
+          - "validate"
+          - "http://localhost:8000/api/eda/v1/openapi.json"
