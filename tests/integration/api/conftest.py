@@ -17,7 +17,6 @@ from unittest import mock
 
 import pytest
 from ansible_base.rbac.models import DABPermission, RoleDefinition
-from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 
@@ -32,15 +31,6 @@ from aap_eda.core.enums import (
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
-
-
-@pytest.fixture
-def default_organization():
-    "Corresponds to migration add_default_organization"
-    return models.Organization.objects.get_or_create(
-        name=settings.DEFAULT_ORGANIZATION_NAME,
-        description="The default organization",
-    )[0]
 
 
 @pytest.fixture

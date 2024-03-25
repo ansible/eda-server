@@ -18,6 +18,7 @@ import pytest
 from django.conf import settings
 from pytest_redis import factories
 
+from aap_eda.core import models
 from aap_eda.core.tasking import Queue
 
 ADMIN_USERNAME = "test.admin"
@@ -52,3 +53,12 @@ def caplog_factory(caplog):
         return caplog
 
     return _factory
+
+
+@pytest.fixture
+def default_organization():
+    "Corresponds to migration add_default_organization"
+    return models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )[0]
