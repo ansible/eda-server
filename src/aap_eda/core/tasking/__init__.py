@@ -5,14 +5,11 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
 from django_rq.queues import Queue as _Queue
 from rq import Connection, Worker as _Worker
-from rq.defaults import (
-    DEFAULT_JOB_MONITORING_INTERVAL,
-    DEFAULT_RESULT_TTL,
-    DEFAULT_WORKER_TTL,
-)
+from rq.defaults import DEFAULT_JOB_MONITORING_INTERVAL, DEFAULT_WORKER_TTL
 from rq.job import Job as _Job, JobStatus
 from rq.serializers import JSONSerializer
 
@@ -108,7 +105,8 @@ class DefaultWorker(_Worker):
         self,
         queues: Iterable[Union[Queue, str]],
         name: Optional[str] = "default",
-        default_result_ttl: int = DEFAULT_RESULT_TTL,
+        default_result_ttl: int = settings.ACTIVATION_RETENTION_SUCCESS_HOURS
+        * 3600,
         connection: Optional[Connection] = None,
         exc_handler: Any = None,
         exception_handlers: _ErrorHandlersArgType = None,
@@ -154,7 +152,8 @@ class ActivationWorker(_Worker):
         self,
         queues: Iterable[Union[Queue, str]],
         name: Optional[str] = "activation",
-        default_result_ttl: int = DEFAULT_RESULT_TTL,
+        default_result_ttl: int = settings.ACTIVATION_RETENTION_SUCCESS_HOURS
+        * 3600,
         connection: Optional[Connection] = None,
         exc_handler: Any = None,
         exception_handlers: _ErrorHandlersArgType = None,

@@ -33,6 +33,8 @@ from aap_eda.core.models.event_stream import (
     RestartCompletionInterval,
     RestartFailureInterval,
     RestartFailureLimit,
+    RetentionFailurePeriod,
+    RetentionSuccessPeriod,
 )
 from tests.integration.constants import api_url_v1
 
@@ -471,6 +473,42 @@ def test_create_event_stream_with_restart_params(
         assert (
             event_stream.effective_restart_failure_limit
             == settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+        )
+
+    assert (
+        event_stream.retention_failure_period == RetentionFailurePeriod.DEFAULT
+    )
+    if RetentionFailurePeriod.DEFAULT == RetentionFailurePeriod.SETTINGS:
+        assert (
+            event_stream.effective_retention_failure_period
+            == settings.ACTIVATION_RETENTION_FAILURE_HOURS * 3600
+        ) or (
+            (
+                settings.ACTIVATION_RETENTION_FAILURE_HOURS
+                == RetentionFailurePeriod.FOREVER
+            )
+            and (
+                event_stream.effective_retention_failure_period
+                == settings.ACTIVATION_RETENTION_FAILURE_HOURS
+            )
+        )
+
+    assert (
+        event_stream.retention_success_period == RetentionSuccessPeriod.DEFAULT
+    )
+    if RetentionSuccessPeriod.DEFAULT == RetentionSuccessPeriod.SETTINGS:
+        assert (
+            event_stream.effective_retention_success_period
+            == settings.ACTIVATION_RETENTION_SUCCESS_HOURS * 3600
+        ) or (
+            (
+                settings.ACTIVATION_RETENTION_SUCCESS_HOURS
+                == RetentionSuccessPeriod.FOREVER
+            )
+            and (
+                event_stream.effective_retention_success_period
+                == settings.ACTIVATION_RETENTION_SUCCESS_HOURS
+            )
         )
 
 

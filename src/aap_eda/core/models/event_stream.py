@@ -48,6 +48,20 @@ class RestartFailureLimit(enum.IntEnum):
     UNLIMITED = MINIMUM
 
 
+class RetentionFailurePeriod(enum.IntEnum):
+    MINIMUM = -1
+    SETTINGS = 0
+    DEFAULT = SETTINGS
+    FOREVER = MINIMUM
+
+
+class RetentionSuccessPeriod(enum.IntEnum):
+    MINIMUM = -1
+    SETTINGS = 0
+    DEFAULT = SETTINGS
+    FOREVER = MINIMUM
+
+
 class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     """Model representing an event stream."""
 
@@ -116,6 +130,38 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
+    )
+    retention_failure_period = models.IntegerField(
+        validators=[
+            validators.MinValueValidator(
+                limit_value=RetentionFailurePeriod.MINIMUM,
+                message="The retention period for failiures specifies"
+                " the length of time, in hours, an individual failure"
+                "result will be retained"
+                "; it must be an integer greater than or equal to"
+                f" {RetentionFailurePeriod.MINIMUM}"
+                f"; system settings = {RetentionFailurePeriod.SETTINGS}"
+                f", forever = {RetentionFailurePeriod.FOREVER}"
+                f", default = {RetentionFailurePeriod.DEFAULT}",
+            ),
+        ],
+        default=RetentionFailurePeriod.DEFAULT,
+    )
+    retention_success_period = models.IntegerField(
+        validators=[
+            validators.MinValueValidator(
+                limit_value=RetentionSuccessPeriod.MINIMUM,
+                message="The retention period for successes specifies"
+                " the length of time, in hours, an individual success"
+                "result will be retained"
+                "; it must be an integer greater than or equal to"
+                f" {RetentionSuccessPeriod.MINIMUM}"
+                f"; system settings = {RetentionSuccessPeriod.SETTINGS}"
+                f", forever = {RetentionSuccessPeriod.FOREVER}"
+                f", default = {RetentionSuccessPeriod.DEFAULT}",
+            ),
+        ],
+        default=RetentionSuccessPeriod.DEFAULT,
     )
     status = models.TextField(
         choices=ActivationStatus.choices(),
@@ -195,3 +241,21 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     @property
     def unlimited_restart_failures(self):
         return self.restart_failure_limit == RestartFailureLimit.UNLIMITED
+
+    @property
+    def effective_retention_failure_period(self):
+        effective = self.retention_failure_period
+        if effective == RetentionFailurePeriod.SETTINGS:
+            effective = settings.ACTIVATION_RETENTION_FAILURE_HOURS
+        if effective != RetentionFailurePeriod.FOREVER:
+            effective *= 3600
+        return effective
+
+    @property
+    def effective_retention_success_period(self):
+        effective = self.retention_success_period
+        if effective == RetentionSuccessPeriod.SETTINGS:
+            effective = settings.ACTIVATION_RETENTION_SUCCESS_HOURS
+        if effective != RetentionSuccessPeriod.FOREVER:
+            effective *= 3600
+        return effective

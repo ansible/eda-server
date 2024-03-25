@@ -173,6 +173,8 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "restart_failure_limit",
             "restart_policy",
             "log_level",
+            "retention_failure_period",
+            "retention_success_period",
         ]
 
     def create(self, validated_data):
