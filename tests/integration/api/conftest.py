@@ -50,13 +50,12 @@ def admin_user(default_organization):
         password=ADMIN_PASSWORD,
         email="admin@localhost",
     )
-    organization = models.Organization.objects.get_default()
     admin_role = RoleDefinition.objects.create(
         name="Test Admin",
-        content_type=ContentType.objects.get_for_model(organization),
+        content_type=ContentType.objects.get_for_model(default_organization),
     )
     admin_role.permissions.add(*DABPermission.objects.all())
-    admin_role.give_permission(user, organization)
+    admin_role.give_permission(user, default_organization)
     return user
 
 
