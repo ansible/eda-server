@@ -83,7 +83,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
                 " the delay, in seconds, between restarts"
                 "; it must be an integer greater than or equal to"
                 f" {RestartCompletionInterval.MINIMUM}"
-                " indicating the delay, in seconds, between restarts"
                 f"; system settings = {RestartCompletionInterval.SETTINGS}"
                 f", default = {RestartCompletionInterval.DEFAULT}",
             ),
@@ -98,7 +97,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
                 " the delay, in seconds, between restarts"
                 "; it must be an integer greater than or equal to "
                 f" {RestartFailureInterval.MINIMUM}"
-                " indicating the delay, in seconds, between restarts"
                 f"; system settings = {RestartFailureInterval.SETTINGS}"
                 f", default = {RestartFailureInterval.DEFAULT}",
             ),
