@@ -413,17 +413,36 @@ def audit_event_3(
 
 
 @pytest.fixture
-def default_extra_var(
-    default_organization: models.Organization,
-) -> models.ExtraVar:
-    """Return a default ExtraVar"""
-    return models.ExtraVar.objects.create(
-        extra_var="""
+def extra_var_data() -> str:
+    return """
         ---
         collections:
         - community.general
         - benthomasson.eda
-        """,
+        """.strip()
+
+
+@pytest.fixture
+def vault_extra_var_data() -> str:
+    return """
+        limit: !vault |
+                $ANSIBLE_VAULT;1.1;AES256
+                32323466393537363831636134336565656265336564633366396632616431376363353231396562
+                6334646433623764383863656365386363616136633138390a656331383939323930383061363262
+                62376665646431376464653831633634356432323531613661346339643032356366613564386333
+                6433633539353862620a343931393734343437613666343039643764333162303436306434663737
+                3633
+        """.strip()
+
+
+@pytest.fixture
+def default_extra_var(
+    default_organization: models.Organization,
+    extra_var_data: str,
+) -> models.ExtraVar:
+    """Return a default ExtraVar"""
+    return models.ExtraVar.objects.create(
+        extra_var=extra_var_data,
         organization=default_organization,
     )
 
