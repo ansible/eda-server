@@ -19,7 +19,7 @@ from django.utils.timezone import now
 from rest_framework.test import APIClient
 
 from aap_eda.core.management.commands.create_initial_data import Command
-from aap_eda.core.models import User
+from aap_eda.core.models import RulebookProcess, User
 
 
 # Fixtures copied from DAB because authenticator app is not yet used here
@@ -64,6 +64,10 @@ class ModelFactory:
 
     def fk_fields(self, cls):
         for field in cls._meta.concrete_fields:
+            # corner case for when either an activation or a event_stream
+            # must be set, but not both
+            if cls == RulebookProcess and field.name == "event_stream":
+                continue
             if isinstance(field, ForeignKey):
                 yield field
 
