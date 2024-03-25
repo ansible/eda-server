@@ -313,35 +313,6 @@ def test_create_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_create_activation_with_system_vault_credential(client: APIClient):
-    fks = create_activation_related_data()
-    test_activation = TEST_ACTIVATION.copy()
-    test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["rulebook_id"] = fks["rulebook_id"]
-    test_activation["extra_var_id"] = fks["extra_var_id"]
-
-    event_stream = models.EventStream.objects.create(
-        name="test_event_stream",
-        source_type="test_source_type",
-        source_args="test_source_args",
-        user_id=fks["user_id"],
-        decision_environment_id=fks["decision_environment_id"],
-    )
-    test_activation["event_streams"] = [event_stream.id]
-
-    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
-    assert response.status_code == status.HTTP_201_CREATED
-    data = response.data
-    activation = models.Activation.objects.filter(id=data["id"]).first()
-    assert activation.system_vault_credential is not None
-    assert (
-        activation.system_vault_credential.credential_type
-        == enums.CredentialType.VAULT
-    )
-
-
-@pytest.mark.django_db
 def test_create_activation_disabled(client: APIClient):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()

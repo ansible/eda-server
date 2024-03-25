@@ -36,11 +36,11 @@ def check_if_rulebook_exists(rulebook_id: int) -> int:
 def check_if_de_exists(decision_environment_id: int) -> int:
     try:
         de = models.DecisionEnvironment.objects.get(pk=decision_environment_id)
-        if de.credential_id:
-            models.Credential.objects.get(pk=de.credential_id)
-    except models.Credential.DoesNotExist:
+        if de.eda_credential_id:
+            models.EdaCredential.objects.get(pk=de.eda_credential_id)
+    except models.EdaCredential.DoesNotExist:
         raise serializers.ValidationError(
-            f"Credential with id {de.credential_id} does not exist"
+            f"Credential with id {de.eda_credential_id} does not exist"
         )
     except models.DecisionEnvironment.DoesNotExist:
         raise serializers.ValidationError(

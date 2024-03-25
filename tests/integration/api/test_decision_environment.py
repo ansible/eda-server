@@ -13,7 +13,6 @@ class InitData:
     project: models.Project
     activation: models.Activation
     decision_environment: models.DecisionEnvironment
-    credential: models.Credential
     eda_credential: models.EdaCredential
     rulebook: models.Rulebook
     ruleset: models.Ruleset
@@ -195,10 +194,6 @@ def init_db():
         url="https://github.com/eda-project",
     )
 
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
-
     eda_credential = models.EdaCredential.objects.create(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
@@ -207,7 +202,6 @@ def init_db():
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de1",
         image_url="registry.com/img1:tag1",
-        credential=credential,
     )
 
     rulebook = models.Rulebook.objects.create(
@@ -259,7 +253,6 @@ def init_db():
         activation=activation,
         project=project,
         decision_environment=decision_environment,
-        credential=credential,
         eda_credential=eda_credential,
         rulebook=rulebook,
         ruleset=ruleset,

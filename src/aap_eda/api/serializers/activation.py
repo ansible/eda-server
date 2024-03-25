@@ -25,7 +25,6 @@ from aap_eda.api.constants import (
     PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
 )
 from aap_eda.api.exceptions import InvalidEventStreamRulebook
-from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -68,15 +67,6 @@ def _updated_ruleset(validated_data):
             password = ""
             if bool(encrypt_vars):
                 password = secrets.token_urlsafe()
-
-                validated_data[
-                    "system_vault_credential"
-                ] = models.Credential.objects.create(
-                    name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
-                    credential_type=CredentialType.VAULT,
-                    vault_identifier=EDA_SERVER_VAULT_LABEL,
-                    secret=password,
-                )
 
             extra_vars = substitute_extra_vars(
                 event_stream.__dict__, extra_vars, encrypt_vars, password
@@ -163,12 +153,6 @@ def _get_vault_credential_type():
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
-    credentials = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=CredentialSerializer(),
-    )
-
     event_streams = serializers.ListField(
         required=False,
         allow_null=True,
@@ -203,7 +187,6 @@ class ActivationSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
-            "credentials",
             "event_streams",
             "eda_credentials",
             "log_level",
@@ -221,11 +204,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
 
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
-    credentials = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=CredentialSerializer(),
-    )
 
     event_streams = serializers.ListField(
         required=False,
@@ -260,7 +238,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
-            "credentials",
             "event_streams",
             "log_level",
             "eda_credentials",
@@ -271,10 +248,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
-        credentials = [
-            CredentialSerializer(credential).data
-            for credential in activation.credentials.all()
-        ]
         event_streams = [
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
@@ -304,7 +277,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
-            "credentials": credentials,
             "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
@@ -326,7 +298,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "awx_token_id",
-            "credentials",
             "event_streams",
             "log_level",
             "eda_credentials",
@@ -349,11 +320,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_if_awx_token_exists],
         required=False,
-    )
-    credentials = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=serializers.IntegerField(),
     )
     event_streams = serializers.ListField(
         required=False,
@@ -500,7 +466,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at",
             "status_message",
             "awx_token_id",
-            "credentials",
             "eda_credentials",
             "event_streams",
             "log_level",
@@ -545,10 +510,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if len(activation_instances) > 1 and activation.restart_count > 0
             else None
         )
-        credentials = [
-            CredentialSerializer(credential).data
-            for credential in activation.credentials.all()
-        ]
 
         event_streams = [
             EventStreamOutSerializer(event_stream).data
@@ -584,7 +545,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
-            "credentials": credentials,
             "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
