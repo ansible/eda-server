@@ -162,17 +162,15 @@ def test_manage_not_start(start_mock, activation, max_running_processes):
         (orchestrator.restart_rulebook_process, ActivationRequest.RESTART),
     ],
 )
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator._enqueue_process")
 def test_activation_requests(
     enqueue_mock, activation, command, queued_request
 ):
     command(ProcessParentType.ACTIVATION, activation.id)
     enqueue_args = [
-        "activation",
         orchestrator._manage_process_job_id(
             ProcessParentType.ACTIVATION, activation.id
         ),
-        orchestrator._manage,
         ProcessParentType.ACTIVATION,
         activation.id,
     ]
@@ -185,17 +183,15 @@ def test_activation_requests(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator._enqueue_process")
 def test_monitor_rulebook_processes(
     enqueue_mock, activation, max_running_processes
 ):
     call_args = [
         mock.call(
-            "activation",
             orchestrator._manage_process_job_id(
                 ProcessParentType.ACTIVATION, activation.id
             ),
-            orchestrator._manage,
             ProcessParentType.ACTIVATION,
             activation.id,
         )
@@ -203,11 +199,9 @@ def test_monitor_rulebook_processes(
     for running in max_running_processes:
         call_args.append(
             mock.call(
-                "activation",
                 orchestrator._manage_process_job_id(
                     ProcessParentType.ACTIVATION, running.id
                 ),
-                orchestrator._manage,
                 ProcessParentType.ACTIVATION,
                 running.id,
             )

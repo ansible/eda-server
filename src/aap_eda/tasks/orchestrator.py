@@ -121,6 +121,44 @@ def _run_request(
     return True
 
 
+def _enqueue_process(
+    job_id: str,
+    process_parent_type: ProcessParentType,
+    parent_id: int,
+    *args,
+    **kwargs,
+) -> None:
+    match process_parent_type:
+        case ProcessParentType.ACTIVATION:
+            klass = Activation
+        case ProcessParentType.EVENT_STREAM:
+            klass = EventStream
+        case _:
+            raise ValueError(
+                f"unknown process type '{process_parent_type}' specified"
+            )
+    try:
+        process_parent = klass.objects.get(id=parent_id)
+    except ObjectDoesNotExist:
+        LOGGER.warning(
+            f"{process_parent_type} with {parent_id} no longer exists, "
+            "job will not be enqueued",
+        )
+        return
+
+    unique_enqueue(
+        "activation",
+        job_id,
+        _manage,
+        process_parent_type,
+        parent_id,
+        result_ttl=process_parent.effective_retention_success_period,
+        failure_ttl=process_parent.effective_retention_failure_period,
+        *args,
+        **kwargs,
+    )
+
+
 def _make_user_request(
     process_parent_type: ProcessParentType,
     id: int,
@@ -129,7 +167,7 @@ def _make_user_request(
     """Enqueue a task to manage the activation with the given id."""
     requests_queue.push(process_parent_type, id, request_type)
     job_id = _manage_process_job_id(process_parent_type, id)
-    unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+    _enqueue_process(job_id, process_parent_type, id)
 
 
 def start_rulebook_process(
@@ -172,7 +210,7 @@ def monitor_rulebook_processes() -> None:
     # run pending user requests
     for process_parent_type, id in requests_queue.list_requests():
         job_id = _manage_process_job_id(process_parent_type, id)
-        unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+        _enqueue_process(job_id, process_parent_type, id)
 
     # monitor running instances
     for process in models.RulebookProcess.objects.filter(
@@ -184,4 +222,4 @@ def monitor_rulebook_processes() -> None:
         else:
             id = process.event_stream_id
         job_id = _manage_process_job_id(process_parent_type, id)
-        unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+        _enqueue_process(job_id, process_parent_type, id)
