@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import base64
-import json
 import logging
 import os
 
@@ -23,6 +21,7 @@ from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
+from rq.timeouts import JobTimeoutException
 
 from aap_eda.core.enums import ActivationStatus
 
@@ -31,7 +30,6 @@ from .common import (
     ContainerEngine,
     ContainerRequest,
     ContainerStatus,
-    Credential,
     LogHandler,
 )
 
@@ -63,6 +61,7 @@ class Engine(ContainerEngine):
     def __init__(
         self,
         _activation_id: str,
+        _resource_prefix: str = None,
         client=None,
     ) -> None:
         try:
@@ -71,6 +70,7 @@ class Engine(ContainerEngine):
             else:
                 self.client = get_podman_client()
             LOGGER.debug(self.client.version())
+
         except APIError as e:
             LOGGER.error(f"Failed to initialize podman engine: f{e}")
             raise exceptions.ContainerEngineInitError(str(e))
@@ -97,6 +97,11 @@ class Engine(ContainerEngine):
         # ContainerCleanupError handled by the manager
         except APIError as e:
             raise exceptions.ContainerCleanupError(str(e)) from e
+        finally:
+            # Ensure volumes are purged due to a bug in podman
+            # ref: https://github.com/containers/podman-py/issues/328
+            pruned_volumes = self.client.volumes.prune()
+            LOGGER.info(f"Pruned volumes: {pruned_volumes}")
 
     def _image_exists(self, image_url: str) -> bool:
         try:
@@ -110,7 +115,6 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerStartError("Missing image url")
 
         try:
-            self._set_auth_json_file()
             self._login(request)
             LOGGER.info(f"Image URL is {request.image_url}")
             if request.pull_policy == "Always" or not self._image_exists(
@@ -120,11 +124,12 @@ class Engine(ContainerEngine):
 
             log_handler.write("Starting Container", True)
             command = request.cmdline.command_and_args()
-            log_handler.write(f"Container args {command}", True)
+            command_log = request.cmdline.command_and_args(sanitized=True)
+            log_handler.write(f"Container args {command_log}", True)
             pod_args = self._load_pod_args(request)
             LOGGER.info(
                 "Creating container: "
-                f"command: {command}, "
+                f"command: {command_log}, "
                 f"pod_args: {pod_args}"
             )
             container = self.client.containers.run(
@@ -143,7 +148,7 @@ class Engine(ContainerEngine):
                 f"id: {container.id}, "
                 f"ports: {container.ports}, "
                 f"status: {container.status}, "
-                f"command: {command}, "
+                f"command: {command_log}, "
                 f"pod_args: {pod_args}"
             )
 
@@ -168,7 +173,9 @@ class Engine(ContainerEngine):
         container = self.client.containers.get(container_id)
         error_msg = container.attrs.get("State").get("Error", "")
 
-        if container.status == "exited":
+        # Check container status
+        # Ref: https://github.com/containers/podman/blob/main/libpod/define/containerstate.go # noqa: E501
+        if container.status in ["exited", "stopped"]:
             exit_code = container.attrs.get("State").get("ExitCode")
             if exit_code == 0:
                 message = messages.POD_COMPLETED.format(
@@ -187,13 +194,15 @@ class Engine(ContainerEngine):
                 status=ActivationStatus.FAILED,
                 message=error_msg,
             )
-        if container.status == "running":
+
+        if container.status in ["running", "stopping"]:
             return ContainerStatus(
                 status=ActivationStatus.RUNNING,
                 message=messages.POD_RUNNING.format(
                     pod_id=container_id,
                 ),
             )
+
         if container.status == "created":
             if not error_msg:
                 error_msg = messages.POD_NOT_RUNNING.format(
@@ -204,19 +213,30 @@ class Engine(ContainerEngine):
                 status=ActivationStatus.FAILED,
                 message=error_msg,
             )
-        if container.status == "paused":
+
+        # Not expected statuses
+        if container.status in [
+            "paused",
+            "restarting",
+            "removing",
+            "dead",
+            "configured",
+            "unknown",
+        ]:
             return ContainerStatus(
                 status=ActivationStatus.FAILED,
-                message=messages.POD_PAUSED.format(
+                message=messages.POD_WRONG_STATE.format(
                     pod_id=container_id,
+                    pod_state=container.status,
                 ),
             )
 
-        # container.status == "unknown":
+        # undocumented status, fail safe
         return ContainerStatus(
             status=ActivationStatus.ERROR,
-            message=messages.POD_ERROR.format(
+            message=messages.POD_UNEXPECTED.format(
                 pod_id=container_id,
+                pod_state=container.status,
             ),
         )
 
@@ -230,24 +250,36 @@ class Engine(ContainerEngine):
             since = None
             log_read_at = log_handler.get_log_read_at()
             if log_read_at:
-                since = int(log_handler.get_log_read_at().timestamp()) + 1
+                since = int(log_handler.get_log_read_at().timestamp())
 
-            container = self.client.containers.get(container_id)
             log_args = {"timestamps": True, "stderr": True}
+            last_timestamp = None
+            num_wrote_lines = 0
             if since:
                 log_args["since"] = since
-            timestamp = None
-            for logline in container.logs(**log_args):
+                num_wrote_lines = log_handler.num_log_write_from(since)
+
+            container = self.client.containers.get(container_id)
+
+            for i, logline in enumerate(container.logs(**log_args)):
+                if i < num_wrote_lines:
+                    continue
+
                 log = logline.decode("utf-8").strip()
                 log_parts = log.split(" ", 1)
-                timestamp = log_parts[0]
+                last_timestamp = log_parts[0]
                 if len(log_parts) > 1:
                     log_handler.write(
-                        lines=log_parts[1], flush=False, timestamp=False
+                        lines=log_parts[1],
+                        flush=False,
+                        timestamp=False,
+                        log_timestamp=int(
+                            parser.parse(last_timestamp).timestamp()
+                        ),
                     )
 
-            if timestamp:
-                dt = parser.parse(timestamp)
+            if last_timestamp:
+                dt = parser.parse(last_timestamp)
                 log_handler.flush()
                 log_handler.set_log_read_at(dt)
 
@@ -295,44 +327,6 @@ class Engine(ContainerEngine):
             LOGGER.exception("Login failed: f{e}")
             raise exceptions.ContainerStartError(str(e))
 
-    def _write_auth_json(self, request: ContainerRequest) -> None:
-        if not self.auth_file:
-            LOGGER.debug("No auth file to create")
-            return
-
-        auth_dict = {}
-        if os.path.exists(self.auth_file):
-            with open(self.auth_file) as f:
-                auth_dict = json.load(f)
-
-        if "auths" not in auth_dict:
-            auth_dict["auths"] = {}
-        registry = request.image_url.split("/")[0]
-        auth_dict["auths"][registry] = self._create_auth_key(
-            request.credential
-        )
-
-        with open(self.auth_file, "w") as f:
-            json.dump(auth_dict, f, indent=6)
-
-    def _create_auth_key(self, credential: Credential) -> dict:
-        data = f"{credential.username}:{credential.secret}"
-        encoded_data = data.encode("ascii")
-        return {"auth": base64.b64encode(encoded_data).decode("ascii")}
-
-    def _set_auth_json_file(self) -> None:
-        xdg_runtime_dir = os.getenv(
-            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-        )
-        auth_file = f"{xdg_runtime_dir}/containers/auth.json"
-        dir_name = os.path.dirname(auth_file)
-        if os.path.exists(dir_name):
-            self.auth_file = auth_file
-            LOGGER.debug("Will use auth file %s", auth_file)
-        else:
-            self.auth_file = None
-            LOGGER.debug("Will not use auth file")
-
     def _pull_image(
         self, request: ContainerRequest, log_handler: LogHandler
     ) -> Image:
@@ -345,7 +339,6 @@ class Engine(ContainerEngine):
                     "username": request.credential.username,
                     "password": request.credential.secret,
                 }
-                self._write_auth_json(request)
             image = self.client.images.pull(request.image_url, **kwargs)
 
             # https://github.com/containers/podman-py/issues/301
@@ -358,14 +351,19 @@ class Engine(ContainerEngine):
                 raise exceptions.ContainerImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
-        except ImageNotFound:
+        except ImageNotFound as e:
             msg = f"Image {request.image_url} not found"
-            LOGGER.exception(msg)
+            LOGGER.error(msg)
             log_handler.write(msg, True)
-            raise exceptions.ContainerImagePullError(msg)
+            raise exceptions.ContainerImagePullError(msg) from e
         except APIError as e:
-            LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
+            LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
+        except JobTimeoutException as e:
+            msg = f"Timeout: {e}"
+            LOGGER.error(msg)
+            log_handler.write(msg, True)
+            raise exceptions.ContainerImagePullError(msg) from e
 
     def _load_pod_args(self, request: ContainerRequest) -> dict:
         pod_args = {"name": request.name}

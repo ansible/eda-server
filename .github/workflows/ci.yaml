@@ -7,7 +7,6 @@ on:
   push:
     branches: [ 'main' ]
   pull_request:
-    branches: [ 'main' ]
   merge_group:
     branches: [ 'main' ]
 
@@ -28,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.11'
           cache: 'poetry'
 
       - name: Install dependencies
@@ -49,12 +48,16 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.11"
     env:
       EDA_SECRET_KEY: 'test'
       EDA_DB_PASSWORD: 'secret'
     services:
       postgres:
-        image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+        image: 'quay.io/sclorg/postgresql-15-c9s:latest'
         env:
           POSTGRESQL_USER: eda
           POSTGRESQL_PASSWORD: secret
@@ -80,20 +83,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-      - name: Install LDAP dependencies
-        run: |
-            set -ex
-            sudo apt update
-            sudo apt install python3-dev libldap2-dev libsasl2-dev libssl-dev libxmlsec1 libxmlsec1-dev
-
       - name: Install poetry
         run: pipx install poetry
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: ${{ matrix.python-version }}
           cache: 'poetry'
 
       - name: Install package
@@ -111,6 +107,6 @@ jobs:
           env_vars: OS,PYTHON
           fail_ci_if_error: false
           files: ./coverage.xml
-          flags: "unit-int-tests"
+          flags: "unit-int-tests-${{ matrix.python-version }}"
           name: codecov-umbrella
           verbose: true

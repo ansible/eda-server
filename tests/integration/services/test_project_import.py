@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
+import logging
 import os
 import re
 import shutil
@@ -92,6 +93,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
     for project in projects:
         service = ProjectImportService(git_cls=git_mock)
         service.import_project(project)
+        project.refresh_from_db()
 
         git_mock.clone.assert_called_with(
             project.url,
@@ -137,6 +139,7 @@ def test_project_import_with_new_layout(
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -173,6 +176,35 @@ def test_project_import_rulebook_directory_missing(
     assert project.import_error == message_expected
 
 
+@pytest.mark.django_db
+def test_project_import_with_vaulted_data(
+    storage_save_patch, service_tempdir_patch
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-04"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    project = models.Project.objects.create(
+        name="test-project-04", url="https://git.example.com/repo.git"
+    )
+
+    service = ProjectImportService(git_cls=git_mock)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+
+
 def _setup_project_sync():
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-02"
@@ -191,6 +223,7 @@ def _setup_project_sync():
 
     service = ProjectImportService(git_cls=git_mock)
     service.import_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -221,6 +254,7 @@ def test_project_sync(storage_save_patch, service_tempdir_patch):
 
     service = ProjectImportService(git_cls=git_mock)
     service.sync_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -253,6 +287,7 @@ def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
 
     service = ProjectImportService(git_cls=git_mock)
     service.sync_project(project)
+    project.refresh_from_db()
 
     assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     assert project.import_state == models.Project.ImportState.COMPLETED
@@ -265,6 +300,51 @@ def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
     for rulebook, expected in zip(rulebooks, expected_rulebooks):
         assert_rulebook_is_valid(rulebook, expected)
     storage_save_patch.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_project_import_with_invalid_rulebooks(
+    storage_save_patch, service_tempdir_patch, caplog
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-05"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+
+    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock.clone.side_effect = clone_project
+
+    project = models.Project.objects.create(
+        name="test-project-04", url="https://git.example.com/repo.git"
+    )
+
+    logger = logging.getLogger("aap_eda")
+    propagate = logger.propagate
+    logger.propagate = True
+    caplog.set_level(logging.WARNING)
+    try:
+        service = ProjectImportService(git_cls=git_mock)
+        service.import_project(project)
+        project.refresh_from_db()
+    finally:
+        logger.propagate = propagate
+
+    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+    assert caplog.text.count("WARNING") == 10
+
+    rulebooks = list(project.rulebook_set.order_by("name"))
+    assert len(rulebooks) == 1
+
+    with open(DATA_DIR / "project-05-import.json") as fp:
+        expected_rulebooks = json.load(fp)
+    for rulebook, expected in zip(rulebooks, expected_rulebooks):
+        assert_rulebook_is_valid(rulebook, expected)
 
 
 def assert_rulebook_is_valid(rulebook: models.Rulebook, expected: dict):

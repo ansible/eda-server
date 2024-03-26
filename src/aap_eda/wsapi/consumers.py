@@ -1,15 +1,18 @@
 import base64
 import json
 import logging
+import typing as tp
 from datetime import datetime
 from enum import Enum
 
+import yaml
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
+from aap_eda.core.enums import DefaultCredentialType
 
 from .messages import (
     ActionMessage,
@@ -20,6 +23,8 @@ from .messages import (
     HeartbeatMessage,
     JobMessage,
     Rulebook,
+    VaultCollection,
+    VaultPassword,
     WorkerMessage,
 )
 
@@ -98,9 +103,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
 
-        if msg_type != MessageType.SHUTDOWN:
-            await self.send(text_data=json.dumps({"type": "Hello"}))
-
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
         rulesets, extra_var = await self.get_resources(message.activation_id)
@@ -114,14 +116,21 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             await self.send(text_data=extra_var_message.json())
 
-        controller_info = ControllerInfo(
-            url=settings.EDA_CONTROLLER_URL,
-            token=await self.get_awx_token(message),
-            ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
-        )
-
         await self.send(text_data=rulebook_message.json())
-        await self.send(text_data=controller_info.json())
+        awx_token = await self.get_awx_token(message)
+        if awx_token:
+            controller_info = ControllerInfo(
+                url=settings.EDA_CONTROLLER_URL,
+                token=awx_token,
+                ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
+            )
+            await self.send(text_data=controller_info.json())
+
+        eda_vault_data = await self.get_eda_system_vault_passwords(message)
+        if eda_vault_data:
+            vault_collection = VaultCollection(data=eda_vault_data)
+            await self.send(text_data=vault_collection.json())
+
         await self.send(text_data=EndOfResponse().json())
 
         # TODO: add broadcasting later by channel groups
@@ -142,7 +151,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
         logger.info(f"Start to handle heartbeat: {message}")
 
-        instance = models.ActivationInstance.objects.filter(
+        instance = models.RulebookProcess.objects.filter(
             id=message.activation_id
         ).first()
 
@@ -150,7 +159,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             instance.updated_at = message.reported_at
             instance.save(update_fields=["updated_at"])
 
-            activation = instance.activation
+            activation = instance.get_parent()
             activation.ruleset_stats[
                 message.stats["ruleSetName"]
             ] = message.stats
@@ -209,9 +218,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def insert_audit_rule_data(self, message: ActionMessage) -> None:
-        job_id = message.job_id
-        job_instance = models.JobInstance.objects.filter(uuid=job_id).first()
-        job_instance_id = job_instance.id if job_instance else None
+        job_instance_id = None
+        if message.job_id:
+            job_instance = models.JobInstance.objects.filter(
+                uuid=message.job_id
+            ).first()
+            job_instance_id = job_instance.id if job_instance else None
 
         audit_rule = models.AuditRule.objects.filter(
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
@@ -252,6 +264,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 status=message.status,
                 rule_fired_at=message.rule_run_at,
                 audit_rule_id=audit_rule.id,
+                status_message=message.message,
             )
 
             logger.info(f"Audit action [{audit_action.name}] is created.")
@@ -303,14 +316,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_resources(
-        self, activation_instance_id: str
+        self, rulebook_process_id: str
     ) -> tuple[str, models.ExtraVar]:
-        activation_instance = models.ActivationInstance.objects.get(
-            id=activation_instance_id
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=rulebook_process_id
         )
-        activation = models.Activation.objects.get(
-            id=activation_instance.activation_id
-        )
+        activation = rulebook_process_instance.get_parent()
 
         if activation.extra_var_id:
             extra_var = models.ExtraVar.objects.filter(
@@ -322,15 +333,49 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return activation.rulebook_rulesets, extra_var
 
     @database_sync_to_async
-    def get_awx_token(self, message):
-        # query for activation
-        activation_instance = models.ActivationInstance.objects.get(
-            id=message.activation_id
+    def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
+        """Get AWX token from the worker message."""
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
         )
+        parent = rulebook_process_instance.get_parent()
+        if not hasattr(parent, "awx_token"):
+            return None
 
-        # check/get AWX token
-        awx_token = models.AwxToken.objects.filter(
-            user_id=activation_instance.activation.user_id
-        ).first()
+        awx_token = parent.awx_token
+        return awx_token.token.get_secret_value() if awx_token else None
 
-        return awx_token.token.get_secret_value()
+    @database_sync_to_async
+    def get_eda_system_vault_passwords(
+        self, message: WorkerMessage
+    ) -> tp.List[VaultPassword]:
+        """Get vault info from activation."""
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        activation = rulebook_process_instance.get_parent()
+        vault_passwords = []
+
+        if activation.eda_system_vault_credential:
+            vault = models.EdaCredential.objects.filter(
+                id=activation.eda_system_vault_credential.id
+            )
+        else:
+            vault = models.EdaCredential.objects.none()
+
+        vault_credential_type = models.CredentialType.objects.get(
+            name=DefaultCredentialType.VAULT
+        )
+        for credential in activation.eda_credentials.filter(
+            credential_type_id=vault_credential_type.id
+        ).union(vault):
+            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+            vault_passwords.append(
+                VaultPassword(
+                    label=inputs["vault_id"],
+                    password=inputs["vault_password"],
+                )
+            )
+
+        return vault_passwords

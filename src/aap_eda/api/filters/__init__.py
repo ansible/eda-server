@@ -17,8 +17,10 @@ from .activation import (
     ActivationInstanceFilter,
     ActivationInstanceLogFilter,
 )
-from .credential import CredentialFilter
+from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
+from .eda_credential import EdaCredentialFilter
+from .event_stream import EventStreamFilter
 from .project import ProjectFilter
 from .role import RoleFilter
 from .rulebook import (
@@ -26,7 +28,6 @@ from .rulebook import (
     AuditRuleEventFilter,
     AuditRuleFilter,
     RulebookFilter,
-    RulesetFilter,
 )
 from .user import UserFilter
 
@@ -35,12 +36,12 @@ __all__ = (
     "ProjectFilter",
     # rulebook
     "RulebookFilter",
-    "RulesetFilter",
     "AuditRuleFilter",
     "AuditRuleActionFilter",
     "AuditRuleEventFilter",
-    # credential
-    "CredentialFilter",
+    # credential type
+    "CredentialTypeFilter",
+    "EdaCredentialFilter",
     # decision_environment
     "DecisionEnvironmentFilter",
     # activation instance
@@ -51,4 +52,6 @@ __all__ = (
     "UserFilter",
     # role
     "RoleFilter",
+    # event_stream
+    "EventStreamFilter",
 )

@@ -25,13 +25,13 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerUpdateLogsError,
 )
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class DBLogger(LogHandler):
     def __init__(self, activation_instance_id: int):
-        self.line_number = 0
         self.activation_instance_id = activation_instance_id
+        self.line_number = self.num_of_log_lines()
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
             self.incremental_flush = False
@@ -47,6 +47,7 @@ class DBLogger(LogHandler):
         lines: Union[list[str], str],
         flush: bool = False,
         timestamp: bool = True,
+        log_timestamp: int = 0,
     ) -> None:
         if self.incremental_flush and self.line_number % self.flush_after == 0:
             self.flush()
@@ -60,10 +61,11 @@ class DBLogger(LogHandler):
                 line = f"{dt} {line}"
 
             self.activation_instance_log_buffer.append(
-                models.ActivationInstanceLog(
-                    line_number=self.line_number,
+                models.RulebookProcessLog(
+                    line_number=self.num_of_log_lines(),
                     log=line,
                     activation_instance_id=self.activation_instance_id,
+                    log_timestamp=log_timestamp,
                 )
             )
             self.line_number += 1
@@ -74,7 +76,7 @@ class DBLogger(LogHandler):
     def flush(self) -> None:
         try:
             if self.activation_instance_log_buffer:
-                models.ActivationInstanceLog.objects.bulk_create(
+                models.RulebookProcessLog.objects.bulk_create(
                     self.activation_instance_log_buffer
                 )
         except IntegrityError:
@@ -87,7 +89,7 @@ class DBLogger(LogHandler):
 
     def get_log_read_at(self) -> Optional[datetime]:
         try:
-            activation_instance = models.ActivationInstance.objects.get(
+            activation_instance = models.RulebookProcess.objects.get(
                 pk=self.activation_instance_id
             )
 
@@ -97,10 +99,30 @@ class DBLogger(LogHandler):
 
     def set_log_read_at(self, dt: datetime) -> None:
         try:
-            activation_instance = models.ActivationInstance.objects.get(
+            activation_instance = models.RulebookProcess.objects.get(
                 pk=self.activation_instance_id
             )
             activation_instance.log_read_at = dt
             activation_instance.save(update_fields=["log_read_at"])
+        except IntegrityError as e:
+            raise ContainerUpdateLogsError(str(e))
+
+    def num_of_log_lines(self) -> int:
+        return models.RulebookProcessLog.objects.filter(
+            activation_instance_id=self.activation_instance_id,
+        ).count()
+
+    def num_log_write_from(self, log_timestamp: int) -> int:
+        return models.RulebookProcessLog.objects.filter(
+            activation_instance_id=self.activation_instance_id,
+            log_timestamp=log_timestamp,
+        ).count()
+
+    def clear_log_write_from(self, log_timestamp: int) -> int:
+        try:
+            models.RulebookProcessLog.objects.filter(
+                activation_instance_id=self.activation_instance_id,
+                log_timestamp=log_timestamp,
+            ).delete()
         except IntegrityError as e:
             raise ContainerUpdateLogsError(str(e))

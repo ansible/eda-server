@@ -15,6 +15,7 @@
 from enum import Enum
 
 
+# TODO(alex): migrate to django.db.models.TextChoices
 class DjangoStrEnum(str, Enum):
     @classmethod
     def choices(cls):
@@ -42,15 +43,16 @@ class ResourceType(DjangoStrEnum):
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
     AUDIT_EVENT = "audit_event"
-    TASK = "task"
     USER = "user"
     PROJECT = "project"
-    INVENTORY = "inventory"
     EXTRA_VAR = "extra_var"
     RULEBOOK = "rulebook"
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
     CREDENTIAL = "credential"
+    CREDENTIAL_TYPE = "credential_type"
+    EDA_CREDENTIAL = "eda_credential"
+    EVENT_STREAM = "event_stream"
 
 
 class Action(DjangoStrEnum):
@@ -63,13 +65,7 @@ class Action(DjangoStrEnum):
     RESTART = "restart"
 
 
-class InventorySource(DjangoStrEnum):
-    PROJECT = "project"
-    COLLECTION = "collection"
-    USER_DEFINED = "user_defined"
-    EXECUTION_ENV = "execution_env"
-
-
+# TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 class ActivationStatus(DjangoStrEnum):
     STARTING = "starting"
     RUNNING = "running"
@@ -85,12 +81,24 @@ class ActivationStatus(DjangoStrEnum):
     ERROR = "error"
 
 
+# TODO: Deprecated, will be removed in future version, use
+# DefaultCredentialType instead
 class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
+    VAULT = "Vault"
 
 
+class DefaultCredentialType(DjangoStrEnum):
+    REGISTRY = "Container Registry"
+    VAULT = "Vault"
+    SOURCE_CONTROL = "Source Control"
+    AAP = "Red Hat Ansible Automation Platform"
+    GPG = "GPG Public Key"
+
+
+# TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.PENDING: "Wait for a worker to be available to start activation",  # noqa: E501
     ActivationStatus.STARTING: "Worker is starting activation",
@@ -105,9 +113,25 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
 }
 
 
+# TODO: rename to "RulebookProcessRequest"
 class ActivationRequest(DjangoStrEnum):
     START = "start"
     STOP = "stop"
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+
+
+class ProcessParentType(DjangoStrEnum):
+    """Types of parent objects for a rulebook process."""
+
+    ACTIVATION = "activation"
+    EVENT_STREAM = "event_stream"
+
+
+class RulebookProcessLogLevel(DjangoStrEnum):
+    """Types of log levels for a rulebook process."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    ERROR = "error"

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import yaml
 from django.db import models
 
 __all__ = (
@@ -36,10 +37,26 @@ class Rulebook(models.Model):
     name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
     # TODO: this field should not have a default value.
+    # TODO: should the content of this field be validated?
+    # https://issues.redhat.com/browse/AAP-19202
     rulesets = models.TextField(null=False, default="")
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    # For instrospection purposes we need to return
+    # rulesets data unserialized.
+    def get_rulesets_data(self) -> list[dict]:
+        """Return rulesets data as a list of dicts."""
+        try:
+            return yaml.safe_load(self.rulesets)
+        except yaml.YAMLError as e:
+            raise ValueError(
+                (
+                    "Unable to parse rulesets data for rulebook "
+                    f" {self.id} - {self.name}: Error: {e}"
+                )
+            )
 
 
 class Ruleset(models.Model):
@@ -83,7 +100,7 @@ class AuditRule(models.Model):
     ruleset_uuid = models.UUIDField(null=True)
     ruleset_name = models.TextField(null=True)
     activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.SET_NULL, null=True
+        "RulebookProcess", on_delete=models.SET_NULL, null=True
     )
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.SET_NULL, null=True
@@ -102,6 +119,7 @@ class AuditAction(models.Model):
     url = models.URLField(blank=True)
     fired_at = models.DateTimeField()
     rule_fired_at = models.DateTimeField(null=True)
+    status_message = models.TextField(null=True, default=None)
 
     audit_rule = models.ForeignKey(
         "AuditRule", on_delete=models.CASCADE, null=True

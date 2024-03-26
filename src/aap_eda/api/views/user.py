@@ -227,7 +227,9 @@ class UserViewSet(
     ResponseSerializerMixin,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.User.objects.order_by("id")
+    queryset = models.User.objects.filter(is_service_account=False).order_by(
+        "id"
+    )
     filter_backends = (DjangoFilterBackend,)
     filterset_class = filters.UserFilter
 

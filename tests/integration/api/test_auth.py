@@ -19,7 +19,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient, RequestsClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -145,12 +145,17 @@ def test_retrieve_role(client: APIClient, init_db):
         "description": init_db.role.description,
         "permissions": [
             {
-                "resource_type": "activation_instance",
-                "action": ["read", "delete"],
+                "resource_type": str(enums.ResourceType.ACTIVATION_INSTANCE),
+                "action": [str(enums.Action.READ), str(enums.Action.DELETE)],
             },
             {
-                "resource_type": "user",
-                "action": ["create", "read", "update", "delete"],
+                "resource_type": str(enums.ResourceType.USER),
+                "action": [
+                    str(enums.Action.CREATE),
+                    str(enums.Action.READ),
+                    str(enums.Action.UPDATE),
+                    str(enums.Action.DELETE),
+                ],
             },
         ],
         "created_at": init_db.role.created_at.strftime(DATETIME_FORMAT),

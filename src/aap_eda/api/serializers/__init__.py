@@ -32,11 +32,25 @@ from .credential import (
     CredentialRefSerializer,
     CredentialSerializer,
 )
+from .credential_type import (
+    CredentialTypeCreateSerializer,
+    CredentialTypeRefSerializer,
+    CredentialTypeSerializer,
+)
 from .decision_environment import (
     DecisionEnvironmentCreateSerializer,
     DecisionEnvironmentReadSerializer,
     DecisionEnvironmentRefSerializer,
     DecisionEnvironmentSerializer,
+)
+from .eda_credential import (
+    EdaCredentialCreateSerializer,
+    EdaCredentialSerializer,
+)
+from .event_stream import (
+    EventStreamCreateSerializer,
+    EventStreamOutSerializer,
+    EventStreamSerializer,
 )
 from .project import (
     ExtraVarCreateSerializer,
@@ -56,12 +70,7 @@ from .rulebook import (
     AuditRuleSerializer,
     RulebookRefSerializer,
     RulebookSerializer,
-    RuleOutSerializer,
-    RuleSerializer,
-    RulesetOutSerializer,
-    RulesetSerializer,
 )
-from .tasks import TaskRefSerializer, TaskSerializer
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
@@ -90,13 +99,6 @@ __all__ = (
     "AuditRuleListSerializer",
     "RulebookSerializer",
     "RulebookRefSerializer",
-    "RulesetOutSerializer",
-    "RulesetSerializer",
-    "RuleOutSerializer",
-    "RuleSerializer",
-    # tasks
-    "TaskRefSerializer",
-    "TaskSerializer",
     # activations
     "ActivationSerializer",
     "ActivationListSerializer",
@@ -116,10 +118,20 @@ __all__ = (
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",
+    # credential type
+    "CredentialTypeSerializer",
+    "CredentialTypeCreateSerializer",
+    "CredentialTypeRefSerializer",
+    "EdaCredentialSerializer",
+    "EdaCredentialCreateSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # roles
     "RoleSerializer",
     "RoleListSerializer",
     "RoleDetailSerializer",
+    # event streams
+    "EventStreamSerializer",
+    "EventStreamCreateSerializer",
+    "EventStreamOutSerializer",
 )

@@ -14,7 +14,7 @@
 
 from django.db import models
 
-from aap_eda.core.enums import ActivationRequest
+from aap_eda.core.enums import ActivationRequest, ProcessParentType
 
 
 class ActivationRequestQueue(models.Model):
@@ -23,8 +23,16 @@ class ActivationRequestQueue(models.Model):
         ordering = ["id"]
 
     request = models.TextField(null=False, choices=ActivationRequest.choices())
+    process_parent_type = models.TextField(
+        choices=ProcessParentType.choices(),
+        null=False,
+        default=ProcessParentType.ACTIVATION,
+    )
+    process_parent_id = models.BigIntegerField(null=False)
+
+    # TODO: can be removed later
     activation = models.ForeignKey(
-        "Activation", on_delete=models.CASCADE, null=False
+        "Activation", on_delete=models.CASCADE, null=True
     )
 
 

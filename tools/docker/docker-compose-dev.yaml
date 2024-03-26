@@ -17,6 +17,12 @@ x-environment:
   - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
   - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
   - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
+  - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
+  - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
+  - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
+  - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
+  - EDA_DEBUG=${EDA_DEBUG:-'True'}
+  - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
 
 services:
   podman-pre-setup:
@@ -35,7 +41,7 @@ services:
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
-      - 8888:8888
+      - "${EDA_PODMAN_PORT:-8888}:8888"
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
     depends_on:
@@ -46,7 +52,7 @@ services:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     environment: *common-env
     ports:
-      - '8443:443'
+      - '${EDA_UI_PORT:-8443}:443'
     depends_on:
       eda-api:
         condition: service_healthy
@@ -66,7 +72,7 @@ services:
         && scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
-      - '8000:8000'
+      - "${EDA_API_PORT:-8000}:8000"
     depends_on:
       redis:
         condition: service_healthy
@@ -79,6 +85,9 @@ services:
       retries: 10
     volumes:
       - '../../:/app/src:z'
+    networks:
+      - service-mesh
+      - default
 
   eda-ws:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
@@ -89,7 +98,7 @@ services:
       - >-
         aap-eda-manage runserver 0.0.0.0:8000
     ports:
-      - '8001:8000'
+      - "${EDA_WS_PORT:-8001}:8000"
     depends_on:
       eda-api:
         condition: service_healthy
@@ -156,14 +165,14 @@ services:
     restart: always
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
       POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
     ports:
-      - '5432:5432'
+      - '${EDA_PG_PORT:-5432}:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
     healthcheck:
@@ -176,7 +185,7 @@ services:
   redis:
     image: 'quay.io/sclorg/redis-6-c9s:latest'
     ports:
-      - '6379:6379'
+      - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
       test: [ 'CMD', 'redis-cli', 'ping' ]
       interval: 5s
@@ -187,3 +196,7 @@ services:
 volumes:
   postgres_data: {}
   podman_data: {}
+
+networks:
+  service-mesh:
+    name: service-mesh

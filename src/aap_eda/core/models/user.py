@@ -31,6 +31,7 @@ class User(AbstractUser):
 
     roles = models.ManyToManyField("Role", related_name="users")
     modified_at = models.DateTimeField(auto_now=True, null=False)
+    is_service_account = models.BooleanField(default=False)
 
 
 class AwxToken(models.Model):

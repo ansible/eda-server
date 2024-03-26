@@ -11,7 +11,7 @@
 
 For running services locally:
 
-* Python >= 3.9
+* Python >= 3.11
 
 For standalone development tools written in Python, such as `pre-commit`,
 we recommend using your system package manager,
@@ -86,7 +86,7 @@ systemctl --user enable --now podman.socket
 On Linux and macOS, Poetry can be installed with the official installer:
 
 ```shell
-curl -sSL https://install.python-poetry.org | python3 -
+curl -sSL https://install.python-poetry.org | python3.11 -
 ```
 
 Alternatively, you can install it with manually with `pip` or `pipx`:
@@ -100,7 +100,7 @@ pipx install poetry
 In ArchLinux, Poetry is available in the official distribution repositories:
 
 ```shell
-sudo pacman -S python-poetry 
+sudo pacman -S python-poetry
 ```
 
 In macOS, Poetry can be installed with Homebrew:
@@ -157,10 +157,10 @@ git clone git@github.com:ansible/eda-server.git
 
 ### Install dependencies
 
-Go you project directory and install dependencies for local development:
+Go to your project directory and install dependencies for local development:
 
 ```shell
-task dev:init 
+task dev:init
 ```
 
 Or if you want to customize installation options, you may run commands, executed by the `dev:init`
@@ -186,6 +186,7 @@ $ docker images
 REPOSITORY                                    TAG         IMAGE ID       CREATED        SIZE
 localhost/aap-eda                             latest      28fd94c8cf89   5 hours ago    611MB
 ```
+
 To override image name:(using short git hash for version here)
 
 ```shell
@@ -247,20 +248,21 @@ task manage -- migrate
 With docker compose:
 
 ```shell
-task docker:migrate 
+task docker:migrate
 ```
 
 ### Seeding the database
 
 Locally:
+
 ```shell
 task manage -- create_initial_data
 ```
 
 With docker compose:
 
-```
-task docker -- run api --rm aap-eda-manage create_initial_data
+```shell
+task docker -- run --rm eda-api aap-eda-manage create_initial_data
 ```
 
 ### Create superuser
@@ -274,13 +276,18 @@ task create:superuser
 Locally:
 
 ```shell
+task run:api
+# OR
 task manage -- runserver
 ```
+
+**NOTE**: When running the API server locally, make sure to bring up the scheduler container
+by running `task run:scheduler`
 
 With docker compose:
 
 ```shell
-task docker -- up -d api 
+task docker -- up -d eda-api
 ```
 
 ### Running tests
@@ -289,26 +296,26 @@ To run tests locally, you need to have a running instance of postgresql and redi
 
 Run all tests:
 
-```
+```shell
 task test
 ```
 
 Run a single module:
 
-```
+```shell
 task test -- tests/integration/api/test_activation.py
 ```
 
 Run a single test:
 
-```
+```shell
 task test -- tests/integration/api/test_activation.py::test_retrieve_activation
 ```
 
 With docker compose:
 
-```shell 
-task docker -- run api --rm python -m pytest  
+```shell
+task docker -- run --rm eda-api python3.11 -m pytest
 ```
 
 ### Running linters
@@ -347,3 +354,5 @@ You can run individual formatting tools if needed:
 task format:isort
 task format:black
 ```
+
+You can now access the UI at <https://localhost:8443/eda/> with default login username and password(admin/testpass).
