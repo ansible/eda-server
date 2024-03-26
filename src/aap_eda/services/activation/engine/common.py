@@ -120,6 +120,7 @@ class ContainerRequest(BaseModel):
     mounts: tp.Optional[list[dict]] = None
     env_vars: tp.Optional[dict] = None
     extra_args: tp.Optional[dict] = None
+    k8s_service_name: tp.Optional[str] = None
 
 
 class ContainerableMixinError(Exception):
@@ -164,6 +165,7 @@ class ContainerableMixin:
             mem_limit=settings.PODMAN_MEM_LIMIT,
             mounts=settings.PODMAN_MOUNTS,
             cmdline=self._build_cmdline(),
+            k8s_service_name=self._get_k8s_service_name(),
         )
 
     def get_restart_policy(self) -> str:
@@ -256,6 +258,9 @@ class ContainerableMixin:
     def _validate(self):
         if not self.latest_instance:
             raise ContainerableNoLatestInstanceError
+
+    def _get_k8s_service_name(self):
+        return self.k8s_service_name or settings.K8S_SERVICE_NAME
 
 
 class ContainerStatus(BaseModel):

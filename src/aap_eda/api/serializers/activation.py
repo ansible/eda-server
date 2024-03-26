@@ -280,6 +280,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
+            "k8s_service_name": activation.k8s_service_name,
         }
 
 
@@ -301,6 +302,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "event_streams",
             "log_level",
             "eda_credentials",
+            "k8s_service_name",
         ]
 
     rulebook_id = serializers.IntegerField(

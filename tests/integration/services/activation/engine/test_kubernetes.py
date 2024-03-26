@@ -64,6 +64,7 @@ def init_data():
     )
     activation = models.Activation.objects.create(
         name="activation",
+        k8s_service_name="test_k8s_service",
         user=user,
     )
     activation_instance = models.RulebookProcess.objects.create(
@@ -103,6 +104,7 @@ def get_request(data: InitData):
         mem_limit="8G",
         env_vars={"a": 1},
         extra_args={"b": 2},
+        k8s_service_name=data.activation.k8s_service_name,
     )
 
 
@@ -358,7 +360,9 @@ def test_engine_start(init_data, kubernetes_engine):
     log_handler = DBLogger(init_data.activation_instance.id)
 
     with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
-        engine.start(request, log_handler)
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            engine.start(request, log_handler)
 
     assert engine.job_name == (
         f"activation-job-{init_data.activation.id}-"
@@ -382,7 +386,9 @@ def test_event_stream_engine_start(init_data, kubernetes_event_stream_engine):
     log_handler = DBLogger(init_data.activation_instance.id)
 
     with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
-        engine.start(request, log_handler)
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            engine.start(request, log_handler)
 
     assert engine.job_name == (
         f"event-stream-job-{init_data.activation.id}-"
@@ -422,24 +428,26 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
     request = get_request(init_data)
     log_handler = DBLogger(init_data.activation_instance.id)
 
-    with mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.watch"
-    ) as watch_mock:
-        watcher = mock.Mock()
-        watch_mock.Watch.return_value = watcher
-        for phase in ["Pending", "Running", "Succeeded"]:
-            watcher.stream.return_value = get_stream_event(phase)
-            engine.start(request, log_handler)
-
-            assert models.RulebookProcessLog.objects.last().log.endswith(
-                f"Job {engine.job_name} is running"
-            )
-
-        watcher.stream.return_value = get_stream_event("Unknown")
-        with pytest.raises(ContainerStartError):
-            with mock.patch.object(engine, "cleanup") as cleanup_mock:
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_service.return_value.items = None
+        with mock.patch(
+            "aap_eda.services.activation.engine.kubernetes.watch"
+        ) as watch_mock:
+            watcher = mock.Mock()
+            watch_mock.Watch.return_value = watcher
+            for phase in ["Pending", "Running", "Succeeded"]:
+                watcher.stream.return_value = get_stream_event(phase)
                 engine.start(request, log_handler)
-                cleanup_mock.assert_called_once()
+
+                assert models.RulebookProcessLog.objects.last().log.endswith(
+                    f"Job {engine.job_name} is running"
+                )
+
+            watcher.stream.return_value = get_stream_event("Unknown")
+            with pytest.raises(ContainerStartError):
+                with mock.patch.object(engine, "cleanup") as cleanup_mock:
+                    engine.start(request, log_handler)
+                    cleanup_mock.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -755,10 +763,11 @@ def test_get_job_pod(init_data, kubernetes_engine):
 def test_create_service(init_data, kubernetes_engine):
     engine = kubernetes_engine
     engine.job_name = "eda-job"
+    request = get_request(init_data)
 
     with mock.patch.object(engine.client, "core_api") as core_api_mock:
         core_api_mock.list_namespaced_service.return_value.items = None
-        engine._create_service(8000)
+        engine._create_service(request)
 
         core_api_mock.create_namespaced_service.assert_called_once()
 
@@ -769,7 +778,7 @@ def test_create_service(init_data, kubernetes_engine):
         core_api_mock.list_namespaced_service.side_effect = raise_api_error
 
         with pytest.raises(ContainerStartError):
-            engine._create_service(8000)
+            engine._create_service(request)
 
 
 @pytest.mark.django_db
