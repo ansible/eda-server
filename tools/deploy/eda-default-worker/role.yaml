@@ -5,7 +5,7 @@ metadata:
   name: eda-default-job
 rules:
 - apiGroups: [""] # "" indicates the core API group
-  resources: ["pods", "pods/log", "jobs", "secrets", "services"]
+  resources: ["pods", "pods/log", "jobs", "secrets", "services", "events"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["batch", "extensions"]
   resources: ["jobs"]
