@@ -28,11 +28,6 @@ from aap_eda.core.models.event_stream import (
     RestartCompletionInterval,
     RestartFailureInterval,
     RestartFailureLimit,
-)
-from aap_eda.core.models.event_stream import (
-    RestartCompletionInterval,
-    RestartFailureInterval,
-    RestartFailureLimit,
     RetentionFailurePeriod,
     RetentionSuccessPeriod,
 )
@@ -271,210 +266,6 @@ def test_create_event_stream(
             == settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
         )
 
-
-@pytest.mark.parametrize(
-    "param_data",
-    [
-        {
-            "param": "restart_completion_interval",
-            "value": RestartCompletionInterval.MINIMUM - 1,
-            "expect": {
-                "status": status.HTTP_400_BAD_REQUEST,
-                "message": (
-                    "Ensure this value is greater than or equal to"
-                    f" {RestartCompletionInterval.MINIMUM}."
-                ),
-            },
-        },
-        {
-            "param": "restart_completion_interval",
-            "value": RestartCompletionInterval.MINIMUM,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_completion_interval",
-            "value": RestartCompletionInterval.SETTINGS,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-                "effective": {
-                    "property": "effective_restart_completion_interval",
-                    "setting": "ACTIVATION_RESTART_SECONDS_ON_COMPLETE",
-                },
-            },
-        },
-        {
-            "param": "restart_completion_interval",
-            "value": RestartCompletionInterval.DEFAULT,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_completion_interval",
-            "value": RestartCompletionInterval.DEFAULT + 1,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_interval",
-            "value": RestartFailureInterval.MINIMUM - 1,
-            "expect": {
-                "status": status.HTTP_400_BAD_REQUEST,
-                "message": (
-                    "Ensure this value is greater than or equal to"
-                    f" {RestartFailureInterval.MINIMUM}."
-                ),
-            },
-        },
-        {
-            "param": "restart_failure_interval",
-            "value": RestartFailureInterval.MINIMUM,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_interval",
-            "value": RestartFailureInterval.SETTINGS,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-                "effective": {
-                    "property": "effective_restart_failure_interval",
-                    "setting": "ACTIVATION_RESTART_SECONDS_ON_FAILURE",
-                },
-            },
-        },
-        {
-            "param": "restart_failure_interval",
-            "value": RestartFailureInterval.DEFAULT,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_interval",
-            "value": RestartFailureInterval.DEFAULT + 1,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_limit",
-            "value": RestartFailureLimit.MINIMUM - 1,
-            "expect": {
-                "status": status.HTTP_400_BAD_REQUEST,
-                "message": (
-                    "Ensure this value is greater than or equal to"
-                    f" {RestartFailureLimit.MINIMUM}."
-                ),
-            },
-        },
-        {
-            "param": "restart_failure_limit",
-            "value": RestartFailureLimit.MINIMUM,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_limit",
-            "value": RestartFailureLimit.SETTINGS,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-                "effective": {
-                    "property": "effective_restart_failure_limit",
-                    "setting": "ACTIVATION_MAX_RESTARTS_ON_FAILURE",
-                },
-            },
-        },
-        {
-            "param": "restart_failure_limit",
-            "value": RestartFailureLimit.DEFAULT,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_limit",
-            "value": RestartFailureLimit.DEFAULT + 1,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-        {
-            "param": "restart_failure_limit",
-            "value": RestartFailureLimit.UNLIMITED + 1,
-            "expect": {
-                "status": status.HTTP_201_CREATED,
-            },
-        },
-    ],
-)
-@pytest.mark.django_db
-def test_create_event_stream_with_restart_params(
-    client: APIClient,
-    default_de: models.DecisionEnvironment,
-    param_data: dict,
-    settings,
-):
-    models.Rulebook.objects.create(
-        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
-        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
-    )
-
-    param = param_data["param"]
-    value = param_data["value"]
-
-    args = {"limit": 5, "delay": 1}
-    source_type = "ansible.eda.range"
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": f"{source_type}",
-        "source_args": f"{args}",
-        "decision_environment_id": default_de.id,
-    } | {param: value}
-    response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == param_data["expect"]["status"]
-    if response.status_code == status.HTTP_201_CREATED:
-        event_stream = models.EventStream.objects.first()
-        assert getattr(event_stream, param) == value
-        effective = param_data["expect"].get("effective", None)
-        if effective:
-            assert getattr(event_stream, effective["property"]) == getattr(
-                settings, effective["setting"]
-            )
-    else:
-        assert response.data[param][0] == param_data["expect"]["message"]
-
-    assert (
-        event_stream.restart_completion_interval
-        == RestartCompletionInterval.DEFAULT
-    )
-    if RestartCompletionInterval.DEFAULT == RestartCompletionInterval.SETTINGS:
-        assert (
-            event_stream.effective_restart_completion_interval
-            == settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE
-        )
-
-    assert (
-        event_stream.restart_failure_interval == RestartFailureInterval.DEFAULT
-    )
-    if RestartFailureInterval.DEFAULT == RestartFailureInterval.SETTINGS:
-        assert (
-            event_stream.effective_restart_failure_interval
-            == settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE
-        )
-
-    assert event_stream.restart_failure_limit == RestartFailureLimit.DEFAULT
-    if RestartFailureLimit.DEFAULT == RestartFailureLimit.SETTINGS:
-        assert (
-            event_stream.effective_restart_failure_limit
-            == settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
-        )
-
     assert (
         event_stream.retention_failure_period == RetentionFailurePeriod.DEFAULT
     )
@@ -686,6 +477,148 @@ def test_create_event_stream_with_restart_params(
             assert getattr(event_stream, effective["property"]) == getattr(
                 settings, effective["setting"]
             )
+    else:
+        assert response.data[param][0] == param_data["expect"]["message"]
+
+
+@pytest.mark.parametrize(
+    "param_data",
+    [
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RetentionFailurePeriod.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_retention_failure_period",
+                    "setting": "ACTIVATION_RETENTION_FAILURE_HOURS",
+                },
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.FOREVER + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RetentionSuccessPeriod.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_retention_success_period",
+                    "setting": "ACTIVATION_RETENTION_SUCCESS_HOURS",
+                },
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.FOREVER + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+    ],
+)
+@pytest.mark.django_db
+def test_create_event_stream_with_retention_params(
+    client: APIClient,
+    default_de: models.DecisionEnvironment,
+    param_data: dict,
+    settings,
+):
+    models.Rulebook.objects.create(
+        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
+        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    )
+
+    param = param_data["param"]
+    value = param_data["value"]
+
+    args = {"limit": 5, "delay": 1}
+    source_type = "ansible.eda.range"
+    data_in = {
+        "name": "test_event_stream",
+        "source_type": f"{source_type}",
+        "source_args": f"{args}",
+        "decision_environment_id": default_de.id,
+    } | {param: value}
+    response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
+    assert response.status_code == param_data["expect"]["status"]
+    if response.status_code == status.HTTP_201_CREATED:
+        event_stream = models.EventStream.objects.first()
+        assert getattr(event_stream, param) == value
+        effective = param_data["expect"].get("effective", None)
+        if effective:
+            assert getattr(event_stream, effective["property"]) == (
+                getattr(settings, effective["setting"]) * 3600
+            )  # conver to seconds
     else:
         assert response.data[param][0] == param_data["expect"]["message"]
 

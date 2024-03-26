@@ -543,6 +543,144 @@ def test_create_activation_with_restart_params(
         assert response.data[param][0] == param_data["expect"]["message"]
 
 
+@pytest.mark.parametrize(
+    "param_data",
+    [
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RetentionFailurePeriod.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_retention_failure_period",
+                    "setting": "ACTIVATION_RETENTION_FAILURE_HOURS",
+                },
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_failure_period",
+            "value": RetentionFailurePeriod.FOREVER + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.MINIMUM - 1,
+            "expect": {
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": (
+                    "Ensure this value is greater than or equal to"
+                    f" {RetentionSuccessPeriod.MINIMUM}."
+                ),
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.MINIMUM,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.SETTINGS,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+                "effective": {
+                    "property": "effective_retention_success_period",
+                    "setting": "ACTIVATION_RETENTION_SUCCESS_HOURS",
+                },
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.DEFAULT,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.DEFAULT + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+        {
+            "param": "retention_success_period",
+            "value": RetentionSuccessPeriod.FOREVER + 1,
+            "expect": {
+                "status": status.HTTP_201_CREATED,
+            },
+        },
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_retention_params(
+    client: APIClient,
+    param_data: dict,
+    settings,
+):
+    param = param_data["param"]
+    value = param_data["value"]
+
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["extra_var_id"] = fks["extra_var_id"]
+    test_activation[param] = value
+
+    client.post(f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN)
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == param_data["expect"]["status"]
+    if response.status_code == status.HTTP_201_CREATED:
+        activation = models.Activation.objects.filter(
+            id=response.data["id"]
+        ).first()
+        assert getattr(activation, param) == value
+        effective = param_data["expect"].get("effective", None)
+        if effective:
+            assert getattr(activation, effective["property"]) == (
+                getattr(settings, effective["setting"]) * 3600
+            )  # conver to seconds
+    else:
+        assert response.data[param][0] == param_data["expect"]["message"]
+
+
 @pytest.mark.django_db
 def test_create_activation_disabled(
     client: APIClient, preseed_credential_types
