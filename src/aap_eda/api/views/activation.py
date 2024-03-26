@@ -36,6 +36,7 @@ from aap_eda.core.enums import (
 )
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
+    monitor_rulebook_process,
     restart_rulebook_process,
     start_rulebook_process,
     stop_rulebook_process,
@@ -269,6 +270,27 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 id=activation.id,
             )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
+        description="Refresh the Activation",
+        request=None,
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None,
+                description="Activation has been refreshed.",
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
+    def refresh(self, request, pk):
+        activation = get_object_or_404(models.Activation, pk=pk)
+
+        monitor_rulebook_process(
+            process_parent_type=ProcessParentType.ACTIVATION,
+            id=activation.id,
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

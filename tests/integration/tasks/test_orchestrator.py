@@ -118,7 +118,7 @@ def test_manage_request(manager_mock, activation, verb):
     manager_instance_mock = mock.Mock()
     manager_mock.return_value = manager_instance_mock
 
-    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+    orchestrator.manage(ProcessParentType.ACTIVATION, activation.id)
 
     manager_mock.assert_called_once_with(activation)
     if verb == ActivationRequest.START:
@@ -143,7 +143,7 @@ def test_manage_not_start(start_mock, activation, max_running_processes):
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
 
-    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+    orchestrator.manage(ProcessParentType.ACTIVATION, activation.id)
 
     start_mock.assert_not_called()
     assert (
@@ -172,7 +172,7 @@ def test_activation_requests(
         orchestrator._manage_process_job_id(
             ProcessParentType.ACTIVATION, activation.id
         ),
-        orchestrator._manage,
+        "aap_eda.tasks.orchestrator.manage",
         ProcessParentType.ACTIVATION,
         activation.id,
     ]
@@ -195,7 +195,7 @@ def test_monitor_rulebook_processes(
             orchestrator._manage_process_job_id(
                 ProcessParentType.ACTIVATION, activation.id
             ),
-            orchestrator._manage,
+            "aap_eda.tasks.orchestrator.manage",
             ProcessParentType.ACTIVATION,
             activation.id,
         )
@@ -207,7 +207,7 @@ def test_monitor_rulebook_processes(
                 orchestrator._manage_process_job_id(
                     ProcessParentType.ACTIVATION, running.id
                 ),
-                orchestrator._manage,
+                "aap_eda.tasks.orchestrator.manage",
                 ProcessParentType.ACTIVATION,
                 running.id,
             )
@@ -255,7 +255,7 @@ def test_max_running_activation_after_start_job(
     queue.push(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
-    orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+    orchestrator.manage(ProcessParentType.ACTIVATION, activation.id)
     assert start_mock.call_count == 1
     running_processes = models.RulebookProcess.objects.filter(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]

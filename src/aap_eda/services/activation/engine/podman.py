@@ -14,6 +14,7 @@
 
 import logging
 import os
+from datetime import datetime
 
 from dateutil import parser
 from django.conf import settings
@@ -30,6 +31,7 @@ from .common import (
     ContainerEngine,
     ContainerRequest,
     ContainerStatus,
+    EngineEvent,
     LogHandler,
 )
 
@@ -74,6 +76,17 @@ class Engine(ContainerEngine):
         except APIError as e:
             LOGGER.error(f"Failed to initialize podman engine: f{e}")
             raise exceptions.ContainerEngineInitError(str(e))
+
+    def monitor_events(self):
+        for e in self.client.events(decode=True, filters={"status": "died"}):
+            event_time = datetime.utcfromtimestamp(e["time"]).isoformat() + "Z"
+            yield EngineEvent(
+                name=e["id"],
+                reason=e["status"],
+                message="",
+                type=e["Type"],
+                time=event_time,
+            )
 
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         try:

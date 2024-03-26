@@ -120,6 +120,8 @@ class ActivationRequest(DjangoStrEnum):
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+    MONITOR = "monitor"
+    NODE_FAILOVER = "node_failover"
 
 
 class ProcessParentType(DjangoStrEnum):
@@ -135,3 +137,11 @@ class RulebookProcessLogLevel(DjangoStrEnum):
     DEBUG = "debug"
     INFO = "info"
     ERROR = "error"
+
+
+class NodeStatusType(DjangoStrEnum):
+    """Types of status for a node."""
+
+    ACTIVE = "active"
+    NOT_RESPONDING = "not_responding"
+    ABANDONED = "abandoned"

@@ -18,8 +18,12 @@ from django.db.utils import IntegrityError
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
-from aap_eda.core.tasking import enqueue_delay
+from aap_eda.core.tasking import enqueue_delay, unique_enqueue
 
+_MANAGE_TASK = "aap_eda.tasks.orchestrator.manage"
+_MONITOR_ENGINE_EVENTS_TASK = (
+    "aap_eda.tasks.orchestrator.monitor_engine_events"
+)
 LOGGER = logging.getLogger(__name__)
 
 
@@ -50,8 +54,19 @@ def _queue_auto_start(process_parent_type: str, id: int) -> None:
         requests_queue.push(
             process_parent_type, id, ActivationRequest.AUTO_START
         )
+        job_id = f"{process_parent_type}-{id}"
+        unique_enqueue(
+            "activation", job_id, _MANAGE_TASK, process_parent_type, id
+        )
     except IntegrityError:
         LOGGER.warning(
             f"{process_parent_type} {id} no longer exists, "
             "auto-start request will not be processed",
         )
+
+
+def start_monitor_engine_events_job(queue_name: str, job_id: str) -> None:
+    LOGGER.info(f"Requesting start of monitor_engine_events {job_id}")
+    unique_enqueue(
+        queue_name, job_id, _MONITOR_ENGINE_EVENTS_TASK, **{"job_timeout": -1}
+    )

@@ -328,7 +328,11 @@ RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
     {
         "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
-        "interval": 5,
+        "interval": 600,
+    },
+    {
+        "func": "aap_eda.tasks.orchestrator.monitor_nodes",
+        "interval": 300,
     },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
 ]
@@ -525,3 +529,7 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
     "SAFE_PLUGINS_FOR_PORT_FORWARD",
     ["ansible.eda.webhook", "ansible.eda.alertmanager"],
 )
+
+LOCAL_QUEUE_NAME = settings.get("LOCAL_QUEUE_NAME", None)
+REFRESH_RQ_QUEUES = settings.get("REFRESH_RQ_QUEUES", True)
+WORKER_HEARTBEAT_DELAY = int(settings.get("WORKER_HEARTBEAT_DELAY", 360))

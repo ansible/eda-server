@@ -298,6 +298,14 @@ class ContainerEngine(ABC):
             raise exceptions.ContainerCleanupError(e) from e
 
     @abstractmethod
+    def monitor_events(self) -> None:
+        try:
+            # Implementation
+            ...
+        except Exception as e:
+            raise exceptions.ContainerEngineError(e) from e
+
+    @abstractmethod
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
             # Implementation
@@ -308,3 +316,11 @@ class ContainerEngine(ABC):
 
 class SpeficicImagePullError(Exception):
     """Placeholder for the interface to raise specific image pull errors."""
+
+
+class EngineEvent(BaseModel):
+    name: str
+    reason: str
+    message: str
+    time: str
+    type: str

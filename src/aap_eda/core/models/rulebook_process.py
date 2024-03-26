@@ -73,6 +73,13 @@ class RulebookProcess(models.Model):
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
+    node = models.ForeignKey(
+        "Node",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="node",
+    )
 
     class Meta:
         db_table = "core_rulebook_process"

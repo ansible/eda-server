@@ -37,6 +37,7 @@ from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerRequest
 from aap_eda.services.activation.restart_helper import (
+    start_monitor_engine_events_job,
     system_restart_activation,
 )
 
@@ -85,6 +86,8 @@ class ActivationManager:
     updating the DB but only one instance of the manager for a given
     activation should be running at a time by async workers.
     """
+
+    started_monitor_events = False
 
     def __init__(
         self,
@@ -802,7 +805,7 @@ class ActivationManager:
 
         LOGGER.info(
             "Restart operation requested for activation id: "
-            "{self.db_instance.id} ",
+            f"{self.db_instance.id} ",
         )
         self.stop()
 
@@ -811,6 +814,26 @@ class ActivationManager:
             "Activation restart scheduled for 1 second.",
         )
         user_msg = "Restart requested by user. "
+        self._set_activation_status(ActivationStatus.PENDING, user_msg)
+        container_logger.write(user_msg, flush=True)
+        system_restart_activation(
+            self.db_instance_type, self.db_instance.id, delay_seconds=1
+        )
+
+    def node_failover(self):
+        """Node failure restart the activation on a different node."""
+        container_logger = self.container_logger_class(self.latest_instance.id)
+
+        LOGGER.info(
+            "Node failure, restart operation requested for activation id: "
+            f"{self.db_instance.id} ",
+        )
+
+        LOGGER.info(
+            f"Activation manager activation id: {self.db_instance.id} "
+            "Activation restart scheduled for 1 second.",
+        )
+        user_msg = "Restarting because of node failure "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
         system_restart_activation(
@@ -1050,6 +1073,23 @@ class ActivationManager:
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
         }
+        if settings.LOCAL_QUEUE_NAME:
+            args["node"], _ = models.Node.objects.get_or_create(
+                name=settings.LOCAL_QUEUE_NAME
+            )
+            monitor_events_job_id = settings.LOCAL_QUEUE_NAME
+            monitor_events_queue = settings.LOCAL_QUEUE_NAME
+        else:
+            monitor_events_job_id = "activation"
+            monitor_events_queue = "activation"
+
+        # Start the Monitor Engine events once
+        if not ActivationManager.started_monitor_events:
+            ActivationManager.started_monitor_events = True
+            start_monitor_engine_events_job(
+                monitor_events_queue, monitor_events_job_id
+            )
+
         args[f"{self.db_instance_type}"] = self.db_instance
         try:
             models.RulebookProcess.objects.create(**args)

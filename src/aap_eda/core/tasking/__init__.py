@@ -5,8 +5,11 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
 from django_rq.queues import Queue as _Queue
+from django_rq.settings import QUEUES
+from redis import Redis
 from rq import Connection, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
@@ -172,8 +175,14 @@ class ActivationWorker(_Worker):
         if queue_class is None:
             queue_class = Queue
 
+        queues = [Queue(name="activation", connection=connection)]
+        if settings.LOCAL_QUEUE_NAME:
+            queues.append(
+                Queue(name=settings.LOCAL_QUEUE_NAME, connection=connection)
+            )
+
         super().__init__(
-            queues=[Queue(name="activation", connection=connection)],
+            queues=queues,
             name=name,
             default_result_ttl=default_result_ttl,
             connection=connection,
@@ -199,6 +208,35 @@ def enqueue_delay(queue_name: str, delay: int, *args, **kwargs) -> Job:
 
 
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
+    try:
+        return _unique_enqueue(queue_name, job_id, *args, **kwargs)
+    except KeyError:
+        if settings.REFRESH_RQ_QUEUES:
+            logger.info(f"Missing queue {queue_name} will attempt to refresh")
+            _refresh_queues()
+            return _unique_enqueue(queue_name, job_id, *args, **kwargs)
+        else:
+            raise
+
+
+def _refresh_queues():
+    activation_values = QUEUES["activation"]
+    redis = Redis(
+        host=activation_values["HOST"], port=activation_values["PORT"]
+    )
+    queues = []
+    for worker in _Worker.all(connection=redis):
+        for queue in worker.queues:
+            if queue.name not in queues:
+                queues.append(queue.name)
+
+    for queue in queues:
+        if queue not in QUEUES:
+            logger.info(f"Adding queue {queue} to RQ_QUEUES")
+            QUEUES[queue] = activation_values
+
+
+def _unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     """Enqueue a new job if it is not already enqueued.
 
     Detects if a job with the same id is already enqueued and if it is

@@ -26,6 +26,7 @@ from .job import (
     JobInstanceEvent,
     JobInstanceHost,
 )
+from .node import Node
 from .project import ExtraVar, Project
 from .queue import ActivationRequestQueue
 from .rulebook import (
@@ -66,4 +67,5 @@ __all__ = [
     "DecisionEnvironment",
     "ActivationRequestQueue",
     "EventStream",
+    "Node",
 ]
