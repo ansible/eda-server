@@ -93,16 +93,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         null=True,
         default=None,
     )
-    credentials = models.ManyToManyField(
-        "Credential", related_name="activations", default=None
-    )
-    system_vault_credential = models.OneToOneField(
-        "Credential",
-        null=True,
-        default=None,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
     event_streams = models.ManyToManyField(
         "EventStream",
         default=None,

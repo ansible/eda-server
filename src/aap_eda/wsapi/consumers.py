@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
-from aap_eda.core.enums import CredentialType, DefaultCredentialType
+from aap_eda.core.enums import DefaultCredentialType
 
 from .messages import (
     ActionMessage,
@@ -125,11 +125,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
             )
             await self.send(text_data=controller_info.json())
-
-        vault_data = await self.get_vault_passwords(message)
-        if vault_data:
-            vault_collection = VaultCollection(data=vault_data)
-            await self.send(text_data=vault_collection.json())
 
         eda_vault_data = await self.get_eda_system_vault_passwords(message)
         if eda_vault_data:
@@ -349,38 +344,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         awx_token = parent.awx_token
         return awx_token.token.get_secret_value() if awx_token else None
-
-    @database_sync_to_async
-    def get_vault_passwords(
-        self, message: WorkerMessage
-    ) -> tp.List[VaultPassword]:
-        """Get vault info from activation."""
-        rulebook_process_instance = models.RulebookProcess.objects.get(
-            id=message.activation_id,
-        )
-        activation = rulebook_process_instance.get_parent()
-        vault_passwords = []
-
-        if activation.system_vault_credential:
-            vault = models.Credential.objects.filter(
-                id=activation.system_vault_credential.id
-            )
-        else:
-            vault = models.Credential.objects.none()
-
-        for credential in activation.credentials.filter(
-            credential_type=CredentialType.VAULT
-        ).union(vault):
-            vault_passwords.append(
-                VaultPassword(
-                    label=credential.vault_identifier,
-                    # TODO: Use pydantic secret feature (available > 2.0)
-                    # https://docs.pydantic.dev/latest/examples/secrets/
-                    password=credential.secret.get_secret_value(),
-                )
-            )
-
-        return vault_passwords
 
     @database_sync_to_async
     def get_eda_system_vault_passwords(

@@ -57,6 +57,7 @@ class Project(models.Model):
     url = models.TextField(null=False)
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
+    # TODO: used by migration, remove it later
     credential = models.ForeignKey(
         "Credential",
         blank=True,

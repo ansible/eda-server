@@ -36,15 +36,6 @@ INPUTS = {
 }
 
 
-@pytest.fixture
-def credential_type() -> models.CredentialType:
-    credential_type = models.CredentialType.objects.create(
-        name="type1", inputs=INPUTS, injectors={}
-    )
-    credential_type.refresh_from_db()
-    return credential_type
-
-
 @pytest.mark.django_db
 def test_create_eda_credential(
     client: APIClient, credential_type: models.CredentialType
