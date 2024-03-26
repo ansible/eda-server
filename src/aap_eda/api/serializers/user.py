@@ -1,6 +1,7 @@
 from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
 
+from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
 from .auth import RoleRefSerializer
@@ -131,3 +132,19 @@ class AwxTokenCreateSerializer(serializers.ModelSerializer):
             "description",
             "token",
         ]
+
+    def validate(self, data):
+        """Validate the uniqueness of a combination of user and name fields."""
+        user = self.context["request"].user
+        name = data.get("name")
+
+        existing_token = models.AwxToken.objects.filter(user=user, name=name)
+
+        # If updating, exclude the current instance from the queryset
+        if self.instance:
+            existing_token = existing_token.exclude(pk=self.instance.pk)
+
+        if existing_token.exists():
+            raise Conflict("Token with this name already exists.")
+
+        return data
