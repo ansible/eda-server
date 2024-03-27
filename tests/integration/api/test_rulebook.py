@@ -364,7 +364,6 @@ def test_list_actions_from_audit_rule_filter_name(
         "fired_at",
         "organization_id",
         "rule_fired_at",
-        "organization_id",
         "audit_rule_id",
         "status_message",
     ]
