@@ -92,7 +92,9 @@ class CredentialViewSet(
     filterset_class = filters.CredentialFilter
 
     def filter_queryset(self, queryset):
-        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     def handle_exception(self, exc):
         if isinstance(exc, fernet.InvalidToken):

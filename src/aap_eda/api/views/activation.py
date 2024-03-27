@@ -72,7 +72,9 @@ class ActivationViewSet(
     rbac_action = None
 
     def filter_queryset(self, queryset):
-        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -377,7 +379,9 @@ class ActivationInstanceViewSet(
     rbac_action = None
 
     def filter_queryset(self, queryset):
-        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     @extend_schema(
         description="List all logs for the Activation Instance",

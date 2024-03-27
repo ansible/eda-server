@@ -76,7 +76,9 @@ class OrganizationViewSet(
     rbac_action = None
 
     def filter_queryset(self, queryset):
-        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     def get_serializer_class(self):
         return serializers.OrganizationSerializer

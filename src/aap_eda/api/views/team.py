@@ -86,7 +86,9 @@ class TeamViewSet(
     rbac_resource_type = ResourceType.TEAM
 
     def filter_queryset(self, queryset):
-        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     def get_serializer_class(self):
         if self.action == "create":
