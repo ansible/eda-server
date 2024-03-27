@@ -115,9 +115,11 @@ class AuditRuleViewSet(
     ]
 
     def filter_queryset(self, queryset):
-        return super().filter_queryset(
-            queryset.model.access_qs(self.request.user, queryset=queryset)
-        )
+        if queryset.model is models.AuditRule:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -162,7 +164,7 @@ class AuditRuleViewSet(
         url_path="(?P<id>[^/.]+)/actions",
     )
     def actions(self, _request, id):
-        audit_rule = get_object_or_404(self.get_queryset(), id=id)
+        audit_rule = get_object_or_404(models.AuditRule.access_qs(_request.user), id=id)
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
@@ -202,7 +204,7 @@ class AuditRuleViewSet(
         url_path="(?P<id>[^/.]+)/events",
     )
     def events(self, _request, id):
-        audit_rule = get_object_or_404(self.get_queryset(), id=id)
+        audit_rule = get_object_or_404(models.AuditRule.access_qs(_request.user), id=id)
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
