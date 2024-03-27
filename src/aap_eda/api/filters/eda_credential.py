@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,14 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import django_filters
 
-class ResponseSerializerMixin(object):
-    """
-    Provide default implementation to get_response_serializer_class.
+from aap_eda.core import models
 
-    The view class should override this method if the response body format
-    is different from the request.
-    """
 
-    def get_response_serializer_class(self):
-        return self.get_serializer_class()
+class EdaCredentialFilter(django_filters.FilterSet):
+    name = django_filters.CharFilter(
+        field_name="name",
+        lookup_expr="istartswith",
+        label="Filter by EDA credential name.",
+    )
+
+    class Meta:
+        model = models.EdaCredential
+        fields = ["name"]

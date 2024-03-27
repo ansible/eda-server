@@ -21,12 +21,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
-from aap_eda.core import models
-from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
-    ActivationStatus,
-    CredentialType,
-)
+from aap_eda.core import enums, models
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
@@ -121,7 +116,7 @@ def default_user_awx_token(default_user: models.User):
 
 @pytest.fixture
 def default_project(
-    default_credential: models.Credential,
+    default_eda_credential: models.EdaCredential,
     default_organization: models.Organization,
 ) -> models.Project:
     """Return a default Project."""
@@ -130,7 +125,9 @@ def default_project(
         description="Default Project",
         url="https://git.example.com/acme/project-01",
         git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
-        credential=default_credential,
+        eda_credential=default_eda_credential,
+        signature_validation_credential=default_eda_credential,
+        scm_branch="main",
         organization=default_organization,
         import_state=models.Project.ImportState.COMPLETED,
         import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
@@ -148,6 +145,7 @@ def new_project(
         url="https://git.example.com/acme/project-02",
         git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
         organization=default_organization,
+        scm_refspec="refspec",
         verify_ssl=False,
         import_state=models.Project.ImportState.FAILED,
         import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
@@ -519,18 +517,18 @@ def default_activation_instances(
                 name="default-activation-instance-1",
                 activation=default_activation,
                 git_hash=default_project.git_hash,
-                status=ActivationStatus.COMPLETED,
-                status_message=ACTIVATION_STATUS_MESSAGE_MAP[
-                    ActivationStatus.COMPLETED
+                status=enums.ActivationStatus.COMPLETED,
+                status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
+                    enums.ActivationStatus.COMPLETED
                 ],
             ),
             models.RulebookProcess(
                 name="default-activation-instance-2",
                 activation=default_activation,
                 git_hash=default_project.git_hash,
-                status=ActivationStatus.FAILED,
-                status_message=ACTIVATION_STATUS_MESSAGE_MAP[
-                    ActivationStatus.FAILED
+                status=enums.ActivationStatus.FAILED,
+                status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
+                    enums.ActivationStatus.FAILED
                 ],
             ),
         ]
@@ -546,9 +544,9 @@ def new_activation_instance(
         name=new_activation.name,
         activation=new_activation,
         git_hash=default_project.git_hash,
-        status=ActivationStatus.COMPLETED,
-        status_message=ACTIVATION_STATUS_MESSAGE_MAP[
-            ActivationStatus.COMPLETED
+        status=enums.ActivationStatus.COMPLETED,
+        status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
+            enums.ActivationStatus.COMPLETED
         ],
     )
 
@@ -574,18 +572,33 @@ def default_activation_instance_logs(
     )
 
 
-@pytest.fixture
-def default_credential(
+@pytest.mark.fixture
+def default_eda_credential(
     default_organization: models.Organization,
-) -> models.Credential:
+    credential_registry_type: models.CredentialType,
+) -> models.EdaCredential:
     """Return a default Credential"""
-    return models.Credential.objects.create(
+    return models.EdaCredential.objects.create(
         name="default-credential",
-        description="Default Credential",
-        credential_type=CredentialType.REGISTRY,
-        username="dummy-user",
-        secret="dummy-password",
+        description="Default EDA Credential",
+        credential_type=credential_registry_type,
+        inputs={"username": "dummy-user", "password": "dummy-password"},
         organization=default_organization,
+    )
+
+
+@pytest.mark.fixture
+def credential_registry_type() -> models.CredentialType:
+    return models.CredentialType.objects.create(
+        name=enums.DefaultCredentialType.REGISTRY,
+        inputs={
+            "fields": [
+                {"id": "username", "label": "Username"},
+                {"id": "password", "label": "Password", "secret": True},
+            ]
+        },
+        injectors={},
+        managed=False,
     )
 
 
@@ -597,7 +610,7 @@ def default_vault_credential(
     return models.Credential.objects.create(
         name="default-vault-credential",
         description="Default Vault Credential",
-        credential_type=CredentialType.VAULT,
+        credential_type=enums.CredentialType.VAULT,
         username="dummy-vault-user",
         secret="dummy-password",
         organization=default_organization,
@@ -613,7 +626,7 @@ def default_eda_vault_credential(
         name="default-eda-vault-credential",
         description="Default EDA Vault Credential",
         vault_identifier=EDA_SERVER_VAULT_LABEL,
-        credential_type=CredentialType.VAULT,
+        credential_type=enums.CredentialType.VAULT,
         username="dummy-eda-vault-user",
         secret="dummy-password",
         organization=default_organization,
@@ -628,7 +641,7 @@ def credential_payload(
     return {
         "name": "test-credential",
         "description": "Test Credential",
-        "credential_type": CredentialType.REGISTRY,
+        "credential_type": enums.CredentialType.REGISTRY,
         "username": "test-user",
         "secret": "test-password",
         "organization_id": default_organization.id,

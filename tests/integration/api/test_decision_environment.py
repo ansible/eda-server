@@ -29,8 +29,8 @@ def test_create_decision_environment(
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
-        "credential_id": default_credential.id,
         "organization_id": default_organization.id,
+        "eda_credential_id": default_credential.id,
     }
     response = client.post(
         f"{api_url_v1}/decision-environments/", data=data_in

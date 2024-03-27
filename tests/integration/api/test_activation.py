@@ -21,12 +21,7 @@ from aap_eda.api.serializers.activation import (
     get_rules_count,
     is_activation_valid,
 )
-from aap_eda.core import models
-from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
-    ActivationStatus,
-    CredentialType,
-)
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
@@ -60,38 +55,10 @@ def test_create_activation(
     assert activation.rulebook_name == default_rulebook.name
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
-    assert activation.status == ActivationStatus.PENDING
+    assert activation.status == enums.ActivationStatus.PENDING
     assert (
         activation.status_message
-        == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
-    )
-
-
-@pytest.mark.django_db
-def test_create_activation_with_system_vault_credential(
-    activation_payload: Dict[str, Any],
-    admin_awx_token: models.AwxToken,
-    client: APIClient,
-):
-    event_stream = models.EventStream.objects.create(
-        name="test_event_stream",
-        source_type="test_source_type",
-        source_args="test_source_args",
-        user_id=activation_payload["user_id"],
-        decision_environment_id=activation_payload["decision_environment_id"],
-    )
-    activation_payload["event_streams"] = [event_stream.id]
-
-    response = client.post(
-        f"{api_url_v1}/activations/", data=activation_payload
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    data = response.data
-    activation = models.Activation.objects.filter(id=data["id"]).first()
-    assert activation.system_vault_credential is not None
-    assert (
-        activation.system_vault_credential.credential_type
-        == CredentialType.VAULT
+        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
     )
 
 
@@ -113,7 +80,7 @@ def test_create_activation_disabled(
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == default_rulebook.name
     assert activation.rulebook_rulesets == default_rulebook.rulesets
-    assert activation.status == ActivationStatus.PENDING
+    assert activation.status == enums.ActivationStatus.PENDING
     assert activation.status_message == "Activation is marked as disabled"
     assert not data["instances"]
 
@@ -211,8 +178,8 @@ def test_list_activations_filter_status(
     new_activation: models.Activation,
     client: APIClient,
 ):
-    filter_status = "failed"
-    new_activation.status = ActivationStatus.FAILED
+    filter_status = enums.ActivationStatus.FAILED
+    new_activation.status = enums.ActivationStatus.FAILED
     new_activation.save(update_fields=["status"])
     activations = [default_activation, new_activation]
 
@@ -243,6 +210,59 @@ def test_list_activations_filter_decision_environment_id(
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_activations_filter_credential_id(
+    default_activation: models.Activation,
+    default_eda_credential: models.EdaCredential,
+    client: APIClient,
+) -> None:
+    """Test filtering by credential_id."""
+
+    url = (
+        f"{api_url_v1}/activations/?credential_id={default_eda_credential.id}"
+    )
+    response = client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+    url = f"{api_url_v1}/activations/?credential_id=31415"
+    response = client.get(url)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_retrieve_activation(
+    default_activation: models.Activation, client: APIClient
+):
+    response = client.get(f"{api_url_v1}/activations/{default_activation.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.data
+    assert_activation_base_data(data, default_activation)
+    if default_activation.project:
+        assert data["project"]["id"] == default_activation.project.id
+    else:
+        assert not data["project"]
+    if default_activation.rulebook:
+        assert data["rulebook"]["id"] == default_activation.rulebook.id
+    else:
+        assert not data["rulebook"]
+    assert (
+        data["decision_environment"]["id"]
+        == default_activation.decision_environment.id
+    )
+    assert data["extra_var"]["id"] == default_activation.extra_var.id
+    activation_instances = models.RulebookProcess.objects.filter(
+        activation_id=default_activation.id
+    )
+    if activation_instances:
+        assert data["restarted_at"] == activation_instances.latest(
+            "started_at"
+        ).started_at.strftime(DATETIME_FORMAT)
+    else:
+        assert data["restarted_at"] is None
 
 
 @pytest.mark.django_db
@@ -280,7 +300,7 @@ def test_restart_activation_without_de(
     client: APIClient,
     action,
 ):
-    if action == "enable":
+    if action == enums.Action.ENABLE:
         default_activation.is_enabled = False
         default_activation.save(update_fields=["is_enabled"])
 
@@ -295,7 +315,7 @@ def test_restart_activation_without_de(
         == "{'decision_environment_id': 'This field may not be null.'}"
     )
     default_activation.refresh_from_db()
-    assert default_activation.status == ActivationStatus.ERROR
+    assert default_activation.status == enums.ActivationStatus.ERROR
     assert (
         default_activation.status_message
         == "{'decision_environment_id': 'This field may not be null.'}"
@@ -307,11 +327,11 @@ def test_enable_activation(
     default_activation: models.Activation, client: APIClient
 ):
     for state in [
-        ActivationStatus.STARTING,
-        ActivationStatus.STOPPING,
-        ActivationStatus.DELETING,
-        ActivationStatus.RUNNING,
-        ActivationStatus.UNRESPONSIVE,
+        enums.ActivationStatus.STARTING,
+        enums.ActivationStatus.STOPPING,
+        enums.ActivationStatus.DELETING,
+        enums.ActivationStatus.RUNNING,
+        enums.ActivationStatus.UNRESPONSIVE,
     ]:
         default_activation.is_enabled = False
         default_activation.status = state
@@ -324,14 +344,14 @@ def test_enable_activation(
         assert response.status_code == status.HTTP_409_CONFLICT
         assert (
             default_activation.status_message
-            == ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
+            == enums.ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
         )
 
     for state in [
-        ActivationStatus.COMPLETED,
-        ActivationStatus.PENDING,
-        ActivationStatus.STOPPED,
-        ActivationStatus.FAILED,
+        enums.ActivationStatus.COMPLETED,
+        enums.ActivationStatus.PENDING,
+        enums.ActivationStatus.STOPPED,
+        enums.ActivationStatus.FAILED,
     ]:
         default_activation.is_enabled = False
         default_activation.status = state
@@ -345,7 +365,7 @@ def test_enable_activation(
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert (
             default_activation.status_message
-            == ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
+            == enums.ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
         )
 
 
@@ -408,7 +428,7 @@ def test_list_activation_instances_filter_status(
 ):
     instances = default_activation_instances
 
-    filter_status = "failed"
+    filter_status = enums.ActivationStatus.FAILED
     response = client.get(
         f"{api_url_v1}/activations/{default_activation.id}"
         f"/instances/?status={filter_status}"

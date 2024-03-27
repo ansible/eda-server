@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("auth", "0012_alter_user_first_name_max_length"),
-        ("core", "0026_activation_log_level_eventstream_log_level"),
+        ("core", "0028_remove_activation_credentials_and_more"),
     ]
     run_before = [("dab_rbac", "__first__")]
 
@@ -156,6 +156,24 @@ class Migration(migrations.Migration):
                 to="core.organization",
             ),
         ),
+        migrations.AddField(
+            model_name="credentialtype",
+            name="organization",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+            ),
+        ),
+        migrations.AddField(
+            model_name="edacredential",
+            name="organization",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+            ),
+        ),
         migrations.CreateModel(
             name="Team",
             fields=[
@@ -251,6 +269,8 @@ class Migration(migrations.Migration):
                     ("role", "role"),
                     ("decision_environment", "decision_environment"),
                     ("credential", "credential"),
+                    ("credential_type", "credential_type"),
+                    ("eda_credential", "eda_credential"),
                     ("event_stream", "event_stream"),
                     ("organization", "organization"),
                     ("team", "team"),

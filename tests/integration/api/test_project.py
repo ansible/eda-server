@@ -19,6 +19,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
 from tests.integration.constants import api_url_v1
 
 
@@ -29,7 +30,6 @@ def test_list_projects(
     default_project: models.Project,
     new_project: models.Project,
     client: APIClient,
-    check_permission_mock: mock.Mock,
 ):
     projects = [default_project, new_project]
     response = client.get(f"{api_url_v1}/projects/")
@@ -106,10 +106,26 @@ def test_create_project(
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
 
+    cred_type = models.CredentialType.objects.create(
+        name="type1", inputs={"fields": [{"id": "user", "type": "string"}]}
+    )
+    cred_inputs = inputs_to_store({"user": "me"})
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential1", credential_type=cred_type, inputs=cred_inputs
+    )
+    sv_cred_inputs = inputs_to_store({"user": "him"})
+    sv_credential = models.EdaCredential.objects.create(
+        name="svcred1", credential_type=cred_type, inputs=sv_cred_inputs
+    )
+
     bodies = [
         {
             "name": "test-project-01",
             "url": "https://git.example.com/acme/project-01",
+            "eda_credential_id": eda_credential.id,
+            "signature_validation_credential_id": sv_credential.id,
+            "scm_branch": "main",
+            "scm_refspec": "ref1",
         },
         {
             "name": "test-project-02",
@@ -290,28 +306,32 @@ def test_update_project_with_400(
     response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
     data = {
         "name": "new project name",
-        "credential_id": 87,
+        "eda_credential_id": 87,
     }
     response = client.patch(
         f"{api_url_v1}/projects/{default_project.id}/", data=data
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["errors"] == "Credential [87] not found"
+    assert response.data["errors"] == "EdaCredential [87] not found"
 
 
 @pytest.mark.django_db
 def test_partial_update_project(
     new_project: models.Project,
-    default_vault_credential: models.Credential,
+    default_eda_credential: models.EdaCredential,
     client: APIClient,
     check_permission_mock: mock.Mock,
 ):
-    assert new_project.credential_id is None
-    assert new_project.verify_ssl is False
+    assert new_project.eda_credential_id is None
+    assert new_project.signature_validation_credential_id is None
+    assert new_project.verify_ssl is True
 
     new_data = {
         "name": "new-project-updated",
-        "credential_id": default_vault_credential.id,
+        "eda_credential_id": default_eda_credential.id,
+        "signature_validation_credential_id": default_eda_credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
         "verify_ssl": True,
     }
     response = client.patch(
@@ -322,7 +342,13 @@ def test_partial_update_project(
 
     new_project.refresh_from_db()
     assert new_project.name == new_data["name"]
-    assert new_project.credential_id == new_data["credential_id"]
+    assert new_project.eda_credential.id == new_data["eda_credential_id"]
+    assert (
+        new_project.signature_validation_credential.id
+        == new_data["eda_credential_id"]
+    )
+    assert new_project.scm_branch == new_data["scm_branch"]
+    assert new_project.scm_refspec == new_data["scm_refspec"]
     assert new_project.verify_ssl is new_data["verify_ssl"]
 
     assert_project_base_data(response.json(), new_project)
@@ -372,10 +398,17 @@ def assert_project_base_data(
 
 
 def assert_project_fk_data(response: Dict[str, Any], expected: models.Project):
-    if expected.credential:
-        assert response["credential_id"] == expected.credential.id
+    if expected.eda_credential:
+        assert response["eda_credential_id"] == expected.eda_credential.id
     else:
-        assert not response["credential_id"]
+        assert not response["eda_credential_id"]
+    if expected.signature_validation_credential:
+        assert (
+            response["signature_validation_credential_id"]
+            == expected.signature_validation_credential.id
+        )
+    else:
+        assert not response["signature_validation_credential_id"]
     if expected.organization:
         assert response["organization_id"] == expected.organization.id
     else:
@@ -385,25 +418,26 @@ def assert_project_fk_data(response: Dict[str, Any], expected: models.Project):
 def assert_project_related_data(
     response: Dict[str, Any], expected: models.Project
 ):
-    if expected.credential:
+    if expected.eda_credential:
         credential_data = response["credential"]
-        assert credential_data["id"] == expected.credential.id
-        assert credential_data["name"] == expected.credential.name
+        assert credential_data["id"] == expected.eda_credential.id
+        assert credential_data["name"] == expected.eda_credential.name
         assert (
-            credential_data["description"] == expected.credential.description
+            credential_data["description"]
+            == expected.eda_credential.description
         )
+        assert credential_data["managed"] == expected.eda_credential.managed
         assert (
             credential_data["credential_type"]
-            == expected.credential.credential_type
+            == expected.eda_credential.credential_type
         )
-        assert credential_data["username"] == expected.credential.username
-        assert (
-            credential_data["vault_identifier"]
-            == expected.credential.vault_identifier
+        assert credential_data["inputs"] == inputs_to_display(
+            expected.eda_credential.credential_type.inputs,
+            expected.eda_credential.inputs.get_secret_value(),
         )
         assert (
             credential_data["organization_id"]
-            == expected.credential.organization.id
+            == expected.eda_credential.organization.id
         )
     else:
         assert not response["credential"]

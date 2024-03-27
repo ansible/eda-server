@@ -23,7 +23,31 @@ from aap_eda.core.tasking import Queue
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
-
+INPUTS = {
+    "fields": [
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+        },
+        {
+            "id": "ssh_key_data",
+            "label": "SCM Private Key",
+            "type": "string",
+            "format": "ssh_private_key",
+            "secret": True,
+            "multiline": True,
+        },
+        {
+            "id": "ssh_key_unlock",
+            "label": "Private Key Passphrase",
+            "type": "string",
+            "secret": True,
+        },
+    ]
+}
 
 # fixture for pytest-redis plugin
 # like django-db for a running redis server
@@ -53,6 +77,16 @@ def caplog_factory(caplog):
         return caplog
 
     return _factory
+
+
+def credential_type() -> models.CredentialType:
+    """Return a default Credential Type."""
+    credential_type = models.CredentialType.objects.create(
+        name="default_credential_type", inputs=INPUTS, injectors={}
+    )
+    credential_type.refresh_from_db()
+
+    return credential_type
 
 
 @pytest.fixture
