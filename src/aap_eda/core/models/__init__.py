@@ -17,7 +17,9 @@ from ansible_base.rbac import permission_registry
 from .activation import Activation
 from .auth import Permission, Role
 from .credential import Credential
+from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
+from .eda_credential import EdaCredential
 from .event_stream import EventStream
 from .job import (
     ActivationInstanceJobInstance,
@@ -63,6 +65,8 @@ __all__ = [
     "User",
     "AwxToken",
     "Credential",
+    "CredentialType",
+    "EdaCredential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
     "EventStream",
@@ -73,6 +77,8 @@ __all__ = [
 permission_registry.register(
     Activation,
     Credential,
+    CredentialType,
+    EdaCredential,
     DecisionEnvironment,
     ExtraVar,
     Project,

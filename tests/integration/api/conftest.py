@@ -19,7 +19,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
@@ -271,13 +271,30 @@ def new_activation(
 
 
 @pytest.fixture
-def default_credential(default_organization) -> models.Credential:
+def credential_registry_type() -> models.CredentialType:
+    return models.CredentialType.objects.create(
+        name=enums.DefaultCredentialType.REGISTRY,
+        inputs={
+            "fields": [
+                {"id": "username", "label": "Username"},
+                {"id": "password", "label": "Password", "secret": True},
+            ]
+        },
+        injectors={},
+        managed=False,
+    )
+
+
+@pytest.fixture
+def default_eda_credential(
+    default_organization: models.Organization,
+    credential_registry_type: models.CredentialType,
+) -> models.EdaCredential:
     """Return a default Credential"""
-    return models.Credential.objects.create(
+    return models.EdaCredential.objects.create(
         name="default-credential",
-        description="Default Credential",
-        credential_type="Container Registry",
-        username="dummy-user",
-        secret="dummy-password",
+        description="Default EDA Credential",
+        credential_type=credential_registry_type,
+        inputs={"username": "dummy-user", "password": "dummy-password"},
         organization=default_organization,
     )

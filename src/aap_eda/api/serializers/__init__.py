@@ -32,11 +32,20 @@ from .credential import (
     CredentialRefSerializer,
     CredentialSerializer,
 )
+from .credential_type import (
+    CredentialTypeCreateSerializer,
+    CredentialTypeRefSerializer,
+    CredentialTypeSerializer,
+)
 from .decision_environment import (
     DecisionEnvironmentCreateSerializer,
     DecisionEnvironmentReadSerializer,
     DecisionEnvironmentRefSerializer,
     DecisionEnvironmentSerializer,
+)
+from .eda_credential import (
+    EdaCredentialCreateSerializer,
+    EdaCredentialSerializer,
 )
 from .event_stream import (
     EventStreamCreateSerializer,
@@ -121,6 +130,12 @@ __all__ = (
     "CredentialSerializer",
     "CredentialCreateSerializer",
     "CredentialRefSerializer",
+    # credential type
+    "CredentialTypeSerializer",
+    "CredentialTypeCreateSerializer",
+    "CredentialTypeRefSerializer",
+    "EdaCredentialSerializer",
+    "EdaCredentialCreateSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # roles

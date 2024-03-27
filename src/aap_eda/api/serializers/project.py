@@ -15,19 +15,22 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from aap_eda.api.serializers.credential import CredentialRefSerializer
+from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
+    eda_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project
         read_only_fields = [
             "id",
             "url",
+            "scm_type",
             "git_hash",
             "import_state",
             "import_error",
@@ -37,16 +40,24 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
-            "credential_id",
             "organization_id",
+            "eda_credential_id",
+            "signature_validation_credential_id",
+            "scm_branch",
+            "scm_refspec",
             "verify_ssl",
             *read_only_fields,
         ]
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
     organization_id = serializers.IntegerField(required=False, allow_null=True)
+    eda_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
+    signature_validation_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project
@@ -54,9 +65,13 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
             "url",
             "name",
             "description",
-            "credential_id",
             "organization_id",
+            "eda_credential_id",
+            "signature_validation_credential_id",
             "verify_ssl",
+            "scm_type",
+            "scm_branch",
+            "scm_refspec",
         ]
 
 
@@ -79,32 +94,66 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Description of the project",
     )
-    credential_id = serializers.IntegerField(
+    eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        help_text="Credential id of the project",
+        help_text="EdaCredential id of the project",
+    )
+    signature_validation_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "ID of an optional credential used for validating files in the "
+            "project against unexpected changes"
+        ),
     )
     verify_ssl = serializers.BooleanField(
         required=False,
         help_text="Indicates if SSL verification is enabled",
     )
+    scm_branch = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Specific branch, tag or commit to checkout.",
+    )
+    scm_refspec = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="For git projects, an additional refspec to fetch.",
+    )
 
     class Meta:
         model = models.Project
-        fields = ["name", "description", "credential_id", "verify_ssl"]
+        fields = [
+            "name",
+            "description",
+            "eda_credential_id",
+            "signature_validation_credential_id",
+            "scm_branch",
+            "scm_refspec",
+            "verify_ssl",
+        ]
 
 
 class ProjectReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the Project with embedded objects."""
 
-    credential = CredentialRefSerializer(required=False, allow_null=True)
     organization = OrganizationRefSerializer()
+    eda_credential = EdaCredentialRefSerializer(
+        required=False, allow_null=True
+    )
+    signature_validation_credential = EdaCredentialRefSerializer(
+        required=False, allow_null=True
+    )
 
     class Meta:
         model = models.Project
         read_only_fields = [
             "id",
             "url",
+            "scm_type",
             "git_hash",
             "import_state",
             "import_error",
@@ -114,16 +163,26 @@ class ProjectReadSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
-            "credential",
             "organization",
+            "eda_credential",
+            "signature_validation_credential",
             "verify_ssl",
+            "scm_branch",
+            "scm_refspec",
             *read_only_fields,
         ]
 
     def to_representation(self, project):
-        credential = (
-            CredentialRefSerializer(project["credential"]).data
-            if project["credential"]
+        eda_credential = (
+            EdaCredentialRefSerializer(project["eda_credential"]).data
+            if project["eda_credential"]
+            else None
+        )
+        signature_validation_credential = (
+            EdaCredentialRefSerializer(
+                project["signature_validation_credential"]
+            ).data
+            if project["signature_validation_credential"]
             else None
         )
         organization = (
@@ -136,10 +195,14 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "name": project["name"],
             "description": project["description"],
             "url": project["url"],
+            "scm_type": project["scm_type"],
+            "scm_branch": project["scm_branch"],
+            "scm_refspec": project["scm_refspec"],
             "git_hash": project["git_hash"],
             "verify_ssl": project["verify_ssl"],
-            "credential": credential,
             "organization": organization,
+            "eda_credential": eda_credential,
+            "signature_validation_credential": signature_validation_credential,
             "import_state": project["import_state"],
             "import_error": project["import_error"],
             "created_at": project["created_at"],
@@ -154,6 +217,7 @@ class ProjectRefSerializer(serializers.ModelSerializer):
             "id",
             "git_hash",
             "url",
+            "scm_type",
             "name",
             "description",
             "organization_id",

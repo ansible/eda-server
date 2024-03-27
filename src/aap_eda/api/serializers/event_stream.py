@@ -22,7 +22,6 @@ from django.core.validators import RegexValidator
 from rest_framework import serializers
 
 from aap_eda.api.constants import (
-    EDA_SERVER_VAULT_LABEL,
     PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
     PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
 )
@@ -31,11 +30,9 @@ from aap_eda.api.exceptions import (
     MissingEventStreamRulebookKeys,
     MissingEventStreamRulebookSource,
 )
-from aap_eda.api.serializers.credential import CredentialSerializer
 from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
-from aap_eda.api.serializers.utils import substitute_extra_vars, swap_sources
 from aap_eda.core import models, validators
-from aap_eda.core.enums import CredentialType
+from aap_eda.core.utils.strings import substitute_extra_vars, swap_sources
 
 logger = logging.getLogger(__name__)
 
@@ -88,13 +85,6 @@ def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
     if bool(encrypt_vars):
         password = secrets.token_urlsafe()
 
-        credential_id = models.Credential.objects.create(
-            name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
-            credential_type=CredentialType.VAULT,
-            vault_identifier=EDA_SERVER_VAULT_LABEL,
-            secret=password,
-        ).pk
-
     extra_vars = substitute_extra_vars(
         validated_data, extra_vars, encrypt_vars, password
     )
@@ -120,7 +110,6 @@ class EventStreamSerializer(serializers.ModelSerializer):
     )
     user = serializers.SerializerMethodField()
     source_args = YAMLSerializerField(required=False, allow_null=True)
-    credentials = serializers.SerializerMethodField()
 
     class Meta:
         model = models.EventStream
@@ -139,19 +128,12 @@ class EventStreamSerializer(serializers.ModelSerializer):
             "status_message",
             "decision_environment_id",
             "user",
-            "credentials",
             "log_level",
             *read_only_fields,
         ]
 
     def get_user(self, obj) -> str:
         return f"{obj.user.username}"
-
-    def get_credentials(self, obj) -> str:
-        return [
-            CredentialSerializer(credential).data
-            for credential in obj.credentials.all()
-        ]
 
 
 class EventStreamCreateSerializer(serializers.ModelSerializer):
@@ -172,11 +154,6 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             ),
         ],
     )
-    credentials = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=serializers.IntegerField(),
-    )
 
     class Meta:
         model = models.EventStream
@@ -192,7 +169,6 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "extra_var_id",
             "user",
             "restart_policy",
-            "credentials",
             "log_level",
         ]
 
@@ -217,7 +193,6 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             validated_data
         )
         validated_data["extra_var_id"] = extra_var_id
-        validated_data["system_vault_credential_id"] = credential_id
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
         )

@@ -101,11 +101,11 @@ class DecisionEnvironmentViewSet(
     )
     def retrieve(self, request, pk):
         decision_environment = super().retrieve(request, pk)
-        decision_environment.data["credential"] = (
-            models.Credential.objects.get(
-                pk=decision_environment.data["credential_id"]
+        decision_environment.data["eda_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=decision_environment.data["eda_credential_id"]
             )
-            if decision_environment.data["credential_id"]
+            if decision_environment.data["eda_credential_id"]
             else None
         )
 

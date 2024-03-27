@@ -47,6 +47,9 @@ class Project(models.Model):
         FAILED = "failed"
         COMPLETED = "completed"
 
+    class ScmType(models.TextChoices):
+        GIT = "git"
+
     name = models.TextField(
         null=False,
         unique=True,
@@ -56,6 +59,7 @@ class Project(models.Model):
     url = models.TextField(null=False)
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
+    # TODO: used by migration, remove it later
     credential = models.ForeignKey(
         "Credential",
         blank=True,
@@ -65,6 +69,13 @@ class Project(models.Model):
     )
     organization = models.ForeignKey(
         "Organization", on_delete=models.CASCADE, null=True
+    )
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
     )
     archive_file = models.FileField(upload_to=PROJECT_ARCHIVE_DIR)
 
@@ -76,6 +87,23 @@ class Project(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+
+    scm_type = models.TextField(
+        choices=ScmType.choices,
+        default=ScmType.GIT,
+    )
+    scm_branch = models.TextField(blank=True, default="")
+    scm_refspec = models.TextField(blank=True, default="")
+
+    # credential (keys) used to validate content signature
+    signature_validation_credential = models.ForeignKey(
+        "EdaCredential",
+        related_name="%(class)ss_signature_validation",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"

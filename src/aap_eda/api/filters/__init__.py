@@ -17,8 +17,9 @@ from .activation import (
     ActivationInstanceFilter,
     ActivationInstanceLogFilter,
 )
-from .credential import CredentialFilter
+from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
+from .eda_credential import EdaCredentialFilter
 from .event_stream import EventStreamFilter
 from .organization import OrganizationFilter
 from .project import ProjectFilter
@@ -40,8 +41,9 @@ __all__ = (
     "AuditRuleFilter",
     "AuditRuleActionFilter",
     "AuditRuleEventFilter",
-    # credential
-    "CredentialFilter",
+    # credential type
+    "CredentialTypeFilter",
+    "EdaCredentialFilter",
     # decision_environment
     "DecisionEnvironmentFilter",
     # activation instance

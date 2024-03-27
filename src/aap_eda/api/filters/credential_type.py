@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -17,13 +17,13 @@ import django_filters
 from aap_eda.core import models
 
 
-class CredentialFilter(django_filters.FilterSet):
+class CredentialTypeFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter by credential name.",
+        label="Filter by credential type name.",
     )
 
     class Meta:
-        model = models.Credential
+        model = models.CredentialType
         fields = ["name"]

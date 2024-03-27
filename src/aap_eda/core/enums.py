@@ -49,6 +49,8 @@ class ResourceType(DjangoStrEnum):
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
     CREDENTIAL = "credential"
+    CREDENTIAL_TYPE = "credential_type"
+    EDA_CREDENTIAL = "eda_credential"
     EVENT_STREAM = "event_stream"
     ORGANIZATION = "organization"
     TEAM = "team"
@@ -80,11 +82,21 @@ class ActivationStatus(DjangoStrEnum):
     ERROR = "error"
 
 
+# TODO: Deprecated, will be removed in future version, use
+# DefaultCredentialType instead
 class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
     VAULT = "Vault"
+
+
+class DefaultCredentialType(DjangoStrEnum):
+    REGISTRY = "Container Registry"
+    VAULT = "Vault"
+    SOURCE_CONTROL = "Source Control"
+    AAP = "Red Hat Ansible Automation Platform"
+    GPG = "GPG Public Key"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

@@ -103,16 +103,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         null=True,
         default=None,
     )
-    credentials = models.ManyToManyField(
-        "Credential", related_name="activations", default=None
-    )
-    system_vault_credential = models.OneToOneField(
-        "Credential",
-        null=True,
-        default=None,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
     event_streams = models.ManyToManyField(
         "EventStream",
         default=None,
@@ -121,6 +111,16 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         max_length=20,
         choices=RulebookProcessLogLevel.choices(),
         default=get_default_log_level,
+    )
+    eda_credentials = models.ManyToManyField(
+        "EdaCredential", related_name="activations", default=None
+    )
+    eda_system_vault_credential = models.OneToOneField(
+        "EdaCredential",
+        null=True,
+        default=None,
+        on_delete=models.CASCADE,
+        related_name="+",
     )
 
     def save(self, *args, **kwargs):
