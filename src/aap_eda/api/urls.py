@@ -39,7 +39,11 @@ router.register(
     "roles", views.RoleViewSet
 )  # deprecated, DAB RBAC uses roledefinition
 router.register("activations", views.ActivationViewSet)
-router.register("activation-instances", views.ActivationInstanceViewSet)
+router.register(
+    "activation-instances",
+    views.ActivationInstanceViewSet,
+    basename="activationinstance"
+)
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("users", views.UserViewSet)
 router.register("event-streams", views.EventStreamViewSet)
