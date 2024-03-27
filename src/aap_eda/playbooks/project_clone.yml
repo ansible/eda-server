@@ -1,0 +1,41 @@
+---
+# The following variables will be set by the runner of this playbook:
+# project_path: The destination folder
+# scm_url: https://server/repo
+# scm_branch: branch/tag/revision (HEAD if unset)
+# scm_refspec: a refspec to fetch in addition to obtaining version
+# key_file: private ssh file
+# depth: Create a shallow clone with a truncated history. Minimum 1.
+
+- hosts: localhost
+  gather_facts: false
+  connection: local
+  name: Update source tree if necessary
+  vars:
+    scm_branch: HEAD
+  tasks:
+    - name: Update project using git
+      tags:
+        - update_git
+      block:
+        - name: Update project using git
+          ansible.builtin.git:
+            dest: "{{ project_path | quote }}"
+            repo: "{{ scm_url }}"
+            version: "{{ scm_branch | default(omit) | quote }}"
+            refspec: "{{ scm_refspec | default(omit) }}"
+            key_file: "{{ key_file | default(omit) }}"
+            accept_hostkey: true
+            depth: "{{ depth |default(omit) }}"
+          register: git_result
+
+        - name: Set the git repository version
+          ansible.builtin.set_fact:
+            scm_version: "{{ git_result['after'] }}"
+          when: "'after' in git_result"
+
+    - name: Repository Version
+      ansible.builtin.debug:
+        msg: "Repository Version {{ scm_version }}"
+      tags:
+        - update_git
