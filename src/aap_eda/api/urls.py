@@ -42,7 +42,7 @@ router.register("activations", views.ActivationViewSet)
 router.register(
     "activation-instances",
     views.ActivationInstanceViewSet,
-    basename="activationinstance"
+    basename="activationinstance",
 )
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("users", views.UserViewSet)
