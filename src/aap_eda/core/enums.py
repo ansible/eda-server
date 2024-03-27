@@ -120,6 +120,7 @@ class ActivationRequest(DjangoStrEnum):
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+    MONITOR = "monitor"
 
 
 class ProcessParentType(DjangoStrEnum):

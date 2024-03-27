@@ -1050,6 +1050,9 @@ class ActivationManager:
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
         }
+        if settings.LOCAL_QUEUE_NAME:
+            args["queue"] = settings.LOCAL_QUEUE_NAME
+
         args[f"{self.db_instance_type}"] = self.db_instance
         try:
             models.RulebookProcess.objects.create(**args)

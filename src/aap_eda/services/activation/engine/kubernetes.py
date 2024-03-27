@@ -18,6 +18,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import partial
 
 from dateutil import parser
 from kubernetes import client as k8sclient, config, watch
@@ -40,6 +41,7 @@ from .common import (
     ContainerEngine,
     ContainerRequest,
     ContainerStatus,
+    EngineEvent,
     LogHandler,
 )
 
@@ -96,6 +98,23 @@ class Engine(ContainerEngine):
         self.secret_name = f"{self.resource_prefix}-secret-{activation_id}"
         self.job_name = None
         self.pod_name = None
+
+    def monitor_events(self):
+        w = watch.Watch()
+        for event in w.stream(
+            partial(
+                self.client.core_api.list_namespaced_event,
+                namespace=self.namespace,
+            )
+        ):
+            yield EngineEvent(
+                name=event["object"]["involvedObject"]["name"],
+                type=event.get("type", "missing"),
+                message=event["object"]["message"],
+                reason=event["object"]["reason"],
+                time=event["object"]["metadata"]["creationTimestamp"],
+            )
+        w.stop()
 
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         # TODO : Should this be compatible with the previous version

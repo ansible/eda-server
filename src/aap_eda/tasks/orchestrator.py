@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 import logging
-from typing import Union
+from typing import Optional, Union
 
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -27,9 +27,11 @@ from aap_eda.core.enums import (
 from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
 from aap_eda.core.tasking import unique_enqueue
 from aap_eda.services.activation import exceptions
+from aap_eda.services.activation.engine.factory import new_container_engine
 from aap_eda.services.activation.manager import ActivationManager
 
 LOGGER = logging.getLogger(__name__)
+_MANAGE_TASK = "aap_eda.tasks.orchestrator.manage"
 
 
 def _manage_process_job_id(process_parent_type: str, id: int) -> str:
@@ -37,23 +39,14 @@ def _manage_process_job_id(process_parent_type: str, id: int) -> str:
     return f"{process_parent_type}-{id}"
 
 
-def _manage(process_parent_type: str, id: int) -> None:
+def manage(process_parent_type: str, id: int) -> None:
     """Manage the activation with the given id.
 
     It will run pending user requests or monitor the activation
     if there are no pending requests.
     """
-    try:
-        if process_parent_type == ProcessParentType.ACTIVATION:
-            klass = Activation
-        else:
-            klass = EventStream
-        process_parent = klass.objects.get(id=id)
-    except ObjectDoesNotExist:
-        LOGGER.warning(
-            f"{process_parent_type} with {id} no longer exists, "
-            "activation manager task will not be processed",
-        )
+    process_parent = _get_process_parent(process_parent_type, id)
+    if not process_parent:
         return
 
     has_request_processed = False
@@ -111,6 +104,8 @@ def _run_request(
             manager.restart()
         elif request.request == ActivationRequest.DELETE:
             manager.delete()
+        elif request.request == ActivationRequest.MONITOR:
+            manager.monitor()
     except exceptions.MaxRunningProcessesError:
         return False
     except Exception as e:
@@ -125,39 +120,59 @@ def _make_user_request(
     process_parent_type: ProcessParentType,
     id: int,
     request_type: ActivationRequest,
+    queue="activation",
 ) -> None:
     """Enqueue a task to manage the activation with the given id."""
     requests_queue.push(process_parent_type, id, request_type)
     job_id = _manage_process_job_id(process_parent_type, id)
-    unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+    if not queue:
+        queue = "activation"
+    unique_enqueue(queue, job_id, _MANAGE_TASK, process_parent_type, id)
 
 
 def start_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to start the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.START)
+    _make_user_request(process_parent_type, id, ActivationRequest.START, None)
 
 
 def stop_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to stop the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.STOP)
+    queue = _get_queue_name(process_parent_type, id)
+    _make_user_request(process_parent_type, id, ActivationRequest.STOP, queue)
 
 
 def delete_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to delete the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.DELETE)
+    queue = _get_queue_name(process_parent_type, id)
+    _make_user_request(
+        process_parent_type, id, ActivationRequest.DELETE, queue
+    )
 
 
 def restart_rulebook_process(
     process_parent_type: ProcessParentType, id: int
 ) -> None:
     """Create a request to restart the activation with the given id."""
-    _make_user_request(process_parent_type, id, ActivationRequest.RESTART)
+    queue = _get_queue_name(process_parent_type, id)
+    _make_user_request(
+        process_parent_type, id, ActivationRequest.RESTART, queue
+    )
+
+
+def monitor_rulebook_process(
+    process_parent_type: ProcessParentType, id: int
+) -> None:
+    """Create a request to monitor the activation with the given id."""
+    queue = _get_queue_name(process_parent_type, id)
+    _make_user_request(
+        process_parent_type, id, ActivationRequest.MONITOR, queue
+    )
 
 
 def monitor_rulebook_processes() -> None:
@@ -172,7 +187,8 @@ def monitor_rulebook_processes() -> None:
     # run pending user requests
     for process_parent_type, id in requests_queue.list_requests():
         job_id = _manage_process_job_id(process_parent_type, id)
-        unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+        queue = _get_queue_name(process_parent_type, id)
+        unique_enqueue(queue, job_id, _MANAGE_TASK, process_parent_type, id)
 
     # monitor running instances
     for process in models.RulebookProcess.objects.filter(
@@ -184,4 +200,55 @@ def monitor_rulebook_processes() -> None:
         else:
             id = process.event_stream_id
         job_id = _manage_process_job_id(process_parent_type, id)
-        unique_enqueue("activation", job_id, _manage, process_parent_type, id)
+        queue = _get_queue_name(process_parent_type, id)
+        unique_enqueue(queue, job_id, _MANAGE_TASK, process_parent_type, id)
+
+
+def monitor_engine_events() -> None:
+    """Monitor container engine events.
+
+    Started by the scheduler, executed by the activation worker.
+    It enqueues a monitor task for each activation when it ends
+    """
+    container_engine = new_container_engine(1, ProcessParentType.ACTIVATION)
+    for event in container_engine.monitor_events():
+        # monitor running instances
+        LOGGER.info(f"Container engine event {event}")
+        if event.reason in ["died", "Completed", "BackoffLimitExceeded"]:
+            for process in models.RulebookProcess.objects.filter(
+                status=ActivationStatus.RUNNING, activation_pod_id=event.name
+            ):
+                try:
+                    process_parent_type = str(process.parent_type)
+                    if process_parent_type == ProcessParentType.ACTIVATION:
+                        id = process.activation_id
+                    else:
+                        id = process.event_stream_id
+                    monitor_rulebook_process(process_parent_type, id)
+                except Exception as e:
+                    LOGGER.error(f"Monitor events error {e}")
+
+
+def _get_queue_name(
+    process_parent_type: ProcessParentType, id: int
+) -> Optional[str]:
+    obj = _get_process_parent(process_parent_type, id)
+    if obj and obj.latest_instance and obj.latest_instance.queue:
+        return obj.latest_instance.queue
+
+    return "activation"
+
+
+def _get_process_parent(process_parent_type: ProcessParentType, id: int):
+    try:
+        if process_parent_type == ProcessParentType.ACTIVATION:
+            klass = Activation
+        else:
+            klass = EventStream
+        return klass.objects.get(id=id)
+    except ObjectDoesNotExist:
+        LOGGER.warning(
+            f"{process_parent_type} with {id} no longer exists, "
+            "activation manager task will not be processed",
+        )
+    return None

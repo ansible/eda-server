@@ -18,8 +18,9 @@ from django.db.utils import IntegrityError
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
-from aap_eda.core.tasking import enqueue_delay
+from aap_eda.core.tasking import enqueue_delay, unique_enqueue
 
+_MANAGE_TASK = "aap_eda.tasks.orchestrator.manage"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -49,6 +50,10 @@ def _queue_auto_start(process_parent_type: str, id: int) -> None:
     try:
         requests_queue.push(
             process_parent_type, id, ActivationRequest.AUTO_START
+        )
+        job_id = f"{process_parent_type}-{id}"
+        unique_enqueue(
+            "activation", job_id, _MANAGE_TASK, process_parent_type, id
         )
     except IntegrityError:
         LOGGER.warning(
