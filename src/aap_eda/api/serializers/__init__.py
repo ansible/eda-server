@@ -52,6 +52,11 @@ from .event_stream import (
     EventStreamOutSerializer,
     EventStreamSerializer,
 )
+from .organization import (
+    OrganizationCreateSerializer,
+    OrganizationRefSerializer,
+    OrganizationSerializer,
+)
 from .project import (
     ExtraVarCreateSerializer,
     ExtraVarRefSerializer,
@@ -70,6 +75,12 @@ from .rulebook import (
     AuditRuleSerializer,
     RulebookRefSerializer,
     RulebookSerializer,
+)
+from .team import (
+    TeamCreateSerializer,
+    TeamDetailSerializer,
+    TeamSerializer,
+    TeamUpdateSerializer,
 )
 from .user import (
     AwxTokenCreateSerializer,
@@ -118,6 +129,7 @@ __all__ = (
     # credential
     "CredentialSerializer",
     "CredentialCreateSerializer",
+    "CredentialRefSerializer",
     # credential type
     "CredentialTypeSerializer",
     "CredentialTypeCreateSerializer",
@@ -134,4 +146,13 @@ __all__ = (
     "EventStreamSerializer",
     "EventStreamCreateSerializer",
     "EventStreamOutSerializer",
+    # organizations
+    "OrganizationSerializer",
+    "OrganizationCreateSerializer",
+    "OrganizationRefSerializer",
+    # teams
+    "TeamSerializer",
+    "TeamCreateSerializer",
+    "TeamUpdateSerializer",
+    "TeamDetailSerializer",
 )

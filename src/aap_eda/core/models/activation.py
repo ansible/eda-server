@@ -23,6 +23,7 @@ from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
+from .organization import Organization
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
@@ -33,6 +34,12 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
         ordering = ("-created_at",)
+        permissions = [
+            ("enable_activation", "Can enable an activation"),
+            ("disable_activation", "Can disable an activation"),
+            ("restart_activation", "Can restart an activation"),
+        ]
+        default_permissions = ["add", "view", "delete"]
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
@@ -51,6 +58,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     )
     extra_var = models.ForeignKey(
         "ExtraVar", on_delete=models.CASCADE, null=True
+    )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
@@ -112,3 +122,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="+",
     )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])

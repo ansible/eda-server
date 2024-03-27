@@ -13,16 +13,22 @@
 #  limitations under the License.
 
 import django_filters
-from ansible_base.rbac.models import RoleDefinition
+
+from aap_eda.core.models import Organization
 
 
-class RoleFilter(django_filters.FilterSet):
+class OrganizationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter roles by name.",
+        label="Filter by organization name.",
+    )
+    description = django_filters.CharFilter(
+        field_name="description",
+        lookup_expr="icontains",
+        label="Filter by organization description.",
     )
 
     class Meta:
-        model = RoleDefinition
-        fields = ["name"]
+        model = Organization
+        fields = ["name", "description"]

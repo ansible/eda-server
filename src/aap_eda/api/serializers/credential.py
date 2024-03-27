@@ -26,6 +26,7 @@ class CredentialSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "organization_id",
         ]
         fields = [
             "name",
@@ -39,6 +40,7 @@ class CredentialSerializer(serializers.ModelSerializer):
 
 class CredentialCreateSerializer(serializers.ModelSerializer):
     secret = serializers.CharField(required=True, allow_null=False)
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
         credential_type = data.get("credential_type", CredentialType.REGISTRY)
@@ -63,6 +65,7 @@ class CredentialCreateSerializer(serializers.ModelSerializer):
             "username",
             "vault_identifier",
             "secret",
+            "organization_id",
         ]
 
 
@@ -78,5 +81,6 @@ class CredentialRefSerializer(serializers.ModelSerializer):
             "credential_type",
             "username",
             "vault_identifier",
+            "organization_id",
         ]
         read_only_fields = ["id"]

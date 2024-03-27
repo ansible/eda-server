@@ -26,6 +26,8 @@
 
 from django.db import models
 
+from .organization import Organization
+
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
@@ -65,6 +67,9 @@ class Project(models.Model):
         default=None,
         on_delete=models.SET_NULL,
     )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
     eda_credential = models.ForeignKey(
         "EdaCredential",
         blank=True,
@@ -103,14 +108,33 @@ class Project(models.Model):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])
+
 
 class ExtraVar(models.Model):
     class Meta:
         db_table = "core_extra_var"
+        default_permissions = (
+            "add",
+            "view",
+        )
 
     name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])
 
 
 __all__ = [

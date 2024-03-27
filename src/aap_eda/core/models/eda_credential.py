@@ -16,6 +16,8 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
+from .organization import Organization
+
 __all__ = ("EdaCredential",)
 
 
@@ -39,3 +41,12 @@ class EdaCredential(models.Model):
     credential_type = models.ForeignKey(
         "CredentialType", on_delete=models.CASCADE, null=True
     )
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.CASCADE, null=True
+    )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if not self.organization:
+            self.organization = Organization.objects.get_default()
+            super().save(update_fields=["organization"])

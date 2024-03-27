@@ -1,5 +1,8 @@
 from django.db import migrations
 
+# The source of truth for permissions data changed since this migration
+# - actions available for model is defined in model Meta properties
+# - models tracked by role permissions added to permission_registry.register()
 PERMISSIONS = {
     "activation": [
         "create",

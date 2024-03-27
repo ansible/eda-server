@@ -90,6 +90,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
             "ruleset_name",
             "activation_instance_id",
             "job_instance_id",
+            "organization_id",
             "definition",
         ]
         read_only_fields = ["id", "created_at"]
@@ -227,6 +228,7 @@ class AuditActionSerializer(serializers.ModelSerializer):
             "status",
             "url",
             "fired_at",
+            "organization_id",
             "rule_fired_at",
             "audit_rule_id",
             "status_message",
@@ -263,5 +265,14 @@ class AuditEventSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.AuditEvent
-        fields = "__all__"
+        fields = [
+            "id",
+            "source_name",
+            "source_type",
+            "payload",
+            "organization_id",
+            "audit_actions",
+            "received_at",
+            "rule_fired_at",
+        ]
         read_only_fields = ["id"]

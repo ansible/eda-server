@@ -18,10 +18,7 @@ from django.db import models
 
 from aap_eda.core.enums import Action, ResourceType
 
-__all__ = (
-    "Role",
-    "Permission",
-)
+__all__ = ("Role", "Permission")
 
 
 class Role(models.Model):

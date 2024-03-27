@@ -11,6 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.lib.dynamic_config.dynamic_urls import (
+    api_version_urls as dab_urls,
+)
 from ansible_base.resource_registry.urls import (
     urlpatterns as resource_api_urls,
 )
@@ -27,24 +30,42 @@ from rest_framework_simplejwt import views as jwt_views
 from . import views
 
 router = routers.SimpleRouter()
-router.register("extra-vars", views.ExtraVarViewSet)
-router.register("projects", views.ProjectViewSet)
-router.register("rulebooks", views.RulebookViewSet)
-router.register("roles", views.RoleViewSet)
-router.register("activations", views.ActivationViewSet)
-router.register("activation-instances", views.ActivationInstanceViewSet)
-router.register("audit-rules", views.AuditRuleViewSet)
-router.register("users", views.UserViewSet)
-router.register("event-streams", views.EventStreamViewSet)
+# basename has to be set when queryset is user-dependent
+# which is any model with permissions
+router.register("extra-vars", views.ExtraVarViewSet, basename="extravar")
+router.register("projects", views.ProjectViewSet, basename="project")
+router.register("rulebooks", views.RulebookViewSet, basename="rulebook")
+router.register(
+    "roles", views.RoleViewSet, basename="role"
+)  # deprecated, DAB RBAC uses roledefinition
+router.register("activations", views.ActivationViewSet, basename="activation")
+router.register(
+    "activation-instances",
+    views.ActivationInstanceViewSet,
+    basename="activationinstance",
+)
+router.register("audit-rules", views.AuditRuleViewSet, basename="auditrule")
+router.register("users", views.UserViewSet, basename="user")
+router.register(
+    "event-streams", views.EventStreamViewSet, basename="eventstream"
+)
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,
     basename="controller-token",
 )
-router.register("credentials", views.CredentialViewSet)
+router.register("credentials", views.CredentialViewSet, basename="credential")
 router.register("credential-types", views.CredentialTypeViewSet)
 router.register("eda-credentials", views.EdaCredentialViewSet)
-router.register("decision-environments", views.DecisionEnvironmentViewSet)
+router.register(
+    "decision-environments",
+    views.DecisionEnvironmentViewSet,
+    basename="decisionenvironment",
+)
+router.register(
+    "organizations", views.OrganizationViewSet, basename="organization"
+)
+router.register("teams", views.TeamViewSet, basename="team")
 
 openapi_urls = [
     path(
@@ -70,6 +91,7 @@ openapi_urls = [
 ]
 
 v1_urls = [
+    path("", include(dab_urls)),
     path("", include(resource_api_urls)),
     path("", include(openapi_urls)),
     path("auth/session/login/", views.SessionLoginView.as_view()),

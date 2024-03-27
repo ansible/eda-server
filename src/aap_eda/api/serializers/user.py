@@ -18,7 +18,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
     )
     created_at = serializers.DateTimeField(source="date_joined")
 
-    roles = RoleRefSerializer(read_only=True, many=True)
+    roles = RoleRefSerializer(
+        many=True, allow_empty=True, allow_null=True, required=False
+    )
 
     class Meta:
         model = models.User
@@ -60,7 +62,9 @@ class UserListSerializer(serializers.Serializer):
         help_text="The user is a superuser.",
     )
 
-    roles = RoleRefSerializer(read_only=True, many=True)
+    roles = RoleRefSerializer(
+        many=True, allow_empty=True, allow_null=True, required=False
+    )
 
 
 class UserUpdateSerializerBase(serializers.ModelSerializer):

@@ -162,6 +162,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
+    "ansible_base.rbac",
     "ansible_base.resource_registry",
     # Local apps
     "aap_eda.api",
@@ -272,7 +273,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
-        "aap_eda.api.permissions.RoleBasedPermission",
+        "ansible_base.rbac.api.permissions.AnsibleBaseObjectPermissions",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
@@ -496,6 +497,19 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
 # DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
 # ---------------------------------------------------------
 ANSIBLE_BASE_RESOURCE_CONFIG_MODULE = "aap_eda.api.resource_api"
+
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE RBAC SETTINGS
+# ---------------------------------------------------------
+DEFAULT_ORGANIZATION_NAME = "Default"
+
+ANSIBLE_BASE_SERVICE_PREFIX = "eda"
+
+ANSIBLE_BASE_TEAM_MODEL = "core.Team"
+ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
+
+# Organization and object roles will come from create_initial_data
+ANSIBLE_BASE_ROLE_PRECREATE = {}
 
 ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
