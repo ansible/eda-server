@@ -54,14 +54,15 @@ from aap_eda.core.enums import Action, ResourceType
 class RulebookViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
+    queryset = models.Rulebook.objects.order_by("id")
     serializer_class = serializers.RulebookSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.RulebookFilter
 
     rbac_action = None
 
-    def get_queryset(self):
-        return models.Rulebook.access_qs(self.request.user).order_by("id")
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
 
     @extend_schema(
         description="Get the JSON format of a rulebook by its id",
@@ -100,6 +101,7 @@ class RulebookViewSet(
 class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
+    queryset = models.AuditRule.objects.all()
     filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
     filterset_class = filters.AuditRuleFilter
     ordering_fields = [
@@ -110,8 +112,8 @@ class AuditRuleViewSet(
         "fired_at",
     ]
 
-    def get_queryset(self):
-        return models.AuditRule.access_qs(self.request.user)
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(queryset.model.access_qs(self.request.user, queryset=queryset))
 
     def get_serializer_class(self):
         if self.action == "retrieve":
