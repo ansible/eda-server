@@ -32,44 +32,32 @@ from . import views
 router = routers.SimpleRouter()
 # basename has to be set when queryset is user-dependent
 # which is any model with permissions
-router.register("extra-vars", views.ExtraVarViewSet, basename="extravar")
-router.register("projects", views.ProjectViewSet, basename="project")
-router.register("rulebooks", views.RulebookViewSet, basename="rulebook")
+router.register("extra-vars", views.ExtraVarViewSet)
+router.register("projects", views.ProjectViewSet)
+router.register("rulebooks", views.RulebookViewSet)
 router.register(
-    "roles", views.RoleViewSet, basename="role"
+    "roles", views.RoleViewSet
 )  # deprecated, DAB RBAC uses roledefinition
-router.register("activations", views.ActivationViewSet, basename="activation")
+router.register("activations", views.ActivationViewSet)
 router.register(
     "activation-instances",
     views.ActivationInstanceViewSet,
     basename="activationinstance",
 )
-router.register("audit-rules", views.AuditRuleViewSet, basename="auditrule")
-router.register("users", views.UserViewSet, basename="user")
-router.register(
-    "event-streams", views.EventStreamViewSet, basename="eventstream"
-)
+router.register("audit-rules", views.AuditRuleViewSet)
+router.register("users", views.UserViewSet)
+router.register("event-streams", views.EventStreamViewSet)
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,
     basename="controller-token",
 )
-router.register("credentials", views.CredentialViewSet, basename="credential")
-router.register(
-    "credential-types", views.CredentialTypeViewSet, basename="credentialtype"
-)
-router.register(
-    "eda-credentials", views.EdaCredentialViewSet, basename="edacredential"
-)
-router.register(
-    "decision-environments",
-    views.DecisionEnvironmentViewSet,
-    basename="decisionenvironment",
-)
-router.register(
-    "organizations", views.OrganizationViewSet, basename="organization"
-)
-router.register("teams", views.TeamViewSet, basename="team")
+router.register("credentials", views.CredentialViewSet)
+router.register("credential-types", views.CredentialTypeViewSet)
+router.register("eda-credentials", views.EdaCredentialViewSet)
+router.register("decision-environments", views.DecisionEnvironmentViewSet)
+router.register("organizations", views.OrganizationViewSet)
+router.register("teams", views.TeamViewSet)
 
 openapi_urls = [
     path(
