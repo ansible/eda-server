@@ -63,6 +63,7 @@ class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
+    queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
@@ -70,8 +71,12 @@ class ActivationViewSet(
     rbac_resource_type = None
     rbac_action = None
 
-    def get_queryset(self):
-        return models.Activation.access_qs(self.request.user)
+    def filter_queryset(self, queryset):
+        if queryset.model is models.Activation:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
 
     @extend_schema(
         request=serializers.ActivationCreateSerializer,
@@ -174,7 +179,9 @@ class ActivationViewSet(
         url_path="(?P<id>[^/.]+)/instances",
     )
     def instances(self, request, id):
-        activation_exists = self.get_queryset().filter(id=id).exists()
+        activation_exists = (
+            models.Activation.access_qs(request.user).filter(id=id).exists()
+        )
         if not activation_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
@@ -368,14 +375,19 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
+    queryset = models.RulebookProcess.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
     rbac_resource_type = ResourceType.ACTIVATION_INSTANCE
     rbac_action = None
 
-    def get_queryset(self):
-        return models.RulebookProcess.access_qs(self.request.user)
+    def filter_queryset(self, queryset):
+        if queryset.model is models.RulebookProcess:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
 
     @extend_schema(
         description="List all logs for the Activation Instance",
@@ -402,7 +414,11 @@ class ActivationInstanceViewSet(
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
-        instance_exists = self.get_queryset().filter(pk=id).exists()
+        instance_exists = (
+            models.RulebookProcess.access_qs(request.user)
+            .filter(pk=id)
+            .exists()
+        )
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,

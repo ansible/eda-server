@@ -69,13 +69,16 @@ class OrganizationViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
+    queryset = models.Organization.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.OrganizationFilter
     rbac_resource_type = ResourceType.ORGANIZATION
     rbac_action = None
 
-    def get_queryset(self):
-        return models.Organization.access_qs(self.request.user).order_by("id")
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     def get_serializer_class(self):
         return serializers.OrganizationSerializer
