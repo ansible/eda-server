@@ -108,6 +108,13 @@ class DecisionEnvironmentViewSet(
             if decision_environment.data["eda_credential_id"]
             else None
         )
+        decision_environment.data["organization"] = (
+            models.Organization.objects.get(
+                pk=decision_environment.data["organization_id"]
+            )
+            if decision_environment.data["organization_id"]
+            else None
+        )
 
         return Response(
             serializers.DecisionEnvironmentReadSerializer(

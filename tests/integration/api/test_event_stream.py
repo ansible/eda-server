@@ -26,6 +26,10 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action, ProcessParentType, ResourceType
 from tests.integration.constants import api_url_v1
 
+pytestmark = pytest.mark.skip(
+    reason="EventStream views are currently hidden, thus no need to run tests"
+)
+
 BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_TYPE = """
 ---
 - name: PG Notify Template Event Stream

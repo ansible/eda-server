@@ -11,6 +11,10 @@ from pydantic.error_wrappers import ValidationError
 from aap_eda.core import enums, models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
+# TODO(doston): this test module needs a whole refactor to use already
+# existing fixtures over from API conftest.py instead of creating new objects
+# keeping it to minimum for now to pass all failing tests
+
 TIMEOUT = 5
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -56,12 +60,15 @@ VAULT_INPUTS = {
 
 
 @pytest.fixture(autouse=True)
-def vault_credential_type() -> models.CredentialType:
+def vault_credential_type(
+    default_organization: models.Organization,
+) -> models.CredentialType:
     credential_type = models.CredentialType.objects.create(
         name=enums.DefaultCredentialType.VAULT,
         inputs=VAULT_INPUTS,
         injectors={},
         managed=True,
+        organization=default_organization,
     )
     credential_type.refresh_from_db()
     return credential_type
@@ -178,7 +185,9 @@ async def test_handle_workers_with_validation_errors():
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_jobs(ws_communicator: WebsocketCommunicator):
+async def test_handle_jobs(
+    ws_communicator: WebsocketCommunicator,
+):
     rulebook_process_id = await _prepare_db_data()
 
     assert (await get_job_instance_count()) == 0
@@ -280,7 +289,9 @@ async def test_handle_actions_with_empty_job_uuid(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_actions(ws_communicator: WebsocketCommunicator):
+async def test_handle_actions(
+    ws_communicator: WebsocketCommunicator,
+):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
@@ -355,7 +366,9 @@ async def test_rule_status_with_multiple_failed_actions(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
+async def test_handle_heartbeat(
+    ws_communicator: WebsocketCommunicator,
+):
     rulebook_process_id = await _prepare_db_data()
     rulebook_process = await get_rulebook_process(rulebook_process_id)
 

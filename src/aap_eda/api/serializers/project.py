@@ -229,7 +229,6 @@ class ExtraVarSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
-        validators=[validators.is_extra_var_dict],
     )
 
     class Meta:
@@ -242,6 +241,7 @@ class ExtraVarCreateSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
+        validators=[validators.is_extra_var_dict],
     )
     organization_id = serializers.IntegerField(required=False, allow_null=True)
 
