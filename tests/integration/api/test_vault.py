@@ -29,6 +29,7 @@ label = "EDA"
 @pytest.mark.parametrize(
     "plaintext", ["abc", "space between", "preserve   spaces"]
 )
+@pytest.mark.django_db
 def test_vault_strings(plaintext):
     vault_string = encrypt_string(PASSWORD, plaintext, label)
     decrypted_value = decrypt(PASSWORD, vault_string)
@@ -37,6 +38,7 @@ def test_vault_strings(plaintext):
     assert plaintext == decrypted_value
 
 
+@pytest.mark.django_db
 def test_failed_decrypt():
     vault_string = encrypt_string(PASSWORD, "abc", label)
 

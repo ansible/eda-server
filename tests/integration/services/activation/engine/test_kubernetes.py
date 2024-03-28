@@ -329,6 +329,7 @@ def test_engine_init_with_exception(init_data):
         )
 
 
+@pytest.mark.django_db
 def test_get_k8s_client():
     with mock.patch("kubernetes.config.load_incluster_config"):
         client = get_k8s_client()
@@ -339,6 +340,7 @@ def test_get_k8s_client():
         assert client.network_api is not None
 
 
+@pytest.mark.django_db
 def test_get_k8s_client_exception():
     def raise_config_exception(*args, **kwargs):
         raise ConfigException("Config error")

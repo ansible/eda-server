@@ -146,6 +146,7 @@ def podman_engine(init_data):
         yield engine
 
 
+@pytest.mark.django_db
 def test_get_podman_client(settings):
     settings.PODMAN_SOCKET_URL = None
     uid_0_mock = mock.Mock(return_value=0)
@@ -167,6 +168,7 @@ def test_get_podman_client(settings):
     )
 
 
+@pytest.mark.django_db
 def test_get_podman_client_with_exception(settings):
     def raise_error(*args, **kwargs):
         raise ValueError("Failed to initialize client")

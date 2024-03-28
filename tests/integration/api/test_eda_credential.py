@@ -38,7 +38,8 @@ INPUTS = {
 
 @pytest.mark.django_db
 def test_create_eda_credential(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    credential_type: models.CredentialType,
 ):
     data_in = {
         "name": "eda-credential",

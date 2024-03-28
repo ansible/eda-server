@@ -27,6 +27,7 @@ def fake_task(number: int):
     pass
 
 
+@pytest.mark.django_db
 def test_unique_enqueue_existing_job(default_queue, eda_caplog):
     default_queue.enqueue(fake_task, job_id="fake_task", number=1)
     job = unique_enqueue(default_queue.name, "fake_task", fake_task, number=2)
@@ -34,6 +35,7 @@ def test_unique_enqueue_existing_job(default_queue, eda_caplog):
     assert "already enqueued" in eda_caplog.text
 
 
+@pytest.mark.django_db
 def test_unique_enqueue_old_job_completed(default_queue, eda_caplog):
     old_job = default_queue.enqueue(fake_task, job_id="fake_task", number=1)
     old_job.set_status("finished")
@@ -42,6 +44,7 @@ def test_unique_enqueue_old_job_completed(default_queue, eda_caplog):
     assert "Enqueing unique job" in eda_caplog.text
 
 
+@pytest.mark.django_db
 def test_unique_enqueue_old_job_failed(default_queue, eda_caplog):
     old_job = default_queue.enqueue(fake_task, job_id="fake_task", number=1)
     old_job.set_status("failed")
@@ -50,6 +53,7 @@ def test_unique_enqueue_old_job_failed(default_queue, eda_caplog):
     assert "Enqueing unique job" in eda_caplog.text
 
 
+@pytest.mark.django_db
 def test_unique_enqueue_new_job(default_queue, eda_caplog):
     job = unique_enqueue(default_queue.name, "fake_task", fake_task, number=2)
     assert job.kwargs["number"] == 2
