@@ -35,37 +35,6 @@ TEST_RULESETS = """
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
-VAULT_INPUTS = {
-    "fields": [
-        {
-            "id": "vault_id",
-            "label": "Vault Identifier",
-            "type": "string",
-            "help_text": ("Vault identifier to use use with vaulted strings"),
-        },
-        {
-            "id": "vault_password",
-            "label": "Vault Password",
-            "type": "string",
-            "secret": True,
-            "help_text": "Vault Password",
-        },
-    ],
-    "required": ["vault_password"],
-}
-
-
-@pytest.fixture(autouse=True)
-def vault_credential_type() -> models.CredentialType:
-    credential_type = models.CredentialType.objects.create(
-        name=enums.DefaultCredentialType.VAULT,
-        inputs=VAULT_INPUTS,
-        injectors={},
-        managed=True,
-    )
-    credential_type.refresh_from_db()
-    return credential_type
-
 
 @pytest.fixture
 @pytest.mark.django_db(transaction=True)
@@ -127,13 +96,10 @@ async def test_handle_workers_without_credentials(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_eda_system_vault_credential(
-    ws_communicator: WebsocketCommunicator,
-    vault_credential_type: models.CredentialType,
+    ws_communicator: WebsocketCommunicator, preseed_credential_types
 ):
     rulebook_process_id = (
-        await _prepare_activation_instance_with_eda_system_vault_credential(
-            vault_credential_type
-        )
+        await _prepare_activation_instance_with_eda_system_vault_credential()
     )
 
     payload = {
@@ -481,9 +447,7 @@ def get_job_instance_event_count():
 
 
 @database_sync_to_async
-def _prepare_activation_instance_with_eda_system_vault_credential(
-    credential_type: models.CredentialType,
-):
+def _prepare_activation_instance_with_eda_system_vault_credential():
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
@@ -509,12 +473,15 @@ def _prepare_activation_instance_with_eda_system_vault_credential(
         email="luke.skywalker@example.com",
         password="secret",
     )
+    vault_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.VAULT
+    )
 
     credential = models.EdaCredential.objects.create(
         name="eda_credential",
         inputs={"vault_id": "adam", "vault_password": "secret"},
         managed=False,
-        credential_type_id=credential_type.id,
+        credential_type=vault_credential_type,
     )
 
     activation, _ = models.Activation.objects.get_or_create(

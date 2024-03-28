@@ -38,7 +38,8 @@ INPUTS = {
 
 @pytest.mark.django_db
 def test_create_eda_credential(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    credential_type: models.CredentialType,
 ):
     data_in = {
         "name": "eda-credential",
@@ -260,7 +261,9 @@ def test_partial_update_eda_credential_name(
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation(client: APIClient):
+def test_delete_credential_used_by_activation(
+    client: APIClient, preseed_credential_types
+):
     # TODO(alex) presetup should be a reusable fixture
     activation_dependencies = create_activation_related_data()
     create_activation(activation_dependencies)
@@ -272,7 +275,9 @@ def test_delete_credential_used_by_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation_forced(client: APIClient):
+def test_delete_credential_used_by_activation_forced(
+    client: APIClient, preseed_credential_types
+):
     # TODO(alex) presetup should be a reusable fixture
     activation_dependencies = create_activation_related_data()
     create_activation(activation_dependencies)
@@ -285,7 +290,9 @@ def test_delete_credential_used_by_activation_forced(client: APIClient):
 
 @pytest.mark.parametrize("refs", ["true", "false"])
 @pytest.mark.django_db
-def test_retrieve_eda_credential_with_refs(client: APIClient, refs):
+def test_retrieve_eda_credential_with_refs(
+    client: APIClient, refs, preseed_credential_types
+):
     activation_dependencies = create_activation_related_data()
     activation = create_activation(activation_dependencies)
     eda_credential_id = activation_dependencies["eda_credential_id"]
