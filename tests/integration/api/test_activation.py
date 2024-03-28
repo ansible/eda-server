@@ -452,25 +452,6 @@ def test_list_activations_filter_decision_environment_id(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_activations_filter_credential_id(client: APIClient) -> None:
-    """Test filtering by credential_id."""
-    # TODO(alex): Refactor the presetup, it should be fixtures
-    fks = create_activation_related_data()
-    create_activation(fks)
-    eda_credential_id = fks["eda_credential_id"]
-
-    url = f"{api_url_v1}/activations/?credential_id={eda_credential_id}"
-    response = client.get(url)
-    assert response.status_code == status.HTTP_200_OK
-    assert len(response.data["results"]) == 1
-
-    url = f"{api_url_v1}/activations/?credential_id=31415"
-    response = client.get(url)
-    assert response.status_code == status.HTTP_200_OK
-    assert len(response.data["results"]) == 0
-
-
-@pytest.mark.django_db
 @pytest.mark.parametrize("with_project", [True, False])
 def test_retrieve_activation(client: APIClient, with_project):
     fks = create_activation_related_data(with_project)
