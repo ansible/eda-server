@@ -163,22 +163,8 @@ def create_activation_related_data(with_project=True):
         token=TEST_AWX_TOKEN["token"],
         user=user,
     )
-    models.CredentialType.objects.create(
-        name=enums.DefaultCredentialType.VAULT,
-        inputs={"fields": [{"a": "b"}]},
-        injectors={},
-        managed=False,
-    )
-    registry_type = models.CredentialType.objects.create(
+    registry_type = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.REGISTRY,
-        inputs={
-            "fields": [
-                {"id": "username", "label": "Username"},
-                {"id": "password", "label": "Password", "secret": True},
-            ]
-        },
-        injectors={},
-        managed=False,
     )
     eda_credential_id = models.EdaCredential.objects.create(
         name="test-credential",
@@ -751,6 +737,7 @@ def assert_activation_related_object_fks(
     )
 
 
+@pytest.mark.django_db
 def test_get_rules_count():
     ruleset_stats = {
         "Basic short": {

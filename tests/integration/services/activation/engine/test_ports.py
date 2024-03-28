@@ -18,6 +18,7 @@ from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine.ports import find_ports
 
 
+@pytest.mark.django_db
 def test_ports():
     rulebook = """
 ---
@@ -36,6 +37,7 @@ def test_ports():
     assert ports == [("0.0.0.0", 5555)]
 
 
+@pytest.mark.django_db
 def test_ports_as_string():
     rulebook = """
 ---
@@ -51,6 +53,7 @@ def test_ports_as_string():
     assert ports == [(None, 5555)]
 
 
+@pytest.mark.django_db
 def test_ports_with_multi_sources():
     rulebook = """
 ---
@@ -70,6 +73,7 @@ def test_ports_with_multi_sources():
     assert ports == [("0.0.0.0", 5555), ("127.0.0.1", 8888)]
 
 
+@pytest.mark.django_db
 def test_ports_without_host():
     rulebook = """
 ---
@@ -85,6 +89,7 @@ def test_ports_without_host():
     assert ports == [(None, 5555)]
 
 
+@pytest.mark.django_db
 def test_ports_without_port():
     rulebook = """
 ---
@@ -100,6 +105,7 @@ def test_ports_without_port():
     assert ports == []
 
 
+@pytest.mark.django_db
 def test_ports_with_empty_plugin():
     rulebook = """
 ---
@@ -114,6 +120,7 @@ def test_ports_with_empty_plugin():
     assert ports == []
 
 
+@pytest.mark.django_db
 def test_ports_with_extra_vars():
     rulebook = """
 ---
@@ -160,6 +167,7 @@ def test_ports_with_extra_vars():
         find_ports(rulebook, context)
 
 
+@pytest.mark.django_db
 def test_ports_with_extra_vars_without_default():
     rulebook = """
 ---
@@ -175,6 +183,7 @@ def test_ports_with_extra_vars_without_default():
         find_ports(rulebook, context)
 
 
+@pytest.mark.django_db
 def test_ports_non_webhook_source():
     rulebook = """
 ---
@@ -190,6 +199,7 @@ def test_ports_non_webhook_source():
     assert not ports
 
 
+@pytest.mark.django_db
 def test_ports_alertmanager_source():
     rulebook = """
 ---
