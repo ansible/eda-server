@@ -60,12 +60,15 @@ VAULT_INPUTS = {
 
 
 @pytest.fixture(autouse=True)
-def vault_credential_type() -> models.CredentialType:
+def vault_credential_type(
+    default_organization: models.Organization,
+) -> models.CredentialType:
     credential_type = models.CredentialType.objects.create(
         name=enums.DefaultCredentialType.VAULT,
         inputs=VAULT_INPUTS,
         injectors={},
         managed=True,
+        organization=default_organization,
     )
     credential_type.refresh_from_db()
     return credential_type
@@ -75,7 +78,6 @@ def vault_credential_type() -> models.CredentialType:
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_without_credentials(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_with_extra_var = await _prepare_db_data()
     rulebook_process_without_extra_var = (
@@ -133,7 +135,6 @@ async def test_handle_workers_without_credentials(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_eda_system_vault_credential(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
     vault_credential_type: models.CredentialType,
 ):
     rulebook_process_id = (
@@ -164,9 +165,7 @@ async def test_handle_workers_with_eda_system_vault_credential(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_workers_with_validation_errors(
-    default_organization: models.Organization,
-):
+async def test_handle_workers_with_validation_errors():
     communicator = WebsocketCommunicator(
         AnsibleRulebookConsumer.as_asgi(), "ws/"
     )
@@ -188,7 +187,6 @@ async def test_handle_workers_with_validation_errors(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_jobs(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
 
@@ -236,7 +234,6 @@ async def test_handle_events(ws_communicator: WebsocketCommunicator):
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_multiple_firing(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -270,7 +267,6 @@ async def test_handle_actions_multiple_firing(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_with_empty_job_uuid(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     assert (await get_audit_rule_count()) == 0
@@ -295,7 +291,6 @@ async def test_handle_actions_with_empty_job_uuid(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -338,7 +333,6 @@ async def test_handle_actions(
 @pytest.mark.django_db(transaction=True)
 async def test_rule_status_with_multiple_failed_actions(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -374,7 +368,6 @@ async def test_rule_status_with_multiple_failed_actions(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_heartbeat(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     rulebook_process = await get_rulebook_process(rulebook_process_id)
@@ -412,7 +405,6 @@ async def test_handle_heartbeat(
 @pytest.mark.django_db(transaction=True)
 async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
-    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()

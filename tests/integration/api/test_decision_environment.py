@@ -21,7 +21,7 @@ def test_list_decision_environments(
 
 @pytest.mark.django_db
 def test_create_decision_environment(
-    default_credential: models.Credential,
+    default_eda_credential: models.EdaCredential,
     default_organization: models.Organization,
     client: APIClient,
 ):
@@ -30,7 +30,7 @@ def test_create_decision_environment(
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
         "organization_id": default_organization.id,
-        "eda_credential_id": default_credential.id,
+        "eda_credential_id": default_eda_credential.id,
     }
     response = client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
@@ -66,10 +66,10 @@ def test_retrieve_decision_environment_not_exist(client: APIClient):
 @pytest.mark.django_db
 def test_partial_update_decision_environment(
     default_de: models.DecisionEnvironment,
-    default_vault_credential: models.Credential,
+    default_vault_credential: models.EdaCredential,
     client: APIClient,
 ):
-    data = {"credential_id": default_vault_credential.id}
+    data = {"eda_credential_id": default_vault_credential.id}
     response = client.patch(
         f"{api_url_v1}/decision-environments/{default_de.id}/", data=data
     )
@@ -79,7 +79,7 @@ def test_partial_update_decision_environment(
     assert_de_base_data(response.data, default_de)
     assert_de_fk_data(response.data, default_de)
 
-    assert default_de.credential == default_vault_credential
+    assert default_de.eda_credential == default_vault_credential
 
 
 @pytest.mark.django_db
@@ -152,10 +152,10 @@ def assert_de_base_data(
 def assert_de_fk_data(
     response: Dict[str, Any], expected: models.DecisionEnvironment
 ):
-    if expected.credential:
-        assert response["credential_id"] == expected.credential.id
+    if expected.eda_credential:
+        assert response["eda_credential_id"] == expected.eda_credential.id
     else:
-        assert not response["credential_id"]
+        assert not response["eda_credential_id"]
     if expected.organization:
         assert response["organization_id"] == expected.organization.id
     else:
@@ -163,28 +163,21 @@ def assert_de_fk_data(
 
 
 def assert_de_related_data(response: Dict[str, Any], expected: models.Project):
-    if expected.credential:
-        credential_data = response["credential"]
-        assert credential_data["id"] == expected.credential.id
-        assert credential_data["name"] == expected.credential.name
+    if expected.eda_credential:
+        credential_data = response["eda_credential"]
+        assert credential_data["id"] == expected.eda_credential.id
+        assert credential_data["name"] == expected.eda_credential.name
         assert (
-            credential_data["description"] == expected.credential.description
+            credential_data["description"]
+            == expected.eda_credential.description
         )
+        assert credential_data["managed"] == expected.eda_credential.managed
         assert (
-            credential_data["credential_type"]
-            == expected.credential.credential_type
-        )
-        assert credential_data["username"] == expected.credential.username
-        assert (
-            credential_data["vault_identifier"]
-            == expected.credential.vault_identifier
-        )
-        assert (
-            credential_data["organization_id"]
-            == expected.credential.organization.id
+            credential_data["credential_type_id"]
+            == expected.eda_credential.credential_type.id
         )
     else:
-        assert not response["credential"]
+        assert not response["eda_credential"]
     if expected.organization:
         organization_data = response["organization"]
         assert organization_data["id"] == expected.organization.id

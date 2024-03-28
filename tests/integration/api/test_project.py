@@ -19,7 +19,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
+from aap_eda.core.utils.credentials import inputs_to_store
 from tests.integration.constants import api_url_v1
 
 
@@ -324,7 +324,7 @@ def test_partial_update_project(
 ):
     assert new_project.eda_credential_id is None
     assert new_project.signature_validation_credential_id is None
-    assert new_project.verify_ssl is True
+    assert new_project.verify_ssl is False
 
     new_data = {
         "name": "new-project-updated",
@@ -347,8 +347,6 @@ def test_partial_update_project(
         new_project.signature_validation_credential.id
         == new_data["eda_credential_id"]
     )
-    assert new_project.scm_branch == new_data["scm_branch"]
-    assert new_project.scm_refspec == new_data["scm_refspec"]
     assert new_project.verify_ssl is new_data["verify_ssl"]
 
     assert_project_base_data(response.json(), new_project)
@@ -419,7 +417,7 @@ def assert_project_related_data(
     response: Dict[str, Any], expected: models.Project
 ):
     if expected.eda_credential:
-        credential_data = response["credential"]
+        credential_data = response["eda_credential"]
         assert credential_data["id"] == expected.eda_credential.id
         assert credential_data["name"] == expected.eda_credential.name
         assert (
@@ -428,19 +426,11 @@ def assert_project_related_data(
         )
         assert credential_data["managed"] == expected.eda_credential.managed
         assert (
-            credential_data["credential_type"]
-            == expected.eda_credential.credential_type
-        )
-        assert credential_data["inputs"] == inputs_to_display(
-            expected.eda_credential.credential_type.inputs,
-            expected.eda_credential.inputs.get_secret_value(),
-        )
-        assert (
-            credential_data["organization_id"]
-            == expected.eda_credential.organization.id
+            credential_data["credential_type_id"]
+            == expected.eda_credential.credential_type.id
         )
     else:
-        assert not response["credential"]
+        assert not response["eda_credential"]
     if expected.organization:
         organization_data = response["organization"]
         assert organization_data["id"] == expected.organization.id

@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import uuid
-from typing import Any, Dict, List
+from typing import List
 from unittest import mock
 
 import pytest
@@ -20,7 +20,6 @@ from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APIClient
 
-from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums, models
 
 ADMIN_USERNAME = "test.admin"
@@ -81,14 +80,14 @@ def check_permission_mock():
 @pytest.fixture
 def default_de(
     default_organization: models.Organization,
-    default_credential: models.Credential,
+    default_eda_credential: models.EdaCredential,
 ) -> models.DecisionEnvironment:
     """Return a default DE."""
     return models.DecisionEnvironment.objects.create(
         name="default_de",
         image_url="quay.io/ansible/ansible-rulebook:latest",
         description="Default DE",
-        credential=default_credential,
+        eda_credential=default_eda_credential,
         organization=default_organization,
     )
 
@@ -116,6 +115,7 @@ def default_user_awx_token(default_user: models.User):
 
 @pytest.fixture
 def default_project(
+    default_vault_credential: models.EdaCredential,
     default_eda_credential: models.EdaCredential,
     default_organization: models.Organization,
 ) -> models.Project:
@@ -126,7 +126,7 @@ def default_project(
         url="https://git.example.com/acme/project-01",
         git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
         eda_credential=default_eda_credential,
-        signature_validation_credential=default_eda_credential,
+        signature_validation_credential=default_vault_credential,
         scm_branch="main",
         organization=default_organization,
         import_state=models.Project.ImportState.COMPLETED,
@@ -441,7 +441,7 @@ def activation_payload(
     default_rulebook: models.Rulebook,
     default_extra_var: models.ExtraVar,
     default_organization: models.Organization,
-    default_user: models.User,
+    admin_user: models.User,
 ) -> dict:
     return {
         "name": "test-activation",
@@ -452,8 +452,9 @@ def activation_payload(
         "rulebook_id": default_rulebook.id,
         "extra_var_id": default_extra_var.id,
         "organization": default_organization.id,
-        "user_id": default_user.id,
-        "log_level": "debug",
+        "user_id": admin_user.id,
+        "restart_policy": enums.RestartPolicy.ON_FAILURE,
+        "log_level": enums.RulebookProcessLogLevel.DEBUG,
     }
 
 
@@ -465,7 +466,7 @@ def default_activation(
     default_extra_var: models.ExtraVar,
     default_organization: models.Organization,
     default_user: models.User,
-    default_credential: models.Credential,
+    default_eda_credential: models.EdaCredential,
 ) -> models.Activation:
     """Return a default Activation"""
     activation = models.Activation.objects.create(
@@ -479,7 +480,7 @@ def default_activation(
         user=default_user,
         log_level="debug",
     )
-    activation.credentials.add(default_credential)
+    activation.eda_credentials.add(default_eda_credential)
     return activation
 
 
@@ -570,79 +571,3 @@ def default_activation_instance_logs(
             ),
         ]
     )
-
-
-@pytest.mark.fixture
-def default_eda_credential(
-    default_organization: models.Organization,
-    credential_registry_type: models.CredentialType,
-) -> models.EdaCredential:
-    """Return a default Credential"""
-    return models.EdaCredential.objects.create(
-        name="default-credential",
-        description="Default EDA Credential",
-        credential_type=credential_registry_type,
-        inputs={"username": "dummy-user", "password": "dummy-password"},
-        organization=default_organization,
-    )
-
-
-@pytest.mark.fixture
-def credential_registry_type() -> models.CredentialType:
-    return models.CredentialType.objects.create(
-        name=enums.DefaultCredentialType.REGISTRY,
-        inputs={
-            "fields": [
-                {"id": "username", "label": "Username"},
-                {"id": "password", "label": "Password", "secret": True},
-            ]
-        },
-        injectors={},
-        managed=False,
-    )
-
-
-@pytest.fixture
-def default_vault_credential(
-    default_organization: models.Organization,
-) -> models.Credential:
-    """Return a default Vault Credential"""
-    return models.Credential.objects.create(
-        name="default-vault-credential",
-        description="Default Vault Credential",
-        credential_type=enums.CredentialType.VAULT,
-        username="dummy-vault-user",
-        secret="dummy-password",
-        organization=default_organization,
-    )
-
-
-@pytest.fixture
-def default_eda_vault_credential(
-    default_organization: models.Organization,
-) -> models.Credential:
-    """Return a default EDA Vault Credential"""
-    return models.Credential.objects.create(
-        name="default-eda-vault-credential",
-        description="Default EDA Vault Credential",
-        vault_identifier=EDA_SERVER_VAULT_LABEL,
-        credential_type=enums.CredentialType.VAULT,
-        username="dummy-eda-vault-user",
-        secret="dummy-password",
-        organization=default_organization,
-    )
-
-
-@pytest.fixture
-def credential_payload(
-    default_organization: models.Organization,
-) -> Dict[str, Any]:
-    """Return the payload for creating a new Credential"""
-    return {
-        "name": "test-credential",
-        "description": "Test Credential",
-        "credential_type": enums.CredentialType.REGISTRY,
-        "username": "test-user",
-        "secret": "test-password",
-        "organization_id": default_organization.id,
-    }
