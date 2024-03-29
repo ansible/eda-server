@@ -825,7 +825,7 @@ def test_create_activation_no_token_but_required(
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        "The rulebook requires an Awx Token."
+        "The rulebook requires an Awx Token or RH AAP credential."
         in response.data["non_field_errors"]
     )
 
@@ -881,7 +881,10 @@ def test_restart_activation_with_required_token_deleted(
         f"{api_url_v1}/activations/{response.data['id']}/restart/",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "The rulebook requires an Awx Token." in response.data["errors"]
+    assert (
+        "The rulebook requires an Awx Token or RH AAP credential."
+        in response.data["errors"]
+    )
 
 
 @pytest.mark.django_db
