@@ -56,6 +56,12 @@ KEYGEN_COMMAND = shutil.which("ssh-keygen")
 if KEYGEN_COMMAND is None:
     raise ExecutableNotFoundError("Cannot find ssh-keygen executable")
 
+GPG_COMMAND = shutil.which("gpg2")
+if GPG_COMMAND is None:
+    GPG_COMMAND = shutil.which("gpg")
+if GPG_COMMAND is None:
+    raise ExecutableNotFoundError("Cannot find gpg executable")
+
 
 class ScmRepository:
     """Represents a SCM repository."""
@@ -95,6 +101,7 @@ class ScmRepository:
         path: StrPath,
         *,
         credential: Optional[EdaCredential] = None,
+        gpg_credential: Optional[EdaCredential] = None,
         depth: Optional[int] = None,
         verify_ssl: bool = True,
         branch: Optional[str] = None,
@@ -106,6 +113,8 @@ class ScmRepository:
 
         :param url: The repository URL to clone from.
         :param path: The directory to clone into.
+        :credential: The credential used to checkout the project
+        :gpg_credential: The credential used to verify the commit
         :param depth: If set, creates a shallow clone with a history truncated
             to the specified number of commits.
         :param verify_ssl: Indicates if SSL verification is enabled.
@@ -121,6 +130,7 @@ class ScmRepository:
         final_url = url
         secret = ""
         key_file = None
+        gpg_key_file = None
         if credential:
             inputs = inputs_from_store(credential.inputs.get_secret_value())
             secret = inputs.get("password", "")
@@ -141,6 +151,17 @@ class ScmRepository:
                 key_password = inputs.get("ssh_key_unlock")
                 if key_password:
                     cls.decrypt_key_file(key_file.name, key_password)
+
+        if gpg_credential:
+            gpg_inputs = inputs_from_store(
+                gpg_credential.inputs.get_secret_value()
+            )
+            gpg_key = gpg_inputs.get("gpg_public_key")
+            gpg_key_file = tempfile.NamedTemporaryFile("w+t")
+            gpg_key_file.write(gpg_key)
+            gpg_key_file.flush()
+            vars.append("verify_commit=true")
+            cls.add_gpg_key(gpg_key_file.name)
 
         if not verify_ssl:
             _executor.ENVIRON["GIT_SSL_NO_VERIFY"] = "true"
@@ -168,6 +189,8 @@ class ScmRepository:
         finally:
             if key_file:
                 key_file.close()
+            if gpg_key_file:
+                gpg_key_file.close()
         instance = cls(path, _executor=_executor)
         instance.git_hash = git_hash
         return instance
@@ -200,12 +223,17 @@ class ScmRepository:
         return urlunparse(unparsed)
 
     @classmethod
-    def decrypt_key_file(cls, key_file: str, password: str) -> str:
+    def decrypt_key_file(cls, key_file: str, password: str) -> None:
         cmd = f'{KEYGEN_COMMAND} -p -P {password} -N "" -f {key_file}'
         child = pexpect.spawn(cmd)
         index = child.expect(["Failed to load key", pexpect.EOF])
         if index == 0:
             raise ScmError("Incorrect passhprase for the private key")
+
+    @classmethod
+    def add_gpg_key(cls, key_file: str) -> None:
+        cmd = f"{GPG_COMMAND} --import {key_file}"
+        pexpect.run(cmd)
 
 
 class PlaybookExecutor:
