@@ -100,8 +100,12 @@ class Engine(ContainerEngine):
         finally:
             # Ensure volumes are purged due to a bug in podman
             # ref: https://github.com/containers/podman-py/issues/328
-            pruned_volumes = self.client.volumes.prune()
-            LOGGER.info(f"Pruned volumes: {pruned_volumes}")
+            try:
+                pruned_volumes = self.client.volumes.prune()
+            except Exception as e:
+                LOGGER.warning(f"Exception pruning voiumes: {e}")
+            else:
+                LOGGER.info(f"Pruned volumes: {pruned_volumes}")
 
     def _image_exists(self, image_url: str) -> bool:
         try:
