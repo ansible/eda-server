@@ -103,7 +103,7 @@ class Engine(ContainerEngine):
             try:
                 pruned_volumes = self.client.volumes.prune()
             except Exception as e:
-                LOGGER.warning(f"Exception pruning voiumes: {e}")
+                LOGGER.warning(f"Exception pruning volumes: {e}")
             else:
                 LOGGER.info(f"Pruned volumes: {pruned_volumes}")
 
