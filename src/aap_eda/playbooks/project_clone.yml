@@ -6,13 +6,12 @@
 # scm_refspec: a refspec to fetch in addition to obtaining version
 # key_file: private ssh file
 # depth: Create a shallow clone with a truncated history. Minimum 1.
+# verify_commit: true or false. whether verify the commit with GPG
 
 - hosts: localhost
   gather_facts: false
   connection: local
   name: Update source tree if necessary
-  vars:
-    scm_branch: HEAD
   tasks:
     - name: Update project using git
       tags:
@@ -26,7 +25,8 @@
             refspec: "{{ scm_refspec | default(omit) }}"
             key_file: "{{ key_file | default(omit) }}"
             accept_hostkey: true
-            depth: "{{ depth |default(omit) }}"
+            depth: "{{ depth | default(omit) }}"
+            verify_commit: " {{ verify_commit | default(false) }}"
           register: git_result
 
         - name: Set the git repository version
