@@ -161,6 +161,10 @@ def test_git_rev_parse_head():
             "http://user:pass@git.example.com/repo.git",
         ],
         [
+            ("http://git.example.com/repo.git", "", "token", ""),
+            "http://token@git.example.com/repo.git",
+        ],
+        [
             ("http://demo:abc@git.example.com/repo.git", "user", "pass", ""),
             "http://user:pass@git.example.com/repo.git",
         ],

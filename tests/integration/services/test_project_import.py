@@ -103,6 +103,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
             project.url,
             os.path.join(service_tempdir_patch.last_name, "src"),
             credential=None,
+            gpg_credential=None,
             depth=1,
             verify_ssl=project.verify_ssl,
             branch=project.scm_branch,
