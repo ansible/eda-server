@@ -38,7 +38,8 @@ INPUTS = {
 
 @pytest.mark.django_db
 def test_create_eda_credential(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    credential_type: models.CredentialType,
 ):
     data_in = {
         "name": "eda-credential",
@@ -260,7 +261,9 @@ def test_partial_update_eda_credential_name(
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation(client: APIClient):
+def test_delete_credential_used_by_activation(
+    client: APIClient, preseed_credential_types
+):
     # TODO(alex) presetup should be a reusable fixture
     activation_dependencies = create_activation_related_data()
     create_activation(activation_dependencies)
@@ -272,7 +275,9 @@ def test_delete_credential_used_by_activation(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation_forced(client: APIClient):
+def test_delete_credential_used_by_activation_forced(
+    client: APIClient, preseed_credential_types
+):
     # TODO(alex) presetup should be a reusable fixture
     activation_dependencies = create_activation_related_data()
     create_activation(activation_dependencies)
@@ -281,3 +286,45 @@ def test_delete_credential_used_by_activation_forced(client: APIClient):
         f"{api_url_v1}/eda-credentials/{eda_credential_id}/?force=true",
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.parametrize("refs", ["true", "false"])
+@pytest.mark.django_db
+def test_retrieve_eda_credential_with_refs(
+    client: APIClient, refs, preseed_credential_types
+):
+    activation_dependencies = create_activation_related_data()
+    activation = create_activation(activation_dependencies)
+    eda_credential_id = activation_dependencies["eda_credential_id"]
+    decision_environment = models.DecisionEnvironment.objects.get(
+        eda_credential_id=eda_credential_id
+    )
+    eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
+    activation.eda_credentials.add(eda_credential)
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/{eda_credential_id}/?refs={refs}",
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    if refs == "true":
+        assert response.data["references"] is not None
+        references = response.data["references"]
+
+        assert len(references) == 2
+        references[0] = {
+            "type": "Activation",
+            "id": activation.id,
+            "name": activation.name,
+            "url": f"api/eda/v1/activations/{activation.id}/",
+        }
+        references[1] = {
+            "type": "DecisionEnvironment",
+            "id": decision_environment.id,
+            "name": decision_environment.name,
+            "url": (
+                f"api/eda/v1/decision_environments/{decision_environment.id}/"
+            ),
+        }
+    else:
+        assert response.data["references"] is None
