@@ -20,8 +20,9 @@ import shutil
 import subprocess
 from typing import IO, Final, Iterable, Optional, Union
 
-from aap_eda.core.models import Credential
+from aap_eda.core.models import EdaCredential
 from aap_eda.core.types import StrPath
+from aap_eda.core.utils.credentials import inputs_from_store
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ class GitRepository:
         url: str,
         path: StrPath,
         *,
-        credential: Optional[Credential] = None,
+        credential: Optional[EdaCredential] = None,
         depth: Optional[int] = None,
         verify_ssl: bool = True,
         _executor: Optional[GitExecutor] = None,
@@ -128,7 +129,8 @@ class GitRepository:
         final_url = url
         secret = ""
         if credential:
-            secret = credential.secret.get_secret_value()
+            inputs = inputs_from_store(credential.inputs.get_secret_value())
+            secret = inputs["password"]
             # TODO(alex): encapsulate url composition
             index = 0
             if url.startswith("https://"):
@@ -138,7 +140,7 @@ class GitRepository:
             if index > 0:
                 # user can be optional
                 user_part = (
-                    f"{credential.username}:" if credential.username else ""
+                    f"{inputs['username']}:" if inputs["username"] else ""
                 )
                 final_url = f"{url[:index]}{user_part}{secret}@{url[index:]}"
 
@@ -165,7 +167,7 @@ class GitRepository:
 
 
 class GitExecutor:
-    DEFAULT_TIMEOUT: Final = 30
+    DEFAULT_TIMEOUT: Final = 120
     ENVIRON: dict = {
         "GIT_TERMINAL_PROMPT": "0",
     }

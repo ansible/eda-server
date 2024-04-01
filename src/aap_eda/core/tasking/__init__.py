@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
-from django_rq import enqueue, get_queue, job
-from rq import Connection, Queue as _Queue, Worker as _Worker
+from django_rq import enqueue, get_queue, get_scheduler, job
+from django_rq.queues import Queue as _Queue
+from rq import Connection, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
     DEFAULT_RESULT_TTL,
@@ -123,24 +125,22 @@ class DefaultWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
 
         super().__init__(
-            queues,
-            name,
-            default_result_ttl,
-            connection,
-            exc_handler,
-            exception_handlers,
-            default_worker_ttl,
-            job_class,
-            queue_class,
-            log_job_description,
-            job_monitoring_interval,
-            disable_default_exception_handler,
-            prepare_for_work,
-            serializer,
+            queues=queues,
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=default_worker_ttl,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
         )
 
 
@@ -171,25 +171,31 @@ class ActivationWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
 
         super().__init__(
-            [Queue(name="activation", connection=connection)],
-            name,
-            default_result_ttl,
-            connection,
-            exc_handler,
-            exception_handlers,
-            default_worker_ttl,
-            job_class,
-            queue_class,
-            log_job_description,
-            job_monitoring_interval,
-            disable_default_exception_handler,
-            prepare_for_work,
-            serializer,
+            queues=[Queue(name="activation", connection=connection)],
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=default_worker_ttl,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
         )
+
+
+def enqueue_delay(queue_name: str, delay: int, *args, **kwargs) -> Job:
+    """Enqueue a job to run after specific seconds."""
+    scheduler = get_scheduler(name=queue_name)
+    return scheduler.enqueue_at(
+        datetime.utcnow() + timedelta(seconds=delay), *args, **kwargs
+    )
 
 
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
@@ -211,8 +217,10 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
         return queue.enqueue(*args, **kwargs)
 
 
-def job_from_queue(queue: Queue, job_id: str) -> Optional[Job]:
+def job_from_queue(queue: Union[Queue, str], job_id: str) -> Optional[Job]:
     """Return queue job if it not canceled or finished else None."""
+    if type(queue) is str:
+        queue = get_queue(name=queue)
     job = queue.fetch_job(job_id)
     if job and job.get_status(refresh=True) in [
         JobStatus.QUEUED,

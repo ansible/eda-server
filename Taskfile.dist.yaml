@@ -234,6 +234,20 @@ tasks:
         vars:
           CLI_ARGS: build {{.CLI_ARGS}}
 
+  minikube:build:api:
+    desc: "Build EDA api image and push to minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: build-api {{.CLI_ARGS}}
+
+  minikube:build:ui:
+    desc: "Build EDA UI image and push to minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: build-ui {{.CLI_ARGS}}
+
   minikube:deploy:
     desc: "Build deployment and deploy to minikube"
     cmds:
@@ -241,12 +255,26 @@ tasks:
         vars:
           CLI_ARGS: deploy {{.CLI_ARGS}}
 
+  minikube:quay-deploy:
+    desc: "Build deployment from quay deploy to minikube"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: quay-deploy {{.CLI_ARGS}}
+
   minikube:clean:
     desc: "Clean deployment directory and clean minikube resources"
     cmds:
       - task: minikube
         vars:
           CLI_ARGS: clean {{.CLI_ARGS}}
+
+  minikube:clean:api:
+    desc: "Clean API related minikube resources"
+    cmds:
+      - task: minikube
+        vars:
+          CLI_ARGS: clean-api {{.CLI_ARGS}}
 
   minikube:fp:ui:
     desc: "Forward local port to ui instance port in minikube"
@@ -281,6 +309,13 @@ tasks:
     cmds:
       - task: minikube:clean
       - task: minikube:build
+      - task: minikube:deploy
+
+  minikube:api:
+    desc: "build, deploy api pods"
+    cmds:
+      - task: minikube:clean:api
+      - task: minikube:build:api
       - task: minikube:deploy
 
   macpodman:

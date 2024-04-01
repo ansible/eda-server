@@ -85,9 +85,15 @@ class ControllerInfo(BaseModel):
     ssl_verify: str
 
 
-class Hello(BaseModel):
-    data: str = {}
-    type: str = "Hello"
+class VaultPassword(BaseModel):
+    type: str = "VaultPassword"
+    label: Optional[str]
+    password: str
+
+
+class VaultCollection(BaseModel):
+    type: str = "VaultCollection"
+    data: list[VaultPassword]
 
 
 class HeartbeatMessage(BaseModel):

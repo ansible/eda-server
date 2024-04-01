@@ -19,8 +19,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
-from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -75,14 +74,14 @@ class InitData:
 @pytest.mark.django_db
 def test_list_activation_instances(client: APIClient):
     activation = prepare_init_data()
-    instances = models.ActivationInstance.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-1",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
             ),
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-1",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
@@ -97,14 +96,14 @@ def test_list_activation_instances(client: APIClient):
 @pytest.mark.django_db
 def test_list_activation_instances_filter_name(client: APIClient):
     activation = prepare_init_data()
-    instances = models.ActivationInstance.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="activation-instance-1",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
             ),
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-2",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
@@ -124,15 +123,15 @@ def test_list_activation_instances_filter_name(client: APIClient):
 @pytest.mark.django_db
 def test_list_activation_instances_filter_status(client: APIClient):
     activation = prepare_init_data()
-    instances = models.ActivationInstance.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="activation-instance-1",
                 status="completed",
                 activation=activation,
                 git_hash=PROJECT_GIT_HASH,
             ),
-            models.ActivationInstance(
+            models.RulebookProcess(
                 name="test-activation-instance-2",
                 status="failed",
                 activation=activation,
@@ -141,7 +140,7 @@ def test_list_activation_instances_filter_status(client: APIClient):
         ]
     )
 
-    filter_name = "failed"
+    filter_name = enums.ActivationStatus.FAILED
     response = client.get(
         f"{api_url_v1}/activation-instances/?status={filter_name}"
     )
@@ -153,7 +152,7 @@ def test_list_activation_instances_filter_status(client: APIClient):
 @pytest.mark.django_db
 def test_retrieve_activation_instance(client: APIClient):
     activation = prepare_init_data()
-    instance = models.ActivationInstance.objects.create(
+    instance = models.RulebookProcess.objects.create(
         name="activation-instance",
         activation=activation,
     )
@@ -172,7 +171,7 @@ def test_retrieve_activation_instance_not_exist(client: APIClient):
 @pytest.mark.django_db
 def test_delete_activation_instance(client: APIClient):
     activation = prepare_init_data()
-    instance = models.ActivationInstance.objects.create(
+    instance = models.RulebookProcess.objects.create(
         name="activation-instance",
         activation=activation,
     )
@@ -182,27 +181,25 @@ def test_delete_activation_instance(client: APIClient):
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    assert (
-        models.ActivationInstance.objects.filter(pk=instance.id).count() == 0
-    )
+    assert models.RulebookProcess.objects.filter(pk=instance.id).count() == 0
 
 
 @pytest.mark.django_db
 def test_list_logs_from_activation_instance(client: APIClient):
     activation = prepare_init_data()
-    instance = models.ActivationInstance.objects.create(
+    instance = models.RulebookProcess.objects.create(
         name="test-activation-instance",
         activation=activation,
     )
 
-    models.ActivationInstanceLog.objects.bulk_create(
+    models.RulebookProcessLog.objects.bulk_create(
         [
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-1",
                 line_number=1,
                 activation_instance=instance,
             ),
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-2",
                 line_number=2,
                 activation_instance=instance,
@@ -222,6 +219,7 @@ def test_list_logs_from_activation_instance(client: APIClient):
         "id",
         "line_number",
         "log",
+        "log_timestamp",
         "activation_instance",
     ]
 
@@ -229,19 +227,19 @@ def test_list_logs_from_activation_instance(client: APIClient):
 @pytest.mark.django_db
 def test_list_activation_instance_logs_filter(client: APIClient):
     activation = prepare_init_data()
-    instance = models.ActivationInstance.objects.create(
+    instance = models.RulebookProcess.objects.create(
         name="test-activation-instance",
         activation=activation,
     )
 
-    instance_logs = models.ActivationInstanceLog.objects.bulk_create(
+    instance_logs = models.RulebookProcessLog.objects.bulk_create(
         [
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-1",
                 line_number=1,
                 activation_instance=instance,
             ),
-            models.ActivationInstanceLog(
+            models.RulebookProcessLog(
                 log="activation-instance-log-2",
                 line_number=2,
                 activation_instance=instance,
@@ -262,7 +260,7 @@ def test_list_activation_instance_logs_filter(client: APIClient):
 @pytest.mark.django_db
 def test_list_activation_instance_logs_filter_non_existent(client: APIClient):
     activation = prepare_init_data()
-    instance = models.ActivationInstance.objects.create(
+    instance = models.RulebookProcess.objects.create(
         name="test-activation-instance",
         activation=activation,
     )
@@ -278,7 +276,7 @@ def test_list_activation_instance_logs_filter_non_existent(client: APIClient):
 
 
 def assert_activation_instance_data(
-    data: Dict[str, Any], instance: models.ActivationInstance
+    data: Dict[str, Any], instance: models.RulebookProcess
 ):
     assert data == {
         "id": instance.id,
@@ -288,7 +286,8 @@ def assert_activation_instance_data(
         "activation_id": instance.activation.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
-        "status_message": ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
+        "status_message": enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
+        "event_stream_id": None,
     }
 
 

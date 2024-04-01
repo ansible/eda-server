@@ -33,15 +33,10 @@ class ActivationFilter(django_filters.FilterSet):
         lookup_expr="exact",
         label="Filter by Decision Environment ID.",
     )
-    credential_id = django_filters.NumberFilter(
-        field_name="decision_environment__credential_id",
-        lookup_expr="exact",
-        label="Filter by Credential ID.",
-    )
 
     class Meta:
         model = models.Activation
-        fields = ["name", "status", "decision_environment_id", "credential_id"]
+        fields = ["name", "status", "decision_environment_id"]
 
 
 class ActivationInstanceFilter(django_filters.FilterSet):
@@ -57,7 +52,7 @@ class ActivationInstanceFilter(django_filters.FilterSet):
     )
 
     class Meta:
-        model = models.ActivationInstance
+        model = models.RulebookProcess
         fields = ["name", "status"]
 
 
@@ -69,5 +64,5 @@ class ActivationInstanceLogFilter(django_filters.FilterSet):
     )
 
     class Meta:
-        model = models.ActivationInstanceLog
+        model = models.RulebookProcessLog
         fields = ["log"]

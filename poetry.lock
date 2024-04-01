@@ -158,8 +158,6 @@ mypy-extensions = ">=0.4.3"
 packaging = ">=22.0"
 pathspec = ">=0.9.0"
 platformdirs = ">=2"
-tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
-typing-extensions = {version = ">=3.10.0.0", markers = "python_version < \"3.10\""}
 
 [package.extras]
 colorama = ["colorama (>=0.4.3)"]
@@ -466,9 +464,6 @@ files = [
     {file = "coverage-7.3.0.tar.gz", hash = "sha256:49dbb19cdcafc130f597d9e04a29d0a032ceedf729e41b181f51cd170e6ee865"},
 ]
 
-[package.dependencies]
-tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.11.0a6\" and extra == \"toml\""}
-
 [package.extras]
 toml = ["tomli"]
 
@@ -558,17 +553,6 @@ files = [
 ]
 
 [[package]]
-name = "defusedxml"
-version = "0.7.1"
-description = "XML bomb protection for Python stdlib modules"
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
-files = [
-    {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
-    {file = "defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"},
-]
-
-[[package]]
 name = "django"
 version = "4.2.7"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
@@ -590,7 +574,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "0.0.0"
+version = "2024.2.12"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -598,38 +582,27 @@ files = []
 develop = false
 
 [package.dependencies]
+channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
-django-auth-ldap = "*"
 django-crum = "*"
-django-filter = "*"
+django-split-settings = "*"
 djangorestframework = "*"
-drf-spectacular = "*"
 inflection = "*"
-python-ldap = "*"
-social-auth-app-django = "*"
-tabulate = "*"
+
+[package.extras]
+all = ["channels", "cryptography", "django-auth-ldap", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "requests", "social-auth-app-django", "tabulate"]
+api-documentation = ["drf-spectacular"]
+authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
+channel-auth = ["channels"]
+jwt-consumer = ["pyjwt", "requests"]
+testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "0.1.0"
-resolved_reference = "a07fffe8f40fb1798069e97056cd1c666ff4e5f1"
-
-[[package]]
-name = "django-auth-ldap"
-version = "4.6.0"
-description = "Django LDAP authentication backend"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "django-auth-ldap-4.6.0.tar.gz", hash = "sha256:9ae2bf87f9b6367b6cfd94a0451896cbc728e5400ed81cbfbd58ce743c0909a2"},
-    {file = "django_auth_ldap-4.6.0-py3-none-any.whl", hash = "sha256:4e82ded9292dc6ac7a75784d81b95174b72ca5e650a76e11317e3b68008e56d8"},
-]
-
-[package.dependencies]
-Django = ">=3.2"
-python-ldap = ">=3.1"
+reference = "2024.2.12"
+resolved_reference = "dc5bbf57af4a323f6689093993044aa552cc1227"
 
 [[package]]
 name = "django-crum"
@@ -647,13 +620,13 @@ django = ">=1.8"
 
 [[package]]
 name = "django-filter"
-version = "23.1"
+version = "23.5"
 description = "Django-filter is a reusable Django application for allowing users to filter querysets dynamically."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "django-filter-23.1.tar.gz", hash = "sha256:dee5dcf2cea4d7f767e271b6d01f767fce7500676d5e5dc58dac8154000b87df"},
-    {file = "django_filter-23.1-py3-none-any.whl", hash = "sha256:e3c52ad83c32fb5882125105efb5fea2a1d6a85e7dc64b04ef52edbf14451b6c"},
+    {file = "django-filter-23.5.tar.gz", hash = "sha256:67583aa43b91fe8c49f74a832d95f4d8442be628fd4c6d65e9f811f5153a4e5c"},
+    {file = "django_filter-23.5-py3-none-any.whl", hash = "sha256:99122a201d83860aef4fe77758b69dda913e874cc5e0eaa50a86b0b18d708400"},
 ]
 
 [package.dependencies]
@@ -661,13 +634,13 @@ Django = ">=3.2"
 
 [[package]]
 name = "django-rq"
-version = "2.7.0"
+version = "2.8.0"
 description = "An app that provides django integration for RQ (Redis Queue)"
 optional = false
 python-versions = "*"
 files = [
-    {file = "django-rq-2.7.0.tar.gz", hash = "sha256:50440be33c23427f3b34d206ff72025740b721b54b42976e7b18a0474174802b"},
-    {file = "django_rq-2.7.0-py2.py3-none-any.whl", hash = "sha256:5b09798a3d0b03d4c7b55dbba50409c16dcbb09d42c2839511b52c29744be8c8"},
+    {file = "django-rq-2.8.0.tar.gz", hash = "sha256:161fcd037aa837e047400db909d2efa2867294c5efe1c45bcaf8d888ad1839b4"},
+    {file = "django_rq-2.8.0-py2.py3-none-any.whl", hash = "sha256:2820ecefed024a7f14fe42ebc46b22f53bcd84639a79c0a379491c10d82bfaa3"},
 ]
 
 [package.dependencies]
@@ -678,6 +651,17 @@ rq = ">=1.2"
 [package.extras]
 sentry = ["raven (>=6.1.0)"]
 testing = ["mock (>=2.0.0)"]
+
+[[package]]
+name = "django-split-settings"
+version = "1.2.0"
+description = "Organize Django settings into multiple files and directories. Easily override and modify settings. Use wildcards and optional settings files."
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "django-split-settings-1.2.0.tar.gz", hash = "sha256:31415a618256b54c5cee8662cbaa72a890683b8b7465d64ba88fdd3affdd6c60"},
+    {file = "django_split_settings-1.2.0-py3-none-any.whl", hash = "sha256:4b3be146776d49c61bd9dcf89fad40edb1544f13ab27a87a0b1aecf5a0d636f4"},
+]
 
 [[package]]
 name = "djangorestframework"
@@ -695,14 +679,38 @@ django = ">=3.0"
 pytz = "*"
 
 [[package]]
+name = "djangorestframework-simplejwt"
+version = "5.3.1"
+description = "A minimal JSON Web Token authentication plugin for Django REST Framework"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "djangorestframework_simplejwt-5.3.1-py3-none-any.whl", hash = "sha256:381bc966aa46913905629d472cd72ad45faa265509764e20ffd440164c88d220"},
+    {file = "djangorestframework_simplejwt-5.3.1.tar.gz", hash = "sha256:6c4bd37537440bc439564ebf7d6085e74c5411485197073f508ebdfa34bc9fae"},
+]
+
+[package.dependencies]
+django = ">=3.2"
+djangorestframework = ">=3.12"
+pyjwt = ">=1.7.1,<3"
+
+[package.extras]
+crypto = ["cryptography (>=3.3.1)"]
+dev = ["Sphinx (>=1.6.5,<2)", "cryptography", "flake8", "freezegun", "ipython", "isort", "pep8", "pytest", "pytest-cov", "pytest-django", "pytest-watch", "pytest-xdist", "python-jose (==3.3.0)", "sphinx_rtd_theme (>=0.1.9)", "tox", "twine", "wheel"]
+doc = ["Sphinx (>=1.6.5,<2)", "sphinx_rtd_theme (>=0.1.9)"]
+lint = ["flake8", "isort", "pep8"]
+python-jose = ["python-jose (==3.3.0)"]
+test = ["cryptography", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-xdist", "tox"]
+
+[[package]]
 name = "drf-spectacular"
-version = "0.26.2"
+version = "0.26.5"
 description = "Sane and flexible OpenAPI 3 schema generation for Django REST framework"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "drf-spectacular-0.26.2.tar.gz", hash = "sha256:005623d6bb9de37d2d0ec24ccd59c636e4a42f9af252f1470129ac32ccab38cb"},
-    {file = "drf_spectacular-0.26.2-py3-none-any.whl", hash = "sha256:e80eba58d9579bf6c3380ffd6d6a9b466c4bc35b23da0ba76dfcc96de1e907d7"},
+    {file = "drf-spectacular-0.26.5.tar.gz", hash = "sha256:aee55330a774ba8a9cbdb125714d1c9ee05a8aafd3ce3be8bfd26527649aeb44"},
+    {file = "drf_spectacular-0.26.5-py3-none-any.whl", hash = "sha256:c0002a820b11771fdbf37853deb371947caf0159d1afeeffe7598e964bc1db94"},
 ]
 
 [package.dependencies]
@@ -719,13 +727,13 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "dynaconf"
-version = "3.1.12"
+version = "3.2.4"
 description = "The dynamic configurator for your Python Project"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "dynaconf-3.1.12-py2.py3-none-any.whl", hash = "sha256:a79d7b3ad4a35af9b576c49f11cd3b23a1b04b87b63a4e9f92cc82f2b0cafeeb"},
-    {file = "dynaconf-3.1.12.tar.gz", hash = "sha256:11a60bcd735f82b8a47b288f99e4ffbbd08c6c130a7be93c5d03e93fc260a5e1"},
+    {file = "dynaconf-3.2.4-py2.py3-none-any.whl", hash = "sha256:858f9806fab2409c4f5442614c2605d4c4071d5e5153b0e7f24a225f27465aed"},
+    {file = "dynaconf-3.2.4.tar.gz", hash = "sha256:2e6adebaa587f4df9241a16a4bec3fda521154d26b15f3258fde753a592831b6"},
 ]
 
 [package.extras]
@@ -733,7 +741,7 @@ all = ["configobj", "hvac", "redis", "ruamel.yaml"]
 configobj = ["configobj"]
 ini = ["configobj"]
 redis = ["redis"]
-test = ["codecov", "configobj", "django", "flake8", "flake8-debugger", "flake8-print", "flake8-todo", "flask (>=0.12)", "hvac", "pep8-naming", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
+test = ["configobj", "django", "flake8", "flake8-debugger", "flake8-print", "flake8-todo", "flask (>=0.12)", "hvac (>=1.1.0)", "pep8-naming", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
 toml = ["toml"]
 vault = ["hvac"]
 yaml = ["ruamel.yaml"]
@@ -748,20 +756,6 @@ files = [
     {file = "eradicate-2.2.0-py3-none-any.whl", hash = "sha256:751813c315a48ce7e3d0483410991015342d380a956e86e0265c61bfb875bcbc"},
     {file = "eradicate-2.2.0.tar.gz", hash = "sha256:c329a05def6a4b558dab58bb1b694f5209706b7c99ba174d226dfdb69a5ba0da"},
 ]
-
-[[package]]
-name = "exceptiongroup"
-version = "1.1.1"
-description = "Backport of PEP 654 (exception groups)"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "exceptiongroup-1.1.1-py3-none-any.whl", hash = "sha256:232c37c63e4f682982c8b6459f33a8981039e5fb8756b2074364e5055c498c9e"},
-    {file = "exceptiongroup-1.1.1.tar.gz", hash = "sha256:d484c3090ba2889ae2928419117447a14daf3c1231d5e30d0aae34f354f01785"},
-]
-
-[package.extras]
-test = ["pytest (>=6)"]
 
 [[package]]
 name = "executing"
@@ -1015,7 +1009,6 @@ files = [
 appnope = {version = "*", markers = "sys_platform == \"darwin\""}
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
 decorator = "*"
-exceptiongroup = {version = "*", markers = "python_version < \"3.11\""}
 jedi = ">=0.16"
 matplotlib-inline = "*"
 pexpect = {version = ">4.3", markers = "sys_platform != \"win32\""}
@@ -1023,7 +1016,6 @@ prompt-toolkit = ">=3.0.30,<3.0.37 || >3.0.37,<3.1.0"
 pygments = ">=2.4.0"
 stack-data = "*"
 traitlets = ">=5"
-typing-extensions = {version = "*", markers = "python_version < \"3.10\""}
 
 [package.extras]
 all = ["black", "curio", "docrepr", "exceptiongroup", "ipykernel", "ipyparallel", "ipywidgets", "matplotlib", "matplotlib (!=3.2.0)", "nbconvert", "nbformat", "notebook", "numpy (>=1.22)", "pandas", "pickleshare", "pytest (<7)", "pytest (<7.1)", "pytest-asyncio (<0.22)", "qtconsole", "setuptools (>=18.5)", "sphinx (>=1.3)", "sphinx-rtd-theme", "stack-data", "testpath", "trio", "typing-extensions"]
@@ -1075,6 +1067,23 @@ qa = ["flake8 (==5.0.4)", "mypy (==0.971)", "types-setuptools (==67.2.0.1)"]
 testing = ["Django", "attrs", "colorama", "docopt", "pytest (<7.0.0)"]
 
 [[package]]
+name = "jinja2"
+version = "3.1.3"
+description = "A very fast and expressive template engine."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "Jinja2-3.1.3-py3-none-any.whl", hash = "sha256:7d6d50dd97d52cbc355597bd845fabfbac3f551e1f99619e39a35ce8c370b5fa"},
+    {file = "Jinja2-3.1.3.tar.gz", hash = "sha256:ac8bd6544d4bb2c9792bf3a159e80bba8fda7f07e81bc3aed565432d5925ba90"},
+]
+
+[package.dependencies]
+MarkupSafe = ">=2.0"
+
+[package.extras]
+i18n = ["Babel (>=2.7)"]
+
+[[package]]
 name = "jsonschema"
 version = "4.17.3"
 description = "An implementation of JSON Schema validation for Python"
@@ -1118,6 +1127,75 @@ websocket-client = ">=0.32.0,<0.40.0 || >0.40.0,<0.41.dev0 || >=0.43.dev0"
 
 [package.extras]
 adal = ["adal (>=1.0.2)"]
+
+[[package]]
+name = "markupsafe"
+version = "2.1.3"
+description = "Safely add untrusted strings to HTML/XML markup."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "MarkupSafe-2.1.3-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:cd0f502fe016460680cd20aaa5a76d241d6f35a1c3350c474bac1273803893fa"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:e09031c87a1e51556fdcb46e5bd4f59dfb743061cf93c4d6831bf894f125eb57"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:68e78619a61ecf91e76aa3e6e8e33fc4894a2bebe93410754bd28fce0a8a4f9f"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:65c1a9bcdadc6c28eecee2c119465aebff8f7a584dd719facdd9e825ec61ab52"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:525808b8019e36eb524b8c68acdd63a37e75714eac50e988180b169d64480a00"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-musllinux_1_1_aarch64.whl", hash = "sha256:962f82a3086483f5e5f64dbad880d31038b698494799b097bc59c2edf392fce6"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:aa7bd130efab1c280bed0f45501b7c8795f9fdbeb02e965371bbef3523627779"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:c9c804664ebe8f83a211cace637506669e7890fec1b4195b505c214e50dd4eb7"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-win32.whl", hash = "sha256:10bbfe99883db80bdbaff2dcf681dfc6533a614f700da1287707e8a5d78a8431"},
+    {file = "MarkupSafe-2.1.3-cp310-cp310-win_amd64.whl", hash = "sha256:1577735524cdad32f9f694208aa75e422adba74f1baee7551620e43a3141f559"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:ad9e82fb8f09ade1c3e1b996a6337afac2b8b9e365f926f5a61aacc71adc5b3c"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:3c0fae6c3be832a0a0473ac912810b2877c8cb9d76ca48de1ed31e1c68386575"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b076b6226fb84157e3f7c971a47ff3a679d837cf338547532ab866c57930dbee"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bfce63a9e7834b12b87c64d6b155fdd9b3b96191b6bd334bf37db7ff1fe457f2"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:338ae27d6b8745585f87218a3f23f1512dbf52c26c28e322dbe54bcede54ccb9"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:e4dd52d80b8c83fdce44e12478ad2e85c64ea965e75d66dbeafb0a3e77308fcc"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:df0be2b576a7abbf737b1575f048c23fb1d769f267ec4358296f31c2479db8f9"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:5bbe06f8eeafd38e5d0a4894ffec89378b6c6a625ff57e3028921f8ff59318ac"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-win32.whl", hash = "sha256:dd15ff04ffd7e05ffcb7fe79f1b98041b8ea30ae9234aed2a9168b5797c3effb"},
+    {file = "MarkupSafe-2.1.3-cp311-cp311-win_amd64.whl", hash = "sha256:134da1eca9ec0ae528110ccc9e48041e0828d79f24121a1a146161103c76e686"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:f698de3fd0c4e6972b92290a45bd9b1536bffe8c6759c62471efaa8acb4c37bc"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:aa57bd9cf8ae831a362185ee444e15a93ecb2e344c8e52e4d721ea3ab6ef1823"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ffcc3f7c66b5f5b7931a5aa68fc9cecc51e685ef90282f4a82f0f5e9b704ad11"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:47d4f1c5f80fc62fdd7777d0d40a2e9dda0a05883ab11374334f6c4de38adffd"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1f67c7038d560d92149c060157d623c542173016c4babc0c1913cca0564b9939"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:9aad3c1755095ce347e26488214ef77e0485a3c34a50c5a5e2471dff60b9dd9c"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-musllinux_1_1_i686.whl", hash = "sha256:14ff806850827afd6b07a5f32bd917fb7f45b046ba40c57abdb636674a8b559c"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:8f9293864fe09b8149f0cc42ce56e3f0e54de883a9de90cd427f191c346eb2e1"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-win32.whl", hash = "sha256:715d3562f79d540f251b99ebd6d8baa547118974341db04f5ad06d5ea3eb8007"},
+    {file = "MarkupSafe-2.1.3-cp312-cp312-win_amd64.whl", hash = "sha256:1b8dd8c3fd14349433c79fa8abeb573a55fc0fdd769133baac1f5e07abf54aeb"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:8e254ae696c88d98da6555f5ace2279cf7cd5b3f52be2b5cf97feafe883b58d2"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cb0932dc158471523c9637e807d9bfb93e06a95cbf010f1a38b98623b929ef2b"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9402b03f1a1b4dc4c19845e5c749e3ab82d5078d16a2a4c2cd2df62d57bb0707"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:ca379055a47383d02a5400cb0d110cef0a776fc644cda797db0c5696cfd7e18e"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-musllinux_1_1_aarch64.whl", hash = "sha256:b7ff0f54cb4ff66dd38bebd335a38e2c22c41a8ee45aa608efc890ac3e3931bc"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-musllinux_1_1_i686.whl", hash = "sha256:c011a4149cfbcf9f03994ec2edffcb8b1dc2d2aede7ca243746df97a5d41ce48"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-musllinux_1_1_x86_64.whl", hash = "sha256:56d9f2ecac662ca1611d183feb03a3fa4406469dafe241673d521dd5ae92a155"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-win32.whl", hash = "sha256:8758846a7e80910096950b67071243da3e5a20ed2546e6392603c096778d48e0"},
+    {file = "MarkupSafe-2.1.3-cp37-cp37m-win_amd64.whl", hash = "sha256:787003c0ddb00500e49a10f2844fac87aa6ce977b90b0feaaf9de23c22508b24"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:2ef12179d3a291be237280175b542c07a36e7f60718296278d8593d21ca937d4"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:2c1b19b3aaacc6e57b7e25710ff571c24d6c3613a45e905b1fde04d691b98ee0"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8afafd99945ead6e075b973fefa56379c5b5c53fd8937dad92c662da5d8fd5ee"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8c41976a29d078bb235fea9b2ecd3da465df42a562910f9022f1a03107bd02be"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:d080e0a5eb2529460b30190fcfcc4199bd7f827663f858a226a81bc27beaa97e"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-musllinux_1_1_aarch64.whl", hash = "sha256:69c0f17e9f5a7afdf2cc9fb2d1ce6aabdb3bafb7f38017c0b77862bcec2bbad8"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-musllinux_1_1_i686.whl", hash = "sha256:504b320cd4b7eff6f968eddf81127112db685e81f7e36e75f9f84f0df46041c3"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:42de32b22b6b804f42c5d98be4f7e5e977ecdd9ee9b660fda1a3edf03b11792d"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-win32.whl", hash = "sha256:ceb01949af7121f9fc39f7d27f91be8546f3fb112c608bc4029aef0bab86a2a5"},
+    {file = "MarkupSafe-2.1.3-cp38-cp38-win_amd64.whl", hash = "sha256:1b40069d487e7edb2676d3fbdb2b0829ffa2cd63a2ec26c4938b2d34391b4ecc"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:8023faf4e01efadfa183e863fefde0046de576c6f14659e8782065bcece22198"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:6b2b56950d93e41f33b4223ead100ea0fe11f8e6ee5f641eb753ce4b77a7042b"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9dcdfd0eaf283af041973bff14a2e143b8bd64e069f4c383416ecd79a81aab58"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:05fb21170423db021895e1ea1e1f3ab3adb85d1c2333cbc2310f2a26bc77272e"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:282c2cb35b5b673bbcadb33a585408104df04f14b2d9b01d4c345a3b92861c2c"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-musllinux_1_1_aarch64.whl", hash = "sha256:ab4a0df41e7c16a1392727727e7998a467472d0ad65f3ad5e6e765015df08636"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:7ef3cb2ebbf91e330e3bb937efada0edd9003683db6b57bb108c4001f37a02ea"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:0a4e4a1aff6c7ac4cd55792abf96c915634c2b97e3cc1c7129578aa68ebd754e"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-win32.whl", hash = "sha256:fec21693218efe39aa7f8599346e90c705afa52c5b31ae019b2e57e8f6542bb2"},
+    {file = "MarkupSafe-2.1.3-cp39-cp39-win_amd64.whl", hash = "sha256:3fd4abcb888d15a94f32b75d8fd18ee162ca0c064f35b11134be77050296d6ba"},
+    {file = "MarkupSafe-2.1.3.tar.gz", hash = "sha256:af598ed32d6ae86f1b747b82783958b1a4ab8f617b06fe68795c7f026abbdcad"},
+]
 
 [[package]]
 name = "matplotlib-inline"
@@ -1238,13 +1316,13 @@ flake8 = ">=5.0.0"
 
 [[package]]
 name = "pexpect"
-version = "4.8.0"
+version = "4.9.0"
 description = "Pexpect allows easy control of interactive console applications."
 optional = false
 python-versions = "*"
 files = [
-    {file = "pexpect-4.8.0-py2.py3-none-any.whl", hash = "sha256:0b48a55dcb3c05f3329815901ea4fc1537514d6ba867a152b581d69ae3710937"},
-    {file = "pexpect-4.8.0.tar.gz", hash = "sha256:fc65a43959d153d0114afe13997d439c22823a27cefceb5ff35c2178c6784c0c"},
+    {file = "pexpect-4.9.0-py2.py3-none-any.whl", hash = "sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523"},
+    {file = "pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f"},
 ]
 
 [package.dependencies]
@@ -1282,20 +1360,22 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "podman"
-version = "4.5.0"
+version = "4.9.0"
 description = "Bindings for Podman RESTful API"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "podman-4.5.0-py3-none-any.whl", hash = "sha256:307428e60df9704e2e3bca0ead93babe05fd397e62a3e3a02a2e05d3a779122c"},
-    {file = "podman-4.5.0.tar.gz", hash = "sha256:62ff5f89168f348afc39b5efabe388789a4372305e9da67b09b4c4e0eac2bb06"},
+    {file = "podman-4.9.0-py3-none-any.whl", hash = "sha256:0613314edb8f51b791e2818438e4b386da3937ae73cf0187b27a1f8bb096ac64"},
+    {file = "podman-4.9.0.tar.gz", hash = "sha256:48683485a5bbcb3f6b2e9e93aa8647faadc5c27918f8b86e04bff1d0822691af"},
 ]
 
 [package.dependencies]
 pyxdg = ">=0.26"
 requests = ">=2.24"
-tomli = {version = ">=1.2.3", markers = "python_version < \"3.11\""}
-urllib3 = ">=1.26.5"
+urllib3 = "*"
+
+[package.extras]
+progress-bar = ["rich (>=12.5.1)"]
 
 [[package]]
 name = "port-for"
@@ -1692,11 +1772,9 @@ files = [
 
 [package.dependencies]
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
 iniconfig = "*"
 packaging = "*"
 pluggy = ">=0.12,<2.0"
-tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 
 [package.extras]
 testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "xmlschema"]
@@ -1756,6 +1834,20 @@ docs = ["sphinx", "sphinx-rtd-theme"]
 testing = ["Django", "django-configurations (>=2.0)"]
 
 [[package]]
+name = "pytest-lazy-fixture"
+version = "0.6.3"
+description = "It helps to use fixtures in pytest.mark.parametrize"
+optional = false
+python-versions = "*"
+files = [
+    {file = "pytest-lazy-fixture-0.6.3.tar.gz", hash = "sha256:0e7d0c7f74ba33e6e80905e9bfd81f9d15ef9a790de97993e34213deb5ad10ac"},
+    {file = "pytest_lazy_fixture-0.6.3-py3-none-any.whl", hash = "sha256:e0b379f38299ff27a653f03eaa69b08a6fd4484e46fd1c9907d984b9f9daeda6"},
+]
+
+[package.dependencies]
+pytest = ">=3.2.5"
+
+[[package]]
 name = "pytest-redis"
 version = "3.0.2"
 description = "Redis fixtures and fixture factories for Pytest."
@@ -1785,38 +1877,6 @@ files = [
 
 [package.dependencies]
 six = ">=1.5"
-
-[[package]]
-name = "python-ldap"
-version = "3.4.4"
-description = "Python modules for implementing LDAP clients"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "python-ldap-3.4.4.tar.gz", hash = "sha256:7edb0accec4e037797705f3a05cbf36a9fde50d08c8f67f2aef99a2628fab828"},
-]
-
-[package.dependencies]
-pyasn1 = ">=0.3.7"
-pyasn1_modules = ">=0.1.5"
-
-[[package]]
-name = "python3-openid"
-version = "3.2.0"
-description = "OpenID support for modern servers and consumers."
-optional = false
-python-versions = "*"
-files = [
-    {file = "python3-openid-3.2.0.tar.gz", hash = "sha256:33fbf6928f401e0b790151ed2b5290b02545e8775f982485205a066f874aaeaf"},
-    {file = "python3_openid-3.2.0-py3-none-any.whl", hash = "sha256:6626f771e0417486701e0b4daff762e7212e820ca5b29fcc0d05f6f8736dfa6b"},
-]
-
-[package.dependencies]
-defusedxml = "*"
-
-[package.extras]
-mysql = ["mysql-connector-python"]
-postgresql = ["psycopg2"]
 
 [[package]]
 name = "pytz"
@@ -2079,47 +2139,6 @@ files = [
 ]
 
 [[package]]
-name = "social-auth-app-django"
-version = "5.4.0"
-description = "Python Social Authentication, Django integration."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "social-auth-app-django-5.4.0.tar.gz", hash = "sha256:09ac02a063cb313eed5e9ef2f9ac4477c8bf5bbd685925ff3aba43f9072f1bbb"},
-    {file = "social_auth_app_django-5.4.0-py3-none-any.whl", hash = "sha256:28c65b2e2092f30cdb3cf912eeaa6988b49fdf4001b29bd89e683673d700a38e"},
-]
-
-[package.dependencies]
-Django = ">=3.2"
-social-auth-core = ">=4.4.1"
-
-[[package]]
-name = "social-auth-core"
-version = "4.5.1"
-description = "Python social authentication made simple."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "social-auth-core-4.5.1.tar.gz", hash = "sha256:307a4ba64d4f3ec86e4389163eac1d8b8656ffe5ab2e964aeff043ab00b3a662"},
-    {file = "social_auth_core-4.5.1-py3-none-any.whl", hash = "sha256:54d0c598bf6ea0ec12bbcf78bee035c7cd604b5d781d80b7997e9e033c3ac05d"},
-]
-
-[package.dependencies]
-cryptography = ">=1.4"
-defusedxml = ">=0.5.0rc1"
-oauthlib = ">=1.0.3"
-PyJWT = ">=2.7.0"
-python3-openid = ">=3.0.10"
-requests = ">=2.9.1"
-requests-oauthlib = ">=0.6.1"
-
-[package.extras]
-all = ["cryptography (>=2.1.1)", "python3-saml (>=1.5.0)"]
-allpy3 = ["cryptography (>=2.1.1)", "python3-saml (>=1.5.0)"]
-azuread = ["cryptography (>=2.1.1)"]
-saml = ["python3-saml (>=1.5.0)"]
-
-[[package]]
 name = "sqlparse"
 version = "0.4.4"
 description = "A non-validating SQL parser."
@@ -2153,31 +2172,6 @@ pure-eval = "*"
 
 [package.extras]
 tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
-
-[[package]]
-name = "tabulate"
-version = "0.9.0"
-description = "Pretty-print tabular data"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "tabulate-0.9.0-py3-none-any.whl", hash = "sha256:024ca478df22e9340661486f85298cff5f6dcdba14f3813e8830015b9ed1948f"},
-    {file = "tabulate-0.9.0.tar.gz", hash = "sha256:0095b12bf5966de529c0feb1fa08671671b3368eec77d7ef7ab114be2c068b3c"},
-]
-
-[package.extras]
-widechars = ["wcwidth"]
-
-[[package]]
-name = "tomli"
-version = "2.0.1"
-description = "A lil' TOML parser"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},
-    {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
-]
 
 [[package]]
 name = "traitlets"
@@ -2405,5 +2399,5 @@ dev = ["psycopg2-binary"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = ">=3.9,<4"
-content-hash = "a6a14c5c21e14d27ed0c5988908d4c7feeac2227d975abfc9e2697c67c7fb9c8"
+python-versions = ">=3.11,<3.12"
+content-hash = "f0cbbec5ed37ceeda48ebe71275705145f1f1cbd06973cde2abeb7996339b462"

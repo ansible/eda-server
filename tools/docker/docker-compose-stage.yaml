@@ -19,6 +19,9 @@ x-environment:
   - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
   - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
   - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
+  - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
+  - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
+  - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
 
 services:
   podman-pre-setup:
@@ -147,7 +150,7 @@ services:
     restart: always
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret

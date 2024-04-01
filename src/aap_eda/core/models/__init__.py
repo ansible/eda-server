@@ -12,11 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from .activation import Activation, ActivationInstance, ActivationInstanceLog
+from .activation import Activation
 from .auth import Permission, Role
 from .credential import Credential
+from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
-from .inventory import Inventory
+from .eda_credential import EdaCredential
+from .event_stream import EventStream
 from .job import (
     ActivationInstanceJobInstance,
     Job,
@@ -25,6 +27,7 @@ from .job import (
     JobInstanceHost,
 )
 from .project import ExtraVar, Project
+from .queue import ActivationRequestQueue
 from .rulebook import (
     AuditAction,
     AuditEvent,
@@ -33,18 +36,18 @@ from .rulebook import (
     Rulebook,
     Ruleset,
 )
+from .rulebook_process import RulebookProcess, RulebookProcessLog
 from .user import AwxToken, User
 
 __all__ = [
     "ActivationInstanceJobInstance",
-    "ActivationInstanceLog",
-    "ActivationInstance",
+    "RulebookProcessLog",
+    "RulebookProcess",
     "Activation",
     "AuditAction",
     "AuditEvent",
     "AuditRule",
     "ExtraVar",
-    "Inventory",
     "JobInstanceEvent",
     "JobInstanceHost",
     "JobInstance",
@@ -58,5 +61,9 @@ __all__ = [
     "User",
     "AwxToken",
     "Credential",
+    "CredentialType",
+    "EdaCredential",
     "DecisionEnvironment",
+    "ActivationRequestQueue",
+    "EventStream",
 ]

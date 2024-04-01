@@ -30,8 +30,16 @@ class DecisionEnvironment(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="", blank=True, null=False)
     image_url = models.TextField(blank=False, null=False)
+    # TODO: used by migration, remove it later
     credential = models.ForeignKey(
         "Credential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
         blank=True,
         null=True,
         default=None,

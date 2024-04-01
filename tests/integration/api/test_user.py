@@ -172,6 +172,32 @@ def test_create_user(
     response = client.post(f"{api_url_v1}/users/", data=create_user_data)
 
     assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["is_superuser"] is False
+    check_permission_mock.assert_called_once_with(
+        mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE
+    )
+
+
+@pytest.mark.django_db
+def test_create_superuser(
+    client: APIClient,
+    check_permission_mock: mock.Mock,
+    init_db,
+):
+    create_user_data = {
+        "username": "test.user",
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "test.user@example.com",
+        "password": "secret",
+        "is_superuser": True,
+        "roles": [str(init_db.role.id)],
+    }
+
+    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["is_superuser"] is True
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE
     )

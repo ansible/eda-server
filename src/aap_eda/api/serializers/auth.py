@@ -103,12 +103,12 @@ class RoleDetailSerializer(serializers.Serializer):
 
     name = serializers.CharField(
         required=True,
-        help_text="Name of the rulebook",
+        help_text="Name of the role",
     )
 
     description = serializers.CharField(
         default="",
-        help_text="Description of the rulebook",
+        help_text="Description of the role",
         allow_null=True,
     )
 
@@ -116,12 +116,12 @@ class RoleDetailSerializer(serializers.Serializer):
 
     created_at = serializers.DateTimeField(
         required=True,
-        help_text="The created_at timestamp of the ruleset",
+        help_text="The created_at timestamp of the role",
     )
 
     modified_at = serializers.DateTimeField(
         required=True,
-        help_text="The modified_at timestamp of the ruleset",
+        help_text="The modified_at timestamp of the role",
     )
 
 

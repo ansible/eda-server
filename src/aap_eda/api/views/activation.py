@@ -28,8 +28,18 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ActivationStatus, ResourceType
-from aap_eda.tasks.ruleset import activate, deactivate, restart
+from aap_eda.core.enums import (
+    Action,
+    ActivationStatus,
+    ProcessParentType,
+    ResourceType,
+)
+from aap_eda.tasks.orchestrator import (
+    delete_rulebook_process,
+    restart_rulebook_process,
+    start_rulebook_process,
+    stop_rulebook_process,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,15 +83,16 @@ class ActivationViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        response = serializer.create(serializer.validated_data)
+        activation = serializer.create(serializer.validated_data)
 
-        if response.is_enabled:
-            job = activate(activation_id=response.id)
-            response.current_job_id = job.id
-            response.save(update_fields=["current_job_id"])
+        if activation.is_enabled:
+            start_rulebook_process(
+                process_parent_type=ProcessParentType.ACTIVATION,
+                id=activation.id,
+            )
 
         return Response(
-            serializers.ActivationReadSerializer(response).data,
+            serializers.ActivationReadSerializer(activation).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -117,11 +128,9 @@ class ActivationViewSet(
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
-
-        deactivate.delay(
-            activation_id=activation.id,
-            requester=activation.user.username,
-            delete=True,
+        delete_rulebook_process(
+            process_parent_type=ProcessParentType.ACTIVATION,
+            id=activation.id,
         )
 
     @extend_schema(
@@ -143,7 +152,7 @@ class ActivationViewSet(
     )
     @action(
         detail=False,
-        queryset=models.ActivationInstance.objects.order_by("id"),
+        queryset=models.RulebookProcess.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceFilter,
         rbac_resource_type=ResourceType.ACTIVATION_INSTANCE,
         rbac_action=Action.READ,
@@ -157,8 +166,9 @@ class ActivationViewSet(
                 detail=f"Activation with ID={id} does not exist.",
             )
 
-        activation_instances = models.ActivationInstance.objects.filter(
-            activation_id=id
+        activation_instances = models.RulebookProcess.objects.filter(
+            activation_id=id,
+            parent_type=ProcessParentType.ACTIVATION,
         )
         filtered_instances = self.filter_queryset(activation_instances)
         result = self.paginate_queryset(filtered_instances)
@@ -226,11 +236,10 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
-
-        job = activate(activation_id=pk)
-
-        activation.current_job_id = job.id
-        activation.save(update_fields=["current_job_id"])
+        start_rulebook_process(
+            process_parent_type=ProcessParentType.ACTIVATION,
+            id=pk,
+        )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -256,9 +265,9 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
-
-            deactivate.delay(
-                activation_id=activation.id, requester=activation.user.username
+            stop_rulebook_process(
+                process_parent_type=ProcessParentType.ACTIVATION,
+                id=activation.id,
             )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -299,12 +308,10 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        restart.delay(
-            activation_id=activation.id, requester=activation.user.username
+        restart_rulebook_process(
+            process_parent_type=ProcessParentType.ACTIVATION,
+            id=activation.id,
         )
-
-        activation.restart_count += 1
-        activation.save(update_fields=["restart_count", "modified_at"])
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -346,7 +353,7 @@ class ActivationInstanceViewSet(
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.ActivationInstance.objects.all()
+    queryset = models.RulebookProcess.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
@@ -372,22 +379,20 @@ class ActivationInstanceViewSet(
     )
     @action(
         detail=False,
-        queryset=models.ActivationInstanceLog.objects.order_by("id"),
+        queryset=models.RulebookProcessLog.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceLogFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
     )
     def logs(self, request, id):
-        instance_exists = models.ActivationInstance.objects.filter(
-            pk=id
-        ).exists()
+        instance_exists = models.RulebookProcess.objects.filter(pk=id).exists()
         if not instance_exists:
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
                 detail=f"Activation Instance with ID={id} does not exist.",
             )
 
-        activation_instance_logs = models.ActivationInstanceLog.objects.filter(
+        activation_instance_logs = models.RulebookProcessLog.objects.filter(
             activation_instance_id=id
         ).order_by("id")
         activation_instance_logs = self.filter_queryset(

@@ -22,7 +22,6 @@ from typing import Any, Callable, Final, Iterator, Optional, Type
 
 import yaml
 from django.core import exceptions
-from django.db import utils
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
@@ -46,27 +45,41 @@ class ProjectImportError(Exception):
     pass
 
 
+class MalformedError(Exception):
+    pass
+
+
 def _project_import_wrapper(
     func: Callable[[ProjectImportService, models.Project], None]
 ):
     @wraps(func)
     def wrapper(self: ProjectImportService, project: models.Project):
         project.import_state = models.Project.ImportState.RUNNING
-        project.save()
+        project.save(update_fields=["import_state"])
+        error = None
         try:
             func(self, project)
             project.import_state = models.Project.ImportState.COMPLETED
-            project.save()
-        except (utils.IntegrityError, exceptions.ObjectDoesNotExist):
-            logger.exception("Object may have been deleted")
         except Exception as e:
+            project.import_state = models.Project.ImportState.FAILED
+            project.import_error = str(e)
+            error = e
+        finally:
             try:
-                project.import_state = models.Project.ImportState.FAILED
-                project.import_error = str(e)
-                project.save()
+                project.save(
+                    update_fields=["import_state", "import_error", "git_hash"]
+                )
             except exceptions.ObjectDoesNotExist:
-                logger.exception("Project may have been deleted")
-            raise
+                raise ProjectImportError(
+                    "Project may have been deleted"
+                ) from error
+            else:
+                if error and isinstance(error, ProjectImportError):
+                    raise error
+                elif error:
+                    raise ProjectImportError(
+                        f"Failed to import the project: {str(error)}"
+                    ) from error
 
     return wrapper
 
@@ -88,7 +101,7 @@ class ProjectImportService:
             repo = self._git_cls.clone(
                 project.url,
                 repo_dir,
-                credential=project.credential,
+                credential=project.eda_credential,
                 depth=1,
                 verify_ssl=project.verify_ssl,
             )
@@ -104,7 +117,7 @@ class ProjectImportService:
             repo = self._git_cls.clone(
                 project.url,
                 repo_dir,
-                credential=project.credential,
+                credential=project.eda_credential,
                 depth=1,
                 verify_ssl=project.verify_ssl,
             )
@@ -224,7 +237,10 @@ class ProjectImportService:
             logger.warning("Invalid YAML file %s: %s", rulebook_path, exc)
             return None
 
-        if not self._is_rulebook_file(content):
+        try:
+            self._validate_rulebook_file(content)
+        except MalformedError as exc:
+            logger.warning("Malformed rulebook %s: %s", rulebook_path, exc)
             return None
 
         relpath = os.path.relpath(rulebook_path, rulebooks_dir)
@@ -234,7 +250,32 @@ class ProjectImportService:
             content=content,
         )
 
-    def _is_rulebook_file(self, data: Any) -> bool:
+    def _validate_rulebook_file(self, data: Any) -> None:
         if not isinstance(data, list):
-            return False
-        return all("rules" in entry for entry in data)
+            raise MalformedError("rulebook must contain a list of rulesets")
+        required_keys = ["name", "condition", "action|actions"]
+        for ruleset in data:
+            if "rules" not in ruleset:
+                raise MalformedError("no rules in a ruleset")
+            rules = ruleset["rules"]
+            if not isinstance(rules, list):
+                raise MalformedError("ruleset must contain a list of rules")
+            for rule in rules:
+                if not all(
+                    any(any_key in rule for any_key in key.split("|"))
+                    for key in required_keys
+                ):
+                    raise MalformedError(
+                        f"ruleset must contain {required_keys}"
+                    )
+
+                if not all(
+                    any(
+                        rule.get(any_key) is not None
+                        for any_key in key.split("|")
+                    )
+                    for key in required_keys
+                ):
+                    raise MalformedError(
+                        f"rule's {required_keys} must have non empty values"
+                    )

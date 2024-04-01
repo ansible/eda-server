@@ -15,26 +15,20 @@
 from django.db import models
 
 from aap_eda.core.enums import (
-    ACTIVATION_STATUS_MESSAGE_MAP,
     ActivationStatus,
     RestartPolicy,
+    RulebookProcessLogLevel,
 )
-from aap_eda.core.exceptions import (
-    StatusRequiredError,
-    UnknownStatusError,
-    UpdateFieldsRequiredError,
-)
+from aap_eda.core.utils import get_default_log_level
+from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .user import User
+from .mixins import StatusHandlerModelMixin
+from .user import AwxToken, User
 
-__all__ = (
-    "Activation",
-    "ActivationInstance",
-    "ActivationInstanceLog",
-)
+__all__ = ("Activation",)
 
 
-class Activation(models.Model):
+class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
@@ -44,6 +38,8 @@ class Activation(models.Model):
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")
+    # TODO(alex) Since local activations are no longer supported
+    # this field should be mandatory.
     decision_environment = models.ForeignKey(
         "DecisionEnvironment", on_delete=models.SET_NULL, null=True
     )
@@ -68,6 +64,8 @@ class Activation(models.Model):
     restart_count = models.IntegerField(default=0)
     failure_count = models.IntegerField(default=0)  # internal, since last good
     is_valid = models.BooleanField(default=False)  # internal, passed first run
+    # TODO(alex): name and rulesets should be populated in the model, not in
+    # the serializer.
     rulebook_name = models.TextField(
         null=False,
         help_text="Name of the referenced rulebook",
@@ -82,129 +80,35 @@ class Activation(models.Model):
     modified_at = models.DateTimeField(auto_now=True, null=False)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
-
-    def save(self, *args, **kwargs):
-        # when creating
-        if self._state.adding:
-            if self.status_message is None:
-                self._set_status_message()
-        else:
-            if not bool(kwargs) or "update_fields" not in kwargs:
-                raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
-                )
-            else:
-                if "status" in kwargs["update_fields"]:
-                    self._is_valid_status()
-
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
-                raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
-                )
-            # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
-                self._set_status_message()
-                kwargs["update_fields"].append("status_message")
-
-        super().save(*args, **kwargs)
-
-    def _set_status_message(self):
-        self.status_message = self._get_default_status_message()
-
-        if self.status == ActivationStatus.PENDING and not self.is_enabled:
-            self.status_message = "Activation is marked as disabled"
-
-    def _get_default_status_message(self):
-        try:
-            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
-        except KeyError:
-            raise UnknownStatusError(f"Status [{self.status}] is invalid")
-
-    def _is_valid_status(self):
-        try:
-            ActivationStatus(self.status)
-        except ValueError as error:
-            raise UnknownStatusError(error)
-
-
-class ActivationInstance(models.Model):
-    class Meta:
-        db_table = "core_activation_instance"
-        ordering = ("-started_at",)
-
-    name = models.TextField(null=False, default="")
-    status = models.TextField(
-        choices=ActivationStatus.choices(),
-        default=ActivationStatus.PENDING,
+    latest_instance = models.OneToOneField(
+        "RulebookProcess",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
     )
-    git_hash = models.TextField(null=False, default="")
-    activation = models.ForeignKey("Activation", on_delete=models.CASCADE)
-    started_at = models.DateTimeField(auto_now_add=True, null=False)
-    updated_at = models.DateTimeField(null=True)
-    ended_at = models.DateTimeField(null=True)
-    activation_pod_id = models.TextField(null=True)
-    status_message = models.TextField(null=True, default=None)
-
-    def save(self, *args, **kwargs):
-        # when creating
-        if self._state.adding:
-            if self.status_message is None:
-                self.status_message = self._get_default_status_message()
-        else:
-            if not bool(kwargs) or "update_fields" not in kwargs:
-                raise UpdateFieldsRequiredError(
-                    "update_fields is required to use when saving "
-                    "due to race conditions"
-                )
-            else:
-                if "status" in kwargs["update_fields"]:
-                    self._is_valid_status()
-
-            if (
-                "status_message" in kwargs["update_fields"]
-                and "status" not in kwargs["update_fields"]
-            ):
-                raise StatusRequiredError(
-                    "status_message cannot be set by itself, "
-                    "it requires status and status_message together"
-                )
-            # when updating without status_message
-            elif (
-                "status" in kwargs["update_fields"]
-                and "status_message" not in kwargs["update_fields"]
-            ):
-                self.status_message = self._get_default_status_message()
-                kwargs["update_fields"].append("status_message")
-
-        super().save(*args, **kwargs)
-
-    def _get_default_status_message(self):
-        try:
-            return ACTIVATION_STATUS_MESSAGE_MAP[self.status]
-        except KeyError:
-            raise UnknownStatusError(f"Status [{self.status}] is invalid")
-
-    def _is_valid_status(self):
-        try:
-            ActivationStatus(self.status)
-        except ValueError as error:
-            raise UnknownStatusError(error)
-
-
-class ActivationInstanceLog(models.Model):
-    class Meta:
-        db_table = "core_activation_instance_log"
-
-    activation_instance = models.ForeignKey(
-        "ActivationInstance", on_delete=models.CASCADE
+    awx_token = models.ForeignKey(
+        AwxToken,
+        on_delete=models.SET_NULL,
+        null=True,
+        default=None,
     )
-    line_number = models.IntegerField()
-    log = models.TextField()
+    event_streams = models.ManyToManyField(
+        "EventStream",
+        default=None,
+    )
+    log_level = models.CharField(
+        max_length=20,
+        choices=RulebookProcessLogLevel.choices(),
+        default=get_default_log_level,
+    )
+    eda_credentials = models.ManyToManyField(
+        "EdaCredential", related_name="activations", default=None
+    )
+    eda_system_vault_credential = models.OneToOneField(
+        "EdaCredential",
+        null=True,
+        default=None,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )

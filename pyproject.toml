@@ -8,13 +8,11 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "aap-eda"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
-packages = [
-    {include = "aap_eda", from = "src"}
-]
+packages = [{ include = "aap_eda", from = "src" }]
 
 [tool.poetry.scripts]
 aap-eda-manage = 'aap_eda.manage:main'
@@ -27,38 +25,44 @@ all = ["psycopg2"]
 dev = ["psycopg2-binary"]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4"
+python = ">=3.11,<3.12"
 django = ">=4.2,<4.3"
-djangorestframework = "*"
-dynaconf = ">=3"
-drf-spectacular = "*"
-channels = { version = "*", extras = ["daphne"] }
-psycopg2 = { version = "*", optional = true }
+djangorestframework = "3.14.*"
+djangorestframework_simplejwt = "5.3.*"
+dynaconf = ">=3.1.12,<3.3"
+drf-spectacular = ">=0.26.5,<0.27"
+channels = { version = "4.0.*", extras = ["daphne"] }
+psycopg2 = { version = "2.9.*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
-django-rq = "*"
-rq = "*"
-django-filter = "*"
-pydantic = "*"
-cryptography = "*"
-kubernetes = "*"
-podman = ">=4.5"
+django-rq = ">=2.5,<2.9"
+rq = ">=1.10.1,<1.14"
+django-filter = ">23.2,<24"
+pydantic = ">=1.8.1,<1.11"
+cryptography = ">=38,<42"
+kubernetes = "26.1.*"
+podman = "4.9.*"
 rq-scheduler = "^0.10"
-# Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-django-ansible-base = {git = "https://github.com/ansible/django-ansible-base.git", tag = "0.1.0"}
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2024.2.12", extras = [
+    "channel_auth",
+] }
+jinja2 = ">=3.1.3,<3.2"
+django-split-settings = "^1.2.0"
+pexpect = "^4.9.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
-requests = { version="*", python="<4.0" }
+requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-redis = "^3.0.2"
+pytest-lazy-fixture = "^0.6.3"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"
 isort = "*"
 black = "*"
-flake8-broken-line = { version="*", python="<4.0" }
+flake8-broken-line = { version = "*", python = "<4.0" }
 flake8-string-format = "*"
 # This is an experimental linter.
 ruff = "*"
@@ -69,7 +73,7 @@ flake8-bugbear = "*"
 flake8-comprehensions = "*"
 flake8-debugger = "*"
 flake8-docstrings = "*"
-flake8-eradicate = { version="*", python="<4.0" }
+flake8-eradicate = { version = "*", python = "<4.0" }
 flake8-print = "*"
 
 [tool.poetry.group.dev.dependencies]
@@ -93,16 +97,22 @@ line-length = 79
 select = [
     "E",
     "F",
-    "D",        # flake8-docstrings
-    "TID",      # flake8-tidy-imports
+    "D",   # flake8-docstrings
+    "TID", # flake8-tidy-imports
 ]
 extend-ignore = [
-    "D1",       #  Missing docstrings errors
+    "D1", #  Missing docstrings errors
 ]
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 "src/aap_eda/core/migrations/*" = ["E501"]
+"tests/**/*.py" = [
+    "S101",   # Asserts allowed in tests
+    "ARG",    # Fixtures are not always used explicitly
+    "SLF001", # Call private methods in tests
+    "D",      # Docstrings are not required in tests
+]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"

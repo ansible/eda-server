@@ -148,9 +148,18 @@ class ProjectViewSet(
     )
     def retrieve(self, request, pk):
         project = super().retrieve(request, pk)
-        project.data["credential"] = (
-            models.Credential.objects.get(pk=project.data["credential_id"])
-            if project.data["credential_id"]
+        project.data["eda_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["eda_credential_id"]
+            )
+            if project.data["eda_credential_id"]
+            else None
+        )
+        project.data["signature_validation_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["signature_validation_credential_id"]
+            )
+            if project.data["signature_validation_credential_id"]
             else None
         )
 
@@ -180,23 +189,29 @@ class ProjectViewSet(
             instance=project, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        credential_id = request.data.get("credential_id")
 
-        # Validate credential_id if has meaningful value
-        if credential_id is not None and int(credential_id) > 0:
-            credential = models.Credential.objects.filter(
+        credential_ids = [
+            request.data.get("eda_credential_id"),
+            request.data.get("signature_validation_credential_id"),
+        ]
+
+        # Validate eda_credential_id if has meaningful value
+        for credential_id in credential_ids:
+            if credential_id is None:
+                continue
+            credential = models.EdaCredential.objects.filter(
                 id=credential_id
             ).first()
             if not credential:
+                msg = f"EdaCredential [{credential_id}] not found"
                 return Response(
-                    {"errors": f"Credential [{credential_id}] not found"},
+                    {"errors": msg},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        else:
-            credential_id = None  # for credential = 0
 
         try:
-            project.credential_id = credential_id
+            project.eda_credential_id = credential_ids[0]
+            project.signature_validation_credential_id = credential_ids[1]
             project.name = request.data.get("name", project.name)
             project.description = request.data.get(
                 "description", project.description
