@@ -211,6 +211,8 @@ class ScmRepository:
             return url
         elif user and password:
             domain = f"{user}:{password}@{domain}"
+        elif password:
+            domain = f"{password}@{domain}"
 
         unparsed = (
             scheme,
@@ -267,7 +269,8 @@ class PlaybookExecutor:
             elif index == 1:
                 line = child.readline().decode()
                 if "could not read Username" in line:
-                    raise ScmAuthenticationError("Credentials not provided")
+                    msg = "Credentials not provided or incorrect"
+                    raise ScmAuthenticationError(msg)
                 raise ScmError(f"{self.ERROR_PREFIX} {line}")
             raise ScmError(f"{self.ERROR_PREFIX} {child.before}")
         except pexpect.exceptions.TIMEOUT:
