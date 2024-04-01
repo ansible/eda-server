@@ -196,7 +196,3 @@ services:
 volumes:
   postgres_data: {}
   podman_data: {}
-
-networks:
-  service-mesh:
-    name: service-mesh
