@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
@@ -209,22 +209,12 @@ class ProjectViewSet(
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        try:
-            project.eda_credential_id = credential_ids[0]
-            project.signature_validation_credential_id = credential_ids[1]
-            project.name = request.data.get("name", project.name)
-            project.description = request.data.get(
-                "description", project.description
-            )
-            project.verify_ssl = request.data.get(
-                "verify_ssl", project.verify_ssl
-            )
-            project.save()
-        except IntegrityError as e:
-            return Response(
-                {"errors": str(e)},
-                status=status.HTTP_409_CONFLICT,
-            )
+        update_fields = []
+        for key, value in serializer.validated_data.items():
+            setattr(project, key, value)
+            update_fields.append(key)
+
+        project.save(update_fields=update_fields)
 
         return Response(serializers.ProjectSerializer(project).data)
 

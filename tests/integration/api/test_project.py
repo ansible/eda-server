@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import datetime
 from typing import Any, Dict
 from unittest import mock
 
@@ -143,7 +144,7 @@ def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
     )
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
-    assert_project_data_details(response.json(), project)
+    assert_project_data(response.json(), project)
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ
@@ -167,7 +168,7 @@ def test_retrieve_project_failed_state(client: APIClient):
     assert data["import_state"] == "failed"
     assert data["import_error"] == "Unexpected error. Please contact support."
 
-    assert_project_data_details(data, project)
+    assert_project_data(data, project)
 
 
 @pytest.mark.django_db
@@ -452,26 +453,22 @@ def test_partial_update_project(
     assert project.signature_validation_credential_id is None
     assert project.verify_ssl is True
 
+    data = {
+        "name": "test-project-01-updated",
+        "eda_credential_id": eda_credential.id,
+        "signature_validation_credential_id": sv_credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
+        "verify_ssl": False,
+    }
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
-        data={
-            "name": "test-project-01-updated",
-            "eda_credential_id": eda_credential.id,
-            "signature_validation_credential_id": sv_credential.id,
-            "scm_branch": "main",
-            "scm_refspec": "ref1",
-            "verify_ssl": False,
-        },
+        data,
     )
     assert response.status_code == status.HTTP_200_OK
 
     project = models.Project.objects.get(pk=project.id)
-    assert project.name == "test-project-01-updated"
-    assert project.eda_credential_id == eda_credential.id
-    assert project.signature_validation_credential_id == sv_credential.id
-    assert project.verify_ssl is False
-
-    assert_project_data(response.json(), project)
+    assert_project_data(data, project)
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
@@ -508,24 +505,14 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def assert_project_data(data: Dict[str, Any], project: models.Project):
-    eda_credential_id = (
-        project.eda_credential.id if project.eda_credential else None
-    )
-    signature_validation_credential_id = (
-        project.signature_validation_credential.id
-        if project.signature_validation_credential
-        else None
-    )
-    verify_ssl = project.verify_ssl if project.verify_ssl is not None else True
-
-    project_to_data = model_to_data_common(project)
-    project_to_data["eda_credential_id"] = eda_credential_id
-    project_to_data[
-        "signature_validation_credential_id"
-    ] = signature_validation_credential_id
-    project_to_data["verify_ssl"] = verify_ssl
-
-    assert data == project_to_data
+    for key, value in data.items():
+        project_value = getattr(project, key, None)
+        if isinstance(project_value, datetime.datetime):
+            project_value = project_value.strftime(DATETIME_FORMAT)
+        if isinstance(project_value, models.EdaCredential):
+            assert value == get_credential_details(project_value)
+        else:
+            assert value == project_value
 
 
 def get_credential_details(credential: models.EdaCredential) -> dict:
@@ -540,40 +527,4 @@ def get_credential_details(credential: models.EdaCredential) -> dict:
             credential.credential_type.inputs,
             credential.inputs.get_secret_value(),
         ),
-    }
-
-
-def assert_project_data_details(data: Dict[str, Any], project: models.Project):
-    eda_credential = project.eda_credential
-    eda_credential_data = (
-        get_credential_details(eda_credential) if eda_credential else None
-    )
-    sv_credential = project.signature_validation_credential
-    sv_credential_data = (
-        get_credential_details(sv_credential) if sv_credential else None
-    )
-    verify_ssl = project.verify_ssl if project.verify_ssl is not None else True
-
-    project_to_data = model_to_data_common(project)
-    project_to_data["eda_credential"] = eda_credential_data
-    project_to_data["signature_validation_credential"] = sv_credential_data
-    project_to_data["verify_ssl"] = verify_ssl
-
-    assert data == project_to_data
-
-
-def model_to_data_common(project: models.Project):
-    return {
-        "id": project.id,
-        "url": project.url,
-        "name": project.name,
-        "description": project.description,
-        "git_hash": project.git_hash,
-        "scm_type": project.scm_type,
-        "scm_branch": project.scm_branch,
-        "scm_refspec": project.scm_refspec,
-        "import_state": project.import_state,
-        "import_error": project.import_error,
-        "created_at": project.created_at.strftime(DATETIME_FORMAT),
-        "modified_at": project.modified_at.strftime(DATETIME_FORMAT),
     }
