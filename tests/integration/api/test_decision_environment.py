@@ -13,7 +13,7 @@ class InitData:
     project: models.Project
     activation: models.Activation
     decision_environment: models.DecisionEnvironment
-    credential: models.Credential
+    eda_credential: models.EdaCredential
     rulebook: models.Rulebook
     ruleset: models.Ruleset
     rule: models.Rule
@@ -22,11 +22,14 @@ class InitData:
 
 @pytest.mark.django_db
 def test_list_decision_environments(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret"},
     )
     obj = models.DecisionEnvironment.objects.create(
-        name="de1", image_url="registry.com/img1:tag1", credential=credential
+        name="de1",
+        image_url="registry.com/img1:tag1",
+        eda_credential=credential,
     )
     response = client.get(f"{api_url_v1}/decision-environments/")
     assert response.status_code == status.HTTP_200_OK
@@ -37,21 +40,22 @@ def test_list_decision_environments(client: APIClient):
         "name": "de1",
         "description": "",
         "image_url": "registry.com/img1:tag1",
-        "credential_id": credential.id,
+        "eda_credential_id": credential.id,
         "id": obj.id,
     }
 
 
 @pytest.mark.django_db
 def test_create_decision_environment(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret"},
     )
     data_in = {
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
-        "credential_id": credential.id,
+        "eda_credential_id": credential.id,
     }
     response = client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
@@ -65,7 +69,7 @@ def test_create_decision_environment(client: APIClient):
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
-        "credential_id": credential.id,
+        "eda_credential_id": credential.id,
         "id": id_,
     }
     assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
@@ -73,7 +77,6 @@ def test_create_decision_environment(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_decision_environment(client: APIClient, init_db):
-    credential = init_db.credential
     obj = init_db.decision_environment
 
     response = client.get(f"{api_url_v1}/decision-environments/{obj.id}/")
@@ -86,14 +89,7 @@ def test_retrieve_decision_environment(client: APIClient, init_db):
         "name": "de1",
         "description": "",
         "image_url": "registry.com/img1:tag1",
-        "credential": {
-            "id": credential.id,
-            "name": credential.name,
-            "description": credential.description,
-            "credential_type": credential.credential_type,
-            "username": credential.username,
-            "vault_identifier": None,
-        },
+        "eda_credential": None,
     }
 
 
@@ -106,10 +102,11 @@ def test_retrieve_decision_environment_not_exist(client: APIClient):
 @pytest.mark.django_db
 def test_partial_update_decision_environment(client: APIClient, init_db):
     obj = init_db.decision_environment
-    credential = models.Credential.objects.create(
-        name="newcredential", username="me2", secret="sec2"
+    credential = models.EdaCredential.objects.create(
+        name="test-eda-credential",
+        inputs={"username": "adam", "password": "secret"},
     )
-    data = {"credential_id": credential.id}
+    data = {"eda_credential_id": credential.id}
     response = client.patch(
         f"{api_url_v1}/decision-environments/{obj.id}/", data=data
     )
@@ -121,13 +118,13 @@ def test_partial_update_decision_environment(client: APIClient, init_db):
         "name": "de1",
         "description": "",
         "image_url": "registry.com/img1:tag1",
-        "credential_id": credential.id,
+        "eda_credential_id": credential.id,
         "id": obj.id,
     }
     updated_obj = models.DecisionEnvironment.objects.filter(
         pk=int(obj.id)
     ).first()
-    assert updated_obj.credential == credential
+    assert updated_obj.eda_credential == credential
 
 
 @pytest.mark.django_db
@@ -197,14 +194,14 @@ def init_db():
         url="https://github.com/eda-project",
     )
 
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
+    eda_credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret"},
     )
 
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de1",
         image_url="registry.com/img1:tag1",
-        credential=credential,
     )
 
     rulebook = models.Rulebook.objects.create(
@@ -256,7 +253,7 @@ def init_db():
         activation=activation,
         project=project,
         decision_environment=decision_environment,
-        credential=credential,
+        eda_credential=eda_credential,
         rulebook=rulebook,
         ruleset=ruleset,
         rule=rule,

@@ -5,13 +5,14 @@ import typing as tp
 from datetime import datetime
 from enum import Enum
 
+import yaml
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
-from aap_eda.core.enums import CredentialType
+from aap_eda.core.enums import DefaultCredentialType
 
 from .messages import (
     ActionMessage,
@@ -125,9 +126,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             await self.send(text_data=controller_info.json())
 
-        vault_data = await self.get_vault_passwords(message)
-        if vault_data:
-            vault_collection = VaultCollection(data=vault_data)
+        eda_vault_data = await self.get_eda_system_vault_passwords(message)
+        if eda_vault_data:
+            vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
 
         await self.send(text_data=EndOfResponse().json())
@@ -345,7 +346,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return awx_token.token.get_secret_value() if awx_token else None
 
     @database_sync_to_async
-    def get_vault_passwords(
+    def get_eda_system_vault_passwords(
         self, message: WorkerMessage
     ) -> tp.List[VaultPassword]:
         """Get vault info from activation."""
@@ -355,22 +356,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation = rulebook_process_instance.get_parent()
         vault_passwords = []
 
-        if activation.system_vault_credential:
-            vault = models.Credential.objects.filter(
-                id=activation.system_vault_credential.id
+        if activation.eda_system_vault_credential:
+            vault = models.EdaCredential.objects.filter(
+                id=activation.eda_system_vault_credential.id
             )
         else:
-            vault = models.Credential.objects.none()
+            vault = models.EdaCredential.objects.none()
 
-        for credential in activation.credentials.filter(
-            credential_type=CredentialType.VAULT
+        vault_credential_type = models.CredentialType.objects.get(
+            name=DefaultCredentialType.VAULT
+        )
+        for credential in activation.eda_credentials.filter(
+            credential_type_id=vault_credential_type.id
         ).union(vault):
+            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
             vault_passwords.append(
                 VaultPassword(
-                    label=credential.vault_identifier,
-                    # TODO: Use pydantic secret feature (available > 2.0)
-                    # https://docs.pydantic.dev/latest/examples/secrets/
-                    password=credential.secret.get_secret_value(),
+                    label=inputs["vault_id"],
+                    password=inputs["vault_password"],
                 )
             )
 

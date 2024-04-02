@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import datetime
 from typing import Any, Dict
 from unittest import mock
 
@@ -20,6 +21,7 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ResourceType
+from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
 from tests.integration.constants import api_url_v1
 
 
@@ -27,15 +29,25 @@ from tests.integration.constants import api_url_v1
 # -------------------------------------
 @pytest.mark.django_db
 def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
+    cred_type = models.CredentialType.objects.create(
+        name="credtype",
+        inputs={},
+    )
     projects = models.Project.objects.bulk_create(
         [
             models.Project(
                 name="test-project-01",
                 url="https://git.example.com/acme/project-01",
                 git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-                credential=models.Credential.objects.create(
-                    name="credential1", username="me", secret="sec1"
+                eda_credential=models.EdaCredential.objects.create(
+                    name="credential1",
+                    credential_type=cred_type,
+                    inputs="sec1",
                 ),
+                signature_validation_credential=models.EdaCredential.objects.create(  # noqa: E501
+                    name="svcred1", credential_type=cred_type, inputs="sec2"
+                ),
+                scm_branch="main",
                 import_state=models.Project.ImportState.PENDING,
                 import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
             ),
@@ -44,6 +56,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
                 url="https://git.example.com/acme/project-02",
                 description="Project description.",
                 git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
+                scm_refspec="refspec",
                 verify_ssl=False,
                 import_state=models.Project.ImportState.COMPLETED,
                 import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
@@ -111,17 +124,27 @@ def test_list_projects_filter_name_none_exist(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
+    cred_type = models.CredentialType.objects.create(
+        name="type1", inputs={"fields": [{"id": "user", "type": "string"}]}
+    )
+    cred_inputs = inputs_to_store({"user": "me"})
+    sv_cred_inputs = inputs_to_store({"user": "him"})
     project = models.Project.objects.create(
         name="test-project-01",
-        credential=models.Credential.objects.create(
-            name="credential1", username="me", secret="sec1"
+        eda_credential=models.EdaCredential.objects.create(
+            name="credential1", credential_type=cred_type, inputs=cred_inputs
         ),
+        signature_validation_credential=models.EdaCredential.objects.create(
+            name="svcred1", credential_type=cred_type, inputs=sv_cred_inputs
+        ),
+        scm_branch="main",
+        scm_refspec="ref1",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
-    assert_project_data_details(response.json(), project)
+    assert_project_data(response.json(), project)
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.READ
@@ -145,7 +168,7 @@ def test_retrieve_project_failed_state(client: APIClient):
     assert data["import_state"] == "failed"
     assert data["import_error"] == "Unexpected error. Please contact support."
 
-    assert_project_data_details(data, project)
+    assert_project_data(data, project)
 
 
 @pytest.mark.django_db
@@ -167,10 +190,26 @@ def test_create_project(
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
 
+    cred_type = models.CredentialType.objects.create(
+        name="type1", inputs={"fields": [{"id": "user", "type": "string"}]}
+    )
+    cred_inputs = inputs_to_store({"user": "me"})
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential1", credential_type=cred_type, inputs=cred_inputs
+    )
+    sv_cred_inputs = inputs_to_store({"user": "him"})
+    sv_credential = models.EdaCredential.objects.create(
+        name="svcred1", credential_type=cred_type, inputs=sv_cred_inputs
+    )
+
     bodies = [
         {
             "name": "test-project-01",
             "url": "https://git.example.com/acme/project-01",
+            "eda_credential_id": eda_credential.id,
+            "signature_validation_credential_id": sv_credential.id,
+            "scm_branch": "main",
+            "scm_refspec": "ref1",
         },
         {
             "name": "test-project-02",
@@ -352,14 +391,10 @@ def test_update_project_not_found(client: APIClient):
 
 @pytest.mark.django_db
 def test_update_project_with_400(client: APIClient):
-    credential = models.Credential.objects.create(
-        name="credential", username="me", secret="sec"
-    )
     first = models.Project.objects.create(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
-        credential_id=credential.id,
     )
     second = models.Project.objects.create(
         name="test-project-02",
@@ -386,19 +421,27 @@ def test_update_project_with_400(client: APIClient):
     response = client.get(f"{api_url_v1}/projects/{first.id}/")
     data = {
         "name": "new project name",
-        "credential_id": 2,
+        "eda_credential_id": 2,
     }
     response = client.patch(f"{api_url_v1}/projects/{first.id}/", data=data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["errors"] == "Credential [2] not found"
+    assert response.data["errors"] == "EdaCredential [2] not found"
 
 
 @pytest.mark.django_db
 def test_partial_update_project(
     client: APIClient, check_permission_mock: mock.Mock
 ):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
+    cred_type = models.CredentialType.objects.create(
+        name="type1", inputs={"fields": [{"id": "user", "type": "string"}]}
+    )
+    cred_inputs = inputs_to_store({"user": "me"})
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential1", credential_type=cred_type, inputs=cred_inputs
+    )
+    sv_cred_inputs = inputs_to_store({"user": "him"})
+    sv_credential = models.EdaCredential.objects.create(
+        name="svcred1", credential_type=cred_type, inputs=sv_cred_inputs
     )
 
     project = models.Project.objects.create(
@@ -406,25 +449,26 @@ def test_partial_update_project(
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
-    assert project.credential_id is None
+    assert project.eda_credential_id is None
+    assert project.signature_validation_credential_id is None
     assert project.verify_ssl is True
 
+    data = {
+        "name": "test-project-01-updated",
+        "eda_credential_id": eda_credential.id,
+        "signature_validation_credential_id": sv_credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
+        "verify_ssl": False,
+    }
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
-        data={
-            "name": "test-project-01-updated",
-            "credential_id": credential.id,
-            "verify_ssl": False,
-        },
+        data,
     )
     assert response.status_code == status.HTTP_200_OK
 
     project = models.Project.objects.get(pk=project.id)
-    assert project.name == "test-project-01-updated"
-    assert project.credential_id == credential.id
-    assert project.verify_ssl is False
-
-    assert_project_data(response.json(), project)
+    assert_project_data(data, project)
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
@@ -461,48 +505,26 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def assert_project_data(data: Dict[str, Any], project: models.Project):
-    credential_id = project.credential.id if project.credential else None
-    verify_ssl = project.verify_ssl if project.verify_ssl is not None else True
-
-    project_to_data = model_to_data_common(project)
-    project_to_data["credential_id"] = credential_id
-    project_to_data["verify_ssl"] = verify_ssl
-
-    assert data == project_to_data
-
-
-def assert_project_data_details(data: Dict[str, Any], project: models.Project):
-    credential = project.credential
-    credential_data = (
-        {
-            "id": credential.id,
-            "name": credential.name,
-            "description": credential.description,
-            "credential_type": credential.credential_type,
-            "username": credential.username,
-            "vault_identifier": None,
-        }
-        if credential
-        else None
-    )
-    verify_ssl = project.verify_ssl if project.verify_ssl is not None else True
-
-    project_to_data = model_to_data_common(project)
-    project_to_data["credential"] = credential_data
-    project_to_data["verify_ssl"] = verify_ssl
-
-    assert data == project_to_data
+    for key, value in data.items():
+        project_value = getattr(project, key, None)
+        if isinstance(project_value, datetime.datetime):
+            project_value = project_value.strftime(DATETIME_FORMAT)
+        if isinstance(project_value, models.EdaCredential):
+            assert value == get_credential_details(project_value)
+        else:
+            assert value == project_value
 
 
-def model_to_data_common(project: models.Project):
+def get_credential_details(credential: models.EdaCredential) -> dict:
+    credential.refresh_from_db()
     return {
-        "id": project.id,
-        "url": project.url,
-        "name": project.name,
-        "description": project.description,
-        "git_hash": project.git_hash,
-        "import_state": project.import_state,
-        "import_error": project.import_error,
-        "created_at": project.created_at.strftime(DATETIME_FORMAT),
-        "modified_at": project.modified_at.strftime(DATETIME_FORMAT),
+        "id": credential.id,
+        "name": credential.name,
+        "description": credential.description,
+        "credential_type_id": credential.credential_type.id,
+        "managed": credential.managed,
+        "inputs": inputs_to_display(
+            credential.credential_type.inputs,
+            credential.inputs.get_secret_value(),
+        ),
     }

@@ -26,7 +26,7 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api import exceptions, serializers
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import models
 from aap_eda.core.enums import CredentialType
@@ -78,6 +78,7 @@ logger = logging.getLogger(__name__)
         ],
     ),
 )
+@extend_schema(exclude=True)
 class CredentialViewSet(
     ResponseSerializerMixin,
     CreateModelMixin,
@@ -89,7 +90,6 @@ class CredentialViewSet(
 ):
     queryset = models.Credential.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.CredentialFilter
 
     def handle_exception(self, exc):
         if isinstance(exc, fernet.InvalidToken):
@@ -106,6 +106,7 @@ class CredentialViewSet(
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:
+            # TODO: remove these later
             return serializers.CredentialCreateSerializer
         return serializers.CredentialSerializer
 

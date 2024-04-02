@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
@@ -148,9 +148,18 @@ class ProjectViewSet(
     )
     def retrieve(self, request, pk):
         project = super().retrieve(request, pk)
-        project.data["credential"] = (
-            models.Credential.objects.get(pk=project.data["credential_id"])
-            if project.data["credential_id"]
+        project.data["eda_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["eda_credential_id"]
+            )
+            if project.data["eda_credential_id"]
+            else None
+        )
+        project.data["signature_validation_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["signature_validation_credential_id"]
+            )
+            if project.data["signature_validation_credential_id"]
             else None
         )
 
@@ -180,36 +189,32 @@ class ProjectViewSet(
             instance=project, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        credential_id = request.data.get("credential_id")
 
-        # Validate credential_id if has meaningful value
-        if credential_id is not None and int(credential_id) > 0:
-            credential = models.Credential.objects.filter(
+        credential_ids = [
+            request.data.get("eda_credential_id"),
+            request.data.get("signature_validation_credential_id"),
+        ]
+
+        # Validate eda_credential_id if has meaningful value
+        for credential_id in credential_ids:
+            if credential_id is None:
+                continue
+            credential = models.EdaCredential.objects.filter(
                 id=credential_id
             ).first()
             if not credential:
+                msg = f"EdaCredential [{credential_id}] not found"
                 return Response(
-                    {"errors": f"Credential [{credential_id}] not found"},
+                    {"errors": msg},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        else:
-            credential_id = None  # for credential = 0
 
-        try:
-            project.credential_id = credential_id
-            project.name = request.data.get("name", project.name)
-            project.description = request.data.get(
-                "description", project.description
-            )
-            project.verify_ssl = request.data.get(
-                "verify_ssl", project.verify_ssl
-            )
-            project.save()
-        except IntegrityError as e:
-            return Response(
-                {"errors": str(e)},
-                status=status.HTTP_409_CONFLICT,
-            )
+        update_fields = []
+        for key, value in serializer.validated_data.items():
+            setattr(project, key, value)
+            update_fields.append(key)
+
+        project.save(update_fields=update_fields)
 
         return Response(serializers.ProjectSerializer(project).data)
 

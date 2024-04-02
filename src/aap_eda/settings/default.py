@@ -48,6 +48,10 @@ Database settings:
 * DB_USER - Database username (default: "postgres")
 * DB_PASSWORD - Database user password (default: None)
 * DB_NAME - Database name (default: "eda")
+* EDA_PGSSLMODE - SSL mode for PostgreSQL connection (default: "prefer")
+* EDA_PGSSLCERT - Path to SSL certificate file (default: "")
+* EDA_PGSSLKEY - Path to SSL key file (default: "")
+* EDA_PGSSLROOTCERT - Path to SSL root certificate file (default: "")
 
 Redis queue settings:
 
@@ -211,9 +215,14 @@ DATABASES = {
         "USER": settings.get("DB_USER", "postgres"),
         "PASSWORD": settings.get("DB_PASSWORD"),
         "NAME": settings.get("DB_NAME", "eda"),
+        "OPTIONS": {
+            "sslmode": settings.get("PGSSLMODE", default="prefer"),
+            "sslcert": settings.get("PGSSLCERT", default=""),
+            "sslkey": settings.get("PGSSLKEY", default=""),
+            "sslrootcert": settings.get("PGSSLROOTCERT", default=""),
+        },
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
