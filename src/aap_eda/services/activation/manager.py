@@ -833,6 +833,8 @@ class ActivationManager:
             f"Activation manager activation id: {self.db_instance.id} "
             "Activation restart scheduled for 1 second.",
         )
+        self._set_latest_instance_status(ActivationStatus.NODE_FAILOVER)
+        self._set_activation_pod_id(pod_id=None)
         user_msg = "Restarting because of node failure "
         self._set_activation_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
@@ -1125,7 +1127,9 @@ class ActivationManager:
         if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
             LOGGER.info(
                 "No capacity to start a new rulebook process. "
-                f"{parent_type} {parent_id} is postponed",
+                f"{parent_type} {parent_id} is postponed. "
+                f"Max allowed {settings.MAX_RUNNING_ACTIVATIONS}, "
+                f"currently there are {num_running_processes} active "
             )
             return False
         return True

@@ -79,6 +79,7 @@ class ActivationStatus(DjangoStrEnum):
     # monitor task will handle it
     UNRESPONSIVE = "unresponsive"
     ERROR = "error"
+    NODE_FAILOVER = "node_failover"
 
 
 # TODO: Deprecated, will be removed in future version, use
