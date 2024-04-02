@@ -142,7 +142,7 @@ class ModelFactory:
                 try:
                     related_obj = self.get_or_create(field.related_model)
                 except Exception:
-                    # Even if we cannot create a dependencyj,
+                    # Even if we cannot create a dependency,
                     # the original object creation might still work, and this
                     related_obj = None
             if related_obj:

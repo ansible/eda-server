@@ -88,10 +88,8 @@ class CredentialViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
+    queryset = models.Credential.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
-
-    def get_queryset(self):
-        return models.Credential.access_qs(self.request.user).order_by("id")
 
     def handle_exception(self, exc):
         if isinstance(exc, fernet.InvalidToken):
