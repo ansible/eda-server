@@ -13,7 +13,7 @@
 #  limitations under the License.
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.forms import model_to_dict
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
@@ -238,29 +238,19 @@ class ProjectViewSet(
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        try:
-            old_data = model_to_dict(project)
-            project.eda_credential_id = credential_ids[0]
-            project.signature_validation_credential_id = credential_ids[1]
-            project.name = request.data.get("name", project.name)
-            project.description = request.data.get(
-                "description", project.description
-            )
-            project.verify_ssl = request.data.get(
-                "verify_ssl", project.verify_ssl
-            )
-            with transaction.atomic():
-                project.save()
-                check_related_permissions(
-                    request.user,
-                    serializer.Meta.model,
-                    old_data,
-                    model_to_dict(project),
-                )
-        except IntegrityError as e:
-            return Response(
-                {"errors": str(e)},
-                status=status.HTTP_409_CONFLICT,
+        update_fields = []
+        for key, value in serializer.validated_data.items():
+            setattr(project, key, value)
+            update_fields.append(key)
+
+        old_data = model_to_dict(project)
+        with transaction.atomic():
+            project.save(update_fields=update_fields)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(project),
             )
 
         return Response(serializers.ProjectSerializer(project).data)

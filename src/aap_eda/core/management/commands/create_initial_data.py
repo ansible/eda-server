@@ -161,36 +161,171 @@ ORG_ROLES = [
     },
 ]
 
+SOURCE_CONTROL_INPUTS = {
+    "fields": [
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+        },
+        {
+            "id": "ssh_key_data",
+            "label": "SCM Private Key",
+            "type": "string",
+            "format": "ssh_private_key",
+            "secret": True,
+            "multiline": True,
+        },
+        {
+            "id": "ssh_key_unlock",
+            "label": "Private Key Passphrase",
+            "type": "string",
+            "secret": True,
+        },
+    ]
+}
+
+REGISTRY_INPUTS = {
+    "fields": [
+        {
+            "id": "host",
+            "label": "Authentication URL",
+            "type": "string",
+            "help_text": (
+                "Authentication endpoint for the container registry."
+            ),
+            "default": "quay.io",
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "password",
+            "label": "Password or Token",
+            "type": "string",
+            "secret": True,
+            "help_text": ("A password or token used to authenticate with"),
+        },
+        {
+            "id": "verify_ssl",
+            "label": "Verify SSL",
+            "type": "boolean",
+            "default": True,
+        },
+    ],
+    "required": ["host"],
+}
+
+GPG_INPUTS = {
+    "fields": [
+        {
+            "id": "gpg_public_key",
+            "label": "GPG Public Key",
+            "type": "string",
+            "secret": True,
+            "multiline": True,
+            "help_text": (
+                "GPG Public Key used to validate content signatures."
+            ),
+        },
+    ],
+    "required": ["gpg_public_key"],
+}
+
+AAP_INPUTS = {
+    "fields": [
+        {
+            "id": "host",
+            "label": "Red Hat Ansible Automation Platform",
+            "type": "string",
+            "help_text": (
+                "Red Hat Ansible Automation Platform base URL"
+                " to authenticate with."
+            ),
+        },
+        {
+            "id": "username",
+            "label": "Username",
+            "type": "string",
+            "help_text": (
+                "Red Hat Ansible Automation Platform username id"
+                " to authenticate as.This should not be set if"
+                " an OAuth token is being used."
+            ),
+        },
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+        },
+        {
+            "id": "oauth_token",
+            "label": "OAuth Token",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "An OAuth token to use to authenticate with."
+                "This should not be set if username/password"
+                " are being used."
+            ),
+        },
+        {
+            "id": "verify_ssl",
+            "label": "Verify SSL",
+            "type": "boolean",
+            "secret": False,
+        },
+    ],
+    "required": ["host"],
+}
+
+AAP_INJECTORS = {
+    "env": {
+        "TOWER_HOST": "{{host}}",
+        "TOWER_USERNAME": "{{username}}",
+        "TOWER_PASSWORD": "{{password}}",
+        "TOWER_VERIFY_SSL": "{{verify_ssl}}",
+        "TOWER_OAUTH_TOKEN": "{{oauth_token}}",
+        "CONTROLLER_HOST": "{{host}}",
+        "CONTROLLER_USERNAME": "{{username}}",
+        "CONTROLLER_PASSWORD": "{{password}}",
+        "CONTROLLER_VERIFY_SSL": "{{verify_ssl}}",
+        "CONTROLLER_OAUTH_TOKEN": "{{oauth_token}}",
+    }
+}
+
+VAULT_INPUTS = {
+    "fields": [
+        {
+            "id": "vault_password",
+            "label": "Vault Password",
+            "type": "string",
+            "secret": True,
+            "ask_at_runtime": True,
+        },
+        {
+            "id": "vault_id",
+            "label": "Vault Identifier",
+            "type": "string",
+            "format": "vault_id",
+            "help_text": (
+                "Specify an (optional) Vault ID. This is equivalent "
+                "to specifying the --vault-id Ansible parameter for "
+                "providing multiple Vault passwords.  Note: this "
+                " feature only works in Ansible 2.4+."
+            ),
+        },
+    ],
+    "required": ["vault_password"],
+}
+
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
         "namespace": "scm",
         "kind": "scm",
-        "inputs": {
-            "fields": [
-                {"id": "username", "label": "Username", "type": "string"},
-                {
-                    "id": "password",
-                    "label": "Password",
-                    "type": "string",
-                    "secret": True,
-                },
-                {
-                    "id": "ssh_key_data",
-                    "label": "SCM Private Key",
-                    "type": "string",
-                    "format": "ssh_private_key",
-                    "secret": True,
-                    "multiline": True,
-                },
-                {
-                    "id": "ssh_key_unlock",
-                    "label": "Private Key Passphrase",
-                    "type": "string",
-                    "secret": True,
-                },
-            ]
-        },
+        "inputs": SOURCE_CONTROL_INPUTS,
         "injectors": {},
         "managed": True,
     },
@@ -198,36 +333,7 @@ CREDENTIAL_TYPES = [
         "name": enums.DefaultCredentialType.REGISTRY,
         "kind": "registry",
         "namespace": "registry",
-        "inputs": {
-            "fields": [
-                {
-                    "id": "host",
-                    "label": "Authentication URL",
-                    "type": "string",
-                    "help_text": (
-                        "Authentication endpoint for the container registry."
-                    ),
-                    "default": "quay.io",
-                },
-                {"id": "username", "label": "Username", "type": "string"},
-                {
-                    "id": "password",
-                    "label": "Password or Token",
-                    "type": "string",
-                    "secret": True,
-                    "help_text": (
-                        "A password or token used to authenticate with"
-                    ),
-                },
-                {
-                    "id": "verify_ssl",
-                    "label": "Verify SSL",
-                    "type": "boolean",
-                    "default": True,
-                },
-            ],
-            "required": ["host"],
-        },
+        "inputs": REGISTRY_INPUTS,
         "injectors": {},
         "managed": True,
     },
@@ -235,21 +341,7 @@ CREDENTIAL_TYPES = [
         "name": enums.DefaultCredentialType.GPG,
         "kind": "cryptography",
         "namespace": "gpg_public_key",
-        "inputs": {
-            "fields": [
-                {
-                    "id": "gpg_public_key",
-                    "label": "GPG Public Key",
-                    "type": "string",
-                    "secret": True,
-                    "multiline": True,
-                    "help_text": (
-                        "GPG Public Key used to validate content signatures."
-                    ),
-                },
-            ],
-            "required": ["gpg_public_key"],
-        },
+        "inputs": GPG_INPUTS,
         "injectors": {},
         "managed": True,
     },
@@ -257,101 +349,40 @@ CREDENTIAL_TYPES = [
         "name": enums.DefaultCredentialType.AAP,
         "kind": "cloud",
         "namespace": "controller",
-        "inputs": {
-            "fields": [
-                {
-                    "id": "host",
-                    "label": "Red Hat Ansible Automation Platform",
-                    "type": "string",
-                    "help_text": (
-                        "Red Hat Ansible Automation Platform base URL"
-                        " to authenticate with."
-                    ),
-                },
-                {
-                    "id": "username",
-                    "label": "Username",
-                    "type": "string",
-                    "help_text": (
-                        "Red Hat Ansible Automation Platform username id"
-                        " to authenticate as.This should not be set if"
-                        " an OAuth token is being used."
-                    ),
-                },
-                {
-                    "id": "password",
-                    "label": "Password",
-                    "type": "string",
-                    "secret": True,
-                },
-                {
-                    "id": "oauth_token",
-                    "label": "OAuth Token",
-                    "type": "string",
-                    "secret": True,
-                    "help_text": (
-                        "An OAuth token to use to authenticate with."
-                        "This should not be set if username/password"
-                        " are being used."
-                    ),
-                },
-                {
-                    "id": "verify_ssl",
-                    "label": "Verify SSL",
-                    "type": "boolean",
-                    "secret": False,
-                },
-            ],
-            "required": ["host"],
-        },
-        "injectors": {
-            "env": {
-                "TOWER_HOST": "{{host}}",
-                "TOWER_USERNAME": "{{username}}",
-                "TOWER_PASSWORD": "{{password}}",
-                "TOWER_VERIFY_SSL": "{{verify_ssl}}",
-                "TOWER_OAUTH_TOKEN": "{{oauth_token}}",
-                "CONTROLLER_HOST": "{{host}}",
-                "CONTROLLER_USERNAME": "{{username}}",
-                "CONTROLLER_PASSWORD": "{{password}}",
-                "CONTROLLER_VERIFY_SSL": "{{verify_ssl}}",
-                "CONTROLLER_OAUTH_TOKEN": "{{oauth_token}}",
-            }
-        },
+        "inputs": AAP_INPUTS,
+        "injectors": AAP_INJECTORS,
         "managed": True,
     },
     {
         "name": enums.DefaultCredentialType.VAULT,
         "namespace": "vault",
         "kind": "vault",
-        "inputs": {
-            "fields": [
-                {
-                    "id": "vault_password",
-                    "label": "Vault Password",
-                    "type": "string",
-                    "secret": True,
-                    "ask_at_runtime": True,
-                },
-                {
-                    "id": "vault_id",
-                    "label": "Vault Identifier",
-                    "type": "string",
-                    "format": "vault_id",
-                    "help_text": (
-                        "Specify an (optional) Vault ID. This is equivalent "
-                        "to specifying the --vault-id Ansible parameter for "
-                        "providing multiple Vault passwords.  Note: this "
-                        " feature only works in Ansible 2.4+."
-                    ),
-                },
-            ],
-            "required": ["vault_password"],
-        },
+        "inputs": VAULT_INPUTS,
         "injectors": {},
         "managed": True,
     },
 ]
+
+
+def populate_credential_types(
+    credential_types: list[dict],
+) -> list[models.CredentialType]:
+    created_credential_types = []
+
+    for credential_type_data in credential_types:
+        new_type, created = models.CredentialType.objects.get_or_create(
+            name=credential_type_data["name"],
+            description=credential_type_data.get("description", ""),
+            namespace=credential_type_data.get("namespace"),
+            kind=credential_type_data.get("kind", "cloud"),
+            inputs=credential_type_data.get("inputs", {}),
+            injectors=credential_type_data.get("injectors", {}),
+            managed=credential_type_data.get("managed", True),
+        )
+        if created:
+            created_credential_types.append(new_type)
+
+    return created_credential_types
 
 
 class Command(BaseCommand):
@@ -366,20 +397,10 @@ class Command(BaseCommand):
         self._create_obj_roles()
 
     def _preload_credential_types(self):
-        for credential_type_data in CREDENTIAL_TYPES:
-            new_type, created = models.CredentialType.objects.get_or_create(
-                name=credential_type_data["name"],
-                description=credential_type_data.get("description", ""),
-                namespace=credential_type_data.get("namespace"),
-                kind=credential_type_data.get("kind", "cloud"),
-                inputs=credential_type_data.get("inputs", {}),
-                injectors=credential_type_data.get("injectors", {}),
-                managed=credential_type_data.get("managed", True),
+        for credential_type in populate_credential_types(CREDENTIAL_TYPES):
+            self.stdout.write(
+                f"New credential type {credential_type.name} is added."
             )
-            if created:
-                self.stdout.write(
-                    f"New credential type {new_type.name} is added."
-                )
 
     def _copy_registry_credentials(self):
         credentials = models.Credential.objects.filter(
