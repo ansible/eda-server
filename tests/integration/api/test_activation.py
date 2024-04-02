@@ -515,6 +515,7 @@ def test_create_activation_with_restart_params(
     client: APIClient,
     param_data: dict,
     settings,
+    preseed_credential_types,
 ):
     param = param_data["param"]
     value = param_data["value"]
@@ -653,6 +654,7 @@ def test_create_activation_with_retention_params(
     client: APIClient,
     param_data: dict,
     settings,
+    preseed_credential_types,
 ):
     param = param_data["param"]
     value = param_data["value"]
@@ -676,7 +678,7 @@ def test_create_activation_with_retention_params(
         if effective:
             assert getattr(activation, effective["property"]) == (
                 getattr(settings, effective["setting"]) * 3600
-            )  # conver to seconds
+            )  # convert to seconds
     else:
         assert response.data[param][0] == param_data["expect"]["message"]
 
