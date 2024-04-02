@@ -46,7 +46,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
     credential_type = CredentialTypeRefSerializer(
         required=False, allow_null=True
     )
-    references = EdaCredentialReferenceField(required=False)
+    references = EdaCredentialReferenceField(required=False, allow_null=True)
 
     class Meta:
         model = models.EdaCredential
