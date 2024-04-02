@@ -12,6 +12,7 @@ from django.db.models import (
     CharField,
     DateTimeField,
     ForeignKey,
+    JSONField,
     TextField,
     UUIDField,
 )
@@ -100,8 +101,27 @@ class ModelFactory:
             elif isinstance(field, (TextField, CharField)):
                 if field.name == "extra_var":
                     data["extra_var"] = '{"a": "b"}'
+                elif field.name == "inputs":
+                    data["inputs"] = {"username": "adam", "password": "secret"}
                 else:
                     data[field.name] = self.make_name()
+            elif isinstance(field, JSONField):
+                if field.name == "inputs":
+                    data[field.name] = {
+                        "fields": [
+                            {
+                                "id": "username",
+                                "label": "Username",
+                                "type": "string",
+                            },
+                            {
+                                "id": "password",
+                                "label": "Password",
+                                "type": "string",
+                                "secret": True,
+                            },
+                        ]
+                    }
             elif isinstance(field, UUIDField):
                 data[field.name] = uuid4()
             elif isinstance(field, DateTimeField):

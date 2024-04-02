@@ -15,6 +15,7 @@
 from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models
 from aap_eda.core.utils.credentials import inputs_to_display, validate_inputs
 from aap_eda.core.utils.crypto.base import SecretValue
@@ -33,6 +34,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "managed",
+            "organization",
         ]
         fields = [
             "name",
@@ -51,6 +53,11 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             if eda_credential.credential_type
             else None
         )
+        organization = (
+            OrganizationRefSerializer(eda_credential.organization).data
+            if eda_credential.credential_type
+            else None
+        )
         return {
             "id": eda_credential.id,
             "name": eda_credential.name,
@@ -58,6 +65,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "managed": eda_credential.managed,
             "inputs": self.get_inputs(eda_credential),
             "credential_type": credential_type,
+            "organization": organization,
             "created_at": eda_credential.created_at,
             "modified_at": eda_credential.modified_at,
         }
@@ -100,6 +108,7 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
             "description",
             "inputs",
             "credential_type_id",
+            "organization_id",
         ]
 
 
@@ -117,6 +126,7 @@ class EdaCredentialRefSerializer(serializers.ModelSerializer):
             "inputs",
             "managed",
             "credential_type_id",
+            "organization_id",
         ]
         read_only_fields = ["id"]
 

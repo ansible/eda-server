@@ -14,6 +14,10 @@
 
 import logging
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -67,7 +71,6 @@ class EdaCredentialViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.EdaCredential.objects.all()
     serializer_class = serializers.EdaCredentialSerializer
     filter_backends = (
         KindFilterBackend,
@@ -75,6 +78,9 @@ class EdaCredentialViewSet(
     )
     filterset_class = filters.EdaCredentialFilter
     ordering_fields = ["name"]
+
+    def get_queryset(self):
+        return models.EdaCredential.access_qs(self.request.user)
 
     rbac_resource_type = ResourceType.EDA_CREDENTIAL
     rbac_action = None
@@ -98,10 +104,20 @@ class EdaCredentialViewSet(
         serializer.validated_data["inputs"] = inputs_to_store(
             serializer.validated_data["inputs"]
         )
-        eda_credential = serializer.create(serializer.validated_data)
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
 
         return Response(
-            serializers.EdaCredentialSerializer(eda_credential).data,
+            serializers.EdaCredentialSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 

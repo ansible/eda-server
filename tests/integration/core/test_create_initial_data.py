@@ -13,7 +13,7 @@ def test_create_all_roles():
         for rd in RoleDefinition.objects.all()
     ]
     assert "organization" in role_types
-    assert "credential" in role_types
+    assert "edacredential" in role_types
 
 
 @pytest.mark.django_db

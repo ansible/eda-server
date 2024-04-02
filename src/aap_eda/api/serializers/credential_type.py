@@ -26,6 +26,7 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "managed",
+            "organization",
         ]
         fields = [
             "name",
@@ -73,6 +74,7 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
             "description",
             "inputs",
             "injectors",
+            "organization_id",
             *read_only_fields,
         ]
 
@@ -80,4 +82,4 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
 class CredentialTypeRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CredentialType
-        fields = ["id", "name", "namespace", "kind"]
+        fields = ["id", "name", "namespace", "kind", "organization_id"]
