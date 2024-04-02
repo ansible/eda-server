@@ -258,7 +258,9 @@ def create_multiple_activations(fks: dict):
 
 
 @pytest.mark.django_db
-def test_create_activation(client: APIClient, settings, preseed_credential_types):
+def test_create_activation(
+    client: APIClient, settings, preseed_credential_types
+):
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
