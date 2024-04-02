@@ -103,6 +103,7 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     credential_type_id = serializers.IntegerField(
         required=True, allow_null=True
     )
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
     inputs = serializers.JSONField()
 
     def validate(self, data):

@@ -48,6 +48,7 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
             validators.check_if_schema_valid,
         ],
     )
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
         if data.get("injectors") and data.get("inputs"):
