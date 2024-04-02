@@ -152,9 +152,9 @@ def _enqueue_process(
         _manage,
         process_parent_type,
         parent_id,
+        *args,
         result_ttl=process_parent.effective_retention_success_period,
         failure_ttl=process_parent.effective_retention_failure_period,
-        *args,
         **kwargs,
     )
 
