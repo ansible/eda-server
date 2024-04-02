@@ -197,7 +197,7 @@ def give_obj_perm():
         then it gives the specified user to the specified object
         """
         ct = ContentType.objects.get_for_model(obj)
-        rd = RoleDefinition.objects.create(
+        rd, _ = RoleDefinition.objects.get_or_create(
             name=f"{obj._meta.model_name}-{action}", content_type=ct
         )
         permissions = [
