@@ -183,7 +183,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'quay.io/sclorg/redis-6-c9s:latest'
+    image: 'quay.io/fedora/redis-6:latest'
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:

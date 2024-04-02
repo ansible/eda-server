@@ -84,6 +84,9 @@ def test_retrieve_project_failed_state(
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
 
+    assert data["import_state"] == "failed"
+    assert data["import_error"] == "Unexpected error. Please contact support."
+
     assert_project_base_data(data, new_project)
     assert_project_related_data(data, new_project)
 

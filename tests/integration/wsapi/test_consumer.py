@@ -39,40 +39,6 @@ TEST_RULESETS = """
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
-VAULT_INPUTS = {
-    "fields": [
-        {
-            "id": "vault_id",
-            "label": "Vault Identifier",
-            "type": "string",
-            "help_text": ("Vault identifier to use use with vaulted strings"),
-        },
-        {
-            "id": "vault_password",
-            "label": "Vault Password",
-            "type": "string",
-            "secret": True,
-            "help_text": "Vault Password",
-        },
-    ],
-    "required": ["vault_password"],
-}
-
-
-@pytest.fixture(autouse=True)
-def vault_credential_type(
-    default_organization: models.Organization,
-) -> models.CredentialType:
-    credential_type = models.CredentialType.objects.create(
-        name=enums.DefaultCredentialType.VAULT,
-        inputs=VAULT_INPUTS,
-        injectors={},
-        managed=True,
-        organization=default_organization,
-    )
-    credential_type.refresh_from_db()
-    return credential_type
-
 
 @pytest.fixture
 @pytest.mark.django_db(transaction=True)
@@ -135,12 +101,10 @@ async def test_handle_workers_without_credentials(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_eda_system_vault_credential(
     ws_communicator: WebsocketCommunicator,
-    vault_credential_type: models.CredentialType,
+    preseed_credential_types,
 ):
     rulebook_process_id = (
-        await _prepare_activation_instance_with_eda_system_vault_credential(
-            vault_credential_type
-        )
+        await _prepare_activation_instance_with_eda_system_vault_credential()
     )
 
     payload = {
@@ -165,7 +129,9 @@ async def test_handle_workers_with_eda_system_vault_credential(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_workers_with_validation_errors():
+async def test_handle_workers_with_validation_errors(
+    default_organization: models.Organization,
+):
     communicator = WebsocketCommunicator(
         AnsibleRulebookConsumer.as_asgi(), "ws/"
     )
@@ -187,6 +153,7 @@ async def test_handle_workers_with_validation_errors():
 @pytest.mark.django_db(transaction=True)
 async def test_handle_jobs(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
 
@@ -234,6 +201,7 @@ async def test_handle_events(ws_communicator: WebsocketCommunicator):
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_multiple_firing(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -267,6 +235,7 @@ async def test_handle_actions_multiple_firing(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_with_empty_job_uuid(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     assert (await get_audit_rule_count()) == 0
@@ -291,6 +260,7 @@ async def test_handle_actions_with_empty_job_uuid(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -333,6 +303,7 @@ async def test_handle_actions(
 @pytest.mark.django_db(transaction=True)
 async def test_rule_status_with_multiple_failed_actions(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -368,6 +339,7 @@ async def test_rule_status_with_multiple_failed_actions(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_heartbeat(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     rulebook_process = await get_rulebook_process(rulebook_process_id)
@@ -405,6 +377,7 @@ async def test_handle_heartbeat(
 @pytest.mark.django_db(transaction=True)
 async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -494,9 +467,7 @@ def get_job_instance_event_count():
 
 
 @database_sync_to_async
-def _prepare_activation_instance_with_eda_system_vault_credential(
-    credential_type: models.CredentialType,
-):
+def _prepare_activation_instance_with_eda_system_vault_credential():
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
@@ -522,12 +493,15 @@ def _prepare_activation_instance_with_eda_system_vault_credential(
         email="luke.skywalker@example.com",
         password="secret",
     )
+    vault_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.VAULT
+    )
 
     credential = models.EdaCredential.objects.create(
         name="eda_credential",
         inputs={"vault_id": "adam", "vault_password": "secret"},
         managed=False,
-        credential_type_id=credential_type.id,
+        credential_type=vault_credential_type,
     )
 
     activation, _ = models.Activation.objects.get_or_create(

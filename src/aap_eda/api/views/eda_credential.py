@@ -18,18 +18,19 @@ from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
 from django.forms import model_to_dict
+from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
     extend_schema,
-    extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 from aap_eda.core.utils.credentials import inputs_to_store
@@ -51,17 +52,6 @@ class KindFilterBackend(BaseFilterBackend):
         return queryset
 
 
-@extend_schema_view(
-    retrieve=extend_schema(
-        description="Get EDA credential by id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.EdaCredentialSerializer,
-                description="Return an EDA credential by id.",
-            ),
-        },
-    ),
-)
 class EdaCredentialViewSet(
     ResponseSerializerMixin,
     CreateModelMixin,
@@ -84,6 +74,39 @@ class EdaCredentialViewSet(
 
     rbac_resource_type = ResourceType.EDA_CREDENTIAL
     rbac_action = None
+
+    @extend_schema(
+        description="Get EDA credential by id",
+        parameters=[
+            OpenApiParameter(
+                "refs",
+                required=False,
+                enum=["true", "false"],
+                description=(
+                    "Query resources that have reference to the credential"
+                    " by its id"
+                ),
+            ),
+        ],
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.EdaCredentialSerializer,
+                description="Return an EDA credential by id.",
+            ),
+        },
+    )
+    def retrieve(self, request, pk):
+        eda_credential = get_object_or_404(models.EdaCredential, id=pk)
+        eda_credential_serializers = serializers.EdaCredentialSerializer(
+            eda_credential
+        )
+
+        refs = request.query_params.get("refs", "false").lower() == "true"
+        eda_credential_serializers.references = (
+            get_references(eda_credential) if refs else None
+        )
+
+        return Response(eda_credential_serializers.data)
 
     @extend_schema(
         description="Create a new EDA credential.",

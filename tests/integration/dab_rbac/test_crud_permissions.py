@@ -33,7 +33,12 @@ def test_factory_sanity(model, cls_factory):
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_add_permissions(
-    model, cls_factory, user, user_api_client, give_obj_perm
+    model,
+    cls_factory,
+    user,
+    user_api_client,
+    give_obj_perm,
+    preseed_credential_types,
 ):
     create_data = cls_factory.get_create_data(model)
     data = cls_factory.get_post_data(model, create_data)

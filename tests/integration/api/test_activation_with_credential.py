@@ -116,24 +116,6 @@ KAFKA_INPUTS = {
     ]
 }
 
-VAULT_INPUTS = {
-    "fields": [
-        {
-            "id": "vault_id",
-            "label": "Vault Identifier",
-            "type": "string",
-            "help_text": ("Vault identifier to use use with vaulted strings"),
-        },
-        {
-            "id": "vault_password",
-            "label": "Vault Password",
-            "type": "string",
-            "secret": True,
-            "help_text": "Vault Password",
-        },
-    ],
-    "required": ["vault_password"],
-}
 
 INJECTORS = {
     "extra_vars": {
@@ -148,18 +130,9 @@ INJECTORS = {
 
 @pytest.fixture
 def kafka_credential_type() -> models.CredentialType:
-    vault_credential_type = models.CredentialType.objects.create(
-        name=DefaultCredentialType.VAULT,
-        inputs=VAULT_INPUTS,
-        injectors={},
-        managed=True,
-    )
-    credential_type = models.CredentialType.objects.create(
+    return models.CredentialType.objects.create(
         name="type1", inputs=KAFKA_INPUTS, injectors=INJECTORS
     )
-    credential_type.refresh_from_db()
-    vault_credential_type.refresh_from_db()
-    return credential_type
 
 
 def create_activation_related_data(extra_var, with_project=True):
@@ -210,7 +183,9 @@ def create_activation_related_data(extra_var, with_project=True):
 
 @pytest.mark.django_db
 def test_create_activation_with_eda_credential(
-    client: APIClient, kafka_credential_type: models.CredentialType
+    client: APIClient,
+    kafka_credential_type: models.CredentialType,
+    preseed_credential_types,
 ):
     fks = create_activation_related_data(TEST_EXTRA_VAR)
     test_activation = TEST_ACTIVATION.copy()
@@ -256,7 +231,9 @@ def test_create_activation_with_eda_credential(
 
 @pytest.mark.django_db
 def test_create_activation_with_key_conflict(
-    client: APIClient, kafka_credential_type: models.CredentialType
+    client: APIClient,
+    kafka_credential_type: models.CredentialType,
+    preseed_credential_types,
 ):
     fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
     test_activation = TEST_ACTIVATION.copy()
@@ -285,7 +262,9 @@ def test_create_activation_with_key_conflict(
 
 @pytest.mark.django_db
 def test_create_activation_with_compatible_credentials(
-    client: APIClient, kafka_credential_type: models.CredentialType
+    client: APIClient,
+    kafka_credential_type: models.CredentialType,
+    preseed_credential_types,
 ):
     fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
     test_activation = TEST_ACTIVATION.copy()
@@ -332,7 +311,9 @@ def test_create_activation_with_compatible_credentials(
 
 @pytest.mark.django_db
 def test_create_activation_with_conflict_credentials(
-    client: APIClient, kafka_credential_type: models.CredentialType
+    client: APIClient,
+    kafka_credential_type: models.CredentialType,
+    preseed_credential_types,
 ):
     fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
     test_activation = TEST_ACTIVATION.copy()

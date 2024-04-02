@@ -34,7 +34,8 @@ INPUTS = {
 
 @pytest.mark.django_db
 def test_create_eda_credential(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    credential_type: models.CredentialType,
 ):
     data_in = {
         "name": "eda-credential",
@@ -257,7 +258,9 @@ def test_partial_update_eda_credential_name(
 
 @pytest.mark.django_db
 def test_delete_credential_used_by_activation(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     eda_credential_id = default_activation.eda_credentials.all()[0]
     response = client.delete(
@@ -268,10 +271,59 @@ def test_delete_credential_used_by_activation(
 
 @pytest.mark.django_db
 def test_delete_credential_used_by_activation_forced(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     eda_credential = default_activation.eda_credentials.all()[0]
     response = client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/?force=true",
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.parametrize("refs", ["true", "false"])
+@pytest.mark.django_db
+def test_retrieve_eda_credential_with_refs(
+    default_activation: models.Activation,
+    client: APIClient,
+    refs,
+    preseed_credential_types,
+):
+    eda_credential = default_activation.eda_credentials.all()[0]
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/?refs={refs}",
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    if refs == "true":
+        assert response.data["references"] is not None
+        references = response.data["references"]
+
+        assert len(references) == 3
+        references[0] = {
+            "type": "Activation",
+            "id": default_activation.id,
+            "name": default_activation.name,
+            "url": f"api/eda/v1/activations/{default_activation.id}/",
+        }
+        references[1] = (
+            {
+                "type": "DecisionEnvironment",
+                "id": default_activation.decision_environment.id,
+                "name": default_activation.decision_environment.name,
+                "url": (
+                    "api/eda/v1/decision_environments/"
+                    f"{default_activation.decision_environment.id}/"
+                ),
+            },
+        )
+        references[1] = {
+            "type": "Project",
+            "id": default_activation.project.id,
+            "name": default_activation.project.name,
+            "url": (f"api/eda/v1/projects/{default_activation.project.id}/"),
+        }
+    else:
+        assert response.data["references"] is None

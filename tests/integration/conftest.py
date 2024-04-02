@@ -20,6 +20,10 @@ from django.conf import settings
 from pytest_redis import factories
 
 from aap_eda.core import enums, models
+from aap_eda.core.management.commands.create_initial_data import (
+    CREDENTIAL_TYPES,
+    populate_credential_types,
+)
 from aap_eda.core.tasking import Queue
 from aap_eda.core.utils.credentials import inputs_to_store
 
@@ -87,48 +91,19 @@ def credential_type() -> models.CredentialType:
     credential_type = models.CredentialType.objects.create(
         name="default_credential_type", inputs=INPUTS, injectors={}
     )
-    credential_type.refresh_from_db()
 
     return credential_type
 
 
 @pytest.fixture
-def registry_credential_type() -> models.CredentialType:
-    """Return a Registry type Credential Type."""
-    return models.CredentialType.objects.create(
-        name=enums.DefaultCredentialType.REGISTRY,
-        inputs={
-            "fields": [
-                {"id": "username", "label": "Username"},
-                {"id": "password", "label": "Password", "secret": True},
-            ]
-        },
-        injectors={},
-        managed=False,
-    )
-
-
-@pytest.fixture
-def vault_credential_type() -> models.CredentialType:
-    return models.CredentialType.objects.create(
-        name=enums.DefaultCredentialType.VAULT,
-        inputs={
-            "fields": [
-                {"id": "username", "label": "Username"},
-                {"id": "password", "label": "Password", "secret": True},
-            ]
-        },
-        injectors={},
-        managed=False,
-    )
-
-
-@pytest.fixture
 def default_eda_credential(
     default_organization: models.Organization,
-    registry_credential_type: models.CredentialType,
+    preseed_credential_types,
 ) -> models.EdaCredential:
     """Return a default Credential"""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
     return models.EdaCredential.objects.create(
         name="default-eda-credential",
         description="Default EDA Credential",
@@ -143,9 +118,12 @@ def default_eda_credential(
 @pytest.fixture
 def default_vault_credential(
     default_organization: models.Organization,
-    vault_credential_type: models.EdaCredential,
+    preseed_credential_types,
 ) -> models.EdaCredential:
     """Return a default Vault Credential"""
+    vault_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.VAULT
+    )
     return models.EdaCredential.objects.create(
         name="default-vault-credential",
         description="Default Vault Credential",
@@ -160,9 +138,12 @@ def default_vault_credential(
 @pytest.fixture
 def credential_payload(
     default_organization: models.Organization,
-    registry_credential_type: models.CredentialType,
+    preseed_credential_types,
 ) -> Dict[str, Any]:
     """Return the payload for creating a new EdaCredential"""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
     return {
         "name": "test-credential",
         "description": "Test Credential",
@@ -179,3 +160,11 @@ def default_organization() -> models.Organization:
         name=settings.DEFAULT_ORGANIZATION_NAME,
         description="The default organization",
     )[0]
+
+
+@pytest.fixture
+def preseed_credential_types(
+    default_organization: models.Organization,
+) -> list[models.CredentialType]:
+    """Preseed Credential Types."""
+    return populate_credential_types(CREDENTIAL_TYPES)

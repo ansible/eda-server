@@ -32,7 +32,9 @@ def cls_factory(admin_user):  # noqa: F811
 @override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
-def test_create_with_default_org(cls_factory, model, admin_api_client):
+def test_create_with_default_org(
+    cls_factory, model, admin_api_client, preseed_credential_types
+):
     create_data = cls_factory.get_create_data(model)
     data = cls_factory.get_post_data(model, create_data)
     assert "organization_id" in data  # sanity
@@ -68,7 +70,9 @@ def test_create_with_default_org(cls_factory, model, admin_api_client):
 @override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
-def test_create_with_custom_org(cls_factory, model, admin_api_client):
+def test_create_with_custom_org(
+    cls_factory, model, admin_api_client, preseed_credential_types
+):
     create_data = cls_factory.get_create_data(model)
     data = cls_factory.get_post_data(model, create_data)
     assert "organization_id" in data  # sanity

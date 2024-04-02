@@ -68,6 +68,7 @@ def test_create_activation_disabled(
     admin_awx_token: models.AwxToken,
     default_rulebook: models.Rulebook,
     client: APIClient,
+    preseed_credential_types,
 ):
     activation_payload["is_enabled"] = False
     response = client.post(
@@ -115,6 +116,7 @@ def test_create_activation_with_bad_entity(
     admin_awx_token: models.AwxToken,
     client: APIClient,
     dependent_object: str,
+    preseed_credential_types,
 ):
     for key in dependent_object:
         response = client.post(
@@ -133,7 +135,9 @@ def test_create_activation_with_bad_entity(
 
 @pytest.mark.django_db
 def test_list_activations(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     activations = [default_activation]
     response = client.get(f"{api_url_v1}/activations/")
@@ -148,6 +152,7 @@ def test_list_activations_filter_name(
     default_activation: models.Activation,
     new_activation: models.Activation,
     client: APIClient,
+    preseed_credential_types,
 ):
     filter_name = "new"
     activations = [default_activation, new_activation]
@@ -164,6 +169,7 @@ def test_list_activations_filter_name_none_exist(
     default_activation: models.Activation,
     new_activation: models.Activation,
     client: APIClient,
+    preseed_credential_types,
 ):
     filter_name = "noname"
 
@@ -177,6 +183,7 @@ def test_list_activations_filter_status(
     default_activation: models.Activation,
     new_activation: models.Activation,
     client: APIClient,
+    preseed_credential_types,
 ):
     filter_status = enums.ActivationStatus.FAILED
     new_activation.status = enums.ActivationStatus.FAILED
@@ -195,6 +202,7 @@ def test_list_activations_filter_decision_environment_id(
     new_activation: models.Activation,
     default_de: models.DecisionEnvironment,
     client: APIClient,
+    preseed_credential_types,
 ):
     activations = [default_activation, new_activation]
     de_id = default_de.id
@@ -213,29 +221,10 @@ def test_list_activations_filter_decision_environment_id(
 
 
 @pytest.mark.django_db
-def test_list_activations_filter_credential_id(
-    default_activation: models.Activation,
-    default_eda_credential: models.EdaCredential,
-    client: APIClient,
-) -> None:
-    """Test filtering by credential_id."""
-
-    url = (
-        f"{api_url_v1}/activations/?credential_id={default_eda_credential.id}"
-    )
-    response = client.get(url)
-    assert response.status_code == status.HTTP_200_OK
-    assert len(response.data["results"]) == 1
-
-    url = f"{api_url_v1}/activations/?credential_id=31415"
-    response = client.get(url)
-    assert response.status_code == status.HTTP_200_OK
-    assert len(response.data["results"]) == 0
-
-
-@pytest.mark.django_db
 def test_retrieve_activation(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     response = client.get(f"{api_url_v1}/activations/{default_activation.id}/")
     assert response.status_code == status.HTTP_200_OK
@@ -273,7 +262,9 @@ def test_retrieve_activation_not_exist(client: APIClient):
 
 @pytest.mark.django_db
 def test_delete_activation(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     response = client.delete(
         f"{api_url_v1}/activations/{default_activation.id}/"
@@ -283,7 +274,9 @@ def test_delete_activation(
 
 @pytest.mark.django_db
 def test_restart_activation(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     response = client.post(
         f"{api_url_v1}/activations/{default_activation.id}/restart/"
@@ -293,12 +286,13 @@ def test_restart_activation(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("action", ["restart", "enable"])
+@pytest.mark.parametrize("action", [enums.Action.RESTART, enums.Action.ENABLE])
 def test_restart_activation_without_de(
     default_activation: models.Activation,
     default_de: models.DecisionEnvironment,
     client: APIClient,
     action,
+    preseed_credential_types,
 ):
     if action == enums.Action.ENABLE:
         default_activation.is_enabled = False
@@ -324,7 +318,9 @@ def test_restart_activation_without_de(
 
 @pytest.mark.django_db
 def test_enable_activation(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     for state in [
         enums.ActivationStatus.STARTING,
@@ -371,7 +367,9 @@ def test_enable_activation(
 
 @pytest.mark.django_db
 def test_disable_activation(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
     response = client.post(
         f"{api_url_v1}/activations/{default_activation.id}/disable/"
@@ -385,6 +383,7 @@ def test_list_activation_instances(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
+    preseed_credential_types,
 ):
     instances = sorted(
         default_activation_instances, key=lambda x: x.started_at
@@ -407,6 +406,7 @@ def test_list_activation_instances_filter_name(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
+    preseed_credential_types,
 ):
     instances = default_activation_instances
 
@@ -425,6 +425,7 @@ def test_list_activation_instances_filter_status(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
+    preseed_credential_types,
 ):
     instances = default_activation_instances
 
@@ -517,7 +518,9 @@ def test_get_rules_count():
 
 
 @pytest.mark.django_db
-def test_is_activation_valid(default_activation: models.Activation):
+def test_is_activation_valid(
+    default_activation: models.Activation, preseed_credential_types
+):
     valid, error = is_activation_valid(default_activation)
 
     assert valid is True
@@ -526,7 +529,7 @@ def test_is_activation_valid(default_activation: models.Activation):
 
 @pytest.mark.django_db
 def test_create_activation_no_token_no_required(
-    activation_payload, client: APIClient
+    activation_payload, client: APIClient, preseed_credential_types
 ):
     """Test that an activation can be created without a token if the
     rulebook does not require one."""
@@ -541,6 +544,7 @@ def test_create_activation_no_token_but_required(
     client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     activation_payload: Dict[str, Any],
+    preseed_credential_types,
 ):
     """Test that an activation cannot be created without a token if the
     rulebook requires one."""
@@ -562,6 +566,7 @@ def test_create_activation_with_invalid_token(
     rulebook_with_job_template: models.Rulebook,
     default_user_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
+    preseed_credential_types,
 ):
     """Test that an activation cannot be created with a token that
     does not belong to the user."""
@@ -584,6 +589,7 @@ def test_restart_activation_with_required_token_deleted(
     rulebook_with_job_template: models.Rulebook,
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
+    preseed_credential_types,
 ):
     """Test that an activation cannot be restarted when the token
     required is deleted."""
@@ -609,6 +615,7 @@ def test_create_activation_with_awx_token(
     rulebook_with_job_template: models.Rulebook,
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
+    preseed_credential_types,
 ):
     """Test that an activation can be created with a token if the
     rulebook requires one."""

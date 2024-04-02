@@ -48,6 +48,14 @@ Database settings:
 * DB_USER - Database username (default: "postgres")
 * DB_PASSWORD - Database user password (default: None)
 * DB_NAME - Database name (default: "eda")
+* EDA_PGSSLMODE - SSL mode for PostgreSQL connection (default: "prefer")
+* EDA_PGSSLCERT - Path to SSL certificate file (default: "")
+* EDA_PGSSLKEY - Path to SSL key file (default: "")
+* EDA_PGSSLROOTCERT - Path to SSL root certificate file (default: "")
+
+Optionally you can define DATABASES as an object
+* DATABASES - A dict with django database settings
+
 
 Redis queue settings:
 
@@ -204,17 +212,33 @@ ASGI_APPLICATION = "aap_eda.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "HOST": settings.get("DB_HOST", "127.0.0.1"),
-        "PORT": settings.get("DB_PORT", 5432),
-        "USER": settings.get("DB_USER", "postgres"),
-        "PASSWORD": settings.get("DB_PASSWORD"),
-        "NAME": settings.get("DB_NAME", "eda"),
-    }
-}
 
+def _get_databases_settings() -> dict:
+    databases = settings.get("DATABASES", {})
+    if databases and "default" not in databases:
+        raise ImproperlyConfigured(
+            "DATABASES settings must contain a 'default' key"
+        )
+
+    if not databases:
+        databases["default"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "HOST": settings.get("DB_HOST", "127.0.0.1"),
+            "PORT": settings.get("DB_PORT", 5432),
+            "USER": settings.get("DB_USER", "postgres"),
+            "PASSWORD": settings.get("DB_PASSWORD"),
+            "NAME": settings.get("DB_NAME", "eda"),
+            "OPTIONS": {
+                "sslmode": settings.get("PGSSLMODE", default="prefer"),
+                "sslcert": settings.get("PGSSLCERT", default=""),
+                "sslkey": settings.get("PGSSLKEY", default=""),
+                "sslrootcert": settings.get("PGSSLROOTCERT", default=""),
+            },
+        }
+    return databases
+
+
+DATABASES = _get_databases_settings()
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
