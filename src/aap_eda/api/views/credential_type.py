@@ -76,7 +76,7 @@ class CredentialTypeViewSet(
 
     @extend_schema(
         description="Create a new credential type.",
-        request=serializers.CredentialTypeSerializer,
+        request=serializers.CredentialTypeCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.CredentialTypeSerializer,
@@ -123,10 +123,8 @@ class CredentialTypeViewSet(
         credential_type.save()
 
         return Response(
-            serializers.CredentialTypeSerializer(credential_type).data,
-            status=status.HTTP_206_PARTIAL_CONTENT,
+            serializers.CredentialTypeSerializer(credential_type).data
         )
-        pass
 
     @extend_schema(
         description="Delete a credential type by id",

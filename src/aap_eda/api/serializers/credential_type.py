@@ -42,7 +42,7 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
     inputs = serializers.JSONField(
         required=True,
         allow_null=False,
-        help_text="Name of the project",
+        help_text="Name of the credential type",
         validators=[
             validators.check_if_schema_valid,
         ],
@@ -60,20 +60,11 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.CredentialType
-        read_only_fields = [
-            "id",
-            "created_at",
-            "modified_at",
-            "managed",
-            "kind",
-            "namespace",
-        ]
         fields = [
             "name",
             "description",
             "inputs",
             "injectors",
-            *read_only_fields,
         ]
 
 
