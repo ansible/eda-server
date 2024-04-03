@@ -82,7 +82,12 @@ jobs:
         env:
           EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
           EDAQA_ENV: authenticated
-        run: pytest -vv -k ${{ github.event.inputs.pytest_filter }}
+        run: |
+          if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
+            pytest -vv -k "${{ github.event.inputs.pytest_filter }}"
+          else
+            pytest -vv
+          fi
 
       - name: Print EDA logs
         if: always()
