@@ -227,7 +227,7 @@ def test_partial_update_eda_credential(
     response = client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )
-    assert response.status_code == status.HTTP_206_PARTIAL_CONTENT
+    assert response.status_code == status.HTTP_200_OK
     result = response.data
     assert result["inputs"] == {
         "password": "$encrypted$",
@@ -250,7 +250,7 @@ def test_partial_update_eda_credential_name(
     response = client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )
-    assert response.status_code == status.HTTP_206_PARTIAL_CONTENT
+    assert response.status_code == status.HTTP_200_OK
     result = response.data
     assert result["inputs"] == {
         "password": "$encrypted$",

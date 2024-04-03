@@ -123,10 +123,8 @@ class CredentialTypeViewSet(
         credential_type.save()
 
         return Response(
-            serializers.CredentialTypeSerializer(credential_type).data,
-            status=status.HTTP_206_PARTIAL_CONTENT,
+            serializers.CredentialTypeSerializer(credential_type).data
         )
-        pass
 
     @extend_schema(
         description="Delete a credential type by id",
