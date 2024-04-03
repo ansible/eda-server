@@ -17,8 +17,6 @@ from django.db import models
 from aap_eda.core.enums import CredentialType
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
-from .organization import Organization
-
 __all__ = ("Credential",)
 
 
@@ -41,14 +39,5 @@ class Credential(models.Model):
     username = models.TextField(null=True)
     secret = EncryptedTextField(null=False)
     vault_identifier = models.TextField(null=True)
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])

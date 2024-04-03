@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from rest_framework import status
@@ -381,27 +381,17 @@ def test_disable_activation(
 @pytest.mark.django_db
 def test_list_activation_instances(
     default_activation: models.Activation,
+    default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
     preseed_credential_types,
 ):
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="test-activation-instance-1",
-                activation=default_activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-1",
-                activation=default_activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-        ]
+    instances = sorted(
+        default_activation_instances, key=lambda x: x.started_at
     )
     response = client.get(
         f"{api_url_v1}/activations/{default_activation.id}/instances/"
     )
-    data = response.data["results"]
+    data = sorted(response.data["results"], key=lambda x: x["started_at"])
     assert response.status_code == status.HTTP_200_OK
     assert len(data) == len(instances)
     assert data[0]["name"] == instances[0].name
@@ -414,21 +404,11 @@ def test_list_activation_instances(
 @pytest.mark.django_db
 def test_list_activation_instances_filter_name(
     default_activation: models.Activation,
+    default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
     preseed_credential_types,
 ):
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="activation-instance-1",
-                activation=default_activation,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-2",
-                activation=default_activation,
-            ),
-        ]
-    )
+    instances = default_activation_instances
 
     filter_name = "instance-1"
     response = client.get(
@@ -443,23 +423,11 @@ def test_list_activation_instances_filter_name(
 @pytest.mark.django_db
 def test_list_activation_instances_filter_status(
     default_activation: models.Activation,
+    default_activation_instances: List[models.RulebookProcess],
     client: APIClient,
     preseed_credential_types,
 ):
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="activation-instance-1",
-                status="completed",
-                activation=default_activation,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-2",
-                status="failed",
-                activation=default_activation,
-            ),
-        ]
-    )
+    instances = default_activation_instances
 
     filter_status = enums.ActivationStatus.FAILED
     response = client.get(

@@ -228,9 +228,12 @@ class ProjectViewSet(
         for credential_id in credential_ids:
             if credential_id is None:
                 continue
-            credential = models.EdaCredential.objects.filter(
-                id=credential_id
-            ).first()
+            # we should fetch only the credentials user has access to
+            credential = (
+                models.EdaCredential.access_qs(self.request.user)
+                .filter(id=credential_id)
+                .first()
+            )
             if not credential:
                 msg = f"EdaCredential [{credential_id}] not found"
                 return Response(

@@ -12,6 +12,7 @@ from django.db.models import (
     CharField,
     DateTimeField,
     ForeignKey,
+    JSONField,
     TextField,
     UUIDField,
 )
@@ -19,7 +20,7 @@ from django.utils.timezone import now
 from rest_framework.test import APIClient
 
 from aap_eda.core.management.commands.create_initial_data import Command
-from aap_eda.core.models import User
+from aap_eda.core.models import RulebookProcess, User
 
 
 # Fixtures copied from DAB because authenticator app is not yet used here
@@ -64,6 +65,10 @@ class ModelFactory:
 
     def fk_fields(self, cls):
         for field in cls._meta.concrete_fields:
+            # corner case for when either an activation or a event_stream
+            # must be set, but not both
+            if cls == RulebookProcess and field.name == "event_stream":
+                continue
             if isinstance(field, ForeignKey):
                 yield field
 
@@ -96,8 +101,27 @@ class ModelFactory:
             elif isinstance(field, (TextField, CharField)):
                 if field.name == "extra_var":
                     data["extra_var"] = '{"a": "b"}'
+                elif field.name == "inputs":
+                    data["inputs"] = {"username": "adam", "password": "secret"}
                 else:
                     data[field.name] = self.make_name()
+            elif isinstance(field, JSONField):
+                if field.name == "inputs":
+                    data[field.name] = {
+                        "fields": [
+                            {
+                                "id": "username",
+                                "label": "Username",
+                                "type": "string",
+                            },
+                            {
+                                "id": "password",
+                                "label": "Password",
+                                "type": "string",
+                                "secret": True,
+                            },
+                        ]
+                    }
             elif isinstance(field, UUIDField):
                 data[field.name] = uuid4()
             elif isinstance(field, DateTimeField):
@@ -118,7 +142,7 @@ class ModelFactory:
                 try:
                     related_obj = self.get_or_create(field.related_model)
                 except Exception:
-                    # Even if we cannot create a dependencyj,
+                    # Even if we cannot create a dependency,
                     # the original object creation might still work, and this
                     related_obj = None
             if related_obj:
@@ -173,7 +197,7 @@ def give_obj_perm():
         then it gives the specified user to the specified object
         """
         ct = ContentType.objects.get_for_model(obj)
-        rd = RoleDefinition.objects.create(
+        rd, _ = RoleDefinition.objects.get_or_create(
             name=f"{obj._meta.model_name}-{action}", content_type=ct
         )
         permissions = [

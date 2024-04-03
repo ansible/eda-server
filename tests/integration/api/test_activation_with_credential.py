@@ -206,12 +206,12 @@ def test_create_activation_with_eda_credential(
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
-
     assert data["eda_credentials"][0]["credential_type"] == {
         "id": kafka_credential_type.id,
         "name": kafka_credential_type.name,
         "namespace": None,
         "kind": "cloud",
+        "organization_id": kafka_credential_type.organization.id,
     }
     activation = models.Activation.objects.filter(id=data["id"]).first()
 

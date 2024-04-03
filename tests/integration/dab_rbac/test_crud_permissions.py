@@ -2,6 +2,7 @@ import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
+from django.test import override_settings
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse
 
@@ -28,10 +29,16 @@ def test_factory_sanity(model, cls_factory):
     cls_factory.create(model)
 
 
+@override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_add_permissions(
-    model, cls_factory, user, user_api_client, give_obj_perm
+    model,
+    cls_factory,
+    user,
+    user_api_client,
+    give_obj_perm,
+    preseed_credential_types,
 ):
     create_data = cls_factory.get_create_data(model)
     data = cls_factory.get_post_data(model, create_data)
@@ -122,6 +129,7 @@ def test_view_permissions(
     assert response.status_code == 200, response.data
 
 
+@override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_change_permissions(

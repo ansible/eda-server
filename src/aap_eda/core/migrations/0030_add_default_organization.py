@@ -2,6 +2,15 @@ from django.conf import settings
 from django.db import migrations
 from django.utils import timezone
 
+RESOURCES_LIST = (
+    "Activation",
+    "CredentialType",
+    "EdaCredential",
+    "DecisionEnvironment",
+    "ExtraVar",
+    "Project",
+)
+
 
 def create_default_org(apps, schema_editor):
     Organization = apps.get_model("core", "Organization")  # noqa: N806
@@ -27,17 +36,6 @@ def delete_default_org(apps, schema_editor):
 
 
 def add_resources_to_default_org(apps, schema_editor):
-    resources_list = (
-        "Activation",
-        "AuditAction",
-        "AuditEvent",
-        "AuditRule",
-        "Credential",
-        "DecisionEnvironment",
-        "ExtraVar",
-        "Project",
-    )
-
     Organization = apps.get_model("core", "Organization")  # noqa: N806
     db_alias = schema_editor.connection.alias
 
@@ -47,24 +45,12 @@ def add_resources_to_default_org(apps, schema_editor):
         .first()
     )
 
-    for resource in resources_list:
+    for resource in RESOURCES_LIST:
         resource_model = apps.get_model("core", resource)
         resource_model.objects.update(organization=default_org)
 
 
 def remove_resources_from_default_org(apps, schema_editor):
-    resources_list = (
-        "Activation",
-        "AuditAction",
-        "AuditEvent",
-        "AuditRule",
-        "Credential",
-        "DecisionEnvironment",
-        "ExtraVar",
-        "Project",
-        "Role",
-    )
-
     Organization = apps.get_model("core", "Organization")  # noqa: N806
     db_alias = schema_editor.connection.alias
 
@@ -74,7 +60,7 @@ def remove_resources_from_default_org(apps, schema_editor):
         .first()
     )
 
-    for resource in resources_list:
+    for resource in RESOURCES_LIST:
         resource_model = apps.get_model("core", resource)
         default_org_resources = resource_model.objects.filter(
             organization=default_org

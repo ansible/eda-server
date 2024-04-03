@@ -7,7 +7,7 @@ from aap_eda.core import models
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
-def test_organization_field_not_editable(
+def test_related_organization_edit_access_control(
     cls_factory, user, user_api_client, give_obj_perm, model
 ):
     obj = cls_factory.create(model)
@@ -31,7 +31,7 @@ def test_organization_field_not_editable(
     response = user_api_client.patch(
         url, data={"organization_id": organization.pk}
     )
-    # views may have inconsistentently editable organization fields
+    # views may have inconsistently editable organization fields
     # so no asserts on status here
     obj.refresh_from_db()
     assert organization.pk != obj.organization_id
@@ -45,20 +45,20 @@ def test_project_credential_access(
     give_obj_perm(user, project, "change")
     url = reverse("project-detail", kwargs={"pk": project.pk})
 
-    credential = cls_factory.create(models.Credential)
-    assert project.credential_id != credential.pk  # sanity
+    credential = cls_factory.create(models.EdaCredential)
+    assert project.eda_credential_id != credential.pk  # sanity
 
     response = user_api_client.patch(
-        url, data={"credential_id": credential.pk}
+        url, data={"eda_credential_id": credential.pk}
     )
-    assert response.status_code == 403, response.data
+    assert response.status_code == 400, response.data
     project.refresh_from_db()
-    assert project.credential_id != credential.pk
+    assert project.eda_credential_id != credential.pk
 
     give_obj_perm(user, credential, "change")
     response = user_api_client.patch(
-        url, data={"credential_id": credential.pk}
+        url, data={"eda_credential_id": credential.pk}
     )
     assert response.status_code == 200, response.data
     project.refresh_from_db()
-    assert project.credential_id == credential.pk
+    assert project.eda_credential_id == credential.pk
