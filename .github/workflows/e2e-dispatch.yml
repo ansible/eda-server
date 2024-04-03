@@ -7,6 +7,10 @@ on:
         description: 'ref of the eda-qa repository, default is main'
         required: false
         default: 'main'
+      pytest_filter:
+        description: 'filter for pytest to be used after "-k" flag, default is empty'
+        required: false
+        default: ''
   pull_request_target:
     types:
       - labeled
@@ -78,7 +82,7 @@ jobs:
         env:
           EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
           EDAQA_ENV: authenticated
-        run: pytest
+        run: pytest -vv -k ${{ github.event.inputs.pytest_filter }}
 
       - name: Print EDA logs
         if: always()
