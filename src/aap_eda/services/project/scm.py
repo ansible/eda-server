@@ -248,8 +248,8 @@ class PlaybookExecutor:
         timeout: Optional[float] = 30,
         cwd: Optional[StrPath] = None,
     ):
-        msg = pexpect.run('git config --add credential.helper ""')
-        logger.info(f"Unset credential helper: {msg}")
+        # msg = pexpect.run('git config --add credential.helper ""')
+        # logger.info(f"Unset credential helper: {msg}")
         res = pexpect.run("git config --list")
         logger.info(f"Git config: {res}")
         res = pexpect.run("ls -l .git")
