@@ -248,8 +248,11 @@ class PlaybookExecutor:
         timeout: Optional[float] = 30,
         cwd: Optional[StrPath] = None,
     ):
+        msg = pexpect.run('git config --add credential.helper ""')
+        logger.info(f"Unset credential helper: {msg}")
         try:
             cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"
+            cwd = "/tmp"
             child = pexpect.spawn(
                 cmd,
                 env=os.environ | PlaybookExecutor.ENVIRON,
