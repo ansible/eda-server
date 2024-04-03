@@ -76,7 +76,7 @@ class CredentialTypeViewSet(
 
     @extend_schema(
         description="Create a new credential type.",
-        request=serializers.CredentialTypeSerializer,
+        request=serializers.CredentialTypeCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.CredentialTypeSerializer,

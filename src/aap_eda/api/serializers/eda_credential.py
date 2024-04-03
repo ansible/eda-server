@@ -117,12 +117,6 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.EdaCredential
-        read_only_fields = [
-            "id",
-            "managed",
-            "created_at",
-            "modified_at",
-        ]
         fields = [
             "name",
             "description",
