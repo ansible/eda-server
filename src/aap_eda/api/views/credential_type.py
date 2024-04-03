@@ -140,7 +140,6 @@ class CredentialTypeViewSet(
 
         return Response(
             serializers.CredentialTypeSerializer(credential_type).data,
-            status=status.HTTP_206_PARTIAL_CONTENT,
         )
         pass
 

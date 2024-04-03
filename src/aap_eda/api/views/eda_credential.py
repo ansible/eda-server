@@ -96,7 +96,7 @@ class EdaCredentialViewSet(
         },
     )
     def retrieve(self, request, pk):
-        eda_credential = get_object_or_404(models.EdaCredential, id=pk)
+        eda_credential = get_object_or_404(self.get_queryset(), id=pk)
         eda_credential_serializers = serializers.EdaCredentialSerializer(
             eda_credential
         )
@@ -205,7 +205,6 @@ class EdaCredentialViewSet(
 
         return Response(
             serializers.EdaCredentialSerializer(eda_credential).data,
-            status=status.HTTP_206_PARTIAL_CONTENT,
         )
 
     @extend_schema(

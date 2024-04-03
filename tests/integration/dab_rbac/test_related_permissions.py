@@ -31,7 +31,7 @@ def test_organization_field_not_editable(
     response = user_api_client.patch(
         url, data={"organization_id": organization.pk}
     )
-    # views may have inconsistentently editable organization fields
+    # views may have inconsistently editable organization fields
     # so no asserts on status here
     obj.refresh_from_db()
     assert organization.pk != obj.organization_id
