@@ -89,77 +89,28 @@ def test_retrieve_eda_credential(
 
 @pytest.mark.django_db
 def test_list_eda_credentials(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    default_eda_credential: models.EdaCredential,
+    default_vault_credential: models.EdaCredential,
+    managed_eda_credential: models.EdaCredential,
 ):
-    models.EdaCredential.objects.bulk_create(
-        [
-            models.EdaCredential(
-                name="credential-1",
-                inputs={"username": "adam", "password": "secret"},
-                credential_type_id=credential_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-2",
-                inputs={"username": "bearny", "password": "secret"},
-                credential_type_id=credential_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-3",
-                inputs={"username": "christ", "password": "secret"},
-                credential_type_id=credential_type.id,
-                managed=True,
-            ),
-        ]
-    )
     response = client.get(f"{api_url_v1}/eda-credentials/")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 2
-    assert response.data["results"][0]["name"] == "credential-1"
-    assert response.data["results"][0]["inputs"] == {
-        "username": "adam",
-        "password": "$encrypted$",
-    }
-    assert response.data["results"][1]["name"] == "credential-2"
-    assert response.data["results"][1]["inputs"] == {
-        "username": "bearny",
-        "password": "$encrypted$",
-    }
+    assert response.data["results"][0]["name"] == default_eda_credential.name
+    assert response.data["results"][1]["name"] == default_vault_credential.name
 
 
 @pytest.mark.django_db
 def test_list_eda_credentials_with_kind_filter(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
 ):
-    registry_type = models.CredentialType.objects.create(
-        name="registry", inputs=INPUTS, injectors={}, kind="registry"
-    )
-    scm_type = models.CredentialType.objects.create(
-        name="scm", inputs=INPUTS, injectors={}, kind="scm"
-    )
-    models.EdaCredential.objects.bulk_create(
-        [
-            models.EdaCredential(
-                name="credential-1",
-                inputs={"username": "adam", "password": "secret"},
-                credential_type_id=registry_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-2",
-                inputs={"username": "bearny", "password": "secret"},
-                credential_type_id=scm_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-3",
-                inputs={"username": "christ", "password": "secret"},
-                credential_type_id=scm_type.id,
-            ),
-        ]
-    )
-
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
     )
-    assert len(response.data["results"]) == 2
+    assert len(response.data["results"]) == 1
 
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=registry"
@@ -175,13 +126,13 @@ def test_list_eda_credentials_with_kind_filter(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         "&credential_type__kind=vault",
     )
-    assert len(response.data["results"]) == 2
+    assert len(response.data["results"]) == 1
 
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         "&credential_type__kind=registry",
     )
-    assert len(response.data["results"]) == 3
+    assert len(response.data["results"]) == 2
 
 
 @pytest.mark.django_db

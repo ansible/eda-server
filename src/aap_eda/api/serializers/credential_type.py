@@ -76,7 +76,6 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
             "inputs",
             "injectors",
             "organization_id",
-            *read_only_fields,
         ]
 
 

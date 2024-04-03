@@ -82,7 +82,7 @@ class CredentialTypeViewSet(
 
     @extend_schema(
         description="Create a new credential type.",
-        request=serializers.CredentialTypeSerializer,
+        request=serializers.CredentialTypeCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.CredentialTypeSerializer,
@@ -116,7 +116,7 @@ class CredentialTypeViewSet(
 
     @extend_schema(
         description="Partial update of a credential type",
-        request=serializers.CredentialTypeSerializer,
+        request=serializers.CredentialTypeCreateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.CredentialTypeSerializer,
@@ -133,10 +133,18 @@ class CredentialTypeViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
+        old_data = model_to_dict(credential_type)
         for key, value in serializer.validated_data.items():
             setattr(credential_type, key, value)
 
-        credential_type.save()
+        with transaction.atomic():
+            credential_type.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(credential_type),
+            )
 
         return Response(
             serializers.CredentialTypeSerializer(credential_type).data,

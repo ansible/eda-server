@@ -161,9 +161,7 @@ class EdaCredentialViewSet(
         },
     )
     def list(self, request):
-        credentials = models.EdaCredential.objects.exclude(
-            managed=True,
-        )
+        credentials = self.get_queryset().exclude(managed=True)
         credentials = self.filter_queryset(credentials)
 
         serializer = serializers.EdaCredentialSerializer(
@@ -198,10 +196,18 @@ class EdaCredentialViewSet(
                 eda_credential.inputs,
             )
 
+        old_data = model_to_dict(eda_credential)
         for key, value in serializer.validated_data.items():
             setattr(eda_credential, key, value)
 
-        eda_credential.save()
+        with transaction.atomic():
+            eda_credential.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(eda_credential),
+            )
 
         return Response(
             serializers.EdaCredentialSerializer(eda_credential).data,

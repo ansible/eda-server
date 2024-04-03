@@ -136,6 +136,47 @@ def default_vault_credential(
 
 
 @pytest.fixture
+def default_scm_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a managed Eda Credential"""
+    scm_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.SOURCE_CONTROL
+    )
+    return models.EdaCredential.objects.create(
+        name="managed-eda-credential",
+        description="Default EDA Credential",
+        credential_type=scm_credential_type,
+        inputs=inputs_to_store(
+            {"username": "dummy-user", "password": "dummy-password"}
+        ),
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def managed_eda_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a managed Eda Credential"""
+    scm_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    return models.EdaCredential.objects.create(
+        name="managed-eda-credential",
+        description="Managed EDA Credential",
+        credential_type=scm_credential_type,
+        inputs=inputs_to_store(
+            {"username": "dummy-user", "password": "dummy-password"}
+        ),
+        organization=default_organization,
+        managed=True,
+    )
+
+
+@pytest.fixture
 def credential_payload(
     default_organization: models.Organization,
     preseed_credential_types,
