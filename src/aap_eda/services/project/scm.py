@@ -250,11 +250,12 @@ class PlaybookExecutor:
     ):
         # msg = pexpect.run('git config --add credential.helper ""')
         # logger.info(f"Unset credential helper: {msg}")
-        res = pexpect.run("git config --list | cat")
-        logger.info(f"Git config: {res}")
         res = pexpect.run("ls -l .git")
-        logger.info(f"Git directory: {res}")
+        logger.info(f"Git directory: {res.decode()}")
         logger.info(f"cwd: {os.getcwd()}")
+        res = pexpect.run("git config --list", env={"GIT_PAGER": "cat"})
+        logger.info(f"Git config: {res.decode()}")
+
         try:
             cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"
             cwd = "/tmp"
