@@ -149,7 +149,6 @@ class CredentialTypeViewSet(
         return Response(
             serializers.CredentialTypeSerializer(credential_type).data,
         )
-        pass
 
     @extend_schema(
         description="Delete a credential type by id",
