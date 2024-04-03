@@ -59,11 +59,18 @@ Optionally you can define DATABASES as an object
 
 Redis queue settings:
 
-* MQ_UNIX_SOCKET_PATH - Redis unix socket path, mutually exclusive with
-    host and port (default: None)
+* MQ_UNIX_SOCKET_PATH - Redis unix socket path (default: None)
+*   - Takes precedence over host and port
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
 * MQ_DB - Redis queue database (default: 0)
+* MQ_USER - Redis user (default: None)
+* MQ_USER_PASSWORD - Redis user passed (default: None)
+* MQ_CLIENT_CERT_PATH - Redis TLS client certificate path (default: None)
+*   - If MQ_UNIX_SOCKET_PATH is not set and MQ_CLIENT_CERT_PATH
+*     is set TLS with be used.
+* MQ_CLIENT_KEY_PATH - Redis TLS client key path (default: None)
+* MQ_CLIENT_CACERT_PATH - Redis TLS CA certificate path (default: None)
 
 
 Podman settings:
@@ -310,32 +317,58 @@ RQ = {
     "JOB_CLASS": "aap_eda.core.tasking.Job",
 }
 
-RQ_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
+REDIS_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
+REDIS_HOST = settings.get("MQ_HOST", "localhost")
+REDIS_PORT = settings.get("MQ_PORT", 6379)
+REDIS_USER = settings.get("MQ_USER", None)
+REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
+REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
+REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
+REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
 
-if RQ_UNIX_SOCKET_PATH:
+
+if REDIS_UNIX_SOCKET_PATH:
     RQ_QUEUES = {
         "default": {
-            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+            "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
             "DEFAULT_TIMEOUT": 300,
         },
         "activation": {
-            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
+            "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
             "DEFAULT_TIMEOUT": 120,
         },
     }
 else:
     RQ_QUEUES = {
         "default": {
-            "HOST": settings.get("MQ_HOST", "localhost"),
-            "PORT": settings.get("MQ_PORT", 6379),
+            "HOST": REDIS_HOST,
+            "PORT": REDIS_PORT,
+            "USERNAME": REDIS_USER,
+            "PASSWORD": REDIS_USER_PASSWORD,
             "DEFAULT_TIMEOUT": 300,
         },
         "activation": {
-            "HOST": settings.get("MQ_HOST", "localhost"),
-            "PORT": settings.get("MQ_PORT", 6379),
+            "HOST": REDIS_HOST,
+            "PORT": REDIS_PORT,
+            "USERNAME": REDIS_USER,
+            "PASSWORD": REDIS_USER_PASSWORD,
             "DEFAULT_TIMEOUT": 120,
         },
     }
+    if REDIS_CLIENT_CERT_PATH:
+        RQ_QUEUES["default"] |= {"SSL": True}
+        RQ_QUEUES["default"]["REDIS_CLIENT_KWARGS"] = {
+            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
+            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
+            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+        }
+
+        RQ_QUEUES["activation"] |= {"SSL": True}
+        RQ_QUEUES["activation"]["REDIS_CLIENT_KWARGS"] = {
+            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
+            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
+            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+        }
 RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
 RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
 
