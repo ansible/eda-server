@@ -378,7 +378,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 return ControllerInfo(
                     url=inputs["host"],
                     token=inputs.get("oauth_token", ""),
-                    ssl_verify=inputs.get("ssl_verify", "yes"),
+                    ssl_verify="yes" if inputs.get("verify_ssl") else "no",
                     username=inputs.get("username", ""),
                     password=inputs.get("password", ""),
                 )

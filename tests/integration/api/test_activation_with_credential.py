@@ -225,6 +225,53 @@ def create_activation_related_data(extra_var, with_project=True):
     }
 
 
+@pytest.mark.parametrize(
+    ("inputs", "result"),
+    [
+        ({"username": "adam", "password": "secret"}, True),
+        ({"oauth_token": "valid_token"}, True),
+        (
+            {"username": "adam", "password": "secret", "oauth_token": "token"},
+            True,
+        ),
+        ({"username": "adam", "oauth_token": "token"}, True),
+        ({"password": "secret", "oauth_token": "token"}, True),
+        ({}, False),
+        ({"username": "adam"}, False),
+        ({"password": "secret"}, False),
+    ],
+)
+@pytest.mark.django_db
+def test_validate_for_aap_credential(
+    client: APIClient,
+    inputs,
+    result,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+    aap_credential_type = models.CredentialType.objects.get(
+        name=DefaultCredentialType.AAP,
+    )
+    credential = models.EdaCredential.objects.create(
+        name="test_eda_credential",
+        inputs=inputs,
+        managed=False,
+        credential_type_id=aap_credential_type.id,
+    )
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        user_id=fks["user_id"],
+    )
+    activation.eda_credentials.add(credential)
+
+    valid, _ = is_activation_valid(activation)
+    assert valid is result
+
+
 @pytest.mark.django_db
 def test_is_activation_valid_with_token_and_run_job_template(
     client: APIClient,
@@ -268,7 +315,6 @@ def test_is_activation_valid_with_aap_credential_and_run_job_template(
         rulebook_id=fks["run_job_rulebook_id"],
         decision_environment_id=fks["decision_environment_id"],
         project_id=fks["project_id"],
-        awx_token_id=fks["awx_token_id"],
         user_id=fks["user_id"],
     )
     activation.eda_credentials.add(credential)
@@ -297,7 +343,7 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
 
     assert valid is False
     assert (
-        "The rulebook requires an Awx Token or " "RH AAP credential."
+        "The rulebook requires an Awx Token or RH AAP credential."
     ) in message
 
 
