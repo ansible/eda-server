@@ -250,7 +250,11 @@ class PlaybookExecutor:
         cwd: Optional[StrPath] = None,
     ):
         cwd = "/tmp"
-        res = pexpect.run('git config unset credential.helper ""')
+        res = pexpect.run(
+            "git config --get-all --show-origin credential.helper"
+        )
+        logger.info(f"git credential helper: {res}")
+        res = pexpect.run("git config --unset credential.helper")
         logger.info(f"Unset credential helper: {res}")
         res = pexpect.run("ls -l .git")
         logger.info(f"Git directory: {res.decode()}")
@@ -263,6 +267,8 @@ class PlaybookExecutor:
         )
         logger.info(f"Git config: {res.decode()}")
         if final_url:
+            logger.info(f"partial url: {final_url.split('@')[0][:-6]}")
+
             res = pexpect.run(f"git ls-remote {final_url}")
             logger.info(f"First run ls-remote: {res}")
             res = pexpect.run(f"git ls-remote {final_url}")
