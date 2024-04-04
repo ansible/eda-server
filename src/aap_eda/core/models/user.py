@@ -33,6 +33,16 @@ class User(AbstractUser):
     modified_at = models.DateTimeField(auto_now=True, null=False)
     is_service_account = models.BooleanField(default=False)
 
+    def summary_fields(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "is_superuser": self.is_superuser,
+        }
+
 
 class AwxToken(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
