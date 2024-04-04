@@ -263,7 +263,7 @@ class PlaybookExecutor:
         logger.info(f"Git config: {res.decode()}")
 
         try:
-            cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"
+            cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK} -vvv"
 
             child = pexpect.spawn(
                 cmd,
