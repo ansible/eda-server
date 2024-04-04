@@ -179,7 +179,7 @@ class ScmRepository:
         cmd = ["-e", f"'{vars_str}'", "-t", "update_git"]
         logger.info("Cloning repository: %s", url)
         try:
-            git_hash = _executor(cmd)
+            git_hash = _executor(cmd, final_url=final_url)
         except ScmError as e:
             msg = str(e)
             if secret:
@@ -245,12 +245,13 @@ class PlaybookExecutor:
     def __call__(
         self,
         args: Iterable[str],
+        final_url=None,
         timeout: Optional[float] = 30,
         cwd: Optional[StrPath] = None,
     ):
         cwd = "/tmp"
-        # msg = pexpect.run('git config --add credential.helper ""')
-        # logger.info(f"Unset credential helper: {msg}")
+        res = pexpect.run('git config unset credential.helper ""')
+        logger.info(f"Unset credential helper: {res}")
         res = pexpect.run("ls -l .git")
         logger.info(f"Git directory: {res.decode()}")
         logger.info(f"cwd: {os.getcwd()}")
@@ -261,6 +262,11 @@ class PlaybookExecutor:
             cwd=cwd,
         )
         logger.info(f"Git config: {res.decode()}")
+        if final_url:
+            res = pexpect.run(f"git ls-remote {final_url}")
+            logger.info(f"First run ls-remote: {res}")
+            res = pexpect.run(f"git ls-remote {final_url}")
+            logger.info(f"Second run ls-remote: {res}")
 
         try:
             cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK} -vvv"
