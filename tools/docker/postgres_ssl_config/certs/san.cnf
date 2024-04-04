@@ -5,11 +5,11 @@ distinguished_name = dn
 
 [dn]
 C=BR
-ST=Sao Paulo
-L=Sao Paulo
+ST=Raleigh
+L=Raleigh
 O=Red Hat
 OU=Ansible EDA
-emailAddress=mmagnani@redhat.com
+emailAddress=eda@redhat.com
 CN = *.eda.local
 
 [req_ext]
