@@ -258,6 +258,7 @@ class PlaybookExecutor:
         res = pexpect.run(
             "git config --list --show-origin --show-scope",
             env={"GIT_PAGER": "cat"},
+            cwd=cwd,
         )
         logger.info(f"Git config: {res.decode()}")
 
