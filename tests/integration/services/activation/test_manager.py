@@ -196,7 +196,9 @@ def test_start_disabled_activation(activation_with_instance, eda_caplog):
 
 
 @pytest.mark.django_db
-def test_start_no_awx_token(basic_activation, rulebook_with_job_template):
+def test_start_no_awx_token(
+    basic_activation, rulebook_with_job_template, preseed_credential_types
+):
     """Test start verb when no AWX token is present."""
     basic_activation.rulebook = rulebook_with_job_template
     basic_activation.save(update_fields=["rulebook"])
@@ -205,7 +207,9 @@ def test_start_no_awx_token(basic_activation, rulebook_with_job_template):
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
     assert basic_activation.status == enums.ActivationStatus.ERROR
-    assert "The rulebook requires an Awx Token." in str(exc.value)
+    assert "The rulebook requires an Awx Token or RH AAP credential." in str(
+        exc.value
+    )
     assert str(exc.value) in basic_activation.status_message
 
 
@@ -227,6 +231,7 @@ def test_start_already_running(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
+    preseed_credential_types,
 ):
     """Test start verb when activation is already running."""
     activation_manager = ActivationManager(
@@ -248,6 +253,7 @@ def test_start_first_run(
     basic_activation: models.Activation,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
+    preseed_credential_types,
 ):
     """Test start verb for a new activation."""
     activation_manager = ActivationManager(
@@ -273,6 +279,7 @@ def test_start_restart(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
+    preseed_credential_types,
 ):
     """Test start verb for a restarted activation."""
     activation_manager = ActivationManager(
@@ -593,6 +600,7 @@ def test_start_max_running_activations(
     basic_activation: models.Activation,
     settings: SettingsWrapper,
     eda_caplog: LogCaptureFixture,
+    preseed_credential_types,
 ):
     """Test start verb when max running activations is reached."""
     apply_settings(settings, MAX_RUNNING_ACTIVATIONS=1)
