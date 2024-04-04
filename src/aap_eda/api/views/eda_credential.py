@@ -188,8 +188,7 @@ class EdaCredentialViewSet(
         eda_credential.save()
 
         return Response(
-            serializers.EdaCredentialSerializer(eda_credential).data,
-            status=status.HTTP_206_PARTIAL_CONTENT,
+            serializers.EdaCredentialSerializer(eda_credential).data
         )
 
     @extend_schema(

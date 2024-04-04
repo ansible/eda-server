@@ -173,7 +173,7 @@ def test_delete_credential_type(client: APIClient):
         (
             {"username": "fred"},
             {"fields": [{"id": "username", "label": "Username"}]},
-            status.HTTP_206_PARTIAL_CONTENT,
+            status.HTTP_200_OK,
             True,
             {"id": "username", "label": "Username"},
         ),
