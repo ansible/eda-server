@@ -15,7 +15,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 INPUT = {
@@ -199,3 +199,20 @@ def test_partial_update_inputs_credential_type(
         assert obj.inputs == new_inputs
     else:
         assert message in response.data["inputs"]
+
+
+@pytest.mark.django_db
+def test_update_managed_credential_type(
+    client: APIClient, preseed_credential_types
+):
+    scm = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.SOURCE_CONTROL,
+    )
+    data = {"name": "new_name"}
+    response = client.patch(
+        f"{api_url_v1}/credential-types/{scm.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Managed credential type cannot be updated" in response.data["errors"]
+    )
