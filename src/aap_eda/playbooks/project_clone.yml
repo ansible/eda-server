@@ -13,15 +13,6 @@
   connection: local
   name: Update source tree if necessary
   tasks:
-    - name: debug command
-      ansible.builtin.shell:
-        cmd: "/usr/bin/git ls-remote {{ scm_url }} -h refs/heads/HEAD"
-      register: git_head
-
-    - name: debug command
-      ansible.builtin.debug:
-        msg: "{{ git_head.stdout }}"
-
     - name: Update project using git
       tags:
         - update_git
@@ -31,7 +22,7 @@
             dest: "{{ project_path | quote }}"
             repo: "{{ scm_url }}"
             version: "{{ scm_branch | default(omit) | quote }}"
-            # refspec: "{{ scm_refspec | default(omit) }}"
+            refspec: "{{ scm_refspec | default(omit) }}"
             key_file: "{{ key_file | default(omit) }}"
             accept_hostkey: true
             depth: "{{ depth | default(omit) }}"
