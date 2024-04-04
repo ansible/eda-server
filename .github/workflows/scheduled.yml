@@ -30,8 +30,8 @@ jobs:
       - name: Run api in background
         working-directory: tools/docker
         run: |
-          docker-compose -p eda -f docker-compose-stage.yaml pull
-          docker-compose -p eda -f docker-compose-stage.yaml up -d
+          docker compose -p eda -f docker-compose-stage.yaml pull
+          docker compose -p eda -f docker-compose-stage.yaml up -d
           while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
             echo "Waiting for API to be ready..."
             sleep 1
@@ -65,7 +65,7 @@ jobs:
         if: always()
         working-directory: tools/docker
         run: |
-          docker-compose -p eda -f docker-compose-stage.yaml logs
+          docker compose -p eda -f docker-compose-stage.yaml logs
 
       - name: Notify to slack if failure
         if: ${{ failure() }}
