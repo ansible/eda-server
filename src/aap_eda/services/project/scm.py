@@ -251,7 +251,9 @@ class PlaybookExecutor:
     ):
         cwd = "/tmp"
         res = pexpect.run(
-            "git config --get-all --show-origin credential.helper"
+            "git config --get-all --show-origin credential.helper",
+            env={"GIT_PAGER": "cat"},
+            cwd=cwd,
         )
         logger.info(f"git credential helper: {res}")
         res = pexpect.run("git config --unset credential.helper")
@@ -275,7 +277,7 @@ class PlaybookExecutor:
             logger.info(f"Second run ls-remote: {res}")
 
         try:
-            cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK} -vvv"
+            cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"
 
             child = pexpect.spawn(
                 cmd,
