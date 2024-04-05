@@ -15,7 +15,6 @@ import json
 import logging
 import secrets
 import uuid
-from typing import Union
 
 import yaml
 from rest_framework import serializers
@@ -336,21 +335,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        user = data["user"]
-        awx_token = models.AwxToken.objects.filter(
-            id=data.get("awx_token_id"),
-        ).first()
-        if awx_token and awx_token.user != user:
-            raise serializers.ValidationError(
-                "The Awx Token does not belong to the user."
-            )
-        if not awx_token:
-            validate_rulebook_token(data["rulebook_id"])
-
-        if data.get("eda_credentials"):
-            validate_eda_credentials(
-                data.get("eda_credentials"), data.get("extra_var_id")
-            )
+        _validate_credentials_and_token_and_rulebook(data)
 
         return data
 
@@ -579,16 +564,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        awx_token = data.get("awx_token_id")
-
-        eda_credentials = data.get("eda_credentials", [])
-        aap_cred = _aap_in_eda_credentials(eda_credentials)
-
-        if not awx_token and not aap_cred:
-            validate_rulebook_token(data["rulebook_id"])
-
-        if data.get("extra_var_id"):
-            validate_eda_credentials(eda_credentials, data.get("extra_var_id"))
+        _validate_credentials_and_token_and_rulebook(data)
 
         return data
 
@@ -645,8 +621,47 @@ def parse_validation_errors(errors: dict) -> str:
     return str(messages)
 
 
-def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
-    """Validate if the rulebook requires an Awx Token."""
+def _validate_credentials_and_token_and_rulebook(data: dict) -> None:
+    """Validate Awx Token and AAP credentials."""
+    eda_credentials = data.get("eda_credentials", [])
+    aap_credentials = _get_aap_credentials_if_exists(eda_credentials)
+
+    # validate EDA credentials
+    _validate_eda_credentials(data)
+
+    # validate AAP credentials
+    if aap_credentials:
+        for credential in aap_credentials:
+            _validate_aap_credential(credential)
+
+        return
+
+    # validate awx token
+    awx_token = _validate_awx_token(data)
+
+    # validate rulebook
+    _validate_rulebook(data, awx_token is not None)
+
+
+def _validate_awx_token(data: dict) -> models.AwxToken:
+    """Validate Awx Token, return it if it's valid."""
+    awx_token_id = data.get("awx_token_id")
+
+    if awx_token_id is None:
+        return
+
+    user = data.get("user")
+    awx_token = models.AwxToken.objects.filter(id=awx_token_id).first()
+    if awx_token and user and awx_token.user != user:
+        raise serializers.ValidationError(
+            "The Awx Token does not belong to the user."
+        )
+
+    return awx_token
+
+
+def _validate_rulebook(data: dict, with_token: bool = False) -> None:
+    rulebook_id = data.get("rulebook_id")
     if rulebook_id is None:
         return
 
@@ -660,7 +675,7 @@ def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
     except ValueError:
         raise serializers.ValidationError("Invalid rulebook data.")
 
-    if validators.check_rulesets_require_token(
+    if not with_token and validators.check_rulesets_require_token(
         rulesets_data,
     ):
         raise serializers.ValidationError(
@@ -668,10 +683,34 @@ def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
         )
 
 
-def validate_eda_credentials(
-    eda_credential_ids: list[int], extra_var_id: int
-) -> None:
+def _validate_aap_credential(credential: models.EdaCredential) -> None:
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+    username = inputs.get("username")
+    password = inputs.get("password")
+    token = inputs.get("oauth_token")
+
+    if not username and not password and not token:
+        raise serializers.ValidationError(
+            "Invalid RH AAP credential: "
+            "either username/password or token has to be set"
+        )
+
+    if not token and (not username or not password):
+        raise serializers.ValidationError(
+            "Invalid RH AAP credential: "
+            "both username and password have to be set when token is empty"
+        )
+
+
+def _validate_eda_credentials(data: dict) -> None:
+    eda_credential_ids = data.get("eda_credentials")
+    if eda_credential_ids is None:
+        return
+
     existing_keys = []
+    extra_var_id = data.get("extra_var_id")
+
     try:
         vault = _get_vault_credential_type()
         if extra_var_id:
@@ -716,16 +755,19 @@ def validate_eda_credentials(
             )
 
 
-def _aap_in_eda_credentials(eda_credential_ids: list[int]) -> bool:
+def _get_aap_credentials_if_exists(
+    eda_credential_ids: list[int],
+) -> list[models.EdaCredential]:
     aap_credential_type = models.CredentialType.objects.get(
         name=DefaultCredentialType.AAP
     )
-    for eda_credential_id in eda_credential_ids:
-        eda_credential = models.EdaCredential.objects.get(pk=eda_credential_id)
-        if (
-            eda_credential
-            and eda_credential.credential_type.id == aap_credential_type.id
-        ):
-            return True
+    eda_credentials = [
+        models.EdaCredential.objects.get(pk=eda_credential_id)
+        for eda_credential_id in eda_credential_ids
+    ]
 
-    return False
+    return [
+        eda_credential
+        for eda_credential in eda_credentials
+        if eda_credential.credential_type.id == aap_credential_type.id
+    ]
