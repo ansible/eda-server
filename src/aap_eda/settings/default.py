@@ -536,10 +536,6 @@ ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}
 
-# This will make a special create-specific serializer for DAB RBAC views
-# also should apply to authentication and other apps, if that ever matters
-ANSIBLE_BASE_AUTO_CREATE_SERIALIZER = True
-
 ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
 )
