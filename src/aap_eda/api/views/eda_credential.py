@@ -18,7 +18,6 @@ from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
 from django.forms import model_to_dict
-from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -101,7 +100,7 @@ class EdaCredentialViewSet(
         },
     )
     def retrieve(self, request, pk):
-        eda_credential = get_object_or_404(self.get_queryset(), id=pk)
+        eda_credential = self.get_object()
         eda_credential_serializers = serializers.EdaCredentialSerializer(
             eda_credential
         )
