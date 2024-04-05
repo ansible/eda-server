@@ -1,10 +1,7 @@
-from ansible_base.rbac.api.views import RoleDefinitionViewSet
 from ansible_base.rbac.api.serializers import RoleDefinitionSerializer
-
-from rest_framework import status
-
+from ansible_base.rbac.api.views import RoleDefinitionViewSet
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-
+from rest_framework import status
 
 extend_schema(
     description="Create a RoleDefinition.",

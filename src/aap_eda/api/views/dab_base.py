@@ -1,7 +1,5 @@
 from rest_framework.views import APIView
 
-# from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
-
 registry = {}
 
 
@@ -39,20 +37,21 @@ def convert_to_create_serializer(cls):
 
 class BaseAPIView(APIView):
     def get_serializer_class(self):
-        # raise Exception
         serializer_cls = super().get_serializer_class()
         if self.action == "create":
             return convert_to_create_serializer(serializer_cls)
         return serializer_cls
 
     def get_serializer(self, *args, **kwargs):
-        if "context" in kwargs and hasattr(super(), 'get_serializer'):
+        # We use the presence of context here to know we are called
+        # by drf_spectacular for schema generation
+        # in these cases we use a custom creation serializer
+        if "context" in kwargs and hasattr(super(), "get_serializer"):
             return super().get_serializer(*args, **kwargs)
-        # raise Exception
-        # print(f'serializer details in base view: {args}-{kwargs}')
-        serializer_class = super().get_serializer_class()
-        kwargs.setdefault('context', self.get_serializer_context())
-        return serializer_class(*args, **kwargs)
 
-    # def get_response_serializer_class(self):
-    #     return self.serializer
+        # If not, we are processing a real request
+        # in that case, we do not want the phony and incorrect serializer
+        # to do that, we duplicate the DRF version of get_serializer
+        serializer_class = super().get_serializer_class()
+        kwargs.setdefault("context", self.get_serializer_context())
+        return serializer_class(*args, **kwargs)

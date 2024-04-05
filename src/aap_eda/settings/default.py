@@ -560,4 +560,4 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
     ["ansible.eda.webhook", "ansible.eda.alertmanager"],
 )
 
-ANSIBLE_BASE_CUSTOM_VIEW_PARENT = 'aap_eda.api.views.dab_base.BaseAPIView'
+ANSIBLE_BASE_CUSTOM_VIEW_PARENT = "aap_eda.api.views.dab_base.BaseAPIView"
