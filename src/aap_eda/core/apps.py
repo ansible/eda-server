@@ -7,4 +7,4 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         # make sure we apply DAB decorations in case they are not yet imported
-        from aap_eda.api.views import dab_decorate
+        from aap_eda.api.views import dab_decorate  # noqa: F401
