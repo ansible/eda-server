@@ -61,6 +61,7 @@ class EdaCredentialViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
+    queryset = models.EdaCredential.objects.all()
     serializer_class = serializers.EdaCredentialSerializer
     filter_backends = (
         KindFilterBackend,
@@ -69,8 +70,12 @@ class EdaCredentialViewSet(
     filterset_class = filters.EdaCredentialFilter
     ordering_fields = ["name"]
 
-    def get_queryset(self):
-        return models.EdaCredential.access_qs(self.request.user)
+    def filter_queryset(self, queryset):
+        if queryset.model is models.EdaCredential:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
 
     rbac_resource_type = ResourceType.EDA_CREDENTIAL
     rbac_action = None

@@ -69,13 +69,18 @@ class CredentialTypeViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
+    queryset = models.CredentialType.objects.all()
     serializer_class = serializers.CredentialTypeSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialTypeFilter
     ordering_fields = ["name"]
 
-    def get_queryset(self):
-        return models.CredentialType.access_qs(self.request.user)
+    def filter_queryset(self, queryset):
+        if queryset.model is models.CredentialType:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
 
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
