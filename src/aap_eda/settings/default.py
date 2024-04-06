@@ -81,6 +81,7 @@ import os
 from datetime import timedelta
 
 import dynaconf
+import rq
 from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
@@ -463,6 +464,22 @@ ACTIVATION_RESTART_SECONDS_ON_FAILURE = int(
 )
 ACTIVATION_MAX_RESTARTS_ON_FAILURE = int(
     settings.get("ACTIVATION_MAX_RESTARTS_ON_FAILURE", 5)
+)
+
+# RQ default in hours
+ACTIVATION_RETENTION_FAILURE_HOURS = int(
+    settings.get(
+        "ACTIVATION_RETENTION_FAILURE_HOURS",
+        min(1, rq.defaults.DEFAULT_FAILURE_TTL / 3600),
+    )
+)
+
+# RQ default in hours
+ACTIVATION_RETENTION_SUCCESS_HOURS = int(
+    settings.get(
+        "ACTIVATION_RETENTION_SUCCESS_HOURS",
+        min(1, rq.defaults.DEFAULT_RESULT_TTL),
+    )
 )
 
 # -1 means no limit

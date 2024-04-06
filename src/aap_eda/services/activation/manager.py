@@ -522,9 +522,10 @@ class ActivationManager:
             )
             user_msg = (
                 f"Activation completed. It will attempt to restart in "
-                f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds "
-                f"according to the restart policy {RestartPolicy.ALWAYS}."
-                "It may take longer if there is no capacity available."
+                f"{self.db_instance.effective_restart_completion_interval}"
+                f" seconds according to the restart policy"
+                f" {RestartPolicy.ALWAYS}."
+                " It may take longer if there is no capacity available."
             )
             if container_msg:
                 user_msg = f"{container_msg} {user_msg}"
@@ -540,7 +541,9 @@ class ActivationManager:
             system_restart_activation(
                 self.db_instance_type,
                 self.db_instance.id,
-                delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
+                delay_seconds=(
+                    self.db_instance.effective_restart_completion_interval
+                ),
             )
         else:
             LOGGER.info(
@@ -599,9 +602,9 @@ class ActivationManager:
                 raise exceptions.ActivationMonitorError(msg) from exc
 
         # No restart if it has reached the maximum number of restarts
-        elif (
+        elif (not self.db_instance.unlimited_restart_failures) and (
             self.db_instance.failure_count
-            >= settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE
+            >= self.db_instance.effective_restart_failure_limit
         ):
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
@@ -634,16 +637,17 @@ class ActivationManager:
                 raise exceptions.ActivationMonitorError(msg) from exc
         # Restart
         else:
-            count_msg = (
-                f"({self.db_instance.failure_count + 1}/"
-                f"{settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE})"
+            count_msg = f"({self.db_instance.failure_count + 1}" "/{0}".format(
+                self.db_instance.effective_restart_failure_limit
+                if not self.db_instance.unlimited_restart_failures
+                else "unlimited"
             )
             user_msg = (
                 f"Activation failed. It will attempt to restart {count_msg} in"
-                f" {settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds "
-                "according to the restart policy "
+                f" {self.db_instance.effective_restart_failure_interval}"
+                f" seconds according to the restart policy "
                 f"{self.db_instance.restart_policy}."
-                "It may take longer if there is no capacity available."
+                " It may take longer if there is no capacity available."
             )
             if container_msg:
                 user_msg = f"{container_msg} {user_msg}"
@@ -671,12 +675,15 @@ class ActivationManager:
                 f"Activation {self.db_instance.id} failed. "
                 f"Restart policy is set to {self.db_instance.restart_policy}. "
                 f"Scheduling restart in "
-                f"{settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds.",
+                f"{self.db_instance.effective_restart_failure_interval} "
+                "seconds.",
             )
             system_restart_activation(
                 self.db_instance_type,
                 self.db_instance.id,
-                delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
+                delay_seconds=(
+                    self.db_instance.effective_restart_failure_interval
+                ),
             )
 
     def _fail_instance(self, msg: tp.Optional[str] = None):

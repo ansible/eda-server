@@ -168,8 +168,13 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "rulebook_id",
             "extra_var_id",
             "user",
+            "restart_completion_interval",
+            "restart_failure_interval",
+            "restart_failure_limit",
             "restart_policy",
             "log_level",
+            "retention_failure_period",
+            "retention_success_period",
         ]
 
     def create(self, validated_data):
