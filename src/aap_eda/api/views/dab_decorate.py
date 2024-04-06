@@ -6,7 +6,6 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 
-
 for viewset_cls in [
     views.RoleDefinitionViewSet,
     views.RoleUserAssignmentViewSet,
