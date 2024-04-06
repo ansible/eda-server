@@ -11,13 +11,14 @@ for viewset_cls in [
     views.RoleUserAssignmentViewSet,
     views.RoleTeamAssignmentViewSet,
 ]:
+    cls_name = viewset_cls.__name__.replace('ViewSet', '')
     extend_schema_view(
         create=extend_schema(
-            description="Create a RoleDefinition.",
+            description=f"Create a {cls_name}.",
             responses={
                 status.HTTP_201_CREATED: OpenApiResponse(
                     viewset_cls.serializer_class,
-                    description="Return a created RoleDefinition.",
+                    description=f"Return a created {cls_name}.",
                 ),
             },
         ),
