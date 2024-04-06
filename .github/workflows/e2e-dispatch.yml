@@ -47,7 +47,7 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Run api in background
-        working-directory: tools/docker
+        working-directory: .
         env:
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
