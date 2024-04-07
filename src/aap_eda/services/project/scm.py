@@ -250,8 +250,8 @@ class PlaybookExecutor:
         cwd: Optional[StrPath] = None,
     ):
 
-        cwd = "/tmp"
-        os.chdir(cwd)
+        #cwd = "/tmp"
+        #os.chdir(cwd)
         #res = pexpect.run(
         #    "git config --get-all --show-origin credential.helper",
         #    env={"GIT_PAGER": "cat"},
@@ -260,18 +260,18 @@ class PlaybookExecutor:
         #logger.info(f"git credential helper: {res}")
         #res = pexpect.run("git config --unset credential.helper")
         #logger.info(f"Unset credential helper: {res}")
-        logger.error("TESTING *******************")
-        res = pexpect.run("ls -l .git")
-        logger.error(f"Git directory: {res.decode()}")
-        logger.error(f"cwd: {os.getcwd()}")
-        logger.error(f"local cwd: {cwd}")
+        #logger.error("TESTING *******************")
+        #res = pexpect.run("ls -l .git")
+        #logger.error(f"Git directory: {res.decode()}")
+        #logger.error(f"cwd: {os.getcwd()}")
+        #logger.error(f"local cwd: {cwd}")
         #res = pexpect.run(
         #    "git config --list --show-origin --show-scope",
         #    env={"GIT_PAGER": "cat"},
         #    cwd=cwd,
         #)
         #logger.info(f"Git config: {res.decode()}")
-        if final_url:
+        if False and final_url:
             logger.error(f"partial url: {final_url.split('@')[0][:-6]}")
 
             res = pexpect.run(f"git ls-remote {final_url}")

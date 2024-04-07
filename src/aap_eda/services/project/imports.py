@@ -98,6 +98,7 @@ class ProjectImportService:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
             logger.error("In debugging mode")
+            os.chdir(repo_dir)
             repo = self._scm_cls.clone(
                 project.url,
                 repo_dir,
