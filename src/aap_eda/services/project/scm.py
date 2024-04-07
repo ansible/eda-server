@@ -249,33 +249,6 @@ class PlaybookExecutor:
         timeout: Optional[float] = 30,
         cwd: Optional[StrPath] = None,
     ):
-        cwd = "/tmp"
-        res = pexpect.run(
-            "git config --get-all --show-origin credential.helper",
-            env={"GIT_PAGER": "cat"},
-            cwd=cwd,
-        )
-        logger.info(f"git credential helper: {res}")
-        res = pexpect.run("git config --unset credential.helper")
-        logger.info(f"Unset credential helper: {res}")
-        res = pexpect.run("ls -l .git")
-        logger.info(f"Git directory: {res.decode()}")
-        logger.info(f"cwd: {os.getcwd()}")
-        logger.info(f"local cwd: {cwd}")
-        res = pexpect.run(
-            "git config --list --show-origin --show-scope",
-            env={"GIT_PAGER": "cat"},
-            cwd=cwd,
-        )
-        logger.info(f"Git config: {res.decode()}")
-        if final_url:
-            logger.info(f"partial url: {final_url.split('@')[0][:-6]}")
-
-            res = pexpect.run(f"git ls-remote {final_url}")
-            logger.info(f"First run ls-remote: {res}")
-            res = pexpect.run(f"git ls-remote {final_url}")
-            logger.info(f"Second run ls-remote: {res}")
-
         try:
             cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"
 

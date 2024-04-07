@@ -13,6 +13,7 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import tempfile
@@ -97,49 +98,54 @@ class ProjectImportService:
     def import_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
+            os.mkdir(repo_dir)
+            with contextlib.chdir(repo_dir):
+                repo = self._scm_cls.clone(
+                    project.url,
+                    repo_dir,
+                    credential=project.eda_credential,
+                    gpg_credential=project.signature_validation_credential,
+                    depth=1,
+                    verify_ssl=project.verify_ssl,
+                    branch=project.scm_branch,
+                    refspec=project.scm_refspec,
+                )
+                project.git_hash = repo.rev_parse("HEAD")
 
-            repo = self._scm_cls.clone(
-                project.url,
-                repo_dir,
-                credential=project.eda_credential,
-                gpg_credential=project.signature_validation_credential,
-                depth=1,
-                verify_ssl=project.verify_ssl,
-                branch=project.scm_branch,
-                refspec=project.scm_refspec,
-            )
-            project.git_hash = repo.rev_parse("HEAD")
-
-            self._import_rulebooks(project, repo_dir)
+                self._import_rulebooks(project, repo_dir)
 
     @_project_import_wrapper
     def sync_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
-
-            repo = self._scm_cls.clone(
-                project.url,
-                repo_dir,
-                credential=project.eda_credential,
-                gpg_credential=project.signature_validation_credential,
-                depth=1,
-                verify_ssl=project.verify_ssl,
-                branch=project.scm_branch,
-                refspec=project.scm_refspec,
-            )
-            git_hash = repo.rev_parse("HEAD")
-
-            if project.git_hash == git_hash:
-                logger.info(
-                    "Project (id=%s, name=%s) is up to date. Nothing to sync.",
-                    project.id,
-                    project.name,
+            os.mkdir(repo_dir)
+            with contextlib.chdir(repo_dir):
+                repo = self._scm_cls.clone(
+                    project.url,
+                    repo_dir,
+                    credential=project.eda_credential,
+                    gpg_credential=project.signature_validation_credential,
+                    depth=1,
+                    verify_ssl=project.verify_ssl,
+                    branch=project.scm_branch,
+                    refspec=project.scm_refspec,
                 )
-                return
+                git_hash = repo.rev_parse("HEAD")
 
-            project.git_hash = git_hash
+                if project.git_hash == git_hash:
+                    logger.info(
+                        (
+                            "Project (id=%s, name=%s) is up "
+                            "to date. Nothing to sync."
+                        ),
+                        project.id,
+                        project.name,
+                    )
+                    return
 
-            self._sync_rulebooks(project, repo_dir, git_hash)
+                project.git_hash = git_hash
+
+                self._sync_rulebooks(project, repo_dir, git_hash)
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
