@@ -51,7 +51,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
-          EDA_IMAGE: quay.io/mkanoor/eda-server:gitplaybook2
+          EDA_IMAGE: quay.io/mkanoor/eda-server:gitplaybook6
         run: |
           docker-compose -p eda -f ./tools/docker/docker-compose-dev.yaml up -d
           while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do

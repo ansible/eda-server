@@ -151,7 +151,7 @@ class GitRepository:
         if depth is not None:
             cmd.extend(["--depth", str(depth)])
         cmd.extend([final_url, os.fspath(path)])
-        logger.info("Cloning repository: %s", url)
+        logger.info("GIT -- Demo Cloning repository: %s", url)
         try:
             _executor(cmd)
         except GitError as e:

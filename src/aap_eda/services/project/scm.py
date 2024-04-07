@@ -177,7 +177,7 @@ class ScmRepository:
         vars_str = " ".join(vars)
 
         cmd = ["-e", f"'{vars_str}'", "-t", "update_git"]
-        logger.info("Cloning repository: %s", url)
+        logger.error("MK Cloning repository: %s", url)
         try:
             git_hash = _executor(cmd, final_url=final_url)
         except ScmError as e:
@@ -259,10 +259,11 @@ class PlaybookExecutor:
         #logger.info(f"git credential helper: {res}")
         #res = pexpect.run("git config --unset credential.helper")
         #logger.info(f"Unset credential helper: {res}")
-        #res = pexpect.run("ls -l .git")
-        #logger.info(f"Git directory: {res.decode()}")
-        #logger.info(f"cwd: {os.getcwd()}")
-        #logger.info(f"local cwd: {cwd}")
+        logger.error("TESTING *******************")
+        res = pexpect.run("ls -l .git")
+        logger.error(f"Git directory: {res.decode()}")
+        logger.error(f"cwd: {os.getcwd()}")
+        logger.error(f"local cwd: {cwd}")
         #res = pexpect.run(
         #    "git config --list --show-origin --show-scope",
         #    env={"GIT_PAGER": "cat"},
@@ -270,12 +271,12 @@ class PlaybookExecutor:
         #)
         #logger.info(f"Git config: {res.decode()}")
         if final_url:
-            logger.info(f"partial url: {final_url.split('@')[0][:-6]}")
+            logger.error(f"partial url: {final_url.split('@')[0][:-6]}")
 
             res = pexpect.run(f"git ls-remote {final_url}")
-            logger.info(f"First run ls-remote: {res}")
+            logger.error(f"First run ls-remote: {res}")
             res = pexpect.run(f"git ls-remote {final_url}")
-            logger.info(f"Second run ls-remote: {res}")
+            logger.error(f"Second run ls-remote: {res}")
 
         try:
             cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"

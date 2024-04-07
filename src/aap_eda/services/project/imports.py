@@ -97,7 +97,7 @@ class ProjectImportService:
     def import_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
-
+            logger.error("In debugging mode")
             repo = self._scm_cls.clone(
                 project.url,
                 repo_dir,
