@@ -250,7 +250,8 @@ class PlaybookExecutor:
         cwd: Optional[StrPath] = None,
     ):
 
-        #cwd = "/tmp"
+        cwd = "/tmp"
+        os.chdir(cwd)
         #res = pexpect.run(
         #    "git config --get-all --show-origin credential.helper",
         #    env={"GIT_PAGER": "cat"},
