@@ -97,7 +97,8 @@ class ProjectImportService:
     def import_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
-            logger.error("In debugging mode")
+            os.mkdir(repo_dir)
+            cwd = os.getcwd()
             os.chdir(repo_dir)
             repo = self._scm_cls.clone(
                 project.url,
@@ -109,6 +110,7 @@ class ProjectImportService:
                 branch=project.scm_branch,
                 refspec=project.scm_refspec,
             )
+            os.chdir(cwd)
             project.git_hash = repo.rev_parse("HEAD")
 
             self._import_rulebooks(project, repo_dir)
@@ -117,6 +119,9 @@ class ProjectImportService:
     def sync_project(self, project: models.Project) -> None:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
+            os.mkdir(repo_dir)
+            cwd = os.getcwd()
+            os.chdir(repo_dir)
 
             repo = self._scm_cls.clone(
                 project.url,
@@ -128,6 +133,7 @@ class ProjectImportService:
                 branch=project.scm_branch,
                 refspec=project.scm_refspec,
             )
+            os.chdir(cwd)
             git_hash = repo.rev_parse("HEAD")
 
             if project.git_hash == git_hash:
