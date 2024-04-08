@@ -34,12 +34,16 @@ class InjectorMissingKeyException(Exception):
 def inputs_to_display(schema: dict, inputs: str) -> dict:
     secret_fields = get_secret_fields(schema)
     decoded_inputs = inputs_from_store(inputs)
+    result = {}
 
     for key in decoded_inputs.keys():
         if key in secret_fields:
-            decoded_inputs[key] = ENCRYPTED_STRING
+            if decoded_inputs[key]:
+                result[key] = ENCRYPTED_STRING
+        else:
+            result[key] = decoded_inputs[key]
 
-    return decoded_inputs
+    return result
 
 
 def get_secret_fields(schema: dict) -> list[str]:
