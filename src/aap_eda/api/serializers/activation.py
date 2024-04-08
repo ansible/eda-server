@@ -335,7 +335,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        _validate_credentials_and_token_and_rulebook(data)
+        _validate_credentials_and_token_and_rulebook(data, True)
 
         return data
 
@@ -564,7 +564,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        _validate_credentials_and_token_and_rulebook(data)
+        _validate_credentials_and_token_and_rulebook(data, False)
 
         return data
 
@@ -621,13 +621,16 @@ def parse_validation_errors(errors: dict) -> str:
     return str(messages)
 
 
-def _validate_credentials_and_token_and_rulebook(data: dict) -> None:
+def _validate_credentials_and_token_and_rulebook(
+    data: dict, check_extra_var: bool
+) -> None:
     """Validate Awx Token and AAP credentials."""
     eda_credentials = data.get("eda_credentials", [])
     aap_credentials = _get_aap_credentials_if_exists(eda_credentials)
 
     # validate EDA credentials
-    _validate_eda_credentials(data)
+    if check_extra_var:
+        _validate_eda_credentials(data)
 
     # validate AAP credentials
     if aap_credentials:
