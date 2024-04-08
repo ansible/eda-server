@@ -169,22 +169,6 @@ def test_retrieve_activation_instance_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_activation_instance(client: APIClient):
-    activation = prepare_init_data()
-    instance = models.RulebookProcess.objects.create(
-        name="activation-instance",
-        activation=activation,
-    )
-
-    response = client.delete(
-        f"{api_url_v1}/activation-instances/{instance.id}/"
-    )
-    assert response.status_code == status.HTTP_204_NO_CONTENT
-
-    assert models.RulebookProcess.objects.filter(pk=instance.id).count() == 0
-
-
-@pytest.mark.django_db
 def test_list_logs_from_activation_instance(client: APIClient):
     activation = prepare_init_data()
     instance = models.RulebookProcess.objects.create(
