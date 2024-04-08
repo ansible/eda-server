@@ -12,10 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import pytest
+import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
+from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import DefaultCredentialType, RestartPolicy
 from aap_eda.core.utils.crypto.base import SecretValue
@@ -42,6 +44,12 @@ TEST_PROJECT = {
     "name": "test-project-01",
     "url": "https://git.example.com/acme/project-01",
     "description": "test project",
+}
+
+TEST_AWX_TOKEN = {
+    "name": "test-awx-token",
+    "description": "test AWX token",
+    "token": "abc123xyx",
 }
 
 TEST_RULEBOOK = {
@@ -135,6 +143,24 @@ def kafka_credential_type() -> models.CredentialType:
     )
 
 
+def create_user_credential_type() -> models.CredentialType:
+    return models.CredentialType.objects.create(
+        name="user_type",
+        inputs={
+            "fields": [
+                {"id": "sasl_username"},
+                {"id": "sasl_password"},
+            ]
+        },
+        injectors={
+            "extra_vars": {
+                "sasl_username": "{{ sasl_username }}",
+                "sasl_password": "{{ sasl_password }}",
+            }
+        },
+    )
+
+
 def create_activation_related_data(extra_var, with_project=True):
     user = models.User.objects.create_user(
         username="luke.skywalker",
@@ -144,6 +170,12 @@ def create_activation_related_data(extra_var, with_project=True):
         password="secret",
     )
     user_id = user.pk
+    awx_token = models.AwxToken.objects.create(
+        name=TEST_AWX_TOKEN["name"],
+        token=TEST_AWX_TOKEN["token"],
+        user=user,
+    )
+    awx_token_id = awx_token.id
 
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
@@ -170,15 +202,149 @@ def create_activation_related_data(extra_var, with_project=True):
         if with_project
         else None
     )
+
+    run_job_rulebook_id = (
+        models.Rulebook.objects.create(
+            name="test rulebook",
+            rulesets=RULESET_WITH_JOB_TEMPLATE,
+            project_id=project_id,
+        ).pk
+        if with_project
+        else None
+    )
     extra_var_id = models.ExtraVar.objects.create(extra_var=extra_var).pk
 
     return {
         "user_id": user_id,
+        "awx_token_id": awx_token_id,
         "decision_environment_id": decision_environment_id,
         "project_id": project_id,
         "rulebook_id": rulebook_id,
+        "run_job_rulebook_id": run_job_rulebook_id,
         "extra_var_id": extra_var_id,
     }
+
+
+@pytest.mark.parametrize(
+    ("inputs", "result"),
+    [
+        ({"username": "adam", "password": "secret"}, True),
+        ({"oauth_token": "valid_token"}, True),
+        (
+            {"username": "adam", "password": "secret", "oauth_token": "token"},
+            True,
+        ),
+        ({"username": "adam", "oauth_token": "token"}, True),
+        ({"password": "secret", "oauth_token": "token"}, True),
+        ({}, False),
+        ({"username": "adam"}, False),
+        ({"password": "secret"}, False),
+    ],
+)
+@pytest.mark.django_db
+def test_validate_for_aap_credential(
+    client: APIClient,
+    inputs,
+    result,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+    aap_credential_type = models.CredentialType.objects.get(
+        name=DefaultCredentialType.AAP,
+    )
+    credential = models.EdaCredential.objects.create(
+        name="test_eda_credential",
+        inputs=inputs,
+        managed=False,
+        credential_type_id=aap_credential_type.id,
+    )
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        user_id=fks["user_id"],
+    )
+    activation.eda_credentials.add(credential)
+
+    valid, _ = is_activation_valid(activation)
+    assert valid is result
+
+
+@pytest.mark.django_db
+def test_is_activation_valid_with_token_and_run_job_template(
+    client: APIClient,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        awx_token_id=fks["awx_token_id"],
+        user_id=fks["user_id"],
+    )
+
+    valid, _ = is_activation_valid(activation)
+    assert valid is True
+
+
+@pytest.mark.django_db
+def test_is_activation_valid_with_aap_credential_and_run_job_template(
+    client: APIClient,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+    aap_credential_type = models.CredentialType.objects.get(
+        name=DefaultCredentialType.AAP,
+    )
+    credential = models.EdaCredential.objects.create(
+        name="test_eda_credential",
+        inputs={"username": "adam", "password": "secret"},
+        managed=False,
+        credential_type_id=aap_credential_type.id,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        user_id=fks["user_id"],
+    )
+    activation.eda_credentials.add(credential)
+
+    valid, _ = is_activation_valid(activation)
+    assert valid is True
+
+
+@pytest.mark.django_db
+def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
+    client: APIClient,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        user_id=fks["user_id"],
+    )
+
+    valid, message = is_activation_valid(activation)
+
+    assert valid is False
+    assert (
+        "The rulebook requires an Awx Token or RH AAP credential."
+    ) in message
 
 
 @pytest.mark.django_db
@@ -241,15 +407,12 @@ def test_create_activation_with_key_conflict(
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
 
-    test_eda_credential = {
-        "name": "eda-credential",
-        "inputs": {"sasl_username": "adam", "sasl_password": "secret"},
-        "credential_type_id": kafka_credential_type.id,
-    }
-    response = client.post(
-        f"{api_url_v1}/eda-credentials/", data=test_eda_credential
+    test_eda_credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=kafka_credential_type.id,
     )
-    test_activation["eda_credentials"] = [response.data["id"]]
+    test_activation["eda_credentials"] = [test_eda_credential.id]
 
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -258,61 +421,11 @@ def test_create_activation_with_key_conflict(
         "in extra var. It conflicts with credential type: type1. "
         "Please check injectors." in response.data["non_field_errors"]
     )
-
-
-@pytest.mark.django_db
-def test_create_activation_with_compatible_credentials(
-    client: APIClient,
-    kafka_credential_type: models.CredentialType,
-    preseed_credential_types,
-):
-    fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
-    test_activation = TEST_ACTIVATION.copy()
-    test_activation["decision_environment_id"] = fks["decision_environment_id"]
-    test_activation["rulebook_id"] = fks["rulebook_id"]
-    test_activation["extra_var_id"] = fks["extra_var_id"]
-
-    credential_types = models.CredentialType.objects.bulk_create(
-        [
-            models.CredentialType(
-                name="user_type",
-                inputs={"fields": [{"a": "b"}]},
-                injectors={"extra_vars": {"username": "adam"}},
-            ),
-            models.CredentialType(
-                name="password_type",
-                inputs={"fields": [{"1": "2"}]},
-                injectors={"extra_vars": {"password": "secret"}},
-            ),
-        ]
-    )
-
-    eda_credentials = models.EdaCredential.objects.bulk_create(
-        [
-            models.EdaCredential(
-                name="credential-1",
-                inputs={"sasl_username": "adam", "sasl_password": "secret"},
-                credential_type_id=credential_types[0].id,
-            ),
-            models.EdaCredential(
-                name="credential-2",
-                inputs={"sasl_username": "bearny", "sasl_password": "demo"},
-                credential_type_id=credential_types[1].id,
-            ),
-        ]
-    )
-
-    eda_credential_ids = [credential.id for credential in eda_credentials]
-    test_activation["eda_credentials"] = eda_credential_ids
-
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
-    assert response.status_code == status.HTTP_201_CREATED
 
 
 @pytest.mark.django_db
 def test_create_activation_with_conflict_credentials(
     client: APIClient,
-    kafka_credential_type: models.CredentialType,
     preseed_credential_types,
 ):
     fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
@@ -320,18 +433,19 @@ def test_create_activation_with_conflict_credentials(
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["extra_var_id"] = fks["extra_var_id"]
+    user_credential_type = create_user_credential_type()
 
     eda_credentials = models.EdaCredential.objects.bulk_create(
         [
             models.EdaCredential(
                 name="credential-1",
                 inputs={"sasl_username": "adam", "sasl_password": "secret"},
-                credential_type_id=kafka_credential_type.id,
+                credential_type_id=user_credential_type.id,
             ),
             models.EdaCredential(
                 name="credential-2",
                 inputs={"sasl_username": "bearny", "sasl_password": "demo"},
-                credential_type_id=kafka_credential_type.id,
+                credential_type_id=user_credential_type.id,
             ),
         ]
     )
@@ -342,7 +456,76 @@ def test_create_activation_with_conflict_credentials(
     response = client.post(f"{api_url_v1}/activations/", data=test_activation)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        "Key: sasl_plain_password already exists "
-        "in extra var. It conflicts with credential type: type1. "
+        "Key: sasl_password already exists "
+        "in extra var. It conflicts with credential type: user_type. "
         "Please check injectors." in response.data["non_field_errors"]
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_without_extra_vars_single_credential(
+    client: APIClient,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation.pop("extra_var_id")
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    user_credential_type = create_user_credential_type()
+
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential-1",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=user_credential_type.id,
+    )
+
+    eda_credential_ids = [eda_credential.id]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    assert models.ExtraVar.objects.count() == 1
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+    assert models.ExtraVar.objects.count() == 2
+    extra_var = yaml.safe_load(models.ExtraVar.objects.last().extra_var)
+    assert extra_var["sasl_username"] == "adam"
+    assert extra_var["sasl_password"] == "secret"
+
+
+@pytest.mark.django_db
+def test_create_activation_without_extra_vars_duplicate_credentials(
+    client: APIClient,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(OVERLAP_EXTRA_VAR)
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation.pop("extra_var_id")
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    user_credential_type = create_user_credential_type()
+
+    eda_credentials = models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"sasl_username": "adam", "sasl_password": "secret"},
+                credential_type_id=user_credential_type.id,
+            ),
+            models.EdaCredential(
+                name="credential-2",
+                inputs={"sasl_username": "bearny", "sasl_password": "demo"},
+                credential_type_id=user_credential_type.id,
+            ),
+        ]
+    )
+
+    eda_credential_ids = [credential.id for credential in eda_credentials]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Key: sasl_password already exists in extra var. It conflicts with"
+        " credential type: user_type. Please check injectors."
+        in response.data["non_field_errors"]
     )

@@ -39,6 +39,14 @@ TEST_RULESETS = """
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 DUMMY_UUID2 = "8472ff2c-6045-4418-8d4e-46f6cfffffff"
 
+AAP_INPUTS = {
+    "host": "https://eda_controller_url",
+    "username": "adam",
+    "password": "secret",
+    "ssl_verify": "no",
+    "oauth_token": "",
+}
+
 
 @pytest.fixture
 @pytest.mark.django_db(transaction=True)
@@ -126,6 +134,33 @@ async def test_handle_workers_with_eda_system_vault_credential(
             assert data[0]["type"] == "VaultPassword"
             assert data[0]["password"] == "secret"
             assert data[0]["label"] == "adam"
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_controller_info(
+    ws_communicator: WebsocketCommunicator, preseed_credential_types
+):
+    rulebook_process_id = await _prepare_activation_with_controller_info()
+
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
+        "ControllerInfo",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "ControllerInfo":
+            assert response["url"] == AAP_INPUTS["host"]
+            assert response["username"] == AAP_INPUTS["username"]
+            assert response["password"] == AAP_INPUTS["password"]
+            assert response["ssl_verify"] == AAP_INPUTS["ssl_verify"]
+            assert response["token"] == AAP_INPUTS["oauth_token"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -502,6 +537,61 @@ def _prepare_activation_instance_with_eda_system_vault_credential():
         inputs={"vault_id": "adam", "vault_password": "secret"},
         managed=False,
         credential_type=vault_credential_type,
+    )
+
+    activation, _ = models.Activation.objects.get_or_create(
+        name="test-activation",
+        restart_policy=enums.RestartPolicy.ALWAYS,
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+    )
+    activation.eda_credentials.add(credential)
+
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
+        activation=activation,
+    )
+
+    return rulebook_process.id
+
+
+@database_sync_to_async
+def _prepare_activation_with_controller_info():
+    project, _ = models.Project.objects.get_or_create(
+        name="test-project",
+        url="https://github.com/test/project",
+        git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+    )
+
+    rulebook, _ = models.Rulebook.objects.get_or_create(
+        name="test-rulebook",
+        rulesets=TEST_RULESETS,
+        project=project,
+    )
+
+    decision_environment = models.DecisionEnvironment.objects.create(
+        name="de_test_name_1",
+        image_url="de_test_image_url",
+        description="de_test_description",
+    )
+
+    user = models.User.objects.create_user(
+        username="luke.skywalker",
+        first_name="Luke",
+        last_name="Skywalker",
+        email="luke.skywalker@example.com",
+        password="secret",
+    )
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+
+    credential = models.EdaCredential.objects.create(
+        name="eda_credential",
+        inputs=AAP_INPUTS,
+        managed=False,
+        credential_type=aap_credential_type,
     )
 
     activation, _ = models.Activation.objects.get_or_create(

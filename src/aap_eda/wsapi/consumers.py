@@ -117,13 +117,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=extra_var_message.json())
 
         await self.send(text_data=rulebook_message.json())
-        awx_token = await self.get_awx_token(message)
-        if awx_token:
-            controller_info = ControllerInfo(
-                url=settings.EDA_CONTROLLER_URL,
-                token=awx_token,
-                ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
-            )
+
+        controller_info = await self.get_controller_info(message)
+        if controller_info:
             await self.send(text_data=controller_info.json())
 
         eda_vault_data = await self.get_eda_system_vault_passwords(message)
@@ -344,6 +340,50 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         awx_token = parent.awx_token
         return awx_token.token.get_secret_value() if awx_token else None
+
+    async def get_controller_info(
+        self, message: WorkerMessage
+    ) -> tp.Optional[ControllerInfo]:
+        """Get Controller Info."""
+        controller_info = await self.get_controller_info_from_aap_cred(message)
+        if controller_info:
+            return controller_info
+
+        awx_token = await self.get_awx_token(message)
+        if awx_token:
+            return ControllerInfo(
+                url=settings.EDA_CONTROLLER_URL,
+                token=awx_token,
+                ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
+            )
+        return None
+
+    @database_sync_to_async
+    def get_controller_info_from_aap_cred(
+        self, message: WorkerMessage
+    ) -> tp.Optional[ControllerInfo]:
+        """Get AAP Credential from Activation."""
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        parent = rulebook_process_instance.get_parent()
+        aap_credential_type = models.CredentialType.objects.get(
+            name=DefaultCredentialType.AAP
+        )
+        for eda_credential in parent.eda_credentials.all():
+            if eda_credential.credential_type.id == aap_credential_type.id:
+                inputs = yaml.safe_load(
+                    eda_credential.inputs.get_secret_value()
+                )
+                return ControllerInfo(
+                    url=inputs["host"],
+                    token=inputs.get("oauth_token", ""),
+                    ssl_verify="yes" if inputs.get("verify_ssl") else "no",
+                    username=inputs.get("username", ""),
+                    password=inputs.get("password", ""),
+                )
+
+        return None
 
     @database_sync_to_async
     def get_eda_system_vault_passwords(

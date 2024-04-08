@@ -133,6 +133,13 @@ class CredentialTypeViewSet(
     )
     def partial_update(self, request, pk):
         credential_type = self.get_object()
+
+        if credential_type.managed:
+            error = "Managed credential type cannot be updated"
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
+
         serializer = serializers.CredentialTypeCreateSerializer(
             credential_type, data=request.data, partial=True
         )

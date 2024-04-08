@@ -15,7 +15,6 @@ import json
 import logging
 import secrets
 import uuid
-from typing import Union
 
 import yaml
 from rest_framework import serializers
@@ -38,7 +37,7 @@ from aap_eda.api.serializers.project import (
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
-from aap_eda.core.enums import CredentialType, ProcessParentType
+from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
 from aap_eda.core.utils.credentials import get_secret_fields
 from aap_eda.core.utils.strings import (
     substitute_extra_vars,
@@ -88,14 +87,16 @@ def _updated_ruleset(validated_data):
 def _handle_eda_credentials(
     validated_data: dict,
     extra_var_obj: models.ExtraVar,
-    vault: models.CredentialType,
     password: str,
 ) -> bool:
     system_vault_credential_needed = False
 
     for eda_credential_id in validated_data["eda_credentials"]:
         eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
-        if eda_credential.credential_type.id == vault.id:
+        if eda_credential.credential_type.name in [
+            DefaultCredentialType.VAULT,
+            DefaultCredentialType.AAP,
+        ]:
             continue
 
         schema_inputs = eda_credential.credential_type.inputs
@@ -117,16 +118,16 @@ def _handle_eda_credentials(
 
         if extra_var_obj:
             existing_data = yaml.safe_load(extra_var_obj.extra_var)
-            for key in data["extra_vars"]:
+            for key in data.get("extra_vars", []):
                 existing_data[key] = data["extra_vars"][key]
 
             extra_var_obj.extra_var = yaml.dump(existing_data)
             extra_var_obj.save(update_fields=["extra_var"])
         else:
-            extra_var = models.ExtraVar.objects.create(
+            extra_var_obj = models.ExtraVar.objects.create(
                 extra_var=yaml.dump(data["extra_vars"])
             )
-            validated_data["extra_var_id"] = extra_var.id
+            validated_data["extra_var_id"] = extra_var_obj.id
 
     return system_vault_credential_needed
 
@@ -148,7 +149,7 @@ def _create_system_eda_credential(
 
 
 def _get_vault_credential_type():
-    return models.CredentialType.objects.get(name=CredentialType.VAULT)
+    return models.CredentialType.objects.get(name=DefaultCredentialType.VAULT)
 
 
 class ActivationSerializer(serializers.ModelSerializer):
@@ -341,21 +342,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        user = data["user"]
-        awx_token = models.AwxToken.objects.filter(
-            id=data.get("awx_token_id"),
-        ).first()
-        if awx_token and awx_token.user != user:
-            raise serializers.ValidationError(
-                "The Awx Token does not belong to the user."
-            )
-        if not awx_token:
-            validate_rulebook_token(data["rulebook_id"])
-
-        if data.get("eda_credentials") and data.get("extra_var_id"):
-            validate_eda_credentails(
-                data.get("eda_credentials"), data.get("extra_var_id")
-            )
+        _validate_credentials_and_token_and_rulebook(data, True)
 
         return data
 
@@ -385,7 +372,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
         if validated_data.get("eda_credentials"):
             system_vault_credential_needed = _handle_eda_credentials(
-                validated_data, extra_var_obj, vault, password
+                validated_data, extra_var_obj, password
             )
 
         if system_vault_credential_needed:
@@ -584,12 +571,14 @@ class PostActivationSerializer(serializers.ModelSerializer):
         validators=[validators.check_if_awx_token_exists],
     )
     rulebook_id = serializers.IntegerField(allow_null=True)
+    eda_credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
+    )
 
     def validate(self, data):
-        awx_token = data.get("awx_token_id")
-
-        if not awx_token:
-            validate_rulebook_token(data["rulebook_id"])
+        _validate_credentials_and_token_and_rulebook(data, False)
 
         return data
 
@@ -607,6 +596,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "modified_at",
             "awx_token_id",
             "rulebook_id",
+            "eda_credentials",
         ]
         read_only_fields = [
             "id",
@@ -628,7 +618,11 @@ def get_rules_count(ruleset_stats: dict) -> tuple[int, int]:
 
 
 def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
-    serializer = PostActivationSerializer(data=activation.__dict__)
+    data = activation.__dict__
+    data["eda_credentials"] = [
+        obj.id for obj in activation.eda_credentials.all()
+    ]
+    serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
     message = parse_validation_errors(serializer.errors)
@@ -642,8 +636,50 @@ def parse_validation_errors(errors: dict) -> str:
     return str(messages)
 
 
-def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
-    """Validate if the rulebook requires an Awx Token."""
+def _validate_credentials_and_token_and_rulebook(
+    data: dict, check_extra_var: bool
+) -> None:
+    """Validate Awx Token and AAP credentials."""
+    eda_credentials = data.get("eda_credentials", [])
+    aap_credentials = _get_aap_credentials_if_exists(eda_credentials)
+
+    # validate EDA credentials
+    if check_extra_var:
+        _validate_eda_credentials(data)
+
+    # validate AAP credentials
+    if aap_credentials:
+        for credential in aap_credentials:
+            _validate_aap_credential(credential)
+
+        return
+
+    # validate awx token
+    awx_token = _validate_awx_token(data)
+
+    # validate rulebook
+    _validate_rulebook(data, awx_token is not None)
+
+
+def _validate_awx_token(data: dict) -> models.AwxToken:
+    """Validate Awx Token, return it if it's valid."""
+    awx_token_id = data.get("awx_token_id")
+
+    if awx_token_id is None:
+        return
+
+    user = data.get("user")
+    awx_token = models.AwxToken.objects.filter(id=awx_token_id).first()
+    if awx_token and user and awx_token.user != user:
+        raise serializers.ValidationError(
+            "The Awx Token does not belong to the user."
+        )
+
+    return awx_token
+
+
+def _validate_rulebook(data: dict, with_token: bool = False) -> None:
+    rulebook_id = data.get("rulebook_id")
     if rulebook_id is None:
         return
 
@@ -657,31 +693,57 @@ def validate_rulebook_token(rulebook_id: Union[int, None]) -> None:
     except ValueError:
         raise serializers.ValidationError("Invalid rulebook data.")
 
-    if validators.check_rulesets_require_token(
+    if not with_token and validators.check_rulesets_require_token(
         rulesets_data,
     ):
         raise serializers.ValidationError(
-            "The rulebook requires an Awx Token.",
+            "The rulebook requires an Awx Token or RH AAP credential.",
         )
 
 
-def validate_eda_credentails(
-    eda_credential_ids: list[int], extra_var_id: int
-) -> None:
+def _validate_aap_credential(credential: models.EdaCredential) -> None:
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+    username = inputs.get("username")
+    password = inputs.get("password")
+    token = inputs.get("oauth_token")
+
+    if not username and not password and not token:
+        raise serializers.ValidationError(
+            "Invalid RH AAP credential: "
+            "either username/password or token has to be set"
+        )
+
+    if not token and (not username or not password):
+        raise serializers.ValidationError(
+            "Invalid RH AAP credential: "
+            "both username and password have to be set when token is empty"
+        )
+
+
+def _validate_eda_credentials(data: dict) -> None:
+    eda_credential_ids = data.get("eda_credentials")
+    if eda_credential_ids is None:
+        return
+
+    existing_keys = []
+    extra_var_id = data.get("extra_var_id")
+
     try:
         vault = _get_vault_credential_type()
-        extra_var = models.ExtraVar.objects.get(id=extra_var_id)
-        existing_data = yaml.safe_load(extra_var.extra_var)
+        if extra_var_id:
+            extra_var = models.ExtraVar.objects.get(id=extra_var_id)
+            existing_data = yaml.safe_load(extra_var.extra_var)
+            existing_keys = [*existing_data.keys()]
     except models.CredentialType.DoesNotExist:
         raise serializers.ValidationError(
-            f"CredentialType with name '{CredentialType.VAULT}' does not exist"
+            f"CredentialType with name '{DefaultCredentialType.VAULT}'"
+            " does not exist"
         )
     except models.ExtraVar.DoesNotExist:
         raise serializers.ValidationError(
             f"ExtraVar with id {extra_var_id} does not exist"
         )
-
-    existing_keys = [*existing_data.keys()]
 
     for eda_credential_id in eda_credential_ids:
         try:
@@ -694,8 +756,8 @@ def validate_eda_credentails(
 
             injectors = eda_credential.credential_type.injectors
 
-            for key in injectors["extra_vars"]:
-                if key in existing_keys or key in existing_data:
+            for key in injectors.get("extra_vars", []):
+                if key in existing_keys:
                     message = (
                         f"Key: {key} already exists in extra var. "
                         f"It conflicts with credential type: "
@@ -709,3 +771,21 @@ def validate_eda_credentails(
             raise serializers.ValidationError(
                 f"EdaCredential with id {eda_credential_id} does not exist"
             )
+
+
+def _get_aap_credentials_if_exists(
+    eda_credential_ids: list[int],
+) -> list[models.EdaCredential]:
+    aap_credential_type = models.CredentialType.objects.get(
+        name=DefaultCredentialType.AAP
+    )
+    eda_credentials = [
+        models.EdaCredential.objects.get(pk=eda_credential_id)
+        for eda_credential_id in eda_credential_ids
+    ]
+
+    return [
+        eda_credential
+        for eda_credential in eda_credentials
+        if eda_credential.credential_type.id == aap_credential_type.id
+    ]
