@@ -4,8 +4,6 @@ from rest_framework import serializers
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
-from .auth import RoleRefSerializer
-
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,10 +17,6 @@ class UserDetailSerializer(serializers.ModelSerializer):
     )
     created_at = serializers.DateTimeField(source="date_joined")
 
-    roles = RoleRefSerializer(
-        many=True, allow_empty=True, allow_null=True, required=False
-    )
-
     class Meta:
         model = models.User
         fields = [
@@ -32,7 +26,6 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "is_superuser",
-            "roles",
             "created_at",
             "modified_at",
         ]
@@ -61,10 +54,6 @@ class UserListSerializer(serializers.Serializer):
     is_superuser = serializers.BooleanField(
         required=True,
         help_text="The user is a superuser.",
-    )
-
-    roles = RoleRefSerializer(
-        many=True, allow_empty=True, allow_null=True, required=False
     )
 
 
@@ -96,7 +85,6 @@ class UserCreateUpdateSerializer(UserUpdateSerializerBase):
             "email",
             "password",
             "is_superuser",
-            "roles",
         ]
 
 
