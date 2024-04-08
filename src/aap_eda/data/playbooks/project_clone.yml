@@ -7,17 +7,16 @@
 # key_file: private ssh file
 # depth: Create a shallow clone with a truncated history. Minimum 1.
 # verify_commit: true or false. whether verify the commit with GPG
+# ssl_no_verify: true or false.
 
 - hosts: localhost
   gather_facts: false
   connection: local
-  name: Update source tree if necessary
+  name: Clone or pull a git repo and get revision
   tasks:
-    - name: Update project using git
-      tags:
-        - update_git
+    - name: Clone or pull a project using git
       block:
-        - name: Update project using git
+        - name: Clone or pull a project using gitt
           ansible.builtin.git:
             dest: "{{ project_path | quote }}"
             repo: "{{ scm_url }}"
@@ -27,6 +26,9 @@
             accept_hostkey: true
             depth: "{{ depth | default(omit) }}"
             verify_commit: " {{ verify_commit | default(false) }}"
+          environment:
+            GIT_TERMINAL_PROMPT: 0
+            GIT_SSL_NO_VERIFY: "{{ ssl_no_verify | default(false) }}"
           register: git_result
 
         - name: Set the git repository version
@@ -37,5 +39,3 @@
     - name: Repository Version
       ansible.builtin.debug:
         msg: "Repository Version {{ scm_version }}"
-      tags:
-        - update_git
