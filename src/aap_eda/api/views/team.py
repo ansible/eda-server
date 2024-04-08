@@ -28,7 +28,6 @@ from aap_eda.api.serializers import (
     TeamUpdateSerializer,
 )
 from aap_eda.core import models
-from aap_eda.core.enums import ResourceType
 
 from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
 
@@ -83,7 +82,6 @@ class TeamViewSet(
     queryset = models.Team.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = TeamFilter
-    rbac_resource_type = ResourceType.TEAM
 
     def filter_queryset(self, queryset):
         return super().filter_queryset(

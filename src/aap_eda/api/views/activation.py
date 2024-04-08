@@ -31,12 +31,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import (
-    Action,
-    ActivationStatus,
-    ProcessParentType,
-    ResourceType,
-)
+from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
@@ -67,7 +62,6 @@ class ActivationViewSet(
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
 
-    rbac_resource_type = None
     rbac_action = None
 
     def filter_queryset(self, queryset):
@@ -173,7 +167,6 @@ class ActivationViewSet(
         detail=False,
         queryset=models.RulebookProcess.objects.order_by("id"),
         filterset_class=filters.ActivationInstanceFilter,
-        rbac_resource_type=ResourceType.ACTIVATION_INSTANCE,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/instances",
     )
@@ -378,7 +371,6 @@ class ActivationInstanceViewSet(
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
-    rbac_resource_type = ResourceType.ACTIVATION_INSTANCE
     rbac_action = None
 
     def filter_queryset(self, queryset):

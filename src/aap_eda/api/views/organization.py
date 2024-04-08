@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -25,7 +24,6 @@ from rest_framework.decorators import action
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
 
 from .mixins import PartialUpdateOnlyModelMixin
 
@@ -72,7 +70,6 @@ class OrganizationViewSet(
     queryset = models.Organization.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.OrganizationFilter
-    rbac_resource_type = ResourceType.ORGANIZATION
     rbac_action = None
 
     def filter_queryset(self, queryset):
@@ -102,15 +99,13 @@ class OrganizationViewSet(
         ],
     )
     @action(
-        detail=False,
+        detail=True,
+        methods=["get"],
         queryset=models.Team.objects.order_by("id"),
         filterset_class=filters.OrganizationTeamFilter,
-        rbac_resource_type=ResourceType.TEAM,
-        rbac_action=Action.READ,
-        url_path="(?P<id>[^/.]+)/teams",
     )
-    def teams(self, request, id):
-        organization = get_object_or_404(models.Organization, pk=id)
+    def teams(self, request, pk):
+        organization = self.get_object()
 
         teams = models.Team.objects.filter(organization_id=organization.id)
         filtered_teams = self.filter_queryset(teams)
