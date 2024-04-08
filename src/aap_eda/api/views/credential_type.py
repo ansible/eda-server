@@ -91,6 +91,9 @@ class CredentialTypeViewSet(
 
         serializer.is_valid(raise_exception=True)
         serializer.validated_data["kind"] = "cloud"
+        for field in serializer.validated_data["inputs"]["fields"]:
+            if "type" not in field:
+                field["type"] = "string"
         credential_type = serializer.create(serializer.validated_data)
 
         return Response(
