@@ -77,7 +77,7 @@ class RulebookProcess(models.Model):
     class Meta:
         db_table = "core_rulebook_process"
         ordering = ("-started_at",)
-        default_permissions = ("view", "delete")
+        default_permissions = ("view",)
 
     def __str__(self) -> str:
         return f"Rulebook Process id {self.id}"

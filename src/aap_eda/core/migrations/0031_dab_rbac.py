@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
         migrations.AlterModelOptions(
             name="rulebookprocess",
             options={
-                "default_permissions": ("view", "delete"),
+                "default_permissions": ("view",),
                 "ordering": ("-started_at",),
             },
         ),

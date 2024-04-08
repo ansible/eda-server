@@ -21,7 +21,12 @@ from aap_eda.core import models
 @pytest.mark.django_db
 @pytest.mark.parametrize("action", ["enable", "restart", "disable"])
 def test_activation_actions(
-    cls_factory, user, user_api_client, give_obj_perm, action
+    cls_factory,
+    user,
+    user_api_client,
+    give_obj_perm,
+    action,
+    preseed_credential_types,
 ):
     activation = cls_factory.create(models.Activation)
     url = reverse(f"activation-{action}", kwargs={"pk": activation.pk})
