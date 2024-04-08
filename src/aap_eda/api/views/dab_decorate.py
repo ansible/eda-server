@@ -11,7 +11,7 @@ for viewset_cls in [
     views.RoleUserAssignmentViewSet,
     views.RoleTeamAssignmentViewSet,
 ]:
-    cls_name = viewset_cls.__name__.replace('ViewSet', '')
+    cls_name = viewset_cls.__name__.replace("ViewSet", "")
     extend_schema_view(
         create=extend_schema(
             description=f"Create a {cls_name}.",
