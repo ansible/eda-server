@@ -122,6 +122,22 @@ class CredentialTypeViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        if models.EdaCredential.objects.filter(
+            credential_type=credential_type
+        ).exists():
+            inputs = request.data.get("inputs")
+            injectors = request.data.get("injectors")
+            if inputs or injectors:
+                field = "inputs" if inputs else "injectors"
+                error = (
+                    f"Modifications to {field} are not allowed for credential "
+                    "types that are in use"
+                )
+                return Response(
+                    data={field: [error]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         serializer = serializers.CredentialTypeCreateSerializer(
             credential_type, data=request.data, partial=True
         )
