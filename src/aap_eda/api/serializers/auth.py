@@ -90,9 +90,11 @@ class RoleSerializer(serializers.ModelSerializer):
     modified_at = serializers.SerializerMethodField()
 
     def get_created_at(self, obj) -> datetime.datetime:
+        """Return a corresponding creation date from RoleDefinition model."""
         return obj.created
 
     def get_modified_at(self, obj) -> datetime.datetime:
+        """Return a corresponding modified date from RoleDefinition model."""
         return obj.modified
 
     class Meta:
