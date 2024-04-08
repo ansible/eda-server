@@ -339,20 +339,8 @@ class ActivationViewSet(
             ),
         },
     ),
-    destroy=extend_schema(
-        description="Delete an existing Activation Instance",
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                None,
-                description="The Activation Instance has been deleted.",
-            ),
-        },
-    ),
 )
-class ActivationInstanceViewSet(
-    viewsets.ReadOnlyModelViewSet,
-    mixins.DestroyModelMixin,
-):
+class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = models.RulebookProcess.objects.all()
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)

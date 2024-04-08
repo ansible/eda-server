@@ -81,8 +81,10 @@ class ExtraVars(BaseModel):
 class ControllerInfo(BaseModel):
     type: str = "ControllerInfo"
     url: str
-    token: str
     ssl_verify: str
+    token: str = ""
+    username: str = ""
+    password: str = ""
 
 
 class VaultPassword(BaseModel):
