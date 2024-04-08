@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import datetime
+
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from rest_framework import serializers
 
@@ -36,11 +38,11 @@ class PermissionSerializer(serializers.ModelSerializer):
     resource_type = serializers.SerializerMethodField()
     action = serializers.SerializerMethodField()
 
-    def get_resource_type(self, obj):
+    def get_resource_type(self, obj) -> str:
         action, model = obj.codename.split("_", 1)
         return model
 
-    def get_action(self, obj):
+    def get_action(self, obj) -> str:
         action, model = obj.codename.split("_", 1)
         return action
 
@@ -54,11 +56,11 @@ class PermissionRefSerializer(serializers.ModelSerializer):
     resource_type = serializers.SerializerMethodField()
     action = serializers.SerializerMethodField()
 
-    def get_resource_type(self, obj):
+    def get_resource_type(self, obj) -> str:
         action, model = obj.codename.split("_", 1)
         return model
 
-    def get_action(self, obj):
+    def get_action(self, obj) -> str:
         action, model = obj.codename.split("_", 1)
         return action
 
@@ -87,10 +89,10 @@ class RoleSerializer(serializers.ModelSerializer):
     created_at = serializers.SerializerMethodField()
     modified_at = serializers.SerializerMethodField()
 
-    def get_created_at(self, obj):
+    def get_created_at(self, obj) -> datetime.datetime:
         return obj.created
 
-    def get_modified_at(self, obj):
+    def get_modified_at(self, obj) -> datetime.datetime:
         return obj.modified
 
     class Meta:
@@ -134,10 +136,10 @@ class RoleDetailSerializer(serializers.Serializer):
     created_at = serializers.SerializerMethodField()
     modified_at = serializers.SerializerMethodField()
 
-    def get_created_at(self, obj):
+    def get_created_at(self, obj) -> datetime.datetime:
         return obj.created
 
-    def get_modified_at(self, obj):
+    def get_modified_at(self, obj) -> datetime.datetime:
         return obj.modified
 
 
