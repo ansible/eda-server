@@ -13,13 +13,18 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import contextlib
+import io
 import logging
 import os
+import re
 import shutil
 import tempfile
+from importlib import resources
 from typing import Iterable, Optional
 from urllib.parse import urlparse, urlunparse
 
+import ansible_runner
 import pexpect
 
 from aap_eda.core.models import EdaCredential
@@ -47,10 +52,9 @@ class ExecutableNotFoundError(Exception):
     pass
 
 
-PLAYBOOK_COMMAND = shutil.which("ansible-playbook")
-if PLAYBOOK_COMMAND is None:
-    raise ExecutableNotFoundError("Cannot find ansible-playbook executable")
-PLAYBOOK = f"{os.path.dirname(os.path.abspath(__file__))}/../../playbooks/project_clone.yml"  # noqa E501
+PLAYBOOK = str(
+    resources.files("aap_eda.data.playbooks").joinpath("project_clone.yml")
+)
 
 KEYGEN_COMMAND = shutil.which("ssh-keygen")
 if KEYGEN_COMMAND is None:
@@ -62,6 +66,10 @@ if GPG_COMMAND is None:
 if GPG_COMMAND is None:
     raise ExecutableNotFoundError("Cannot find gpg executable")
 
+RUNNER_COMMAND = shutil.which("ansible-runner")
+if RUNNER_COMMAND is None:
+    raise ExecutableNotFoundError("Cannot find ansible-runner executable")
+
 
 class ScmRepository:
     """Represents a SCM repository."""
@@ -70,7 +78,7 @@ class ScmRepository:
         self,
         root: StrPath,
         *,
-        _executor: Optional[PlaybookExecutor] = None,
+        _executor: Optional[GitAnsibleRunnerExecutor] = None,
     ):
         """
         Create an instance for existing repository.
@@ -80,7 +88,7 @@ class ScmRepository:
         """
         self.root = root
         if _executor is None:
-            _executor = PlaybookExecutor()
+            _executor = GitAnsibleRunnerExecutor()
         self._executor = _executor
         self.git_hash = None
 
@@ -106,7 +114,7 @@ class ScmRepository:
         verify_ssl: bool = True,
         branch: Optional[str] = None,
         refspec: Optional[str] = None,
-        _executor: Optional[PlaybookExecutor] = None,
+        _executor: Optional[GitAnsibleRunnerExecutor] = None,
     ) -> ScmRepository:
         """
         Clone a repository from url into target path.
@@ -124,9 +132,11 @@ class ScmRepository:
         :return:
         """
         if _executor is None:
-            _executor = PlaybookExecutor()
+            _executor = GitAnsibleRunnerExecutor()
 
-        vars = [f"project_path={path}"]
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        extra_vars = {"project_path": path}
         final_url = url
         secret = ""
         key_file = None
@@ -147,7 +157,7 @@ class ScmRepository:
                 key_file = tempfile.NamedTemporaryFile("w+t")
                 key_file.write(key_data)
                 key_file.flush()
-                vars.append(f"key_file={key_file.name}")
+                extra_vars["key_file"] = key_file.name
                 key_password = inputs.get("ssh_key_unlock")
                 if key_password:
                     cls.decrypt_key_file(key_file.name, key_password)
@@ -160,26 +170,24 @@ class ScmRepository:
             gpg_key_file = tempfile.NamedTemporaryFile("w+t")
             gpg_key_file.write(gpg_key)
             gpg_key_file.flush()
-            vars.append("verify_commit=true")
+            extra_vars["verify_commit"] = "true"
             cls.add_gpg_key(gpg_key_file.name)
 
         if not verify_ssl:
-            _executor.ENVIRON["GIT_SSL_NO_VERIFY"] = "true"
+            extra_vars["ssl_no_verify"] = "true"
 
-        vars.append(f"scm_url={final_url}")
+        extra_vars["scm_url"] = final_url
         if branch:
-            vars.append(f"scm_branch={branch}")
+            extra_vars["scm_branch"] = branch
         if refspec:
-            vars.append(f"scm_refspec={refspec}")
+            extra_vars["scm_refspec"] = refspec
         if depth:
-            vars.append(f"depth={depth}")
+            extra_vars["depth"] = depth
 
-        vars_str = " ".join(vars)
-
-        cmd = ["-e", f"'{vars_str}'", "-t", "update_git"]
         logger.info("Cloning repository: %s", url)
         try:
-            git_hash = _executor(cmd)
+            with contextlib.chdir(path):
+                git_hash = _executor(extra_vars=extra_vars)
         except ScmError as e:
             msg = str(e)
             if secret:
@@ -238,42 +246,42 @@ class ScmRepository:
         pexpect.run(cmd)
 
 
-class PlaybookExecutor:
-    ENVIRON = {"GIT_TERMINAL_PROMPT": "0"}
+class GitAnsibleRunnerExecutor:
     ERROR_PREFIX = "Failed to clone the project:"
 
     def __call__(
         self,
-        args: Iterable[str],
-        timeout: Optional[float] = 30,
-        cwd: Optional[StrPath] = None,
+        extra_vars: dict,
     ):
-        try:
-            cmd = f"{PLAYBOOK_COMMAND} {' '.join(args)} {PLAYBOOK}"
-            child = pexpect.spawn(
-                cmd,
-                env=os.environ | PlaybookExecutor.ENVIRON,
-                timeout=timeout,
-                cwd=cwd,
+        with tempfile.TemporaryDirectory(prefix="AAP_RUNNER") as data_dir:
+            outputs = io.StringIO()
+            with contextlib.redirect_stdout(outputs):
+                runner = ansible_runner.run(
+                    private_data_dir=data_dir,
+                    playbook=PLAYBOOK,
+                    extravars=extra_vars,
+                )
+
+            if runner.rc == 0:
+                match = re.search(
+                    r'"msg": "Repository Version ([0-9a-fA-F]+)"',
+                    outputs.getvalue(),
+                )
+                if match:
+                    return match.group(1)
+            match = re.search(
+                r'fatal: \[localhost\]: FAILED! => \{.+"msg": (.+)\}',
+                outputs.getvalue(),
             )
-            index = child.expect(
-                [
-                    '"msg": "Repository Version ',
-                    "fatal: \\[localhost\\]: ",
-                    pexpect.EOF,
+            if match:
+                err_msg = match.group(1)
+                err_keywords = [
+                    "could not read Username",
+                    "could not read Password",
+                    "Authentication failed",
                 ]
-            )
-            if index == 0:
-                line = child.readline().decode()
-                return line.split('"')[0]
-            elif index == 1:
-                line = child.readline().decode()
-                if "could not read Username" in line:
-                    msg = "Credentials not provided or incorrect"
-                    raise ScmAuthenticationError(msg)
-                raise ScmError(f"{self.ERROR_PREFIX} {line}")
-            raise ScmError(f"{self.ERROR_PREFIX} {child.before}")
-        except pexpect.exceptions.TIMEOUT:
-            raise ScmError(f"{self.ERROR_PREFIX} command timeout.")
-        except pexpect.exceptions.ExceptionPexpect as e:
-            raise ScmError(f"{self.ERROR_PREFIX} {str(e)}") from e
+                if any(key in err_msg for key in err_keywords):
+                    err_msg = "Credentials not provided or incorrect"
+                    raise ScmAuthenticationError(err_msg)
+                raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
+            raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")
