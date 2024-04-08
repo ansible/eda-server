@@ -28,7 +28,7 @@ from rest_framework.filters import OrderingFilter
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
+from aap_eda.core.enums import Action
 
 
 @extend_schema_view(
@@ -71,9 +71,9 @@ class RulebookViewSet(
         request=None,
         responses={status.HTTP_200_OK: serializers.RulebookSerializer},
     )
-    @action(detail=True, rbac_action=Action.READ)
+    @action(detail=True)
     def json(self, request, pk):
-        rulebook = get_object_or_404(self.get_queryset(), pk=pk)
+        rulebook = self.get_object()
         data = serializers.RulebookSerializer(rulebook).data
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
@@ -132,7 +132,6 @@ class AuditRuleViewSet(
             return serializers.AuditEventSerializer
         return serializers.AuditRuleSerializer
 
-    rbac_resource_type = ResourceType.AUDIT_RULE
     rbac_action = None
 
     @extend_schema(

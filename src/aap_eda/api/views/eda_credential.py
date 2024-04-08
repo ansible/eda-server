@@ -31,7 +31,6 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
-from aap_eda.core.enums import ResourceType
 from aap_eda.core.utils.credentials import inputs_to_store
 
 from .mixins import (
@@ -75,9 +74,6 @@ class EdaCredentialViewSet(
                 queryset.model.access_qs(self.request.user, queryset=queryset)
             )
         return super().filter_queryset(queryset)
-
-    rbac_resource_type = ResourceType.EDA_CREDENTIAL
-    rbac_action = None
 
     @extend_schema(
         description="Get EDA credential by id",

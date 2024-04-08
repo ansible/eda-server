@@ -28,7 +28,7 @@ from rest_framework.response import Response
 from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
+from aap_eda.core.enums import Action
 
 from .mixins import CreateModelMixin, ResponseSerializerMixin
 
@@ -70,8 +70,6 @@ class ExtraVarViewSet(
     queryset = models.ExtraVar.objects.order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
-
-    rbac_resource_type = ResourceType.EXTRA_VAR
 
     def filter_queryset(self, queryset):
         return super().filter_queryset(
