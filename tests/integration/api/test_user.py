@@ -54,15 +54,17 @@ def user2() -> models.User:
 
 
 @pytest.fixture
-def client(base_client: APIClient, user: models.User) -> APIClient:
+def api_client(base_client: APIClient, user: models.User) -> APIClient:
     client = base_client
     client.login(username=user.username, password="secret")
     return client
 
 
 @pytest.mark.django_db
-def test_retrieve_current_user(client: APIClient, user: models.User, init_db):
-    response = client.get(f"{api_url_v1}/users/me/")
+def test_retrieve_current_user(
+    api_client: APIClient, user: models.User, init_db
+):
+    response = api_client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
         "id": user.id,
@@ -93,8 +95,10 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
 
 
 @pytest.mark.django_db
-def test_update_current_user(client: APIClient, user: models.User, init_db):
-    response = client.patch(
+def test_update_current_user(
+    api_client: APIClient, user: models.User, init_db
+):
+    response = api_client.patch(
         f"{api_url_v1}/users/me/",
         data={
             "first_name": "Darth",
@@ -109,9 +113,9 @@ def test_update_current_user(client: APIClient, user: models.User, init_db):
 
 @pytest.mark.django_db
 def test_update_current_user_password(
-    client: APIClient, user: models.User, init_db
+    api_client: APIClient, user: models.User, init_db
 ):
-    response = client.patch(
+    response = api_client.patch(
         f"{api_url_v1}/users/me/",
         data={"password": "updated-password"},
     )
@@ -125,9 +129,9 @@ def test_update_current_user_password(
 
 @pytest.mark.django_db
 def test_update_current_user_username_fail(
-    client: APIClient, user: models.User, init_db
+    api_client: APIClient, user: models.User, init_db
 ):
-    response = client.patch(
+    response = api_client.patch(
         f"{api_url_v1}/users/me/",
         data={"username": "darth.vader"},
     )
@@ -144,9 +148,9 @@ def test_update_current_user_username_fail(
 
 @pytest.mark.django_db
 def test_update_current_user_roles_fail(
-    client: APIClient, user: models.User, init_db
+    api_client: APIClient, user: models.User, init_db
 ):
-    response = client.patch(f"{api_url_v1}/users/me/", data={"roles": []})
+    response = api_client.patch(f"{api_url_v1}/users/me/", data={"roles": []})
     # NOTE(cutwater): DRF serializer will not detect an unexpected field
     #   in PATCH operation, but must ignore it.
     assert response.status_code == status.HTTP_200_OK
@@ -156,7 +160,7 @@ def test_update_current_user_roles_fail(
 
 @pytest.mark.django_db
 def test_create_user(
-    client: APIClient,
+    api_client: APIClient,
     check_permission_mock: mock.Mock,
     init_db,
 ):
@@ -169,7 +173,7 @@ def test_create_user(
         "roles": [str(init_db.role.id)],
     }
 
-    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
+    response = api_client.post(f"{api_url_v1}/users/", data=create_user_data)
 
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["is_superuser"] is False
@@ -237,12 +241,12 @@ def test_retrieve_user_details(
 
 @pytest.mark.django_db
 def test_list_users(
-    client: APIClient,
+    api_client: APIClient,
     user: models.User,
     init_db,
     check_permission_mock: mock.Mock,
 ):
-    response = client.get(f"{api_url_v1}/users/")
+    response = api_client.get(f"{api_url_v1}/users/")
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
 
@@ -320,12 +324,12 @@ def test_delete_user(
 
 @pytest.mark.django_db
 def test_delete_user_not_allowed(
-    client: APIClient,
+    api_client: APIClient,
     user: models.User,
     check_permission_mock: mock.Mock,
 ):
     user_id = user.id
-    response = client.delete(f"{api_url_v1}/users/{user_id}/")
+    response = api_client.delete(f"{api_url_v1}/users/{user_id}/")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
     assert models.User.objects.filter(id=user_id).count() == 1
