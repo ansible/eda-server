@@ -47,6 +47,33 @@ INPUT = {
     "required": ["host"],
 }
 
+INPUT_SANS_TYPE = {
+    "fields": [
+        {
+            "id": "host",
+            "label": "Authentication URL",
+            "help_text": (
+                "Authentication endpoint for the container registry."
+            ),
+            "default": "quay.io",
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "password",
+            "label": "Password or Token",
+            "secret": True,
+            "help_text": ("A password or token used to authenticate with"),
+        },
+        {
+            "id": "verify_ssl",
+            "label": "Verify SSL",
+            "type": "boolean",
+            "default": True,
+        },
+    ],
+    "required": ["host"],
+}
+
 
 @pytest.mark.django_db
 def test_create_credential_type(client: APIClient):
@@ -68,6 +95,32 @@ def test_create_credential_type(client: APIClient):
     response = client.post(f"{api_url_v1}/credential-types/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "credential_type_1"
+
+
+@pytest.mark.django_db
+def test_create_credential_type_sans_type(client: APIClient):
+    injectors = {
+        "extra_vars": {
+            "host": "localhost",
+            "username": "adam",
+            "password": "password",
+            "verify_ssl": False,
+        }
+    }
+    data_in = {
+        "name": "credential_type_1",
+        "description": "desc here",
+        "inputs": INPUT_SANS_TYPE,
+        "injectors": injectors,
+    }
+
+    response = client.post(f"{api_url_v1}/credential-types/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "credential_type_1"
+    assert response.data["inputs"]["fields"][0]["type"] == "string"
+    assert response.data["inputs"]["fields"][1]["type"] == "string"
+    assert response.data["inputs"]["fields"][2]["type"] == "string"
+    assert response.data["inputs"]["fields"][3]["type"] == "boolean"
 
 
 @pytest.mark.django_db

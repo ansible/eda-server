@@ -278,3 +278,23 @@ def test_retrieve_eda_credential_with_refs(
         }
     else:
         assert response.data["references"] is None
+
+
+@pytest.mark.django_db
+def test_retrieve_eda_credential_with_empty_encrypted_fields(
+    client: APIClient, preseed_credential_types
+):
+    scm_type = models.CredentialType.objects.filter(name="Source Control")[0]
+    data_in = {
+        "name": "scm-credential",
+        "inputs": {
+            "username": "adam",
+            "password": "secret",
+            "ssh_key_unlock": "",
+        },
+        "credential_type_id": scm_type.id,
+    }
+    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    key_list = list(response.data["inputs"].keys())
+    assert "ssh_key_unlock" not in key_list
