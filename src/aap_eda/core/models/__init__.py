@@ -15,7 +15,6 @@
 from ansible_base.rbac import permission_registry
 
 from .activation import Activation
-from .auth import Permission, Role
 from .credential import Credential
 from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
@@ -57,8 +56,6 @@ __all__ = [
     "JobInstance",
     "Job",
     "Project",
-    "Permission",
-    "Role",
     "Rule",
     "Rulebook",
     "Ruleset",

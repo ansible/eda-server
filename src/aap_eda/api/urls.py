@@ -35,9 +35,6 @@ router = routers.SimpleRouter()
 router.register("extra-vars", views.ExtraVarViewSet)
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
-router.register(
-    "roles", views.RoleViewSet
-)  # deprecated, DAB RBAC uses roledefinition
 router.register("activations", views.ActivationViewSet)
 router.register(
     "activation-instances",
