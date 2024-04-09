@@ -302,6 +302,12 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
 
+# Disable DRF browsable API by default
+if not DEBUG:
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] = (
+        "rest_framework.renderers.JSONRenderer",
+    )
+
 # ---------------------------------------------------------
 # TASKING SETTINGS
 # ---------------------------------------------------------
