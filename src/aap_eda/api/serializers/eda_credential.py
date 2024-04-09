@@ -47,6 +47,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
     credential_type = CredentialTypeRefSerializer(
         required=False, allow_null=True
     )
+    organization = OrganizationRefSerializer()
     references = EdaCredentialReferenceField(required=False, allow_null=True)
 
     class Meta:
@@ -78,7 +79,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
         )
         organization = (
             OrganizationRefSerializer(eda_credential.organization).data
-            if eda_credential.credential_type
+            if eda_credential.organization
             else None
         )
 

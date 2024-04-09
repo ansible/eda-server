@@ -26,7 +26,7 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "managed",
-            "organization",
+            "organization_id",
         ]
         fields = [
             "name",
