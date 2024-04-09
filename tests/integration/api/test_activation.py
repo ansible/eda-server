@@ -346,7 +346,7 @@ def test_create_activation_bad_entity(client: APIClient):
         {"extra_var": "ExtraVar with id 0 does not exist"},
     ],
 )
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 def test_create_activation_with_bad_entity(
     client: APIClient,
     dependent_object,
