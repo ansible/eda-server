@@ -11,6 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+from urllib.parse import urlparse
+
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
@@ -22,6 +25,7 @@ from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import inputs_to_store
 
 CRUD = ["add", "view", "change", "delete"]
+LOGGER = logging.getLogger(__name__)
 
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
@@ -408,21 +412,42 @@ class Command(BaseCommand):
             name=enums.DefaultCredentialType.REGISTRY
         ).first()
         for cred in credentials:
+            de = models.DecisionEnvironment.objects.filter(
+                credential=cred
+            ).first()
+            host = "quay.io"
+            if de:
+                image_url = (
+                    de.image_url.replace("http://", "")
+                    .replace("https://", "")
+                    .replace("//", "")
+                )
+                host = urlparse(f"//{image_url}").hostname
             inputs = {
+                "host": host,
                 "username": cred.username,
                 "password": cred.secret.get_secret_value(),
             }
-            eda_cred = models.EdaCredential.objects.create(
+            eda_cred, created = models.EdaCredential.objects.get_or_create(
                 name=cred.name,
-                description=cred.description,
-                managed=False,
-                credential_type=cred_type,
-                inputs=inputs_to_store(inputs),
+                defaults={
+                    "description": cred.description,
+                    "managed": False,
+                    "credential_type": cred_type,
+                    "inputs": inputs_to_store(inputs),
+                },
             )
-            models.DecisionEnvironment.objects.filter(credential=cred).update(
-                eda_credential=eda_cred, credential=None
-            )
-            cred.delete()
+            if created:
+                models.DecisionEnvironment.objects.filter(
+                    credential=cred
+                ).update(eda_credential=eda_cred, credential=None)
+                cred.delete()
+            else:
+                info_msg = (
+                    f"Registry Credential {cred.name} already converted to "
+                    "EdaCredential. Skip the duplicated one."
+                )
+                LOGGER.info(info_msg)
 
         self.stdout.write(
             "All REGISTRY credentials are converted to Container Registry "
@@ -445,17 +470,26 @@ class Command(BaseCommand):
                 "username": cred.username,
                 "password": cred.secret.get_secret_value(),
             }
-            eda_cred = models.EdaCredential.objects.create(
+            eda_cred, created = models.EdaCredential.objects.get_or_create(
                 name=cred.name,
-                description=cred.description,
-                managed=False,
-                credential_type=cred_type,
-                inputs=inputs_to_store(inputs),
+                defaults={
+                    "description": cred.description,
+                    "managed": False,
+                    "credential_type": cred_type,
+                    "inputs": inputs_to_store(inputs),
+                },
             )
-            models.Project.objects.filter(credential=cred).update(
-                eda_credential=eda_cred, credential=None
-            )
-            cred.delete()
+            if created:
+                models.Project.objects.filter(credential=cred).update(
+                    eda_credential=eda_cred, credential=None
+                )
+                cred.delete()
+            else:
+                info_msg = (
+                    f"Git Credential {cred.name} already converted to "
+                    "EdaCredential. Skip the duplicated one."
+                )
+                LOGGER.info(info_msg)
 
         self.stdout.write(
             "All GITHUB and GITLAB credentials are converted to Source "
