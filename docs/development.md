@@ -237,6 +237,26 @@ environment variables:
 * `EDA_DB_PASSWORD` – Database user password (default: `secret`, only in development mode)
 * `EDA_DB_NAME` – Database name (default: `eda`)
 
+### TLS-enabled redis
+If you wish to run a development environment requiring TLS connections to redis it is a simple
+process...
+1. build your container images as described above
+2. start them using `docker-compose -f ./tools/docker/docker-compose-dev-redis-tls.yaml up`
+
+In order to successfully run the development environment tests using TLS-enabled
+redis you will need to export the following environment variables:
+
+* `EDA_MQ_CLIENT_CERT_PATH=<<workspace>>/tools/docker/redis-tls/client/client.crt`
+* `EDA_MQ_CLIENT_KEY_PATH=<<workspace>>/tools/docker/redis-tls/client/client.key`
+* `EDA_MQ_CLIENT_CACERT_PATH=<<workspace>>/tools/docker/redis-tls/ca.crt`
+
+`EDA_MQ_CLIENT_CERT_PATH` has special significance.  While all three variables are required 
+`EDA_MQ_CLIENT_CERT_PATH` determines whether requests are made to redis using TLS.  You can use
+this as a convenience in switching client-side processing between TLS and non-TLS by always
+exporting `EDA_MQ_CLIENT_KEY_PATH` and `EDA_MQ_CLIENT_CACERT_PATH` and switching behavior
+by setting/clearing `EDA_MQ_CLIENT_CERT_PATH`.
+
+
 ### Executing migrations
 
 Locally:
