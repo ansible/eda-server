@@ -141,7 +141,10 @@ class CredentialTypeViewSet(
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None, description="Delete successful."
-            )
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None, description="CredentialType in use by Credentials."
+            ),
         },
     )
     def destroy(self, request, *args, **kwargs):
@@ -151,6 +154,14 @@ class CredentialTypeViewSet(
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        if models.EdaCredential.objects.filter(
+            credential_type=credential_type
+        ).exists():
+            error = (
+                f"CredentialType {credential_type.name} is used by credentials"
+            )
+            return Response({"errors": error}, status=status.HTTP_409_CONFLICT)
 
         self.perform_destroy(credential_type)
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -213,6 +213,33 @@ def test_delete_credential_type(client: APIClient):
 
 
 @pytest.mark.django_db
+def test_delete_credential_type_with_credentials(
+    client: APIClient, preseed_credential_types
+):
+    credential_type = models.CredentialType.objects.create(
+        name="user_type",
+        inputs={"fields": [{"id": "username"}]},
+        injectors={},
+        managed=False,
+    )
+
+    models.EdaCredential.objects.create(
+        name="credential-1",
+        inputs={"username": "adam"},
+        credential_type=credential_type,
+    )
+
+    response = client.delete(
+        f"{api_url_v1}/credential-types/{credential_type.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"CredentialType {credential_type.name} is used by credentials"
+        in response.data["errors"]
+    )
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("old_inputs", "new_inputs", "status_code", "passed", "message"),
     [
