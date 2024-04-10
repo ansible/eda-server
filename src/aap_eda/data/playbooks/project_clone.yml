@@ -1,0 +1,41 @@
+---
+# The following variables will be set by the runner of this playbook:
+# project_path: The destination folder
+# scm_url: https://server/repo
+# scm_branch: branch/tag/revision (HEAD if unset)
+# scm_refspec: a refspec to fetch in addition to obtaining version
+# key_file: private ssh file
+# depth: Create a shallow clone with a truncated history. Minimum 1.
+# verify_commit: true or false. whether verify the commit with GPG
+# ssl_no_verify: true or false.
+
+- hosts: localhost
+  gather_facts: false
+  connection: local
+  name: Clone or pull a git repo and get revision
+  tasks:
+    - name: Clone or pull a project using git
+      block:
+        - name: Clone or pull a project using gitt
+          ansible.builtin.git:
+            dest: "{{ project_path | quote }}"
+            repo: "{{ scm_url }}"
+            version: "{{ scm_branch | default(omit) | quote }}"
+            refspec: "{{ scm_refspec | default(omit) }}"
+            key_file: "{{ key_file | default(omit) }}"
+            accept_hostkey: true
+            depth: "{{ depth | default(omit) }}"
+            verify_commit: " {{ verify_commit | default(false) }}"
+          environment:
+            GIT_TERMINAL_PROMPT: 0
+            GIT_SSL_NO_VERIFY: "{{ ssl_no_verify | default(false) }}"
+          register: git_result
+
+        - name: Set the git repository version
+          ansible.builtin.set_fact:
+            scm_version: "{{ git_result['after'] }}"
+          when: "'after' in git_result"
+
+    - name: Repository Version
+      ansible.builtin.debug:
+        msg: "Repository Version {{ scm_version }}"
