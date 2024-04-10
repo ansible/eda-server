@@ -18,7 +18,6 @@ RUN DNF=dnf \
     libpq-devel \
     gcc \
     gettext \
-    ansible-core \
     git-core \
     java-17-openjdk-headless" \
     && $DNF -y install dnf-plugins-core \
@@ -52,6 +51,7 @@ RUN poetry install -E all --no-root --no-cache \
     && ${PYTHON_BIN} -m pip install gunicorn
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
+RUN pip install ansible-core
 
 USER 0
 RUN for dir in \
