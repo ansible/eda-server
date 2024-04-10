@@ -23,7 +23,12 @@ class EdaCredentialFilter(django_filters.FilterSet):
         lookup_expr="istartswith",
         label="Filter by EDA credential name.",
     )
+    credential_type_id = django_filters.NumberFilter(
+        field_name="credential_type__id",
+        lookup_expr="exact",
+        label="Filter by Credential Type ID.",
+    )
 
     class Meta:
         model = models.EdaCredential
-        fields = ["name"]
+        fields = ["name", "credential_type_id"]

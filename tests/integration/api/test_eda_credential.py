@@ -2,7 +2,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 INPUTS = {
@@ -136,6 +136,64 @@ def test_list_eda_credentials_with_kind_filter(
 
 
 @pytest.mark.django_db
+def test_list_eda_credentials_filter_credential_type_id(
+    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
+    client: APIClient,
+    preseed_credential_types,
+):
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    scm_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.SOURCE_CONTROL
+    )
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type_id="
+        f"{registry_credential_type.id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert (
+        response.data["results"][0]["credential_type"]["name"]
+        == registry_credential_type.name
+    )
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type_id="
+        f"{scm_credential_type.id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert (
+        response.data["results"][0]["credential_type"]["name"]
+        == scm_credential_type.name
+    )
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_name(
+    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
+    client: APIClient,
+    preseed_credential_types,
+):
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?name={default_eda_credential.name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == default_eda_credential.name
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?name={default_scm_credential.name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == default_scm_credential.name
+
+
+@pytest.mark.django_db
 def test_delete_eda_credential(client: APIClient):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
@@ -208,16 +266,54 @@ def test_partial_update_eda_credential_name(
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation(
+def test_delete_credential_with_de_reference(
+    default_de: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
+):
+    eda_credential = default_de.eda_credential
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_delete_credential_with_project_reference(
+    default_project: models.Project,
+    client: APIClient,
+    preseed_credential_types,
+):
+    eda_credential = default_project.eda_credential
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_delete_credential_with_activation_reference(
     default_activation: models.Activation,
     client: APIClient,
     preseed_credential_types,
 ):
-    eda_credential_id = default_activation.eda_credentials.all()[0]
+    eda_credential = default_activation.eda_credentials.all()[0]
     response = client.delete(
-        f"{api_url_v1}/eda-credentials/{eda_credential_id.id}/"
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
 
 
 @pytest.mark.django_db
@@ -231,6 +327,7 @@ def test_delete_credential_used_by_activation_forced(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/?force=true",
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert default_activation.eda_credentials.count() == 0
 
 
 @pytest.mark.parametrize("refs", ["true", "false"])

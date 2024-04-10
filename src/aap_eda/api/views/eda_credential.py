@@ -242,17 +242,13 @@ class EdaCredentialViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # If the credential is in use and the 'force' flag
-        # is not True, raise a PermissionDenied exception
-        is_used = models.Activation.objects.filter(
-            decision_environment__eda_credential=eda_credential
-        ).exists()
+        references = get_references(eda_credential)
 
-        if is_used and not force:
+        if bool(references) and not force:
             raise exceptions.Conflict(
-                "Credential is being used by Activations "
-                "and cannot be deleted. If you want to force delete, "
-                "please add /?force=true query param."
+                f"Credential {eda_credential.name} is being referenced by "
+                "other resources and cannot be deleted. If you want to force "
+                "delete, please add /?force=true query param."
             )
         self.perform_destroy(eda_credential)
         return Response(status=status.HTTP_204_NO_CONTENT)

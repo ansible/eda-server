@@ -13,6 +13,7 @@ description = ""
 authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
 packages = [{ include = "aap_eda", from = "src" }]
+include = ["aap_eda/data/playbooks/*.yml"]
 
 [tool.poetry.scripts]
 aap-eda-manage = 'aap_eda.manage:main'
@@ -50,6 +51,7 @@ django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.gi
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
 pexpect = "^4.9.0"
+ansible-runner = ">=2.3"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
