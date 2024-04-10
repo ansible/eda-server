@@ -2,7 +2,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from tests.integration.api.test_activation import (
     create_activation,
     create_activation_related_data,
@@ -186,6 +186,86 @@ def test_list_eda_credentials_with_kind_filter(
         "&credential_type__kind=registry",
     )
     assert len(response.data["results"]) == 3
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_credential_type_id(
+    client: APIClient, preseed_credential_types
+):
+    registry_type = models.CredentialType.objects.create(
+        name="registry", inputs=INPUTS, injectors={}, kind="registry"
+    )
+    scm_type = models.CredentialType.objects.create(
+        name="scm", inputs=INPUTS, injectors={}, kind="scm"
+    )
+    models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"username": "adam", "password": "secret"},
+                credential_type_id=registry_type.id,
+            ),
+            models.EdaCredential(
+                name="credential-2",
+                inputs={"username": "bearny", "password": "secret"},
+                credential_type_id=scm_type.id,
+            ),
+            models.EdaCredential(
+                name="credential-3",
+                inputs={"username": "christ", "password": "secret"},
+                credential_type_id=scm_type.id,
+            ),
+        ]
+    )
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type_id={registry_type.id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type_id={scm_type.id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 2
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_name(
+    client: APIClient, preseed_credential_types
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+
+    models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"username": "adam", "password": "secret"},
+                credential_type_id=credential_type.id,
+            ),
+            models.EdaCredential(
+                name="new-credential",
+                inputs={"username": "bearny", "password": "secret"},
+                credential_type_id=credential_type.id,
+            ),
+            models.EdaCredential(
+                name="new-test-credential",
+                inputs={"username": "christ", "password": "secret"},
+                credential_type_id=credential_type.id,
+            ),
+        ]
+    )
+
+    response = client.get(f"{api_url_v1}/eda-credentials/?name=credential")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+    response = client.get(f"{api_url_v1}/eda-credentials/?name=new")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 2
 
 
 @pytest.mark.django_db
