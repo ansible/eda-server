@@ -23,7 +23,6 @@ from .eda_credential import EdaCredentialFilter
 from .event_stream import EventStreamFilter
 from .organization import OrganizationFilter
 from .project import ProjectFilter
-from .role import RoleFilter
 from .rulebook import (
     AuditRuleActionFilter,
     AuditRuleEventFilter,
@@ -52,8 +51,6 @@ __all__ = (
     "ActivationInstanceLogFilter",
     # user
     "UserFilter",
-    # role
-    "RoleFilter",
     # event_stream
     "EventStreamFilter",
     # organization

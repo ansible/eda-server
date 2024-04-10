@@ -21,12 +21,7 @@ from .activation import (
     ActivationSerializer,
     PostActivationSerializer,
 )
-from .auth import (
-    LoginSerializer,
-    RoleDetailSerializer,
-    RoleListSerializer,
-    RoleSerializer,
-)
+from .auth import LoginSerializer
 from .credential import (
     CredentialCreateSerializer,
     CredentialRefSerializer,
@@ -138,10 +133,6 @@ __all__ = (
     "EdaCredentialCreateSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
-    # roles
-    "RoleSerializer",
-    "RoleListSerializer",
-    "RoleDetailSerializer",
     # event streams
     "EventStreamSerializer",
     "EventStreamCreateSerializer",

@@ -37,7 +37,6 @@ def test_retrieve_current_user(client: APIClient, admin_user: models.User):
         "last_name": admin_user.last_name,
         "email": admin_user.email,
         "is_superuser": admin_user.is_superuser,
-        "roles": [],
         "created_at": admin_user.date_joined.strftime(DATETIME_FORMAT),
         "modified_at": admin_user.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -103,17 +102,6 @@ def test_update_current_user_username_fail(
     assert admin_user.username == ADMIN_USERNAME
 
 
-@pytest.mark.skip(reason="Roles are to be deprecated")
-@pytest.mark.django_db
-def test_update_current_user_roles_fail(client: APIClient, user: models.User):
-    response = client.patch(f"{api_url_v1}/users/me/", data={"roles": []})
-    # NOTE(cutwater): DRF serializer will not detect an unexpected field
-    #   in PATCH operation, but must ignore it.
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert len(data["roles"]) > 0
-
-
 @pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_create_user(client: APIClient):
@@ -145,7 +133,6 @@ def test_create_superuser(
         "email": "test.user@example.com",
         "password": "secret",
         "is_superuser": True,
-        "roles": [str(init_db.role.id)],
     }
 
     response = client.post(f"{api_url_v1}/users/", data=create_user_data)
@@ -173,7 +160,6 @@ def test_retrieve_user_details(
         "last_name": default_user.last_name,
         "email": default_user.email,
         "is_superuser": default_user.is_superuser,
-        "roles": [],
         "created_at": default_user.date_joined.strftime(DATETIME_FORMAT),
         "modified_at": default_user.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -199,7 +185,6 @@ def test_list_users(
         "first_name": admin_user.first_name,
         "last_name": admin_user.last_name,
         "is_superuser": admin_user.is_superuser,
-        "roles": [],
     }
 
 
@@ -221,7 +206,6 @@ def test_partial_update_user(
         "last_name": updated_user.last_name,
         "email": updated_user.email,
         "is_superuser": admin_user.is_superuser,
-        "roles": [],
         "created_at": updated_user.date_joined.strftime(DATETIME_FORMAT),
         "modified_at": updated_user.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -275,7 +259,6 @@ def test_list_users_filter_username(
         "first_name": admin_user.first_name,
         "last_name": admin_user.last_name,
         "is_superuser": admin_user.is_superuser,
-        "roles": [],
     }
 
 

@@ -11,26 +11,18 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from ansible_base.rbac.models import RoleDefinition
 from django.contrib.auth import authenticate, login, logout
-from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import (
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
-from rest_framework import authentication, permissions, status, viewsets
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import authentication, permissions, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api import exceptions
 from aap_eda.api.serializers import LoginSerializer
-from aap_eda.services.auth import display_permissions
 
 
 class SessionLoginView(APIView):
@@ -100,48 +92,3 @@ class SessionLogoutView(APIView):
     def post(self, request: Request, *args, **kwargs):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@extend_schema_view(
-    list=extend_schema(
-        description="List all roles",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RoleListSerializer,
-                description="Return a list of roles.",
-            ),
-        },
-    )
-)
-class RoleViewSet(
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = RoleDefinition.objects.order_by("id")
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = filters.RoleFilter
-    deprecated = True
-
-    def get_serializer_class(self):
-        if self.action == "list":
-            return serializers.RoleListSerializer
-        elif self.action == "retrieve":
-            return serializers.RoleDetailSerializer
-
-    @extend_schema(
-        description="Retrieve a role by id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.RoleDetailSerializer,
-                description="Return a role.",
-            ),
-        },
-    )
-    def retrieve(self, _request, pk=None):
-        # TODO: Optimization by querying to retrieve desired permission format
-        role = get_object_or_404(self.queryset, pk=pk)
-
-        detail_serialzer = self.get_serializer_class()
-        role = detail_serialzer(role).data
-        result = display_permissions(role)
-
-        return Response(result)

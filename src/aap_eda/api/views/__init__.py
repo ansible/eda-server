@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
-from .auth import RoleViewSet, SessionLoginView, SessionLogoutView
+from .auth import SessionLoginView, SessionLogoutView
 from .credential import CredentialViewSet
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
