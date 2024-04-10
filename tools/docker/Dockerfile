@@ -6,6 +6,11 @@ RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && chown -R "${USER_ID}:0" /app/.local /var/lib/eda \
     && chmod 0775 /app /var/lib/eda
 
+RUN mkdir -p /var/lib/eda/redis-tls \
+    && chown -R "${USER_ID}:0" /var/lib/eda/redis-tls \
+    && chmod 0775 /var/lib/eda/redis-tls
+COPY ./tools/docker/redis-tls /var/lib/eda/redis-tls
+
 RUN DNF=dnf \
     INSTALL_PACKAGES="python3.11 \
     python3.11-devel \
