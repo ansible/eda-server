@@ -23,6 +23,8 @@ x-environment:
   - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
   - EDA_DEBUG=${EDA_DEBUG:-'True'}
   - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
+  - EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT=${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-'False'}
+  - EDA_ANSIBLE_BASE_JWT_KEY=${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
 
 services:
   podman-pre-setup:
