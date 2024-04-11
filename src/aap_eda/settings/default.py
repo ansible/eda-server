@@ -477,16 +477,6 @@ PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
 DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
 CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
 
-
-def get_default_k8s_service_name() -> str:
-    # TODO: implement later
-    return "default-service-name"
-
-
-K8S_SERVICE_NAME = settings.get(
-    "K8S_SERVICE_NAME", get_default_k8s_service_name()
-)
-
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
 # ---------------------------------------------------------

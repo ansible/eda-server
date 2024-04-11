@@ -19,7 +19,3 @@ from aap_eda.core.enums import RulebookProcessLogLevel
 
 def get_default_log_level() -> RulebookProcessLogLevel:
     return settings.ANSIBLE_RULEBOOK_LOG_LEVEL
-
-
-def get_default_k8s_service_name() -> str:
-    return settings.K8S_SERVICE_NAME

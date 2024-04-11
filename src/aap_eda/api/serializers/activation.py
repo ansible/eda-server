@@ -17,6 +17,7 @@ import secrets
 import uuid
 
 import yaml
+from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.api.constants import (
@@ -38,6 +39,10 @@ from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
 from aap_eda.core.utils.credentials import get_secret_fields
+from aap_eda.core.utils.k8s_service_name import (
+    InvalidRFC1035LabelError,
+    create_k8s_service_name,
+)
 from aap_eda.core.utils.strings import (
     substitute_extra_vars,
     substitute_source_args,
@@ -81,6 +86,11 @@ def _updated_ruleset(validated_data):
     except Exception as e:
         logger.error(f"Failed to update rulesets: {e}")
         raise InvalidEventStreamRulebook(e)
+
+
+def _update_k8s_service_name(validated_data: dict) -> str:
+    service_name = validated_data.get("k8s_service_name")
+    return service_name or create_k8s_service_name(validated_data["name"])
 
 
 def _handle_eda_credentials(
@@ -335,6 +345,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=serializers.IntegerField(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_rcf_1035_compliant],
+    )
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data, True)
@@ -349,6 +364,12 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
+
+        if settings.DEPLOYMENT_TYPE == "k8s":
+            validated_data["k8s_service_name"] = _update_k8s_service_name(
+                validated_data
+            )
+
         if validated_data.get("event_streams"):
             validated_data["rulebook_rulesets"] = _updated_ruleset(
                 validated_data
@@ -564,6 +585,11 @@ class PostActivationSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=serializers.IntegerField(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_rcf_1035_compliant],
+    )
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data, False)
@@ -584,6 +610,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "rulebook_id",
             "eda_credentials",
+            "k8s_service_name",
         ]
         read_only_fields = [
             "id",
@@ -646,6 +673,13 @@ def _validate_credentials_and_token_and_rulebook(
 
     # validate rulebook
     _validate_rulebook(data, awx_token is not None)
+
+    # validate if activation name is compatible with RFC 1035
+    if not data.get("k8s_service_name") and settings.DEPLOYMENT_TYPE == "k8s":
+        try:
+            create_k8s_service_name(data["name"])
+        except InvalidRFC1035LabelError as e:
+            raise serializers.ValidationError({"k8s_service_name": [str(e)]})
 
 
 def _validate_awx_token(data: dict) -> models.AwxToken:

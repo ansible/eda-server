@@ -15,10 +15,12 @@ import logging
 import typing as tp
 
 import yaml
+from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.core import models
 from aap_eda.core.utils.credentials import validate_schema
+from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
 
 logger = logging.getLogger(__name__)
 
@@ -128,3 +130,12 @@ def check_if_schema_valid(schema: dict):
 
     if bool(errors):
         raise serializers.ValidationError(errors)
+
+
+def check_if_rcf_1035_compliant(service_name: str):
+    if settings.DEPLOYMENT_TYPE == "k8s" and not is_rfc_1035_compliant(
+        service_name
+    ):
+        raise serializers.ValidationError(
+            f"{service_name} must be a valid RFC 1035 label name"
+        )

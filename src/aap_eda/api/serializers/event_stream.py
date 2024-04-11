@@ -155,6 +155,11 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             ),
         ],
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_rcf_1035_compliant],
+    )
 
     class Meta:
         model = models.EventStream
