@@ -514,3 +514,5 @@ def test_retrieve_eda_credential_with_empty_encrypted_fields(
     assert response.status_code == status.HTTP_201_CREATED
     key_list = list(response.data["inputs"].keys())
     assert "ssh_key_unlock" not in key_list
+    assert key_list[0] == "username"
+    assert key_list[1] == "password"
