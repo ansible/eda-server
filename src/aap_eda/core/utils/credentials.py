@@ -64,7 +64,7 @@ def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
     old_inputs.update(
         (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_STRING
     )
-    return yaml.dump(old_inputs)
+    return yaml.dump(old_inputs, sort_keys=False)
 
 
 def inputs_from_store(inputs: str) -> dict:
