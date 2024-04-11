@@ -58,6 +58,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
                 git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
                 scm_refspec="refspec",
                 verify_ssl=False,
+                proxy="myproxy.com",
                 import_state=models.Project.ImportState.COMPLETED,
                 import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
             ),
@@ -139,6 +140,7 @@ def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
         ),
         scm_branch="main",
         scm_refspec="ref1",
+        proxy="myproxy.com",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
@@ -215,6 +217,7 @@ def test_create_project(
             "name": "test-project-02",
             "url": "https://git.example.com/acme/project-02",
             "verify_ssl": False,
+            "proxy": "myproxy.com",
         },
     ]
 
@@ -460,6 +463,7 @@ def test_partial_update_project(
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": False,
+        "proxy": "myproxy.com",
     }
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",

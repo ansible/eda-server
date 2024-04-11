@@ -108,6 +108,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
             verify_ssl=project.verify_ssl,
             branch=project.scm_branch,
             refspec=project.scm_refspec,
+            proxy=project.proxy,
         )
 
         assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
