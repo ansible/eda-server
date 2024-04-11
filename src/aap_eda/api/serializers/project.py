@@ -44,6 +44,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "scm_branch",
             "scm_refspec",
             "verify_ssl",
+            "proxy",
             *read_only_fields,
         ]
 
@@ -60,6 +61,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
         model = models.Project
         fields = [
             "url",
+            "proxy",
             "name",
             "description",
             "eda_credential_id",
@@ -119,6 +121,12 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="For git projects, an additional refspec to fetch.",
     )
+    proxy = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Proxy server for http or https connection",
+    )
 
     class Meta:
         model = models.Project
@@ -130,6 +138,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "scm_branch",
             "scm_refspec",
             "verify_ssl",
+            "proxy",
         ]
 
 
@@ -163,6 +172,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "verify_ssl",
             "scm_branch",
             "scm_refspec",
+            "proxy",
             *read_only_fields,
         ]
 
@@ -184,6 +194,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "name": project["name"],
             "description": project["description"],
             "url": project["url"],
+            "proxy": project["proxy"],
             "scm_type": project["scm_type"],
             "scm_branch": project["scm_branch"],
             "scm_refspec": project["scm_refspec"],

@@ -114,6 +114,7 @@ class ScmRepository:
         verify_ssl: bool = True,
         branch: Optional[str] = None,
         refspec: Optional[str] = None,
+        proxy: Optional[str] = None,
         _executor: Optional[GitAnsibleRunnerExecutor] = None,
     ) -> ScmRepository:
         """
@@ -137,6 +138,7 @@ class ScmRepository:
         if not os.path.isdir(path):
             os.makedirs(path)
         extra_vars = {"project_path": path}
+        env_vars = {}
         final_url = url
         secret = ""
         key_file = None
@@ -183,11 +185,16 @@ class ScmRepository:
             extra_vars["scm_refspec"] = refspec
         if depth:
             extra_vars["depth"] = depth
+        if proxy:
+            env_vars["http_proxy"] = proxy
+            env_vars["https_proxy"] = proxy
+            env_vars["HTTP_PROXY"] = proxy
+            env_vars["HTTPS_PROXY"] = proxy
 
         logger.info("Cloning repository: %s", url)
         try:
             with contextlib.chdir(path):
-                git_hash = _executor(extra_vars=extra_vars)
+                git_hash = _executor(extra_vars=extra_vars, env_vars=env_vars)
         except ScmError as e:
             msg = str(e)
             if secret:
@@ -257,6 +264,7 @@ class GitAnsibleRunnerExecutor:
     def __call__(
         self,
         extra_vars: dict,
+        env_vars: dict,
     ):
         with tempfile.TemporaryDirectory(prefix="EDA_RUNNER") as data_dir:
             outputs = io.StringIO()
@@ -265,6 +273,7 @@ class GitAnsibleRunnerExecutor:
                     private_data_dir=data_dir,
                     playbook=PLAYBOOK,
                     extravars=extra_vars,
+                    envvars=env_vars,
                 )
 
             if runner.rc == 0:
