@@ -24,7 +24,7 @@ class EdaCredentialFilter(django_filters.FilterSet):
         label="Filter by EDA credential name.",
     )
     credential_type_id = django_filters.NumberFilter(
-        field_name="credential_type__id",
+        field_name="credential_type_id",
         lookup_expr="exact",
         label="Filter by Credential Type ID.",
     )
