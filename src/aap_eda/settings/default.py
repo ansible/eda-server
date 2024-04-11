@@ -361,6 +361,35 @@ if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
 if not RULEBOOK_WORKER_QUEUES:
     RULEBOOK_WORKER_QUEUES = ["activation"]
 
+
+def _rq_common_parameters():
+    params = {
+        "HOST": REDIS_HOST,
+        "PORT": REDIS_PORT,
+        "USERNAME": REDIS_USER,
+        "PASSWORD": REDIS_USER_PASSWORD,
+    }
+    if REDIS_CLIENT_CERT_PATH:
+        params["SSL"] = True
+    return params
+
+
+def _rq_cert_parameters():
+    params = {}
+    if REDIS_CLIENT_CERT_PATH:
+        params |= {
+            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
+            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
+            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+        }
+    return params
+
+
+def _rq_redis_client_parameters():
+    params = _rq_common_parameters() | _rq_cert_parameters()
+    return {k.lower(): v for (k, v) in params.items()}
+
+
 DEFAULT_QUEUE_TIMEOUT = 300
 DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
 
