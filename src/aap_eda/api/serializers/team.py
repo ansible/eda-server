@@ -16,8 +16,12 @@ from rest_framework import serializers
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models
 
+from .fields.ansible_resource import AnsibleResourceField
+
 
 class TeamSerializer(serializers.ModelSerializer):
+    resource = AnsibleResourceField(read_only=True)
+
     class Meta:
         model = models.Team
         fields = [
@@ -25,6 +29,7 @@ class TeamSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "organization_id",
+            "resource",
             "created",
             "created_by",
             "modified",
@@ -46,6 +51,7 @@ class TeamCreateSerializer(serializers.ModelSerializer):
 
 class TeamDetailSerializer(serializers.ModelSerializer):
     organization = OrganizationRefSerializer()
+    resource = AnsibleResourceField(read_only=True)
 
     class Meta:
         model = models.Team
@@ -54,6 +60,7 @@ class TeamDetailSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "organization",
+            "resource",
             "created",
             "created_by",
             "modified",

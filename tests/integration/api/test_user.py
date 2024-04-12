@@ -37,6 +37,10 @@ def test_retrieve_current_user(client: APIClient, admin_user: models.User):
         "last_name": admin_user.last_name,
         "email": admin_user.email,
         "is_superuser": admin_user.is_superuser,
+        "resource": {
+            "ansible_id": str(admin_user.resource.ansible_id),
+            "resource_type": admin_user.resource.resource_type,
+        },
         "created_at": admin_user.date_joined.strftime(DATETIME_FORMAT),
         "modified_at": admin_user.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -185,6 +189,10 @@ def test_list_users(
         "first_name": admin_user.first_name,
         "last_name": admin_user.last_name,
         "is_superuser": admin_user.is_superuser,
+        "resource": {
+            "ansible_id": str(admin_user.resource.ansible_id),
+            "resource_type": admin_user.resource.resource_type,
+        },
     }
 
 
@@ -206,6 +214,10 @@ def test_partial_update_user(
         "last_name": updated_user.last_name,
         "email": updated_user.email,
         "is_superuser": admin_user.is_superuser,
+        "resource": {
+            "ansible_id": str(admin_user.resource.ansible_id),
+            "resource_type": admin_user.resource.resource_type,
+        },
         "created_at": updated_user.date_joined.strftime(DATETIME_FORMAT),
         "modified_at": updated_user.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -259,6 +271,10 @@ def test_list_users_filter_username(
         "first_name": admin_user.first_name,
         "last_name": admin_user.last_name,
         "is_superuser": admin_user.is_superuser,
+        "resource": {
+            "ansible_id": str(admin_user.resource.ansible_id),
+            "resource_type": admin_user.resource.resource_type,
+        },
     }
 
 

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.resource_registry.fields import AnsibleResourceField
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -31,6 +32,7 @@ class User(AbstractUser):
 
     modified_at = models.DateTimeField(auto_now=True, null=False)
     is_service_account = models.BooleanField(default=False)
+    resource = AnsibleResourceField(primary_key_field="id")
 
     def summary_fields(self):
         return {

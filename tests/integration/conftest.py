@@ -204,6 +204,16 @@ def default_organization() -> models.Organization:
 
 
 @pytest.fixture
+def default_team(default_organization: models.Organization) -> models.Team:
+    """Return a default team in default_organization."""
+    return models.Team.objects.create(
+        name="Default Team",
+        description="This is a default team.",
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
 def preseed_credential_types(
     default_organization: models.Organization,
 ) -> list[models.CredentialType]:

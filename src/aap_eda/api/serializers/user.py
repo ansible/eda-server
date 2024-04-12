@@ -4,11 +4,22 @@ from rest_framework import serializers
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
+from .fields.ansible_resource import AnsibleResourceField
+
 
 class UserSerializer(serializers.ModelSerializer):
+    resource = AnsibleResourceField(read_only=True)
+
     class Meta:
         model = models.User
-        fields = "__all__"
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "is_superuser",
+            "resource",
+        ]
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
@@ -16,6 +27,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         help_text="The user's log in name.",
     )
     created_at = serializers.DateTimeField(source="date_joined")
+    resource = AnsibleResourceField(read_only=True)
 
     class Meta:
         model = models.User
@@ -26,6 +38,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "is_superuser",
+            "resource",
             "created_at",
             "modified_at",
         ]
@@ -55,6 +68,8 @@ class UserListSerializer(serializers.Serializer):
         required=True,
         help_text="The user is a superuser.",
     )
+
+    resource = AnsibleResourceField(read_only=True)
 
 
 class UserUpdateSerializerBase(serializers.ModelSerializer):

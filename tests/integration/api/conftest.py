@@ -28,6 +28,17 @@ DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
 
 @pytest.fixture
+def super_user():
+    """Return a user with is_superuser=True flag."""
+    return models.User.objects.create_user(
+        username="superuser",
+        password="superuser123",
+        email="superuser@localhost",
+        is_superuser=True,
+    )
+
+
+@pytest.fixture
 def admin_user(default_organization):
     user = models.User.objects.create_user(
         username=ADMIN_USERNAME,

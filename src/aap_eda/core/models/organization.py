@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from ansible_base.lib.abstract_models.organization import AbstractOrganization
+from ansible_base.resource_registry.fields import AnsibleResourceField
 from django.conf import settings
 from django.db import models
 
@@ -24,6 +25,8 @@ class OrganizationManager(models.Manager):
 
 class Organization(AbstractOrganization):
     objects = OrganizationManager()
+
+    resource = AnsibleResourceField(primary_key_field="id")
 
     class Meta:
         app_label = "core"
