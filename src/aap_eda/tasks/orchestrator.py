@@ -180,7 +180,7 @@ def dispatch(
         # policy is respected. Same if the request is restart and
         # the queue is not healthy.
         if not queue_name or queue_name not in settings.RULEBOOK_WORKER_QUEUES:
-            LOGGER.warning(
+            LOGGER.info(
                 f"Queue {queue_name} doesn't exist or is not valid. "
                 f"Rescheduling {process_parent_type} {process_parent_id}"
                 f" to the most free queue.",
