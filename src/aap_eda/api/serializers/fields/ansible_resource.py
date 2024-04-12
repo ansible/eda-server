@@ -11,16 +11,15 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+#
+from rest_framework import serializers
 
-from ansible_base.lib.abstract_models import AbstractTeam
-from ansible_base.resource_registry.fields import AnsibleResourceField
 
+class AnsibleResourceField(serializers.Field):
+    """Serializer for Ansible Resource Field."""
 
-class Team(AbstractTeam):
-    resource = AnsibleResourceField(primary_key_field="id")
-
-    class Meta(AbstractTeam.Meta):
-        app_label = "core"
-        permissions = [
-            ("member_team", "Inherit all roles assigned to this team")
-        ]
+    def to_representation(self, instance) -> dict:
+        return {
+            "ansible_id": instance.ansible_id,
+            "resource_type": instance.resource_type,
+        }
