@@ -20,7 +20,7 @@ def populate_rulebook_process_queue(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0028_remove_activation_credentials_and_more"),
+        ("core", "0029_project_proxy"),
     ]
 
     operations = [
