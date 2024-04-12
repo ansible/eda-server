@@ -18,7 +18,7 @@ from rest_framework import serializers
 class AnsibleResourceField(serializers.Field):
     """Serializer for Ansible Resource Field."""
 
-    def to_representation(self, instance) -> str:
+    def to_representation(self, instance) -> dict:
         return {
             "ansible_id": instance.ansible_id,
             "resource_type": instance.resource_type,
