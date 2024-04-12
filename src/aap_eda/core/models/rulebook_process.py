@@ -201,9 +201,9 @@ class RulebookProcessLog(models.Model):
 class RulebookProcessQueue(models.Model):
     """Rulebook Process Queue model.
 
-    Rulebook Process Queue is an instance of ansible-rulebook process
-    that is created when a rulebook process is started.
-    It keeps track of the queue name where the process is running.
+    Rulebook Process Queue keeps track of the queue name for a
+    Rulebook Process. Every rulebook process is associated with the
+    queue name where is running when it is created.
     """
 
     queue_name = models.CharField(max_length=255)
