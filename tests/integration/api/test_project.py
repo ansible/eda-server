@@ -58,7 +58,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
                 git_hash="06a71890b48189edc0b7afccf18285ec042ce302",
                 scm_refspec="refspec",
                 verify_ssl=False,
-                proxy="myproxy.com",
+                proxy="http://myproxy.com",
                 import_state=models.Project.ImportState.COMPLETED,
                 import_task_id="46e289a7-9dcc-4baa-a49a-a6ca756d9b71",
             ),
@@ -67,6 +67,7 @@ def test_list_projects(client: APIClient, check_permission_mock: mock.Mock):
     response = client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_200_OK
     for data, project in zip(response.json()["results"], projects):
+        project.refresh_from_db()
         assert_project_data(data, project)
 
     check_permission_mock.assert_called_once_with(
@@ -96,6 +97,7 @@ def test_list_projects_filter_name(client: APIClient):
     data = response.json()["results"][0]
     project = projects[0]
     assert response.status_code == status.HTTP_200_OK
+    project.refresh_from_db()
     assert_project_data(data, project)
 
 
@@ -140,10 +142,11 @@ def test_retrieve_project(client: APIClient, check_permission_mock: mock.Mock):
         ),
         scm_branch="main",
         scm_refspec="ref1",
-        proxy="myproxy.com",
+        proxy="http://user:secret@myproxy.com",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
     )
+    project.refresh_from_db()
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_project_data(response.json(), project)
@@ -163,6 +166,7 @@ def test_retrieve_project_failed_state(client: APIClient):
         import_task_id="3677eb4a-de4a-421a-a73b-411aa502484d",
         import_error="Unexpected error. Please contact support.",
     )
+    project.refresh_from_db()
     response = client.get(f"{api_url_v1}/projects/{project.id}/")
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -451,6 +455,7 @@ def test_partial_update_project(
         name="test-project-01",
         url="https://git.example.com/acme/project-01",
         git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+        proxy="http://user:secret@myproxy.com",
     )
     assert project.eda_credential_id is None
     assert project.signature_validation_credential_id is None
@@ -463,7 +468,7 @@ def test_partial_update_project(
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": False,
-        "proxy": "myproxy.com",
+        "proxy": "http://user:$encrypted$@myproxy.com",
     }
     response = client.patch(
         f"{api_url_v1}/projects/{project.id}/",
@@ -476,6 +481,32 @@ def test_partial_update_project(
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.PROJECT, Action.UPDATE
+    )
+
+
+@pytest.mark.django_db
+def test_partial_update_project_bad_proxy(
+    client: APIClient, check_permission_mock: mock.Mock
+):
+    project = models.Project.objects.create(
+        name="test-project-01",
+        url="https://git.example.com/acme/project-01",
+        git_hash="4673c67547cf6fe6a223a9dd49feb1d5f953449c",
+        proxy="http://user:secret@myproxy.com",
+    )
+
+    data = {
+        "name": "test-project-01-updated",
+        "proxy": "http://new-user:$encrypted$@myproxy.com",
+    }
+    response = client.patch(
+        f"{api_url_v1}/projects/{project.id}/",
+        data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.data["errors"]
+        == "The password in the proxy field should be unencrypted"
     )
 
 
@@ -513,9 +544,14 @@ def assert_project_data(data: Dict[str, Any], project: models.Project):
         project_value = getattr(project, key, None)
         if isinstance(project_value, datetime.datetime):
             project_value = project_value.strftime(DATETIME_FORMAT)
+
         if isinstance(project_value, models.EdaCredential):
             assert value == get_credential_details(project_value)
         else:
+            if key == "proxy":
+                project_value = project_value.get_secret_value().replace(
+                    "secret", "$encrypted$"
+                )
             assert value == project_value
 
 
