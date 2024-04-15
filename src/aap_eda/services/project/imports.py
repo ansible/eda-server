@@ -107,6 +107,7 @@ class ProjectImportService:
                 verify_ssl=project.verify_ssl,
                 branch=project.scm_branch,
                 refspec=project.scm_refspec,
+                proxy=project.proxy,
             )
             project.git_hash = repo.rev_parse("HEAD")
 
@@ -126,6 +127,7 @@ class ProjectImportService:
                 verify_ssl=project.verify_ssl,
                 branch=project.scm_branch,
                 refspec=project.scm_refspec,
+                proxy=project.proxy,
             )
             git_hash = repo.rev_parse("HEAD")
 

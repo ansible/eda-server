@@ -139,6 +139,7 @@ def default_project(
         eda_credential=default_eda_credential,
         signature_validation_credential=default_vault_credential,
         scm_branch="main",
+        proxy="myproxy.com",
         organization=default_organization,
         import_state=models.Project.ImportState.COMPLETED,
         import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",

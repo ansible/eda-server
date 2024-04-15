@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0031_dab_rbac"),
+        ("core", "0032_dab_rbac"),
     ]
 
     operations = [

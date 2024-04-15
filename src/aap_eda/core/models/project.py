@@ -57,6 +57,7 @@ class Project(models.Model):
     )
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
+    proxy = models.TextField(blank=True, default="")
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
     # TODO: used by migration, remove it later

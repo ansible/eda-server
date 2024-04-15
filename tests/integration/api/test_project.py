@@ -134,6 +134,7 @@ def test_create_project(
             "name": "test-project-02",
             "url": "https://git.example.com/acme/project-02",
             "verify_ssl": False,
+            "proxy": "myproxy.com",
         },
     ]
 
@@ -336,6 +337,7 @@ def test_partial_update_project(
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": True,
+        "proxy": "myproxy.com",
     }
     response = client.patch(
         f"{api_url_v1}/projects/{new_project.id}/",

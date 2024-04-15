@@ -41,6 +41,7 @@ def test_git_clone(credential: EdaCredential):
             depth=1,
             branch="branch1",
             refspec="spec1",
+            proxy="myproxy.com",
             _executor=executor,
         )
         executor.assert_called_once_with(
@@ -50,7 +51,13 @@ def test_git_clone(credential: EdaCredential):
                 "scm_branch": "branch1",
                 "scm_refspec": "spec1",
                 "depth": 1,
-            }
+            },
+            env_vars={
+                "http_proxy": "myproxy.com",
+                "https_proxy": "myproxy.com",
+                "HTTP_PROXY": "myproxy.com",
+                "HTTPS_PROXY": "myproxy.com",
+            },
         )
         assert isinstance(repository, ScmRepository)
         assert repository.root == dest_path
@@ -96,7 +103,8 @@ def test_git_clone_without_ssl_verification():
                 "project_path": dest_path,
                 "ssl_no_verify": "true",
                 "scm_url": "https://adam:secret@git.example.com/repo.git",
-            }
+            },
+            env_vars={},
         )
 
 
