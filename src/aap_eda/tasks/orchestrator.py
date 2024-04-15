@@ -37,7 +37,7 @@ from aap_eda.services.activation.manager import ActivationManager
 LOGGER = logging.getLogger(__name__)
 
 
-class QueueNotFoundError(Exception):
+class HealthyQueueNotFoundError(Exception):
     """Raised when a queue is not found."""
 
     ...
@@ -251,7 +251,7 @@ def get_most_free_queue_name() -> str:
         queue_counter[queue_name] = running_processes_count
 
     if not queue_counter:
-        raise QueueNotFoundError(
+        raise HealthyQueueNotFoundError(
             "No healthy queue found to dispatch the request",
         )
 
