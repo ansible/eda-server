@@ -98,6 +98,7 @@ class ProjectImportService:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
+            proxy = project.proxy.get_secret_value() if project.proxy else None
             repo = self._scm_cls.clone(
                 project.url,
                 repo_dir,
@@ -107,7 +108,7 @@ class ProjectImportService:
                 verify_ssl=project.verify_ssl,
                 branch=project.scm_branch,
                 refspec=project.scm_refspec,
-                proxy=project.proxy,
+                proxy=proxy,
             )
             project.git_hash = repo.rev_parse("HEAD")
 
@@ -118,6 +119,7 @@ class ProjectImportService:
         with self._temporary_directory() as tempdir:
             repo_dir = os.path.join(tempdir, "src")
 
+            proxy = project.proxy.get_secret_value() if project.proxy else None
             repo = self._scm_cls.clone(
                 project.url,
                 repo_dir,
@@ -127,7 +129,7 @@ class ProjectImportService:
                 verify_ssl=project.verify_ssl,
                 branch=project.scm_branch,
                 refspec=project.scm_refspec,
-                proxy=project.proxy,
+                proxy=proxy,
             )
             git_hash = repo.rev_parse("HEAD")
 

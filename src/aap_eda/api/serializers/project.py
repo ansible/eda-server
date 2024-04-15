@@ -12,17 +12,34 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from urllib.parse import urlparse, urlunparse
+
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.core import models, validators
+from aap_eda.core.utils.crypto.base import SecretValue
+
+ENCRYPTED_STRING = "$encrypted$"
 
 
-class ProjectSerializer(serializers.ModelSerializer):
+class ProxyFieldMixin:
+    def get_proxy(self, obj: models.Project) -> str:
+        if not obj.proxy:
+            return ""
+        url = obj.proxy
+        if isinstance(url, SecretValue):
+            url = obj.proxy.get_secret_value()
+        return get_proxy_for_display(url)
+
+
+class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     eda_credential_id = serializers.IntegerField(
         required=False, allow_null=True
     )
+
+    proxy = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Project
@@ -142,7 +159,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         ]
 
 
-class ProjectReadSerializer(serializers.ModelSerializer):
+class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     """Serializer for reading the Project with embedded objects."""
 
     eda_credential = EdaCredentialRefSerializer(
@@ -151,6 +168,7 @@ class ProjectReadSerializer(serializers.ModelSerializer):
     signature_validation_credential = EdaCredentialRefSerializer(
         required=False, allow_null=True
     )
+    proxy = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Project()
@@ -247,3 +265,27 @@ class ExtraVarRefSerializer(serializers.ModelSerializer):
         model = models.ExtraVar
         fields = ["id"]
         read_only_fields = ["id"]
+
+
+def get_proxy_for_display(proxy: str) -> str:
+    if not (proxy.startswith("http://") or proxy.startswith("https://")):
+        return proxy
+    result = urlparse(proxy)
+    if "@" not in proxy:
+        return proxy
+    cred, domain = result.netloc.split("@")
+    if ":" in cred:
+        user, _ = cred.split(":")
+        domain = f"{user}:{ENCRYPTED_STRING}@{domain}"
+    else:
+        domain = f"{ENCRYPTED_STRING}@{domain}"
+
+    unparsed = (
+        result.scheme,
+        domain,
+        result.path,
+        result.params,
+        result.query,
+        result.fragment,
+    )
+    return urlunparse(unparsed)
