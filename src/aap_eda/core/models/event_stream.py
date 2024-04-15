@@ -88,6 +88,11 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         choices=RulebookProcessLogLevel.choices(),
         default=get_default_log_level,
     )
+    k8s_service_name = models.TextField(
+        null=True,
+        default=None,
+        help_text="Name of the kubernetes service",
+    )
 
     class Meta:
         db_table = "core_event_stream"
