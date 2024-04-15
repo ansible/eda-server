@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from datetime import datetime, timedelta
 from unittest import mock
 
 import pytest
@@ -20,6 +21,7 @@ from aap_eda.core.enums import ProcessParentType
 from aap_eda.core.models import Activation, EventStream
 from aap_eda.tasks.orchestrator import (
     UnknownProcessParentType,
+    check_rulebook_queue_health,
     get_process_parent,
 )
 
@@ -60,3 +62,90 @@ def test_get_process_parent_unknown_type():
         str(exc_info.value)
         == f"Unknown process parent type {process_parent_type}"
     )
+
+
+@pytest.fixture
+def setup_queue_health():
+    queue_name = "rulebook_queue"
+    queue_mock = mock.Mock()
+    get_queue_mock = mock.Mock(return_value=queue_mock)
+    settings_mock = mock.Mock()
+    settings_mock.DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
+    datetime_mock = mock.Mock()
+    timedelta_mock = mock.Mock()
+    timedelta_mock.return_value = timedelta(seconds=60)
+
+    patches = {
+        "get_queue": mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue", get_queue_mock
+        ),
+        "datetime": mock.patch(
+            "aap_eda.tasks.orchestrator.datetime", datetime_mock
+        ),
+        "timedelta": mock.patch(
+            "aap_eda.tasks.orchestrator.timedelta", timedelta_mock
+        ),
+        "settings": mock.patch(
+            "aap_eda.tasks.orchestrator.settings", settings_mock
+        ),
+    }
+    with patches["get_queue"], patches["datetime"], patches[
+        "timedelta"
+    ], patches["settings"]:
+        yield (
+            queue_name,
+            queue_mock,
+            get_queue_mock,
+            datetime_mock,
+            settings_mock,
+        )
+
+
+def test_check_rulebook_queue_health_all_workers_dead(setup_queue_health):
+    (
+        queue_name,
+        queue_mock,
+        get_queue_mock,
+        datetime_mock,
+        _,
+    ) = setup_queue_health
+
+    # Specific setup for this test
+    worker_mock = mock.Mock()
+    worker_mock.last_heartbeat = datetime(2022, 1, 1)
+    all_workers_mock = mock.Mock(return_value=[worker_mock])
+    datetime_mock.now.return_value = datetime(2022, 1, 1, minute=5)
+
+    with mock.patch("aap_eda.tasks.orchestrator.Worker.all", all_workers_mock):
+        result = check_rulebook_queue_health(queue_name)
+
+    get_queue_mock.assert_called_once_with(queue_name)
+    all_workers_mock.assert_called_once_with(queue=queue_mock)
+    queue_mock.empty.assert_called_once()
+    assert result is False
+
+
+def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
+    (
+        queue_name,
+        queue_mock,
+        get_queue_mock,
+        datetime_mock,
+        _,
+    ) = setup_queue_health
+
+    # Specific setup for this test
+    worker_mock1 = mock.Mock()
+    worker_mock1.last_heartbeat = datetime(2022, 1, 1, hour=6)
+    worker_mock2 = mock.Mock()
+    worker_mock2.last_heartbeat = datetime(2022, 1, 1)
+    all_workers_mock = mock.Mock(return_value=[worker_mock1, worker_mock2])
+    datetime_mock.now.return_value = datetime(2022, 1, 1, hour=6, second=30)
+
+    with mock.patch("aap_eda.tasks.orchestrator.Worker.all", all_workers_mock):
+        result = check_rulebook_queue_health(queue_name)
+
+    get_queue_mock.assert_called_once_with(queue_name)
+    all_workers_mock.assert_called_once_with(queue=queue_mock)
+    queue_mock.empty.assert_not_called()
+    assert result is True
