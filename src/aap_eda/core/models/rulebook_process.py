@@ -203,7 +203,7 @@ class RulebookProcessQueue(models.Model):
 
     Rulebook Process Queue keeps track of the queue name for a
     Rulebook Process. Every rulebook process is associated with the
-    queue name where is running when it is created.
+    queue, by name, where it ran at creation.
     """
 
     queue_name = models.CharField(max_length=255)
