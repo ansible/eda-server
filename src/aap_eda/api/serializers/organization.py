@@ -16,13 +16,13 @@ from ansible_base.lib.serializers.common import NamedCommonModelSerializer
 
 from aap_eda.core.models import Organization
 
-from .fields.ansible_resource import AnsibleResourceField
+from .fields.ansible_resource import AnsibleResourceFieldSerializer
 
 
 class OrganizationSerializer(NamedCommonModelSerializer):
     reverse_url_name = "organization-detail"
 
-    resource = AnsibleResourceField(read_only=True)
+    resource = AnsibleResourceFieldSerializer(read_only=True)
 
     class Meta:
         model = Organization

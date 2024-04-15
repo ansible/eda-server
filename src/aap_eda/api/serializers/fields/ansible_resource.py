@@ -12,10 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 
-class AnsibleResourceField(serializers.Field):
+@extend_schema_field(OpenApiTypes.OBJECT)
+class AnsibleResourceFieldSerializer(serializers.Field):
     """Serializer for Ansible Resource Field."""
 
     def to_representation(self, instance) -> dict:
