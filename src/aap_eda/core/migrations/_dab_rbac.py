@@ -46,10 +46,19 @@ def migrate_roles_to_dab(apps, schema_editor):
                 continue  # models were removed
 
             ct = ContentType.objects.get(model=model_name)
-            permission = DABPermission.objects.get(
-                content_type=ct, codename__startswith=action
-            )
-            new_permissions.append(permission)
+            try:
+                # old permissions list for resources isn't accurate
+                # so we ignore those that are not in the new permissions list
+                # e.g. update_activation, delete_rulebook, etc.
+                permission = DABPermission.objects.get(
+                    content_type=ct, codename__startswith=action
+                )
+                new_permissions.append(permission)
+            except DABPermission.DoesNotExist:
+                logger.info(
+                    f"Action {p.action} is not found for resource {p.resource_type}. Skipping.."
+                )
+                continue
 
         # Role in new system is created as an organization-level role
         new_role, _ = RoleDefinition.objects.get_or_create(

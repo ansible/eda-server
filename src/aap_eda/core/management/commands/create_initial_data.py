@@ -467,9 +467,11 @@ class Command(BaseCommand):
         for role_data in ORG_ROLES:
             role, _ = RoleDefinition.objects.get_or_create(
                 name=role_data["name"],
-                description=role_data["description"],
-                content_type=org_ct,
-                managed=True,
+                defaults={
+                    "description": role_data["description"],
+                    "content_type": org_ct,
+                    "managed": True,
+                },
             )
             permissions = []
             for resource_type, actions in role_data["permissions"].items():
