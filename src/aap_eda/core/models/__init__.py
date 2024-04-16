@@ -38,7 +38,11 @@ from .rulebook import (
     Rulebook,
     Ruleset,
 )
-from .rulebook_process import RulebookProcess, RulebookProcessLog
+from .rulebook_process import (
+    RulebookProcess,
+    RulebookProcessLog,
+    RulebookProcessQueue,
+)
 from .team import Team
 from .user import AwxToken, User
 
@@ -46,6 +50,7 @@ __all__ = [
     "ActivationInstanceJobInstance",
     "RulebookProcessLog",
     "RulebookProcess",
+    "RulebookProcessQueue",
     "Activation",
     "AuditAction",
     "AuditEvent",

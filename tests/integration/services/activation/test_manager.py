@@ -14,6 +14,7 @@
 """Activation Manager tests."""
 # TODO(alex) dedup code and fixtures across all the tests
 
+from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
@@ -130,12 +131,23 @@ def new_activation_with_instance(
         activation=activation,
         status=enums.ActivationStatus.RUNNING,
     )
+    models.RulebookProcessQueue.objects.create(
+        process=activation.latest_instance,
+        queue_name="queue_name_test",
+    )
     return activation
 
 
 @pytest.fixture
 def container_engine_mock() -> MagicMock:
     return create_autospec(ContainerEngine, instance=True)
+
+
+@pytest.fixture
+def job_mock():
+    mock_job = MagicMock()
+    mock_job.origin = "queue_name_test"
+    return mock_job
 
 
 @pytest.mark.django_db
@@ -252,6 +264,7 @@ def test_start_already_running(
 def test_start_first_run(
     basic_activation: models.Activation,
     container_engine_mock: MagicMock,
+    job_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
     preseed_credential_types,
 ):
@@ -261,7 +274,11 @@ def test_start_first_run(
         container_engine=container_engine_mock,
     )
     container_engine_mock.start.return_value = "test-pod-id"
-    activation_manager.start()
+    with mock.patch(
+        "aap_eda.services.activation.manager.get_current_job",
+        return_value=job_mock,
+    ):
+        activation_manager.start()
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
@@ -273,11 +290,17 @@ def test_start_first_run(
     assert basic_activation.latest_instance.activation_pod_id == "test-pod-id"
     assert basic_activation.restart_count == 0
 
+    rulebook_process_queue = models.RulebookProcessQueue.objects.get(
+        process=basic_activation.latest_instance,
+    )
+    assert rulebook_process_queue.queue_name == job_mock.origin
+
 
 @pytest.mark.django_db
 def test_start_restart(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
+    job_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
     preseed_credential_types,
 ):
@@ -287,7 +310,11 @@ def test_start_restart(
         container_engine=container_engine_mock,
     )
     container_engine_mock.start.return_value = "test-pod-id"
-    activation_manager.start(is_restart=True)
+    with mock.patch(
+        "aap_eda.services.activation.manager.get_current_job",
+        return_value=job_mock,
+    ):
+        activation_manager.start(is_restart=True)
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
@@ -300,6 +327,10 @@ def test_start_restart(
         running_activation.latest_instance.activation_pod_id == "test-pod-id"
     )
     assert running_activation.restart_count == 1
+    rulebook_process_queue = models.RulebookProcessQueue.objects.get(
+        process=running_activation.latest_instance,
+    )
+    assert rulebook_process_queue.queue_name == job_mock.origin
 
 
 @pytest.mark.django_db
@@ -596,16 +627,20 @@ def test_delete_with_exception(
 
 @pytest.mark.django_db
 def test_start_max_running_activations(
-    new_activation_with_instance: models.Activation,
     basic_activation: models.Activation,
+    new_activation_with_instance: models.Activation,
     settings: SettingsWrapper,
     eda_caplog: LogCaptureFixture,
+    job_mock: MagicMock,
     preseed_credential_types,
 ):
     """Test start verb when max running activations is reached."""
     apply_settings(settings, MAX_RUNNING_ACTIVATIONS=1)
     activation_manager = ActivationManager(basic_activation)
 
-    with pytest.raises(exceptions.MaxRunningProcessesError):
+    with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
+        "aap_eda.services.activation.manager.get_current_job",
+        return_value=job_mock,
+    ):
         activation_manager.start()
     assert "No capacity to start a new rulebook process" in eda_caplog.text

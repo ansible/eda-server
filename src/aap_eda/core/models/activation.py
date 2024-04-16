@@ -122,6 +122,11 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="+",
     )
+    k8s_service_name = models.TextField(
+        null=True,
+        default=None,
+        help_text="Name of the kubernetes service",
+    )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

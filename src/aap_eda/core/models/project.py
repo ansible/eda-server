@@ -26,6 +26,8 @@
 
 from django.db import models
 
+from aap_eda.core.utils.crypto.fields import EncryptedTextField
+
 from .organization import Organization
 
 PROJECT_ARCHIVE_DIR = "projects/"
@@ -57,7 +59,7 @@ class Project(models.Model):
     )
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
-    proxy = models.TextField(blank=True, default="")
+    proxy = EncryptedTextField(blank=True, default="")
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
     # TODO: used by migration, remove it later

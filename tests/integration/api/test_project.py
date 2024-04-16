@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import datetime
 from typing import Any, Dict
 from unittest import mock
 
@@ -19,7 +20,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
 from tests.integration.constants import api_url_v1
 
 
@@ -35,8 +36,8 @@ def test_list_projects(
     response = client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_200_OK
     for data, project in zip(response.json()["results"], projects):
-        assert_project_base_data(data, project)
-        assert_project_fk_data(data, project)
+        project.refresh_from_db()
+        assert_project_data(data, project)
 
 
 @pytest.mark.django_db
@@ -49,8 +50,8 @@ def test_list_projects_filter_name(
     response = client.get(f"{api_url_v1}/projects/?name={test_name}")
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
-    assert_project_base_data(data, default_project)
-    assert_project_fk_data(data, default_project)
+    default_project.refresh_from_db()
+    assert_project_data(data, default_project)
 
 
 @pytest.mark.django_db
@@ -70,16 +71,17 @@ def test_retrieve_project(
     default_project: models.Project,
     client: APIClient,
 ):
+    default_project.refresh_from_db()
     response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
     assert response.status_code == status.HTTP_200_OK
-    assert_project_base_data(response.json(), default_project)
-    assert_project_related_data(response.json(), default_project)
+    assert_project_data(response.json(), default_project)
 
 
 @pytest.mark.django_db
 def test_retrieve_project_failed_state(
     new_project: models.Project, client: APIClient
 ):
+    new_project.refresh_from_db()
     response = client.get(f"{api_url_v1}/projects/{new_project.id}/")
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -87,8 +89,7 @@ def test_retrieve_project_failed_state(
     assert data["import_state"] == "failed"
     assert data["import_error"] == "Unexpected error. Please contact support."
 
-    assert_project_base_data(data, new_project)
-    assert_project_related_data(data, new_project)
+    assert_project_data(data, new_project)
 
 
 @pytest.mark.django_db
@@ -165,8 +166,7 @@ def test_create_project(
         assert str(project.import_task_id) == job_id
 
         # Check that response returned the valid representation of the project
-        assert_project_base_data(data, project)
-        assert_project_fk_data(data, project)
+        assert_project_data(data, project)
 
         # Check that import task job was created
         import_project_task.delay.assert_called_with(project_id=project.id)
@@ -224,8 +224,7 @@ def test_sync_project(
     assert default_project.import_error is None
     assert str(default_project.import_task_id) == job_id
 
-    assert_project_base_data(data, default_project)
-    assert_project_fk_data(data, default_project)
+    assert_project_data(data, default_project)
 
     sync_project_task.delay.assert_called_once_with(
         project_id=default_project.id,
@@ -324,7 +323,6 @@ def test_partial_update_project(
     new_project: models.Project,
     default_eda_credential: models.EdaCredential,
     client: APIClient,
-    check_permission_mock: mock.Mock,
 ):
     assert new_project.eda_credential_id is None
     assert new_project.signature_validation_credential_id is None
@@ -337,7 +335,7 @@ def test_partial_update_project(
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": True,
-        "proxy": "myproxy.com",
+        "proxy": "http://user:$encrypted$@myproxy.com",
     }
     response = client.patch(
         f"{api_url_v1}/projects/{new_project.id}/",
@@ -354,8 +352,26 @@ def test_partial_update_project(
     )
     assert new_project.verify_ssl is new_data["verify_ssl"]
 
-    assert_project_base_data(response.json(), new_project)
-    assert_project_fk_data(response.json(), new_project)
+    assert_project_data(response.json(), new_project)
+
+
+@pytest.mark.django_db
+def test_partial_update_project_bad_proxy(
+    default_project: models.Project, client: APIClient
+):
+    data = {
+        "name": "test-project-01-updated",
+        "proxy": "http://new-user:$encrypted$@myproxy.com",
+    }
+    response = client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/",
+        data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.data["errors"]
+        == "The password in the proxy field should be unencrypted"
+    )
 
 
 @pytest.mark.django_db
@@ -381,68 +397,44 @@ def test_delete_project_not_found(client: APIClient):
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
-def assert_project_base_data(
-    response: Dict[str, Any], expected: models.Project
-):
-    assert response["id"] == expected.id
-    assert response["name"] == expected.name
-    assert response["description"] == expected.description
-    assert response["url"] == expected.url
-    assert response["git_hash"] == expected.git_hash
-    assert response["verify_ssl"] == expected.verify_ssl
-    assert response["import_state"] == expected.import_state
-    assert response["import_error"] == expected.import_error
-    assert response["created_at"] == expected.created_at.strftime(
-        DATETIME_FORMAT
-    )
-    assert response["modified_at"] == expected.modified_at.strftime(
-        DATETIME_FORMAT
-    )
+def assert_project_data(data: Dict[str, Any], project: models.Project):
+    for key, value in data.items():
+        project_value = getattr(project, key, None)
+        if isinstance(project_value, datetime.datetime):
+            project_value = project_value.strftime(DATETIME_FORMAT)
+
+        if isinstance(project_value, models.EdaCredential):
+            assert value == get_credential_details(project_value)
+        elif isinstance(project_value, models.Organization):
+            assert value == get_organization_details(project_value)
+        else:
+            if key == "proxy":
+                project_value = project_value.get_secret_value().replace(
+                    "secret", "$encrypted$"
+                )
+            assert value == project_value
 
 
-def assert_project_fk_data(response: Dict[str, Any], expected: models.Project):
-    if expected.eda_credential:
-        assert response["eda_credential_id"] == expected.eda_credential.id
-    else:
-        assert not response["eda_credential_id"]
-    if expected.signature_validation_credential:
-        assert (
-            response["signature_validation_credential_id"]
-            == expected.signature_validation_credential.id
-        )
-    else:
-        assert not response["signature_validation_credential_id"]
-    if expected.organization:
-        assert response["organization_id"] == expected.organization.id
-    else:
-        assert not response["organization_id"]
+def get_credential_details(credential: models.EdaCredential) -> dict:
+    credential.refresh_from_db()
+    return {
+        "id": credential.id,
+        "name": credential.name,
+        "description": credential.description,
+        "credential_type_id": credential.credential_type.id,
+        "organization_id": credential.organization.id,
+        "managed": credential.managed,
+        "inputs": inputs_to_display(
+            credential.credential_type.inputs,
+            credential.inputs.get_secret_value(),
+        ),
+    }
 
 
-def assert_project_related_data(
-    response: Dict[str, Any], expected: models.Project
-):
-    if expected.eda_credential:
-        credential_data = response["eda_credential"]
-        assert credential_data["id"] == expected.eda_credential.id
-        assert credential_data["name"] == expected.eda_credential.name
-        assert (
-            credential_data["description"]
-            == expected.eda_credential.description
-        )
-        assert credential_data["managed"] == expected.eda_credential.managed
-        assert (
-            credential_data["credential_type_id"]
-            == expected.eda_credential.credential_type.id
-        )
-    else:
-        assert not response["eda_credential"]
-    if expected.organization:
-        organization_data = response["organization"]
-        assert organization_data["id"] == expected.organization.id
-        assert organization_data["name"] == expected.organization.name
-        assert (
-            organization_data["description"]
-            == expected.organization.description
-        )
-    else:
-        assert not response["organization"]
+def get_organization_details(organization: models.Organization) -> dict:
+    organization.refresh_from_db()
+    return {
+        "id": organization.id,
+        "name": organization.name,
+        "description": organization.description,
+    }

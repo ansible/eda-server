@@ -80,6 +80,7 @@ class ActivationStatus(DjangoStrEnum):
     # monitor task will handle it
     UNRESPONSIVE = "unresponsive"
     ERROR = "error"
+    WORKERS_OFFLINE = "workers offline"
 
 
 # TODO: Deprecated, will be removed in future version, use

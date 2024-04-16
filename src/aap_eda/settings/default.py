@@ -312,6 +312,25 @@ REST_FRAMEWORK = {
 }
 
 # ---------------------------------------------------------
+# DEPLOYMENT SETTINGS
+# ---------------------------------------------------------
+
+DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
+WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
+WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
+WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+    "ws://", "http://"
+).replace("wss://", "https://")
+PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
+PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
+PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
+PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
+DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
+CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
+
+
+# ---------------------------------------------------------
 # TASKING SETTINGS
 # ---------------------------------------------------------
 RQ = {
@@ -327,52 +346,96 @@ REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
 REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
 REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
+REDIS_DB = settings.get("MQ_DB", 0)
+
+# A list of queues to be used in multinode mode
+# If the list is empty, use the default singlenode queue name
+RULEBOOK_WORKER_QUEUES = settings.get("RULEBOOK_WORKER_QUEUES", [])
+if isinstance(RULEBOOK_WORKER_QUEUES, str):
+    RULEBOOK_WORKER_QUEUES = RULEBOOK_WORKER_QUEUES.split(",")
+
+if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
+    raise ImproperlyConfigured(
+        "The RULEBOOK_WORKER_QUEUES setting must not contain duplicates."
+    )
+
+# If the list is empty, use the default queue name for single node mode
+if not RULEBOOK_WORKER_QUEUES:
+    RULEBOOK_WORKER_QUEUES = ["activation"]
+
+DEFAULT_QUEUE_TIMEOUT = 300
+DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
+
+# Time window in seconds to consider a worker as dead
+DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
+DEFAULT_WORKER_TTL = 5
 
 
-if REDIS_UNIX_SOCKET_PATH:
-    RQ_QUEUES = {
-        "default": {
+def get_rq_queues() -> dict:
+    """Construct the RQ_QUEUES dictionary based on the settings.
+
+    If there is no multinode enabled, the default and activation queues
+    are used. Otherwise, constructs the queues based on the
+    WORKERS_RULEBOOK_QUEUES list.
+    """
+    queues = {}
+
+    # Configures the default queue
+    if REDIS_UNIX_SOCKET_PATH:
+        queues["default"] = {
             "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 300,
-        },
-        "activation": {
-            "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 120,
-        },
-    }
-else:
-    RQ_QUEUES = {
-        "default": {
+            "DEFAULT_TIMEOUT": DEFAULT_QUEUE_TIMEOUT,
+        }
+    else:
+        queues["default"] = {
             "HOST": REDIS_HOST,
             "PORT": REDIS_PORT,
-            "USERNAME": REDIS_USER,
-            "PASSWORD": REDIS_USER_PASSWORD,
-            "DEFAULT_TIMEOUT": 300,
-        },
-        "activation": {
-            "HOST": REDIS_HOST,
-            "PORT": REDIS_PORT,
-            "USERNAME": REDIS_USER,
-            "PASSWORD": REDIS_USER_PASSWORD,
-            "DEFAULT_TIMEOUT": 120,
-        },
-    }
-    if REDIS_CLIENT_CERT_PATH:
-        RQ_QUEUES["default"] |= {"SSL": True}
-        RQ_QUEUES["default"]["REDIS_CLIENT_KWARGS"] = {
-            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
-            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
-            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+            "DEFAULT_TIMEOUT": DEFAULT_QUEUE_TIMEOUT,
         }
 
-        RQ_QUEUES["activation"] |= {"SSL": True}
-        RQ_QUEUES["activation"]["REDIS_CLIENT_KWARGS"] = {
-            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
-            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
-            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
-        }
-RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
-RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
+    # Configures the activation queue for single node mode
+    if len(RULEBOOK_WORKER_QUEUES) == 1:
+        if REDIS_UNIX_SOCKET_PATH:
+            queues[RULEBOOK_WORKER_QUEUES[0]] = {
+                "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
+                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
+            }
+        else:
+            queues[RULEBOOK_WORKER_QUEUES[0]] = {
+                "HOST": REDIS_HOST,
+                "PORT": REDIS_PORT,
+                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
+            }
+    # Configure the queues for multinode mode
+    else:
+        for queue in RULEBOOK_WORKER_QUEUES:
+            queues[queue] = {
+                "HOST": REDIS_HOST,
+                "PORT": REDIS_PORT,
+                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
+            }
+
+    # Add the common settings to all queues
+    for queue in queues.values():
+        queue["DB"] = REDIS_DB
+        queue["USERNAME"] = REDIS_USER
+        queue["PASSWORD"] = REDIS_USER_PASSWORD
+        if REDIS_CLIENT_CERT_PATH and not REDIS_UNIX_SOCKET_PATH:
+            queue["SSL"] = True
+            queue["REDIS_CLIENT_KWARGS"] = {
+                "ssl_certfile": REDIS_CLIENT_CERT_PATH,
+                "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
+                "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+            }
+
+    return queues
+
+
+RQ_QUEUES = get_rq_queues()
+
+# Queue name for the rulebook workers. To be used in multinode mode
+# Otherwise, the default name is used
+RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
@@ -460,24 +523,6 @@ EDA_CONTROLLER_TOKEN = settings.get(
     "CONTROLLER_TOKEN", "default_controller_token"
 )
 EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
-
-# ---------------------------------------------------------
-# DEPLOYMENT SETTINGS
-# ---------------------------------------------------------
-
-DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
-WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
-WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
-WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
-    "ws://", "http://"
-).replace("wss://", "https://")
-PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
-PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
-PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
-PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
-PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
-DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
-CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS

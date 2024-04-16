@@ -8,7 +8,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("auth", "0012_alter_user_first_name_max_length"),
-        ("core", "0029_project_proxy"),
+        (
+            "core",
+            "0031_alter_activation_status_alter_eventstream_status_and_more",
+        ),
     ]
     run_before = [("dab_rbac", "__first__")]
 

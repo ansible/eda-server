@@ -72,7 +72,7 @@ class Migration(migrations.Migration):
     dependencies = [
         (
             "core",
-            "0030_organization_team_and_more",
+            "0032_organization_team_and_more",
         ),
     ]
 

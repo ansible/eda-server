@@ -57,10 +57,12 @@ def test_queue(activations):
         ActivationRequest.START,
     )
     assert models.ActivationRequestQueue.objects.count() == 3
-    assert queue.list_requests() == [
-        (ProcessParentType.ACTIVATION, activations[0].id),
-        (ProcessParentType.ACTIVATION, activations[1].id),
-    ]
+    requests = queue.list_requests()
+    assert len(requests) == 2
+    assert requests[0].process_parent_id == activations[0].id
+    assert requests[1].process_parent_id == activations[1].id
+    assert requests[0].request == ActivationRequest.STOP
+    assert requests[1].request == ActivationRequest.DELETE
 
     requests = queue.peek_all(ProcessParentType.ACTIVATION, activations[0].id)
     assert len(requests) == 2
