@@ -59,7 +59,7 @@ INPUTS = {
 @pytest.fixture
 def redis_external():
     client = redis.Redis(
-        **default._rq_redis_client_parameters(),
+        **default.rq_test_redis_client_parameters(),
     )
     yield client
     client.flushall()

@@ -23,6 +23,7 @@ from aap_eda.settings.default import (
     RulebookProcessLogLevel,
     get_rq_queues,
     get_rulebook_process_log_level,
+    rq_test_redis_client_parameters,
 )
 
 
@@ -69,12 +70,24 @@ def test_rq_queues_with_unix_socket_path():
 
 
 def test_rq_queues_default_configuration():
+    # Get the host and port from the test redis client parameters in case the
+    # test is being run using an external redis.
+    params = rq_test_redis_client_parameters()
+    # We explicitly check for None as the parameters may exist with a value of
+    # None.
+    host = params.get("host")
+    if host is None:
+        host = "localhost"
+    port = params.get("port")
+    if port is None:
+        port = 6379
+
     queues = get_rq_queues()
-    assert queues["default"]["HOST"] == "localhost"
-    assert queues["default"]["PORT"] == 6379
+    assert queues["default"]["HOST"] == host
+    assert queues["default"]["PORT"] == port
     assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
-    assert queues["activation"]["HOST"] == "localhost"
-    assert queues["activation"]["PORT"] == 6379
+    assert queues["activation"]["HOST"] == host
+    assert queues["activation"]["PORT"] == port
     assert (
         queues["activation"]["DEFAULT_TIMEOUT"]
         == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
