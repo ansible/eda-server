@@ -32,7 +32,10 @@ from aap_eda.core.enums import (
 from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
 from aap_eda.core.tasking import unique_enqueue
 from aap_eda.services.activation import exceptions
-from aap_eda.services.activation.manager import ActivationManager
+from aap_eda.services.activation.manager import (
+    ActivationManager,
+    StatusManager,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -206,19 +209,14 @@ def dispatch(
                 "There might be a problem in the node, please contact "
                 "the administrator."
             )
-            # TODO: I use an empty container engine because it's not
-            # used to update the status of this case. This is a workaround
-            # Refactor the ActivationManager to avoid this.
-            # jira: https://issues.redhat.com/browse/AAP-22423
-            manager = ActivationManager(
+            status_manager = StatusManager(
                 get_process_parent(process_parent_type, process_parent_id),
-                container_engine=object(),
             )
-            manager._set_activation_status(
+            status_manager.set_status(
                 ActivationStatus.WORKERS_OFFLINE,
                 msg,
             )
-            manager._set_latest_instance_status(
+            status_manager.set_latest_instance_status(
                 ActivationStatus.WORKERS_OFFLINE,
                 msg,
             )
