@@ -25,6 +25,7 @@ from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from pydantic import ValidationError
+from rq import get_current_job
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
@@ -905,7 +906,10 @@ class ActivationManager:
             self.stop()
             return
 
-        if self.db_instance.status != ActivationStatus.RUNNING:
+        if self.db_instance.status not in [
+            ActivationStatus.RUNNING,
+            ActivationStatus.WORKERS_OFFLINE,
+        ]:
             msg = (
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 "Activation is not running. "
@@ -960,7 +964,16 @@ class ActivationManager:
             self._unresponsive_policy()
             return
 
+        # last case is the success case
         if container_status.status == ActivationStatus.RUNNING:
+            if self.db_instance.status == ActivationStatus.WORKERS_OFFLINE:
+                LOGGER.info(
+                    f"Monitor operation: activation id: {self.db_instance.id} "
+                    "Activation is in WORKERS_OFFLINE state. "
+                    "Setting activation and instance status to running.",
+                )
+                self._set_activation_status(ActivationStatus.RUNNING)
+                self._set_latest_instance_status(ActivationStatus.RUNNING)
             msg = (
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 "Container is running. "
@@ -1034,16 +1047,7 @@ class ActivationManager:
             else ""
         )
 
-        if not self.check_new_process_allowed(
-            self.db_instance_type,
-            self.db_instance.id,
-        ):
-            msg = (
-                "Failed to create rulebook process. "
-                "Reason: Max running processes reached. "
-                "Waiting for a free slot."
-            )
-            self._set_activation_status(ActivationStatus.PENDING, msg)
+        if not self.check_new_process_allowed():
             raise exceptions.MaxRunningProcessesError
         args = {
             "name": self.db_instance.name,
@@ -1052,7 +1056,7 @@ class ActivationManager:
         }
         args[f"{self.db_instance_type}"] = self.db_instance
         try:
-            models.RulebookProcess.objects.create(**args)
+            rulebook_process = models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
@@ -1060,6 +1064,15 @@ class ActivationManager:
             )
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
+        queue_name = self._get_queue_name()
+        models.RulebookProcessQueue.objects.create(
+            process=rulebook_process,
+            queue_name=queue_name,
+        )
+
+    def _get_queue_name(self) -> str:
+        this_job = get_current_job()
+        return this_job.origin
 
     def _get_container_request(self) -> ContainerRequest:
         try:
@@ -1072,20 +1085,23 @@ class ActivationManager:
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
 
-    @staticmethod
-    def check_new_process_allowed(parent_type: str, parent_id: int) -> bool:
+    def check_new_process_allowed(self) -> bool:
         """Check if a new process is allowed."""
         if settings.MAX_RUNNING_ACTIVATIONS < 0:
             return True
 
-        num_running_processes = models.RulebookProcess.objects.filter(
+        queue_name = self._get_queue_name()
+        running_processes_count = models.RulebookProcess.objects.filter(
             status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+            rulebookprocessqueue__queue_name=queue_name,
         ).count()
 
-        if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
-            LOGGER.info(
+        if running_processes_count >= settings.MAX_RUNNING_ACTIVATIONS:
+            msg = (
                 "No capacity to start a new rulebook process. "
-                f"{parent_type} {parent_id} is postponed",
+                f"{self.db_instance_type} {self.db_instance.id} is postponed"
             )
+            LOGGER.info(msg)
+            self._set_activation_status(ActivationStatus.PENDING, msg)
             return False
         return True

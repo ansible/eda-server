@@ -196,3 +196,29 @@ class RulebookProcessLog(models.Model):
     line_number = models.IntegerField()
     log = models.TextField()
     log_timestamp = models.BigIntegerField(null=False, default=0)
+
+
+class RulebookProcessQueue(models.Model):
+    """Rulebook Process Queue model.
+
+    Rulebook Process Queue keeps track of the queue name for a
+    Rulebook Process. Every rulebook process is associated with the
+    queue, by name, where it ran at creation.
+    """
+
+    queue_name = models.CharField(max_length=255)
+    process = models.OneToOneField(
+        "RulebookProcess",
+        on_delete=models.CASCADE,
+        primary_key=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["queue_name"]),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"Rulebook Process id {self.process.id} in queue {self.queue_name}"
+        )
