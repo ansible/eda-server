@@ -78,6 +78,15 @@ def client(base_client: APIClient, admin_user: models.User) -> APIClient:
 
 
 @pytest.fixture
+def superuser_client(
+    base_client: APIClient, super_user: models.User
+) -> APIClient:
+    """Return a pre-configured instance of an APIClient."""
+    base_client.force_authenticate(user=super_user)
+    return base_client
+
+
+@pytest.fixture
 def check_permission_mock():
     with mock.patch.object(
         models.User,

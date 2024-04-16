@@ -204,6 +204,15 @@ def default_organization() -> models.Organization:
 
 
 @pytest.fixture
+def new_organization() -> models.Organization:
+    "Return a new organization"
+    return models.Organization.objects.create(
+        name="new-organization",
+        description="A new organization",
+    )
+
+
+@pytest.fixture
 def default_team(default_organization: models.Organization) -> models.Team:
     """Return a default team in default_organization."""
     return models.Team.objects.create(

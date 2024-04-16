@@ -86,19 +86,27 @@ def test_partial_update_organization(
 
 @pytest.mark.django_db
 def test_delete_organization_success(
+    new_organization: models.Organization, superuser_client: APIClient
+):
+    response = superuser_client.delete(
+        f"{api_url_v1}/organizations/{new_organization.id}/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    assert (
+        models.Organization.objects.filter(pk=int(new_organization.id)).count()
+        == 0
+    )
+
+
+@pytest.mark.django_db
+def test_delete_organization_conflict(
     default_organization: models.Organization, client: APIClient
 ):
     response = client.delete(
         f"{api_url_v1}/organizations/{default_organization.id}/"
     )
-    assert response.status_code == status.HTTP_204_NO_CONTENT
-
-    assert (
-        models.Organization.objects.filter(
-            pk=int(default_organization.id)
-        ).count()
-        == 0
-    )
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db

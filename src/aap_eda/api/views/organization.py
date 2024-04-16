@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django.conf import settings
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -21,8 +22,9 @@ from drf_spectacular.utils import (
 )
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 
 from .mixins import PartialUpdateOnlyModelMixin
@@ -82,6 +84,28 @@ class OrganizationViewSet(
 
     def get_response_serializer_class(self):
         return serializers.OrganizationSerializer
+
+    @extend_schema(
+        description="Delete an organization by id",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None, description="Delete successful."
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None, description="Default Organization cannot be deleted."
+            ),
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.name == settings.DEFAULT_ORGANIZATION_NAME:
+            raise api_exc.Conflict(
+                "The default organization cannot be deleted."
+            )
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         description="List all teams of the organization",
