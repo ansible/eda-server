@@ -27,6 +27,8 @@ from drf_spectacular.views import (
 from rest_framework import routers
 from rest_framework_simplejwt import views as jwt_views
 
+from aap_eda.core import views as core_views
+
 from . import views
 
 router = routers.SimpleRouter()
@@ -80,6 +82,7 @@ openapi_urls = [
 ]
 
 v1_urls = [
+    path("status/", core_views.StatusView.as_view()),
     path("", include(dab_urls)),
     path("", include(resource_api_urls)),
     path("", include(openapi_urls)),
