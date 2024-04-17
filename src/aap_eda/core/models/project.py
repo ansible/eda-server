@@ -28,7 +28,7 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
-from .organization import Organization
+from .utils import get_default_organization_id
 
 PROJECT_ARCHIVE_DIR = "projects/"
 
@@ -71,7 +71,9 @@ class Project(models.Model):
         on_delete=models.SET_NULL,
     )
     organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
     )
     eda_credential = models.ForeignKey(
         "EdaCredential",
@@ -111,12 +113,6 @@ class Project(models.Model):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
-
 
 class ExtraVar(models.Model):
     class Meta:
@@ -130,14 +126,10 @@ class ExtraVar(models.Model):
     extra_var = models.TextField()
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
     )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
 
 __all__ = [

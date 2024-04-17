@@ -23,8 +23,8 @@ from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
-from .organization import Organization
 from .user import AwxToken, User
+from .utils import get_default_organization_id
 
 __all__ = ("Activation",)
 
@@ -60,7 +60,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         "ExtraVar", on_delete=models.CASCADE, null=True
     )
     organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
@@ -127,9 +129,3 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         default=None,
         help_text="Name of the kubernetes service",
     )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])

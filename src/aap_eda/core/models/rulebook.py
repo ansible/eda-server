@@ -15,7 +15,7 @@
 import yaml
 from django.db import models
 
-from .organization import Organization
+from .utils import get_default_organization_id
 
 __all__ = (
     "Rulebook",
@@ -110,14 +110,10 @@ class AuditRule(models.Model):
         "JobInstance", on_delete=models.SET_NULL, null=True
     )
     organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
     )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
 
 class AuditAction(models.Model):
@@ -138,14 +134,10 @@ class AuditAction(models.Model):
         "AuditRule", on_delete=models.CASCADE, null=True
     )
     organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
     )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
 
 class AuditEvent(models.Model):
@@ -164,11 +156,7 @@ class AuditEvent(models.Model):
         "AuditAction", related_name="audit_events"
     )
     organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
     )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
