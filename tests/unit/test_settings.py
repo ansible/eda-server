@@ -23,7 +23,6 @@ from aap_eda.settings.default import (
     RulebookProcessLogLevel,
     get_rq_queues,
     get_rulebook_process_log_level,
-    rq_test_redis_client_parameters,
 )
 
 
@@ -69,16 +68,15 @@ def test_rq_queues_with_unix_socket_path():
     assert "activation" not in queues
 
 
-def test_rq_queues_default_configuration():
-    # Get the host and port from the test redis client parameters in case the
+def test_rq_queues_default_configuration(redis_parameters):
+    # Get the host and port from the test redis parameters in case the
     # test is being run using an external redis.
-    params = rq_test_redis_client_parameters()
     # We explicitly check for None as the parameters may exist with a value of
     # None.
-    host = params.get("host")
+    host = redis_parameters.get("host")
     if host is None:
         host = "localhost"
-    port = params.get("port")
+    port = redis_parameters.get("port")
     if port is None:
         port = 6379
 

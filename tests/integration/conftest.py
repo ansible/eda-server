@@ -24,7 +24,6 @@ from aap_eda.core.management.commands.create_initial_data import (
     populate_credential_types,
 )
 from aap_eda.core.tasking import Queue
-from aap_eda.settings import default
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
@@ -57,10 +56,8 @@ INPUTS = {
 
 # fixture for a running redis server
 @pytest.fixture
-def redis_external():
-    client = redis.Redis(
-        **default.rq_test_redis_client_parameters(),
-    )
+def redis_external(redis_parameters):
+    client = redis.Redis(**redis_parameters)
     yield client
     client.flushall()
 

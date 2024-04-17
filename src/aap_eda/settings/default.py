@@ -376,15 +376,6 @@ def _rq_redis_client_parameters():
     return params
 
 
-def rq_test_redis_client_parameters():
-    """For test usage.
-
-    Isolates all parameter determination to settings.
-    """
-    params = _rq_common_parameters() | _rq_redis_client_parameters()
-    return {k.lower(): v for (k, v) in params.items()}
-
-
 # A list of queues to be used in multinode mode
 # If the list is empty, use the default singlenode queue name
 RULEBOOK_WORKER_QUEUES = settings.get("RULEBOOK_WORKER_QUEUES", [])
