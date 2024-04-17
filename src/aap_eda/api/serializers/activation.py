@@ -228,6 +228,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EdaCredentialSerializer(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Service name of the activation",
+    )
 
     class Meta:
         model = models.Activation
@@ -255,6 +260,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams",
             "log_level",
             "eda_credentials",
+            "k8s_service_name",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -458,6 +464,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EdaCredentialSerializer(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Service name of the activation",
+    )
 
     class Meta:
         model = models.Activation
@@ -488,6 +499,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "event_streams",
             "log_level",
+            "k8s_service_name",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -572,6 +584,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
+            "k8s_service_name": activation.k8s_service_name,
         }
 
 
