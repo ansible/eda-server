@@ -348,6 +348,75 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
 
 
 @pytest.mark.django_db
+def test_is_activation_valid_with_updated_credential(
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+    user_credential_type = create_user_credential_type()
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={
+            "var_1": "adam",
+            "var_2": "secret",
+            "sasl_username": "adam",
+            "sasl_password": "secret",
+        },
+        credential_type_id=user_credential_type.id,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        user_id=fks["user_id"],
+        awx_token_id=fks["awx_token_id"],
+        extra_var_id=fks["extra_var_id"],
+    )
+
+    activation.eda_credentials.add(credential)
+
+    valid, message = is_activation_valid(activation)
+    assert valid is True
+
+    extra_var = yaml.safe_load(activation.extra_var.extra_var)
+    assert extra_var["sasl_username"] == "adam"
+    assert extra_var["sasl_password"] == "secret"
+
+
+@pytest.mark.django_db
+def test_is_activation_valid_with_updated_credential_no_vault(
+    kafka_credential_type: models.CredentialType,
+    preseed_credential_types,
+):
+    fks = create_activation_related_data(TEST_EXTRA_VAR)
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=kafka_credential_type.id,
+    )
+
+    activation = models.Activation.objects.create(
+        name="test",
+        description="test activation",
+        rulebook_id=fks["run_job_rulebook_id"],
+        decision_environment_id=fks["decision_environment_id"],
+        project_id=fks["project_id"],
+        user_id=fks["user_id"],
+    )
+
+    activation.eda_credentials.add(credential)
+
+    valid, message = is_activation_valid(activation)
+
+    assert valid is False
+    assert (
+        "No system vault is available for credential eda-credential"
+    ) in message
+
+
+@pytest.mark.django_db
 def test_create_activation_with_eda_credential(
     client: APIClient,
     kafka_credential_type: models.CredentialType,
