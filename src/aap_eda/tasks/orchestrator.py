@@ -32,7 +32,7 @@ from aap_eda.core.enums import (
 from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
 from aap_eda.core.tasking import unique_enqueue
 from aap_eda.services.activation import exceptions
-from aap_eda.services.activation.manager import (
+from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )

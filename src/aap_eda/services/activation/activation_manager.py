@@ -17,11 +17,9 @@ import contextlib
 import logging
 import typing as tp
 from datetime import timedelta
-from functools import wraps
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from pydantic import ValidationError
@@ -29,11 +27,7 @@ from rq import get_current_job
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import (
-    ActivationStatus,
-    ProcessParentType,
-    RestartPolicy,
-)
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerRequest
@@ -44,87 +38,9 @@ from aap_eda.services.activation.restart_helper import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
+from .status_manager import StatusManager, run_with_lock
 
 LOGGER = logging.getLogger(__name__)
-
-
-class HasDbInstance(tp.Protocol):
-    db_instance: tp.Any
-
-
-def run_with_lock(func: tp.Callable) -> tp.Callable:
-    """Run a method with a lock on the database instance."""
-
-    @wraps(func)
-    def _run_with_lock(self: HasDbInstance, *args, **kwargs):
-        with transaction.atomic():
-            locked_instance = (
-                type(self.db_instance)
-                .objects.select_for_update()
-                .get(pk=self.db_instance.pk)
-            )
-
-            original_instance = self.db_instance
-            self.db_instance = locked_instance
-
-            try:
-                return func(self, *args, **kwargs)
-            finally:
-                self.db_instance = original_instance
-                self.db_instance.refresh_from_db()
-
-    return _run_with_lock
-
-
-class StatusManager:
-    """Status Manager manages the status of a process parent.
-
-    The Status Manager is responsible for updating the status
-    of the process parent and its latest instance.
-    """
-
-    def __init__(
-        self,
-        db_instance: tp.Union[models.Activation, models.EventStream],
-    ):
-        """Initialize the Process Parent Status Manager.
-
-        Args:
-            db_instance: The database instance of the process parent.
-        """
-        self.db_instance = db_instance
-        if isinstance(db_instance, models.Activation):
-            self.db_instance_type = ProcessParentType.ACTIVATION
-        else:
-            self.db_instance_type = ProcessParentType.EVENT_STREAM
-
-    @property
-    def latest_instance(self) -> tp.Optional[models.RulebookProcess]:
-        """Return the latest instance of the activation."""
-        return self.db_instance.latest_instance
-
-    def set_latest_instance_status(
-        self,
-        status: ActivationStatus,
-        status_message: tp.Optional[str] = None,
-    ):
-        """Set the status of the process parent instance from the manager."""
-        kwargs = {"status": status}
-        if status_message:
-            kwargs["status_message"] = status_message
-        self.latest_instance.update_status(**kwargs)
-
-    @run_with_lock
-    def set_status(
-        self,
-        status: ActivationStatus,
-        status_message: tp.Optional[str] = None,
-    ) -> None:
-        """Set the status from the manager."""
-        kwargs = {"status": status}
-        if status_message:
-            kwargs["status_message"] = status_message
-        self.db_instance.update_status(**kwargs)
 
 
 class ActivationManager(StatusManager):

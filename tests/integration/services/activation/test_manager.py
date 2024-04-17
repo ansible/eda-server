@@ -23,17 +23,17 @@ from pytest_django.fixtures import SettingsWrapper
 from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import enums, models
+from aap_eda.services.activation.activation_manager import (
+    LOGGER,
+    ActivationManager,
+    exceptions,
+)
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
     ContainerEngine,
     ContainerRequest,
 )
-from aap_eda.services.activation.manager import (
-    LOGGER,
-    ActivationManager,
-    StatusManager,
-    exceptions,
-)
+from aap_eda.services.activation.status_manager import StatusManager
 
 
 def apply_settings(settings: SettingsWrapper, **kwargs):
@@ -298,7 +298,7 @@ def test_start_first_run(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.manager.get_current_job",
+        "aap_eda.services.activation.activation_manager.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
@@ -334,7 +334,7 @@ def test_start_restart(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.manager.get_current_job",
+        "aap_eda.services.activation.activation_manager.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start(is_restart=True)
@@ -662,7 +662,7 @@ def test_start_max_running_activations(
     activation_manager = ActivationManager(basic_activation)
 
     with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
-        "aap_eda.services.activation.manager.get_current_job",
+        "aap_eda.services.activation.activation_manager.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
