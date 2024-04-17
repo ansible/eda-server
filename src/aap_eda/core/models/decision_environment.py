@@ -14,12 +14,12 @@
 
 from django.db import models
 
-from .utils import get_default_organization_id
+from .base_org import BaseOrgModel
 
 __all__ = ("DecisionEnvironment",)
 
 
-class DecisionEnvironment(models.Model):
+class DecisionEnvironment(BaseOrgModel):
     class Meta:
         db_table = "core_decision_environment"
         constraints = [
@@ -39,11 +39,6 @@ class DecisionEnvironment(models.Model):
         null=True,
         default=None,
         on_delete=models.SET_NULL,
-    )
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
     )
     eda_credential = models.ForeignKey(
         "EdaCredential",

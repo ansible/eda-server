@@ -22,14 +22,14 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
+from .base_org import BaseOrgModel
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
-from .utils import get_default_organization_id
 
 __all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
+class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
@@ -58,11 +58,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     )
     extra_var = models.ForeignKey(
         "ExtraVar", on_delete=models.CASCADE, null=True
-    )
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
     )
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),

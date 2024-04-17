@@ -28,12 +28,12 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
-from .utils import get_default_organization_id
+from .base_org import BaseOrgModel
 
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(models.Model):
+class Project(BaseOrgModel):
     class Meta:
         db_table = "core_project"
         constraints = [
@@ -69,11 +69,6 @@ class Project(models.Model):
         null=True,
         default=None,
         on_delete=models.SET_NULL,
-    )
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
     )
     eda_credential = models.ForeignKey(
         "EdaCredential",
@@ -114,7 +109,7 @@ class Project(models.Model):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
-class ExtraVar(models.Model):
+class ExtraVar(BaseOrgModel):
     class Meta:
         db_table = "core_extra_var"
         default_permissions = (
@@ -125,11 +120,6 @@ class ExtraVar(models.Model):
     name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
-    )
 
 
 __all__ = [

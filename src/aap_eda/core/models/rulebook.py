@@ -15,7 +15,7 @@
 import yaml
 from django.db import models
 
-from .utils import get_default_organization_id
+from .base_org import BaseOrgModel
 
 __all__ = (
     "Rulebook",
@@ -86,7 +86,7 @@ class Rule(models.Model):
     action = models.JSONField(default=dict, null=False)
 
 
-class AuditRule(models.Model):
+class AuditRule(BaseOrgModel):
     class Meta:
         db_table = "core_audit_rule"
         indexes = [
@@ -109,14 +109,9 @@ class AuditRule(models.Model):
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.SET_NULL, null=True
     )
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
-    )
 
 
-class AuditAction(models.Model):
+class AuditAction(BaseOrgModel):
     class Meta:
         db_table = "core_audit_action"
         unique_together = ["id", "name"]
@@ -133,14 +128,9 @@ class AuditAction(models.Model):
     audit_rule = models.ForeignKey(
         "AuditRule", on_delete=models.CASCADE, null=True
     )
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
-    )
 
 
-class AuditEvent(models.Model):
+class AuditEvent(BaseOrgModel):
     class Meta:
         db_table = "core_audit_event"
         ordering = ("-received_at", "-rule_fired_at")
@@ -154,9 +144,4 @@ class AuditEvent(models.Model):
 
     audit_actions = models.ManyToManyField(
         "AuditAction", related_name="audit_events"
-    )
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
     )

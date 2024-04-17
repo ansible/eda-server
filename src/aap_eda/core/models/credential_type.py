@@ -14,12 +14,12 @@
 
 from django.db import models
 
-from .utils import get_default_organization_id
+from .base_org import BaseOrgModel
 
 __all__ = ("CredentialType",)
 
 
-class CredentialType(models.Model):
+class CredentialType(BaseOrgModel):
     class Meta:
         db_table = "core_credential_type"
         constraints = [
@@ -36,10 +36,5 @@ class CredentialType(models.Model):
     managed = models.BooleanField(default=False)
     kind = models.TextField(default="cloud", blank=True, null=False)
     namespace = models.TextField(default=None, null=True)
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
-    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
