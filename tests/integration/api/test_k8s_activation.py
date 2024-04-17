@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import pytest
-from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -75,6 +74,11 @@ def create_activation_related_data():
     }
 
 
+@pytest.fixture(autouse=True)
+def use_k8s_setting(settings):
+    settings.DEPLOYMENT_TYPE = "k8s"
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("activation_name", "service_name", "status_code", "key"),
@@ -126,7 +130,6 @@ def test_create_k8s_activation_with_service_name(
     status_code,
     key,
 ):
-    settings.DEPLOYMENT_TYPE = "k8s"
     fks = create_activation_related_data()
     test_activation = TEST_ACTIVATION_DATA.copy()
     test_activation["name"] = activation_name
@@ -169,6 +172,7 @@ def test_create_podman_activation(
     client: APIClient,
     preseed_credential_types,
     activation_name,
+    settings,
 ):
     settings.DEPLOYMENT_TYPE = "podman"
     fks = create_activation_related_data()
@@ -182,3 +186,29 @@ def test_create_podman_activation(
     assert response.status_code == status.HTTP_201_CREATED
     activation = models.Activation.objects.get(id=response.data["id"])
     assert activation.k8s_service_name is None
+
+
+@pytest.mark.django_db
+def test_get_activations_with_service_name(
+    client: APIClient,
+    preseed_credential_types,
+):
+    activation_name = "test-activation"
+    fks = create_activation_related_data()
+    test_activation = TEST_ACTIVATION_DATA.copy()
+    test_activation["name"] = activation_name
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["project_id"] = fks["project_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+
+    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    activation_id = response.data["id"]
+    response = client.get(f"{api_url_v1}/activations/{activation_id}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["k8s_service_name"] == activation_name
+
+    response = client.get(f"{api_url_v1}/activations/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["results"][0]["k8s_service_name"] == activation_name
