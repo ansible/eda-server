@@ -102,24 +102,6 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AddField(
-            model_name="auditaction",
-            name="organization",
-            field=models.ForeignKey(
-                default=aap_eda.core.models.utils.get_default_organization_id,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
-        migrations.AddField(
-            model_name="auditevent",
-            name="organization",
-            field=models.ForeignKey(
-                default=aap_eda.core.models.utils.get_default_organization_id,
-                on_delete=django.db.models.deletion.CASCADE,
-                to="core.organization",
-            ),
-        ),
-        migrations.AddField(
             model_name="credentialtype",
             name="organization",
             field=models.ForeignKey(

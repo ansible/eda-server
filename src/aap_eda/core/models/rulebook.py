@@ -111,7 +111,7 @@ class AuditRule(BaseOrgModel):
     )
 
 
-class AuditAction(BaseOrgModel):
+class AuditAction(models.Model):
     class Meta:
         db_table = "core_audit_action"
         unique_together = ["id", "name"]
@@ -130,7 +130,7 @@ class AuditAction(BaseOrgModel):
     )
 
 
-class AuditEvent(BaseOrgModel):
+class AuditEvent(models.Model):
     class Meta:
         db_table = "core_audit_event"
         ordering = ("-received_at", "-rule_fired_at")

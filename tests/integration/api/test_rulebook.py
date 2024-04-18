@@ -204,6 +204,7 @@ def test_list_audit_rules(
         "name",
         "status",
         "activation_instance",
+        "organization",
         "fired_at",
     ]
 
@@ -226,6 +227,7 @@ def test_list_audit_rules_filter_name(
         "name",
         "status",
         "activation_instance",
+        "organization",
         "fired_at",
     ]
 
@@ -362,7 +364,6 @@ def test_list_actions_from_audit_rule_filter_name(
         "status",
         "url",
         "fired_at",
-        "organization_id",
         "rule_fired_at",
         "audit_rule_id",
         "status_message",
