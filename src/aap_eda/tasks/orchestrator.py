@@ -168,7 +168,7 @@ def dispatch(
     ]:
         LOGGER.info(
             f"Dispatching {process_parent_type} "
-            "{process_parent_id} as new process.",
+            f"{process_parent_id} as new process.",
         )
 
         queue_name = get_most_free_queue_name()
