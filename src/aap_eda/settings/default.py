@@ -346,6 +346,36 @@ REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
 REDIS_DB = settings.get("MQ_DB", 0)
 
+
+def _rq_common_parameters():
+    params = {
+        "DB": REDIS_DB,
+        "USERNAME": REDIS_USER,
+        "PASSWORD": REDIS_USER_PASSWORD,
+    }
+    if REDIS_UNIX_SOCKET_PATH:
+        params["UNIX_SOCKET_PATH"] = REDIS_UNIX_SOCKET_PATH
+    else:
+        params |= {
+            "HOST": REDIS_HOST,
+            "PORT": REDIS_PORT,
+        }
+        if REDIS_CLIENT_CERT_PATH:
+            params["SSL"] = True
+    return params
+
+
+def _rq_redis_client_parameters():
+    params = {}
+    if (not REDIS_UNIX_SOCKET_PATH) and REDIS_CLIENT_CERT_PATH:
+        params |= {
+            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
+            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
+            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+        }
+    return params
+
+
 # A list of queues to be used in multinode mode
 # If the list is empty, use the default singlenode queue name
 RULEBOOK_WORKER_QUEUES = settings.get("RULEBOOK_WORKER_QUEUES", [])
@@ -370,61 +400,19 @@ DEFAULT_WORKER_TTL = 5
 
 
 def get_rq_queues() -> dict:
-    """Construct the RQ_QUEUES dictionary based on the settings.
-
-    If there is no multinode enabled, the default and activation queues
-    are used. Otherwise, constructs the queues based on the
-    WORKERS_RULEBOOK_QUEUES list.
-    """
+    """Construct the RQ_QUEUES dictionary based on the settings."""
     queues = {}
 
-    # Configures the default queue
-    if REDIS_UNIX_SOCKET_PATH:
-        queues["default"] = {
-            "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": DEFAULT_QUEUE_TIMEOUT,
-        }
-    else:
-        queues["default"] = {
-            "HOST": REDIS_HOST,
-            "PORT": REDIS_PORT,
-            "DEFAULT_TIMEOUT": DEFAULT_QUEUE_TIMEOUT,
-        }
+    # Configure the default queue
+    queues["default"] = _rq_common_parameters()
+    queues["default"]["DEFAULT_TIMEOUT"] = DEFAULT_QUEUE_TIMEOUT
+    queues["default"]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
 
-    # Configures the activation queue for single node mode
-    if len(RULEBOOK_WORKER_QUEUES) == 1:
-        if REDIS_UNIX_SOCKET_PATH:
-            queues[RULEBOOK_WORKER_QUEUES[0]] = {
-                "UNIX_SOCKET_PATH": REDIS_UNIX_SOCKET_PATH,
-                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
-            }
-        else:
-            queues[RULEBOOK_WORKER_QUEUES[0]] = {
-                "HOST": REDIS_HOST,
-                "PORT": REDIS_PORT,
-                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
-            }
-    # Configure the queues for multinode mode
-    else:
-        for queue in RULEBOOK_WORKER_QUEUES:
-            queues[queue] = {
-                "HOST": REDIS_HOST,
-                "PORT": REDIS_PORT,
-                "DEFAULT_TIMEOUT": DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
-            }
-
-    # Add the common settings to all queues
-    for queue in queues.values():
-        queue["DB"] = REDIS_DB
-        queue["USERNAME"] = REDIS_USER
-        queue["PASSWORD"] = REDIS_USER_PASSWORD
-        if REDIS_CLIENT_CERT_PATH and not REDIS_UNIX_SOCKET_PATH:
-            queue["SSL"] = True
-            queue["REDIS_CLIENT_KWARGS"] = {
-                "ssl_certfile": REDIS_CLIENT_CERT_PATH,
-                "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
-                "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
-            }
+    # Configure the worker queues
+    for queue in RULEBOOK_WORKER_QUEUES:
+        queues[queue] = _rq_common_parameters()
+        queues[queue]["DEFAULT_TIMEOUT"] = DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+        queues[queue]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
 
     return queues
 

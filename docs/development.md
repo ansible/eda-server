@@ -250,12 +250,16 @@ redis you will need to export the following environment variables:
 * `EDA_MQ_CLIENT_KEY_PATH=<<workspace>>/tools/docker/redis-tls/client/client.key`
 * `EDA_MQ_CLIENT_CACERT_PATH=<<workspace>>/tools/docker/redis-tls/ca.crt`
 
-`EDA_MQ_CLIENT_CERT_PATH` has special significance.  While all three variables are required 
-`EDA_MQ_CLIENT_CERT_PATH` determines whether requests are made to redis using TLS.  You can use
-this as a convenience in switching client-side processing between TLS and non-TLS by always
-exporting `EDA_MQ_CLIENT_KEY_PATH` and `EDA_MQ_CLIENT_CACERT_PATH` and switching behavior
-by setting/clearing `EDA_MQ_CLIENT_CERT_PATH`.
+If using `podman` you will also need to export:
 
+* `EDA_PODMAN_SOCKET_URL=tcp://0.0.0.0:8888`
+
+`EDA_MQ_CLIENT_CERT_PATH` has special significance.  While all three `EDA_MQ_*`
+variables are required `EDA_MQ_CLIENT_CERT_PATH` determines whether requests
+are made to redis using TLS.  You can use this as a convenience in switching
+client-side processing between TLS and non-TLS by always exporting
+`EDA_MQ_CLIENT_KEY_PATH` and `EDA_MQ_CLIENT_CACERT_PATH` and switching behavior
+by setting/clearing `EDA_MQ_CLIENT_CERT_PATH`.
 
 ### Executing migrations
 

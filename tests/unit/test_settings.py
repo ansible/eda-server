@@ -68,13 +68,24 @@ def test_rq_queues_with_unix_socket_path():
     assert "activation" not in queues
 
 
-def test_rq_queues_default_configuration():
+def test_rq_queues_default_configuration(redis_parameters):
+    # Get the host and port from the test redis parameters in case the
+    # test is being run using an external redis.
+    # We explicitly check for None as the parameters may exist with a value of
+    # None.
+    host = redis_parameters.get("host")
+    if host is None:
+        host = "localhost"
+    port = redis_parameters.get("port")
+    if port is None:
+        port = 6379
+
     queues = get_rq_queues()
-    assert queues["default"]["HOST"] == "localhost"
-    assert queues["default"]["PORT"] == 6379
+    assert queues["default"]["HOST"] == host
+    assert queues["default"]["PORT"] == port
     assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
-    assert queues["activation"]["HOST"] == "localhost"
-    assert queues["activation"]["PORT"] == 6379
+    assert queues["activation"]["HOST"] == host
+    assert queues["activation"]["PORT"] == port
     assert (
         queues["activation"]["DEFAULT_TIMEOUT"]
         == DEFAULT_RULEBOOK_QUEUE_TIMEOUT

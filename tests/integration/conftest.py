@@ -15,8 +15,8 @@
 import logging
 
 import pytest
+import redis
 from django.conf import settings
-from pytest_redis import factories
 
 from aap_eda.core import models
 from aap_eda.core.management.commands.create_initial_data import (
@@ -53,9 +53,13 @@ INPUTS = {
     ]
 }
 
-# fixture for pytest-redis plugin
-# like django-db for a running redis server
-redis_external = factories.redisdb("redis_nooproc")
+
+# fixture for a running redis server
+@pytest.fixture
+def redis_external(redis_parameters):
+    client = redis.Redis(**redis_parameters)
+    yield client
+    client.flushall()
 
 
 @pytest.fixture
