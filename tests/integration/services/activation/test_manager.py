@@ -23,16 +23,17 @@ from pytest_django.fixtures import SettingsWrapper
 from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import enums, models
+from aap_eda.services.activation.activation_manager import (
+    LOGGER,
+    ActivationManager,
+    exceptions,
+)
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import (
     ContainerEngine,
     ContainerRequest,
 )
-from aap_eda.services.activation.manager import (
-    LOGGER,
-    ActivationManager,
-    exceptions,
-)
+from aap_eda.services.activation.status_manager import StatusManager
 
 
 def apply_settings(settings: SettingsWrapper, **kwargs):
@@ -136,6 +137,28 @@ def new_activation_with_instance(
         queue_name="queue_name_test",
     )
     return activation
+
+
+@pytest.fixture
+def new_event_stream_with_instance(
+    default_user: models.User,
+    default_decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+) -> models.EventStream:
+    """Return an event stream with an instance."""
+    event_stream = models.EventStream.objects.create(
+        name="new_event_stream_with_instance",
+        user=default_user,
+        decision_environment=default_decision_environment,
+        rulebook=default_rulebook,
+        # rulebook_rulesets is populated by the serializer
+        rulebook_rulesets=default_rulebook.rulesets,
+    )
+    models.RulebookProcess.objects.create(
+        event_stream=event_stream,
+        status=enums.ActivationStatus.RUNNING,
+    )
+    return event_stream
 
 
 @pytest.fixture
@@ -275,7 +298,7 @@ def test_start_first_run(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.manager.get_current_job",
+        "aap_eda.services.activation.activation_manager.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
@@ -311,7 +334,7 @@ def test_start_restart(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.manager.get_current_job",
+        "aap_eda.services.activation.activation_manager.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start(is_restart=True)
@@ -639,8 +662,79 @@ def test_start_max_running_activations(
     activation_manager = ActivationManager(basic_activation)
 
     with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
-        "aap_eda.services.activation.manager.get_current_job",
+        "aap_eda.services.activation.activation_manager.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
     assert "No capacity to start a new rulebook process" in eda_caplog.text
+
+
+@pytest.mark.django_db
+def test_init_status_manager_with_activation(basic_activation):
+    status_manager = StatusManager(basic_activation)
+    assert status_manager.db_instance == basic_activation
+    assert status_manager.latest_instance == basic_activation.latest_instance
+    assert (
+        status_manager.db_instance_type == enums.ProcessParentType.ACTIVATION
+    )
+
+
+@pytest.mark.django_db
+def test_init_status_manager_with_event_stream(new_event_stream_with_instance):
+    status_manager = StatusManager(new_event_stream_with_instance)
+    assert status_manager.db_instance == new_event_stream_with_instance
+    assert (
+        status_manager.latest_instance
+        == new_event_stream_with_instance.latest_instance
+    )
+    assert (
+        status_manager.db_instance_type == enums.ProcessParentType.EVENT_STREAM
+    )
+
+
+@pytest.mark.parametrize(
+    "process_parent",
+    [
+        pytest.param(
+            lazy_fixture("new_activation_with_instance"),
+        ),
+        pytest.param(
+            lazy_fixture("new_event_stream_with_instance"),
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_status_manager_set_latest_instance_status(process_parent):
+    status_manager = StatusManager(process_parent)
+    status_manager.set_latest_instance_status(
+        status=enums.ActivationStatus.PENDING,
+        status_message="Instance is pending",
+    )
+    assert (
+        process_parent.latest_instance.status == enums.ActivationStatus.PENDING
+    )
+    assert (
+        process_parent.latest_instance.status_message == "Instance is pending"
+    )
+
+
+@pytest.mark.parametrize(
+    "process_parent",
+    [
+        pytest.param(
+            lazy_fixture("new_activation_with_instance"),
+        ),
+        pytest.param(
+            lazy_fixture("new_event_stream_with_instance"),
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_status_manager_set_status(process_parent):
+    status_manager = StatusManager(process_parent)
+    status_manager.set_status(
+        status=enums.ActivationStatus.PENDING,
+        status_message="Activation is pending",
+    )
+    assert process_parent.status == enums.ActivationStatus.PENDING
+    assert process_parent.status_message == "Activation is pending"
