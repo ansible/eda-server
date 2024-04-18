@@ -254,6 +254,10 @@ class ScmRepository:
         child = pexpect.spawn(cmd)
         child.expect([pexpect.EOF])
         if child.exitstatus != 0:
+            logger.error(
+                f"gpg import failed with exit code {child.exitstatus}: "
+                f"{child.before}"
+            )
             msg = "Failed to import the gpg public key. Is the key valid?"
             raise ScmError(msg)
 
