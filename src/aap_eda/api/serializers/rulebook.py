@@ -26,6 +26,10 @@ class RulebookSerializer(serializers.ModelSerializer):
         queryset=models.Project.objects.all(),
         help_text="ID of the project",
     )
+    organization_id = serializers.PrimaryKeyRelatedField(
+        queryset=models.Organization.objects.all(),
+        help_text="ID of the organization",
+    )
 
     class Meta:
         model = models.Rulebook
@@ -35,10 +39,16 @@ class RulebookSerializer(serializers.ModelSerializer):
             "description",
             "rulesets",
             "project_id",
+            "organization_id",
             "created_at",
             "modified_at",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "organization_id",
+            "created_at",
+            "modified_at",
+        ]
 
 
 class RulebookRefSerializer(serializers.ModelSerializer):
@@ -46,8 +56,8 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = ["id", "name", "description"]
-        read_only_fields = ["id"]
+        fields = ["id", "name", "description", "organization_id"]
+        read_only_fields = ["id", "organization_id"]
 
 
 class AuditRuleSerializer(serializers.ModelSerializer):
@@ -93,7 +103,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
             "organization_id",
             "definition",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "organization_id", "created_at"]
 
 
 class AuditRuleDetailSerializer(serializers.Serializer):
@@ -113,6 +123,8 @@ class AuditRuleDetailSerializer(serializers.Serializer):
     )
 
     activation_instance = serializers.SerializerMethodField()
+
+    organization = serializers.SerializerMethodField()
 
     ruleset_name = serializers.CharField(
         required=False,
@@ -146,6 +158,25 @@ class AuditRuleDetailSerializer(serializers.Serializer):
         else:
             return {"id": None, "name": "DELETED"}
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "nullable": False},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string", "description": "string"},
+        }
+    )
+    def get_organization(self, rule):
+        organization = rule.organization
+        return {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+        }
+
 
 class AuditRuleListSerializer(serializers.Serializer):
     id = serializers.IntegerField(
@@ -164,6 +195,8 @@ class AuditRuleListSerializer(serializers.Serializer):
     )
 
     activation_instance = serializers.SerializerMethodField()
+
+    organization = serializers.SerializerMethodField()
 
     fired_at = serializers.DateTimeField(
         required=True,
@@ -186,6 +219,25 @@ class AuditRuleListSerializer(serializers.Serializer):
             return {"id": instance.id, "name": instance.name}
         else:
             return {"id": None, "name": "DELETED"}
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "nullable": False},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string", "description": "string"},
+        }
+    )
+    def get_organization(self, rule):
+        organization = rule.organization
+        return {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+        }
 
 
 class AuditActionSerializer(serializers.ModelSerializer):
@@ -228,7 +280,6 @@ class AuditActionSerializer(serializers.ModelSerializer):
             "status",
             "url",
             "fired_at",
-            "organization_id",
             "rule_fired_at",
             "audit_rule_id",
             "status_message",
@@ -270,7 +321,6 @@ class AuditEventSerializer(serializers.ModelSerializer):
             "source_name",
             "source_type",
             "payload",
-            "organization_id",
             "audit_actions",
             "received_at",
             "rule_fired_at",

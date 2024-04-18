@@ -1,6 +1,9 @@
+import django.db.models.deletion
 from django.conf import settings
-from django.db import migrations
+from django.db import migrations, models
 from django.utils import timezone
+
+import aap_eda.core.models.utils
 
 RESOURCES_LIST = (
     "Activation",
@@ -65,7 +68,7 @@ def remove_resources_from_default_org(apps, schema_editor):
         default_org_resources = resource_model.objects.filter(
             organization=default_org
         )
-        default_org_resources.objects.update(organization=None)
+        default_org_resources.update(organization=None)
 
 
 class Migration(migrations.Migration):
@@ -79,6 +82,96 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(
             code=create_default_org, reverse_code=delete_default_org
+        ),
+        migrations.AddField(
+            model_name="activation",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="auditrule",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="credentialtype",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="decisionenvironment",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="edacredential",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="extravar",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="project",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="rulebook",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="rulebookprocess",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
+            ),
         ),
         migrations.RunPython(
             code=add_resources_to_default_org,

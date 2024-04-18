@@ -1053,6 +1053,7 @@ class ActivationManager:
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
+            "organization": self.db_instance.organization,
         }
         args[f"{self.db_instance_type}"] = self.db_instance
         try:

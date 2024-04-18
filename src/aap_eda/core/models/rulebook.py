@@ -15,7 +15,7 @@
 import yaml
 from django.db import models
 
-from .organization import Organization
+from .base_org import BaseOrgModel
 
 __all__ = (
     "Rulebook",
@@ -25,7 +25,7 @@ __all__ = (
 )
 
 
-class Rulebook(models.Model):
+class Rulebook(BaseOrgModel):
     class Meta:
         db_table = "core_rulebook"
         unique_together = ["project_id", "name"]
@@ -86,7 +86,7 @@ class Rule(models.Model):
     action = models.JSONField(default=dict, null=False)
 
 
-class AuditRule(models.Model):
+class AuditRule(BaseOrgModel):
     class Meta:
         db_table = "core_audit_rule"
         indexes = [
@@ -109,15 +109,6 @@ class AuditRule(models.Model):
     job_instance = models.ForeignKey(
         "JobInstance", on_delete=models.SET_NULL, null=True
     )
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
 
 class AuditAction(models.Model):
@@ -137,15 +128,6 @@ class AuditAction(models.Model):
     audit_rule = models.ForeignKey(
         "AuditRule", on_delete=models.CASCADE, null=True
     )
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])
 
 
 class AuditEvent(models.Model):
@@ -163,12 +145,3 @@ class AuditEvent(models.Model):
     audit_actions = models.ManyToManyField(
         "AuditAction", related_name="audit_events"
     )
-    organization = models.ForeignKey(
-        "Organization", on_delete=models.CASCADE, null=True
-    )
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if not self.organization:
-            self.organization = Organization.objects.get_default()
-            super().save(update_fields=["organization"])

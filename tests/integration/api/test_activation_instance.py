@@ -161,6 +161,7 @@ def assert_activation_instance_data(
         "status": instance.status,
         "git_hash": instance.git_hash,
         "activation_id": instance.activation.id,
+        "organization_id": instance.organization.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
         "status_message": enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status],

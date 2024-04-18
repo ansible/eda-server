@@ -178,6 +178,7 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
         "description": rulebook.description,
         "rulesets": rulebook.rulesets,
         "project_id": rulebook.project.id,
+        "organization_id": rulebook.organization.id,
         "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
         "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -204,6 +205,7 @@ def test_list_audit_rules(
         "name",
         "status",
         "activation_instance",
+        "organization",
         "fired_at",
     ]
 
@@ -226,6 +228,7 @@ def test_list_audit_rules_filter_name(
         "name",
         "status",
         "activation_instance",
+        "organization",
         "fired_at",
     ]
 
@@ -362,7 +365,6 @@ def test_list_actions_from_audit_rule_filter_name(
         "status",
         "url",
         "fired_at",
-        "organization_id",
         "rule_fired_at",
         "audit_rule_id",
         "status_message",
