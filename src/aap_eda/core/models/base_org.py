@@ -27,4 +27,5 @@ class BaseOrgModel(models.Model):
         "Organization",
         on_delete=models.CASCADE,
         default=get_default_organization_id,
+        null=True,
     )

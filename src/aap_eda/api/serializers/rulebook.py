@@ -26,6 +26,10 @@ class RulebookSerializer(serializers.ModelSerializer):
         queryset=models.Project.objects.all(),
         help_text="ID of the project",
     )
+    organization_id = serializers.PrimaryKeyRelatedField(
+        queryset=models.Organization.objects.all(),
+        help_text="ID of the organization",
+    )
 
     class Meta:
         model = models.Rulebook
@@ -35,10 +39,16 @@ class RulebookSerializer(serializers.ModelSerializer):
             "description",
             "rulesets",
             "project_id",
+            "organization_id",
             "created_at",
             "modified_at",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "organization_id",
+            "created_at",
+            "modified_at",
+        ]
 
 
 class RulebookRefSerializer(serializers.ModelSerializer):
@@ -46,8 +56,8 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = ["id", "name", "description"]
-        read_only_fields = ["id"]
+        fields = ["id", "name", "description", "organization_id"]
+        read_only_fields = ["id", "organization_id"]
 
 
 class AuditRuleSerializer(serializers.ModelSerializer):
@@ -93,7 +103,7 @@ class AuditRuleSerializer(serializers.ModelSerializer):
             "organization_id",
             "definition",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "organization_id", "created_at"]
 
 
 class AuditRuleDetailSerializer(serializers.Serializer):

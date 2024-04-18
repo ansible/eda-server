@@ -25,7 +25,7 @@ __all__ = (
 )
 
 
-class Rulebook(models.Model):
+class Rulebook(BaseOrgModel):
     class Meta:
         db_table = "core_rulebook"
         unique_together = ["project_id", "name"]

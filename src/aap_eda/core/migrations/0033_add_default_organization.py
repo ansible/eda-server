@@ -68,7 +68,7 @@ def remove_resources_from_default_org(apps, schema_editor):
         default_org_resources = resource_model.objects.filter(
             organization=default_org
         )
-        default_org_resources.objects.update(organization=None)
+        default_org_resources.update(organization=None)
 
 
 class Migration(migrations.Migration):
@@ -90,6 +90,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -99,6 +100,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -108,6 +110,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -117,6 +120,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -126,6 +130,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -135,6 +140,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -144,6 +150,17 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="rulebook",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+                null=True,
             ),
         ),
         migrations.AddField(
@@ -153,6 +170,7 @@ class Migration(migrations.Migration):
                 default=aap_eda.core.models.utils.get_default_organization_id,
                 on_delete=django.db.models.deletion.CASCADE,
                 to="core.organization",
+                null=True,
             ),
         ),
         migrations.RunPython(
