@@ -14,6 +14,7 @@
 
 from urllib.parse import urlparse, urlunparse
 
+import yaml
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -23,6 +24,7 @@ from aap_eda.core import models, validators
 from aap_eda.core.utils.crypto.base import SecretValue
 
 ENCRYPTED_STRING = "$encrypted$"
+ANSIBLE_VAULT_STRING = "$ANSIBLE_VAULT;"
 
 
 class ProxyFieldMixin:
@@ -264,6 +266,24 @@ class ExtraVarSerializer(serializers.ModelSerializer):
         model = models.ExtraVar
         fields = ["id", "extra_var", "organization_id"]
         read_only_fields = ["id"]
+
+    def to_representation(self, extra_var):
+        return {
+            "id": extra_var.id,
+            "extra_var": self.replace_vault_data(extra_var),
+        }
+
+    def replace_vault_data(self, extra_var):
+        data = {
+            key: (
+                ENCRYPTED_STRING
+                if isinstance(value, str) and ANSIBLE_VAULT_STRING in value
+                else value
+            )
+            for key, value in yaml.safe_load(extra_var.extra_var).items()
+        }
+
+        return yaml.safe_dump(data)
 
 
 class ExtraVarCreateSerializer(serializers.ModelSerializer):
