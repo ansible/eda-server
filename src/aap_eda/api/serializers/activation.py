@@ -425,6 +425,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "status_message",
             "activation_id",
             "event_stream_id",
+            "organization_id",
             "started_at",
             "ended_at",
         ]

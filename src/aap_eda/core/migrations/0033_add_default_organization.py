@@ -146,6 +146,15 @@ class Migration(migrations.Migration):
                 to="core.organization",
             ),
         ),
+        migrations.AddField(
+            model_name="rulebookprocess",
+            name="organization",
+            field=models.ForeignKey(
+                default=aap_eda.core.models.utils.get_default_organization_id,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="core.organization",
+            ),
+        ),
         migrations.RunPython(
             code=add_resources_to_default_org,
             reverse_code=remove_resources_from_default_org,

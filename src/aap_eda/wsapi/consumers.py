@@ -228,11 +228,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             activation_instance = models.RulebookProcess.objects.filter(
                 id=message.activation_id
             ).first()
-            activation = models.Activation.objects.filter(
-                id=activation_instance.activation_id
-            ).first()
             activation_org = models.Organization.objects.filter(
-                id=activation.organization.id
+                id=activation_instance.organization.id
             ).first()
             audit_rule = models.AuditRule.objects.create(
                 activation_instance_id=message.activation_id,
