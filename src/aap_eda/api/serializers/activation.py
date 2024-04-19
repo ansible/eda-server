@@ -31,10 +31,7 @@ from aap_eda.api.serializers.decision_environment import (
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.api.serializers.project import (
-    ExtraVarRefSerializer,
-    ProjectRefSerializer,
-)
+from aap_eda.api.serializers.project import ProjectRefSerializer
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
@@ -96,7 +93,6 @@ def _update_k8s_service_name(validated_data: dict) -> str:
 
 def _handle_eda_credentials(
     validated_data: dict,
-    extra_var_obj: models.ExtraVar,
     password: str,
 ) -> bool:
     system_vault_credential_needed = False
@@ -126,18 +122,14 @@ def _handle_eda_credentials(
 
         data = substitute_variables(injectors, user_inputs)
 
-        if extra_var_obj:
-            existing_data = yaml.safe_load(extra_var_obj.extra_var)
+        if validated_data["extra_var"]:
+            existing_data = yaml.safe_load(validated_data["extra_var"])
             for key in data.get("extra_vars", []):
                 existing_data[key] = data["extra_vars"][key]
 
-            extra_var_obj.extra_var = yaml.dump(existing_data)
-            extra_var_obj.save(update_fields=["extra_var"])
+            validated_data["extra_var"] = yaml.dump(existing_data)
         else:
-            extra_var_obj = models.ExtraVar.objects.create(
-                extra_var=yaml.dump(data["extra_vars"])
-            )
-            validated_data["extra_var_id"] = extra_var_obj.id
+            validated_data["extra_var"] = yaml.dump(data["extra_vars"])
 
     return system_vault_credential_needed
 
@@ -186,10 +178,10 @@ class ActivationSerializer(serializers.ModelSerializer):
             "is_enabled",
             "status",
             "git_hash",
+            "extra_var",
             "decision_environment_id",
             "project_id",
             "rulebook_id",
-            "extra_var_id",
             "organization_id",
             "restart_policy",
             "restart_count",
@@ -242,10 +234,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "description",
             "is_enabled",
             "status",
+            "extra_var",
             "decision_environment_id",
             "project_id",
             "rulebook_id",
-            "extra_var_id",
             "organization_id",
             "restart_policy",
             "restart_count",
@@ -286,7 +278,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "decision_environment_id": activation.decision_environment_id,
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
-            "extra_var_id": activation.extra_var_id,
+            "extra_var": activation.extra_var,
             "organization_id": activation.organization_id,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
@@ -318,7 +310,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "is_enabled",
             "decision_environment_id",
             "rulebook_id",
-            "extra_var_id",
+            "extra_var",
             "organization_id",
             "user",
             "restart_policy",
@@ -332,10 +324,10 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists]
     )
-    extra_var_id = serializers.IntegerField(
+    extra_var = serializers.CharField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_extra_var_exists],
+        validators=[validators.is_extra_var_dict],
     )
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists]
@@ -388,20 +380,14 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
                 validated_data
             )
 
-        extra_var_obj = None
         password = secrets.token_urlsafe()
         system_vault_credential_needed = False
-
-        if validated_data.get("extra_var_id"):
-            extra_var_obj = models.ExtraVar.objects.get(
-                id=validated_data["extra_var_id"]
-            )
 
         vault = _get_vault_credential_type()
 
         if validated_data.get("eda_credentials"):
             system_vault_credential_needed = _handle_eda_credentials(
-                validated_data, extra_var_obj, password
+                validated_data, password
             )
 
         if system_vault_credential_needed:
@@ -449,7 +435,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     )
     project = ProjectRefSerializer(required=False, allow_null=True)
     rulebook = RulebookRefSerializer(required=False, allow_null=True)
-    extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
     organization = OrganizationRefSerializer()
     rules_count = serializers.IntegerField()
@@ -522,11 +507,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.rulebook
             else None
         )
-        extra_var = (
-            ExtraVarRefSerializer(activation.extra_var).data
-            if activation.extra_var
-            else None
-        )
         activation_instances = models.RulebookProcess.objects.filter(
             activation_id=activation.id,
             parent_type=ProcessParentType.ACTIVATION,
@@ -566,7 +546,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "git_hash": activation.git_hash,
             "project": project,
             "rulebook": rulebook,
-            "extra_var": extra_var,
+            "extra_var": activation.extra_var,
             "organization": organization,
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True
@@ -595,11 +575,6 @@ class PostActivationSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True)
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists]
-    )
-    extra_var_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
-        validators=[validators.check_if_extra_var_exists],
     )
     # TODO: is_activation_valid needs to tell event stream/activation
     awx_token_id = serializers.IntegerField(
@@ -630,8 +605,8 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "status",
+            "extra_var",
             "decision_environment_id",
-            "extra_var_id",
             "organization_id",
             "user_id",
             "created_at",
@@ -777,22 +752,17 @@ def _validate_eda_credentials(data: dict) -> None:
         return
 
     existing_keys = []
-    extra_var_id = data.get("extra_var_id")
+    extra_var = data.get("extra_var")
 
     try:
         vault = _get_vault_credential_type()
-        if extra_var_id:
-            extra_var = models.ExtraVar.objects.get(id=extra_var_id)
-            existing_data = yaml.safe_load(extra_var.extra_var)
+        if extra_var:
+            existing_data = yaml.safe_load(extra_var)
             existing_keys = [*existing_data.keys()]
     except models.CredentialType.DoesNotExist:
         raise serializers.ValidationError(
             f"CredentialType with name '{DefaultCredentialType.VAULT}'"
             " does not exist"
-        )
-    except models.ExtraVar.DoesNotExist:
-        raise serializers.ValidationError(
-            f"ExtraVar with id {extra_var_id} does not exist"
         )
 
     for eda_credential_id in eda_credential_ids:

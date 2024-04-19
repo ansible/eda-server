@@ -34,59 +34,7 @@ from aap_eda.api.serializers.project import (
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 
-from .mixins import CreateModelMixin, ResponseSerializerMixin
-
-
-@extend_schema_view(
-    retrieve=extend_schema(
-        description="Get the extra_var by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ExtraVarSerializer,
-                description="Return the extra_var by its id.",
-            ),
-        },
-    ),
-    list=extend_schema(
-        description="List all extra_vars",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ExtraVarSerializer,
-                description="Return a list of extra_vars.",
-            ),
-        },
-    ),
-    create=extend_schema(
-        description="Create an extra_var",
-        request=serializers.ExtraVarCreateSerializer,
-        responses={
-            status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.ExtraVarSerializer,
-                description="Return the created extra_var.",
-            ),
-        },
-    ),
-)
-class ExtraVarViewSet(
-    CreateModelMixin,
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.ExtraVar.objects.order_by("id")
-    serializer_class = serializers.ExtraVarSerializer
-    http_method_names = ["get", "post"]
-
-    def filter_queryset(self, queryset):
-        return super().filter_queryset(
-            queryset.model.access_qs(self.request.user, queryset=queryset)
-        )
-
-    def get_serializer_class(self):
-        if self.action == "create":
-            return serializers.ExtraVarCreateSerializer
-        return super().get_serializer_class()
-
-    def get_response_serializer_class(self):
-        return serializers.ExtraVarSerializer
+from .mixins import ResponseSerializerMixin
 
 
 @extend_schema_view(

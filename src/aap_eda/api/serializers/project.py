@@ -19,7 +19,7 @@ from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models, validators
+from aap_eda.core import models
 from aap_eda.core.utils.crypto.base import SecretValue
 
 ENCRYPTED_STRING = "$encrypted$"
@@ -251,40 +251,6 @@ class ProjectRefSerializer(serializers.ModelSerializer):
             "description",
             "organization_id",
         ]
-        read_only_fields = ["id"]
-
-
-class ExtraVarSerializer(serializers.ModelSerializer):
-    extra_var = serializers.CharField(
-        required=True,
-        help_text="Content of the extra_var",
-    )
-
-    class Meta:
-        model = models.ExtraVar
-        fields = ["id", "extra_var", "organization_id"]
-        read_only_fields = ["id"]
-
-
-class ExtraVarCreateSerializer(serializers.ModelSerializer):
-    extra_var = serializers.CharField(
-        required=True,
-        help_text="Content of the extra_var",
-        validators=[validators.is_extra_var_dict],
-    )
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
-
-    class Meta:
-        model = models.ExtraVar
-        fields = ["extra_var", "organization_id"]
-
-
-class ExtraVarRefSerializer(serializers.ModelSerializer):
-    """Serializer for Extra Var reference."""
-
-    class Meta:
-        model = models.ExtraVar
-        fields = ["id"]
         read_only_fields = ["id"]
 
 

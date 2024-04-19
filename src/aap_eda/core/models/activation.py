@@ -56,9 +56,7 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.SET_NULL, null=True
     )
-    extra_var = models.ForeignKey(
-        "ExtraVar", on_delete=models.CASCADE, null=True
-    )
+    extra_var = models.TextField(null=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
@@ -124,3 +122,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
         default=None,
         help_text="Name of the kubernetes service",
     )
+
+    def get_extra_var(self):
+        return self.extra_var

@@ -89,8 +89,7 @@ def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
         validated_data, extra_vars, encrypt_vars, password
     )
 
-    extra_var = models.ExtraVar.objects.create(extra_var=yaml.dump(extra_vars))
-    return extra_var.id, credential_id
+    return extra_vars, credential_id
 
 
 def _updated_listener_ruleset(validated_data):
@@ -172,7 +171,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "channel_name",
             "decision_environment_id",
             "rulebook_id",
-            "extra_var_id",
+            "extra_var",
             "user",
             "restart_policy",
             "log_level",
@@ -196,10 +195,10 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()
         )
-        extra_var_id, credential_id = _get_extra_var_and_credential_ids(
+        extra_vars, credential_id = _get_extra_var_and_credential_ids(
             validated_data
         )
-        validated_data["extra_var_id"] = extra_var_id
+        validated_data["extra_var"] = yaml.dump(extra_vars)
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
         )

@@ -109,20 +109,6 @@ class Project(BaseOrgModel):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
-class ExtraVar(BaseOrgModel):
-    class Meta:
-        db_table = "core_extra_var"
-        default_permissions = (
-            "add",
-            "view",
-        )
-
-    name = models.TextField(unique=True, null=True, default=None)
-    extra_var = models.TextField()
-    project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
-
-
 __all__ = [
-    "ExtraVar",
     "Project",
 ]

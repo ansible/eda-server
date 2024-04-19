@@ -52,16 +52,6 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     return decision_environment_id
 
 
-def check_if_extra_var_exists(extra_var_id: int) -> int:
-    try:
-        models.ExtraVar.objects.get(pk=extra_var_id)
-    except models.ExtraVar.DoesNotExist:
-        raise serializers.ValidationError(
-            f"ExtraVar with id {extra_var_id} does not exist"
-        )
-    return extra_var_id
-
-
 def check_if_awx_token_exists(awx_token_id: int) -> int:
     try:
         models.AwxToken.objects.get(pk=awx_token_id)
