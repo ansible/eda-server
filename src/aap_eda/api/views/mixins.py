@@ -12,6 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
@@ -22,7 +26,17 @@ class CreateModelMixin:
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        with transaction.atomic():
+            self.perform_create(serializer)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(serializer.instance),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, serializer.instance
+            )
         headers = self.get_success_headers(serializer.data)
 
         response_serializer_class = self.get_response_serializer_class()
@@ -46,11 +60,20 @@ class CreateModelMixin:
 class PartialUpdateOnlyModelMixin:
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
+        old_data = model_to_dict(instance)
         serializer = self.get_serializer(
             instance, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+
+        with transaction.atomic():
+            self.perform_update(serializer)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(serializer.instance),
+            )
 
         if getattr(instance, "_prefetched_objects_cache", None):
             # If 'prefetch_related' has been applied to a queryset, we need to

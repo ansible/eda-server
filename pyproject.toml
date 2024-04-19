@@ -43,8 +43,9 @@ cryptography = ">=38,<42"
 kubernetes = "26.1.*"
 podman = "4.9.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2024.2.12", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2024.4.18", extras = [
     "channel_auth",
+    "rbac",
 ] }
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"

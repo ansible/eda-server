@@ -30,6 +30,7 @@ from aap_eda.api.serializers.decision_environment import (
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
     ProjectRefSerializer,
@@ -189,6 +190,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -244,6 +246,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -284,6 +287,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
             "extra_var_id": activation.extra_var_id,
+            "organization_id": activation.organization_id,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -304,6 +308,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = models.Activation
         fields = [
@@ -313,6 +319,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "decision_environment_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "user",
             "restart_policy",
             "awx_token_id",
@@ -418,6 +425,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "status_message",
             "activation_id",
             "event_stream_id",
+            "organization_id",
             "started_at",
             "ended_at",
         ]
@@ -443,6 +451,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer(required=False, allow_null=True)
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
+    organization = OrganizationRefSerializer()
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
@@ -475,6 +484,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project",
             "rulebook",
             "extra_var",
+            "organization",
             "instances",
             "restart_policy",
             "restart_count",
@@ -532,7 +542,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if len(activation_instances) > 1 and activation.restart_count > 0
             else None
         )
-
+        organization = (
+            OrganizationRefSerializer(activation.organization).data
+            if activation.organization
+            else None
+        )
         event_streams = [
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
@@ -553,6 +567,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project": project,
             "rulebook": rulebook,
             "extra_var": extra_var,
+            "organization": organization,
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True
             ).data,
@@ -617,6 +632,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "status",
             "decision_environment_id",
             "extra_var_id",
+            "organization_id",
             "user_id",
             "created_at",
             "modified_at",

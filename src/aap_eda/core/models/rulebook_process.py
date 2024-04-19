@@ -28,13 +28,15 @@ from aap_eda.core.exceptions import (
     UpdateFieldsRequiredError,
 )
 
+from .base_org import BaseOrgModel
+
 __all__ = (
     "RulebookProcess",
     "RulebookProcessLog",
 )
 
 
-class RulebookProcess(models.Model):
+class RulebookProcess(BaseOrgModel):
     """Rulebook Process model.
 
     Rulebook Process is an instance of ansible-rulebook process
@@ -77,6 +79,7 @@ class RulebookProcess(models.Model):
     class Meta:
         db_table = "core_rulebook_process"
         ordering = ("-started_at",)
+        default_permissions = ("view",)
 
     def __str__(self) -> str:
         return f"Rulebook Process id {self.id}"

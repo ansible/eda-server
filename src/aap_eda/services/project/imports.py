@@ -178,6 +178,7 @@ class ProjectImportService:
             project=project,
             name=rulebook_info.relpath,
             rulesets=rulebook_info.raw_content,
+            organization=project.organization,
         )
         insert_rulebook_related_data(rulebook, rulebook_info.content)
         return rulebook

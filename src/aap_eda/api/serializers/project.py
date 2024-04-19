@@ -18,6 +18,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
 from aap_eda.core.utils.crypto.base import SecretValue
 
@@ -56,6 +57,7 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
         fields = [
             "name",
             "description",
+            "organization_id",
             "eda_credential_id",
             "signature_validation_credential_id",
             "scm_branch",
@@ -67,6 +69,7 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
     eda_credential_id = serializers.IntegerField(
         required=False, allow_null=True
     )
@@ -81,6 +84,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
             "proxy",
             "name",
             "description",
+            "organization_id",
             "eda_credential_id",
             "signature_validation_credential_id",
             "verify_ssl",
@@ -162,6 +166,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
 class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     """Serializer for reading the Project with embedded objects."""
 
+    organization = OrganizationRefSerializer()
     eda_credential = EdaCredentialRefSerializer(
         required=False, allow_null=True
     )
@@ -171,7 +176,7 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     proxy = serializers.SerializerMethodField()
 
     class Meta:
-        model = models.Project()
+        model = models.Project
         read_only_fields = [
             "id",
             "url",
@@ -185,6 +190,7 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
         fields = [
             "name",
             "description",
+            "organization",
             "eda_credential",
             "signature_validation_credential",
             "verify_ssl",
@@ -207,6 +213,11 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             if project["signature_validation_credential"]
             else None
         )
+        organization = (
+            OrganizationRefSerializer(project["organization"]).data
+            if project["organization"]
+            else None
+        )
         return {
             "id": project["id"],
             "name": project["name"],
@@ -218,6 +229,7 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "scm_refspec": project["scm_refspec"],
             "git_hash": project["git_hash"],
             "verify_ssl": project["verify_ssl"],
+            "organization": organization,
             "eda_credential": eda_credential,
             "signature_validation_credential": signature_validation_credential,
             "import_state": project["import_state"],
@@ -230,7 +242,15 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 class ProjectRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
-        fields = ["id", "git_hash", "url", "scm_type", "name", "description"]
+        fields = [
+            "id",
+            "git_hash",
+            "url",
+            "scm_type",
+            "name",
+            "description",
+            "organization_id",
+        ]
         read_only_fields = ["id"]
 
 
@@ -238,12 +258,11 @@ class ExtraVarSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
-        validators=[validators.is_extra_var_dict],
     )
 
     class Meta:
         model = models.ExtraVar
-        fields = ["id", "extra_var"]
+        fields = ["id", "extra_var", "organization_id"]
         read_only_fields = ["id"]
 
 
@@ -251,11 +270,13 @@ class ExtraVarCreateSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
+        validators=[validators.is_extra_var_dict],
     )
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = models.ExtraVar
-        fields = ["extra_var"]
+        fields = ["extra_var", "organization_id"]
 
 
 class ExtraVarRefSerializer(serializers.ModelSerializer):

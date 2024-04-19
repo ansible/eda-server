@@ -14,6 +14,10 @@
 
 import logging
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -71,6 +75,13 @@ class CredentialTypeViewSet(
     filterset_class = filters.CredentialTypeFilter
     ordering_fields = ["name"]
 
+    def filter_queryset(self, queryset):
+        if queryset.model is models.CredentialType:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
+
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
 
@@ -94,10 +105,21 @@ class CredentialTypeViewSet(
         for field in serializer.validated_data["inputs"]["fields"]:
             if "type" not in field:
                 field["type"] = "string"
-        credential_type = serializer.create(serializer.validated_data)
+
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
 
         return Response(
-            serializers.CredentialTypeSerializer(credential_type).data,
+            serializers.CredentialTypeSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -143,13 +165,21 @@ class CredentialTypeViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
+        old_data = model_to_dict(credential_type)
         for key, value in serializer.validated_data.items():
             setattr(credential_type, key, value)
 
-        credential_type.save()
+        with transaction.atomic():
+            credential_type.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(credential_type),
+            )
 
         return Response(
-            serializers.CredentialTypeSerializer(credential_type).data
+            serializers.CredentialTypeSerializer(credential_type).data,
         )
 
     @extend_schema(

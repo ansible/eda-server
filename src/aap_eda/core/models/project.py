@@ -28,10 +28,12 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
+from .base_org import BaseOrgModel
+
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(models.Model):
+class Project(BaseOrgModel):
     class Meta:
         db_table = "core_project"
         constraints = [
@@ -107,9 +109,13 @@ class Project(models.Model):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
-class ExtraVar(models.Model):
+class ExtraVar(BaseOrgModel):
     class Meta:
         db_table = "core_extra_var"
+        default_permissions = (
+            "add",
+            "view",
+        )
 
     name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()

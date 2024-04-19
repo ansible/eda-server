@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,18 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import django_filters
+from django.conf import settings
 
-from aap_eda.core import models
+from .organization import Organization
 
 
-class RoleFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="istartswith",
-        label="Filter roles by name.",
-    )
-
-    class Meta:
-        model = models.Role
-        fields = ["name"]
+def get_default_organization_id():
+    return Organization.objects.get(name=settings.DEFAULT_ORGANIZATION_NAME).id
