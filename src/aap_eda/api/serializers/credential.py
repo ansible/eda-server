@@ -39,6 +39,7 @@ class CredentialSerializer(serializers.ModelSerializer):
 
 class CredentialCreateSerializer(serializers.ModelSerializer):
     secret = serializers.CharField(required=True, allow_null=False)
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
         credential_type = data.get("credential_type", CredentialType.REGISTRY)

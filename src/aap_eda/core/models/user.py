@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.resource_registry.fields import AnsibleResourceField
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -29,9 +30,19 @@ class User(AbstractUser):
     Refer to https://docs.djangoproject.com/en/4.1/topics/auth/customizing/#substituting-a-custom-user-model
     """  # noqa: E501
 
-    roles = models.ManyToManyField("Role", related_name="users")
     modified_at = models.DateTimeField(auto_now=True, null=False)
     is_service_account = models.BooleanField(default=False)
+    resource = AnsibleResourceField(primary_key_field="id")
+
+    def summary_fields(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "is_superuser": self.is_superuser,
+        }
 
 
 class AwxToken(models.Model):

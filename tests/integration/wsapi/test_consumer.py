@@ -11,6 +11,10 @@ from pydantic.error_wrappers import ValidationError
 from aap_eda.core import enums, models
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
+# TODO(doston): this test module needs a whole refactor to use already
+# existing fixtures over from API conftest.py instead of creating new objects
+# keeping it to minimum for now to pass all failing tests
+
 TIMEOUT = 5
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -104,7 +108,8 @@ async def test_handle_workers_without_credentials(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_eda_system_vault_credential(
-    ws_communicator: WebsocketCommunicator, preseed_credential_types
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
 ):
     rulebook_process_id = (
         await _prepare_activation_instance_with_eda_system_vault_credential()
@@ -159,7 +164,9 @@ async def test_handle_workers_with_controller_info(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_workers_with_validation_errors():
+async def test_handle_workers_with_validation_errors(
+    default_organization: models.Organization,
+):
     communicator = WebsocketCommunicator(
         AnsibleRulebookConsumer.as_asgi(), "ws/"
     )
@@ -179,7 +186,10 @@ async def test_handle_workers_with_validation_errors():
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_jobs(ws_communicator: WebsocketCommunicator):
+async def test_handle_jobs(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
     rulebook_process_id = await _prepare_db_data()
 
     assert (await get_job_instance_count()) == 0
@@ -226,6 +236,7 @@ async def test_handle_events(ws_communicator: WebsocketCommunicator):
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_multiple_firing(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -259,6 +270,7 @@ async def test_handle_actions_multiple_firing(
 @pytest.mark.django_db(transaction=True)
 async def test_handle_actions_with_empty_job_uuid(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     assert (await get_audit_rule_count()) == 0
@@ -281,7 +293,10 @@ async def test_handle_actions_with_empty_job_uuid(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_actions(ws_communicator: WebsocketCommunicator):
+async def test_handle_actions(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
 
@@ -323,6 +338,7 @@ async def test_handle_actions(ws_communicator: WebsocketCommunicator):
 @pytest.mark.django_db(transaction=True)
 async def test_rule_status_with_multiple_failed_actions(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()
@@ -356,7 +372,10 @@ async def test_rule_status_with_multiple_failed_actions(
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
+async def test_handle_heartbeat(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
     rulebook_process_id = await _prepare_db_data()
     rulebook_process = await get_rulebook_process(rulebook_process_id)
 
@@ -393,6 +412,7 @@ async def test_handle_heartbeat(ws_communicator: WebsocketCommunicator):
 @pytest.mark.django_db(transaction=True)
 async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = await _prepare_db_data()
     job_instance = await _prepare_job_instance()

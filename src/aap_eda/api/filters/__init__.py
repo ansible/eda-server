@@ -21,14 +21,15 @@ from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .eda_credential import EdaCredentialFilter
 from .event_stream import EventStreamFilter
+from .organization import OrganizationFilter
 from .project import ProjectFilter
-from .role import RoleFilter
 from .rulebook import (
     AuditRuleActionFilter,
     AuditRuleEventFilter,
     AuditRuleFilter,
     RulebookFilter,
 )
+from .team import OrganizationTeamFilter, TeamFilter
 from .user import UserFilter
 
 __all__ = (
@@ -50,8 +51,11 @@ __all__ = (
     "ActivationInstanceLogFilter",
     # user
     "UserFilter",
-    # role
-    "RoleFilter",
     # event_stream
     "EventStreamFilter",
+    # organization
+    "OrganizationFilter",
+    # team
+    "TeamFilter",
+    "OrganizationTeamFilter",
 )

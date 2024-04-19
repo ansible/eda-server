@@ -11,8 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
-from django.shortcuts import get_object_or_404
+from django.forms import model_to_dict
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -30,9 +32,9 @@ from aap_eda.api.serializers.project import (
     get_proxy_for_display,
 )
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
+from aap_eda.core.enums import Action
 
-from .mixins import ResponseSerializerMixin
+from .mixins import CreateModelMixin, ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -66,14 +68,25 @@ from .mixins import ResponseSerializerMixin
     ),
 )
 class ExtraVarViewSet(
-    mixins.CreateModelMixin,
+    CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.ExtraVar.objects.order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
 
-    rbac_resource_type = ResourceType.EXTRA_VAR
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.ExtraVarCreateSerializer
+        return super().get_serializer_class()
+
+    def get_response_serializer_class(self):
+        return serializers.ExtraVarSerializer
 
 
 @extend_schema_view(
@@ -111,6 +124,11 @@ class ProjectViewSet(
 
     rbac_action = None
 
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
+
     @extend_schema(
         description="Import a project.",
         request=serializers.ProjectCreateRequestSerializer,
@@ -126,7 +144,17 @@ class ProjectViewSet(
             data=request.data
         )
         serializer.is_valid(raise_exception=True)
-        project = serializer.save()
+        with transaction.atomic():
+            project = serializer.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(serializer.instance),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, serializer.instance
+            )
 
         job = tasks.import_project.delay(project_id=project.id)
 
@@ -166,6 +194,11 @@ class ProjectViewSet(
             if project.data["signature_validation_credential_id"]
             else None
         )
+        project.data["organization"] = (
+            models.Organization.objects.get(pk=project.data["organization_id"])
+            if project.data["organization_id"]
+            else None
+        )
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
 
@@ -188,7 +221,7 @@ class ProjectViewSet(
         },
     )
     def partial_update(self, request, pk):
-        project = get_object_or_404(models.Project, pk=pk)
+        project = self.get_object()
         if "proxy" in request.data:
             new_proxy = request.data["proxy"]
             if ENCRYPTED_STRING in new_proxy:
@@ -220,9 +253,12 @@ class ProjectViewSet(
         for credential_id in credential_ids:
             if credential_id is None:
                 continue
-            credential = models.EdaCredential.objects.filter(
-                id=credential_id
-            ).first()
+            # we should fetch only the credentials user has access to
+            credential = (
+                models.EdaCredential.access_qs(self.request.user)
+                .filter(id=credential_id)
+                .first()
+            )
             if not credential:
                 msg = f"EdaCredential [{credential_id}] not found"
                 return Response(
@@ -235,7 +271,15 @@ class ProjectViewSet(
             setattr(project, key, value)
             update_fields.append(key)
 
-        project.save(update_fields=update_fields)
+        old_data = model_to_dict(project)
+        with transaction.atomic():
+            project.save(update_fields=update_fields)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(project),
+            )
 
         return Response(serializers.ProjectSerializer(project).data)
 
@@ -252,7 +296,7 @@ class ProjectViewSet(
     @transaction.atomic
     def sync(self, request, pk):
         try:
-            project = models.Project.objects.select_for_update().get(pk=pk)
+            project = self.get_queryset().select_for_update().get(pk=pk)
         except models.Project.DoesNotExist:
             raise api_exc.NotFound
 

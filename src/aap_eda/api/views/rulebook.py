@@ -28,7 +28,7 @@ from rest_framework.filters import OrderingFilter
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
+from aap_eda.core.enums import Action
 
 
 @extend_schema_view(
@@ -61,14 +61,19 @@ class RulebookViewSet(
 
     rbac_action = None
 
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
+
     @extend_schema(
         description="Get the JSON format of a rulebook by its id",
         request=None,
         responses={status.HTTP_200_OK: serializers.RulebookSerializer},
     )
-    @action(detail=True, rbac_action=Action.READ)
+    @action(detail=True)
     def json(self, request, pk):
-        rulebook = get_object_or_404(models.Rulebook, pk=pk)
+        rulebook = self.get_object()
         data = serializers.RulebookSerializer(rulebook).data
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
@@ -109,6 +114,13 @@ class AuditRuleViewSet(
         "fired_at",
     ]
 
+    def filter_queryset(self, queryset):
+        if queryset.model is models.AuditRule:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
+
     def get_serializer_class(self):
         if self.action == "retrieve":
             return serializers.AuditRuleDetailSerializer
@@ -120,7 +132,6 @@ class AuditRuleViewSet(
             return serializers.AuditEventSerializer
         return serializers.AuditRuleSerializer
 
-    rbac_resource_type = ResourceType.AUDIT_RULE
     rbac_action = None
 
     @extend_schema(
@@ -152,7 +163,9 @@ class AuditRuleViewSet(
         url_path="(?P<id>[^/.]+)/actions",
     )
     def actions(self, _request, id):
-        audit_rule = get_object_or_404(models.AuditRule, id=id)
+        audit_rule = get_object_or_404(
+            models.AuditRule.access_qs(_request.user), id=id
+        )
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,
@@ -188,12 +201,13 @@ class AuditRuleViewSet(
             "source_type",
             "received_at",
         ],
-        rbac_resource_type=ResourceType.AUDIT_EVENT,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/events",
     )
     def events(self, _request, id):
-        audit_rule = get_object_or_404(models.AuditRule, id=id)
+        audit_rule = get_object_or_404(
+            models.AuditRule.access_qs(_request.user), id=id
+        )
         audit_actions = models.AuditAction.objects.filter(
             audit_rule=audit_rule,
             rule_fired_at=audit_rule.fired_at,

@@ -14,7 +14,10 @@
 
 import logging
 
-from django.shortcuts import get_object_or_404
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -28,7 +31,6 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
-from aap_eda.core.enums import ResourceType
 from aap_eda.core.utils.credentials import inputs_to_store
 
 from .mixins import (
@@ -66,8 +68,12 @@ class EdaCredentialViewSet(
     filterset_class = filters.EdaCredentialFilter
     ordering_fields = ["name"]
 
-    rbac_resource_type = ResourceType.EDA_CREDENTIAL
-    rbac_action = None
+    def filter_queryset(self, queryset):
+        if queryset.model is models.EdaCredential:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
 
     @extend_schema(
         description="Get EDA credential by id",
@@ -90,7 +96,7 @@ class EdaCredentialViewSet(
         },
     )
     def retrieve(self, request, pk):
-        eda_credential = get_object_or_404(models.EdaCredential, id=pk)
+        eda_credential = self.get_object()
         eda_credential_serializers = serializers.EdaCredentialSerializer(
             eda_credential
         )
@@ -121,10 +127,20 @@ class EdaCredentialViewSet(
         serializer.validated_data["inputs"] = inputs_to_store(
             serializer.validated_data["inputs"]
         )
-        eda_credential = serializer.create(serializer.validated_data)
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
 
         return Response(
-            serializers.EdaCredentialSerializer(eda_credential).data,
+            serializers.EdaCredentialSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -145,9 +161,7 @@ class EdaCredentialViewSet(
         },
     )
     def list(self, request):
-        credentials = models.EdaCredential.objects.exclude(
-            managed=True,
-        )
+        credentials = self.get_queryset().exclude(managed=True)
         credentials = self.filter_queryset(credentials)
 
         serializer = serializers.EdaCredentialSerializer(
@@ -182,13 +196,21 @@ class EdaCredentialViewSet(
                 eda_credential.inputs,
             )
 
+        old_data = model_to_dict(eda_credential)
         for key, value in serializer.validated_data.items():
             setattr(eda_credential, key, value)
 
-        eda_credential.save()
+        with transaction.atomic():
+            eda_credential.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(eda_credential),
+            )
 
         return Response(
-            serializers.EdaCredentialSerializer(eda_credential).data
+            serializers.EdaCredentialSerializer(eda_credential).data,
         )
 
     @extend_schema(

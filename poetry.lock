@@ -592,7 +592,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.2.12"
+version = "2024.4.15"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -609,18 +609,19 @@ djangorestframework = "*"
 inflection = "*"
 
 [package.extras]
-all = ["channels", "cryptography", "django-auth-ldap", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "requests", "social-auth-app-django", "tabulate"]
+all = ["channels", "cryptography", "django-auth-ldap", "django-redis", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django", "tabulate", "tacacs_plus"]
 api-documentation = ["drf-spectacular"]
-authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate"]
+authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate", "tacacs_plus"]
 channel-auth = ["channels"]
 jwt-consumer = ["pyjwt", "requests"]
+redis-client = ["django-redis", "redis"]
 testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2024.2.12"
-resolved_reference = "dc5bbf57af4a323f6689093993044aa552cc1227"
+reference = "2024.4.18"
+resolved_reference = "f77200592f06448db4e531c15e03c4f8344128e5"
 
 [[package]]
 name = "django-crum"
@@ -2392,4 +2393,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "b7883669144fbe3b4806499606d8475391e52ebebbceaeedc8ff36fa431cb585"
+content-hash = "75a73f87c68ebe1c0dd74b4365bc7c46406a94fe8f21a57a56d77cf1a29431ff"
