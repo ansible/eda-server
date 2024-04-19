@@ -16,7 +16,6 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 import yaml
 from django.conf import settings
@@ -57,55 +56,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SystemVaultData:
-    password: Optional[str] = None
-    system_vault_credential_id: Optional[int] = None
+class VaultData:
+    password: str = secrets.token_urlsafe()
+    password_used: bool = False
 
 
-class SystemVaultInfo:
-    @classmethod
-    def get_or_create_system_vault_info(
-        cls, activation_id: int = None
-    ) -> SystemVaultData:
-        vault_data = cls.get_system_vault_info(activation_id)
-
-        if vault_data.system_vault_credential_id is None:
-            return cls.create_system_vault_info()
-
-        return vault_data
-
-    @classmethod
-    def get_system_vault_info(
-        cls, activation_id: int = None
-    ) -> SystemVaultData:
-        if activation_id:
-            activation = models.Activation.objects.get(id=activation_id)
-            vault_credential = activation.eda_system_vault_credential
-
-            if vault_credential:
-                inputs = yaml.safe_load(
-                    vault_credential.inputs.get_secret_value()
-                )
-                return SystemVaultData(
-                    password=inputs["vault_password"],
-                    system_vault_credential_id=vault_credential.id,
-                )
-
-        return SystemVaultData()
-
-    @classmethod
-    def create_system_vault_info(cls) -> SystemVaultData:
-        vault = _get_vault_credential_type()
-        password = secrets.token_urlsafe()
-        vault_credential = _create_system_eda_credential(password, vault)
-
-        return SystemVaultData(
-            password=password,
-            system_vault_credential_id=vault_credential.id,
-        )
-
-
-def _updated_ruleset(validated_data):
+def _updated_ruleset(validated_data: dict, vault_data: VaultData):
     try:
         sources_info = []
 
@@ -120,19 +76,14 @@ def _updated_ruleset(validated_data):
             extra_vars = rulesets[0]["sources"][0].get("extra_vars", {})
             encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
 
-            activation_id = validated_data.get("id")
-            vault_info = SystemVaultInfo.get_system_vault_info(activation_id)
-            if vault_info.system_vault_credential_id is None:
-                vault_info = SystemVaultInfo.create_system_vault_info()
-                validated_data[
-                    "eda_system_vault_credential_id"
-                ] = vault_info.system_vault_credential_id
+            if bool(encrypt_vars):
+                vault_data.password_used = True
 
             extra_vars = substitute_extra_vars(
                 event_stream.__dict__,
                 extra_vars,
                 encrypt_vars,
-                vault_info.password,
+                vault_data.password,
             )
 
             source = rulesets[0]["sources"][0]["complementary_source"]
@@ -152,15 +103,11 @@ def _update_k8s_service_name(validated_data: dict) -> str:
     return service_name or create_k8s_service_name(validated_data["name"])
 
 
-def _update_extra_vars_from_credentials(
-    validated_data: dict, is_created: bool
+def _update_extra_vars_from_eda_credentials(
+    validated_data: dict,
+    vault_data: VaultData,
+    creating: bool,
 ) -> None:
-    if not validated_data.get("eda_credentials"):
-        return
-
-    if is_created:
-        _validate_eda_credentials(validated_data)
-
     extra_var_obj = (
         models.ExtraVar.objects.get(id=validated_data["extra_var_id"])
         if validated_data.get("extra_var_id")
@@ -182,19 +129,11 @@ def _update_extra_vars_from_credentials(
         user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
 
         if any(key in user_inputs for key in secret_fields):
-            if is_created:
-                vault_info = SystemVaultInfo.create_system_vault_info()
-                validated_data[
-                    "eda_system_vault_credential_id"
-                ] = vault_info.system_vault_credential_id
+            if creating:
+                vault_data.password_used = True
             else:
-                activation_id = validated_data.get("id")
-                vault_info = SystemVaultInfo.get_system_vault_info(
-                    activation_id
-                )
-
                 # when updateing with new added secret fields credential
-                if vault_info.system_vault_credential_id is None:
+                if not vault_data.password_used:
                     message = (
                         "No system vault is available for credential"
                         f" {eda_credential.name}"
@@ -206,7 +145,7 @@ def _update_extra_vars_from_credentials(
         for key, value in user_inputs.items():
             if key in secret_fields:
                 user_inputs[key] = encrypt_string(
-                    password=vault_info.password,
+                    password=vault_data.password,
                     plaintext=value,
                     vault_id=EDA_SERVER_VAULT_LABEL,
                 )
@@ -450,9 +389,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        _validate_credentials_and_token_and_rulebook(
-            data=data, is_created=True
-        )
+        _validate_credentials_and_token_and_rulebook(data=data, creating=True)
 
         return data
 
@@ -470,10 +407,24 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
                 validated_data
             )
 
+        vault_data = VaultData()
+
         if validated_data.get("event_streams"):
             validated_data["rulebook_rulesets"] = _updated_ruleset(
-                validated_data
+                validated_data, vault_data
             )
+
+        vault = _get_vault_credential_type()
+
+        if validated_data.get("eda_credentials"):
+            _update_extra_vars_from_eda_credentials(
+                validated_data, vault_data, True
+            )
+
+        if vault_data.password_used:
+            validated_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(vault_data.password, vault)
 
         return super().create(validated_data)
 
@@ -690,9 +641,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        _validate_credentials_and_token_and_rulebook(
-            data=data, is_created=False
-        )
+        _validate_credentials_and_token_and_rulebook(data=data, creating=False)
 
         return data
 
@@ -752,14 +701,28 @@ def parse_validation_errors(errors: dict) -> str:
 
 
 def _validate_credentials_and_token_and_rulebook(
-    data: dict, is_created: bool
+    data: dict, creating: bool
 ) -> None:
-    """Validate EDA credentials, Awx Token and AAP credentials."""
-    # validate EDA credentials
-    _update_extra_vars_from_credentials(data, is_created)
-
+    """Validate Awx Token and AAP credentials."""
     eda_credentials = data.get("eda_credentials", [])
     aap_credentials = _get_aap_credentials_if_exists(eda_credentials)
+
+    # validate EDA credentials
+    if creating:
+        _validate_eda_credentials(data)
+    else:
+        # update extra vars if needs
+        activation = models.Activation.objects.get(id=data["id"])
+        vault_credential = activation.eda_system_vault_credential
+        if vault_credential:
+            inputs = yaml.safe_load(vault_credential.inputs.get_secret_value())
+            vault_data = VaultData(password=inputs["vault_password"])
+        else:
+            vault_data = VaultData()
+
+        _update_extra_vars_from_eda_credentials(
+            validated_data=data, vault_data=vault_data, creating=False
+        )
 
     # validate AAP credentials
     if aap_credentials:
@@ -843,7 +806,10 @@ def _validate_aap_credential(credential: models.EdaCredential) -> None:
 
 
 def _validate_eda_credentials(data: dict) -> None:
-    eda_credential_ids = data.get("eda_credentials", [])
+    eda_credential_ids = data.get("eda_credentials")
+    if eda_credential_ids is None:
+        return
+
     existing_keys = []
     extra_var_id = data.get("extra_var_id")
 
