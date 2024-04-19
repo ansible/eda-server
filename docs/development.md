@@ -379,4 +379,4 @@ task format:isort
 task format:black
 ```
 
-You can now access the UI at <https://localhost:8443/eda/> with default login username and password(admin/testpass).
+You can now access the UI at <https://localhost:8443/overview/> with default login username and password(admin/testpass).
