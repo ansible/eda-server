@@ -270,6 +270,7 @@ class ExtraVarSerializer(serializers.ModelSerializer):
     def to_representation(self, extra_var):
         return {
             "id": extra_var.id,
+            "organization_id": extra_var.organization_id,
             "extra_var": self.replace_vault_data(extra_var),
         }
 
@@ -283,7 +284,7 @@ class ExtraVarSerializer(serializers.ModelSerializer):
             for key, value in yaml.safe_load(extra_var.extra_var).items()
         }
 
-        return yaml.safe_dump(data)
+        return yaml.safe_dump(data).rstrip("\n")
 
 
 class ExtraVarCreateSerializer(serializers.ModelSerializer):
