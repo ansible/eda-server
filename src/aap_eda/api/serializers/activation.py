@@ -16,6 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
+from typing import Optional
 
 import yaml
 from django.conf import settings
@@ -131,16 +132,6 @@ def _update_extra_vars_from_eda_credentials(
         if any(key in user_inputs for key in secret_fields):
             if creating:
                 vault_data.password_used = True
-            else:
-                # when updateing with new added secret fields credential
-                if not vault_data.password_used:
-                    message = (
-                        "No system vault is available for credential"
-                        f" {eda_credential.name}"
-                    )
-                    raise serializers.ValidationError(
-                        {"eda_credentials": [message]}
-                    )
 
         for key, value in user_inputs.items():
             if key in secret_fields:
@@ -167,19 +158,23 @@ def _update_extra_vars_from_eda_credentials(
 
 
 def _create_system_eda_credential(
-    password: str, vault: models.CredentialType
+    password: str, vault: models.CredentialType, organization_id: Optional[int]
 ) -> models.EdaCredential:
     inputs = {
         "vault_id": EDA_SERVER_VAULT_LABEL,
         "vault_password": password,
     }
 
-    return models.EdaCredential.objects.create(
-        name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
-        managed=True,
-        inputs=json.dumps(inputs),
-        credential_type=vault,
-    )
+    kwargs = {
+        "name": f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
+        "managed": True,
+        "inputs": json.dumps(inputs),
+        "credential_type": vault,
+    }
+    if organization_id:
+        kwargs["organization_id"] = organization_id
+
+    return models.EdaCredential.objects.create(**kwargs)
 
 
 def _get_vault_credential_type():
@@ -418,13 +413,19 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
         if validated_data.get("eda_credentials"):
             _update_extra_vars_from_eda_credentials(
-                validated_data, vault_data, True
+                validated_data=validated_data,
+                vault_data=vault_data,
+                creating=True,
             )
 
         if vault_data.password_used:
             validated_data[
                 "eda_system_vault_credential"
-            ] = _create_system_eda_credential(vault_data.password, vault)
+            ] = _create_system_eda_credential(
+                vault_data.password,
+                vault,
+                validated_data.get("organization_id"),
+            )
 
         return super().create(validated_data)
 
