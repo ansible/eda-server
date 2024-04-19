@@ -1,5 +1,6 @@
 from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
@@ -101,6 +102,12 @@ class UserCreateUpdateSerializer(UserUpdateSerializerBase):
             "password",
             "is_superuser",
         ]
+
+    def validate_is_superuser(self, value):
+        if value is True:
+            if not self.context["request"].user.is_superuser:
+                raise PermissionDenied
+        return value
 
 
 class CurrentUserUpdateSerializer(UserUpdateSerializerBase):

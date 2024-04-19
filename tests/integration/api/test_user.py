@@ -11,19 +11,55 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from unittest import mock
-
 import pytest
+from ansible_base.rbac.models import RoleDefinition
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
 from tests.integration.constants import api_url_v1
 
 from .conftest import ADMIN_USERNAME
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+@pytest.fixture
+def super_user():
+    return models.User.objects.create(username="super-user", is_superuser=True)
+
+
+@pytest.fixture
+def random_user():
+    return models.User.objects.create(username="unprivledged-user")
+
+
+@pytest.fixture
+def admin_api_client(super_user):
+    client = APIClient()
+    client.force_authenticate(user=super_user)
+    return client
+
+
+@pytest.fixture
+def user_api_client(random_user):
+    client = APIClient()
+    client.force_authenticate(user=random_user)
+    return client
+
+
+@pytest.fixture
+def org_admin_rd():
+    return RoleDefinition.objects.create_from_permissions(
+        name="organization-admin",
+        permissions=[
+            "change_organization",
+            "view_organization",
+            "delete_organization",
+        ],
+        content_type=ContentType.objects.get_for_model(models.Organization),
+    )
 
 
 @pytest.mark.django_db
@@ -106,7 +142,6 @@ def test_update_current_user_username_fail(
     assert admin_user.username == ADMIN_USERNAME
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_create_user(client: APIClient):
     create_user_data = {
@@ -123,12 +158,12 @@ def test_create_user(client: APIClient):
     assert response.data["is_superuser"] is False
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_create_superuser(
-    client: APIClient,
-    check_permission_mock: mock.Mock,
-    init_db,
+    admin_api_client: APIClient,
+    user_api_client: APIClient,
+    org_admin_rd,
+    random_user,
 ):
     create_user_data = {
         "username": "test.user",
@@ -139,25 +174,59 @@ def test_create_superuser(
         "is_superuser": True,
     }
 
-    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
-
+    response = admin_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["is_superuser"] is True
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE
+    create_user_data["username"] += "-2"  # avoid integrity errors
+
+    response = user_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
     )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    # Even if user is org admin, would NORMALLY have permission
+    # this should still be denied because it is creating a superuser
+    org = models.Organization.objects.first()
+    org_admin_rd.give_permission(random_user, org)
+    response = user_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
+@pytest.mark.django_db
+def test_organization_admin_can_create_user(
+    random_user, user_api_client, org_admin_rd
+):
+    create_user_data = {
+        "username": "test.user",
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "test.user@example.com",
+        "password": "secret",
+        "is_superuser": False,
+    }
+    org = models.Organization.objects.first()
+    org_admin_rd.give_permission(random_user, org)
+    response = user_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
 @pytest.mark.django_db
 def test_retrieve_user_details(
-    client: APIClient,
+    admin_api_client: APIClient,
+    user_api_client: APIClient,
     default_user: models.User,
-    check_permission_mock: mock.Mock,
 ):
-    response = client.get(f"{api_url_v1}/users/{default_user.id}/")
+    response = admin_api_client.get(f"{api_url_v1}/users/{default_user.id}/")
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {
+    response_data = response.data.copy()
+    response_data.pop("resource", None)
+    assert response_data == {
         "id": default_user.id,
         "username": default_user.username,
         "first_name": default_user.first_name,
@@ -168,9 +237,8 @@ def test_retrieve_user_details(
         "modified_at": default_user.modified_at.strftime(DATETIME_FORMAT),
     }
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
+    response = user_api_client.get(f"{api_url_v1}/users/{default_user.id}/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
@@ -196,7 +264,6 @@ def test_list_users(
     }
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_partial_update_user(
     client: APIClient,
@@ -223,7 +290,6 @@ def test_partial_update_user(
     }
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_delete_user(
     client: APIClient,
@@ -235,21 +301,15 @@ def test_delete_user(
     assert models.User.objects.filter(id=default_user.id).count() == 0
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_delete_user_not_allowed(
     client: APIClient,
     admin_user: models.User,
-    check_permission_mock: mock.Mock,
 ):
     response = client.delete(f"{api_url_v1}/users/{admin_user.id}/")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
     assert models.User.objects.filter(id=admin_user.id).count() == 1
-
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
-    )
 
 
 @pytest.mark.django_db
