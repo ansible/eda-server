@@ -122,6 +122,3 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
         default=None,
         help_text="Name of the kubernetes service",
     )
-
-    def get_extra_var(self):
-        return self.extra_var
