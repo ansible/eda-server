@@ -349,7 +349,7 @@ class ActivationManager(StatusManager):
             or self._is_in_status(ActivationStatus.ERROR)
         )
 
-    def _is_unresponsive(self) -> bool:
+    def is_unresponsive(self) -> bool:
         if self.db_instance.status in [
             ActivationStatus.RUNNING,
             ActivationStatus.STARTING,
@@ -360,7 +360,7 @@ class ActivationManager(StatusManager):
             return self.latest_instance.updated_at < cutoff_time
         return False
 
-    def _unresponsive_policy(self):
+    def unresponsive_policy(self):
         """Apply the unresponsive restart policy."""
         LOGGER.info(
             "Unresponsive policy called for "
@@ -885,7 +885,7 @@ class ActivationManager(StatusManager):
         # Detect unresponsive activation instance
         # TODO: we should decrease the default timeout/livecheck
         # in the future might be configurable per activation
-        if self._is_unresponsive():
+        if self.is_unresponsive():
             msg = (
                 "Activation is unresponsive. "
                 "Liveness check for ansible rulebook timed out. "
@@ -895,7 +895,7 @@ class ActivationManager(StatusManager):
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 f"{msg}",
             )
-            self._unresponsive_policy()
+            self.unresponsive_policy()
             return
 
         # last case is the success case

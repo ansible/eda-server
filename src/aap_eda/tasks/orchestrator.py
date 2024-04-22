@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import contextlib
 import logging
 from collections import Counter
 from datetime import datetime, timedelta
@@ -36,6 +37,7 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
+from aap_eda.services.activation.engine import exceptions as engine_exceptions
 
 LOGGER = logging.getLogger(__name__)
 
@@ -387,10 +389,21 @@ def monitor_rulebook_processes() -> None:
     Started by the scheduler, executed by the default worker.
     It enqueues a task for each activation that needs to be managed.
     Handles both user requests and monitoring of running activations.
+    Checks for unresponsive processes and applies the unresponsive policy.
     It will not enqueue a task if there is already one for the same
     activation.
     """
     # run pending user requests
+    _run_pending_requests()
+
+    # monitor unresponsive processes
+    _run_unresponsive_monitor()
+
+    # regular monitor
+    _run_process_monitor()
+
+
+def _run_pending_requests() -> None:
     for request in requests_queue.list_requests():
         dispatch(
             request.process_parent_type,
@@ -398,20 +411,73 @@ def monitor_rulebook_processes() -> None:
             request.request,
         )
 
-    # monitor running instances
+
+def _run_unresponsive_monitor() -> None:
+    for process in models.RulebookProcess.objects.filter(
+        status__in=[
+            ActivationStatus.WORKERS_OFFLINE,
+        ]
+    ):
+        try:
+            process_parent = process.get_parent()
+        except ObjectDoesNotExist:
+            LOGGER.warning(
+                f"{process.parent_type} with {process.id} no longer exists, "
+                "monitor task will not be processed",
+            )
+            continue
+        LOGGER.info(
+            f"Checking unresponsiveness for process id {process.id} of ",
+            f"{process.parent_type} {process_parent.id}",
+        )
+        # we expect connection errors here, we are monitoring
+        # processes that can not be monitored by activation workers
+        with contextlib.suppress(engine_exceptions.ContainerEngineInitError):
+            try:
+                _check_unresponsive_process(process_parent)
+            except engine_exceptions.ContainerEngineInitError:
+                raise
+            except (
+                engine_exceptions.ContainerEngineError,
+                exceptions.ActivationManagerError,
+            ) as exc:
+                LOGGER.error(
+                    "Error while checking unresponsiveness for"
+                    f"{process_parent.id}: {exc}",
+                )
+                continue
+
+
+def _check_unresponsive_process(process_parent) -> None:
+    """Check if the process is unresponsive and apply the policy."""
+    activation_manager = ActivationManager(process_parent)
+
+    if activation_manager.is_unresponsive():
+        LOGGER.warning(
+            f"Activation {process_parent.id} is unresponsive. "
+            "Applying unresponsive policy.",
+        )
+        activation_manager.unresponsive_policy()
+
+
+def _run_process_monitor() -> None:
     for process in models.RulebookProcess.objects.filter(
         status__in=[
             ActivationStatus.RUNNING,
             ActivationStatus.WORKERS_OFFLINE,
         ]
     ):
-        process_parent_type = str(process.parent_type)
-        if process_parent_type == ProcessParentType.ACTIVATION:
-            process_parent_id = process.activation_id
-        else:
-            process_parent_id = process.event_stream_id
+        try:
+            process_parent = process.get_parent()
+        except ObjectDoesNotExist:
+            LOGGER.warning(
+                f"{process.parent_type} with {process.id} no longer exists, "
+                "monitor task will not be processed",
+            )
+            continue
+
         dispatch(
-            process_parent_type,
-            process_parent_id,
+            process.parent_type,
+            process_parent.id,
             None,
         )

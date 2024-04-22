@@ -14,6 +14,7 @@
 """Activation Manager tests."""
 # TODO(alex) dedup code and fixtures across all the tests
 
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
@@ -73,15 +74,6 @@ def eda_caplog(caplog_factory) -> LogCaptureFixture:
 
 
 @pytest.fixture
-def activation_with_instance(
-    basic_activation: models.Activation,
-) -> models.Activation:
-    """Return an activation with an instance."""
-    models.RulebookProcess.objects.create(activation=basic_activation)
-    return basic_activation
-
-
-@pytest.fixture
 def running_activation(activation_with_instance: models.Activation):
     """Return a running activation."""
     activation = activation_with_instance
@@ -93,24 +85,6 @@ def running_activation(activation_with_instance: models.Activation):
         update_fields=["status", "activation_pod_id"],
     )
     return activation
-
-
-@pytest.fixture
-def basic_activation(
-    default_user: models.User,
-    default_decision_environment: models.DecisionEnvironment,
-    default_rulebook: models.Rulebook,
-) -> models.Activation:
-    """Return the minimal activation."""
-    return models.Activation.objects.create(
-        name="test-activation",
-        user=default_user,
-        decision_environment=default_decision_environment,
-        rulebook=default_rulebook,
-        # rulebook_rulesets is populated by the serializer
-        rulebook_rulesets=default_rulebook.rulesets,
-        log_level=enums.RulebookProcessLogLevel.INFO,
-    )
 
 
 @pytest.fixture
@@ -738,3 +712,86 @@ def test_status_manager_set_status(process_parent):
     )
     assert process_parent.status == enums.ActivationStatus.PENDING
     assert process_parent.status_message == "Activation is pending"
+
+
+@mock.patch(
+    "aap_eda.services.activation.activation_manager.ActivationManager.unresponsive_policy",  # noqa: E501
+)
+@pytest.mark.parametrize(
+    "threshold,expected",
+    [
+        (30, False),
+        (120, True),
+    ],
+)
+@pytest.mark.django_db
+def test_is_unresponsive(
+    unresponsive_policy_mock: MagicMock,
+    threshold,
+    expected,
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    settings,
+):
+    """Test is_unresponsive."""
+    apply_settings(
+        settings,
+        RULEBOOK_LIVENESS_TIMEOUT_SECONDS=60,
+    )
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    running_activation.latest_instance.updated_at = datetime.now(
+        timezone.utc
+    ) - timedelta(seconds=threshold)
+
+    # Call the is_unresponsive method
+    result = activation_manager.is_unresponsive()
+
+    # Assert that the result is True
+    assert result is expected
+
+
+@pytest.mark.parametrize(
+    "restart_policy",
+    [
+        enums.RestartPolicy.NEVER,
+        enums.RestartPolicy.ON_FAILURE,
+        enums.RestartPolicy.ALWAYS,
+    ],
+)
+@pytest.mark.django_db
+@mock.patch(
+    "aap_eda.services.activation.activation_manager.system_restart_activation",
+)
+@mock.patch(
+    "aap_eda.services.activation.activation_manager.ActivationManager._fail_instance",  # noqa: E501
+)
+@mock.patch(
+    "aap_eda.services.activation.db_log_handler.DBLogger.write",
+)
+def test_unresponsive_policy(
+    db_logger_write_mock: MagicMock,
+    fail_instance_mock: MagicMock,
+    system_restart_activation_mock: MagicMock,
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    restart_policy,
+):
+    """Test unresponsive_policy."""
+    running_activation.restart_policy = restart_policy
+    running_activation.save(update_fields=["restart_policy"])
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+    activation_manager.unresponsive_policy()
+    assert running_activation.status == enums.ActivationStatus.FAILED
+    assert fail_instance_mock.called
+    assert db_logger_write_mock.called
+    if restart_policy == enums.RestartPolicy.NEVER:
+        assert not system_restart_activation_mock.called
+    else:
+        assert system_restart_activation_mock.called

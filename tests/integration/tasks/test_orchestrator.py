@@ -16,14 +16,16 @@ from unittest import mock
 
 import pytest
 from django.conf import settings
+from pytest_lazyfixture import lazy_fixture
 
 import aap_eda.tasks.activation_request_queue as queue
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from aap_eda.core.enums import (
     ActivationRequest,
     ActivationStatus,
     ProcessParentType,
 )
+from aap_eda.services.activation import exceptions
 from aap_eda.tasks import orchestrator
 
 
@@ -286,3 +288,71 @@ def test_max_running_activation_after_start_job(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
     ).count()
     assert running_processes == settings.MAX_RUNNING_ACTIVATIONS
+
+
+@pytest.mark.parametrize(
+    "activation,status",
+    [
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            enums.ActivationStatus.RUNNING,
+            id="running",
+        ),
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            enums.ActivationStatus.WORKERS_OFFLINE,
+            id="workers_offline",
+        ),
+        pytest.param(
+            lazy_fixture("activation_with_instance"),
+            enums.ActivationStatus.STOPPED,
+            id="stopped",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_monitor_unresponsive_process(activation, status):
+    activation.latest_instance.status = status
+    activation.latest_instance.save(update_fields=["status"])
+    patches = {
+        "activation_manager.is_unresponsive": mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager.is_unresponsive"
+        ),
+        "activation_manager.unresponsive_policy": mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager.unresponsive_policy"
+        ),
+    }
+    with patches[
+        "activation_manager.is_unresponsive"
+    ] as is_unresponsive_mock, patches[
+        "activation_manager.unresponsive_policy"
+    ] as unresponsive_policy_mock:
+        is_unresponsive_mock.return_value = True
+        orchestrator.monitor_rulebook_processes()
+        if status == enums.ActivationStatus.WORKERS_OFFLINE:
+            unresponsive_policy_mock.assert_called_once()
+
+        else:
+            assert not unresponsive_policy_mock.called
+
+
+@mock.patch("aap_eda.tasks.orchestrator._check_unresponsive_process")
+@mock.patch("aap_eda.tasks.orchestrator.LOGGER")
+@pytest.mark.django_db
+def test_run_unresponsive_monitor_manager_error(
+    logger_mock,
+    check_unresponsive_process_mock,
+    activation_with_instance,
+):
+    activation_with_instance.latest_instance.status = (
+        enums.ActivationStatus.WORKERS_OFFLINE
+    )
+    activation_with_instance.latest_instance.save(update_fields=["status"])
+    check_unresponsive_process_mock.side_effect = (
+        exceptions.ActivationManagerError("Manager error")
+    )
+
+    orchestrator._run_unresponsive_monitor()
+
+    check_unresponsive_process_mock.assert_called_once()
+    logger_mock.error.assert_called_once()
