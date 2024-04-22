@@ -51,7 +51,7 @@ def test_create_activation(
         data["decision_environment"]["id"]
         == activation_payload["decision_environment_id"]
     )
-    assert data["extra_var"]["id"] == activation_payload["extra_var_id"]
+    assert data["extra_var"] == activation_payload["extra_var"]
     assert activation.rulebook_name == default_rulebook.name
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
@@ -107,7 +107,6 @@ def test_create_activation_bad_entity(client: APIClient):
             "decision_environment": "DecisionEnvironment with id 0 does not exist"  # noqa: E501
         },
         {"rulebook": "Rulebook with id 0 does not exist"},
-        {"extra_var": "ExtraVar with id 0 does not exist"},
     ],
 )
 @pytest.mark.django_db
@@ -131,6 +130,89 @@ def test_create_activation_with_bad_entity(
 
     # Since responses are 400 errors, these checks can happen before
     # permission checks, which is why check_permission_mock is not checked here
+
+
+NOT_OBJECT_ERROR_MSG = "Extra var is not in object format"
+NOT_YAML_JSON_ERROR_MSG = "Extra var must be in JSON or YAML format"
+
+
+@pytest.mark.parametrize(
+    "extra_var,error_message",
+    [
+        ("John", NOT_OBJECT_ERROR_MSG),
+        ("John, ", NOT_OBJECT_ERROR_MSG),
+        ("[John, 3,]", NOT_OBJECT_ERROR_MSG),
+        ('{"name": "John" - 2 }', NOT_YAML_JSON_ERROR_MSG),
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_bad_extra_var(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    client: APIClient,
+    preseed_credential_types,
+    extra_var: str,
+    error_message: str,
+):
+    response = client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "extra_var": extra_var,
+        },
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert str(response.data["extra_var"][0]) == error_message
+
+
+@pytest.mark.parametrize(
+    "extra_var",
+    [
+        "John: Doe",
+        "John: 2",
+        '{"name": "John"}',
+        '"age": 20',
+        "---\nname: hello\nhosts: localhost\ngather_facts: false",
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_valid_extra_var(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    client: APIClient,
+    preseed_credential_types,
+    extra_var: str,
+):
+    response = client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "extra_var": extra_var,
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_create_activation_with_vault_extra_var(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    client: APIClient,
+    preseed_credential_types,
+    vault_extra_var_data: str,
+):
+    response = client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "extra_var": vault_extra_var_data,
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    id = response.data["id"]
+    assert response.data["extra_var"] == vault_extra_var_data
+    assert models.Activation.objects.filter(pk=id).exists()
+    assert models.Activation.objects.first().extra_var == vault_extra_var_data
 
 
 @pytest.mark.django_db
@@ -242,7 +324,6 @@ def test_retrieve_activation(
         data["decision_environment"]["id"]
         == default_activation.decision_environment.id
     )
-    assert data["extra_var"]["id"] == default_activation.extra_var.id
     activation_instances = models.RulebookProcess.objects.filter(
         activation_id=default_activation.id
     )
@@ -451,6 +532,7 @@ def assert_activation_base_data(
     assert data["name"] == activation.name
     assert data["description"] == activation.description
     assert data["is_enabled"] == activation.is_enabled
+    assert data["extra_var"] == activation.extra_var
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
     assert data["rulebook_name"] == activation.rulebook_name
@@ -472,7 +554,6 @@ def assert_activation_related_object_fks(
         assert data["rulebook_id"] == activation.rulebook.id
     else:
         assert not data["rulebook_id"]
-    assert data["extra_var_id"] == activation.extra_var.id
     assert (
         data["decision_environment_id"] == activation.decision_environment.id
     )
