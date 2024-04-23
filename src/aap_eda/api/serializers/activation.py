@@ -361,7 +361,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_rcf_1035_compliant],
+        validators=[validators.check_if_rfc_1035_compliant],
     )
 
     def validate(self, data):
@@ -616,7 +616,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_rcf_1035_compliant],
+        validators=[validators.check_if_rfc_1035_compliant],
     )
 
     def validate(self, data):
