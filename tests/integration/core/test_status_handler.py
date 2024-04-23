@@ -95,19 +95,8 @@ def test_save(instance):
         == ACTIVATION_STATUS_MESSAGE_MAP[instance.status]
     )
 
-    for status in [
-        ActivationStatus.STARTING,
-        ActivationStatus.RUNNING,
-        ActivationStatus.STOPPING,
-        ActivationStatus.DELETING,
-        ActivationStatus.COMPLETED,
-        ActivationStatus.FAILED,
-        ActivationStatus.STOPPED,
-        ActivationStatus.UNRESPONSIVE,
-        ActivationStatus.ERROR,
-        ActivationStatus.PENDING,
-    ]:
-        instance.status = status
+    for status in ActivationStatus:
+        instance.status = status.value
         instance.save(update_fields=["status"])
 
         instance.refresh_from_db()
@@ -121,6 +110,7 @@ def test_save(instance):
     instance.refresh_from_db()
     assert instance.is_enabled is False
 
+    instance.status = ActivationStatus.PENDING
     instance.save(update_fields=["status"])
     instance.refresh_from_db()
     assert instance.status_message == "Activation is marked as disabled"

@@ -14,6 +14,7 @@
 
 from urllib.parse import urlparse, urlunparse
 
+import yaml
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -23,6 +24,7 @@ from aap_eda.core import models, validators
 from aap_eda.core.utils.crypto.base import SecretValue
 
 ENCRYPTED_STRING = "$encrypted$"
+ANSIBLE_VAULT_STRING = "$ANSIBLE_VAULT;"
 
 
 class ProxyFieldMixin:
@@ -69,12 +71,20 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     eda_credential_id = serializers.IntegerField(
-        required=False, allow_null=True
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
     )
     signature_validation_credential_id = serializers.IntegerField(
-        required=False, allow_null=True
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
     )
 
     class Meta:
@@ -117,6 +127,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         help_text="EdaCredential id of the project",
+        validators=[validators.check_if_credential_exists],
     )
     signature_validation_credential_id = serializers.IntegerField(
         required=False,
@@ -125,6 +136,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "ID of an optional credential used for validating files in the "
             "project against unexpected changes"
         ),
+        validators=[validators.check_if_credential_exists],
     )
     verify_ssl = serializers.BooleanField(
         required=False,
@@ -264,6 +276,25 @@ class ExtraVarSerializer(serializers.ModelSerializer):
         model = models.ExtraVar
         fields = ["id", "extra_var", "organization_id"]
         read_only_fields = ["id"]
+
+    def to_representation(self, extra_var):
+        return {
+            "id": extra_var.id,
+            "organization_id": extra_var.organization_id,
+            "extra_var": self.replace_vault_data(extra_var),
+        }
+
+    def replace_vault_data(self, extra_var):
+        data = {
+            key: (
+                ENCRYPTED_STRING
+                if isinstance(value, str) and ANSIBLE_VAULT_STRING in value
+                else value
+            )
+            for key, value in yaml.safe_load(extra_var.extra_var).items()
+        }
+
+        return yaml.safe_dump(data).rstrip("\n")
 
 
 class ExtraVarCreateSerializer(serializers.ModelSerializer):

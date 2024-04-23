@@ -191,6 +191,36 @@ def test_create_project_name_conflict(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+@pytest.mark.django_db
+def test_create_project_wrong_ids(client: APIClient):
+    bodies = [
+        {
+            "name": "test-project-01",
+            "url": "https://git.example.com/acme/project-01",
+            "eda_credential_id": 3000001,
+        },
+        {
+            "name": "test-project-02",
+            "url": "https://git.example.com/acme/project-01",
+            "signature_validation_credential_id": 3000001,
+        },
+        {
+            "name": "test-project-03",
+            "url": "https://git.example.com/acme/project-01",
+            "organization_id": 3000001,
+        },
+    ]
+
+    for body in bodies:
+        response = client.post(
+            f"{api_url_v1}/projects/",
+            data=body,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id 3000001 does not exist" in str(response.json())
+
+
 # Test: Sync project
 # -------------------------------------
 @pytest.mark.django_db
@@ -306,16 +336,17 @@ def test_update_project_with_400(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["name"][0] == "Project with this name already exists."
     # test non-existent dependent object reference
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
-    data = {
-        "name": "new project name",
-        "eda_credential_id": 87,
-    }
-    response = client.patch(
-        f"{api_url_v1}/projects/{default_project.id}/", data=data
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["errors"] == "EdaCredential [87] not found"
+    data = [
+        {"eda_credential_id": 3000001},
+        {"signature_validation_credential_id": 3000001},
+    ]
+
+    for update_data in data:
+        response = client.patch(
+            f"{api_url_v1}/projects/{default_project.id}/", data=update_data
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id 3000001 does not exist" in str(response.json())
 
 
 @pytest.mark.django_db

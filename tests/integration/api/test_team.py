@@ -31,6 +31,58 @@ def test_list_teams(default_team: models.Team, client: APIClient):
 
 
 @pytest.mark.django_db
+def test_list_teams_filter_by_name(
+    default_team: models.Organization,
+    new_team: models.Organization,
+    client: APIClient,
+):
+    filter = default_team.name
+    response = client.get(f"{api_url_v1}/teams/?name={filter}")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    result = response.data["results"][0]
+    assert_team_data(result, default_team)
+
+    response = client.get(f"{api_url_v1}/teams/?name=non-existent-org")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_teams_filter_by_description(
+    default_team: models.Team, new_team: models.Team, client: APIClient
+):
+    filter = default_team.description
+    response = client.get(f"{api_url_v1}/teams/?description={filter}")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    result = response.data["results"][0]
+    assert_team_data(result, default_team)
+
+    response = client.get(f"{api_url_v1}/teams/?description=non-existent-org")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_teams_filter_by_ansible_id(
+    default_team: models.Team, new_team: models.Team, client: APIClient
+):
+    filter = new_team.resource.ansible_id
+    response = client.get(f"{api_url_v1}/teams/?resource__ansible_id={filter}")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    result = response.data["results"][0]
+    assert_team_data(result, new_team)
+
+    response = client.get(
+        f"{api_url_v1}/teams/?resource__ansible_id=non-existent-org"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
 def test_create_team(
     default_organization: models.Organization,
     client: APIClient,
