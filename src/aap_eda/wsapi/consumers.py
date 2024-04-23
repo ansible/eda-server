@@ -420,7 +420,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
             vault_passwords.append(
                 VaultPassword(
-                    label=inputs["vault_id"],
+                    label=inputs.get("vault_id", ""),
                     password=inputs["vault_password"],
                 )
             )
