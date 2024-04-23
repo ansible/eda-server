@@ -122,7 +122,7 @@ def check_if_schema_valid(schema: dict):
         raise serializers.ValidationError(errors)
 
 
-def check_if_rcf_1035_compliant(service_name: str):
+def check_if_rfc_1035_compliant(service_name: str):
     if settings.DEPLOYMENT_TYPE == "k8s" and not is_rfc_1035_compliant(
         service_name
     ):

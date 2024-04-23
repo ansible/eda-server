@@ -111,6 +111,7 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.STOPPED: "Activation has stopped",
     ActivationStatus.UNRESPONSIVE: "Activation is not responsive",
     ActivationStatus.ERROR: "Activation is in an error state",
+    ActivationStatus.WORKERS_OFFLINE: "All workers in the node are offline",
 }
 
 

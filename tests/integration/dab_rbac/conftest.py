@@ -116,7 +116,10 @@ class ModelFactory:
                 if field.name == "extra_var":
                     data["extra_var"] = '{"a": "b"}'
                 elif field.name == "inputs":
-                    data["inputs"] = {"username": "adam", "password": "secret"}
+                    data["inputs"] = {
+                        "vault_id": "adam",
+                        "vault_password": "secret",
+                    }
                 else:
                     data[field.name] = self.make_name()
             elif isinstance(field, JSONField):
