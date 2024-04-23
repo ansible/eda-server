@@ -11,7 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from ansible_base.lib.dynamic_config.dynamic_urls import api_version_urls
+from ansible_base.lib.dynamic_config.dynamic_urls import (
+    api_version_urls as dab_urls,
+)
 from ansible_base.resource_registry.urls import (
     urlpatterns as resource_api_urls,
 )
@@ -25,17 +27,22 @@ from drf_spectacular.views import (
 from rest_framework import routers
 from rest_framework_simplejwt import views as jwt_views
 
+from aap_eda.core import views as core_views
+
 from . import views
 
 router = routers.SimpleRouter()
+# basename has to be set when queryset is user-dependent
+# which is any model with permissions
 router.register("extra-vars", views.ExtraVarViewSet)
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
-router.register("rulesets", views.RulesetViewSet)
-router.register("rules", views.RuleViewSet)
-router.register("roles", views.RoleViewSet)
 router.register("activations", views.ActivationViewSet)
-router.register("activation-instances", views.ActivationInstanceViewSet)
+router.register(
+    "activation-instances",
+    views.ActivationInstanceViewSet,
+    basename="activationinstance",
+)
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("users", views.UserViewSet)
 router.register("event-streams", views.EventStreamViewSet)
@@ -45,7 +52,11 @@ router.register(
     basename="controller-token",
 )
 router.register("credentials", views.CredentialViewSet)
+router.register("credential-types", views.CredentialTypeViewSet)
+router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
+router.register("organizations", views.OrganizationViewSet)
+router.register("teams", views.TeamViewSet)
 
 openapi_urls = [
     path(
@@ -71,9 +82,8 @@ openapi_urls = [
 ]
 
 v1_urls = [
-    # <- Experimental LDAP Auth https://issues.redhat.com/browse/AAP-16938
-    path("", include(api_version_urls)),
-    # ->
+    path("status/", core_views.StatusView.as_view()),
+    path("", include(dab_urls)),
     path("", include(resource_api_urls)),
     path("", include(openapi_urls)),
     path("auth/session/login/", views.SessionLoginView.as_view()),

@@ -12,21 +12,44 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from urllib.parse import urlparse, urlunparse
+
+import yaml
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from aap_eda.api.serializers.credential import CredentialRefSerializer
+from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
+from aap_eda.core.utils.crypto.base import SecretValue
+
+ENCRYPTED_STRING = "$encrypted$"
+ANSIBLE_VAULT_STRING = "$ANSIBLE_VAULT;"
 
 
-class ProjectSerializer(serializers.ModelSerializer):
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
+class ProxyFieldMixin:
+    def get_proxy(self, obj: models.Project) -> str:
+        if not obj.proxy:
+            return ""
+        url = obj.proxy
+        if isinstance(url, SecretValue):
+            url = obj.proxy.get_secret_value()
+        return get_proxy_for_display(url)
+
+
+class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
+    eda_credential_id = serializers.IntegerField(
+        required=False, allow_null=True
+    )
+
+    proxy = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Project
         read_only_fields = [
             "id",
             "url",
+            "scm_type",
             "git_hash",
             "import_state",
             "import_error",
@@ -36,18 +59,49 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
-            "credential_id",
+            "organization_id",
+            "eda_credential_id",
+            "signature_validation_credential_id",
+            "scm_branch",
+            "scm_refspec",
             "verify_ssl",
+            "proxy",
             *read_only_fields,
         ]
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
+    eda_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
+    )
+    signature_validation_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
+    )
 
     class Meta:
         model = models.Project
-        fields = ["url", "name", "description", "credential_id", "verify_ssl"]
+        fields = [
+            "url",
+            "proxy",
+            "name",
+            "description",
+            "organization_id",
+            "eda_credential_id",
+            "signature_validation_credential_id",
+            "verify_ssl",
+            "scm_type",
+            "scm_branch",
+            "scm_refspec",
+        ]
 
 
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
@@ -69,31 +123,76 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Description of the project",
     )
-    credential_id = serializers.IntegerField(
+    eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        help_text="Credential id of the project",
+        help_text="EdaCredential id of the project",
+        validators=[validators.check_if_credential_exists],
+    )
+    signature_validation_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "ID of an optional credential used for validating files in the "
+            "project against unexpected changes"
+        ),
+        validators=[validators.check_if_credential_exists],
     )
     verify_ssl = serializers.BooleanField(
         required=False,
         help_text="Indicates if SSL verification is enabled",
     )
+    scm_branch = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Specific branch, tag or commit to checkout.",
+    )
+    scm_refspec = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="For git projects, an additional refspec to fetch.",
+    )
+    proxy = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Proxy server for http or https connection",
+    )
 
     class Meta:
         model = models.Project
-        fields = ["name", "description", "credential_id", "verify_ssl"]
+        fields = [
+            "name",
+            "description",
+            "eda_credential_id",
+            "signature_validation_credential_id",
+            "scm_branch",
+            "scm_refspec",
+            "verify_ssl",
+            "proxy",
+        ]
 
 
-class ProjectReadSerializer(serializers.ModelSerializer):
+class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     """Serializer for reading the Project with embedded objects."""
 
-    credential = CredentialRefSerializer(required=False, allow_null=True)
+    organization = OrganizationRefSerializer()
+    eda_credential = EdaCredentialRefSerializer(
+        required=False, allow_null=True
+    )
+    signature_validation_credential = EdaCredentialRefSerializer(
+        required=False, allow_null=True
+    )
+    proxy = serializers.SerializerMethodField()
 
     class Meta:
-        model = models.Project()
+        model = models.Project
         read_only_fields = [
             "id",
             "url",
+            "scm_type",
             "git_hash",
             "import_state",
             "import_error",
@@ -103,15 +202,32 @@ class ProjectReadSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
-            "credential",
+            "organization",
+            "eda_credential",
+            "signature_validation_credential",
             "verify_ssl",
+            "scm_branch",
+            "scm_refspec",
+            "proxy",
             *read_only_fields,
         ]
 
     def to_representation(self, project):
-        credential = (
-            CredentialRefSerializer(project["credential"]).data
-            if project["credential"]
+        eda_credential = (
+            EdaCredentialRefSerializer(project["eda_credential"]).data
+            if project["eda_credential"]
+            else None
+        )
+        signature_validation_credential = (
+            EdaCredentialRefSerializer(
+                project["signature_validation_credential"]
+            ).data
+            if project["signature_validation_credential"]
+            else None
+        )
+        organization = (
+            OrganizationRefSerializer(project["organization"]).data
+            if project["organization"]
             else None
         )
         return {
@@ -119,9 +235,15 @@ class ProjectReadSerializer(serializers.ModelSerializer):
             "name": project["name"],
             "description": project["description"],
             "url": project["url"],
+            "proxy": project["proxy"],
+            "scm_type": project["scm_type"],
+            "scm_branch": project["scm_branch"],
+            "scm_refspec": project["scm_refspec"],
             "git_hash": project["git_hash"],
             "verify_ssl": project["verify_ssl"],
-            "credential": credential,
+            "organization": organization,
+            "eda_credential": eda_credential,
+            "signature_validation_credential": signature_validation_credential,
             "import_state": project["import_state"],
             "import_error": project["import_error"],
             "created_at": project["created_at"],
@@ -132,7 +254,15 @@ class ProjectReadSerializer(serializers.ModelSerializer):
 class ProjectRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Project
-        fields = ["id", "git_hash", "url", "name", "description"]
+        fields = [
+            "id",
+            "git_hash",
+            "url",
+            "scm_type",
+            "name",
+            "description",
+            "organization_id",
+        ]
         read_only_fields = ["id"]
 
 
@@ -140,24 +270,44 @@ class ExtraVarSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
-        validators=[validators.is_extra_var_dict],
     )
 
     class Meta:
         model = models.ExtraVar
-        fields = ["id", "extra_var"]
+        fields = ["id", "extra_var", "organization_id"]
         read_only_fields = ["id"]
+
+    def to_representation(self, extra_var):
+        return {
+            "id": extra_var.id,
+            "organization_id": extra_var.organization_id,
+            "extra_var": self.replace_vault_data(extra_var),
+        }
+
+    def replace_vault_data(self, extra_var):
+        data = {
+            key: (
+                ENCRYPTED_STRING
+                if isinstance(value, str) and ANSIBLE_VAULT_STRING in value
+                else value
+            )
+            for key, value in yaml.safe_load(extra_var.extra_var).items()
+        }
+
+        return yaml.safe_dump(data).rstrip("\n")
 
 
 class ExtraVarCreateSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=True,
         help_text="Content of the extra_var",
+        validators=[validators.is_extra_var_dict],
     )
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = models.ExtraVar
-        fields = ["extra_var"]
+        fields = ["extra_var", "organization_id"]
 
 
 class ExtraVarRefSerializer(serializers.ModelSerializer):
@@ -167,3 +317,27 @@ class ExtraVarRefSerializer(serializers.ModelSerializer):
         model = models.ExtraVar
         fields = ["id"]
         read_only_fields = ["id"]
+
+
+def get_proxy_for_display(proxy: str) -> str:
+    if not (proxy.startswith("http://") or proxy.startswith("https://")):
+        return proxy
+    result = urlparse(proxy)
+    if "@" not in proxy:
+        return proxy
+    cred, domain = result.netloc.split("@")
+    if ":" in cred:
+        user, _ = cred.split(":")
+        domain = f"{user}:{ENCRYPTED_STRING}@{domain}"
+    else:
+        domain = f"{ENCRYPTED_STRING}@{domain}"
+
+    unparsed = (
+        result.scheme,
+        domain,
+        result.path,
+        result.params,
+        result.query,
+        result.fragment,
+    )
+    return urlunparse(unparsed)

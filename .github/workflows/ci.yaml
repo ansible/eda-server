@@ -7,7 +7,6 @@ on:
   push:
     branches: [ 'main' ]
   pull_request:
-    branches: [ 'main', 'devel' ]
   merge_group:
     branches: [ 'main' ]
 
@@ -58,7 +57,7 @@ jobs:
       EDA_DB_PASSWORD: 'secret'
     services:
       postgres:
-        image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+        image: 'quay.io/sclorg/postgresql-15-c9s:latest'
         env:
           POSTGRESQL_USER: eda
           POSTGRESQL_PASSWORD: secret
@@ -72,7 +71,7 @@ jobs:
         ports:
           - '5432:5432'
       redis: # Add this section for Redis
-        image: 'quay.io/sclorg/redis-6-c9s:latest'
+        image: 'quay.io/fedora/redis-6:latest'
         ports:
           - '6379:6379'
         options: >-
@@ -83,13 +82,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-      - name: Install LDAP dependencies
-        run: |
-            set -ex
-            sudo apt update
-            sudo apt install python3-dev libldap2-dev libsasl2-dev libssl-dev libxmlsec1 libxmlsec1-dev
 
       - name: Install poetry
         run: pipx install poetry

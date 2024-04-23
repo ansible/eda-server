@@ -15,6 +15,7 @@
 from enum import Enum
 
 
+# TODO(alex): migrate to django.db.models.TextChoices
 class DjangoStrEnum(str, Enum):
     @classmethod
     def choices(cls):
@@ -41,7 +42,6 @@ class ResourceType(DjangoStrEnum):
     ACTIVATION = "activation"
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
-    AUDIT_EVENT = "audit_event"
     USER = "user"
     PROJECT = "project"
     EXTRA_VAR = "extra_var"
@@ -49,7 +49,11 @@ class ResourceType(DjangoStrEnum):
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
     CREDENTIAL = "credential"
+    CREDENTIAL_TYPE = "credential_type"
+    EDA_CREDENTIAL = "eda_credential"
     EVENT_STREAM = "event_stream"
+    ORGANIZATION = "organization"
+    TEAM = "team"
 
 
 class Action(DjangoStrEnum):
@@ -76,13 +80,24 @@ class ActivationStatus(DjangoStrEnum):
     # monitor task will handle it
     UNRESPONSIVE = "unresponsive"
     ERROR = "error"
+    WORKERS_OFFLINE = "workers offline"
 
 
+# TODO: Deprecated, will be removed in future version, use
+# DefaultCredentialType instead
 class CredentialType(DjangoStrEnum):
     REGISTRY = "Container Registry"
     GITHUB = "GitHub Personal Access Token"
     GITLAB = "GitLab Personal Access Token"
     VAULT = "Vault"
+
+
+class DefaultCredentialType(DjangoStrEnum):
+    REGISTRY = "Container Registry"
+    VAULT = "Vault"
+    SOURCE_CONTROL = "Source Control"
+    AAP = "Red Hat Ansible Automation Platform"
+    GPG = "GPG Public Key"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
@@ -97,6 +112,7 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.STOPPED: "Activation has stopped",
     ActivationStatus.UNRESPONSIVE: "Activation is not responsive",
     ActivationStatus.ERROR: "Activation is in an error state",
+    ActivationStatus.WORKERS_OFFLINE: "All workers in the node are offline",
 }
 
 
@@ -114,3 +130,11 @@ class ProcessParentType(DjangoStrEnum):
 
     ACTIVATION = "activation"
     EVENT_STREAM = "event_stream"
+
+
+class RulebookProcessLogLevel(DjangoStrEnum):
+    """Types of log levels for a rulebook process."""
+
+    DEBUG = "debug"
+    INFO = "info"
+    ERROR = "error"

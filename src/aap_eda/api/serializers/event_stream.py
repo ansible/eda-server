@@ -13,13 +13,13 @@
 #  limitations under the License.
 
 import logging
+import secrets
 import uuid
 
 import yaml
 from django.conf import settings
 from django.core.validators import RegexValidator
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 
 from aap_eda.api.constants import (
     PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
@@ -30,9 +30,9 @@ from aap_eda.api.exceptions import (
     MissingEventStreamRulebookKeys,
     MissingEventStreamRulebookSource,
 )
-from aap_eda.api.serializers.credential import CredentialSerializer
-from aap_eda.api.serializers.utils import substitute_extra_vars, swap_sources
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.core import models, validators
+from aap_eda.core.utils.strings import substitute_extra_vars, swap_sources
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +74,23 @@ def _get_default_channel_name():
     return f"{EDA_CHANNEL_PREFIX}{stream_uuid.replace('-','_')}"
 
 
-def _get_extra_var_id(validated_data: dict) -> dict:
+def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
     rulesets = yaml.safe_load(validated_data["rulebook_rulesets"])
     extra_vars = rulesets[0]["sources"][0]["extra_vars"]
+    encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
+
+    credential_id = None
+    password = ""
+
+    if bool(encrypt_vars):
+        password = secrets.token_urlsafe()
+
     extra_vars = substitute_extra_vars(
-        validated_data, extra_vars, [], "password"
+        validated_data, extra_vars, encrypt_vars, password
     )
 
     extra_var = models.ExtraVar.objects.create(extra_var=yaml.dump(extra_vars))
-    return extra_var.id
+    return extra_var.id, credential_id
 
 
 def _updated_listener_ruleset(validated_data):
@@ -96,36 +104,12 @@ def _updated_listener_ruleset(validated_data):
     return swap_sources(validated_data["rulebook_rulesets"], sources_info)
 
 
-class YAMLSerializerField(serializers.Field):
-    """Serializer for YAML a superset of JSON."""
-
-    def to_internal_value(self, data) -> dict:
-        if data:
-            try:
-                parsed_args = yaml.safe_load(data)
-            except yaml.YAMLError:
-                raise ValidationError("Invalid YAML format for 'source_args'")
-
-            if not isinstance(parsed_args, dict):
-                raise ValidationError(
-                    "The 'source_args' field must be a YAML "
-                    "object (dictionary)"
-                )
-
-            return parsed_args
-        return data
-
-    def to_representation(self, value) -> str:
-        return yaml.dump(value)
-
-
 class EventStreamSerializer(serializers.ModelSerializer):
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists]
     )
     user = serializers.SerializerMethodField()
     source_args = YAMLSerializerField(required=False, allow_null=True)
-    credentials = serializers.SerializerMethodField()
 
     class Meta:
         model = models.EventStream
@@ -144,18 +128,13 @@ class EventStreamSerializer(serializers.ModelSerializer):
             "status_message",
             "decision_environment_id",
             "user",
-            "credentials",
+            "log_level",
+            "k8s_service_name",
             *read_only_fields,
         ]
 
     def get_user(self, obj) -> str:
         return f"{obj.user.username}"
-
-    def get_credentials(self, obj) -> str:
-        return [
-            CredentialSerializer(credential).data
-            for credential in obj.credentials.all()
-        ]
 
 
 class EventStreamCreateSerializer(serializers.ModelSerializer):
@@ -167,7 +146,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     source_args = YAMLSerializerField()
     channel_name = serializers.CharField(
-        default=_get_default_channel_name(),
+        default=_get_default_channel_name,
         validators=[
             RegexValidator(
                 regex=r"^\w+$",
@@ -176,10 +155,10 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             ),
         ],
     )
-    credentials = serializers.ListField(
+    k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
-        child=serializers.IntegerField(),
+        validators=[validators.check_if_rfc_1035_compliant],
     )
 
     class Meta:
@@ -196,7 +175,8 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "extra_var_id",
             "user",
             "restart_policy",
-            "credentials",
+            "log_level",
+            "k8s_service_name",
         ]
 
     def create(self, validated_data):
@@ -216,7 +196,10 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()
         )
-        validated_data["extra_var_id"] = _get_extra_var_id(validated_data)
+        extra_var_id, credential_id = _get_extra_var_and_credential_ids(
+            validated_data
+        )
+        validated_data["extra_var_id"] = extra_var_id
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
         )

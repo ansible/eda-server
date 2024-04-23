@@ -26,10 +26,14 @@
 
 from django.db import models
 
+from aap_eda.core.utils.crypto.fields import EncryptedTextField
+
+from .base_org import BaseOrgModel
+
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(models.Model):
+class Project(BaseOrgModel):
     class Meta:
         db_table = "core_project"
         constraints = [
@@ -45,6 +49,9 @@ class Project(models.Model):
         FAILED = "failed"
         COMPLETED = "completed"
 
+    class ScmType(models.TextChoices):
+        GIT = "git"
+
     name = models.TextField(
         null=False,
         unique=True,
@@ -52,10 +59,19 @@ class Project(models.Model):
     )
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
+    proxy = EncryptedTextField(blank=True, default="")
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
+    # TODO: used by migration, remove it later
     credential = models.ForeignKey(
         "Credential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
         blank=True,
         null=True,
         default=None,
@@ -72,13 +88,34 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
 
+    scm_type = models.TextField(
+        choices=ScmType.choices,
+        default=ScmType.GIT,
+    )
+    scm_branch = models.TextField(blank=True, default="")
+    scm_refspec = models.TextField(blank=True, default="")
+
+    # credential (keys) used to validate content signature
+    signature_validation_credential = models.ForeignKey(
+        "EdaCredential",
+        related_name="%(class)ss_signature_validation",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
-class ExtraVar(models.Model):
+class ExtraVar(BaseOrgModel):
     class Meta:
         db_table = "core_extra_var"
+        default_permissions = (
+            "add",
+            "view",
+        )
 
     name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()

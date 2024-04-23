@@ -14,8 +14,9 @@
 
 from rest_framework import serializers
 
-from aap_eda.api.serializers.credential import CredentialRefSerializer
-from aap_eda.core import models
+from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.core import models, validators
 
 
 class DecisionEnvironmentSerializer(serializers.ModelSerializer):
@@ -30,7 +31,8 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "image_url",
-            "credential_id",
+            "organization_id",
+            "eda_credential_id",
             *read_only_fields,
         ]
 
@@ -38,7 +40,16 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
 class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the DecisionEnvironment."""
 
-    credential_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
+    eda_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
+    )
 
     class Meta:
         model = models.DecisionEnvironment
@@ -46,32 +57,46 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "image_url",
-            "credential_id",
+            "organization_id",
+            "eda_credential_id",
         ]
 
 
 class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
     """Serializer for reading the DecisionEnvironment with embedded objects."""
 
-    credential = CredentialRefSerializer(required=False, allow_null=True)
+    eda_credential = EdaCredentialRefSerializer(
+        required=False, allow_null=True
+    )
+    organization = OrganizationRefSerializer()
 
     class Meta:
-        model = models.DecisionEnvironment()
+        model = models.DecisionEnvironment
         fields = [
             "id",
             "name",
             "description",
             "image_url",
-            "credential",
+            "organization",
+            "eda_credential",
             "created_at",
             "modified_at",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
     def to_representation(self, decision_environment):
-        credential = (
-            CredentialRefSerializer(decision_environment["credential"]).data
-            if decision_environment["credential"]
+        eda_credential = (
+            EdaCredentialRefSerializer(
+                decision_environment["eda_credential"]
+            ).data
+            if decision_environment["eda_credential"]
+            else None
+        )
+        organization = (
+            OrganizationRefSerializer(
+                decision_environment["organization"]
+            ).data
+            if decision_environment["organization"]
             else None
         )
         return {
@@ -79,7 +104,8 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "name": decision_environment["name"],
             "description": decision_environment["description"],
             "image_url": decision_environment["image_url"],
-            "credential": credential,
+            "organization": organization,
+            "eda_credential": eda_credential,
             "created_at": decision_environment["created_at"],
             "modified_at": decision_environment["modified_at"],
         }
@@ -90,5 +116,5 @@ class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.DecisionEnvironment
-        fields = ["id", "name", "description", "image_url"]
+        fields = ["id", "name", "description", "image_url", "organization_id"]
         read_only_fields = ["id"]

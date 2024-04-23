@@ -12,10 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.rbac import permission_registry
+
 from .activation import Activation
-from .auth import Permission, Role
 from .credential import Credential
+from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
+from .eda_credential import EdaCredential
 from .event_stream import EventStream
 from .job import (
     ActivationInstanceJobInstance,
@@ -24,6 +27,7 @@ from .job import (
     JobInstanceEvent,
     JobInstanceHost,
 )
+from .organization import Organization
 from .project import ExtraVar, Project
 from .queue import ActivationRequestQueue
 from .rulebook import (
@@ -34,13 +38,19 @@ from .rulebook import (
     Rulebook,
     Ruleset,
 )
-from .rulebook_process import RulebookProcess, RulebookProcessLog
+from .rulebook_process import (
+    RulebookProcess,
+    RulebookProcessLog,
+    RulebookProcessQueue,
+)
+from .team import Team
 from .user import AwxToken, User
 
 __all__ = [
     "ActivationInstanceJobInstance",
     "RulebookProcessLog",
     "RulebookProcess",
+    "RulebookProcessQueue",
     "Activation",
     "AuditAction",
     "AuditEvent",
@@ -51,15 +61,40 @@ __all__ = [
     "JobInstance",
     "Job",
     "Project",
-    "Permission",
-    "Role",
     "Rule",
     "Rulebook",
     "Ruleset",
     "User",
     "AwxToken",
     "Credential",
+    "CredentialType",
+    "EdaCredential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
     "EventStream",
+    "Organization",
+    "Team",
 ]
+
+permission_registry.register(
+    Activation,
+    CredentialType,
+    EdaCredential,
+    DecisionEnvironment,
+    ExtraVar,
+    Project,
+    Organization,
+    Team,
+    parent_field_name="organization",
+)
+permission_registry.register(
+    Rulebook,
+    parent_field_name="project",
+)
+permission_registry.register(
+    RulebookProcess,
+    parent_field_name="activation",
+)
+permission_registry.register(
+    AuditRule, parent_field_name="activation_instance"
+)

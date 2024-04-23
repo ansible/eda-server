@@ -5,8 +5,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
-from rq import Connection, Queue as _Queue, Worker as _Worker
+from django_rq.queues import Queue as _Queue
+from rq import Connection, Worker as _Worker
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
     DEFAULT_RESULT_TTL,
@@ -124,24 +126,22 @@ class DefaultWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
 
         super().__init__(
-            queues,
-            name,
-            default_result_ttl,
-            connection,
-            exc_handler,
-            exception_handlers,
-            default_worker_ttl,
-            job_class,
-            queue_class,
-            log_job_description,
-            job_monitoring_interval,
-            disable_default_exception_handler,
-            prepare_for_work,
-            serializer,
+            queues=queues,
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=default_worker_ttl,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
         )
 
 
@@ -172,24 +172,24 @@ class ActivationWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        if serializer is None:
-            serializer = JSONSerializer
+
+        queue_name = settings.RULEBOOK_QUEUE_NAME
 
         super().__init__(
-            [Queue(name="activation", connection=connection)],
-            name,
-            default_result_ttl,
-            connection,
-            exc_handler,
-            exception_handlers,
-            default_worker_ttl,
-            job_class,
-            queue_class,
-            log_job_description,
-            job_monitoring_interval,
-            disable_default_exception_handler,
-            prepare_for_work,
-            serializer,
+            queues=[Queue(name=queue_name, connection=connection)],
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=settings.DEFAULT_WORKER_TTL,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
         )
 
 
@@ -207,14 +207,15 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     Detects if a job with the same id is already enqueued and if it is
     it will return it instead of enqueuing a new one.
     """
-    queue = get_queue(queue_name)
-    job = job_from_queue(queue, job_id)
-    if job:
-        logger.info(
-            f"Skip enqueing job: {job_id} because it is already enqueued"
-        )
-        return job
+    for name in settings.RQ_QUEUES:
+        job = job_from_queue(name, job_id)
+        if job:
+            logger.info(
+                f"Skip enqueing job: {job_id} because it is already enqueued"
+            )
+            return job
     else:
+        queue = get_queue(name=queue_name)
         kwargs["job_id"] = job_id
         logger.info(f"Enqueing unique job: {job_id}")
         return queue.enqueue(*args, **kwargs)

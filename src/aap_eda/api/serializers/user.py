@@ -1,15 +1,25 @@
 from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
 
+from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
-from .auth import RoleRefSerializer
+from .fields.ansible_resource import AnsibleResourceFieldSerializer
 
 
 class UserSerializer(serializers.ModelSerializer):
+    resource = AnsibleResourceFieldSerializer(read_only=True)
+
     class Meta:
         model = models.User
-        fields = "__all__"
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "is_superuser",
+            "resource",
+        ]
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
@@ -17,8 +27,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         help_text="The user's log in name.",
     )
     created_at = serializers.DateTimeField(source="date_joined")
-
-    roles = RoleRefSerializer(read_only=True, many=True)
+    resource = AnsibleResourceFieldSerializer(read_only=True)
 
     class Meta:
         model = models.User
@@ -29,7 +38,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "is_superuser",
-            "roles",
+            "resource",
             "created_at",
             "modified_at",
         ]
@@ -60,7 +69,7 @@ class UserListSerializer(serializers.Serializer):
         help_text="The user is a superuser.",
     )
 
-    roles = RoleRefSerializer(read_only=True, many=True)
+    resource = AnsibleResourceFieldSerializer(read_only=True)
 
 
 class UserUpdateSerializerBase(serializers.ModelSerializer):
@@ -90,7 +99,7 @@ class UserCreateUpdateSerializer(UserUpdateSerializerBase):
             "last_name",
             "email",
             "password",
-            "roles",
+            "is_superuser",
         ]
 
 
@@ -126,3 +135,19 @@ class AwxTokenCreateSerializer(serializers.ModelSerializer):
             "description",
             "token",
         ]
+
+    def validate(self, data):
+        """Validate the uniqueness of a combination of user and name fields."""
+        user = self.context["request"].user
+        name = data.get("name")
+
+        existing_token = models.AwxToken.objects.filter(user=user, name=name)
+
+        # If updating, exclude the current instance from the queryset
+        if self.instance:
+            existing_token = existing_token.exclude(pk=self.instance.pk)
+
+        if existing_token.exists():
+            raise Conflict("Token with this name already exists.")
+
+        return data

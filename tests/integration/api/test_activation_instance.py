@@ -12,151 +12,71 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
-from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
-
-TEST_RULESETS_SAMPLE = """
----
-- name: Test sample 001
-  hosts: all
-  sources:
-    - ansible.eda.range:
-        limit: 5
-        delay: 1
-      filters:
-        - noop:
-  rules:
-    - name: r1
-      condition: event.i == 1
-      action:
-        debug:
-    - name: r2
-      condition: event.i == 2
-      action:
-        debug:
-
-- name: Test sample 002
-  hosts: all
-  sources:
-    - ansible.eda.range:
-        limit: 5
-        delay: 1
-  rules:
-    - name: r3
-      condition: event.i == 2
-      action:
-        debug:
-""".strip()
-
-DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
-
-PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
-
-
-@dataclass
-class InitData:
-    rulebook: models.Rulebook
-    activation: models.Activation
 
 
 # ------------------------------------------
 # Test Activation Instances:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_activation_instances(client: APIClient):
-    activation = prepare_init_data()
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="test-activation-instance-1",
-                activation=activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-1",
-                activation=activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-        ]
-    )
+def test_list_activation_instances(
+    default_activation_instances: List[models.RulebookProcess],
+    client: APIClient,
+):
     response = client.get(f"{api_url_v1}/activation-instances/")
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data["results"]) == len(instances)
+    assert len(response.data["results"]) == len(default_activation_instances)
 
 
 @pytest.mark.django_db
-def test_list_activation_instances_filter_name(client: APIClient):
-    activation = prepare_init_data()
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="activation-instance-1",
-                activation=activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-2",
-                activation=activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-        ]
-    )
-
-    filter_name = "instance-1"
+def test_list_activation_instances_filter_name(
+    default_activation_instances: List[models.RulebookProcess],
+    client: APIClient,
+):
+    filter_name = default_activation_instances[0].name
     response = client.get(
         f"{api_url_v1}/activation-instances/?name={filter_name}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["name"] == instances[0].name
+    assert (
+        response.data["results"][0]["name"]
+        == default_activation_instances[0].name
+    )
 
 
 @pytest.mark.django_db
-def test_list_activation_instances_filter_status(client: APIClient):
-    activation = prepare_init_data()
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="activation-instance-1",
-                status="completed",
-                activation=activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-2",
-                status="failed",
-                activation=activation,
-                git_hash=PROJECT_GIT_HASH,
-            ),
-        ]
-    )
-
-    filter_name = "failed"
+def test_list_activation_instances_filter_status(
+    default_activation_instances: List[models.RulebookProcess],
+    client: APIClient,
+):
+    filter_name = enums.ActivationStatus.FAILED
     response = client.get(
         f"{api_url_v1}/activation-instances/?status={filter_name}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["name"] == instances[1].name
+    assert (
+        response.data["results"][0]["name"]
+        == default_activation_instances[1].name
+    )
 
 
 @pytest.mark.django_db
-def test_retrieve_activation_instance(client: APIClient):
-    activation = prepare_init_data()
-    instance = models.RulebookProcess.objects.create(
-        name="activation-instance",
-        activation=activation,
-    )
+def test_retrieve_activation_instance(
+    default_activation_instances: List[models.RulebookProcess],
+    client: APIClient,
+):
+    instance = default_activation_instances[0]
     response = client.get(f"{api_url_v1}/activation-instances/{instance.id}/")
 
     assert response.status_code == status.HTTP_200_OK
@@ -170,43 +90,12 @@ def test_retrieve_activation_instance_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_delete_activation_instance(client: APIClient):
-    activation = prepare_init_data()
-    instance = models.RulebookProcess.objects.create(
-        name="activation-instance",
-        activation=activation,
-    )
-
-    response = client.delete(
-        f"{api_url_v1}/activation-instances/{instance.id}/"
-    )
-    assert response.status_code == status.HTTP_204_NO_CONTENT
-
-    assert models.RulebookProcess.objects.filter(pk=instance.id).count() == 0
-
-
-@pytest.mark.django_db
-def test_list_logs_from_activation_instance(client: APIClient):
-    activation = prepare_init_data()
-    instance = models.RulebookProcess.objects.create(
-        name="test-activation-instance",
-        activation=activation,
-    )
-
-    models.RulebookProcessLog.objects.bulk_create(
-        [
-            models.RulebookProcessLog(
-                log="activation-instance-log-1",
-                line_number=1,
-                activation_instance=instance,
-            ),
-            models.RulebookProcessLog(
-                log="activation-instance-log-2",
-                line_number=2,
-                activation_instance=instance,
-            ),
-        ]
-    )
+def test_list_logs_from_activation_instance(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    client: APIClient,
+):
+    instance = default_activation_instances[0]
 
     response = client.get(
         f"{api_url_v1}/activation-instances/{instance.id}/logs/"
@@ -226,28 +115,12 @@ def test_list_logs_from_activation_instance(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_activation_instance_logs_filter(client: APIClient):
-    activation = prepare_init_data()
-    instance = models.RulebookProcess.objects.create(
-        name="test-activation-instance",
-        activation=activation,
-    )
-
-    instance_logs = models.RulebookProcessLog.objects.bulk_create(
-        [
-            models.RulebookProcessLog(
-                log="activation-instance-log-1",
-                line_number=1,
-                activation_instance=instance,
-            ),
-            models.RulebookProcessLog(
-                log="activation-instance-log-2",
-                line_number=2,
-                activation_instance=instance,
-            ),
-        ]
-    )
-
+def test_list_activation_instance_logs_filter(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    client: APIClient,
+):
+    instance = default_activation_instances[0]
     filter_log = "log-1"
     response = client.get(
         f"{api_url_v1}/activation-instances/{instance.id}"
@@ -255,18 +128,21 @@ def test_list_activation_instance_logs_filter(client: APIClient):
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["log"] == instance_logs[0].log
+    assert (
+        response.data["results"][0]["log"]
+        == default_activation_instance_logs[0].log
+    )
 
 
 @pytest.mark.django_db
-def test_list_activation_instance_logs_filter_non_existent(client: APIClient):
-    activation = prepare_init_data()
-    instance = models.RulebookProcess.objects.create(
-        name="test-activation-instance",
-        activation=activation,
-    )
-
+def test_list_activation_instance_logs_filter_non_existent(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation_instance_logs: List[models.RulebookProcessLog],
+    client: APIClient,
+):
+    instance = default_activation_instances[0]
     filter_log = "doesn't exist"
+
     response = client.get(
         f"{api_url_v1}/activation-instances/{instance.id}"
         f"/logs/?log={filter_log}"
@@ -282,32 +158,12 @@ def assert_activation_instance_data(
     assert data == {
         "id": instance.id,
         "name": instance.name,
-        "status": str(instance.status),
+        "status": instance.status,
         "git_hash": instance.git_hash,
         "activation_id": instance.activation.id,
+        "organization_id": instance.organization.id,
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
-        "status_message": ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
+        "status_message": enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
         "event_stream_id": None,
     }
-
-
-def prepare_init_data():
-    rulebook = models.Rulebook.objects.create(
-        name="test-rulebook.yml",
-        rulesets=TEST_RULESETS_SAMPLE,
-    )
-    user = models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
-    activation = models.Activation.objects.create(
-        name="test-activation",
-        rulebook=rulebook,
-        user=user,
-    )
-
-    return activation

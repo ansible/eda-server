@@ -15,6 +15,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.core import models
 
 
@@ -25,6 +26,10 @@ class RulebookSerializer(serializers.ModelSerializer):
         queryset=models.Project.objects.all(),
         help_text="ID of the project",
     )
+    organization_id = serializers.PrimaryKeyRelatedField(
+        queryset=models.Organization.objects.all(),
+        help_text="ID of the organization",
+    )
 
     class Meta:
         model = models.Rulebook
@@ -34,10 +39,16 @@ class RulebookSerializer(serializers.ModelSerializer):
             "description",
             "rulesets",
             "project_id",
+            "organization_id",
             "created_at",
             "modified_at",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "organization_id",
+            "created_at",
+            "modified_at",
+        ]
 
 
 class RulebookRefSerializer(serializers.ModelSerializer):
@@ -45,131 +56,8 @@ class RulebookRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Rulebook
-        fields = ["id", "name", "description"]
-        read_only_fields = ["id"]
-
-
-class RulesetSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the ruleset",
-    )
-
-    sources = serializers.JSONField(
-        required=True,
-        help_text="The contained sources in the ruleset",
-    )
-
-    class Meta:
-        model = models.Ruleset
-        fields = "__all__"
-        read_only_fields = ["id", "created_at", "modified_at"]
-
-
-class RulesetOutSerializer(serializers.Serializer):
-    id = serializers.IntegerField(
-        required=True,
-        help_text="ID of the ruleset",
-    )
-
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the ruleset",
-    )
-
-    rule_count = serializers.IntegerField(
-        required=True,
-        help_text="Number of rules the ruleset contains",
-    )
-
-    source_types = serializers.ListField(
-        child=serializers.CharField(),
-        required=True,
-        help_text="List of source types",
-    )
-
-    fired_stats = serializers.ListField(
-        child=serializers.JSONField(),
-        required=True,
-        help_text="List of stats",
-    )
-
-    created_at = serializers.DateTimeField(
-        required=True,
-        help_text="The created_at timestamp of the ruleset",
-    )
-
-    modified_at = serializers.DateTimeField(
-        required=True,
-        help_text="The modified_at timestamp of the ruleset",
-    )
-
-
-class RuleSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the rule",
-    )
-
-    action = serializers.JSONField(
-        required=True,
-        help_text="The action in the rule",
-    )
-
-    class Meta:
-        model = models.Rule
-        fields = [
-            "id",
-            "name",
-            "action",
-            "ruleset_id",
-        ]
-        read_only_fields = ["id", "created_at", "modified_at"]
-
-
-class RuleOutSerializer(serializers.Serializer):
-    id = serializers.IntegerField(
-        required=True,
-        help_text="ID of the ruleset",
-    )
-
-    name = serializers.CharField(
-        required=True,
-        help_text="Name of the rule",
-    )
-
-    action = serializers.JSONField(
-        default=dict,
-        help_text="The action in the rule",
-        allow_null=True,
-    )
-
-    fired_stats = serializers.ListField(
-        child=serializers.JSONField(),
-        required=True,
-        help_text="List of stats",
-    )
-
-    rulebook_id = serializers.PrimaryKeyRelatedField(
-        required=False,
-        allow_null=True,
-        queryset=models.Rulebook.objects.all(),
-        help_text="ID of the rulebook",
-    )
-
-    ruleset_id = serializers.PrimaryKeyRelatedField(
-        required=False,
-        allow_null=True,
-        queryset=models.Ruleset.objects.all(),
-        help_text="ID of the ruleset",
-    )
-
-    project_id = serializers.PrimaryKeyRelatedField(
-        required=False,
-        allow_null=True,
-        queryset=models.Project.objects.all(),
-        help_text="ID of the project",
-    )
+        fields = ["id", "name", "description", "organization_id"]
+        read_only_fields = ["id", "organization_id"]
 
 
 class AuditRuleSerializer(serializers.ModelSerializer):
@@ -212,9 +100,10 @@ class AuditRuleSerializer(serializers.ModelSerializer):
             "ruleset_name",
             "activation_instance_id",
             "job_instance_id",
+            "organization_id",
             "definition",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "organization_id", "created_at"]
 
 
 class AuditRuleDetailSerializer(serializers.Serializer):
@@ -234,6 +123,8 @@ class AuditRuleDetailSerializer(serializers.Serializer):
     )
 
     activation_instance = serializers.SerializerMethodField()
+
+    organization = serializers.SerializerMethodField()
 
     ruleset_name = serializers.CharField(
         required=False,
@@ -267,6 +158,25 @@ class AuditRuleDetailSerializer(serializers.Serializer):
         else:
             return {"id": None, "name": "DELETED"}
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "nullable": False},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string", "description": "string"},
+        }
+    )
+    def get_organization(self, rule):
+        organization = rule.organization
+        return {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+        }
+
 
 class AuditRuleListSerializer(serializers.Serializer):
     id = serializers.IntegerField(
@@ -285,6 +195,8 @@ class AuditRuleListSerializer(serializers.Serializer):
     )
 
     activation_instance = serializers.SerializerMethodField()
+
+    organization = serializers.SerializerMethodField()
 
     fired_at = serializers.DateTimeField(
         required=True,
@@ -307,6 +219,25 @@ class AuditRuleListSerializer(serializers.Serializer):
             return {"id": instance.id, "name": instance.name}
         else:
             return {"id": None, "name": "DELETED"}
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "nullable": False},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+            },
+            "example": {"id": 0, "name": "string", "description": "string"},
+        }
+    )
+    def get_organization(self, rule):
+        organization = rule.organization
+        return {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+        }
 
 
 class AuditActionSerializer(serializers.ModelSerializer):
@@ -377,12 +308,21 @@ class AuditEventSerializer(serializers.ModelSerializer):
         help_text="The received timestamp of the event",
     )
 
-    payload = serializers.JSONField(
+    payload = YAMLSerializerField(
         required=False,
+        allow_null=True,
         help_text="The payload in the event",
     )
 
     class Meta:
         model = models.AuditEvent
-        fields = "__all__"
+        fields = [
+            "id",
+            "source_name",
+            "source_type",
+            "payload",
+            "audit_actions",
+            "received_at",
+            "rule_fired_at",
+        ]
         read_only_fields = ["id"]

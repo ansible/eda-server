@@ -157,8 +157,6 @@ git clone git@github.com:ansible/eda-server.git
 
 ### Install dependencies
 
-**NOTE**: Since we added experimental [LDAP authentication](https://github.com/ansible/eda-server/pull/557), the following additional packages are required: `openldap-devel xmlsec1-devel libtool-ltdl-devel`.
-
 Go to your project directory and install dependencies for local development:
 
 ```shell
@@ -238,6 +236,30 @@ environment variables:
 * `EDA_DB_USER` – Database username (default: `postgres`)
 * `EDA_DB_PASSWORD` – Database user password (default: `secret`, only in development mode)
 * `EDA_DB_NAME` – Database name (default: `eda`)
+
+### TLS-enabled redis
+If you wish to run a development environment requiring TLS connections to redis it is a simple
+process...
+1. build your container images as described above
+2. start them using `docker-compose -f ./tools/docker/docker-compose-dev-redis-tls.yaml up`
+
+In order to successfully run the development environment tests using TLS-enabled
+redis you will need to export the following environment variables:
+
+* `EDA_MQ_CLIENT_CERT_PATH=<<workspace>>/tools/docker/redis-tls/client/client.crt`
+* `EDA_MQ_CLIENT_KEY_PATH=<<workspace>>/tools/docker/redis-tls/client/client.key`
+* `EDA_MQ_CLIENT_CACERT_PATH=<<workspace>>/tools/docker/redis-tls/ca.crt`
+
+If using `podman` you will also need to export:
+
+* `EDA_PODMAN_SOCKET_URL=tcp://0.0.0.0:8888`
+
+`EDA_MQ_CLIENT_CERT_PATH` has special significance.  While all three `EDA_MQ_*`
+variables are required `EDA_MQ_CLIENT_CERT_PATH` determines whether requests
+are made to redis using TLS.  You can use this as a convenience in switching
+client-side processing between TLS and non-TLS by always exporting
+`EDA_MQ_CLIENT_KEY_PATH` and `EDA_MQ_CLIENT_CACERT_PATH` and switching behavior
+by setting/clearing `EDA_MQ_CLIENT_CERT_PATH`.
 
 ### Executing migrations
 
@@ -357,4 +379,4 @@ task format:isort
 task format:black
 ```
 
-You can now access the UI at <https://localhost:8443/eda/> with default login username and password(admin/testpass).
+You can now access the UI at <https://localhost:8443/overview/> with default login username and password(admin/testpass).

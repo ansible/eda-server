@@ -6,6 +6,11 @@ RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && chown -R "${USER_ID}:0" /app/.local /var/lib/eda \
     && chmod 0775 /app /var/lib/eda
 
+RUN mkdir -p /var/lib/eda/redis-tls \
+    && chown -R "${USER_ID}:0" /var/lib/eda/redis-tls \
+    && chmod 0775 /var/lib/eda/redis-tls
+COPY ./tools/docker/redis-tls /var/lib/eda/redis-tls
+
 RUN DNF=dnf \
     INSTALL_PACKAGES="python3.11 \
     python3.11-devel \
@@ -14,9 +19,7 @@ RUN DNF=dnf \
     gcc \
     gettext \
     git-core \
-    java-17-openjdk-headless \
-    # Experimental LDAP Integration https://issues.redhat.com/browse/AAP-16938
-    openldap-devel xmlsec1-devel libtool-ltdl-devel" \
+    java-17-openjdk-headless" \
     && $DNF -y install dnf-plugins-core \
     && $DNF -y config-manager --set-enabled crb \
     && $DNF -y install $INSTALL_PACKAGES \
@@ -48,6 +51,7 @@ RUN poetry install -E all --no-root --no-cache \
     && ${PYTHON_BIN} -m pip install gunicorn
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
+RUN pip install ansible-core
 
 USER 0
 RUN for dir in \

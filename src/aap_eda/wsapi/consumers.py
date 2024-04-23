@@ -5,13 +5,14 @@ import typing as tp
 from datetime import datetime
 from enum import Enum
 
+import yaml
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.db import DatabaseError
 
 from aap_eda.core import models
-from aap_eda.core.enums import CredentialType
+from aap_eda.core.enums import DefaultCredentialType
 
 from .messages import (
     ActionMessage,
@@ -116,18 +117,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=extra_var_message.json())
 
         await self.send(text_data=rulebook_message.json())
-        awx_token = await self.get_awx_token(message)
-        if awx_token:
-            controller_info = ControllerInfo(
-                url=settings.EDA_CONTROLLER_URL,
-                token=awx_token,
-                ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
-            )
+
+        controller_info = await self.get_controller_info(message)
+        if controller_info:
             await self.send(text_data=controller_info.json())
 
-        vault_data = await self.get_vault_passwords(message)
-        if vault_data:
-            vault_collection = VaultCollection(data=vault_data)
+        eda_vault_data = await self.get_eda_system_vault_passwords(message)
+        if eda_vault_data:
+            vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
 
         await self.send(text_data=EndOfResponse().json())
@@ -228,6 +225,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
         ).first()
         if audit_rule is None:
+            activation_instance = models.RulebookProcess.objects.filter(
+                id=message.activation_id
+            ).first()
+            activation_org = models.Organization.objects.filter(
+                id=activation_instance.organization.id
+            ).first()
             audit_rule = models.AuditRule.objects.create(
                 activation_instance_id=message.activation_id,
                 name=message.rule,
@@ -237,6 +240,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 fired_at=message.rule_run_at,
                 job_instance_id=job_instance_id,
                 status=message.status,
+                organization=activation_org,
             )
 
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
@@ -344,8 +348,52 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         awx_token = parent.awx_token
         return awx_token.token.get_secret_value() if awx_token else None
 
+    async def get_controller_info(
+        self, message: WorkerMessage
+    ) -> tp.Optional[ControllerInfo]:
+        """Get Controller Info."""
+        controller_info = await self.get_controller_info_from_aap_cred(message)
+        if controller_info:
+            return controller_info
+
+        awx_token = await self.get_awx_token(message)
+        if awx_token:
+            return ControllerInfo(
+                url=settings.EDA_CONTROLLER_URL,
+                token=awx_token,
+                ssl_verify=settings.EDA_CONTROLLER_SSL_VERIFY,
+            )
+        return None
+
     @database_sync_to_async
-    def get_vault_passwords(
+    def get_controller_info_from_aap_cred(
+        self, message: WorkerMessage
+    ) -> tp.Optional[ControllerInfo]:
+        """Get AAP Credential from Activation."""
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        parent = rulebook_process_instance.get_parent()
+        aap_credential_type = models.CredentialType.objects.get(
+            name=DefaultCredentialType.AAP
+        )
+        for eda_credential in parent.eda_credentials.all():
+            if eda_credential.credential_type.id == aap_credential_type.id:
+                inputs = yaml.safe_load(
+                    eda_credential.inputs.get_secret_value()
+                )
+                return ControllerInfo(
+                    url=inputs["host"],
+                    token=inputs.get("oauth_token", ""),
+                    ssl_verify="yes" if inputs.get("verify_ssl") else "no",
+                    username=inputs.get("username", ""),
+                    password=inputs.get("password", ""),
+                )
+
+        return None
+
+    @database_sync_to_async
+    def get_eda_system_vault_passwords(
         self, message: WorkerMessage
     ) -> tp.List[VaultPassword]:
         """Get vault info from activation."""
@@ -355,22 +403,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation = rulebook_process_instance.get_parent()
         vault_passwords = []
 
-        if activation.system_vault_credential:
-            vault = models.Credential.objects.filter(
-                id=activation.system_vault_credential.id
+        if activation.eda_system_vault_credential:
+            vault = models.EdaCredential.objects.filter(
+                id=activation.eda_system_vault_credential.id
             )
         else:
-            vault = models.Credential.objects.none()
+            vault = models.EdaCredential.objects.none()
 
-        for credential in activation.credentials.filter(
-            credential_type=CredentialType.VAULT
+        vault_credential_type = models.CredentialType.objects.get(
+            name=DefaultCredentialType.VAULT
+        )
+        for credential in activation.eda_credentials.filter(
+            credential_type_id=vault_credential_type.id
         ).union(vault):
+            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
             vault_passwords.append(
                 VaultPassword(
-                    label=credential.vault_identifier,
-                    # TODO: Use pydantic secret feature (available > 2.0)
-                    # https://docs.pydantic.dev/latest/examples/secrets/
-                    password=credential.secret.get_secret_value(),
+                    label=inputs.get("vault_id", ""),
+                    password=inputs["vault_password"],
                 )
             )
 

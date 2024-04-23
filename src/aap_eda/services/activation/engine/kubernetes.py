@@ -83,6 +83,7 @@ class Engine(ContainerEngine):
     def __init__(
         self,
         activation_id: str,
+        resource_prefix: str,
         client=None,
     ) -> None:
         if client:
@@ -91,7 +92,8 @@ class Engine(ContainerEngine):
             self.client = get_k8s_client()
 
         self._set_namespace()
-        self.secret_name = f"activation-secret-{activation_id}"
+        self.resource_prefix = resource_prefix.replace("_", "-")
+        self.secret_name = f"{self.resource_prefix}-secret-{activation_id}"
         self.job_name = None
         self.pod_name = None
 
@@ -99,12 +101,12 @@ class Engine(ContainerEngine):
         # TODO : Should this be compatible with the previous version
         # Previous Version
         self.job_name = (
-            f"activation-job-{request.activation_id}"
-            f"-{request.activation_instance_id}"
+            f"{self.resource_prefix}-job-{request.process_parent_id}"
+            f"-{request.rulebook_process_id}"
         )
         self.pod_name = (
-            f"activation-pod-{request.activation_id}"
-            f"-{request.activation_instance_id}"
+            f"{self.resource_prefix}-pod-{request.process_parent_id}"
+            f"-{request.rulebook_process_id}"
         )
 
         # Should we switch to new format
@@ -123,8 +125,7 @@ class Engine(ContainerEngine):
                 )
                 raise ContainerImagePullError(msg) from e
             if request.ports:
-                for port in self._get_ports(request.ports):
-                    self._create_service(port)
+                self._create_service(request)
             LOGGER.info(f"Job {self.job_name} is running")
             log_handler.write(f"Job {self.job_name} is running", flush=True)
             return self.job_name
@@ -344,9 +345,11 @@ class Engine(ContainerEngine):
         LOGGER.info(f"Created Pod template: {self.pod_name}")
         return pod_template
 
-    def _create_service(self, port: int) -> None:
+    def _create_service(self, request: ContainerRequest) -> None:
+        request_ports = [item[1] for item in request.ports]
+
         # only create the service if it does not already exist
-        service_name = f"{self.job_name}-{port}"
+        service_name = request.k8s_service_name
 
         try:
             service = self.client.core_api.list_namespaced_service(
@@ -355,18 +358,31 @@ class Engine(ContainerEngine):
             )
 
             if not service.items:
+                LOGGER.info(f"Created request ports: {request_ports}")
                 service_template = k8sclient.V1Service(
                     spec=k8sclient.V1ServiceSpec(
-                        selector={"app": "eda", "job-name": self.job_name},
+                        selector={
+                            "app": "eda",
+                            "job-name": self.job_name,
+                            "created-by": "eda",
+                        },
                         ports=[
                             k8sclient.V1ServicePort(
-                                protocol="TCP", port=port, target_port=port
+                                name=f"{service_name}-{port}",
+                                protocol="TCP",
+                                port=port,
+                                target_port=port,
                             )
+                            for port in request_ports
                         ],
                     ),
                     metadata=k8sclient.V1ObjectMeta(
                         name=f"{service_name}",
-                        labels={"app": "eda", "job-name": self.job_name},
+                        labels={
+                            "app": "eda",
+                            "job-name": self.job_name,
+                            "created-by": "eda",
+                        },
                         namespace=self.namespace,
                     ),
                 )
@@ -377,6 +393,15 @@ class Engine(ContainerEngine):
                 LOGGER.info(f"Created Service: {service_name}")
             else:
                 LOGGER.info(f"Service already exists: {service_name}")
+                opened_ports = [
+                    port_item.port for port_item in service.items[0].spec.ports
+                ]
+                if bool(set(request_ports) - set(opened_ports)):
+                    raise ContainerStartError(
+                        f"Request ports {request_ports} is not opened in the "
+                        f"service {service_name} with ports: {opened_ports}"
+                    )
+
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
             raise ContainerStartError(str(e)) from e

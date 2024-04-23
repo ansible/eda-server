@@ -14,10 +14,12 @@
 
 from django.db import models
 
+from .base_org import BaseOrgModel
+
 __all__ = ("DecisionEnvironment",)
 
 
-class DecisionEnvironment(models.Model):
+class DecisionEnvironment(BaseOrgModel):
     class Meta:
         db_table = "core_decision_environment"
         constraints = [
@@ -30,8 +32,16 @@ class DecisionEnvironment(models.Model):
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="", blank=True, null=False)
     image_url = models.TextField(blank=False, null=False)
+    # TODO: used by migration, remove it later
     credential = models.ForeignKey(
         "Credential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
         blank=True,
         null=True,
         default=None,

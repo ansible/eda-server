@@ -21,6 +21,9 @@ x-environment:
   - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
   - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
   - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
+  - EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT=${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
+  - EDA_ANSIBLE_BASE_JWT_KEY=${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
+  - EDA_DEBUG=${EDA_DEBUG:-True}
 
 services:
   eda-ui:
@@ -137,7 +140,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
@@ -155,7 +158,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'quay.io/sclorg/redis-6-c9s:latest'
+    image: 'quay.io/fedora/redis-6:latest'
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:

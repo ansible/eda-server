@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import base64
-import json
 import logging
 import os
 
@@ -23,6 +21,7 @@ from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
+from rq.timeouts import JobTimeoutException
 
 from aap_eda.core.enums import ActivationStatus
 
@@ -31,7 +30,6 @@ from .common import (
     ContainerEngine,
     ContainerRequest,
     ContainerStatus,
-    Credential,
     LogHandler,
 )
 
@@ -63,6 +61,7 @@ class Engine(ContainerEngine):
     def __init__(
         self,
         _activation_id: str,
+        _resource_prefix: str = None,
         client=None,
     ) -> None:
         try:
@@ -72,7 +71,6 @@ class Engine(ContainerEngine):
                 self.client = get_podman_client()
             LOGGER.debug(self.client.version())
 
-            self.auth_file = None
         except APIError as e:
             LOGGER.error(f"Failed to initialize podman engine: f{e}")
             raise exceptions.ContainerEngineInitError(str(e))
@@ -99,6 +97,19 @@ class Engine(ContainerEngine):
         # ContainerCleanupError handled by the manager
         except APIError as e:
             raise exceptions.ContainerCleanupError(str(e)) from e
+        finally:
+            # Ensure volumes are purged due to a bug in podman
+            # ref: https://github.com/containers/podman-py/issues/328
+            try:
+                pruned_volumes = self.client.volumes.prune()
+            except Exception as e:
+                LOGGER.warning(f"Exception pruning volumes: {e}")
+                log_handler.write(
+                    f"Exception pruning volumes: {e}",
+                    flush=True,
+                )
+            else:
+                LOGGER.info(f"Pruned volumes: {pruned_volumes}")
 
     def _image_exists(self, image_url: str) -> bool:
         try:
@@ -112,7 +123,6 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerStartError("Missing image url")
 
         try:
-            self._set_auth_json_file()
             self._login(request)
             LOGGER.info(f"Image URL is {request.image_url}")
             if request.pull_policy == "Always" or not self._image_exists(
@@ -325,44 +335,6 @@ class Engine(ContainerEngine):
             LOGGER.exception("Login failed: f{e}")
             raise exceptions.ContainerStartError(str(e))
 
-    def _write_auth_json(self, request: ContainerRequest) -> None:
-        if not self.auth_file:
-            LOGGER.debug("No auth file to create")
-            return
-
-        auth_dict = {}
-        if os.path.exists(self.auth_file):
-            with open(self.auth_file, encoding="utf-8") as f:
-                auth_dict = json.load(f)
-
-        if "auths" not in auth_dict:
-            auth_dict["auths"] = {}
-        registry = request.image_url.split("/")[0]
-        auth_dict["auths"][registry] = self._create_auth_key(
-            request.credential
-        )
-
-        with open(self.auth_file, mode="w", encoding="utf-8") as f:
-            json.dump(auth_dict, f, indent=6)
-
-    def _create_auth_key(self, credential: Credential) -> dict:
-        data = f"{credential.username}:{credential.secret}"
-        encoded_data = data.encode("ascii")
-        return {"auth": base64.b64encode(encoded_data).decode("ascii")}
-
-    def _set_auth_json_file(self) -> None:
-        xdg_runtime_dir = os.getenv(
-            "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-        )
-        auth_file = f"{xdg_runtime_dir}/containers/auth.json"
-        dir_name = os.path.dirname(auth_file)
-        if os.path.exists(dir_name):
-            self.auth_file = auth_file
-            LOGGER.debug("Will use auth file %s", auth_file)
-        else:
-            self.auth_file = None
-            LOGGER.debug("Will not use auth file")
-
     def _pull_image(
         self, request: ContainerRequest, log_handler: LogHandler
     ) -> Image:
@@ -375,7 +347,6 @@ class Engine(ContainerEngine):
                     "username": request.credential.username,
                     "password": request.credential.secret,
                 }
-                self._write_auth_json(request)
             image = self.client.images.pull(request.image_url, **kwargs)
 
             # https://github.com/containers/podman-py/issues/301
@@ -390,12 +361,17 @@ class Engine(ContainerEngine):
             return image
         except ImageNotFound as e:
             msg = f"Image {request.image_url} not found"
-            LOGGER.exception(msg)
+            LOGGER.error(msg)
             log_handler.write(msg, True)
             raise exceptions.ContainerImagePullError(msg) from e
         except APIError as e:
-            LOGGER.exception("Failed to pull image {request.image_url}: f{e}")
+            LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
+        except JobTimeoutException as e:
+            msg = f"Timeout: {e}"
+            LOGGER.error(msg)
+            log_handler.write(msg, True)
+            raise exceptions.ContainerImagePullError(msg) from e
 
     def _load_pod_args(self, request: ContainerRequest) -> dict:
         pod_args = {"name": request.name}

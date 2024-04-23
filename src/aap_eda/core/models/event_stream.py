@@ -14,12 +14,18 @@
 
 from django.db import models
 
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    RestartPolicy,
+    RulebookProcessLogLevel,
+)
+from aap_eda.core.utils import get_default_log_level
+from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .mixins import StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, models.Model):
+class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     """Model representing an event stream."""
 
     name = models.TextField(null=False, unique=True)
@@ -77,15 +83,15 @@ class EventStream(StatusHandlerModelMixin, models.Model):
     channel_name = models.TextField(null=True, default=None)
     source_type = models.TextField(null=False)
     source_args = models.JSONField(null=True, default=None)
-    system_vault_credential = models.OneToOneField(
-        "Credential",
+    log_level = models.CharField(
+        max_length=20,
+        choices=RulebookProcessLogLevel.choices(),
+        default=get_default_log_level,
+    )
+    k8s_service_name = models.TextField(
         null=True,
         default=None,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
-    credentials = models.ManyToManyField(
-        "Credential", related_name="event_streams", default=None
+        help_text="Name of the kubernetes service",
     )
 
     class Meta:
@@ -97,3 +103,8 @@ class EventStream(StatusHandlerModelMixin, models.Model):
 
     def __str__(self) -> str:
         return f"EventStream {self.name} ({self.id})"
+
+    # Implementation of the ContainerableMixin.
+    def _get_skip_audit_events(self) -> bool:
+        """Event stream skips audit events."""
+        return True

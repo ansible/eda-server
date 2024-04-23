@@ -14,19 +14,32 @@
 
 from django.db import models
 
-from aap_eda.core.enums import ActivationStatus, RestartPolicy
+from aap_eda.core.enums import (
+    ActivationStatus,
+    RestartPolicy,
+    RulebookProcessLogLevel,
+)
+from aap_eda.core.utils import get_default_log_level
+from aap_eda.services.activation.engine.common import ContainerableMixin
 
+from .base_org import BaseOrgModel
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, models.Model):
+class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
         ordering = ("-created_at",)
+        permissions = [
+            ("enable_activation", "Can enable an activation"),
+            ("disable_activation", "Can disable an activation"),
+            ("restart_activation", "Can restart an activation"),
+        ]
+        default_permissions = ["add", "view", "delete"]
 
     name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
@@ -87,17 +100,27 @@ class Activation(StatusHandlerModelMixin, models.Model):
         null=True,
         default=None,
     )
-    credentials = models.ManyToManyField(
-        "Credential", related_name="activations", default=None
-    )
-    system_vault_credential = models.OneToOneField(
-        "Credential",
-        null=True,
-        default=None,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
     event_streams = models.ManyToManyField(
         "EventStream",
         default=None,
+    )
+    log_level = models.CharField(
+        max_length=20,
+        choices=RulebookProcessLogLevel.choices(),
+        default=get_default_log_level,
+    )
+    eda_credentials = models.ManyToManyField(
+        "EdaCredential", related_name="activations", default=None
+    )
+    eda_system_vault_credential = models.OneToOneField(
+        "EdaCredential",
+        null=True,
+        default=None,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    k8s_service_name = models.TextField(
+        null=True,
+        default=None,
+        help_text="Name of the kubernetes service",
     )

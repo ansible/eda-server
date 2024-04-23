@@ -26,6 +26,10 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action, ProcessParentType, ResourceType
 from tests.integration.constants import api_url_v1
 
+pytestmark = pytest.mark.skip(
+    reason="EventStream views are currently hidden, thus no need to run tests"
+)
+
 BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_TYPE = """
 ---
 - name: PG Notify Template Event Stream
@@ -180,16 +184,6 @@ def test_retrieve_event_stream(
     default_user: models.User,
 ):
     args = {"limit": 5, "delay": 1}
-    credentials = models.Credential.objects.bulk_create(
-        [
-            models.Credential(
-                name="credential1", username="me", secret="sec1"
-            ),
-            models.Credential(
-                name="credential2", username="me", secret="sec2"
-            ),
-        ]
-    )
     event_stream = models.EventStream.objects.create(
         name="test-event_stream-1",
         source_type="ansible.eda.range",
@@ -197,8 +191,6 @@ def test_retrieve_event_stream(
         user=default_user,
         decision_environment_id=default_de.id,
     )
-    for credential in credentials:
-        event_stream.credentials.add(credential.id)
 
     response = client.get(f"{api_url_v1}/event-streams/{event_stream.id}/")
     assert response.status_code == status.HTTP_200_OK
@@ -206,9 +198,6 @@ def test_retrieve_event_stream(
     assert response.data["source_type"] == event_stream.source_type
     assert yaml.safe_load(response.data["source_args"]) == args
     assert response.data["user"] == "luke.skywalker"
-    assert len(response.data["credentials"]) == 2
-    assert response.data["credentials"][0]["name"] == credentials[0].name
-    assert response.data["credentials"][1]["name"] == credentials[1].name
 
     check_permission_mock.assert_called_once_with(
         mock.ANY, mock.ANY, ResourceType.EVENT_STREAM, Action.READ
@@ -249,6 +238,43 @@ def test_create_event_stream(
 
 
 @pytest.mark.django_db
+def test_create_event_stream_with_different_default_channel_names(
+    client: APIClient,
+    default_de: models.DecisionEnvironment,
+):
+    models.Rulebook.objects.create(
+        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
+        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    )
+
+    args = {"limit": 5, "delay": 1}
+    source_type = "ansible.eda.range"
+    data_in_1 = {
+        "name": "test_event_stream",
+        "source_type": f"{source_type}",
+        "source_args": f"{args}",
+        "decision_environment_id": default_de.id,
+    }
+    response = client.post(f"{api_url_v1}/event-streams/", data=data_in_1)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    data_in_2 = {
+        "name": "test_event_stream_2",
+        "source_type": f"{source_type}",
+        "source_args": f"{args}",
+        "decision_environment_id": default_de.id,
+    }
+    response = client.post(f"{api_url_v1}/event-streams/", data=data_in_2)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert models.EventStream.objects.count() == 2
+    assert (
+        models.EventStream.objects.first().channel_name
+        != models.EventStream.objects.last().channel_name
+    )
+
+
+@pytest.mark.django_db
 def test_create_event_stream_with_credential(
     client: APIClient,
     default_de: models.DecisionEnvironment,
@@ -257,9 +283,6 @@ def test_create_event_stream_with_credential(
         name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
         rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
     )
-    credential = models.Credential.objects.create(
-        name="credential", username="me", secret="sec"
-    )
 
     args = {"limit": 5, "delay": 1}
     data_in = {
@@ -267,14 +290,12 @@ def test_create_event_stream_with_credential(
         "source_type": "ansible.eda.range",
         "source_args": f"{args}",
         "decision_environment_id": default_de.id,
-        "credentials": [credential.id],
     }
     response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     result = response.data
     assert result["name"] == "test_event_stream"
     assert result["source_type"] == "ansible.eda.range"
-    assert result["credentials"][0]["name"] == credential.name
     assert yaml.safe_load(response.data["source_args"]) == args
 
 
@@ -356,7 +377,7 @@ def test_create_event_stream_bad_args(
     result = response.data
     assert (
         str(result["source_args"][0])
-        == "The 'source_args' field must be a YAML object (dictionary)"
+        == "The input field must be a YAML object (dictionary)"
     )
 
 

@@ -22,7 +22,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
@@ -64,6 +64,7 @@ def init_data():
     )
     activation = models.Activation.objects.create(
         name="activation",
+        k8s_service_name="test_k8s_service",
         user=user,
     )
     activation_instance = models.RulebookProcess.objects.create(
@@ -95,14 +96,15 @@ def get_request(data: InitData):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
-        activation_instance_id=data.activation_instance.id,
-        activation_id=data.activation.id,
+        rulebook_process_id=data.activation_instance.id,
+        process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         credential=Credential(username="admin", secret="secret"),
         ports=[("localhost", 8080)],
         mem_limit="8G",
         env_vars={"a": 1},
         extra_args={"b": 2},
+        k8s_service_name=data.activation.k8s_service_name,
     )
 
 
@@ -267,23 +269,49 @@ def kubernetes_engine(init_data):
     with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
         engine = Engine(
             activation_id=str(activation_id),
+            resource_prefix=ProcessParentType.ACTIVATION,
             client=mock.Mock(),
         )
 
         yield engine
 
 
-@pytest.mark.django_db
-def test_engine_init(init_data):
+@pytest.fixture
+def kubernetes_event_stream_engine(init_data):
     activation_id = init_data.activation.id
     with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
         engine = Engine(
             activation_id=str(activation_id),
+            resource_prefix=ProcessParentType.EVENT_STREAM,
             client=mock.Mock(),
         )
 
-        assert engine.namespace == "aap-eda"
-        assert engine.secret_name == f"activation-secret-{activation_id}"
+        yield engine
+
+
+@pytest.mark.parametrize(
+    "resource_prefixes",
+    [
+        {ProcessParentType.ACTIVATION: "activation"},
+        {ProcessParentType.EVENT_STREAM: "event-stream"},
+    ],
+)
+@pytest.mark.django_db
+def test_engine_init(init_data, resource_prefixes):
+    activation_id = init_data.activation.id
+    with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
+        for prefix in resource_prefixes:
+            engine = Engine(
+                activation_id=str(activation_id),
+                resource_prefix=prefix,
+                client=mock.Mock(),
+            )
+
+            assert engine.namespace == "aap-eda"
+            assert (
+                engine.secret_name
+                == f"{resource_prefixes[prefix]}-secret-{activation_id}"
+            )
 
 
 @pytest.mark.django_db
@@ -298,6 +326,7 @@ def test_engine_init_with_exception(init_data):
     ):
         Engine(
             activation_id=str(activation_id),
+            resource_prefix=ProcessParentType.ACTIVATION,
             client=mock.Mock(),
         )
 
@@ -331,7 +360,9 @@ def test_engine_start(init_data, kubernetes_engine):
     log_handler = DBLogger(init_data.activation_instance.id)
 
     with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
-        engine.start(request, log_handler)
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            engine.start(request, log_handler)
 
     assert engine.job_name == (
         f"activation-job-{init_data.activation.id}-"
@@ -339,6 +370,32 @@ def test_engine_start(init_data, kubernetes_engine):
     )
     assert engine.pod_name == (
         f"activation-pod-{init_data.activation.id}-"
+        f"{init_data.activation_instance.id}"
+    )
+
+    assert models.RulebookProcessLog.objects.count() == 5
+    assert models.RulebookProcessLog.objects.last().log.endswith(
+        f"Job {engine.job_name} is running"
+    )
+
+
+@pytest.mark.django_db
+def test_event_stream_engine_start(init_data, kubernetes_event_stream_engine):
+    engine = kubernetes_event_stream_engine
+    request = get_request(init_data)
+    log_handler = DBLogger(init_data.activation_instance.id)
+
+    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            engine.start(request, log_handler)
+
+    assert engine.job_name == (
+        f"event-stream-job-{init_data.activation.id}-"
+        f"{init_data.activation_instance.id}"
+    )
+    assert engine.pod_name == (
+        f"event-stream-pod-{init_data.activation.id}-"
         f"{init_data.activation_instance.id}"
     )
 
@@ -371,24 +428,26 @@ def test_engine_start_with_pod_status(init_data, kubernetes_engine):
     request = get_request(init_data)
     log_handler = DBLogger(init_data.activation_instance.id)
 
-    with mock.patch(
-        "aap_eda.services.activation.engine.kubernetes.watch"
-    ) as watch_mock:
-        watcher = mock.Mock()
-        watch_mock.Watch.return_value = watcher
-        for phase in ["Pending", "Running", "Succeeded"]:
-            watcher.stream.return_value = get_stream_event(phase)
-            engine.start(request, log_handler)
-
-            assert models.RulebookProcessLog.objects.last().log.endswith(
-                f"Job {engine.job_name} is running"
-            )
-
-        watcher.stream.return_value = get_stream_event("Unknown")
-        with pytest.raises(ContainerStartError):
-            with mock.patch.object(engine, "cleanup") as cleanup_mock:
+    with mock.patch.object(engine.client, "core_api") as core_api_mock:
+        core_api_mock.list_namespaced_service.return_value.items = None
+        with mock.patch(
+            "aap_eda.services.activation.engine.kubernetes.watch"
+        ) as watch_mock:
+            watcher = mock.Mock()
+            watch_mock.Watch.return_value = watcher
+            for phase in ["Pending", "Running", "Succeeded"]:
+                watcher.stream.return_value = get_stream_event(phase)
                 engine.start(request, log_handler)
-                cleanup_mock.assert_called_once()
+
+                assert models.RulebookProcessLog.objects.last().log.endswith(
+                    f"Job {engine.job_name} is running"
+                )
+
+            watcher.stream.return_value = get_stream_event("Unknown")
+            with pytest.raises(ContainerStartError):
+                with mock.patch.object(engine, "cleanup") as cleanup_mock:
+                    engine.start(request, log_handler)
+                    cleanup_mock.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -704,10 +763,11 @@ def test_get_job_pod(init_data, kubernetes_engine):
 def test_create_service(init_data, kubernetes_engine):
     engine = kubernetes_engine
     engine.job_name = "eda-job"
+    request = get_request(init_data)
 
     with mock.patch.object(engine.client, "core_api") as core_api_mock:
         core_api_mock.list_namespaced_service.return_value.items = None
-        engine._create_service(8000)
+        engine._create_service(request)
 
         core_api_mock.create_namespaced_service.assert_called_once()
 
@@ -718,7 +778,7 @@ def test_create_service(init_data, kubernetes_engine):
         core_api_mock.list_namespaced_service.side_effect = raise_api_error
 
         with pytest.raises(ContainerStartError):
-            engine._create_service(8000)
+            engine._create_service(request)
 
 
 @pytest.mark.django_db

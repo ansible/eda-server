@@ -35,18 +35,6 @@ class RulebookFilter(django_filters.FilterSet):
         fields = ["name", "project_id"]
 
 
-class RulesetFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="istartswith",
-        label="Filter by ruleset name.",
-    )
-
-    class Meta:
-        model = models.Ruleset
-        fields = ["name"]
-
-
 class AuditRuleFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",

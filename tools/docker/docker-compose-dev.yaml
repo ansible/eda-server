@@ -1,52 +1,75 @@
-x-environment:
-  &common-env
-  - EDA_DB_HOST=postgres
-  - EDA_MQ_HOST=redis
-  - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
-  - EDA_ALLOWED_HOSTS=['*']
-  - EDA_DEPLOYMENT_TYPE=${EDA_DEPLOYMENT_TYPE:-podman}
-  - EDA_WEBSOCKET_BASE_URL=${EDA_WEBSOCKET_BASE_URL:-ws://eda-ws:8000}
-  - EDA_WEBSOCKET_SSL_VERIFY=no
-  - EDA_PODMAN_SOCKET_URL=tcp://podman:8888
-  - EDA_CONTROLLER_URL=${EDA_CONTROLLER_URL:-https://awx-example.com}
-  - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
-  - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
-  - EDA_PROTOCOL=http
-  - EDA_HOST=${EDA_HOST:-eda-api:8000}
-  - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
-  - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
-  - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
-  - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
-  - EDA_MAX_RUNNING_ACTIVATIONS=${EDA_MAX_RUNNING_ACTIVATIONS:-5}
-  - EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE=${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-60}
-  - EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE=${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-60}
-  - EDA_SECRET_KEY=${EDA_SECRET_KEY:-'insecure'}
-  - EDA_DEBUG=${EDA_DEBUG:-'True'}
-  - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
+x-environment: &common-env
+  EDA_DB_HOST: postgres
+  EDA_MQ_HOST: redis
+  DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
+  EDA_ALLOWED_HOSTS: '*'
+  EDA_DEPLOYMENT_TYPE: ${EDA_DEPLOYMENT_TYPE:-podman}
+  EDA_WEBSOCKET_BASE_URL: ${EDA_WEBSOCKET_BASE_URL:-ws://eda-ws:8000}
+  EDA_WEBSOCKET_SSL_VERIFY: "no"
+  EDA_PODMAN_SOCKET_URL: tcp://podman:8888
+  EDA_CONTROLLER_URL: ${EDA_CONTROLLER_URL:-https://awx-example.com}
+  EDA_CONTROLLER_TOKEN: ${EDA_CONTROLLER_TOKEN:-some-secret-token}
+  EDA_CONTROLLER_SSL_VERIFY: ${EDA_CONTROLLER_SSL_VERIFY:-no}
+  EDA_PROTOCOL: http
+  EDA_HOST: ${EDA_HOST:-eda-api:8000}
+  EDA_SERVER: http://${EDA_HOST:-eda-api:8000}
+  EDA_ANSIBLE_RULEBOOK_LOG_LEVEL: ${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
+  EDA_CONTAINER_NAME_PREFIX: ${EDA_CONTAINER_NAME_PREFIX:-eda}
+  EDA_PODMAN_ENV_VARS: ${EDA_PODMAN_ENV_VARS:-'@none None'}
+  EDA_MAX_RUNNING_ACTIVATIONS: ${EDA_MAX_RUNNING_ACTIVATIONS:-5}
+  EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE: ${EDA_ACTIVATION_RESTART_SECONDS_ON_COMPLETE:-5}
+  EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE: ${EDA_ACTIVATION_RESTART_SECONDS_ON_FAILURE:-5}
+  EDA_SECRET_KEY: ${EDA_SECRET_KEY:-'insecure'}
+  EDA_DEBUG: ${EDA_DEBUG:-True}
+  EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:-'secret'}
+  EDA_RULEBOOK_WORKER_QUEUES: "activation-node1,activation-node2"
+  EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT: ${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
+  EDA_ANSIBLE_BASE_JWT_KEY: ${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
 
 services:
-  podman-pre-setup:
+  podman-pre-setup-node1:
     user: "0"
     image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       chown -R podman /home/podman/.local/share/containers/storage
     volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
+      - 'podman_data_node1:/home/podman/.local/share/containers/storage'
 
-  podman:
+  podman-pre-setup-node2:
+    user: "0"
+    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    privileged: true
+    command: >-
+      chown -R podman /home/podman/.local/share/containers/storage
+    volumes:
+      - 'podman_data_node2:/home/podman/.local/share/containers/storage'
+
+  podman-node1:
     user: "1000"
     image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
-      - "${EDA_PODMAN_PORT:-8888}:8888"
+      - "${EDA_PODMAN_NODE1_PORT:-8888}:8888"
     volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
+      - 'podman_data_node1:/home/podman/.local/share/containers/storage'
     depends_on:
-     - podman-pre-setup
+     - podman-pre-setup-node1
 
+  podman-node2:
+    user: "1000"
+    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    privileged: true
+    command: >-
+      podman system service --time=0 tcp://0.0.0.0:8888
+    ports:
+      - "${EDA_PODMAN_NODE2_PORT:-8889}:8888"
+    volumes:
+      - 'podman_data_node2:/home/podman/.local/share/containers/storage'
+    depends_on:
+     - podman-pre-setup-node2
 
   eda-ui:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
@@ -85,6 +108,9 @@ services:
       retries: 10
     volumes:
       - '../../:/app/src:z'
+    networks:
+      - service-mesh
+      - default
 
   eda-ws:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
@@ -102,9 +128,10 @@ services:
     volumes:
       - '../../:/app/src:z'
 
-
   eda-scheduler:
     image: "${EDA_IMAGE:-localhost/aap-eda}"
+    deploy:
+      replicas: ${EDA_SCHEDULER_WORKERS:-2}
     environment: *common-env
     command:
       - /bin/bash
@@ -121,7 +148,7 @@ services:
 
   eda-default-worker:
     deploy:
-      replicas: ${EDA_DEFAULT_WORKERS:-1}
+      replicas: ${EDA_DEFAULT_WORKERS:-2}
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
     command:
@@ -140,16 +167,19 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  eda-activation-worker:
+  eda-activation-worker-node1:
     deploy:
       replicas: ${EDA_ACTIVATION_WORKERS:-2}
     image: "${EDA_IMAGE:-localhost/aap-eda}"
+    environment:
+      <<: *common-env
+      EDA_RULEBOOK_QUEUE_NAME: 'activation-node1'
+      EDA_PODMAN_SOCKET_URL: tcp://podman-node1:8888
     command:
       - aap-eda-manage
       - rqworker
       - --worker-class
       - aap_eda.core.tasking.ActivationWorker
-    environment: *common-env
     depends_on:
       eda-api:
         condition: service_healthy
@@ -161,8 +191,33 @@ services:
       - '../../:/app/src:z'
     restart: always
 
+  eda-activation-worker-node2:
+    deploy:
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    environment:
+      <<: *common-env
+      EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
+      EDA_PODMAN_SOCKET_URL: tcp://podman-node2:8888
+    command:
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.ActivationWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
+
   postgres:
-    image: 'quay.io/sclorg/postgresql-13-c9s:latest'
+    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
@@ -180,7 +235,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'quay.io/sclorg/redis-6-c9s:latest'
+    image: 'quay.io/fedora/redis-6:latest'
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
@@ -192,4 +247,9 @@ services:
 
 volumes:
   postgres_data: {}
-  podman_data: {}
+  podman_data_node1: {}
+  podman_data_node2: {}
+
+networks:
+  service-mesh:
+    name: service-mesh

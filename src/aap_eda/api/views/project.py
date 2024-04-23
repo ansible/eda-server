@@ -11,8 +11,10 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from django.db import IntegrityError, transaction
-from django.shortcuts import get_object_or_404
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -25,10 +27,14 @@ from rest_framework.response import Response
 
 from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api.serializers.project import (
+    ENCRYPTED_STRING,
+    get_proxy_for_display,
+)
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
+from aap_eda.core.enums import Action
 
-from .mixins import ResponseSerializerMixin
+from .mixins import CreateModelMixin, ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -62,14 +68,25 @@ from .mixins import ResponseSerializerMixin
     ),
 )
 class ExtraVarViewSet(
-    mixins.CreateModelMixin,
+    CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.ExtraVar.objects.order_by("id")
     serializer_class = serializers.ExtraVarSerializer
     http_method_names = ["get", "post"]
 
-    rbac_resource_type = ResourceType.EXTRA_VAR
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.ExtraVarCreateSerializer
+        return super().get_serializer_class()
+
+    def get_response_serializer_class(self):
+        return serializers.ExtraVarSerializer
 
 
 @extend_schema_view(
@@ -107,6 +124,11 @@ class ProjectViewSet(
 
     rbac_action = None
 
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
+
     @extend_schema(
         description="Import a project.",
         request=serializers.ProjectCreateRequestSerializer,
@@ -122,7 +144,17 @@ class ProjectViewSet(
             data=request.data
         )
         serializer.is_valid(raise_exception=True)
-        project = serializer.save()
+        with transaction.atomic():
+            project = serializer.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(serializer.instance),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, serializer.instance
+            )
 
         job = tasks.import_project.delay(project_id=project.id)
 
@@ -148,9 +180,23 @@ class ProjectViewSet(
     )
     def retrieve(self, request, pk):
         project = super().retrieve(request, pk)
-        project.data["credential"] = (
-            models.Credential.objects.get(pk=project.data["credential_id"])
-            if project.data["credential_id"]
+        project.data["eda_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["eda_credential_id"]
+            )
+            if project.data["eda_credential_id"]
+            else None
+        )
+        project.data["signature_validation_credential"] = (
+            models.EdaCredential.objects.get(
+                pk=project.data["signature_validation_credential_id"]
+            )
+            if project.data["signature_validation_credential_id"]
+            else None
+        )
+        project.data["organization"] = (
+            models.Organization.objects.get(pk=project.data["organization_id"])
+            if project.data["organization_id"]
             else None
         )
 
@@ -175,40 +221,42 @@ class ProjectViewSet(
         },
     )
     def partial_update(self, request, pk):
-        project = get_object_or_404(models.Project, pk=pk)
+        project = self.get_object()
+        if "proxy" in request.data:
+            new_proxy = request.data["proxy"]
+            if ENCRYPTED_STRING in new_proxy:
+                unchanged = (
+                    project.proxy
+                    and get_proxy_for_display(project.proxy.get_secret_value())
+                    == new_proxy
+                )
+                if unchanged:
+                    request.data.pop("proxy")
+                else:
+                    error = (
+                        "The password in the proxy field should be unencrypted"
+                    )
+                    return Response(
+                        {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+                    )
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        credential_id = request.data.get("credential_id")
 
-        # Validate credential_id if has meaningful value
-        if credential_id is not None and int(credential_id) > 0:
-            credential = models.Credential.objects.filter(
-                id=credential_id
-            ).first()
-            if not credential:
-                return Response(
-                    {"errors": f"Credential [{credential_id}] not found"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        else:
-            credential_id = None  # for credential = 0
+        update_fields = []
+        for key, value in serializer.validated_data.items():
+            setattr(project, key, value)
+            update_fields.append(key)
 
-        try:
-            project.credential_id = credential_id
-            project.name = request.data.get("name", project.name)
-            project.description = request.data.get(
-                "description", project.description
-            )
-            project.verify_ssl = request.data.get(
-                "verify_ssl", project.verify_ssl
-            )
-            project.save()
-        except IntegrityError as e:
-            return Response(
-                {"errors": str(e)},
-                status=status.HTTP_409_CONFLICT,
+        old_data = model_to_dict(project)
+        with transaction.atomic():
+            project.save(update_fields=update_fields)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(project),
             )
 
         return Response(serializers.ProjectSerializer(project).data)
@@ -226,7 +274,7 @@ class ProjectViewSet(
     @transaction.atomic
     def sync(self, request, pk):
         try:
-            project = models.Project.objects.select_for_update().get(pk=pk)
+            project = self.get_queryset().select_for_update().get(pk=pk)
         except models.Project.DoesNotExist:
             raise api_exc.NotFound
 
