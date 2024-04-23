@@ -63,13 +63,26 @@ def test_project_credential_access(
     credential = cls_factory.create(models.EdaCredential)
     assert project.eda_credential_id != credential.pk  # sanity
 
+    # User can not view provided credential
     response = user_api_client.patch(
         url, data={"eda_credential_id": credential.pk}
     )
     assert response.status_code == 400, response.data
+    assert "not found" in str(response.data), response.data
     project.refresh_from_db()
     assert project.eda_credential_id != credential.pk
 
+    # User can view related credential, but does not have permission to use
+    give_obj_perm(user, credential, "view")
+    response = user_api_client.patch(
+        url, data={"eda_credential_id": credential.pk}
+    )
+    assert response.status_code == 403, response.data
+    assert "eda_credential" in str(response.data), response.data
+    project.refresh_from_db()
+    assert project.eda_credential_id != credential.pk
+
+    # User has permission to change the related credential
     give_obj_perm(user, credential, "change")
     response = user_api_client.patch(
         url, data={"eda_credential_id": credential.pk}
