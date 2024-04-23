@@ -45,6 +45,25 @@ def test_create_decision_environment(
 
 
 @pytest.mark.django_db
+def test_create_decision_environment_bad_ids(client: APIClient):
+    bad_ids = [
+        {"organization_id": 3000001},
+        {"eda_credential_id": 3000001},
+    ]
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "registry.com/img1:tag1",
+    }
+    for bad_id in bad_ids:
+        response = client.post(
+            f"{api_url_v1}/decision-environments/", data=data_in | bad_id
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id 3000001 does not exist" in str(response.json())
+
+
+@pytest.mark.django_db
 def test_retrieve_decision_environment(
     default_de: models.DecisionEnvironment, client: APIClient
 ):
@@ -80,6 +99,23 @@ def test_partial_update_decision_environment(
     assert_de_fk_data(response.data, default_de)
 
     assert default_de.eda_credential == default_vault_credential
+
+
+@pytest.mark.django_db
+def test_partial_update_decision_environment_bad_ids(
+    default_de: models.DecisionEnvironment,
+    client: APIClient,
+):
+    bad_ids = [
+        {"organization_id": 3000001},
+        {"eda_credential_id": 3000001},
+    ]
+    for bad_id in bad_ids:
+        response = client.patch(
+            f"{api_url_v1}/decision-environments/{default_de.id}/", data=bad_id
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id 3000001 does not exist" in str(response.json())
 
 
 @pytest.mark.django_db

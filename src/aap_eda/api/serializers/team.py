@@ -14,7 +14,7 @@
 from rest_framework import serializers
 
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models
+from aap_eda.core import models, validators
 
 from .fields.ansible_resource import AnsibleResourceFieldSerializer
 
@@ -38,7 +38,11 @@ class TeamSerializer(serializers.ModelSerializer):
 
 
 class TeamCreateSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField()
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
 
     class Meta:
         model = models.Team
