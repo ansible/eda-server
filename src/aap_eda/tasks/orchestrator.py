@@ -171,7 +171,7 @@ def dispatch(
             f"{process_parent_id} as new process.",
         )
 
-        queue_name = get_most_free_queue_name()
+        queue_name = get_least_busy_queue_name()
     else:
         queue_name = get_queue_name_by_parent_id(
             process_parent_type,
@@ -188,7 +188,7 @@ def dispatch(
                 f"Rescheduling {process_parent_type} {process_parent_id}"
                 f" to the most free queue.",
             )
-            queue_name = get_most_free_queue_name()
+            queue_name = get_least_busy_queue_name()
 
         elif (
             request_type == ActivationRequest.RESTART
@@ -199,7 +199,7 @@ def dispatch(
                 f"Restarting {process_parent_type} {process_parent_id}"
                 " to the most free queue.",
             )
-            queue_name = get_most_free_queue_name()
+            queue_name = get_least_busy_queue_name()
 
         elif not check_rulebook_queue_health(queue_name):
             msg = (
@@ -232,7 +232,7 @@ def dispatch(
     )
 
 
-def get_most_free_queue_name() -> str:
+def get_least_busy_queue_name() -> str:
     """Return the queue name with the least running processes."""
     if len(settings.RULEBOOK_WORKER_QUEUES) == 1:
         return settings.RULEBOOK_WORKER_QUEUES[0]
