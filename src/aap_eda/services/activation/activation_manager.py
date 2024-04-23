@@ -17,22 +17,17 @@ import contextlib
 import logging
 import typing as tp
 from datetime import timedelta
-from functools import wraps
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from pydantic import ValidationError
+from rq import get_current_job
 
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
-from aap_eda.core.enums import (
-    ActivationStatus,
-    ProcessParentType,
-    RestartPolicy,
-)
+from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerRequest
@@ -43,39 +38,12 @@ from aap_eda.services.activation.restart_helper import (
 from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
+from .status_manager import StatusManager, run_with_lock
 
 LOGGER = logging.getLogger(__name__)
 
 
-class HasDbInstance(tp.Protocol):
-    db_instance: tp.Any
-
-
-def run_with_lock(func: tp.Callable) -> tp.Callable:
-    """Run a method with a lock on the database instance."""
-
-    @wraps(func)
-    def _run_with_lock(self: HasDbInstance, *args, **kwargs):
-        with transaction.atomic():
-            locked_instance = (
-                type(self.db_instance)
-                .objects.select_for_update()
-                .get(pk=self.db_instance.pk)
-            )
-
-            original_instance = self.db_instance
-            self.db_instance = locked_instance
-
-            try:
-                return func(self, *args, **kwargs)
-            finally:
-                self.db_instance = original_instance
-                self.db_instance.refresh_from_db()
-
-    return _run_with_lock
-
-
-class ActivationManager:
+class ActivationManager(StatusManager):
     """Activation Manager manages the lifecycle of an activation.
 
     The Activation Manager is responsible for starting, stopping, restarting
@@ -98,11 +66,7 @@ class ActivationManager:
             db_instance: The database instance of the activation.
             container_engine: The container engine to use.
         """
-        self.db_instance = db_instance
-        if isinstance(db_instance, models.Activation):
-            self.db_instance_type = ProcessParentType.ACTIVATION
-        else:
-            self.db_instance_type = ProcessParentType.EVENT_STREAM
+        super().__init__(db_instance)
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -112,28 +76,11 @@ class ActivationManager:
 
         self.container_logger_class = container_logger_class
 
-    @property
-    def latest_instance(self) -> tp.Optional[models.RulebookProcess]:
-        """Return the latest instance of the activation."""
-        return self.db_instance.latest_instance
-
     def _set_activation_pod_id(self, pod_id: tp.Optional[str]) -> None:
         """Set the pod id of the activation instance."""
         # TODO: implement db locking?
         self.latest_instance.activation_pod_id = pod_id
         self.latest_instance.save(update_fields=["activation_pod_id"])
-
-    def _set_latest_instance_status(
-        self,
-        status: ActivationStatus,
-        status_message: tp.Optional[str] = None,
-    ):
-        """Set the status of the activation instance from the manager."""
-        # TODO: implement db locking?
-        kwargs = {"status": status}
-        if status_message:
-            kwargs["status_message"] = status_message
-        self.latest_instance.update_status(**kwargs)
 
     @run_with_lock
     def _increase_failure_count(self):
@@ -152,18 +99,6 @@ class ActivationManager:
         """Increase the restart count of the activation."""
         self.db_instance.restart_count += 1
         self.db_instance.save(update_fields=["restart_count", "modified_at"])
-
-    @run_with_lock
-    def _set_activation_status(
-        self,
-        status: ActivationStatus,
-        status_message: tp.Optional[str] = None,
-    ) -> None:
-        """Set the status from the manager."""
-        kwargs = {"status": status}
-        if status_message:
-            kwargs["status_message"] = status_message
-        self.db_instance.update_status(**kwargs)
 
     @run_with_lock
     def _check_start_prerequirements(self) -> None:
@@ -198,7 +133,7 @@ class ActivationManager:
                 f"Reason: {error}"
             )
             LOGGER.error(msg)
-            self._set_activation_status(ActivationStatus.ERROR, msg)
+            self.set_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationStartError(msg)
 
     def _check_latest_instance(self) -> None:
@@ -237,7 +172,7 @@ class ActivationManager:
                 )
                 LOGGER.warning(msg)
                 self._cleanup()
-                self._set_latest_instance_status(ActivationStatus.STOPPED)
+                self.set_latest_instance_status(ActivationStatus.STOPPED)
                 self._set_activation_pod_id(pod_id=None)
 
     def _start_activation_instance(self):
@@ -246,7 +181,7 @@ class ActivationManager:
         Update the status of the activation, latest instance, logs,
         counters and pod id.
         """
-        self._set_activation_status(ActivationStatus.STARTING)
+        self.set_status(ActivationStatus.STARTING)
 
         # Ensure status of previous instances
         # For consistency, we should not have previous instances in
@@ -311,8 +246,8 @@ class ActivationManager:
             raise exceptions.ActivationStartError(msg) from exc
 
         # update status
-        self._set_activation_status(ActivationStatus.RUNNING)
-        self._set_latest_instance_status(ActivationStatus.RUNNING)
+        self.set_status(ActivationStatus.RUNNING)
+        self.set_latest_instance_status(ActivationStatus.RUNNING)
         self._set_activation_pod_id(pod_id=container_id)
         self._reset_failure_count()
 
@@ -445,7 +380,7 @@ class ActivationManager:
             )
             container_logger.write(user_msg, flush=True)
             self._fail_instance(user_msg)
-            self._set_activation_status(
+            self.set_status(
                 ActivationStatus.FAILED,
                 user_msg,
             )
@@ -463,7 +398,7 @@ class ActivationManager:
             )
             container_logger.write(user_msg, flush=True)
             self._fail_instance(msg=user_msg)
-            self._set_activation_status(
+            self.set_status(
                 ActivationStatus.FAILED,
                 user_msg,
             )
@@ -487,7 +422,7 @@ class ActivationManager:
             )
             LOGGER.error(msg)
             # Alex: Not sure if we want to change the status here.
-            self._set_activation_status(ActivationStatus.ERROR, msg)
+            self.set_status(ActivationStatus.ERROR, msg)
             raise exceptions.ActivationMonitorError(msg) from exc
 
         if self.db_instance.restart_policy == RestartPolicy.NEVER:
@@ -498,7 +433,7 @@ class ActivationManager:
                 self.db_instance_type, self.db_instance.id, delay_seconds=1
             )
 
-        self._set_activation_status(
+        self.set_status(
             ActivationStatus.FAILED,
             msg,
         )
@@ -529,11 +464,11 @@ class ActivationManager:
             if container_msg:
                 user_msg = f"{container_msg} {user_msg}"
             container_logger.write(user_msg, flush=True)
-            self._set_latest_instance_status(
+            self.set_latest_instance_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-            self._set_activation_status(
+            self.set_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
@@ -554,11 +489,11 @@ class ActivationManager:
             )
             if container_msg:
                 user_msg = f"{container_msg} {user_msg}"
-            self._set_latest_instance_status(
+            self.set_latest_instance_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
-            self._set_activation_status(
+            self.set_status(
                 ActivationStatus.COMPLETED,
                 user_msg,
             )
@@ -583,7 +518,7 @@ class ActivationManager:
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
-                self._set_activation_status(
+                self.set_status(
                     ActivationStatus.FAILED,
                     user_msg,
                 )
@@ -595,7 +530,7 @@ class ActivationManager:
                 LOGGER.error(msg)
                 # Alex: Not sure if we want to change the status here.
                 self._error_instance(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
+                self.set_status(ActivationStatus.ERROR, msg)
                 raise exceptions.ActivationMonitorError(msg) from exc
 
         # No restart if it has reached the maximum number of restarts
@@ -618,7 +553,7 @@ class ActivationManager:
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
-                self._set_activation_status(
+                self.set_status(
                     ActivationStatus.FAILED,
                     user_msg,
                 )
@@ -630,7 +565,7 @@ class ActivationManager:
                 LOGGER.error(msg)
                 # Alex: Not sure if we want to change the status here.
                 self._error_instance(msg)
-                self._set_activation_status(ActivationStatus.ERROR, msg)
+                self.set_status(ActivationStatus.ERROR, msg)
                 raise exceptions.ActivationMonitorError(msg) from exc
         # Restart
         else:
@@ -650,7 +585,7 @@ class ActivationManager:
             container_logger.write(user_msg, flush=True)
             try:
                 self._fail_instance(user_msg)
-                self._set_activation_status(
+                self.set_status(
                     ActivationStatus.FAILED,
                     user_msg,
                 )
@@ -661,8 +596,8 @@ class ActivationManager:
                 )
                 LOGGER.error(msg)
                 # Alex: Not sure if we want to change the status here.
-                self._set_activation_status(ActivationStatus.ERROR, msg)
-                self._set_latest_instance_status(
+                self.set_status(ActivationStatus.ERROR, msg)
+                self.set_latest_instance_status(
                     ActivationStatus.ERROR,
                     msg,
                 )
@@ -685,7 +620,7 @@ class ActivationManager:
         if msg:
             kwargs["status_message"] = msg
         self._cleanup()
-        self._set_latest_instance_status(ActivationStatus.FAILED, **kwargs)
+        self.set_latest_instance_status(ActivationStatus.FAILED, **kwargs)
         self._set_activation_pod_id(pod_id=None)
         self._increase_failure_count()
 
@@ -695,19 +630,19 @@ class ActivationManager:
         if msg:
             kwargs["status_message"] = msg
         self._cleanup()
-        self._set_latest_instance_status(ActivationStatus.ERROR, **kwargs)
+        self.set_latest_instance_status(ActivationStatus.ERROR, **kwargs)
         self._set_activation_pod_id(pod_id=None)
 
     def _stop_instance(self):
         """Stop the latest activation instance."""
-        self._set_latest_instance_status(ActivationStatus.STOPPING)
+        self.set_latest_instance_status(ActivationStatus.STOPPING)
         self._cleanup()
-        self._set_latest_instance_status(ActivationStatus.STOPPED)
+        self.set_latest_instance_status(ActivationStatus.STOPPED)
         self._set_activation_pod_id(pod_id=None)
 
     def _error_activation(self, msg: str):
         LOGGER.error(msg)
-        self._set_activation_status(ActivationStatus.ERROR, msg)
+        self.set_status(ActivationStatus.ERROR, msg)
 
     def start(self, is_restart: bool = False):
         """Start an activation.
@@ -772,11 +707,11 @@ class ActivationManager:
                 f"Stop operation activation id: {self.db_instance.id} "
                 "No instance found.",
             )
-            self._set_activation_status(ActivationStatus.STOPPED)
+            self.set_status(ActivationStatus.STOPPED)
             return
 
         try:
-            self._set_activation_status(ActivationStatus.STOPPING)
+            self.set_status(ActivationStatus.STOPPING)
             self._stop_instance()
 
         except engine_exceptions.ContainerEngineError as exc:
@@ -788,7 +723,7 @@ class ActivationManager:
             self._error_activation(msg)
             raise exceptions.ActivationStopError(msg) from exc
         user_msg = "Stop requested by user."
-        self._set_activation_status(ActivationStatus.STOPPED, user_msg)
+        self.set_status(ActivationStatus.STOPPED, user_msg)
         container_logger = self.container_logger_class(self.latest_instance.id)
         container_logger.write(user_msg, flush=True)
         LOGGER.info(
@@ -811,7 +746,7 @@ class ActivationManager:
             "Activation restart scheduled for 1 second.",
         )
         user_msg = "Restart requested by user. "
-        self._set_activation_status(ActivationStatus.PENDING, user_msg)
+        self.set_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
         system_restart_activation(
             self.db_instance_type, self.db_instance.id, delay_seconds=1
@@ -905,7 +840,10 @@ class ActivationManager:
             self.stop()
             return
 
-        if self.db_instance.status != ActivationStatus.RUNNING:
+        if self.db_instance.status not in [
+            ActivationStatus.RUNNING,
+            ActivationStatus.WORKERS_OFFLINE,
+        ]:
             msg = (
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 "Activation is not running. "
@@ -960,7 +898,16 @@ class ActivationManager:
             self._unresponsive_policy()
             return
 
+        # last case is the success case
         if container_status.status == ActivationStatus.RUNNING:
+            if self.db_instance.status == ActivationStatus.WORKERS_OFFLINE:
+                LOGGER.info(
+                    f"Monitor operation: activation id: {self.db_instance.id} "
+                    "Activation is in WORKERS_OFFLINE state. "
+                    "Setting activation and instance status to running.",
+                )
+                self.set_status(ActivationStatus.RUNNING)
+                self.set_latest_instance_status(ActivationStatus.RUNNING)
             msg = (
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 "Container is running. "
@@ -1034,25 +981,17 @@ class ActivationManager:
             else ""
         )
 
-        if not self.check_new_process_allowed(
-            self.db_instance_type,
-            self.db_instance.id,
-        ):
-            msg = (
-                "Failed to create rulebook process. "
-                "Reason: Max running processes reached. "
-                "Waiting for a free slot."
-            )
-            self._set_activation_status(ActivationStatus.PENDING, msg)
+        if not self.check_new_process_allowed():
             raise exceptions.MaxRunningProcessesError
         args = {
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
+            "organization": self.db_instance.organization,
         }
         args[f"{self.db_instance_type}"] = self.db_instance
         try:
-            models.RulebookProcess.objects.create(**args)
+            rulebook_process = models.RulebookProcess.objects.create(**args)
         except IntegrityError as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to create "
@@ -1060,6 +999,15 @@ class ActivationManager:
             )
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
+        queue_name = self._get_queue_name()
+        models.RulebookProcessQueue.objects.create(
+            process=rulebook_process,
+            queue_name=queue_name,
+        )
+
+    def _get_queue_name(self) -> str:
+        this_job = get_current_job()
+        return this_job.origin
 
     def _get_container_request(self) -> ContainerRequest:
         try:
@@ -1072,20 +1020,23 @@ class ActivationManager:
             LOGGER.exception(msg)
             raise exceptions.ActivationManagerError(msg)
 
-    @staticmethod
-    def check_new_process_allowed(parent_type: str, parent_id: int) -> bool:
+    def check_new_process_allowed(self) -> bool:
         """Check if a new process is allowed."""
         if settings.MAX_RUNNING_ACTIVATIONS < 0:
             return True
 
-        num_running_processes = models.RulebookProcess.objects.filter(
+        queue_name = self._get_queue_name()
+        running_processes_count = models.RulebookProcess.objects.filter(
             status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
+            rulebookprocessqueue__queue_name=queue_name,
         ).count()
 
-        if num_running_processes >= settings.MAX_RUNNING_ACTIVATIONS:
-            LOGGER.info(
+        if running_processes_count >= settings.MAX_RUNNING_ACTIVATIONS:
+            msg = (
                 "No capacity to start a new rulebook process. "
-                f"{parent_type} {parent_id} is postponed",
+                f"{self.db_instance_type} {self.db_instance.id} is postponed"
             )
+            LOGGER.info(msg)
+            self.set_status(ActivationStatus.PENDING, msg)
             return False
         return True

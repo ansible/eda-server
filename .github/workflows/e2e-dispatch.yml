@@ -47,13 +47,13 @@ jobs:
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Run api in background
-        working-directory: tools/docker
+        working-directory: .
         env:
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
         run: |
-          docker-compose -p eda -f docker-compose-dev.yaml build
-          docker-compose -p eda -f docker-compose-dev.yaml up -d
+          docker compose -p eda -f tools/docker/docker-compose-dev.yaml build
+          docker compose -p eda -f tools/docker/docker-compose-dev.yaml up -d
           while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
             echo "Waiting for API to be ready..."
             sleep 1
@@ -82,6 +82,7 @@ jobs:
         env:
           EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
           EDAQA_ENV: authenticated
+          EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
             pytest -vv -k "${{ github.event.inputs.pytest_filter }}"
@@ -93,5 +94,5 @@ jobs:
         if: always()
         working-directory: tools/docker
         run: |
-          docker-compose -p eda -f docker-compose-dev.yaml logs
+          docker compose -p eda -f docker-compose-dev.yaml logs
 

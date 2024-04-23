@@ -17,8 +17,11 @@ from unittest.mock import patch
 import pytest
 
 from aap_eda.settings.default import (
+    DEFAULT_QUEUE_TIMEOUT,
+    DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
     ImproperlyConfigured,
     RulebookProcessLogLevel,
+    get_rq_queues,
     get_rulebook_process_log_level,
 )
 
@@ -47,3 +50,93 @@ def test_rulebook_log_level_invalid(mock_settings):
     mock_settings.get.return_value = "invalid"
     with pytest.raises(ImproperlyConfigured):
         get_rulebook_process_log_level()
+
+
+@patch("aap_eda.settings.default.REDIS_UNIX_SOCKET_PATH", "path/to/socket")
+@patch("aap_eda.settings.default.RULEBOOK_WORKER_QUEUES", ["activation-node1"])
+def test_rq_queues_with_unix_socket_path():
+    queues = get_rq_queues()
+    assert "default" in queues
+    assert queues["default"]["UNIX_SOCKET_PATH"] == "path/to/socket"
+    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
+    assert "activation-node1" in queues
+    assert queues["activation-node1"]["UNIX_SOCKET_PATH"] == "path/to/socket"
+    assert (
+        queues["activation-node1"]["DEFAULT_TIMEOUT"]
+        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+    )
+    assert "activation" not in queues
+
+
+def test_rq_queues_default_configuration(redis_parameters):
+    # Get the host and port from the test redis parameters in case the
+    # test is being run using an external redis.
+    # We explicitly check for None as the parameters may exist with a value of
+    # None.
+    host = redis_parameters.get("host")
+    if host is None:
+        host = "localhost"
+    port = redis_parameters.get("port")
+    if port is None:
+        port = 6379
+
+    queues = get_rq_queues()
+    assert queues["default"]["HOST"] == host
+    assert queues["default"]["PORT"] == port
+    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
+    assert queues["activation"]["HOST"] == host
+    assert queues["activation"]["PORT"] == port
+    assert (
+        queues["activation"]["DEFAULT_TIMEOUT"]
+        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+    )
+
+
+@patch("aap_eda.settings.default.REDIS_HOST", "custom-host")
+def test_rq_queues_custom_host():
+    queues = get_rq_queues()
+    assert queues["default"]["HOST"] == "custom-host"
+    assert queues["default"]["PORT"] == 6379
+    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
+    assert queues["activation"]["HOST"] == "custom-host"
+    assert queues["activation"]["PORT"] == 6379
+    assert (
+        queues["activation"]["DEFAULT_TIMEOUT"]
+        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+    )
+
+
+@patch(
+    "aap_eda.settings.default.RULEBOOK_WORKER_QUEUES",
+    ["activation-node1", "activation-node2"],
+)
+@patch("aap_eda.settings.default.REDIS_HOST", "custom-host")
+@patch("aap_eda.settings.default.REDIS_USER_PASSWORD", "password")
+@patch("aap_eda.settings.default.REDIS_CLIENT_CERT_PATH", "somepath")
+def test_rq_queues_custom_host_multiple_queues():
+    queues = get_rq_queues()
+    assert queues["default"]["HOST"] == "custom-host"
+    assert queues["default"]["PORT"] == 6379
+    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
+    assert queues["activation-node1"]["HOST"] == "custom-host"
+    assert queues["activation-node1"]["PORT"] == 6379
+    assert (
+        queues["activation-node1"]["DEFAULT_TIMEOUT"]
+        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+    )
+    assert queues["activation-node2"]["HOST"] == "custom-host"
+    assert queues["activation-node2"]["PORT"] == 6379
+    assert (
+        queues["activation-node2"]["DEFAULT_TIMEOUT"]
+        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+    )
+    assert queues["default"]["PASSWORD"] == "password"
+    assert (
+        queues["default"]["REDIS_CLIENT_KWARGS"]["ssl_certfile"] == "somepath"
+    )
+    assert queues["activation-node1"]["PASSWORD"] == "password"
+    assert (
+        queues["activation-node1"]["REDIS_CLIENT_KWARGS"]["ssl_certfile"]
+        == "somepath"
+    )
+    assert "activation" not in queues

@@ -14,6 +14,10 @@
 
 import logging
 
+from ansible_base.rbac.api.related import check_related_permissions
+from ansible_base.rbac.models import RoleDefinition
+from django.db import transaction
+from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -71,6 +75,13 @@ class CredentialTypeViewSet(
     filterset_class = filters.CredentialTypeFilter
     ordering_fields = ["name"]
 
+    def filter_queryset(self, queryset):
+        if queryset.model is models.CredentialType:
+            return super().filter_queryset(
+                queryset.model.access_qs(self.request.user, queryset=queryset)
+            )
+        return super().filter_queryset(queryset)
+
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
 
@@ -91,16 +102,30 @@ class CredentialTypeViewSet(
 
         serializer.is_valid(raise_exception=True)
         serializer.validated_data["kind"] = "cloud"
-        credential_type = serializer.create(serializer.validated_data)
+        for field in serializer.validated_data["inputs"]["fields"]:
+            if "type" not in field:
+                field["type"] = "string"
+
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
 
         return Response(
-            serializers.CredentialTypeSerializer(credential_type).data,
+            serializers.CredentialTypeSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 
     @extend_schema(
         description="Partial update of a credential type",
-        request=serializers.CredentialTypeSerializer,
+        request=serializers.CredentialTypeCreateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.CredentialTypeSerializer,
@@ -112,18 +137,49 @@ class CredentialTypeViewSet(
     )
     def partial_update(self, request, pk):
         credential_type = self.get_object()
+
+        if credential_type.managed:
+            error = "Managed credential type cannot be updated"
+            return Response(
+                {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if models.EdaCredential.objects.filter(
+            credential_type=credential_type
+        ).exists():
+            inputs = request.data.get("inputs")
+            injectors = request.data.get("injectors")
+            if inputs or injectors:
+                field = "inputs" if inputs else "injectors"
+                error = (
+                    f"Modifications to {field} are not allowed for credential "
+                    "types that are in use"
+                )
+                return Response(
+                    data={field: [error]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         serializer = serializers.CredentialTypeCreateSerializer(
             credential_type, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
 
+        old_data = model_to_dict(credential_type)
         for key, value in serializer.validated_data.items():
             setattr(credential_type, key, value)
 
-        credential_type.save()
+        with transaction.atomic():
+            credential_type.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(credential_type),
+            )
 
         return Response(
-            serializers.CredentialTypeSerializer(credential_type).data
+            serializers.CredentialTypeSerializer(credential_type).data,
         )
 
     @extend_schema(
@@ -131,7 +187,10 @@ class CredentialTypeViewSet(
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None, description="Delete successful."
-            )
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None, description="CredentialType in use by Credentials."
+            ),
         },
     )
     def destroy(self, request, *args, **kwargs):
@@ -141,6 +200,14 @@ class CredentialTypeViewSet(
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        if models.EdaCredential.objects.filter(
+            credential_type=credential_type
+        ).exists():
+            error = (
+                f"CredentialType {credential_type.name} is used by credentials"
+            )
+            return Response({"errors": error}, status=status.HTTP_409_CONFLICT)
 
         self.perform_destroy(credential_type)
         return Response(status=status.HTTP_204_NO_CONTENT)

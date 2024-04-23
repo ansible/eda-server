@@ -2,11 +2,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
-from tests.integration.api.test_activation import (
-    create_activation,
-    create_activation_related_data,
-)
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 INPUTS = {
@@ -93,77 +89,28 @@ def test_retrieve_eda_credential(
 
 @pytest.mark.django_db
 def test_list_eda_credentials(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    default_eda_credential: models.EdaCredential,
+    default_vault_credential: models.EdaCredential,
+    managed_eda_credential: models.EdaCredential,
 ):
-    models.EdaCredential.objects.bulk_create(
-        [
-            models.EdaCredential(
-                name="credential-1",
-                inputs={"username": "adam", "password": "secret"},
-                credential_type_id=credential_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-2",
-                inputs={"username": "bearny", "password": "secret"},
-                credential_type_id=credential_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-3",
-                inputs={"username": "christ", "password": "secret"},
-                credential_type_id=credential_type.id,
-                managed=True,
-            ),
-        ]
-    )
     response = client.get(f"{api_url_v1}/eda-credentials/")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 2
-    assert response.data["results"][0]["name"] == "credential-1"
-    assert response.data["results"][0]["inputs"] == {
-        "username": "adam",
-        "password": "$encrypted$",
-    }
-    assert response.data["results"][1]["name"] == "credential-2"
-    assert response.data["results"][1]["inputs"] == {
-        "username": "bearny",
-        "password": "$encrypted$",
-    }
+    assert response.data["results"][0]["name"] == default_eda_credential.name
+    assert response.data["results"][1]["name"] == default_vault_credential.name
 
 
 @pytest.mark.django_db
 def test_list_eda_credentials_with_kind_filter(
-    client: APIClient, credential_type: models.CredentialType
+    client: APIClient,
+    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
 ):
-    registry_type = models.CredentialType.objects.create(
-        name="registry", inputs=INPUTS, injectors={}, kind="registry"
-    )
-    scm_type = models.CredentialType.objects.create(
-        name="scm", inputs=INPUTS, injectors={}, kind="scm"
-    )
-    models.EdaCredential.objects.bulk_create(
-        [
-            models.EdaCredential(
-                name="credential-1",
-                inputs={"username": "adam", "password": "secret"},
-                credential_type_id=registry_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-2",
-                inputs={"username": "bearny", "password": "secret"},
-                credential_type_id=scm_type.id,
-            ),
-            models.EdaCredential(
-                name="credential-3",
-                inputs={"username": "christ", "password": "secret"},
-                credential_type_id=scm_type.id,
-            ),
-        ]
-    )
-
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
     )
-    assert len(response.data["results"]) == 2
+    assert len(response.data["results"]) == 1
 
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=registry"
@@ -179,13 +126,71 @@ def test_list_eda_credentials_with_kind_filter(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         "&credential_type__kind=vault",
     )
-    assert len(response.data["results"]) == 2
+    assert len(response.data["results"]) == 1
 
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         "&credential_type__kind=registry",
     )
-    assert len(response.data["results"]) == 3
+    assert len(response.data["results"]) == 2
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_credential_type_id(
+    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
+    client: APIClient,
+    preseed_credential_types,
+):
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    scm_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.SOURCE_CONTROL
+    )
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type_id="
+        f"{registry_credential_type.id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert (
+        response.data["results"][0]["credential_type"]["name"]
+        == registry_credential_type.name
+    )
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type_id="
+        f"{scm_credential_type.id}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert (
+        response.data["results"][0]["credential_type"]["name"]
+        == scm_credential_type.name
+    )
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_name(
+    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
+    client: APIClient,
+    preseed_credential_types,
+):
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?name={default_eda_credential.name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == default_eda_credential.name
+
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?name={default_scm_credential.name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"] == default_scm_credential.name
 
 
 @pytest.mark.django_db
@@ -261,49 +266,82 @@ def test_partial_update_eda_credential_name(
 
 
 @pytest.mark.django_db
-def test_delete_credential_used_by_activation(
-    client: APIClient, preseed_credential_types
+def test_delete_credential_with_de_reference(
+    default_de: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
-    # TODO(alex) presetup should be a reusable fixture
-    activation_dependencies = create_activation_related_data()
-    create_activation(activation_dependencies)
-    eda_credential_id = activation_dependencies["eda_credential_id"]
+    eda_credential = default_de.eda_credential
     response = client.delete(
-        f"{api_url_v1}/eda-credentials/{eda_credential_id}/"
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_delete_credential_with_project_reference(
+    default_project: models.Project,
+    client: APIClient,
+    preseed_credential_types,
+):
+    eda_credential = default_project.eda_credential
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_delete_credential_with_activation_reference(
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
+):
+    eda_credential = default_activation.eda_credentials.all()[0]
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
 
 
 @pytest.mark.django_db
 def test_delete_credential_used_by_activation_forced(
-    client: APIClient, preseed_credential_types
+    default_activation: models.Activation,
+    client: APIClient,
+    preseed_credential_types,
 ):
-    # TODO(alex) presetup should be a reusable fixture
-    activation_dependencies = create_activation_related_data()
-    create_activation(activation_dependencies)
-    eda_credential_id = activation_dependencies["eda_credential_id"]
+    eda_credential = default_activation.eda_credentials.all()[0]
     response = client.delete(
-        f"{api_url_v1}/eda-credentials/{eda_credential_id}/?force=true",
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/?force=true",
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert default_activation.eda_credentials.count() == 0
 
 
 @pytest.mark.parametrize("refs", ["true", "false"])
 @pytest.mark.django_db
 def test_retrieve_eda_credential_with_refs(
-    client: APIClient, refs, preseed_credential_types
+    default_activation: models.Activation,
+    client: APIClient,
+    refs,
+    preseed_credential_types,
 ):
-    activation_dependencies = create_activation_related_data()
-    activation = create_activation(activation_dependencies)
-    eda_credential_id = activation_dependencies["eda_credential_id"]
-    decision_environment = models.DecisionEnvironment.objects.get(
-        eda_credential_id=eda_credential_id
-    )
-    eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
-    activation.eda_credentials.add(eda_credential)
+    eda_credential = default_activation.eda_credentials.all()[0]
 
     response = client.get(
-        f"{api_url_v1}/eda-credentials/{eda_credential_id}/?refs={refs}",
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/?refs={refs}",
     )
     assert response.status_code == status.HTTP_200_OK
 
@@ -311,20 +349,51 @@ def test_retrieve_eda_credential_with_refs(
         assert response.data["references"] is not None
         references = response.data["references"]
 
-        assert len(references) == 2
+        assert len(references) == 3
         references[0] = {
             "type": "Activation",
-            "id": activation.id,
-            "name": activation.name,
-            "url": f"api/eda/v1/activations/{activation.id}/",
+            "id": default_activation.id,
+            "name": default_activation.name,
+            "url": f"api/eda/v1/activations/{default_activation.id}/",
         }
+        references[1] = (
+            {
+                "type": "DecisionEnvironment",
+                "id": default_activation.decision_environment.id,
+                "name": default_activation.decision_environment.name,
+                "url": (
+                    "api/eda/v1/decision_environments/"
+                    f"{default_activation.decision_environment.id}/"
+                ),
+            },
+        )
         references[1] = {
-            "type": "DecisionEnvironment",
-            "id": decision_environment.id,
-            "name": decision_environment.name,
-            "url": (
-                f"api/eda/v1/decision_environments/{decision_environment.id}/"
-            ),
+            "type": "Project",
+            "id": default_activation.project.id,
+            "name": default_activation.project.name,
+            "url": (f"api/eda/v1/projects/{default_activation.project.id}/"),
         }
     else:
         assert response.data["references"] is None
+
+
+@pytest.mark.django_db
+def test_retrieve_eda_credential_with_empty_encrypted_fields(
+    client: APIClient, preseed_credential_types
+):
+    scm_type = models.CredentialType.objects.filter(name="Source Control")[0]
+    data_in = {
+        "name": "scm-credential",
+        "inputs": {
+            "username": "adam",
+            "password": "secret",
+            "ssh_key_unlock": "",
+        },
+        "credential_type_id": scm_type.id,
+    }
+    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    key_list = list(response.data["inputs"].keys())
+    assert "ssh_key_unlock" not in key_list
+    assert key_list[0] == "username"
+    assert key_list[1] == "password"

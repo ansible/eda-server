@@ -15,6 +15,7 @@
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models
 
 
@@ -30,6 +31,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "image_url",
+            "organization_id",
             "eda_credential_id",
             *read_only_fields,
         ]
@@ -38,6 +40,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
 class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the DecisionEnvironment."""
 
+    organization_id = serializers.IntegerField(required=False, allow_null=True)
     eda_credential_id = serializers.IntegerField(
         required=False, allow_null=True
     )
@@ -48,6 +51,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "image_url",
+            "organization_id",
             "eda_credential_id",
         ]
 
@@ -58,14 +62,16 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
     eda_credential = EdaCredentialRefSerializer(
         required=False, allow_null=True
     )
+    organization = OrganizationRefSerializer()
 
     class Meta:
-        model = models.DecisionEnvironment()
+        model = models.DecisionEnvironment
         fields = [
             "id",
             "name",
             "description",
             "image_url",
+            "organization",
             "eda_credential",
             "created_at",
             "modified_at",
@@ -80,11 +86,19 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             if decision_environment["eda_credential"]
             else None
         )
+        organization = (
+            OrganizationRefSerializer(
+                decision_environment["organization"]
+            ).data
+            if decision_environment["organization"]
+            else None
+        )
         return {
             "id": decision_environment["id"],
             "name": decision_environment["name"],
             "description": decision_environment["description"],
             "image_url": decision_environment["image_url"],
+            "organization": organization,
             "eda_credential": eda_credential,
             "created_at": decision_environment["created_at"],
             "modified_at": decision_environment["modified_at"],
@@ -96,5 +110,5 @@ class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.DecisionEnvironment
-        fields = ["id", "name", "description", "image_url"]
+        fields = ["id", "name", "description", "image_url", "organization_id"]
         read_only_fields = ["id"]

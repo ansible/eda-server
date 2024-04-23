@@ -12,11 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import uuid
-from dataclasses import dataclass
 from typing import Any, Dict
 
 import pytest
+import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -61,33 +60,16 @@ TEST_RULESETS_SAMPLE = """
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
 
-@dataclass
-class InitData:
-    activation: models.Activation
-    project: models.Project
-    project_1: models.Project
-    rulebook: models.Rulebook
-    rulebook_1: models.Rulebook
-    ruleset: models.Ruleset
-    ruleset_1: models.Ruleset
-    ruleset_2: models.Ruleset
-    rule: models.Rule
-    audit_rule_1: models.AuditRule
-    audit_rule_2: models.AuditRule
-    audit_action_1: models.AuditAction
-    audit_action_2: models.AuditAction
-    audit_action_3: models.AuditAction
-    audit_event_1: models.AuditEvent
-    audit_event_2: models.AuditEvent
-    audit_event_3: models.AuditEvent
-
-
 # ------------------------------------------
 # Test Rulebook:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_rulebooks(client: APIClient, init_db):
-    rulebooks = [init_db.rulebook, init_db.rulebook_1]
+def test_list_rulebooks(
+    default_rulebook: models.Rulebook,
+    rulebook_with_job_template: models.Rulebook,
+    client: APIClient,
+):
+    rulebooks = [default_rulebook, rulebook_with_job_template]
     response = client.get(f"{api_url_v1}/rulebooks/")
     assert response.status_code == status.HTTP_200_OK
 
@@ -96,17 +78,23 @@ def test_list_rulebooks(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_list_rulebooks_filter_name(client: APIClient, init_db):
-    filter_name = "another"
+def test_list_rulebooks_filter_name(
+    default_rulebook: models.Rulebook,
+    rulebook_with_job_template: models.Rulebook,
+    client: APIClient,
+):
+    filter_name = default_rulebook.name
+    response = client.get(f"{api_url_v1}/rulebooks/")
     response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
     data = response.json()["results"][0]
-    rulebook = init_db.rulebook_1
     assert response.status_code == status.HTTP_200_OK
-    assert_rulebook_data(data, rulebook)
+    assert_rulebook_data(data, default_rulebook)
 
 
 @pytest.mark.django_db
-def test_list_rulebooks_filter_name_non_existant(client: APIClient, init_db):
+def test_list_rulebooks_filter_name_non_existant(
+    default_rulebook: models.Rulebook, client: APIClient
+):
     filter_name = "doesn't exist"
     response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
     data = response.json()["results"]
@@ -115,20 +103,24 @@ def test_list_rulebooks_filter_name_non_existant(client: APIClient, init_db):
 
 
 @pytest.mark.django_db
-def test_list_rulebooks_filter_project(client: APIClient, init_db):
-    filter_project = init_db.project.id
-    rulebook = init_db.rulebook
+def test_list_rulebooks_filter_project(
+    default_project: models.Project,
+    default_rulebook: models.Rulebook,
+    client: APIClient,
+):
     response = client.get(
-        f"{api_url_v1}/rulebooks/?project_id={filter_project}"
+        f"{api_url_v1}/rulebooks/?project_id={default_project.id}"
     )
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
-    assert data["project_id"] == filter_project
-    assert_rulebook_data(data, rulebook)
+    assert data["project_id"] == default_project.id
+    assert_rulebook_data(data, default_rulebook)
 
 
 @pytest.mark.django_db
-def test_list_rulebooks_filter_project_non_existant(client: APIClient):
+def test_list_rulebooks_filter_project_non_existant(
+    default_rulebook: models.Rulebook, client: APIClient
+):
     filter_project = "10000"
     response = client.get(
         f"{api_url_v1}/rulebooks/?project_id={filter_project}"
@@ -139,12 +131,13 @@ def test_list_rulebooks_filter_project_non_existant(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_rulebook(client: APIClient, init_db):
-    rulebook = init_db.rulebook
-    response = client.get(f"{api_url_v1}/rulebooks/{rulebook.id}/")
+def test_retrieve_rulebook(
+    default_rulebook: models.Rulebook, client: APIClient
+):
+    response = client.get(f"{api_url_v1}/rulebooks/{default_rulebook.id}/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert_rulebook_data(response.json(), rulebook)
+    assert_rulebook_data(response.json(), default_rulebook)
 
 
 @pytest.mark.django_db
@@ -154,20 +147,22 @@ def test_retrieve_rulebook_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_retrieve_json_rulebook(client: APIClient):
-    obj = models.Rulebook.objects.create(
-        name="test-rulebook.yml",
-        rulesets=TEST_RULESETS_SAMPLE,
+def test_retrieve_json_rulebook(
+    default_rulebook: models.Rulebook, client: APIClient
+):
+    response = client.get(
+        f"{api_url_v1}/rulebooks/{default_rulebook.id}/json/"
     )
-    response = client.get(f"{api_url_v1}/rulebooks/{obj.id}/json/")
     assert response.status_code == status.HTTP_200_OK
 
     data = response.json()
-    assert data["id"] == obj.id
-    assert data["name"] == "test-rulebook.yml"
-    assert len(data["rulesets"]) == 2
-    assert data["rulesets"][0]["name"] == "Test sample 001"
-    assert data["rulesets"][1]["name"] == "Test sample 002"
+    assert data["id"] == default_rulebook.id
+    assert data["name"] == default_rulebook.name
+
+    rulebook_rulesets = yaml.safe_load(default_rulebook.rulesets)
+    assert len(data["rulesets"]) == len(rulebook_rulesets)
+    assert data["rulesets"][0]["name"] == rulebook_rulesets[0]["name"]
+    assert data["rulesets"][1]["name"] == rulebook_rulesets[1]["name"]
 
 
 @pytest.mark.django_db
@@ -183,6 +178,7 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
         "description": rulebook.description,
         "rulesets": rulebook.rulesets,
         "project_id": rulebook.project.id,
+        "organization_id": rulebook.organization.id,
         "created_at": rulebook.created_at.strftime(DATETIME_FORMAT),
         "modified_at": rulebook.modified_at.strftime(DATETIME_FORMAT),
     }
@@ -192,43 +188,55 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
 # Test Audit Rule:
 # ------------------------------------------
 @pytest.mark.django_db
-def test_list_audit_rules(client: APIClient, init_db):
+def test_list_audit_rules(
+    audit_rule_1: models.AuditRule,
+    audit_rule_2: models.AuditRule,
+    client: APIClient,
+):
     response = client.get(f"{api_url_v1}/audit-rules/")
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
 
     assert len(audit_rules) == 2
     assert audit_rules[0]["fired_at"] > audit_rules[1]["fired_at"]
-    assert audit_rules[0]["name"] == "rule with 2 actions/events"
+    assert audit_rules[0]["name"] == audit_rule_2.name
     assert list(audit_rules[0]) == [
         "id",
         "name",
         "status",
         "activation_instance",
+        "organization",
         "fired_at",
     ]
 
 
 @pytest.mark.django_db
-def test_list_audit_rules_filter_name(client: APIClient, init_db):
-    filter_name = "rule with 1 action"
+def test_list_audit_rules_filter_name(
+    audit_rule_1: models.AuditRule,
+    audit_rule_2: models.AuditRule,
+    client: APIClient,
+):
+    filter_name = audit_rule_1.name
     response = client.get(f"{api_url_v1}/audit-rules/?name={filter_name}")
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
 
     assert len(audit_rules) == 1
-    assert audit_rules[0]["name"] == "rule with 1 action"
+    assert audit_rules[0]["name"] == audit_rule_1.name
     assert list(audit_rules[0]) == [
         "id",
         "name",
         "status",
         "activation_instance",
+        "organization",
         "fired_at",
     ]
 
 
 @pytest.mark.django_db
-def test_list_audit_rules_filter_name_non_existent(client: APIClient, init_db):
+def test_list_audit_rules_filter_name_non_existent(
+    audit_rule_1: models.AuditRule, client: APIClient
+):
     filter_name = "doesn't exist"
     response = client.get(f"{api_url_v1}/audit-rules/?name={filter_name}")
     data = response.json()["results"]
@@ -245,7 +253,12 @@ def test_list_audit_rules_filter_name_non_existent(client: APIClient, init_db):
     ],
 )
 @pytest.mark.django_db
-def test_list_audit_rules_ordering(client: APIClient, init_db, ordering_field):
+def test_list_audit_rules_ordering(
+    audit_rule_1: models.AuditRule,
+    audit_rule_2: models.AuditRule,
+    client: APIClient,
+    ordering_field,
+):
     response = client.get(
         f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
     )
@@ -253,7 +266,7 @@ def test_list_audit_rules_ordering(client: APIClient, init_db, ordering_field):
     audit_rules = response.data["results"]
     assert len(audit_rules) == 2
     assert audit_rules[0][ordering_field] == getattr(
-        init_db.audit_rule_1, ordering_field
+        audit_rule_1, ordering_field
     )
 
     response = client.get(
@@ -263,12 +276,16 @@ def test_list_audit_rules_ordering(client: APIClient, init_db, ordering_field):
     audit_rules = response.data["results"]
     assert len(audit_rules) == 2
     assert audit_rules[0][ordering_field] == getattr(
-        init_db.audit_rule_2, ordering_field
+        audit_rule_2, ordering_field
     )
 
 
 @pytest.mark.django_db
-def test_list_audit_rules_ordering_activation_name(client: APIClient, init_db):
+def test_list_audit_rules_ordering_activation_name(
+    audit_rule_1: models.AuditRule,
+    audit_rule_2: models.AuditRule,
+    client: APIClient,
+):
     ordering_field = "activation_instance__name"
     response = client.get(
         f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
@@ -278,7 +295,7 @@ def test_list_audit_rules_ordering_activation_name(client: APIClient, init_db):
     assert len(audit_rules) == 2
     assert (
         audit_rules[0]["activation_instance"]["name"]
-        == init_db.audit_rule_1.activation_instance.name
+        == audit_rule_1.activation_instance.name
     )
 
     response = client.get(
@@ -289,19 +306,19 @@ def test_list_audit_rules_ordering_activation_name(client: APIClient, init_db):
     assert len(audit_rules) == 2
     assert (
         audit_rules[0]["activation_instance"]["name"]
-        == init_db.audit_rule_2.activation_instance.name
+        == audit_rule_2.activation_instance.name
     )
 
 
 @pytest.mark.django_db
-def test_retrieve_audit_rule(client: APIClient, init_db):
-    audit_rule_id = init_db.audit_rule_1.id
-
-    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/")
+def test_retrieve_audit_rule(
+    audit_rule_1: models.AuditRule, client: APIClient
+):
+    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_1.id}/")
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["name"] == init_db.audit_rule_1.name
-    assert response.data["ruleset_name"] == init_db.audit_rule_1.ruleset_name
+    assert response.data["name"] == audit_rule_1.name
+    assert response.data["ruleset_name"] == audit_rule_1.ruleset_name
 
 
 @pytest.mark.django_db
@@ -311,30 +328,37 @@ def test_retrieve_audit_rule_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_list_actions_from_audit_rule(client: APIClient, init_db):
-    audit_rule_id = init_db.audit_rule_2.id
-
-    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/")
+def test_list_actions_from_audit_rule(
+    audit_rule_2: models.AuditRule,
+    audit_action_2: models.AuditAction,
+    audit_action_3: models.AuditAction,
+    client: APIClient,
+):
+    response = client.get(
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/"
+    )
     assert response.status_code == status.HTTP_200_OK
 
     actions = response.data["results"]
-    assert len(actions) == 2
+    assert len(actions) == audit_rule_2.auditaction_set.count()
     assert actions[0]["fired_at"] > actions[1]["rule_fired_at"]
 
 
 @pytest.mark.django_db
-def test_list_actions_from_audit_rule_filter_name(client: APIClient, init_db):
-    filter_name = "print_event"
-    audit_rule_id = init_db.audit_rule_2.id
-
+def test_list_actions_from_audit_rule_filter_name(
+    audit_rule_2: models.AuditRule,
+    audit_action_3: models.AuditAction,
+    client: APIClient,
+):
     response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?name={filter_name}"
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/"
+        f"?name={audit_action_3.name}"
     )
     assert response.status_code == status.HTTP_200_OK
 
     filtered_actions = response.data["results"]
     assert len(filtered_actions) == 1
-    assert filtered_actions[0]["name"] == "print_event"
+    assert filtered_actions[0]["name"] == audit_action_3.name
     assert list(filtered_actions[0]) == [
         "id",
         "name",
@@ -353,41 +377,44 @@ def test_list_actions_from_audit_rule_filter_name(client: APIClient, init_db):
 )
 @pytest.mark.django_db
 def test_list_actions_from_audit_rule_ordering(
-    client: APIClient, init_db, ordering_field
+    audit_rule_2: models.AuditRule,
+    audit_action_2: models.AuditAction,
+    audit_action_3: models.AuditAction,
+    client: APIClient,
+    ordering_field,
 ):
-    audit_rule_id = init_db.audit_rule_2.id
     response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
         f"{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     actions = response.data["results"]
     assert len(actions) == 2
     assert actions[0][ordering_field] == getattr(
-        init_db.audit_action_2, ordering_field
+        audit_action_2, ordering_field
     )
 
     response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
         f"-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     actions = response.data["results"]
     assert len(actions) == 2
     assert actions[0][ordering_field] == getattr(
-        init_db.audit_action_3, ordering_field
+        audit_action_3, ordering_field
     )
 
 
 @pytest.mark.django_db
 def test_list_actions_from_audit_rule_filter_name_non_existent(
-    client: APIClient, init_db
+    audit_rule_2: models.AuditRule, client: APIClient
 ):
     filter_name = "doesn't exist"
-    audit_rule_id = init_db.audit_rule_1.id
 
     response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/actions/?name={filter_name}"
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/"
+        f"?name={filter_name}"
     )
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
@@ -395,17 +422,22 @@ def test_list_actions_from_audit_rule_filter_name_non_existent(
 
 
 @pytest.mark.django_db
-def test_list_events_from_audit_rule(client: APIClient, init_db):
-    audit_rule_id = init_db.audit_rule_2.id
-
-    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_id}/events/")
+def test_list_events_from_audit_rule(
+    audit_rule_2: models.AuditRule,
+    audit_event_2: models.AuditEvent,
+    audit_event_3: models.AuditEvent,
+    client: APIClient,
+):
+    response = client.get(
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/"
+    )
     assert response.status_code == status.HTTP_200_OK
 
     events = response.data["results"]
     assert len(events) == 2
     assert events[0]["received_at"] > events[1]["received_at"]
     assert events[0]["payload"] == events[1]["payload"]
-    assert events[0]["payload"] == "key: value\n"
+    assert events[0]["payload"] == yaml.safe_dump(audit_event_2.payload)
 
 
 @pytest.mark.parametrize(
@@ -414,219 +446,46 @@ def test_list_events_from_audit_rule(client: APIClient, init_db):
 )
 @pytest.mark.django_db
 def test_list_events_from_audit_rule_ordering(
-    client: APIClient, init_db, ordering_field
+    audit_rule_2: models.AuditRule,
+    audit_event_2: models.AuditEvent,
+    audit_event_3: models.AuditEvent,
+    client: APIClient,
+    ordering_field,
 ):
-    audit_rule_id = init_db.audit_rule_2.id
     response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/events/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
         f"{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     events = response.data["results"]
     assert len(events) == 2
-    assert events[0][ordering_field] == getattr(
-        init_db.audit_event_2, ordering_field
-    )
+    assert events[0][ordering_field] == getattr(audit_event_2, ordering_field)
 
     response = client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_id}/events/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
         f"-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     events = response.data["results"]
     assert len(events) == 2
-    assert events[0][ordering_field] == getattr(
-        init_db.audit_event_3, ordering_field
-    )
+    assert events[0][ordering_field] == getattr(audit_event_3, ordering_field)
 
 
 @pytest.mark.django_db
-def test_delete_project_and_rulebooks(client: APIClient, init_db):
-    project_id = init_db.project.id
-    response = client.delete(f"{api_url_v1}/projects/{project_id}/")
+def test_delete_project_and_rulebooks(
+    default_project: models.Project,
+    default_activation: models.Activation,
+    default_rulebook: models.Rulebook,
+    ruleset_1: models.Ruleset,
+    default_rule: models.Rule,
+    client: APIClient,
+):
+    response = client.delete(f"{api_url_v1}/projects/{default_project.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
-    activation = models.Activation.objects.get(pk=init_db.activation.id)
+    activation = models.Activation.objects.get(pk=default_activation.id)
     assert activation.project is None
     assert activation.rulebook is None
-    assert not models.Project.objects.filter(id=project_id).exists()
-    assert not models.Rulebook.objects.filter(id=init_db.rulebook.id).exists()
-    assert not models.Ruleset.objects.filter(id=init_db.ruleset.id).exists()
-    assert not models.Rule.objects.filter(id=init_db.rule.id).exists()
-
-
-@pytest.fixture
-def init_db():
-    project = models.Project.objects.create(
-        name="test-project",
-        description="Test Project",
-        url="https://github.com/eda-project",
-        import_state=models.Project.ImportState.COMPLETED,
-    )
-
-    project_1 = models.Project.objects.create(
-        name="test-project-1",
-        description="Test Project 1",
-        url="https://git.example.com/acme/project-01",
-        import_state=models.Project.ImportState.COMPLETED,
-    )
-
-    rulebook = models.Rulebook.objects.create(
-        name="test-rulebook.yml",
-        rulesets=TEST_RULESETS_SAMPLE,
-        project=project,
-    )
-
-    rulebook_1 = models.Rulebook.objects.create(
-        name="test-another-rulebook.yml",
-        rulesets=TEST_RULESETS_SAMPLE,
-        project=project_1,
-    )
-
-    source_list = [
-        {
-            "name": "<unnamed>",
-            "type": "range",
-            "config": {"limit": 5},
-            "source": "ansible.eda.range",
-        }
-    ]
-
-    ruleset = models.Ruleset.objects.create(
-        name="test-ruleset",
-        sources=source_list,
-        rulebook=rulebook,
-    )
-
-    ruleset_1 = models.Ruleset.objects.create(
-        name="test-ruleset-01",
-        sources=source_list,
-        rulebook=rulebook,
-    )
-
-    ruleset_2 = models.Ruleset.objects.create(
-        name="filter-test-ruleset",
-        sources=source_list,
-        rulebook=rulebook_1,
-    )
-
-    rule = models.Rule.objects.create(
-        name="say hello",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset,
-    )
-    user = models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
-    activation = models.Activation.objects.create(
-        name="test-activation",
-        rulebook=rulebook,
-        project=project,
-        user=user,
-    )
-    activation_2 = models.Activation.objects.create(
-        name="test-activation-2",
-        rulebook=rulebook,
-        project=project,
-        user=user,
-    )
-    activation_instance = models.RulebookProcess.objects.create(
-        name=activation.name,
-        activation=activation,
-    )
-    activation_instance_2 = models.RulebookProcess.objects.create(
-        name=activation_2.name, activation=activation_2
-    )
-    audit_rule_1 = models.AuditRule.objects.create(
-        name="rule with 1 action",
-        fired_at="2023-12-14T15:19:02.313122Z",
-        rule_uuid=DUMMY_UUID,
-        ruleset_uuid=DUMMY_UUID,
-        ruleset_name="test-audit-ruleset-name-1",
-        activation_instance=activation_instance,
-    )
-    audit_rule_2 = models.AuditRule.objects.create(
-        name="rule with 2 actions/events",
-        fired_at="2023-12-14T15:19:02.323704Z",
-        rule_uuid=DUMMY_UUID,
-        ruleset_uuid=DUMMY_UUID,
-        ruleset_name="test-audit-ruleset-name-2",
-        activation_instance=activation_instance_2,
-    )
-
-    action_1 = models.AuditAction.objects.create(
-        id=str(uuid.uuid4()),
-        name="debug",
-        audit_rule=audit_rule_1,
-        status="successful",
-        rule_fired_at="2023-12-14T15:19:02.313122Z",
-        fired_at="2023-12-14T15:19:02.319506Z",
-    )
-    action_2 = models.AuditAction.objects.create(
-        id=str(uuid.uuid4()),
-        name="debug",
-        audit_rule=audit_rule_2,
-        status="successful",
-        rule_fired_at="2023-12-14T15:19:02.323704Z",
-        fired_at="2023-12-14T15:19:02.326503Z",
-    )
-    action_3 = models.AuditAction.objects.create(
-        id=str(uuid.uuid4()),
-        name="print_event",
-        audit_rule=audit_rule_2,
-        status="successful",
-        rule_fired_at="2023-12-14T15:19:02.323704Z",
-        fired_at="2023-12-14T15:19:02.327547Z",
-    )
-    audit_event_1 = models.AuditEvent.objects.create(
-        id=str(uuid.uuid4()),
-        source_name="my test source",
-        source_type="ansible.eda.range",
-        rule_fired_at="2023-12-14T15:19:02.313122Z",
-        received_at="2023-12-14T15:19:02.289549Z",
-        payload={"key": "value"},
-    )
-    audit_event_2 = models.AuditEvent.objects.create(
-        id=str(uuid.uuid4()),
-        source_name="my test source",
-        source_type="ansible.eda.range",
-        rule_fired_at="2023-12-14T15:19:02.323704Z",
-        received_at="2023-12-14T15:19:02.313063Z",
-        payload={"key": "value"},
-    )
-    audit_event_3 = models.AuditEvent.objects.create(
-        id=str(uuid.uuid4()),
-        source_name="my test source",
-        source_type="ansible.eda.range",
-        rule_fired_at="2023-12-14T15:19:02.323704Z",
-        received_at="2023-12-14T15:19:02.321472Z",
-        payload={"key": "value"},
-    )
-    audit_event_1.audit_actions.add(action_1)
-    audit_event_2.audit_actions.add(action_2)
-    audit_event_2.audit_actions.add(action_3)
-    audit_event_3.audit_actions.add(action_2)
-    audit_event_3.audit_actions.add(action_3)
-
-    return InitData(
-        activation=activation,
-        project=project,
-        project_1=project,
-        rulebook=rulebook,
-        rulebook_1=rulebook_1,
-        ruleset=ruleset,
-        ruleset_1=ruleset_1,
-        ruleset_2=ruleset_2,
-        rule=rule,
-        audit_rule_1=audit_rule_1,
-        audit_rule_2=audit_rule_2,
-        audit_action_1=action_1,
-        audit_action_2=action_2,
-        audit_action_3=action_3,
-        audit_event_1=audit_event_1,
-        audit_event_2=audit_event_2,
-        audit_event_3=audit_event_3,
-    )
+    assert not models.Project.objects.filter(id=default_project.id).exists()
+    assert not models.Rulebook.objects.filter(id=default_rulebook.id).exists()
+    assert not models.Ruleset.objects.filter(id=ruleset_1.id).exists()
+    assert not models.Rule.objects.filter(id=default_rule.id).exists()

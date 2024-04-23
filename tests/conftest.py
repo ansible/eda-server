@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,18 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import django_filters
+import pytest
 
-from aap_eda.core import models
+from aap_eda.settings import default
 
 
-class RoleFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="istartswith",
-        label="Filter roles by name.",
+@pytest.fixture
+def redis_parameters() -> dict:
+    """Provide redis parameters based on settings values."""
+    params = (
+        default._rq_common_parameters() | default._rq_redis_client_parameters()
     )
-
-    class Meta:
-        model = models.Role
-        fields = ["name"]
+    # Convert to lowercase for use in establishing a redis client.
+    return {k.lower(): v for (k, v) in params.items()}

@@ -42,7 +42,6 @@ class ResourceType(DjangoStrEnum):
     ACTIVATION = "activation"
     ACTIVATION_INSTANCE = "activation_instance"
     AUDIT_RULE = "audit_rule"
-    AUDIT_EVENT = "audit_event"
     USER = "user"
     PROJECT = "project"
     EXTRA_VAR = "extra_var"
@@ -53,6 +52,8 @@ class ResourceType(DjangoStrEnum):
     CREDENTIAL_TYPE = "credential_type"
     EDA_CREDENTIAL = "eda_credential"
     EVENT_STREAM = "event_stream"
+    ORGANIZATION = "organization"
+    TEAM = "team"
 
 
 class Action(DjangoStrEnum):
@@ -79,6 +80,7 @@ class ActivationStatus(DjangoStrEnum):
     # monitor task will handle it
     UNRESPONSIVE = "unresponsive"
     ERROR = "error"
+    WORKERS_OFFLINE = "workers offline"
 
 
 # TODO: Deprecated, will be removed in future version, use
@@ -110,6 +112,7 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.STOPPED: "Activation has stopped",
     ActivationStatus.UNRESPONSIVE: "Activation is not responsive",
     ActivationStatus.ERROR: "Activation is in an error state",
+    ActivationStatus.WORKERS_OFFLINE: "All workers in the node are offline",
 }
 
 

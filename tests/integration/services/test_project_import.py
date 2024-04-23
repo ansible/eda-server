@@ -24,8 +24,8 @@ import pytest
 
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportService
-from aap_eda.services.project.git import GitRepository
 from aap_eda.services.project.imports import ProjectImportError
+from aap_eda.services.project.scm import ScmRepository
 
 # TODO(cutwater): The test cases in this test suite share a lot of common code
 #   and it's ugly. It requires refactoring.
@@ -69,11 +69,11 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
     projects = models.Project.objects.bulk_create(
@@ -81,17 +81,21 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
             models.Project(
                 name="test-project-01",
                 url="https://git.example.com/repo01.git",
+                scm_branch="my_branch",
+                scm_refspec="the_ref",
             ),
             models.Project(
                 name="test-project-02",
                 url="https://git.example.com/repo02.git",
                 verify_ssl=False,
+                scm_branch="tag2",
+                scm_refspec="",
             ),
         ]
     )
 
     for project in projects:
-        service = ProjectImportService(git_cls=git_mock)
+        service = ProjectImportService(scm_cls=git_mock)
         service.import_project(project)
         project.refresh_from_db()
 
@@ -99,8 +103,12 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
             project.url,
             os.path.join(service_tempdir_patch.last_name, "src"),
             credential=None,
+            gpg_credential=None,
             depth=1,
             verify_ssl=project.verify_ssl,
+            branch=project.scm_branch,
+            refspec=project.scm_refspec,
+            proxy=None,
         )
 
         assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
@@ -125,19 +133,19 @@ def test_project_import_with_new_layout(
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
 
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
         name="test-project-01", url="https://git.example.com/repo.git"
     )
 
-    service = ProjectImportService(git_cls=git_mock)
+    service = ProjectImportService(scm_cls=git_mock)
     service.import_project(project)
     project.refresh_from_db()
 
@@ -149,11 +157,11 @@ def test_project_import_with_new_layout(
 def test_project_import_rulebook_directory_missing(
     storage_save_patch, service_tempdir_patch
 ):
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.return_value = repo_mock
 
     project = models.Project.objects.create(
@@ -164,7 +172,7 @@ def test_project_import_rulebook_directory_missing(
         + " directory doesn't exist within the project root."
     )
 
-    service = ProjectImportService(git_cls=git_mock)
+    service = ProjectImportService(scm_cls=git_mock)
     with pytest.raises(
         ProjectImportError,
         match=re.escape(message_expected),
@@ -185,19 +193,19 @@ def test_project_import_with_vaulted_data(
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
 
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
         name="test-project-04", url="https://git.example.com/repo.git"
     )
 
-    service = ProjectImportService(git_cls=git_mock)
+    service = ProjectImportService(scm_cls=git_mock)
     service.import_project(project)
     project.refresh_from_db()
 
@@ -211,17 +219,17 @@ def _setup_project_sync():
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_hash = "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     repo_mock.rev_parse.return_value = repo_hash
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
         name="test-project-01", url="https://git.example.com/repo.git"
     )
 
-    service = ProjectImportService(git_cls=git_mock)
+    service = ProjectImportService(scm_cls=git_mock)
     service.import_project(project)
     project.refresh_from_db()
 
@@ -246,13 +254,13 @@ def test_project_sync(storage_save_patch, service_tempdir_patch):
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_hash = "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
     repo_mock.rev_parse.return_value = repo_hash
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
-    service = ProjectImportService(git_cls=git_mock)
+    service = ProjectImportService(scm_cls=git_mock)
     service.sync_project(project)
     project.refresh_from_db()
 
@@ -279,13 +287,13 @@ def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_hash = "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     repo_mock.rev_parse.return_value = repo_hash
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
-    service = ProjectImportService(git_cls=git_mock)
+    service = ProjectImportService(scm_cls=git_mock)
     service.sync_project(project)
     project.refresh_from_db()
 
@@ -311,12 +319,12 @@ def test_project_import_with_invalid_rulebooks(
         shutil.copytree(src, path, symlinks=False)
         return repo_mock
 
-    repo_mock = mock.Mock(name="GitRepository()")
+    repo_mock = mock.Mock(name="ScmRepository()")
     repo_mock.rev_parse.return_value = (
         "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
     )
 
-    git_mock = mock.Mock(name="GitRepository", spec=GitRepository)
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
@@ -328,7 +336,7 @@ def test_project_import_with_invalid_rulebooks(
     logger.propagate = True
     caplog.set_level(logging.WARNING)
     try:
-        service = ProjectImportService(git_cls=git_mock)
+        service = ProjectImportService(scm_cls=git_mock)
         service.import_project(project)
         project.refresh_from_db()
     finally:

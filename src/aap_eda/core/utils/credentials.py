@@ -34,12 +34,16 @@ class InjectorMissingKeyException(Exception):
 def inputs_to_display(schema: dict, inputs: str) -> dict:
     secret_fields = get_secret_fields(schema)
     decoded_inputs = inputs_from_store(inputs)
+    result = {}
 
     for key in decoded_inputs.keys():
         if key in secret_fields:
-            decoded_inputs[key] = ENCRYPTED_STRING
+            if decoded_inputs[key]:
+                result[key] = ENCRYPTED_STRING
+        else:
+            result[key] = decoded_inputs[key]
 
-    return decoded_inputs
+    return result
 
 
 def get_secret_fields(schema: dict) -> list[str]:
@@ -60,7 +64,7 @@ def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
     old_inputs.update(
         (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_STRING
     )
-    return yaml.dump(old_inputs)
+    return yaml.dump(old_inputs, sort_keys=False)
 
 
 def inputs_from_store(inputs: str) -> dict:
