@@ -244,28 +244,6 @@ class ProjectViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        credential_ids = [
-            request.data.get("eda_credential_id"),
-            request.data.get("signature_validation_credential_id"),
-        ]
-
-        # Validate eda_credential_id if has meaningful value
-        for credential_id in credential_ids:
-            if credential_id is None:
-                continue
-            # we should fetch only the credentials user has access to
-            credential = (
-                models.EdaCredential.access_qs(self.request.user)
-                .filter(id=credential_id)
-                .first()
-            )
-            if not credential:
-                msg = f"EdaCredential [{credential_id}] not found"
-                return Response(
-                    {"errors": msg},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
         update_fields = []
         for key, value in serializer.validated_data.items():
             setattr(project, key, value)

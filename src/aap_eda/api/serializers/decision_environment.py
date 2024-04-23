@@ -16,7 +16,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models
+from aap_eda.core import models, validators
 
 
 class DecisionEnvironmentSerializer(serializers.ModelSerializer):
@@ -40,9 +40,15 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
 class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the DecisionEnvironment."""
 
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     eda_credential_id = serializers.IntegerField(
-        required=False, allow_null=True
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
     )
 
     class Meta:

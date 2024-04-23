@@ -327,8 +327,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
-
     class Meta:
         model = models.Activation
         fields = [
@@ -348,6 +346,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "k8s_service_name",
         ]
 
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists]
     )
