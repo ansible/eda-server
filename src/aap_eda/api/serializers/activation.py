@@ -33,7 +33,11 @@ from aap_eda.api.serializers.decision_environment import (
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.api.serializers.project import ProjectRefSerializer
+from aap_eda.api.serializers.project import (
+    ANSIBLE_VAULT_STRING,
+    ENCRYPTED_STRING,
+    ProjectRefSerializer,
+)
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
@@ -183,6 +187,19 @@ def _get_vault_credential_type():
     return models.CredentialType.objects.get(name=DefaultCredentialType.VAULT)
 
 
+def replace_vault_data(extra_var):
+    data = {
+        key: (
+            ENCRYPTED_STRING
+            if isinstance(value, str) and ANSIBLE_VAULT_STRING in value
+            else value
+        )
+        for key, value in yaml.safe_load(extra_var).items()
+    }
+
+    return yaml.safe_dump(data).rstrip("\n")
+
+
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
@@ -297,6 +314,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
             EdaCredentialSerializer(credential).data
             for credential in activation.eda_credentials.all()
         ]
+        extra_var = (
+            replace_vault_data(activation.extra_var)
+            if activation.extra_var
+            else None
+        )
 
         return {
             "id": activation.id,
@@ -307,7 +329,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "decision_environment_id": activation.decision_environment_id,
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
-            "extra_var": activation.extra_var,
+            "extra_var": extra_var,
             "organization_id": activation.organization_id,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
@@ -329,8 +351,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
 class ActivationCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the Activation."""
 
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
-
     class Meta:
         model = models.Activation
         fields = [
@@ -350,6 +370,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "k8s_service_name",
         ]
 
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists]
     )
@@ -571,6 +596,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             EdaCredentialSerializer(credential).data
             for credential in activation.eda_credentials.all()
         ]
+        extra_var = (
+            replace_vault_data(activation.extra_var)
+            if activation.extra_var
+            else None
+        )
 
         return {
             "id": activation.id,
@@ -582,7 +612,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "git_hash": activation.git_hash,
             "project": project,
             "rulebook": rulebook,
-            "extra_var": activation.extra_var,
+            "extra_var": extra_var,
             "organization": organization,
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True

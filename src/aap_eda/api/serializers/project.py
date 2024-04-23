@@ -19,10 +19,11 @@ from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models
+from aap_eda.core import models, validators
 from aap_eda.core.utils.crypto.base import SecretValue
 
 ENCRYPTED_STRING = "$encrypted$"
+ANSIBLE_VAULT_STRING = "$ANSIBLE_VAULT;"
 
 
 class ProxyFieldMixin:
@@ -69,12 +70,20 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     eda_credential_id = serializers.IntegerField(
-        required=False, allow_null=True
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
     )
     signature_validation_credential_id = serializers.IntegerField(
-        required=False, allow_null=True
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_credential_exists],
     )
 
     class Meta:
@@ -117,6 +126,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         help_text="EdaCredential id of the project",
+        validators=[validators.check_if_credential_exists],
     )
     signature_validation_credential_id = serializers.IntegerField(
         required=False,
@@ -125,6 +135,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "ID of an optional credential used for validating files in the "
             "project against unexpected changes"
         ),
+        validators=[validators.check_if_credential_exists],
     )
     verify_ssl = serializers.BooleanField(
         required=False,

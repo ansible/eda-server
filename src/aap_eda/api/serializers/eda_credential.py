@@ -17,7 +17,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models
+from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import inputs_to_display, validate_inputs
 from aap_eda.core.utils.crypto.base import SecretValue
 
@@ -102,9 +102,15 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
 
 class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     credential_type_id = serializers.IntegerField(
-        required=True, allow_null=True
+        required=True,
+        allow_null=True,
+        validators=[validators.check_if_credential_type_exists],
     )
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     inputs = serializers.JSONField()
 
     def validate(self, data):

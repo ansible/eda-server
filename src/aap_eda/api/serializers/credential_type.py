@@ -44,11 +44,13 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         help_text="Name of the credential type",
-        validators=[
-            validators.check_if_schema_valid,
-        ],
+        validators=[validators.check_if_schema_valid],
     )
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
 
     def validate(self, data):
         if data.get("injectors") and data.get("inputs"):

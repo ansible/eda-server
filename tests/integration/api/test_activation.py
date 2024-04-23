@@ -14,6 +14,7 @@
 from typing import Any, Dict, List
 
 import pytest
+import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -21,10 +22,15 @@ from aap_eda.api.serializers.activation import (
     get_rules_count,
     is_activation_valid,
 )
+from aap_eda.api.serializers.project import ENCRYPTED_STRING
 from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
+
+
+def converted_extra_var(var: str) -> str:
+    return yaml.safe_dump(yaml.safe_load(var)).rstrip("\n")
 
 
 @pytest.mark.django_db
@@ -51,7 +57,9 @@ def test_create_activation(
         data["decision_environment"]["id"]
         == activation_payload["decision_environment_id"]
     )
-    assert data["extra_var"] == activation_payload["extra_var"]
+    assert data["extra_var"] == converted_extra_var(
+        activation_payload["extra_var"]
+    )
     assert activation.rulebook_name == default_rulebook.name
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
@@ -210,7 +218,7 @@ def test_create_activation_with_vault_extra_var(
     )
     assert response.status_code == status.HTTP_201_CREATED
     id = response.data["id"]
-    assert response.data["extra_var"] == vault_extra_var_data
+    assert response.data["extra_var"] == f"limit: {ENCRYPTED_STRING}"
     assert models.Activation.objects.filter(pk=id).exists()
     assert models.Activation.objects.first().extra_var == vault_extra_var_data
 
@@ -532,7 +540,7 @@ def assert_activation_base_data(
     assert data["name"] == activation.name
     assert data["description"] == activation.description
     assert data["is_enabled"] == activation.is_enabled
-    assert data["extra_var"] == activation.extra_var
+    assert data["extra_var"] == converted_extra_var(activation.extra_var)
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
     assert data["rulebook_name"] == activation.rulebook_name
