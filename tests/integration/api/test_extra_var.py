@@ -1,9 +1,15 @@
 import pytest
+import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.serializers.project import ENCRYPTED_STRING
 from aap_eda.core import models
 from tests.integration.constants import api_url_v1
+
+
+def converted_extra_var(var: str) -> str:
+    return yaml.safe_dump(yaml.safe_load(var)).rstrip("\n")
 
 
 @pytest.mark.django_db
@@ -22,7 +28,7 @@ def test_create_extra_var(client: APIClient, extra_var_data: str):
     response = client.post(f"{api_url_v1}/extra-vars/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     id_ = response.data["id"]
-    assert response.data["extra_var"] == extra_var_data
+    assert response.data["extra_var"] == converted_extra_var(extra_var_data)
     assert models.ExtraVar.objects.filter(pk=id_).exists()
 
 
@@ -34,7 +40,7 @@ def test_create_vault_extra_var(client: APIClient, vault_extra_var_data: str):
     response = client.post(f"{api_url_v1}/extra-vars/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     id = response.data["id"]
-    assert response.data["extra_var"] == vault_extra_var_data
+    assert response.data["extra_var"] == f"limit: {ENCRYPTED_STRING}"
     assert models.ExtraVar.objects.filter(pk=id).exists()
     assert models.ExtraVar.objects.first().extra_var == vault_extra_var_data
 
@@ -44,6 +50,16 @@ def test_retrieve_extra_var(client: APIClient, default_extra_var: str):
     response = client.get(f"{api_url_v1}/extra-vars/{default_extra_var.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_extra_var_data(response.data, default_extra_var)
+
+
+@pytest.mark.django_db
+def test_retrieve_vault_extra_var(
+    client: APIClient, vault_extra_var_data: str
+):
+    obj = models.ExtraVar.objects.create(extra_var=vault_extra_var_data)
+    response = client.get(f"{api_url_v1}/extra-vars/{obj.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["extra_var"] == f"limit: {ENCRYPTED_STRING}"
 
 
 @pytest.mark.django_db
@@ -98,5 +114,5 @@ def assert_extra_var_data(response, expected):
     """Assert the response from ExtraVar view matches the object instance
     in DB"""
     assert response["id"] == expected.id
-    assert response["extra_var"] == expected.extra_var
+    assert response["extra_var"] == converted_extra_var(expected.extra_var)
     assert response["organization_id"] == expected.organization.id
