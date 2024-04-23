@@ -288,3 +288,33 @@ def test_list_users_filter_username_non_exist(
     results = response.json()["results"]
 
     assert len(results) == 0
+
+
+@pytest.mark.django_db
+def test_list_users_filter_by_ansible_id(
+    client: APIClient,
+    admin_user: models.User,
+    default_user: models.User,
+):
+    filter = default_user.resource.ansible_id
+    response = client.get(f"{api_url_v1}/users/?resource__ansible_id={filter}")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+    assert len(results) == 1
+    assert results[0] == {
+        "id": default_user.id,
+        "username": default_user.username,
+        "first_name": default_user.first_name,
+        "last_name": default_user.last_name,
+        "is_superuser": default_user.is_superuser,
+        "resource": {
+            "ansible_id": str(default_user.resource.ansible_id),
+            "resource_type": default_user.resource.resource_type,
+        },
+    }
+
+    response = client.get(
+        f"{api_url_v1}/users/?resource__ansible_id=non-existent-org"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0

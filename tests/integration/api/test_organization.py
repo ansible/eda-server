@@ -33,6 +33,72 @@ def test_list_organizations(
 
 
 @pytest.mark.django_db
+def test_list_organizations_filter_by_name(
+    default_organization: models.Organization,
+    new_organization: models.Organization,
+    superuser_client: APIClient,  # only superuser can view both orgs
+):
+    filter = default_organization.name
+    response = superuser_client.get(
+        f"{api_url_v1}/organizations/?name={filter}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    result = response.data["results"][0]
+    assert_organization_data(result, default_organization)
+
+    response = superuser_client.get(
+        f"{api_url_v1}/organizations/?name=non-existent-org"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_organizations_filter_by_description(
+    default_organization: models.Organization,
+    new_organization: models.Organization,
+    superuser_client: APIClient,  # only superuser can view both orgs
+):
+    filter = default_organization.description
+    response = superuser_client.get(
+        f"{api_url_v1}/organizations/?description={filter}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    result = response.data["results"][0]
+    assert_organization_data(result, default_organization)
+
+    response = superuser_client.get(
+        f"{api_url_v1}/organizations/?description=non-existent-org"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_organizations_filter_by_ansible_id(
+    default_organization: models.Organization,
+    new_organization: models.Organization,
+    superuser_client: APIClient,  # only superuser can view both orgs
+):
+    filter = new_organization.resource.ansible_id
+    response = superuser_client.get(
+        f"{api_url_v1}/organizations/?resource__ansible_id={filter}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    result = response.data["results"][0]
+    assert_organization_data(result, new_organization)
+
+    response = superuser_client.get(
+        f"{api_url_v1}/organizations/?resource__ansible_id=non-existent-org"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
 def test_create_organization(
     base_client: APIClient,
     super_user: models.User,

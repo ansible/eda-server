@@ -33,10 +33,20 @@ class TeamFilter(django_filters.FilterSet):
         lookup_expr="icontains",
         label="Filter by team description.",
     )
+    resource__ansible_id = django_filters.CharFilter(
+        field_name="resource__ansible_id",
+        lookup_expr="iexact",
+        label="Filter by resource ansible ID.",
+    )
 
     class Meta:
         model = Team
-        fields = ["name", "organization_id", "description"]
+        fields = [
+            "name",
+            "organization_id",
+            "description",
+            "resource__ansible_id",
+        ]
 
 
 class OrganizationTeamFilter(django_filters.FilterSet):
@@ -50,7 +60,12 @@ class OrganizationTeamFilter(django_filters.FilterSet):
         lookup_expr="icontains",
         label="Filter by team description.",
     )
+    resource__ansible_id = django_filters.CharFilter(
+        field_name="resource__ansible_id",
+        lookup_expr="iexact",
+        label="Filter by resource ansible ID.",
+    )
 
     class Meta:
         model = Team
-        fields = ["name", "description"]
+        fields = ["name", "description", "resource__ansible_id"]
