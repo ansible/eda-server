@@ -79,7 +79,6 @@ def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
     extra_vars = rulesets[0]["sources"][0]["extra_vars"]
     encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
 
-    credential_id = None
     password = ""
 
     if bool(encrypt_vars):
@@ -89,7 +88,7 @@ def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
         validated_data, extra_vars, encrypt_vars, password
     )
 
-    return extra_vars, credential_id
+    return extra_vars
 
 
 def _updated_listener_ruleset(validated_data):
@@ -195,9 +194,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()
         )
-        extra_vars, credential_id = _get_extra_var_and_credential_ids(
-            validated_data
-        )
+        extra_vars = _get_extra_var_and_credential_ids(validated_data)
         validated_data["extra_var"] = yaml.dump(extra_vars)
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
