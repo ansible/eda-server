@@ -20,6 +20,9 @@ spec:
   image_web: {{ eda_server.image_web }}
   image_web_version: {{ eda_server.image_web_version }}
 
+  postgres_image: {{ eda_server.postgres_image }}
+  postgres_image_version: {{ eda_server.postgres_image_version }}
+
   api:
     replicas: {{ eda_server.api.replicas }}
     resource_requirements:
