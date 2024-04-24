@@ -197,7 +197,7 @@ def replace_vault_data(extra_var):
         for key, value in yaml.safe_load(extra_var).items()
     }
 
-    return yaml.safe_dump(data).rstrip("\n")
+    return yaml.safe_dump(data)
 
 
 class ActivationSerializer(serializers.ModelSerializer):

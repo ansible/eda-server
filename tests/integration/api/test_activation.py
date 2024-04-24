@@ -30,7 +30,7 @@ PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
 
 
 def converted_extra_var(var: str) -> str:
-    return yaml.safe_dump(yaml.safe_load(var)).rstrip("\n")
+    return yaml.safe_dump(yaml.safe_load(var))
 
 
 @pytest.mark.django_db
@@ -218,7 +218,7 @@ def test_create_activation_with_vault_extra_var(
     )
     assert response.status_code == status.HTTP_201_CREATED
     id = response.data["id"]
-    assert response.data["extra_var"] == f"limit: {ENCRYPTED_STRING}"
+    assert response.data["extra_var"] == f"limit: {ENCRYPTED_STRING}\n"
     assert models.Activation.objects.filter(pk=id).exists()
     assert models.Activation.objects.first().extra_var == vault_extra_var_data
 
