@@ -16,7 +16,7 @@ from django.db import models
 
 from .utils import get_default_organization_id
 
-__all__ = ("BaseOrgModel",)
+__all__ = ("BaseOrgModel", "UniqueNamedModel")
 
 
 class BaseOrgModel(models.Model):
@@ -29,3 +29,16 @@ class BaseOrgModel(models.Model):
         default=get_default_organization_id,
         null=True,
     )
+
+
+class UniqueNamedModel(models.Model):
+    class Meta:
+        abstract = True
+
+    name = models.TextField(null=False, unique=True)
+
+    def summary_fields(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+        }

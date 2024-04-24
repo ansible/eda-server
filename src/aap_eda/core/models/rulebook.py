@@ -15,7 +15,7 @@
 import yaml
 from django.db import models
 
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel
 
 __all__ = (
     "Rulebook",
