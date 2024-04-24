@@ -107,7 +107,7 @@ def _update_k8s_service_name(validated_data: dict) -> str:
 
 def _extend_extra_vars_from_credentials(
     validated_data: dict, credential_data: Union[str, Dict]
-) -> Union[str, Dict]:
+) -> str:
     if validated_data.get("extra_var"):
         updated_extra_vars = yaml.safe_load(validated_data.get("extra_var"))
         for key in credential_data.get("extra_vars", []):
