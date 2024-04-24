@@ -90,6 +90,12 @@ class UserUpdateSerializerBase(serializers.ModelSerializer):
             validated_data["password"] = make_password(password)
         return super().update(instance, validated_data)
 
+    def validate_is_superuser(self, value):
+        if value is True:
+            if not self.context["request"].user.is_superuser:
+                raise PermissionDenied
+        return value
+
 
 class UserCreateUpdateSerializer(UserUpdateSerializerBase):
     class Meta:
@@ -102,12 +108,6 @@ class UserCreateUpdateSerializer(UserUpdateSerializerBase):
             "password",
             "is_superuser",
         ]
-
-    def validate_is_superuser(self, value):
-        if value is True:
-            if not self.context["request"].user.is_superuser:
-                raise PermissionDenied
-        return value
 
 
 class CurrentUserUpdateSerializer(UserUpdateSerializerBase):

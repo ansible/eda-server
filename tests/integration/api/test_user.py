@@ -15,6 +15,7 @@ import pytest
 from ansible_base.rbac.models import RoleDefinition
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
+from rest_framework.reverse import reverse
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
@@ -26,26 +27,9 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 @pytest.fixture
-def super_user():
-    return models.User.objects.create(username="super-user", is_superuser=True)
-
-
-@pytest.fixture
-def random_user():
-    return models.User.objects.create(username="unprivledged-user")
-
-
-@pytest.fixture
-def admin_api_client(super_user):
+def user_api_client(default_user):
     client = APIClient()
-    client.force_authenticate(user=super_user)
-    return client
-
-
-@pytest.fixture
-def user_api_client(random_user):
-    client = APIClient()
-    client.force_authenticate(user=random_user)
+    client.force_authenticate(user=default_user)
     return client
 
 
@@ -55,8 +39,21 @@ def org_admin_rd():
         name="organization-admin",
         permissions=[
             "change_organization",
+            "member_organization",
             "view_organization",
             "delete_organization",
+        ],
+        content_type=ContentType.objects.get_for_model(models.Organization),
+    )
+
+
+@pytest.fixture
+def org_member_rd():
+    return RoleDefinition.objects.create_from_permissions(
+        name="organization-member",
+        permissions=[
+            "member_organization",
+            "view_organization",
         ],
         content_type=ContentType.objects.get_for_model(models.Organization),
     )
@@ -160,10 +157,10 @@ def test_create_user(client: APIClient):
 
 @pytest.mark.django_db
 def test_create_superuser(
-    admin_api_client: APIClient,
+    superuser_client: APIClient,
     user_api_client: APIClient,
     org_admin_rd,
-    random_user,
+    default_user,
 ):
     create_user_data = {
         "username": "test.user",
@@ -174,7 +171,7 @@ def test_create_superuser(
         "is_superuser": True,
     }
 
-    response = admin_api_client.post(
+    response = superuser_client.post(
         f"{api_url_v1}/users/", data=create_user_data
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -189,7 +186,7 @@ def test_create_superuser(
     # Even if user is org admin, would NORMALLY have permission
     # this should still be denied because it is creating a superuser
     org = models.Organization.objects.first()
-    org_admin_rd.give_permission(random_user, org)
+    org_admin_rd.give_permission(default_user, org)
     response = user_api_client.post(
         f"{api_url_v1}/users/", data=create_user_data
     )
@@ -197,8 +194,52 @@ def test_create_superuser(
 
 
 @pytest.mark.django_db
+def test_modify_superuser_as_superuser(superuser_client: APIClient):
+    other_user = models.User.objects.create(username="other-user")
+    assert other_user.is_superuser is False  # sanity
+    url = reverse("user-detail", kwargs={"pk": other_user.pk})
+    response = superuser_client.patch(url, data={"is_superuser": True})
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["is_superuser"] is True
+
+
+@pytest.mark.django_db
+def test_modify_superuser_as_org_admin(
+    user_api_client: APIClient,
+    org_admin_rd,
+    org_member_rd,
+    default_user,
+):
+    # Set up, giving admin access allows user to modify other_user
+    other_user = models.User.objects.create(username="other-user")
+    org = models.Organization.objects.first()
+    # NOTE: default_user is the user for user_api_client
+    org_admin_rd.give_permission(default_user, org)
+    org_member_rd.give_permission(other_user, org)
+
+    # Changing any ordinary field is fine
+    url = reverse("user-detail", kwargs={"pk": other_user.pk})
+    r = user_api_client.patch(url, data={"last_name": "Meyers"})
+    assert r.status_code == status.HTTP_200_OK
+
+    # Promoting other_user to superuser is not something user can do
+    r = user_api_client.patch(url, data={"is_superuser": True})
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    # User should not be able to promote themself to superuser
+    # but this serializer does not list is_superuser field
+    # so response may be a 200 and that is still okay
+    assert default_user.is_superuser is False  # sanity
+    r = user_api_client.patch(
+        f"{api_url_v1}/users/me/", data={"is_superuser": True}
+    )
+    default_user.refresh_from_db()
+    assert default_user.is_superuser is False
+
+
+@pytest.mark.django_db
 def test_organization_admin_can_create_user(
-    random_user, user_api_client, org_admin_rd
+    default_user, user_api_client, org_admin_rd
 ):
     create_user_data = {
         "username": "test.user",
@@ -209,7 +250,7 @@ def test_organization_admin_can_create_user(
         "is_superuser": False,
     }
     org = models.Organization.objects.first()
-    org_admin_rd.give_permission(random_user, org)
+    org_admin_rd.give_permission(default_user, org)
     response = user_api_client.post(
         f"{api_url_v1}/users/", data=create_user_data
     )
@@ -218,11 +259,11 @@ def test_organization_admin_can_create_user(
 
 @pytest.mark.django_db
 def test_retrieve_user_details(
-    admin_api_client: APIClient,
+    superuser_client: APIClient,
     user_api_client: APIClient,
     default_user: models.User,
 ):
-    response = admin_api_client.get(f"{api_url_v1}/users/{default_user.id}/")
+    response = superuser_client.get(f"{api_url_v1}/users/{default_user.id}/")
     assert response.status_code == status.HTTP_200_OK
     response_data = response.data.copy()
     response_data.pop("resource", None)
@@ -237,7 +278,9 @@ def test_retrieve_user_details(
         "modified_at": default_user.modified_at.strftime(DATETIME_FORMAT),
     }
 
-    response = user_api_client.get(f"{api_url_v1}/users/{default_user.id}/")
+    # user can see themselves and admins, but not unrelated users
+    other_user = models.User.objects.create_user(username='another-user')
+    response = user_api_client.get(f"{api_url_v1}/users/{other_user.id}/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
