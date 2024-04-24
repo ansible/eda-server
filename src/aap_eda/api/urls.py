@@ -50,7 +50,6 @@ router.register(
     views.CurrentUserAwxTokenViewSet,
     basename="controller-token",
 )
-router.register("credentials", views.CredentialViewSet)
 router.register("credential-types", views.CredentialTypeViewSet)
 router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)

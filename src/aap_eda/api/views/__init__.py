@@ -14,7 +14,6 @@
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView
-from .credential import CredentialViewSet
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
@@ -42,7 +41,6 @@ __all__ = (
     "CurrentUserAwxTokenViewSet",
     "UserViewSet",
     # credential
-    "CredentialViewSet",
     "CredentialTypeViewSet",
     "EdaCredentialViewSet",
     # decision_environment
