@@ -74,7 +74,7 @@ def _get_default_channel_name():
     return f"{EDA_CHANNEL_PREFIX}{stream_uuid.replace('-','_')}"
 
 
-def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
+def _get_extra_var(validated_data: dict) -> dict:
     rulesets = yaml.safe_load(validated_data["rulebook_rulesets"])
     extra_vars = rulesets[0]["sources"][0]["extra_vars"]
     encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
@@ -194,7 +194,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()
         )
-        extra_vars = _get_extra_var_and_credential_ids(validated_data)
+        extra_vars = _get_extra_var(validated_data)
         validated_data["extra_var"] = yaml.dump(extra_vars)
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
