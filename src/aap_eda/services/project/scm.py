@@ -243,7 +243,7 @@ class ScmRepository:
     @classmethod
     def decrypt_key_file(cls, key_file: str, password: str) -> None:
         result = subprocess.run(
-            [KEYGEN_COMMAND, "-p", "-P", password, "-N", '""', "-f", key_file],
+            [KEYGEN_COMMAND, "-p", "-P", password, "-N", "", "-f", key_file],
             capture_output=True,
             text=True,
         )
@@ -252,7 +252,7 @@ class ScmRepository:
                 "Failed to load key using the passphrase. Exit code "
                 f"{result.returncode}: {result.stderr} {result.stdout}"
             )
-            msg = "Incorrect passhprase for the private key"
+            msg = "Failed to decrypt the private key using the passphrase"
             raise ScmError(msg)
 
     @classmethod
