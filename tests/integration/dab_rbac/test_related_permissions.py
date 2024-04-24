@@ -51,7 +51,6 @@ def test_related_organization_edit_access_control(
     assert organization.pk != obj.organization_id
 
 
-@pytest.mark.skip(reason="will be reenabled by AAP-23288")
 @pytest.mark.django_db
 def test_project_credential_access(
     cls_factory, user, user_api_client, give_obj_perm
