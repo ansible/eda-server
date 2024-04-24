@@ -430,22 +430,20 @@ def _run_unresponsive_monitor() -> None:
             f"Checking unresponsiveness for process id {process.id} of ",
             f"{process.parent_type} {process_parent.id}",
         )
-        # we expect connection errors here, we are monitoring
-        # processes that can not be monitored by activation workers
-        with contextlib.suppress(engine_exceptions.ContainerEngineInitError):
-            try:
-                _check_unresponsive_process(process_parent)
-            except engine_exceptions.ContainerEngineInitError:
-                raise
-            except (
-                engine_exceptions.ContainerEngineError,
-                exceptions.ActivationManagerError,
-            ) as exc:
-                LOGGER.error(
-                    "Error while checking unresponsiveness for"
-                    f"{process_parent.id}: {exc}",
-                )
-                continue
+        try:
+            _check_unresponsive_process(process_parent)
+        except engine_exceptions.ContainerEngineInitError:
+            # we expect connection errors here, we are monitoring
+            # processes that can not be monitored by activation workers
+            pass
+        except (
+            engine_exceptions.ContainerEngineError,
+            exceptions.ActivationManagerError,
+        ) as exc:
+            LOGGER.error(
+                "Error while checking unresponsiveness for"
+                f"{process_parent.id}: {exc}",
+            )
 
 
 def _check_unresponsive_process(process_parent) -> None:
