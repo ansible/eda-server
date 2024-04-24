@@ -16,7 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, Optional, Union
 
 import yaml
 from django.conf import settings
@@ -106,13 +106,13 @@ def _update_k8s_service_name(validated_data: dict) -> str:
 
 
 def _extend_extra_vars_from_credentials(
-    validated_data: dict, credential_data: Union[str, int, Dict, List]
-) -> Union[str, int, Dict, List]:
+    validated_data: dict, credential_data: Union[str, Dict]
+) -> Union[str, Dict]:
     if validated_data.get("extra_var"):
         updated_extra_vars = yaml.safe_load(validated_data.get("extra_var"))
         for key in credential_data.get("extra_vars", []):
             updated_extra_vars[key] = credential_data["extra_vars"][key]
-        return updated_extra_vars
+        return yaml.dump(updated_extra_vars)
     else:
         return yaml.dump(credential_data["extra_vars"])
 
@@ -159,7 +159,7 @@ def _update_extra_vars_from_eda_credentials(
             return updated_extra_vars
         # if not creating, update the existing activation object extra vars
         else:
-            activation.extra_var = yaml.dump(updated_extra_vars)
+            activation.extra_var = updated_extra_vars
             activation.save(update_fields=["extra_var"])
 
 
