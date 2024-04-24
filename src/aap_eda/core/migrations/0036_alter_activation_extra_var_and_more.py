@@ -37,7 +37,7 @@ def create_extra_var_objects(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0035_remove_role_permissions_remove_user_roles_and_more"),
+        ("core", "0036_alter_project_name"),
     ]
 
     operations = [
