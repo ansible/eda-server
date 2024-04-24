@@ -28,8 +28,7 @@ from aap_eda.core.exceptions import (
     UpdateFieldsRequiredError,
 )
 
-from .base import BaseModel
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel
 
 __all__ = (
     "RulebookProcess",
@@ -37,7 +36,7 @@ __all__ = (
 )
 
 
-class RulebookProcess(BaseOrgModel, BaseModel):
+class RulebookProcess(BaseOrgModel):
     """Rulebook Process model.
 
     Rulebook Process is an instance of ansible-rulebook process
@@ -185,6 +184,12 @@ class RulebookProcess(BaseOrgModel, BaseModel):
         self.save(
             update_fields=update_fields,
         )
+
+    def summary_fields(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+        }
 
 
 class RulebookProcessLog(models.Model):

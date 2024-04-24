@@ -22,8 +22,7 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .base import BaseModel
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel, UniqueNamedModel
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
@@ -31,7 +30,7 @@ __all__ = ("Activation",)
 
 
 class Activation(
-    StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel, BaseModel
+    StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel, UniqueNamedModel
 ):
     class Meta:
         db_table = "core_activation"
@@ -44,7 +43,6 @@ class Activation(
         ]
         default_permissions = ["add", "view", "delete"]
 
-    name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")

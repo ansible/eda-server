@@ -22,14 +22,15 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .base import BaseModel
+from .base import UniqueNamedModel
 from .mixins import StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, ContainerableMixin, BaseModel):
+class EventStream(
+    StatusHandlerModelMixin, ContainerableMixin, UniqueNamedModel
+):
     """Model representing an event stream."""
 
-    name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     decision_environment = models.ForeignKey(

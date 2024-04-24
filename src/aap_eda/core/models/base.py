@@ -14,12 +14,28 @@
 
 from django.db import models
 
-__all__ = ("BaseModel",)
+from .utils import get_default_organization_id
+
+__all__ = ("BaseOrgModel", "UniqueNamedModel")
 
 
-class BaseModel(models.Model):
+class BaseOrgModel(models.Model):
     class Meta:
         abstract = True
+
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        default=get_default_organization_id,
+        null=True,
+    )
+
+
+class UniqueNamedModel(models.Model):
+    class Meta:
+        abstract = True
+
+    name = models.TextField(null=False, unique=True)
 
     def summary_fields(self):
         return {
