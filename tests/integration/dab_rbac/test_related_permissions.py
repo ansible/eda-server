@@ -76,7 +76,8 @@ def test_project_credential_access(
     response = user_api_client.patch(
         url, data={"eda_credential_id": credential.pk}
     )
-    assert response.status_code == 403, response.data
+    # NOTE: the ideal would probably be 400, but still a matter of discussion
+    assert response.status_code in (403, 400), response.data
     assert "eda_credential" in str(response.data), response.data
     project.refresh_from_db()
     assert project.eda_credential_id != credential.pk
