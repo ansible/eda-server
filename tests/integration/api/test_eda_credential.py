@@ -134,6 +134,13 @@ def test_list_eda_credentials_with_kind_filter(
     )
     assert len(response.data["results"]) == 2
 
+    name_prefix = default_eda_credential.name[0]
+    response = client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
+        f"&credential_type__kind=registry&name={name_prefix}",
+    )
+    assert len(response.data["results"]) == 1
+
 
 @pytest.mark.django_db
 def test_list_eda_credentials_filter_credential_type_id(
