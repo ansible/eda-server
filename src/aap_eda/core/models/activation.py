@@ -22,6 +22,7 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
+from .base import BaseModel
 from .base_org import BaseOrgModel
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
@@ -29,7 +30,9 @@ from .user import AwxToken, User
 __all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
+class Activation(
+    StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel, BaseModel
+):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]

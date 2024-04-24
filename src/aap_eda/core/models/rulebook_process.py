@@ -28,6 +28,7 @@ from aap_eda.core.exceptions import (
     UpdateFieldsRequiredError,
 )
 
+from .base import BaseModel
 from .base_org import BaseOrgModel
 
 __all__ = (
@@ -36,7 +37,7 @@ __all__ = (
 )
 
 
-class RulebookProcess(BaseOrgModel):
+class RulebookProcess(BaseOrgModel, BaseModel):
     """Rulebook Process model.
 
     Rulebook Process is an instance of ansible-rulebook process

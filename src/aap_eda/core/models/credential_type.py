@@ -14,12 +14,13 @@
 
 from django.db import models
 
+from .base import BaseModel
 from .base_org import BaseOrgModel
 
 __all__ = ("CredentialType",)
 
 
-class CredentialType(BaseOrgModel):
+class CredentialType(BaseOrgModel, BaseModel):
     class Meta:
         db_table = "core_credential_type"
         constraints = [

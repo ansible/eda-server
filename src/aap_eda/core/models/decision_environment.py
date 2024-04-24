@@ -14,12 +14,13 @@
 
 from django.db import models
 
+from .base import BaseModel
 from .base_org import BaseOrgModel
 
 __all__ = ("DecisionEnvironment",)
 
 
-class DecisionEnvironment(BaseOrgModel):
+class DecisionEnvironment(BaseOrgModel, BaseModel):
     class Meta:
         db_table = "core_decision_environment"
         constraints = [

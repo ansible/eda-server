@@ -15,6 +15,7 @@
 import yaml
 from django.db import models
 
+from .base import BaseModel
 from .base_org import BaseOrgModel
 
 __all__ = (
@@ -25,7 +26,7 @@ __all__ = (
 )
 
 
-class Rulebook(BaseOrgModel):
+class Rulebook(BaseOrgModel, BaseModel):
     class Meta:
         db_table = "core_rulebook"
         unique_together = ["project_id", "name"]
@@ -86,7 +87,7 @@ class Rule(models.Model):
     action = models.JSONField(default=dict, null=False)
 
 
-class AuditRule(BaseOrgModel):
+class AuditRule(BaseOrgModel, BaseModel):
     class Meta:
         db_table = "core_audit_rule"
         indexes = [
