@@ -279,7 +279,7 @@ def test_retrieve_user_details(
     }
 
     # user can see themselves and admins, but not unrelated users
-    other_user = models.User.objects.create_user(username='another-user')
+    other_user = models.User.objects.create_user(username="another-user")
     response = user_api_client.get(f"{api_url_v1}/users/{other_user.id}/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
