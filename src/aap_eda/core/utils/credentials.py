@@ -99,7 +99,7 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
         if user_input is None:
             if default:
                 inputs[field] = default
-            elif required:
+            if required and not default:
                 errors[display_field] = ["Cannot be blank"]
                 continue
 
