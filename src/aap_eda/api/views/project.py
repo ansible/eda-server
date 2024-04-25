@@ -193,11 +193,11 @@ class ProjectViewSet(
         serializer.is_valid(raise_exception=True)
 
         update_fields = []
+        old_data = model_to_dict(project)
         for key, value in serializer.validated_data.items():
             setattr(project, key, value)
             update_fields.append(key)
 
-        old_data = model_to_dict(project)
         with transaction.atomic():
             project.save(update_fields=update_fields)
             check_related_permissions(
