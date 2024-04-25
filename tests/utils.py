@@ -33,7 +33,7 @@ from aap_eda.tasks import orchestrator
 #     "queue1": {
 #         "workers": {
 #             "worker1_1": {
-#                 "good": True
+#                 "responsive": True
 #             }
 #         },
 #         "process_count": 1
@@ -41,7 +41,7 @@ from aap_eda.tasks import orchestrator
 #     "queue2": {
 #         "workers": {
 #             "worker2_1": {
-#                 "good": True
+#                 "responsive": True
 #             }
 #         },
 #         "process_count": 2
@@ -93,7 +93,7 @@ def mock_up_orchestrator_queues(queues, monkeypatch):
             mock_worker = mock.Mock()
             mock_worker.name = worker_name
             mock_worker.last_heartbeat = datetime.now()
-            if not queues[queue_name]["workers"][worker_name]["good"]:
+            if not queues[queue_name]["workers"][worker_name]["responsive"]:
                 mock_worker.last_heartbeat -= timedelta(
                     seconds=(2 * default.DEFAULT_WORKER_HEARTBEAT_TIMEOUT)
                 )

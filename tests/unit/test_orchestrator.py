@@ -33,27 +33,31 @@ from tests.utils import mock_up_orchestrator_queues
     [
         {
             "queue": {
-                "workers": {"worker": {"good": True}},
+                "workers": {"worker": {"responsive": True}},
                 "process_count": 1,
             },
         },
         {
             "queue1": {
-                "workers": {"worker1_1": {"good": True}},
+                "workers": {"worker1_1": {"responsive": True}},
                 "process_count": 1,
             },
             "queue2": {
-                "workers": {"worker2_1": {"good": True}},
+                "workers": {"worker2_1": {"responsive": True}},
                 "process_count": 2,
             },
         },
     ],
 )
 def test_get_least_busy_queue_name(monkeypatch, queues):
+    import pdb
+
+    pdb.set_trace()
     mock_queues = mock_up_orchestrator_queues(queues, monkeypatch)
 
-    queue_name = get_least_busy_queue_name()
-    return
+    expected = min(mock_queues, key=lambda q: mock_queues.get(q).count())
+
+    get_least_busy_queue_name() == expected
 
 
 def test_get_process_parent_activation():
