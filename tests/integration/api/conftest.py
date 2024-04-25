@@ -565,7 +565,7 @@ def default_activation_instances(
     default_activation: models.Activation, default_project: models.Project
 ) -> models.RulebookProcess:
     """Return a list of Activation Instances"""
-    return models.RulebookProcess.objects.bulk_create(
+    instances = models.RulebookProcess.objects.bulk_create(
         [
             models.RulebookProcess(
                 name="default-activation-instance-1",
@@ -587,6 +587,14 @@ def default_activation_instances(
             ),
         ]
     )
+
+    for instance in instances:
+        models.RulebookProcessQueue.objects.create(
+            process=instance,
+            queue_name="activation",
+        )
+
+    return instances
 
 
 @pytest.fixture

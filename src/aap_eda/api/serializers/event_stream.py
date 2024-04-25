@@ -110,6 +110,12 @@ class EventStreamSerializer(serializers.ModelSerializer):
     )
     user = serializers.SerializerMethodField()
     source_args = YAMLSerializerField(required=False, allow_null=True)
+    queue_name = serializers.CharField(
+        source="rulebookprocessqueue.queue_name",
+        read_only=True,
+        allow_null=True,
+        default=None,
+    )
 
     class Meta:
         model = models.EventStream
@@ -130,6 +136,7 @@ class EventStreamSerializer(serializers.ModelSerializer):
             "user",
             "log_level",
             "k8s_service_name",
+            "queue_name",
             *read_only_fields,
         ]
 
