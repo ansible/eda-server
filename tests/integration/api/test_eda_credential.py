@@ -67,6 +67,64 @@ def test_create_eda_credential_with_type(
     }
 
 
+@pytest.mark.parametrize(
+    ("credential_type", "status_code", "key", "error_message"),
+    [
+        (
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+            "inputs.vault_password",
+            "Cannot be blank",
+        ),
+        (
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+            "inputs.host",
+            "Cannot be blank",
+        ),
+        (
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_400_BAD_REQUEST,
+            "inputs.gpg_public_key",
+            "Cannot be blank",
+        ),
+        (
+            # both required and default are True
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_201_CREATED,
+            None,
+            None,
+        ),
+        (
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_201_CREATED,
+            None,
+            None,
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_eda_credential_with_empty_inputs_fields(
+    client: APIClient,
+    preseed_credential_types,
+    credential_type,
+    status_code,
+    key,
+    error_message,
+):
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+
+    data_in = {
+        "name": f"eda-credential-{credential_type}",
+        "inputs": {},
+        "credential_type_id": credential_type.id,
+    }
+    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status_code
+    if error_message:
+        assert error_message in response.data[key]
+
+
 @pytest.mark.django_db
 def test_retrieve_eda_credential(
     client: APIClient, credential_type: models.CredentialType
