@@ -22,8 +22,38 @@ from aap_eda.core.models import Activation, EventStream
 from aap_eda.tasks.orchestrator import (
     UnknownProcessParentType,
     check_rulebook_queue_health,
+    get_least_busy_queue_name,
     get_process_parent,
 )
+from tests.utils import mock_up_orchestrator_queues
+
+
+@pytest.mark.parametrize(
+    "queues",
+    [
+        {
+            "queue": {
+                "workers": {"worker": {"good": True}},
+                "process_count": 1,
+            },
+        },
+        {
+            "queue1": {
+                "workers": {"worker1_1": {"good": True}},
+                "process_count": 1,
+            },
+            "queue2": {
+                "workers": {"worker2_1": {"good": True}},
+                "process_count": 2,
+            },
+        },
+    ],
+)
+def test_get_least_busy_queue_name(monkeypatch, queues):
+    mock_queues = mock_up_orchestrator_queues(queues, monkeypatch)
+
+    queue_name = get_least_busy_queue_name()
+    return
 
 
 def test_get_process_parent_activation():

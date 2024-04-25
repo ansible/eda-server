@@ -23,16 +23,6 @@ from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
 
 
-@pytest.fixture
-def redis_parameters() -> dict:
-    """Provide redis parameters based on settings values."""
-    params = (
-        default._rq_common_parameters() | default._rq_redis_client_parameters()
-    )
-    # Convert to lowercase for use in establishing a redis client.
-    return {k.lower(): v for (k, v) in params.items()}
-
-
 # Sets up a collection of mocked queues in specified states for testing
 # orchestrator functionality.
 #
