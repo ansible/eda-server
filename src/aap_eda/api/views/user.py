@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac.api.permissions import AnsibleBaseUserPermissions
+from ansible_base.rbac.policies import visible_users
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -221,7 +223,12 @@ class UserViewSet(
         "id"
     )
     filter_backends = (DjangoFilterBackend,)
+    permission_classes = [AnsibleBaseUserPermissions]
     filterset_class = filters.UserFilter
+
+    def filter_queryset(self, qs):
+        qs = visible_users(self.request.user, queryset=qs)
+        return super().filter_queryset(qs)
 
     def get_serializer_class(self):
         if self.action == "list":
