@@ -355,7 +355,7 @@ class ActivationViewSet(
     ),
 )
 class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = models.RulebookProcess.objects.all().select_related(
+    queryset = models.RulebookProcess.objects.select_related(
         "rulebookprocessqueue",
     )
     serializer_class = serializers.ActivationInstanceSerializer

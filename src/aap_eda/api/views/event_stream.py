@@ -60,7 +60,7 @@ class EventStreamViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.EventStream.objects.all().select_related(
+    queryset = models.EventStream.objects.select_related(
         "rulebookprocessqueue",
     )
     serializer_class = serializers.EventStreamSerializer
