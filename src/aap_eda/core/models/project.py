@@ -26,10 +26,14 @@
 
 from django.db import models
 
+from aap_eda.core.utils.crypto.fields import EncryptedTextField
+
+from .base import BaseOrgModel, UniqueNamedModel
+
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(models.Model):
+class Project(BaseOrgModel, UniqueNamedModel):
     class Meta:
         db_table = "core_project"
         constraints = [
@@ -48,13 +52,9 @@ class Project(models.Model):
     class ScmType(models.TextChoices):
         GIT = "git"
 
-    name = models.TextField(
-        null=False,
-        unique=True,
-        error_messages={"unique": "A project with this name already exists."},
-    )
     description = models.TextField(default="", blank=True, null=False)
     url = models.TextField(null=False)
+    proxy = EncryptedTextField(blank=True, default="")
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
     # TODO: used by migration, remove it later
@@ -104,9 +104,13 @@ class Project(models.Model):
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
 
 
-class ExtraVar(models.Model):
+class ExtraVar(BaseOrgModel):
     class Meta:
         db_table = "core_extra_var"
+        default_permissions = (
+            "add",
+            "view",
+        )
 
     name = models.TextField(unique=True, null=True, default=None)
     extra_var = models.TextField()

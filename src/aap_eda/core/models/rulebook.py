@@ -15,6 +15,8 @@
 import yaml
 from django.db import models
 
+from .base import BaseOrgModel
+
 __all__ = (
     "Rulebook",
     "Ruleset",
@@ -23,7 +25,7 @@ __all__ = (
 )
 
 
-class Rulebook(models.Model):
+class Rulebook(BaseOrgModel):
     class Meta:
         db_table = "core_rulebook"
         unique_together = ["project_id", "name"]
@@ -33,6 +35,7 @@ class Rulebook(models.Model):
                 name="ck_rulebook_name_not_empty",
             ),
         ]
+        default_permissions = ("view",)
 
     name = models.TextField(null=False)
     description = models.TextField(null=True, default="")
@@ -83,7 +86,7 @@ class Rule(models.Model):
     action = models.JSONField(default=dict, null=False)
 
 
-class AuditRule(models.Model):
+class AuditRule(BaseOrgModel):
     class Meta:
         db_table = "core_audit_rule"
         indexes = [
@@ -91,6 +94,7 @@ class AuditRule(models.Model):
             models.Index(fields=["fired_at"], name="ix_audit_rule_fired_at"),
         ]
         ordering = ("-fired_at",)
+        default_permissions = ("view",)
 
     name = models.TextField(null=False)
     status = models.TextField()

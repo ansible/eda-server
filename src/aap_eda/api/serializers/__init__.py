@@ -21,17 +21,7 @@ from .activation import (
     ActivationSerializer,
     PostActivationSerializer,
 )
-from .auth import (
-    LoginSerializer,
-    RoleDetailSerializer,
-    RoleListSerializer,
-    RoleSerializer,
-)
-from .credential import (
-    CredentialCreateSerializer,
-    CredentialRefSerializer,
-    CredentialSerializer,
-)
+from .auth import LoginSerializer
 from .credential_type import (
     CredentialTypeCreateSerializer,
     CredentialTypeRefSerializer,
@@ -52,6 +42,11 @@ from .event_stream import (
     EventStreamOutSerializer,
     EventStreamSerializer,
 )
+from .organization import (
+    OrganizationCreateSerializer,
+    OrganizationRefSerializer,
+    OrganizationSerializer,
+)
 from .project import (
     ExtraVarCreateSerializer,
     ExtraVarRefSerializer,
@@ -70,6 +65,12 @@ from .rulebook import (
     AuditRuleSerializer,
     RulebookRefSerializer,
     RulebookSerializer,
+)
+from .team import (
+    TeamCreateSerializer,
+    TeamDetailSerializer,
+    TeamSerializer,
+    TeamUpdateSerializer,
 )
 from .user import (
     AwxTokenCreateSerializer,
@@ -115,9 +116,6 @@ __all__ = (
     "UserListSerializer",
     "UserCreateUpdateSerializer",
     "UserDetailSerializer",
-    # credential
-    "CredentialSerializer",
-    "CredentialCreateSerializer",
     # credential type
     "CredentialTypeSerializer",
     "CredentialTypeCreateSerializer",
@@ -126,12 +124,17 @@ __all__ = (
     "EdaCredentialCreateSerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
-    # roles
-    "RoleSerializer",
-    "RoleListSerializer",
-    "RoleDetailSerializer",
     # event streams
     "EventStreamSerializer",
     "EventStreamCreateSerializer",
     "EventStreamOutSerializer",
+    # organizations
+    "OrganizationSerializer",
+    "OrganizationCreateSerializer",
+    "OrganizationRefSerializer",
+    # teams
+    "TeamSerializer",
+    "TeamCreateSerializer",
+    "TeamUpdateSerializer",
+    "TeamDetailSerializer",
 )

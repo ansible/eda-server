@@ -225,6 +225,12 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
         ).first()
         if audit_rule is None:
+            activation_instance = models.RulebookProcess.objects.filter(
+                id=message.activation_id
+            ).first()
+            activation_org = models.Organization.objects.filter(
+                id=activation_instance.organization.id
+            ).first()
             audit_rule = models.AuditRule.objects.create(
                 activation_instance_id=message.activation_id,
                 name=message.rule,
@@ -234,6 +240,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 fired_at=message.rule_run_at,
                 job_instance_id=job_instance_id,
                 status=message.status,
+                organization=activation_org,
             )
 
             logger.info(f"Audit rule [{audit_rule.name}] is created.")
@@ -413,7 +420,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
             vault_passwords.append(
                 VaultPassword(
-                    label=inputs["vault_id"],
+                    label=inputs.get("vault_id", ""),
                     password=inputs["vault_password"],
                 )
             )

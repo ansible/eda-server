@@ -110,6 +110,12 @@ class EventStreamSerializer(serializers.ModelSerializer):
     )
     user = serializers.SerializerMethodField()
     source_args = YAMLSerializerField(required=False, allow_null=True)
+    queue_name = serializers.CharField(
+        source="rulebookprocessqueue.queue_name",
+        read_only=True,
+        allow_null=True,
+        default=None,
+    )
 
     class Meta:
         model = models.EventStream
@@ -129,6 +135,8 @@ class EventStreamSerializer(serializers.ModelSerializer):
             "decision_environment_id",
             "user",
             "log_level",
+            "k8s_service_name",
+            "queue_name",
             *read_only_fields,
         ]
 
@@ -154,6 +162,11 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             ),
         ],
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_rfc_1035_compliant],
+    )
 
     class Meta:
         model = models.EventStream
@@ -170,6 +183,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "log_level",
+            "k8s_service_name",
         ]
 
     def create(self, validated_data):

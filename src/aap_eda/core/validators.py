@@ -15,10 +15,12 @@ import logging
 import typing as tp
 
 import yaml
+from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.core import models
 from aap_eda.core.utils.credentials import validate_schema
+from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,7 @@ def check_if_de_exists(decision_environment_id: int) -> int:
             models.EdaCredential.objects.get(pk=de.eda_credential_id)
     except models.EdaCredential.DoesNotExist:
         raise serializers.ValidationError(
-            f"Credential with id {de.eda_credential_id} does not exist"
+            f"EdaCredential with id {de.eda_credential_id} does not exist"
         )
     except models.DecisionEnvironment.DoesNotExist:
         raise serializers.ValidationError(
@@ -48,6 +50,36 @@ def check_if_de_exists(decision_environment_id: int) -> int:
             "does not exist"
         )
     return decision_environment_id
+
+
+def check_if_credential_exists(eda_credential_id: int) -> int:
+    try:
+        models.EdaCredential.objects.get(pk=eda_credential_id)
+    except models.EdaCredential.DoesNotExist:
+        raise serializers.ValidationError(
+            f"EdaCredential with id {eda_credential_id} does not exist"
+        )
+    return eda_credential_id
+
+
+def check_if_credential_type_exists(credential_type_id: int) -> int:
+    try:
+        models.CredentialType.objects.get(pk=credential_type_id)
+    except models.CredentialType.DoesNotExist:
+        raise serializers.ValidationError(
+            f"CredentialType with id {credential_type_id} does not exist"
+        )
+    return credential_type_id
+
+
+def check_if_organization_exists(organization_id: int) -> int:
+    try:
+        models.Organization.objects.get(pk=organization_id)
+    except models.Organization.DoesNotExist:
+        raise serializers.ValidationError(
+            f"Organization with id {organization_id} does not exist"
+        )
+    return organization_id
 
 
 def check_if_extra_var_exists(extra_var_id: int) -> int:
@@ -128,3 +160,12 @@ def check_if_schema_valid(schema: dict):
 
     if bool(errors):
         raise serializers.ValidationError(errors)
+
+
+def check_if_rfc_1035_compliant(service_name: str):
+    if settings.DEPLOYMENT_TYPE == "k8s" and not is_rfc_1035_compliant(
+        service_name
+    ):
+        raise serializers.ValidationError(
+            f"{service_name} must be a valid RFC 1035 label name"
+        )

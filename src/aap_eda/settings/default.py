@@ -59,11 +59,18 @@ Optionally you can define DATABASES as an object
 
 Redis queue settings:
 
-* MQ_UNIX_SOCKET_PATH - Redis unix socket path, mutually exclusive with
-    host and port (default: None)
+* MQ_UNIX_SOCKET_PATH - Redis unix socket path (default: None)
+*   - Takes precedence over host and port
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
 * MQ_DB - Redis queue database (default: 0)
+* MQ_USER - Redis user (default: None)
+* MQ_USER_PASSWORD - Redis user passed (default: None)
+* MQ_CLIENT_CERT_PATH - Redis TLS client certificate path (default: None)
+*   - If MQ_UNIX_SOCKET_PATH is not set and MQ_CLIENT_CERT_PATH
+*     is set TLS with be used.
+* MQ_CLIENT_KEY_PATH - Redis TLS client key path (default: None)
+* MQ_CLIENT_CACERT_PATH - Redis TLS CA certificate path (default: None)
 
 
 Podman settings:
@@ -170,6 +177,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
+    "ansible_base.rbac",
     "ansible_base.resource_registry",
     # Local apps
     "aap_eda.api",
@@ -184,6 +192,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "crum.CurrentRequestUserMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
@@ -296,7 +305,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
-        "aap_eda.api.permissions.RoleBasedPermission",
+        "ansible_base.rbac.api.permissions.AnsibleBaseObjectPermissions",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
@@ -309,6 +318,25 @@ if not DEBUG:
     )
 
 # ---------------------------------------------------------
+# DEPLOYMENT SETTINGS
+# ---------------------------------------------------------
+
+DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
+WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
+WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
+WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+    "ws://", "http://"
+).replace("wss://", "https://")
+PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
+PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
+PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
+PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
+DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
+CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
+
+
+# ---------------------------------------------------------
 # TASKING SETTINGS
 # ---------------------------------------------------------
 RQ = {
@@ -316,34 +344,92 @@ RQ = {
     "JOB_CLASS": "aap_eda.core.tasking.Job",
 }
 
-RQ_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
+REDIS_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
+REDIS_HOST = settings.get("MQ_HOST", "localhost")
+REDIS_PORT = settings.get("MQ_PORT", 6379)
+REDIS_USER = settings.get("MQ_USER", None)
+REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
+REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
+REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
+REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
+REDIS_DB = settings.get("MQ_DB", 0)
 
-if RQ_UNIX_SOCKET_PATH:
-    RQ_QUEUES = {
-        "default": {
-            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 300,
-        },
-        "activation": {
-            "UNIX_SOCKET_PATH": RQ_UNIX_SOCKET_PATH,
-            "DEFAULT_TIMEOUT": 120,
-        },
+
+def _rq_common_parameters():
+    params = {
+        "DB": REDIS_DB,
+        "USERNAME": REDIS_USER,
+        "PASSWORD": REDIS_USER_PASSWORD,
     }
-else:
-    RQ_QUEUES = {
-        "default": {
-            "HOST": settings.get("MQ_HOST", "localhost"),
-            "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": 300,
-        },
-        "activation": {
-            "HOST": settings.get("MQ_HOST", "localhost"),
-            "PORT": settings.get("MQ_PORT", 6379),
-            "DEFAULT_TIMEOUT": 120,
-        },
-    }
-RQ_QUEUES["default"]["DB"] = settings.get("MQ_DB", 0)
-RQ_QUEUES["activation"]["DB"] = settings.get("MQ_DB", 0)
+    if REDIS_UNIX_SOCKET_PATH:
+        params["UNIX_SOCKET_PATH"] = REDIS_UNIX_SOCKET_PATH
+    else:
+        params |= {
+            "HOST": REDIS_HOST,
+            "PORT": REDIS_PORT,
+        }
+        if REDIS_CLIENT_CERT_PATH:
+            params["SSL"] = True
+    return params
+
+
+def _rq_redis_client_parameters():
+    params = {}
+    if (not REDIS_UNIX_SOCKET_PATH) and REDIS_CLIENT_CERT_PATH:
+        params |= {
+            "ssl_certfile": REDIS_CLIENT_CERT_PATH,
+            "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
+            "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
+        }
+    return params
+
+
+# A list of queues to be used in multinode mode
+# If the list is empty, use the default singlenode queue name
+RULEBOOK_WORKER_QUEUES = settings.get("RULEBOOK_WORKER_QUEUES", [])
+if isinstance(RULEBOOK_WORKER_QUEUES, str):
+    RULEBOOK_WORKER_QUEUES = RULEBOOK_WORKER_QUEUES.split(",")
+
+if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
+    raise ImproperlyConfigured(
+        "The RULEBOOK_WORKER_QUEUES setting must not contain duplicates."
+    )
+
+# If the list is empty, use the default queue name for single node mode
+if not RULEBOOK_WORKER_QUEUES:
+    RULEBOOK_WORKER_QUEUES = ["activation"]
+
+DEFAULT_QUEUE_TIMEOUT = 300
+DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
+
+# Time window in seconds to consider a worker as dead
+DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
+DEFAULT_WORKER_TTL = 5
+
+
+def get_rq_queues() -> dict:
+    """Construct the RQ_QUEUES dictionary based on the settings."""
+    queues = {}
+
+    # Configure the default queue
+    queues["default"] = _rq_common_parameters()
+    queues["default"]["DEFAULT_TIMEOUT"] = DEFAULT_QUEUE_TIMEOUT
+    queues["default"]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
+
+    # Configure the worker queues
+    for queue in RULEBOOK_WORKER_QUEUES:
+        queues[queue] = _rq_common_parameters()
+        queues[queue]["DEFAULT_TIMEOUT"] = DEFAULT_RULEBOOK_QUEUE_TIMEOUT
+        queues[queue]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
+
+    return queues
+
+
+RQ_QUEUES = get_rq_queues()
+
+# Queue name for the rulebook workers. To be used in multinode mode
+# Otherwise, the default name is used
+RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
@@ -433,24 +519,6 @@ EDA_CONTROLLER_TOKEN = settings.get(
 EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 
 # ---------------------------------------------------------
-# DEPLOYMENT SETTINGS
-# ---------------------------------------------------------
-
-DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
-WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
-WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
-WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
-    "ws://", "http://"
-).replace("wss://", "https://")
-PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
-PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
-PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
-PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
-PODMAN_EXTRA_ARGS = settings.get("PODMAN_EXTRA_ARGS", {})
-DEFAULT_PULL_POLICY = settings.get("DEFAULT_PULL_POLICY", "Always")
-CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
-
-# ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
 # ---------------------------------------------------------
 
@@ -527,6 +595,19 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
 # ---------------------------------------------------------
 ANSIBLE_BASE_RESOURCE_CONFIG_MODULE = "aap_eda.api.resource_api"
 
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE RBAC SETTINGS
+# ---------------------------------------------------------
+DEFAULT_ORGANIZATION_NAME = "Default"
+
+ANSIBLE_BASE_SERVICE_PREFIX = "eda"
+
+ANSIBLE_BASE_TEAM_MODEL = "core.Team"
+ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
+
+# Organization and object roles will come from create_initial_data
+ANSIBLE_BASE_ROLE_PRECREATE = {}
+
 ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
 )
@@ -546,3 +627,5 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
     "SAFE_PLUGINS_FOR_PORT_FORWARD",
     ["ansible.eda.webhook", "ansible.eda.alertmanager"],
 )
+
+ANSIBLE_BASE_CUSTOM_VIEW_PARENT = "aap_eda.api.views.dab_base.BaseAPIView"

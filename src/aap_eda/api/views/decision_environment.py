@@ -24,7 +24,6 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ResourceType
 
 from .mixins import (
     CreateModelMixin,
@@ -76,7 +75,11 @@ class DecisionEnvironmentViewSet(
     queryset = models.DecisionEnvironment.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.DecisionEnvironmentFilter
-    rbac_resource_type = ResourceType.DECISION_ENVIRONMENT
+
+    def filter_queryset(self, queryset):
+        return super().filter_queryset(
+            queryset.model.access_qs(self.request.user, queryset=queryset)
+        )
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:
@@ -102,6 +105,13 @@ class DecisionEnvironmentViewSet(
                 pk=decision_environment.data["eda_credential_id"]
             )
             if decision_environment.data["eda_credential_id"]
+            else None
+        )
+        decision_environment.data["organization"] = (
+            models.Organization.objects.get(
+                pk=decision_environment.data["organization_id"]
+            )
+            if decision_environment.data["organization_id"]
             else None
         )
 

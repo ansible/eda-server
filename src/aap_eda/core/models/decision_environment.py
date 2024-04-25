@@ -14,10 +14,12 @@
 
 from django.db import models
 
+from .base import BaseOrgModel, UniqueNamedModel
+
 __all__ = ("DecisionEnvironment",)
 
 
-class DecisionEnvironment(models.Model):
+class DecisionEnvironment(BaseOrgModel, UniqueNamedModel):
     class Meta:
         db_table = "core_decision_environment"
         constraints = [
@@ -27,7 +29,6 @@ class DecisionEnvironment(models.Model):
             )
         ]
 
-    name = models.TextField(null=False, unique=True)
     description = models.TextField(default="", blank=True, null=False)
     image_url = models.TextField(blank=False, null=False)
     # TODO: used by migration, remove it later

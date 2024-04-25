@@ -25,6 +25,9 @@ from aap_eda.core.utils.awx import validate_ssh_private_key
 ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
 SUPPORTED_KEYS_IN_INJECTORS = ["extra_vars"]
+PROTECTED_PASSPHRASE_ERROR = (
+    "The key is passphrase protected, please provide passphrase."
+)
 
 
 class InjectorMissingKeyException(Exception):
@@ -64,7 +67,7 @@ def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
     old_inputs.update(
         (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_STRING
     )
-    return yaml.dump(old_inputs)
+    return yaml.dump(old_inputs, sort_keys=False)
 
 
 def inputs_from_store(inputs: str) -> dict:
@@ -108,7 +111,10 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                 inputs=inputs,
             )
             if bool(result):
-                errors[display_field] = result
+                if PROTECTED_PASSPHRASE_ERROR in result:
+                    errors["inputs.ssh_key_unlock"] = result
+                else:
+                    errors[display_field] = result
 
         if data.get("type") == "boolean":
             if user_input and not isinstance(user_input, bool):
@@ -331,10 +337,7 @@ def _validate_ssh_key(schema: dict, data: str, inputs: dict) -> list[str]:
 
         if "ssh_key_unlock" in id_fields and "ssh_key_data" in id_fields:
             if results[0]["key_enc"] and not inputs.get("ssh_key_unlock"):
-                errors.append(
-                    "The key is passphrase protected, please "
-                    "provide passphrase."
-                )
+                errors.append(PROTECTED_PASSPHRASE_ERROR)
     except ValidationError as e:
         errors.append(str(e))
 

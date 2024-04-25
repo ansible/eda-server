@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -14,16 +14,26 @@
 
 import django_filters
 
-from aap_eda.core import models
+from aap_eda.core.models import Organization
 
 
-class RoleFilter(django_filters.FilterSet):
+class OrganizationFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter roles by name.",
+        label="Filter by organization name.",
+    )
+    description = django_filters.CharFilter(
+        field_name="description",
+        lookup_expr="icontains",
+        label="Filter by organization description.",
+    )
+    resource__ansible_id = django_filters.CharFilter(
+        field_name="resource__ansible_id",
+        lookup_expr="iexact",
+        label="Filter by resource ansible ID.",
     )
 
     class Meta:
-        model = models.Role
-        fields = ["name"]
+        model = Organization
+        fields = ["name", "description", "resource__ansible_id"]

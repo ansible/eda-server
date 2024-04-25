@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from typing import Any, Dict
 
 import pytest
 from rest_framework import status
@@ -8,54 +8,29 @@ from aap_eda.core import models
 from tests.integration.constants import api_url_v1
 
 
-@dataclass
-class InitData:
-    project: models.Project
-    activation: models.Activation
-    decision_environment: models.DecisionEnvironment
-    eda_credential: models.EdaCredential
-    rulebook: models.Rulebook
-    ruleset: models.Ruleset
-    rule: models.Rule
-    activation_instance: models.RulebookProcess
-
-
 @pytest.mark.django_db
-def test_list_decision_environments(client: APIClient):
-    credential = models.EdaCredential.objects.create(
-        name="eda-credential",
-        inputs={"username": "adam", "password": "secret"},
-    )
-    obj = models.DecisionEnvironment.objects.create(
-        name="de1",
-        image_url="registry.com/img1:tag1",
-        eda_credential=credential,
-    )
+def test_list_decision_environments(
+    default_de: models.DecisionEnvironment, client: APIClient
+):
     response = client.get(f"{api_url_v1}/decision-environments/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data["results"][0]
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == {
-        "name": "de1",
-        "description": "",
-        "image_url": "registry.com/img1:tag1",
-        "eda_credential_id": credential.id,
-        "id": obj.id,
-    }
+    assert_de_base_data(result, default_de)
+    assert_de_fk_data(result, default_de)
 
 
 @pytest.mark.django_db
-def test_create_decision_environment(client: APIClient):
-    credential = models.EdaCredential.objects.create(
-        name="eda-credential",
-        inputs={"username": "adam", "password": "secret"},
-    )
+def test_create_decision_environment(
+    default_eda_credential: models.EdaCredential,
+    default_organization: models.Organization,
+    client: APIClient,
+):
     data_in = {
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
-        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+        "eda_credential_id": default_eda_credential.id,
     }
     response = client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
@@ -65,32 +40,40 @@ def test_create_decision_environment(client: APIClient):
     result = response.data
     result.pop("created_at")
     result.pop("modified_at")
-    assert result == {
-        "name": "de1",
-        "description": "desc here",
-        "image_url": "registry.com/img1:tag1",
-        "eda_credential_id": credential.id,
-        "id": id_,
-    }
+    assert result == {"id": id_, **data_in}
     assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
 
 
 @pytest.mark.django_db
-def test_retrieve_decision_environment(client: APIClient, init_db):
-    obj = init_db.decision_environment
-
-    response = client.get(f"{api_url_v1}/decision-environments/{obj.id}/")
-    assert response.status_code == status.HTTP_200_OK
-    result = response.data
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == {
-        "id": obj.id,
+def test_create_decision_environment_bad_ids(client: APIClient):
+    bad_ids = [
+        {"organization_id": 3000001},
+        {"eda_credential_id": 3000001},
+    ]
+    data_in = {
         "name": "de1",
-        "description": "",
+        "description": "desc here",
         "image_url": "registry.com/img1:tag1",
-        "eda_credential": None,
     }
+    for bad_id in bad_ids:
+        response = client.post(
+            f"{api_url_v1}/decision-environments/", data=data_in | bad_id
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id 3000001 does not exist" in str(response.json())
+
+
+@pytest.mark.django_db
+def test_retrieve_decision_environment(
+    default_de: models.DecisionEnvironment, client: APIClient
+):
+    response = client.get(
+        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    assert_de_base_data(response.data, default_de)
+    assert_de_related_data(response.data, default_de)
 
 
 @pytest.mark.django_db
@@ -100,162 +83,144 @@ def test_retrieve_decision_environment_not_exist(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_partial_update_decision_environment(client: APIClient, init_db):
-    obj = init_db.decision_environment
-    credential = models.EdaCredential.objects.create(
-        name="test-eda-credential",
-        inputs={"username": "adam", "password": "secret"},
-    )
-    data = {"eda_credential_id": credential.id}
+def test_partial_update_decision_environment(
+    default_de: models.DecisionEnvironment,
+    default_vault_credential: models.EdaCredential,
+    client: APIClient,
+):
+    data = {"eda_credential_id": default_vault_credential.id}
     response = client.patch(
-        f"{api_url_v1}/decision-environments/{obj.id}/", data=data
+        f"{api_url_v1}/decision-environments/{default_de.id}/", data=data
     )
     assert response.status_code == status.HTTP_200_OK
-    result = response.data
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == {
-        "name": "de1",
-        "description": "",
-        "image_url": "registry.com/img1:tag1",
-        "eda_credential_id": credential.id,
-        "id": obj.id,
-    }
-    updated_obj = models.DecisionEnvironment.objects.filter(
-        pk=int(obj.id)
-    ).first()
-    assert updated_obj.eda_credential == credential
+
+    default_de.refresh_from_db()
+    assert_de_base_data(response.data, default_de)
+    assert_de_fk_data(response.data, default_de)
+
+    assert default_de.eda_credential == default_vault_credential
 
 
 @pytest.mark.django_db
-def test_delete_decision_environment_conflict(client: APIClient, init_db):
-    obj_id = int(init_db.decision_environment.id)
-    response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
+def test_partial_update_decision_environment_bad_ids(
+    default_de: models.DecisionEnvironment,
+    client: APIClient,
+):
+    bad_ids = [
+        {"organization_id": 3000001},
+        {"eda_credential_id": 3000001},
+    ]
+    for bad_id in bad_ids:
+        response = client.patch(
+            f"{api_url_v1}/decision-environments/{default_de.id}/", data=bad_id
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id 3000001 does not exist" in str(response.json())
+
+
+@pytest.mark.django_db
+def test_delete_decision_environment_conflict(
+    default_de: models.DecisionEnvironment,
+    default_activation: models.Activation,
+    client: APIClient,
+):
+    response = client.delete(
+        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    )
     assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db
-def test_delete_decision_environment_success(client: APIClient, init_db):
-    obj_id = int(init_db.decision_environment.id)
-    activation_id = int(init_db.activation.id)
-    models.Activation.objects.filter(id=activation_id).delete()
-
-    response = client.delete(f"{api_url_v1}/decision-environments/{obj_id}/")
+def test_delete_decision_environment_success(
+    default_de: models.DecisionEnvironment, client: APIClient
+):
+    response = client.delete(
+        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert (
-        models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
+        models.DecisionEnvironment.objects.filter(
+            pk=int(default_de.id)
+        ).count()
+        == 0
     )
 
 
 @pytest.mark.django_db
-def test_delete_decision_environment_force(client: APIClient, init_db):
-    obj_id = int(init_db.decision_environment.id)
-    activation_id = int(init_db.activation.id)
-
+def test_delete_decision_environment_force(
+    default_activation: models.Activation, client: APIClient
+):
+    de_id = default_activation.decision_environment.id
     response = client.delete(
-        f"{api_url_v1}/decision-environments/{obj_id}/?force=True"
+        f"{api_url_v1}/decision-environments/{de_id}/?force=True"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert (
-        models.DecisionEnvironment.objects.filter(pk=int(obj_id)).count() == 0
+        models.DecisionEnvironment.objects.filter(pk=int(de_id)).count() == 0
     )
-    activation = models.Activation.objects.get(pk=activation_id)
-    assert activation.decision_environment is None
+    default_activation.refresh_from_db()
+    assert default_activation.decision_environment is None
 
 
-@pytest.fixture
-def init_db():
-    test_rulesets_sample = """
-        ---
-        - name: Test sample 001
-        hosts: all
-        sources:
-            - ansible.eda.range:
-                limit: 5
-                delay: 1
-            filters:
-                - noop:
-        rules:
-            - name: r1
-            condition: event.i == 1
-            action:
-                debug:
-            - name: r2
-            condition: event.i == 2
-            action:
-                debug:
-        """.strip()
+# UTILS
+# ------------------------------
 
-    project = models.Project.objects.create(
-        name="test-project",
-        description="Test Project",
-        url="https://github.com/eda-project",
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def assert_de_base_data(
+    response: Dict[str, Any], expected: models.DecisionEnvironment
+):
+    assert response["id"] == expected.id
+    assert response["name"] == expected.name
+    assert response["description"] == expected.description
+    assert response["image_url"] == expected.image_url
+    assert response["created_at"] == expected.created_at.strftime(
+        DATETIME_FORMAT
+    )
+    assert response["modified_at"] == expected.modified_at.strftime(
+        DATETIME_FORMAT
     )
 
-    eda_credential = models.EdaCredential.objects.create(
-        name="eda-credential",
-        inputs={"username": "adam", "password": "secret"},
-    )
 
-    decision_environment = models.DecisionEnvironment.objects.create(
-        name="de1",
-        image_url="registry.com/img1:tag1",
-    )
+def assert_de_fk_data(
+    response: Dict[str, Any], expected: models.DecisionEnvironment
+):
+    if expected.eda_credential:
+        assert response["eda_credential_id"] == expected.eda_credential.id
+    else:
+        assert not response["eda_credential_id"]
+    if expected.organization:
+        assert response["organization_id"] == expected.organization.id
+    else:
+        assert not response["organization_id"]
 
-    rulebook = models.Rulebook.objects.create(
-        name="test-rulebook.yml",
-        rulesets=test_rulesets_sample,
-        project=project,
-    )
 
-    source_list = [
-        {
-            "name": "<unnamed>",
-            "type": "range",
-            "config": {"limit": 5},
-            "source": "ansible.eda.range",
-        }
-    ]
-
-    ruleset = models.Ruleset.objects.create(
-        name="test-ruleset",
-        sources=source_list,
-        rulebook=rulebook,
-    )
-
-    rule = models.Rule.objects.create(
-        name="say hello",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset,
-    )
-    user = models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
-    activation = models.Activation.objects.create(
-        name="test-activation",
-        rulebook=rulebook,
-        project=project,
-        decision_environment=decision_environment,
-        user=user,
-    )
-
-    activation_instance = models.RulebookProcess.objects.create(
-        activation=activation,
-    )
-
-    return InitData(
-        activation=activation,
-        project=project,
-        decision_environment=decision_environment,
-        eda_credential=eda_credential,
-        rulebook=rulebook,
-        ruleset=ruleset,
-        rule=rule,
-        activation_instance=activation_instance,
-    )
+def assert_de_related_data(response: Dict[str, Any], expected: models.Project):
+    if expected.eda_credential:
+        credential_data = response["eda_credential"]
+        assert credential_data["id"] == expected.eda_credential.id
+        assert credential_data["name"] == expected.eda_credential.name
+        assert (
+            credential_data["description"]
+            == expected.eda_credential.description
+        )
+        assert credential_data["managed"] == expected.eda_credential.managed
+        assert (
+            credential_data["credential_type_id"]
+            == expected.eda_credential.credential_type.id
+        )
+    else:
+        assert not response["eda_credential"]
+    if expected.organization:
+        organization_data = response["organization"]
+        assert organization_data["id"] == expected.organization.id
+        assert organization_data["name"] == expected.organization.name
+        assert (
+            organization_data["description"]
+            == expected.organization.description
+        )
+    else:
+        assert not response["organization"]

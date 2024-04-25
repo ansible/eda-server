@@ -60,7 +60,9 @@ class EventStreamViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.EventStream.objects.all()
+    queryset = models.EventStream.objects.select_related(
+        "rulebookprocessqueue",
+    )
     serializer_class = serializers.EventStreamSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.EventStreamFilter
@@ -88,7 +90,7 @@ class EventStreamViewSet(
         if event_stream.is_enabled:
             start_rulebook_process(
                 process_parent_type=ProcessParentType.EVENT_STREAM,
-                id=event_stream.id,
+                process_parent_id=event_stream.id,
             )
 
         return Response(
@@ -136,7 +138,7 @@ class EventStreamViewSet(
         logger.info(f"Now deleting {event_stream.name} ...")
         delete_rulebook_process(
             process_parent_type=ProcessParentType.EVENT_STREAM,
-            id=event_stream.id,
+            process_parent_id=event_stream.id,
         )
 
     @extend_schema(
@@ -244,7 +246,7 @@ class EventStreamViewSet(
         )
         start_rulebook_process(
             process_parent_type=ProcessParentType.EVENT_STREAM,
-            id=pk,
+            process_parent_id=pk,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -273,7 +275,7 @@ class EventStreamViewSet(
             )
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.EVENT_STREAM,
-                id=event_stream.id,
+                process_parent_id=event_stream.id,
             )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -316,7 +318,7 @@ class EventStreamViewSet(
 
         restart_rulebook_process(
             process_parent_type=ProcessParentType.EVENT_STREAM,
-            id=event_stream.id,
+            process_parent_id=event_stream.id,
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -82,6 +82,7 @@ jobs:
         env:
           EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
           EDAQA_ENV: authenticated
+          EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
             pytest -vv -k "${{ github.event.inputs.pytest_filter }}"

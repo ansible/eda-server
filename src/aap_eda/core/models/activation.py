@@ -22,19 +22,27 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
+from .base import BaseOrgModel, UniqueNamedModel
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
+class Activation(
+    StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel, UniqueNamedModel
+):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
         ordering = ("-created_at",)
+        permissions = [
+            ("enable_activation", "Can enable an activation"),
+            ("disable_activation", "Can disable an activation"),
+            ("restart_activation", "Can restart an activation"),
+        ]
+        default_permissions = ["add", "view", "delete"]
 
-    name = models.TextField(null=False, unique=True)
     description = models.TextField(default="")
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")
@@ -111,4 +119,9 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         default=None,
         on_delete=models.CASCADE,
         related_name="+",
+    )
+    k8s_service_name = models.TextField(
+        null=True,
+        default=None,
+        help_text="Name of the kubernetes service",
     )

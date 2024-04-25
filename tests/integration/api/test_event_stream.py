@@ -26,6 +26,10 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action, ProcessParentType, ResourceType
 from tests.integration.constants import api_url_v1
 
+pytestmark = pytest.mark.skip(
+    reason="EventStream views are currently hidden, thus no need to run tests"
+)
+
 BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_TYPE = """
 ---
 - name: PG Notify Template Event Stream
@@ -451,6 +455,10 @@ def test_list_event_stream_instances(
             ),
         ]
     )
+    models.RulebookProcessQueue.objects.create(
+        process=instances[0],
+        queue_name="activation",
+    )
     response = client.get(
         f"{api_url_v1}/event-streams/{event_stream.id}/instances/"
     )
@@ -459,3 +467,41 @@ def test_list_event_stream_instances(
     assert len(data) == len(instances)
     assert data[0]["name"] == instances[0].name
     assert data[1]["name"] == instances[1].name
+    assert data[0]["queue_name"] == "activation"
+    assert data[1]["queue_name"] is None
+
+
+@pytest.mark.django_db
+def test_retrieve_event_stream_instance(
+    client: APIClient,
+    default_de: models.DecisionEnvironment,
+    default_user: models.User,
+):
+    args = {"limit": 5, "delay": 1}
+    event_stream = models.EventStream.objects.create(
+        name="test-event_stream-1",
+        source_type="ansible.eda.range",
+        source_args=args,
+        user=default_user,
+        decision_environment_id=default_de.id,
+    )
+
+    instance = models.RulebookProcess.objects.create(
+        name="test-activation-instance-1",
+        event_stream=event_stream,
+        parent_type=ProcessParentType.EVENT_STREAM,
+    )
+    models.RulebookProcessQueue.objects.create(
+        process=instance,
+        queue_name="activation",
+    )
+    response = client.get(
+        (
+            f"{api_url_v1}/event-streams/{event_stream.id}"
+            f"/instances/{instance.id}/"
+        ),
+    )
+    data = response.data
+    assert response.status_code == status.HTTP_200_OK
+    assert data["name"] == instance.name
+    assert data["queue_name"] == "activation"

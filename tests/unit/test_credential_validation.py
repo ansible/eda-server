@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from aap_eda.core.utils.credentials import (
+    PROTECTED_PASSPHRASE_ERROR,
     SUPPORTED_KEYS_IN_INJECTORS,
     validate_injectors,
     validate_inputs,
@@ -442,18 +443,20 @@ def test_validate_injectors():
 
 
 @pytest.mark.parametrize(
-    ("phrase", "key_file", "data", "decision"),
+    ("phrase", "key_file", "decision"),
     [
-        ("password", DATA_DIR / "demo1", None, True),
-        (None, DATA_DIR / "demo1", None, False),
-        ("password", None, "dummy_data", False),
-        (None, DATA_DIR / "demo2", None, True),
+        ("password", DATA_DIR / "demo1", True),
+        (None, DATA_DIR / "demo1", False),
+        ("password", None, False),
+        (None, DATA_DIR / "demo2", True),
     ],
 )
-def test_validate_ssh_keys(phrase, key_file, data, decision):
+def test_validate_ssh_keys(phrase, key_file, decision):
     if key_file:
         with open(key_file) as f:
             data = f.read()
+    else:
+        data = "dummy data"
 
     schema = {
         "fields": [
@@ -485,6 +488,11 @@ def test_validate_ssh_keys(phrase, key_file, data, decision):
         assert errors == {}
     else:
         assert bool(errors) is True
+        for key, value in errors.items():
+            if PROTECTED_PASSPHRASE_ERROR in value:
+                assert key == "inputs.ssh_key_unlock"
+            else:
+                assert key == "inputs.ssh_key_data"
 
 
 def test_validate_ssh_keys_without_phrase():

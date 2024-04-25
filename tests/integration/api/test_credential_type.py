@@ -213,6 +213,33 @@ def test_delete_credential_type(client: APIClient):
 
 
 @pytest.mark.django_db
+def test_delete_credential_type_with_credentials(
+    client: APIClient, preseed_credential_types
+):
+    credential_type = models.CredentialType.objects.create(
+        name="user_type",
+        inputs={"fields": [{"id": "username"}]},
+        injectors={},
+        managed=False,
+    )
+
+    models.EdaCredential.objects.create(
+        name="credential-1",
+        inputs={"username": "adam"},
+        credential_type=credential_type,
+    )
+
+    response = client.delete(
+        f"{api_url_v1}/credential-types/{credential_type.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"CredentialType {credential_type.name} is used by credentials"
+        in response.data["errors"]
+    )
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("old_inputs", "new_inputs", "status_code", "passed", "message"),
     [
@@ -269,3 +296,74 @@ def test_update_managed_credential_type(
     assert (
         "Managed credential type cannot be updated" in response.data["errors"]
     )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("data", "status_code", "key", "message"),
+    [
+        (
+            {"name": "new_name"},
+            status.HTTP_200_OK,
+            "name",
+            None,
+        ),
+        (
+            {"injectors": {"user_name": "changed"}},
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Modifications to injectors are not allowed for "
+                "credential types that are in use"
+            ),
+        ),
+        (
+            {"inputs": {"id": "user_password"}},
+            status.HTTP_400_BAD_REQUEST,
+            "inputs",
+            (
+                "Modifications to inputs are not allowed for "
+                "credential types that are in use"
+            ),
+        ),
+        (
+            {
+                "name": "new_name",
+                "inputs": {"id": "user_password"},
+                "injectors": {"user_password": "secret"},
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "inputs",
+            (
+                "Modifications to inputs are not allowed for "
+                "credential types that are in use"
+            ),
+        ),
+    ],
+)
+def test_update_credential_type_with_created_credentials(
+    client: APIClient,
+    preseed_credential_types,
+    data,
+    status_code,
+    key,
+    message,
+):
+    user_type = models.CredentialType.objects.create(
+        name="user_type",
+        inputs={"fields": [{"id": "username"}]},
+        injectors={},
+        managed=False,
+    )
+    models.EdaCredential.objects.create(
+        name="test-eda-credential",
+        inputs={"username": "adam"},
+        credential_type_id=user_type.id,
+    )
+
+    response = client.patch(
+        f"{api_url_v1}/credential-types/{user_type.id}/", data=data
+    )
+    assert response.status_code == status_code
+    if message is not None:
+        assert message in response.data[key]

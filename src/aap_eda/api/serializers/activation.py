@@ -15,8 +15,11 @@ import json
 import logging
 import secrets
 import uuid
+from dataclasses import dataclass
+from typing import Optional
 
 import yaml
+from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.api.constants import (
@@ -29,6 +32,7 @@ from aap_eda.api.serializers.decision_environment import (
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
+from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ExtraVarRefSerializer,
     ProjectRefSerializer,
@@ -38,6 +42,10 @@ from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
 from aap_eda.core.utils.credentials import get_secret_fields
+from aap_eda.core.utils.k8s_service_name import (
+    InvalidRFC1035LabelError,
+    create_k8s_service_name,
+)
 from aap_eda.core.utils.strings import (
     substitute_extra_vars,
     substitute_source_args,
@@ -48,7 +56,13 @@ from aap_eda.core.utils.strings import (
 logger = logging.getLogger(__name__)
 
 
-def _updated_ruleset(validated_data):
+@dataclass
+class VaultData:
+    password: str = secrets.token_urlsafe()
+    password_used: bool = False
+
+
+def _updated_ruleset(validated_data: dict, vault_data: VaultData):
     try:
         sources_info = []
 
@@ -63,12 +77,14 @@ def _updated_ruleset(validated_data):
             extra_vars = rulesets[0]["sources"][0].get("extra_vars", {})
             encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
 
-            password = ""
             if bool(encrypt_vars):
-                password = secrets.token_urlsafe()
+                vault_data.password_used = True
 
             extra_vars = substitute_extra_vars(
-                event_stream.__dict__, extra_vars, encrypt_vars, password
+                event_stream.__dict__,
+                extra_vars,
+                encrypt_vars,
+                vault_data.password,
             )
 
             source = rulesets[0]["sources"][0]["complementary_source"]
@@ -83,12 +99,21 @@ def _updated_ruleset(validated_data):
         raise InvalidEventStreamRulebook(e)
 
 
-def _handle_eda_credentials(
+def _update_k8s_service_name(validated_data: dict) -> str:
+    service_name = validated_data.get("k8s_service_name")
+    return service_name or create_k8s_service_name(validated_data["name"])
+
+
+def _update_extra_vars_from_eda_credentials(
     validated_data: dict,
-    extra_var_obj: models.ExtraVar,
-    password: str,
-) -> bool:
-    system_vault_credential_needed = False
+    vault_data: VaultData,
+    creating: bool,
+) -> None:
+    extra_var_obj = (
+        models.ExtraVar.objects.get(id=validated_data["extra_var_id"])
+        if validated_data.get("extra_var_id")
+        else None
+    )
 
     for eda_credential_id in validated_data["eda_credentials"]:
         eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
@@ -104,14 +129,17 @@ def _handle_eda_credentials(
 
         user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
 
+        if any(key in user_inputs for key in secret_fields):
+            if creating:
+                vault_data.password_used = True
+
         for key, value in user_inputs.items():
             if key in secret_fields:
                 user_inputs[key] = encrypt_string(
-                    password=password,
+                    password=vault_data.password,
                     plaintext=value,
                     vault_id=EDA_SERVER_VAULT_LABEL,
                 )
-                system_vault_credential_needed = True
 
         data = substitute_variables(injectors, user_inputs)
 
@@ -128,23 +156,25 @@ def _handle_eda_credentials(
             )
             validated_data["extra_var_id"] = extra_var_obj.id
 
-    return system_vault_credential_needed
-
 
 def _create_system_eda_credential(
-    password: str, vault: models.CredentialType
+    password: str, vault: models.CredentialType, organization_id: Optional[int]
 ) -> models.EdaCredential:
     inputs = {
         "vault_id": EDA_SERVER_VAULT_LABEL,
         "vault_password": password,
     }
 
-    return models.EdaCredential.objects.create(
-        name=f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
-        managed=True,
-        inputs=json.dumps(inputs),
-        credential_type=vault,
-    )
+    kwargs = {
+        "name": f"{EDA_SERVER_VAULT_LABEL}-{uuid.uuid4()}",
+        "managed": True,
+        "inputs": json.dumps(inputs),
+        "credential_type": vault,
+    }
+    if organization_id:
+        kwargs["organization_id"] = organization_id
+
+    return models.EdaCredential.objects.create(**kwargs)
 
 
 def _get_vault_credential_type():
@@ -179,6 +209,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -216,6 +247,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EdaCredentialSerializer(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Service name of the activation",
+    )
 
     class Meta:
         model = models.Activation
@@ -229,6 +265,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "restart_policy",
             "restart_count",
             "rulebook_name",
@@ -242,6 +279,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams",
             "log_level",
             "eda_credentials",
+            "k8s_service_name",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -268,6 +306,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
             "extra_var_id": activation.extra_var_id,
+            "organization_id": activation.organization_id,
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -281,6 +320,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
+            "k8s_service_name": activation.k8s_service_name,
         }
 
 
@@ -296,14 +336,21 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "decision_environment_id",
             "rulebook_id",
             "extra_var_id",
+            "organization_id",
             "user",
             "restart_policy",
             "awx_token_id",
             "event_streams",
             "log_level",
             "eda_credentials",
+            "k8s_service_name",
         ]
 
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists]
     )
@@ -333,9 +380,14 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=serializers.IntegerField(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_rfc_1035_compliant],
+    )
 
     def validate(self, data):
-        _validate_credentials_and_token_and_rulebook(data, True)
+        _validate_credentials_and_token_and_rulebook(data=data, creating=True)
 
         return data
 
@@ -347,37 +399,49 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
-        if validated_data.get("event_streams"):
-            validated_data["rulebook_rulesets"] = _updated_ruleset(
+
+        if settings.DEPLOYMENT_TYPE == "k8s":
+            validated_data["k8s_service_name"] = _update_k8s_service_name(
                 validated_data
             )
 
-        extra_var_obj = None
-        password = secrets.token_urlsafe()
-        system_vault_credential_needed = False
+        vault_data = VaultData()
 
-        if validated_data.get("extra_var_id"):
-            extra_var_obj = models.ExtraVar.objects.get(
-                id=validated_data["extra_var_id"]
+        if validated_data.get("event_streams"):
+            validated_data["rulebook_rulesets"] = _updated_ruleset(
+                validated_data, vault_data
             )
 
         vault = _get_vault_credential_type()
 
         if validated_data.get("eda_credentials"):
-            system_vault_credential_needed = _handle_eda_credentials(
-                validated_data, extra_var_obj, password
+            _update_extra_vars_from_eda_credentials(
+                validated_data=validated_data,
+                vault_data=vault_data,
+                creating=True,
             )
 
-        if system_vault_credential_needed:
+        if vault_data.password_used:
             validated_data[
                 "eda_system_vault_credential"
-            ] = _create_system_eda_credential(password, vault)
+            ] = _create_system_eda_credential(
+                vault_data.password,
+                vault,
+                validated_data.get("organization_id"),
+            )
 
         return super().create(validated_data)
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
+
+    queue_name = serializers.CharField(
+        source="rulebookprocessqueue.queue_name",
+        read_only=True,
+        allow_null=True,
+        default=None,
+    )
 
     class Meta:
         model = models.RulebookProcess
@@ -389,8 +453,10 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "status_message",
             "activation_id",
             "event_stream_id",
+            "organization_id",
             "started_at",
             "ended_at",
+            "queue_name",
         ]
         read_only_fields = ["id", "started_at", "ended_at"]
 
@@ -414,6 +480,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer(required=False, allow_null=True)
     extra_var = ExtraVarRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
+    organization = OrganizationRefSerializer()
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
@@ -426,6 +493,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         child=EdaCredentialSerializer(),
+    )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="Service name of the activation",
     )
 
     class Meta:
@@ -441,6 +513,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project",
             "rulebook",
             "extra_var",
+            "organization",
             "instances",
             "restart_policy",
             "restart_count",
@@ -456,6 +529,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "event_streams",
             "log_level",
+            "k8s_service_name",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -497,7 +571,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if len(activation_instances) > 1 and activation.restart_count > 0
             else None
         )
-
+        organization = (
+            OrganizationRefSerializer(activation.organization).data
+            if activation.organization
+            else None
+        )
         event_streams = [
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
@@ -518,6 +596,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "project": project,
             "rulebook": rulebook,
             "extra_var": extra_var,
+            "organization": organization,
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True
             ).data,
@@ -535,12 +614,17 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
+            "k8s_service_name": activation.k8s_service_name,
         }
 
 
 class PostActivationSerializer(serializers.ModelSerializer):
     """Serializer for validating activations before reactivate them."""
 
+    id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
     name = serializers.CharField(required=True)
     decision_environment_id = serializers.IntegerField(
         validators=[validators.check_if_de_exists]
@@ -562,9 +646,14 @@ class PostActivationSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=serializers.IntegerField(),
     )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_rfc_1035_compliant],
+    )
 
     def validate(self, data):
-        _validate_credentials_and_token_and_rulebook(data, False)
+        _validate_credentials_and_token_and_rulebook(data=data, creating=False)
 
         return data
 
@@ -576,12 +665,14 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "status",
             "decision_environment_id",
             "extra_var_id",
+            "organization_id",
             "user_id",
             "created_at",
             "modified_at",
             "awx_token_id",
             "rulebook_id",
             "eda_credentials",
+            "k8s_service_name",
         ]
         read_only_fields = [
             "id",
@@ -622,15 +713,28 @@ def parse_validation_errors(errors: dict) -> str:
 
 
 def _validate_credentials_and_token_and_rulebook(
-    data: dict, check_extra_var: bool
+    data: dict, creating: bool
 ) -> None:
     """Validate Awx Token and AAP credentials."""
     eda_credentials = data.get("eda_credentials", [])
     aap_credentials = _get_aap_credentials_if_exists(eda_credentials)
 
     # validate EDA credentials
-    if check_extra_var:
+    if creating:
         _validate_eda_credentials(data)
+    else:
+        # update extra vars if needs
+        activation = models.Activation.objects.get(id=data["id"])
+        vault_credential = activation.eda_system_vault_credential
+        if vault_credential:
+            inputs = yaml.safe_load(vault_credential.inputs.get_secret_value())
+            vault_data = VaultData(password=inputs["vault_password"])
+        else:
+            vault_data = VaultData()
+
+        _update_extra_vars_from_eda_credentials(
+            validated_data=data, vault_data=vault_data, creating=False
+        )
 
     # validate AAP credentials
     if aap_credentials:
@@ -644,6 +748,13 @@ def _validate_credentials_and_token_and_rulebook(
 
     # validate rulebook
     _validate_rulebook(data, awx_token is not None)
+
+    # validate if activation name is compatible with RFC 1035
+    if not data.get("k8s_service_name") and settings.DEPLOYMENT_TYPE == "k8s":
+        try:
+            create_k8s_service_name(data["name"])
+        except InvalidRFC1035LabelError as e:
+            raise serializers.ValidationError({"k8s_service_name": [str(e)]})
 
 
 def _validate_awx_token(data: dict) -> models.AwxToken:

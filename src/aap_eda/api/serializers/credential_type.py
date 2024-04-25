@@ -26,6 +26,7 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "managed",
+            "organization_id",
         ]
         fields = [
             "name",
@@ -43,9 +44,12 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         help_text="Name of the credential type",
-        validators=[
-            validators.check_if_schema_valid,
-        ],
+        validators=[validators.check_if_schema_valid],
+    )
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
     )
 
     def validate(self, data):
@@ -65,10 +69,11 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
             "description",
             "inputs",
             "injectors",
+            "organization_id",
         ]
 
 
 class CredentialTypeRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CredentialType
-        fields = ["id", "name", "namespace", "kind"]
+        fields = ["id", "name", "namespace", "kind", "organization_id"]
