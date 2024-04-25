@@ -19,13 +19,13 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 from importlib import resources
 from typing import Optional
 from urllib.parse import quote, urlparse, urlunparse
 
 import ansible_runner
-import pexpect
 
 from aap_eda.core.models import EdaCredential
 from aap_eda.core.types import StrPath
@@ -242,21 +242,28 @@ class ScmRepository:
 
     @classmethod
     def decrypt_key_file(cls, key_file: str, password: str) -> None:
-        cmd = f'{KEYGEN_COMMAND} -p -P {password} -N "" -f {key_file}'
-        child = pexpect.spawn(cmd)
-        index = child.expect(["Failed to load key", pexpect.EOF])
-        if index == 0:
-            raise ScmError("Incorrect passhprase for the private key")
+        result = subprocess.run(
+            [KEYGEN_COMMAND, "-p", "-P", password, "-N", "", "-f", key_file],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            logger.error(
+                "Failed to load key using the passphrase. Exit code "
+                f"{result.returncode}: {result.stderr} {result.stdout}"
+            )
+            msg = "Failed to decrypt the private key using the passphrase"
+            raise ScmError(msg)
 
     @classmethod
     def add_gpg_key(cls, key_file: str) -> None:
-        cmd = f"{GPG_COMMAND} --import {key_file}"
-        child = pexpect.spawn(cmd)
-        child.expect([pexpect.EOF])
-        if child.exitstatus != 0:
+        result = subprocess.run(
+            [GPG_COMMAND, "--import", key_file], capture_output=True, text=True
+        )
+        if result.returncode != 0:
             logger.error(
-                f"gpg import failed with exit code {child.exitstatus}: "
-                f"{child.before}"
+                f"gpg import failed with exit code {result.returncode}: "
+                f"{result.stderr} {result.stdout}"
             )
             msg = "Failed to import the gpg public key. Is the key valid?"
             raise ScmError(msg)
