@@ -355,7 +355,9 @@ class ActivationViewSet(
     ),
 )
 class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = models.RulebookProcess.objects.all()
+    queryset = models.RulebookProcess.objects.select_related(
+        "rulebookprocessqueue",
+    )
     serializer_class = serializers.ActivationInstanceSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationInstanceFilter
