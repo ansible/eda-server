@@ -60,7 +60,9 @@ class EventStreamViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.EventStream.objects.all()
+    queryset = models.EventStream.objects.select_related(
+        "rulebookprocessqueue",
+    )
     serializer_class = serializers.EventStreamSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.EventStreamFilter
