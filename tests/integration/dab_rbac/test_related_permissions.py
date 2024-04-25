@@ -51,7 +51,6 @@ def test_related_organization_edit_access_control(
     assert organization.pk != obj.organization_id
 
 
-@pytest.mark.skip(reason="will be reenabled by AAP-23288")
 @pytest.mark.django_db
 def test_project_credential_access(
     cls_factory, user, user_api_client, give_obj_perm
@@ -63,13 +62,27 @@ def test_project_credential_access(
     credential = cls_factory.create(models.EdaCredential)
     assert project.eda_credential_id != credential.pk  # sanity
 
+    # User can not view provided credential
     response = user_api_client.patch(
         url, data={"eda_credential_id": credential.pk}
     )
-    assert response.status_code == 400, response.data
+    # NOTE: the ideal would probably be 400, but still a matter of discussion
+    assert response.status_code in (403, 400), response.data
+    assert "eda_credential" in str(response.data), response.data
     project.refresh_from_db()
     assert project.eda_credential_id != credential.pk
 
+    # User can view related credential, but does not have permission to use
+    give_obj_perm(user, credential, "view")
+    response = user_api_client.patch(
+        url, data={"eda_credential_id": credential.pk}
+    )
+    assert response.status_code == 403, response.data
+    assert "eda_credential" in str(response.data), response.data
+    project.refresh_from_db()
+    assert project.eda_credential_id != credential.pk
+
+    # User has permission to change the related credential
     give_obj_perm(user, credential, "change")
     response = user_api_client.patch(
         url, data={"eda_credential_id": credential.pk}

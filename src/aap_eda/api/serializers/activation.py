@@ -436,6 +436,13 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 class ActivationInstanceSerializer(serializers.ModelSerializer):
     """Serializer for the Activation Instance model."""
 
+    queue_name = serializers.CharField(
+        source="rulebookprocessqueue.queue_name",
+        read_only=True,
+        allow_null=True,
+        default=None,
+    )
+
     class Meta:
         model = models.RulebookProcess
         fields = [
@@ -449,6 +456,7 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "organization_id",
             "started_at",
             "ended_at",
+            "queue_name",
         ]
         read_only_fields = ["id", "started_at", "ended_at"]
 
