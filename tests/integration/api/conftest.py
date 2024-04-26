@@ -453,7 +453,8 @@ def audit_event_3(
 
 
 @pytest.fixture
-def extra_var_data() -> str:
+def default_extra_var_data() -> str:
+    """Return a default extra var data"""
     return """
         ---
         collections:
@@ -476,23 +477,11 @@ def vault_extra_var_data() -> str:
 
 
 @pytest.fixture
-def default_extra_var(
-    default_organization: models.Organization,
-    extra_var_data: str,
-) -> models.ExtraVar:
-    """Return a default ExtraVar"""
-    return models.ExtraVar.objects.create(
-        extra_var=extra_var_data,
-        organization=default_organization,
-    )
-
-
-@pytest.fixture
 def activation_payload(
     default_de: models.DecisionEnvironment,
     default_project: models.Project,
     default_rulebook: models.Rulebook,
-    default_extra_var: models.ExtraVar,
+    default_extra_var_data: str,
     default_organization: models.Organization,
     admin_user: models.User,
 ) -> dict:
@@ -503,7 +492,7 @@ def activation_payload(
         "decision_environment_id": default_de.id,
         "project_id": default_project.id,
         "rulebook_id": default_rulebook.id,
-        "extra_var_id": default_extra_var.id,
+        "extra_var": default_extra_var_data,
         "organization": default_organization.id,
         "user_id": admin_user.id,
         "restart_policy": enums.RestartPolicy.ON_FAILURE,
@@ -516,7 +505,7 @@ def default_activation(
     default_de: models.DecisionEnvironment,
     default_project: models.Project,
     default_rulebook: models.Rulebook,
-    default_extra_var: models.ExtraVar,
+    default_extra_var_data: str,
     default_organization: models.Organization,
     default_user: models.User,
     default_eda_credential: models.EdaCredential,
@@ -528,7 +517,7 @@ def default_activation(
         decision_environment=default_de,
         project=default_project,
         rulebook=default_rulebook,
-        extra_var=default_extra_var,
+        extra_var=default_extra_var_data,
         organization=default_organization,
         user=default_user,
         log_level="debug",
@@ -542,7 +531,7 @@ def new_activation(
     default_de: models.DecisionEnvironment,
     default_project: models.Project,
     default_rulebook: models.Rulebook,
-    default_extra_var: models.ExtraVar,
+    default_extra_var_data: str,
     default_organization: models.Organization,
     default_user: models.User,
 ) -> models.Activation:
@@ -553,7 +542,7 @@ def new_activation(
         decision_environment=default_de,
         project=default_project,
         rulebook=default_rulebook,
-        extra_var=default_extra_var,
+        extra_var=default_extra_var_data,
         organization=default_organization,
         user=default_user,
         log_level="debug",

@@ -100,6 +100,28 @@ def credential_type() -> models.CredentialType:
 
 
 @pytest.fixture
+def user_credential_type(
+    default_organization: models.Organization,
+) -> models.CredentialType:
+    return models.CredentialType.objects.create(
+        name="user_type",
+        inputs={
+            "fields": [
+                {"id": "sasl_username"},
+                {"id": "sasl_password"},
+            ]
+        },
+        injectors={
+            "extra_vars": {
+                "sasl_username": "{{ sasl_username }}",
+                "sasl_password": "{{ sasl_password }}",
+            }
+        },
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
 def default_eda_credential(
     default_organization: models.Organization,
     preseed_credential_types,
