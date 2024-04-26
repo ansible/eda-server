@@ -52,6 +52,13 @@ def test_activation_assignment_non_admin(
     user_api_client, user, cls_factory, initial_data
 ):
     rando = models.User.objects.create(username="rando")
+
+    # Add rando and user to same organization so they can see each other
+    org = models.Organization.objects.first()
+    org_member_rd = RoleDefinition.objects.get(name="Organization Member")
+    for u in (rando, user):
+        org_member_rd.give_permission(u, org)
+
     rd = RoleDefinition.objects.get(name="Activation Admin")
     activation = cls_factory.create(models.Activation)
     rd.give_permission(user, activation)
