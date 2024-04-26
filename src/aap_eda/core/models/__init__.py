@@ -28,7 +28,7 @@ from .job import (
     JobInstanceHost,
 )
 from .organization import Organization
-from .project import ExtraVar, Project
+from .project import Project
 from .queue import ActivationRequestQueue
 from .rulebook import (
     AuditAction,
@@ -55,7 +55,6 @@ __all__ = [
     "AuditAction",
     "AuditEvent",
     "AuditRule",
-    "ExtraVar",
     "JobInstanceEvent",
     "JobInstanceHost",
     "JobInstance",
@@ -81,7 +80,6 @@ permission_registry.register(
     CredentialType,
     EdaCredential,
     DecisionEnvironment,
-    ExtraVar,
     Project,
     Organization,
     Team,

@@ -48,9 +48,6 @@ from .organization import (
     OrganizationSerializer,
 )
 from .project import (
-    ExtraVarCreateSerializer,
-    ExtraVarRefSerializer,
-    ExtraVarSerializer,
     ProjectCreateRequestSerializer,
     ProjectReadSerializer,
     ProjectRefSerializer,
@@ -86,9 +83,6 @@ __all__ = (
     # auth
     "LoginSerializer",
     # project
-    "ExtraVarSerializer",
-    "ExtraVarCreateSerializer",
-    "ExtraVarRefSerializer",
     "ProjectSerializer",
     "ProjectCreateRequestSerializer",
     "ProjectUpdateRequestSerializer",
