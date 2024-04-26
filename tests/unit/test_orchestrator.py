@@ -120,7 +120,9 @@ def one_queue(monkeypatch):
         monkeypatch,
         {
             "queue": {
-                "workers": {"worker": {"responsive": True}},
+                "workers": {
+                    "worker": {"responsive": True},
+                },
                 "process_count": 1,
             },
         },
@@ -133,11 +135,15 @@ def two_queues_differing_counts(monkeypatch):
         monkeypatch,
         {
             "queue1": {
-                "workers": {"worker1_1": {"responsive": True}},
+                "workers": {
+                    "worker1_1": {"responsive": True},
+                },
                 "process_count": 1,
             },
             "queue2": {
-                "workers": {"worker2_1": {"responsive": True}},
+                "workers": {
+                    "worker2_1": {"responsive": True},
+                },
                 "process_count": 2,
             },
         },
@@ -150,11 +156,15 @@ def two_queues_one_responsive(monkeypatch):
         monkeypatch,
         {
             "queue1": {
-                "workers": {"worker1_1": {"responsive": True}},
+                "workers": {
+                    "worker1_1": {"responsive": True},
+                },
                 "process_count": 1,
             },
             "queue2": {
-                "workers": {"worker2_1": {"responsive": False}},
+                "workers": {
+                    "worker2_1": {"responsive": False},
+                },
                 "process_count": 1,
             },
         },
@@ -167,11 +177,15 @@ def two_queues_one_responsive_higher_count(monkeypatch):
         monkeypatch,
         {
             "queue1": {
-                "workers": {"worker1_1": {"responsive": True}},
+                "workers": {
+                    "worker1_1": {"responsive": True},
+                },
                 "process_count": 2,
             },
             "queue2": {
-                "workers": {"worker2_1": {"responsive": False}},
+                "workers": {
+                    "worker2_1": {"responsive": False},
+                },
                 "process_count": 1,
             },
         },
@@ -184,11 +198,15 @@ def two_queues_neither_responsive(monkeypatch):
         monkeypatch,
         {
             "queue1": {
-                "workers": {"worker1_1": {"responsive": False}},
+                "workers": {
+                    "worker1_1": {"responsive": False},
+                },
                 "process_count": 1,
             },
             "queue2": {
-                "workers": {"worker2_1": {"responsive": False}},
+                "workers": {
+                    "worker2_1": {"responsive": False},
+                },
                 "process_count": 1,
             },
         },
@@ -211,7 +229,7 @@ def test_get_least_busy_queue_name(fixture, request):
     responsive_queues = [
         queue
         for queue in queues.values()
-        if len([worker for worker in queue.workers if worker.responsive]) > 0
+        if sum(1 for _ in filter(lambda w: w.responsive, queue.workers)) > 0
     ]
 
     if responsive_queues:
@@ -220,6 +238,86 @@ def test_get_least_busy_queue_name(fixture, request):
     else:
         with pytest.raises(HealthyQueueNotFoundError):
             get_least_busy_queue_name()
+
+
+@pytest.fixture
+def multi_queue_various_states(monkeypatch):
+    return _mock_up_queues(
+        monkeypatch,
+        {
+            "good1": {
+                "workers": {
+                    "good1_1": {"responsive": True},
+                },
+                "process_count": 1,
+            },
+            "good2": {
+                "workers": {
+                    "good2_1": {"responsive": True},
+                    "good2_2": {"responsive": True},
+                    "good2_3": {"responsive": False},
+                },
+                "process_count": 1,
+            },
+            "good3": {
+                "workers": {
+                    "good3_1": {"responsive": False},
+                    "good3_2": {"responsive": False},
+                    "good3_3": {"responsive": True},
+                },
+                "process_count": 1,
+            },
+            "bad1": {
+                "workers": {
+                    "bad1_1": {"responsive": False},
+                },
+                "process_count": 1,
+            },
+            "bad2": {
+                "workers": {
+                    "bad2_1": {"responsive": False},
+                    "bad2_2": {"responsive": False},
+                    "bad2_3": {"responsive": False},
+                },
+                "process_count": 1,
+            },
+        },
+    )
+
+
+def test_check_rulebook_queue_health(multi_queue_various_states):
+    queues = multi_queue_various_states
+
+    expected_good_queues = [
+        queue
+        for queue in queues.values()
+        if sum(1 for _ in filter(lambda w: w.responsive, queue.workers)) > 0
+    ]
+    expected_bad_queues = [
+        queue
+        for queue in queues.values()
+        if sum(1 for _ in filter(lambda w: w.responsive, queue.workers)) == 0
+    ]
+
+    found_good_queues = []
+    found_bad_queues = []
+    for queue in queues.values():
+        if check_rulebook_queue_health(queue.name):
+            found_good_queues.append(queue)
+        else:
+            found_bad_queues.append(queue)
+
+    assert len(found_good_queues) == len(expected_good_queues)
+    assert len(
+        [x for x in expected_good_queues if x in found_good_queues]
+    ) == len(expected_good_queues)
+
+    assert len(found_bad_queues) == len(expected_bad_queues)
+    assert len(
+        [x for x in expected_bad_queues if x in found_bad_queues]
+    ) == len(expected_bad_queues)
+    for queue in found_bad_queues:
+        assert queue.count() == 0
 
 
 def test_get_process_parent_activation():
