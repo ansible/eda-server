@@ -36,14 +36,18 @@ INPUTS = {
 }
 
 
+@pytest.mark.parametrize(
+    "inputs", [{}, {"username": "adam", "password": "secret"}]
+)
 @pytest.mark.django_db
 def test_create_eda_credential(
     client: APIClient,
     credential_type: models.CredentialType,
+    inputs,
 ):
     data_in = {
         "name": "eda-credential",
-        "inputs": {"username": "adam", "password": "secret"},
+        "inputs": inputs,
         "credential_type_id": credential_type.id,
     }
     response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
@@ -371,8 +375,73 @@ def test_partial_update_eda_credential(
     }
 
 
+@pytest.mark.parametrize(
+    ("credential_type", "inputs"),
+    [
+        (enums.DefaultCredentialType.VAULT, {}),
+        (
+            enums.DefaultCredentialType.VAULT,
+            {"vault_password": "new_password"},
+        ),
+        (enums.DefaultCredentialType.AAP, {}),
+        (
+            enums.DefaultCredentialType.AAP,
+            {"host": "new_host", "username": "new user"},
+        ),
+        (enums.DefaultCredentialType.GPG, {}),
+        (enums.DefaultCredentialType.GPG, {"gpg_public_key": "new key"}),
+        (enums.DefaultCredentialType.REGISTRY, {}),
+        (
+            enums.DefaultCredentialType.REGISTRY,
+            {"host": "new_host", "username": "new user", "verify_ssl": True},
+        ),
+        (enums.DefaultCredentialType.SOURCE_CONTROL, {}),
+        (
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            {"username": "new user", "password": "new password"},
+        ),
+    ],
+)
 @pytest.mark.django_db
-def test_partial_update_eda_credential_name(
+def test_partial_update_eda_credentials(
+    client: APIClient,
+    preseed_credential_types,
+    credential_type,
+    inputs,
+):
+    old_inputs = {"keep": "data"}
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    obj = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs=old_inputs,
+        credential_type_id=credential_type.id,
+        managed=True,
+    )
+    new_name = "new-eda-credential"
+    new_description = "new-eda-credential description"
+    # update name, description with empty inputs
+    data = {"name": new_name, "description": new_description}
+    response = client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    result = response.data
+    assert result["name"] == new_name
+    assert result["description"] == new_description
+
+    data = {"inputs": inputs}
+    # update inputs
+    response = client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+    result = response.data
+    assert result["inputs"]["keep"] == old_inputs["keep"]
+    for key in inputs.keys():
+        assert result["inputs"][key] is not None
+
+
+@pytest.mark.django_db
+def test_partial_update_eda_credential_with_encrypted_output(
     client: APIClient, credential_type: models.CredentialType
 ):
     obj = models.EdaCredential.objects.create(

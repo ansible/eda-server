@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -116,17 +115,20 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         credential_type_id = data.get("credential_type_id")
-        if credential_type_id:
-            credential_type = models.CredentialType.objects.get(
-                id=credential_type_id
-            )
-        else:
-            # for update
-            credential_type = self.instance.credential_type
+        if not credential_type_id:
+            return data
 
-        errors = validate_inputs(
-            credential_type.inputs, data.get("inputs", {})
+        credential_type = models.CredentialType.objects.get(
+            id=credential_type_id
         )
+
+        inputs = data.get("inputs", {})
+
+        # allow emtpy inputs during updating
+        if self.partial and not bool(inputs):
+            return data
+
+        errors = validate_inputs(credential_type.inputs, inputs)
 
         if bool(errors):
             raise serializers.ValidationError(errors)
