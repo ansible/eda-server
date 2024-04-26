@@ -19,7 +19,7 @@ from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
 from .organization import OrganizationViewSet
-from .project import ExtraVarViewSet, ProjectViewSet
+from .project import ProjectViewSet
 from .rulebook import AuditRuleViewSet, RulebookViewSet
 from .team import TeamViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
@@ -30,7 +30,6 @@ __all__ = (
     "SessionLogoutView",
     "RoleViewSet",
     # project
-    "ExtraVarViewSet",
     "ProjectViewSet",
     "AuditRuleViewSet",
     "RulebookViewSet",

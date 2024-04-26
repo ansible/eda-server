@@ -14,7 +14,6 @@
 
 from urllib.parse import urlparse, urlunparse
 
-import yaml
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -263,59 +262,6 @@ class ProjectRefSerializer(serializers.ModelSerializer):
             "description",
             "organization_id",
         ]
-        read_only_fields = ["id"]
-
-
-class ExtraVarSerializer(serializers.ModelSerializer):
-    extra_var = serializers.CharField(
-        required=True,
-        help_text="Content of the extra_var",
-    )
-
-    class Meta:
-        model = models.ExtraVar
-        fields = ["id", "extra_var", "organization_id"]
-        read_only_fields = ["id"]
-
-    def to_representation(self, extra_var):
-        return {
-            "id": extra_var.id,
-            "organization_id": extra_var.organization_id,
-            "extra_var": self.replace_vault_data(extra_var),
-        }
-
-    def replace_vault_data(self, extra_var):
-        data = {
-            key: (
-                ENCRYPTED_STRING
-                if isinstance(value, str) and ANSIBLE_VAULT_STRING in value
-                else value
-            )
-            for key, value in yaml.safe_load(extra_var.extra_var).items()
-        }
-
-        return yaml.safe_dump(data).rstrip("\n")
-
-
-class ExtraVarCreateSerializer(serializers.ModelSerializer):
-    extra_var = serializers.CharField(
-        required=True,
-        help_text="Content of the extra_var",
-        validators=[validators.is_extra_var_dict],
-    )
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
-
-    class Meta:
-        model = models.ExtraVar
-        fields = ["extra_var", "organization_id"]
-
-
-class ExtraVarRefSerializer(serializers.ModelSerializer):
-    """Serializer for Extra Var reference."""
-
-    class Meta:
-        model = models.ExtraVar
-        fields = ["id"]
         read_only_fields = ["id"]
 
 

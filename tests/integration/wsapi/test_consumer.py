@@ -619,12 +619,6 @@ def _prepare_db_data():
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
     )
 
-    extra_var, _ = models.ExtraVar.objects.get_or_create(
-        name="test-extra_var",
-        extra_var=TEST_EXTRA_VAR,
-        project=project,
-    )
-
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
@@ -651,7 +645,7 @@ def _prepare_db_data():
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy=enums.RestartPolicy.ALWAYS,
-        extra_var=extra_var,
+        extra_var=TEST_EXTRA_VAR,
         rulebook=rulebook,
         project=project,
         user=user,

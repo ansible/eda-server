@@ -57,9 +57,7 @@ class Activation(
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.SET_NULL, null=True
     )
-    extra_var = models.ForeignKey(
-        "ExtraVar", on_delete=models.CASCADE, null=True
-    )
+    extra_var = models.TextField(null=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
