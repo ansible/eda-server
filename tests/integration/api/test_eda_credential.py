@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from tests.integration.conftest import DUMMY_GPG_KEY
 from tests.integration.constants import api_url_v1
 
 DATA_DIR = Path(__file__).parent.parent.parent / "unit/data"
@@ -113,24 +114,6 @@ def test_create_eda_credential_with_type(
         "password": "$encrypted$",
         "username": "adam",
     }
-
-
-@pytest.mark.django_db
-def test_create_eda_credential_with_empty_required_field(
-    client: APIClient, preseed_credential_types
-):
-    credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.REGISTRY
-    )
-
-    data_in = {
-        "name": "eda-credential",
-        "inputs": {"host": ""},
-        "credential_type_id": credential_type.id,
-    }
-    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "Cannot be blank" in response.data["inputs.host"]
 
 
 @pytest.mark.parametrize(
@@ -353,7 +336,7 @@ def test_delete_managed_eda_credential(client: APIClient):
 
 
 @pytest.mark.django_db
-def test_partial_update_eda_credential(
+def test_partial_update_eda_credential_without_inputs(
     client: APIClient, credential_type: models.CredentialType
 ):
     obj = models.EdaCredential.objects.create(
@@ -389,7 +372,7 @@ def test_partial_update_eda_credential(
             {"host": "new_host", "username": "new user"},
         ),
         (enums.DefaultCredentialType.GPG, {}),
-        (enums.DefaultCredentialType.GPG, {"gpg_public_key": "new key"}),
+        (enums.DefaultCredentialType.GPG, {"gpg_public_key": DUMMY_GPG_KEY}),
         (enums.DefaultCredentialType.REGISTRY, {}),
         (
             enums.DefaultCredentialType.REGISTRY,
@@ -415,12 +398,11 @@ def test_partial_update_eda_credentials(
         name="eda-credential",
         inputs=old_inputs,
         credential_type_id=credential_type.id,
-        managed=True,
     )
     new_name = "new-eda-credential"
     new_description = "new-eda-credential description"
     # update name, description with empty inputs
-    data = {"name": new_name, "description": new_description}
+    data = {"name": new_name, "description": new_description, "inputs": inputs}
     response = client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )

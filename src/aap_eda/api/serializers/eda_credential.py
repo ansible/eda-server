@@ -115,12 +115,13 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         credential_type_id = data.get("credential_type_id")
-        if not credential_type_id:
-            return data
-
-        credential_type = models.CredentialType.objects.get(
-            id=credential_type_id
-        )
+        if credential_type_id:
+            credential_type = models.CredentialType.objects.get(
+                id=credential_type_id
+            )
+        else:
+            # for update
+            credential_type = self.instance.credential_type
 
         inputs = data.get("inputs", {})
 
