@@ -395,6 +395,41 @@ def test_delete_credential_used_by_activation_forced(
     assert default_activation.eda_credentials.count() == 0
 
 
+@pytest.mark.django_db
+def test_delete_credential_used_by_project_with_gpg_credential(
+    client: APIClient,
+    preseed_credential_types,
+):
+    gpg_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.GPG
+    )
+    eda_credential = models.EdaCredential.objects.create(
+        name="test_gpg_credential",
+        inputs={"gpg_public_key": "secret"},
+        credential_type=gpg_credential_type,
+    )
+    models.Project.objects.create(
+        name="default-project",
+        description="Default Project",
+        url="https://git.example.com/acme/project-01",
+        git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
+        signature_validation_credential=eda_credential,
+        scm_branch="main",
+        proxy="http://user:secret@myproxy.com",
+        import_state=models.Project.ImportState.COMPLETED,
+        import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
+    )
+    response = client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
+
+
 @pytest.mark.parametrize("refs", ["true", "false"])
 @pytest.mark.django_db
 def test_retrieve_eda_credential_with_refs(

@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -185,7 +186,8 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
         eda_credential=eda_credential
     )
     used_projects = models.Project.objects.filter(
-        eda_credential=eda_credential
+        Q(eda_credential=eda_credential)
+        | Q(signature_validation_credential=eda_credential)
     )
 
     for activation in used_activations:
