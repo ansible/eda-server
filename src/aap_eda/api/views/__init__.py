@@ -22,7 +22,12 @@ from .organization import OrganizationViewSet
 from .project import ProjectViewSet
 from .rulebook import AuditRuleViewSet, RulebookViewSet
 from .team import TeamViewSet
-from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
+from .user import (
+    CurrentUserAwxTokenViewSet,
+    CurrentUserCapabilitiesView,
+    CurrentUserView,
+    UserViewSet,
+)
 
 __all__ = (
     # auth
@@ -38,6 +43,7 @@ __all__ = (
     "ActivationInstanceViewSet",
     # user
     "CurrentUserView",
+    "CurrentUserCapabilitiesView",
     "CurrentUserAwxTokenViewSet",
     "UserViewSet",
     # credential

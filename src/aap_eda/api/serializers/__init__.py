@@ -72,6 +72,7 @@ from .team import (
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
+    CurrentUserCapabilitiesSerializer,
     CurrentUserUpdateSerializer,
     UserCreateUpdateSerializer,
     UserDetailSerializer,
@@ -106,6 +107,7 @@ __all__ = (
     "AwxTokenSerializer",
     "AwxTokenCreateSerializer",
     "CurrentUserUpdateSerializer",
+    "CurrentUserCapabilitiesSerializer",
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",

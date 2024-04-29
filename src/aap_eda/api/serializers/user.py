@@ -158,3 +158,14 @@ class AwxTokenCreateSerializer(serializers.ModelSerializer):
             raise Conflict("Token with this name already exists.")
 
         return data
+
+
+class UserPermissionsSerializer(serializers.Serializer):
+    object_id = serializers.IntegerField(required=True)
+    content_type = serializers.CharField(required=True)
+    permissions = serializers.ListField(child=serializers.CharField())
+
+
+class CurrentUserCapabilitiesSerializer(serializers.Serializer):
+    organizations = UserPermissionsSerializer(many=True, required=False)
+    objects = UserPermissionsSerializer(many=True, required=False)

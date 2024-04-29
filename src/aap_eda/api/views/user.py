@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac import models as rbac_models
 from ansible_base.rbac.api.permissions import AnsibleBaseUserPermissions
 from ansible_base.rbac.policies import visible_users
 from django_filters.rest_framework import DjangoFilterBackend
@@ -75,6 +76,47 @@ class CurrentUserView(views.APIView):
 
         response_serializer = serializers.UserDetailSerializer(user)
         return Response(response_serializer.data)
+
+
+class CurrentUserCapabilitiesView(views.APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    @extend_schema(
+        description="Get current user's capabilities.",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                description="Return current user's capabilities.",
+                response=serializers.CurrentUserCapabilitiesSerializer,
+            ),
+        },
+    )
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        user = request.user
+        response = {"objects": [], "organizations": []}
+        # get all role assignments for current user
+        assignments = rbac_models.RoleUserAssignment.objects.filter(user=user)
+        for a, rd_id in zip(
+            assignments, assignments.values_list("role_definition", flat=True)
+        ):
+            rd = rbac_models.RoleDefinition.objects.get(pk=rd_id)
+            permissions = rd.permissions.all()
+            permission_type = "objects"
+            ct = a.content_type.__str__()
+            if ct == "core | organization":
+                permission_type = "organizations"
+            response[permission_type].append(
+                {
+                    "object_id": a.object_id,
+                    "content_type": a.content_type,
+                    "permissions": list(
+                        permissions.values_list("codename", flat=True)
+                    ),
+                }
+            )
+
+        serializer = serializers.CurrentUserCapabilitiesSerializer(response)
+        return Response(data=serializer.data)
 
 
 @extend_schema_view(

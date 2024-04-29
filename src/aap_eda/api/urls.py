@@ -92,6 +92,9 @@ v1_urls = [
         name="token_refresh",
     ),
     path("users/me/", views.CurrentUserView.as_view()),
+    path(
+        "users/me/capabilities/", views.CurrentUserCapabilitiesView.as_view()
+    ),
     *router.urls,
 ]
 
