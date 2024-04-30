@@ -1,9 +1,13 @@
+from pathlib import Path
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
+
+DATA_DIR = Path(__file__).parent.parent.parent / "unit/data"
 
 INPUTS = {
     "fields": [
@@ -46,6 +50,46 @@ def test_create_eda_credential(
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "eda-credential"
     assert response.data["managed"] is False
+
+
+@pytest.mark.parametrize(
+    ("key_file", "status_code", "status_message"),
+    [
+        (DATA_DIR / "public_key.asc", status.HTTP_201_CREATED, ""),
+        (
+            DATA_DIR / "private_key.asc",
+            status.HTTP_400_BAD_REQUEST,
+            "Key is not a public key",
+        ),
+        (
+            DATA_DIR / "invalid_key.asc",
+            status.HTTP_400_BAD_REQUEST,
+            "No valid GPG data found.",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_eda_credential_with_gpg_key_data(
+    client: APIClient,
+    preseed_credential_types,
+    key_file,
+    status_code,
+    status_message,
+):
+    gpg_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.GPG
+    )
+    with open(key_file) as f:
+        key_data = f.read()
+
+    data_in = {
+        "name": "eda-credential",
+        "inputs": {"gpg_public_key": key_data},
+        "credential_type_id": gpg_type.id,
+    }
+    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status_code
+    assert status_message in response.data.get("inputs.gpg_public_key", "")
 
 
 @pytest.mark.django_db
