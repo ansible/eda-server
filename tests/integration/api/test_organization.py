@@ -137,17 +137,17 @@ def test_retrieve_organization_not_exist(admin_client: APIClient):
 
 @pytest.mark.django_db
 def test_partial_update_organization(
-    default_organization: models.Organization,
-    admin_client: APIClient,
+    new_organization: models.Organization,
+    superuser_client: APIClient,
 ):
     new_data = {"name": "new-name", "description": "New Description"}
-    response = admin_client.patch(
-        f"{api_url_v1}/organizations/{default_organization.id}/", data=new_data
+    response = superuser_client.patch(
+        f"{api_url_v1}/organizations/{new_organization.id}/", data=new_data
     )
     assert response.status_code == status.HTTP_200_OK
 
-    default_organization.refresh_from_db()
-    assert_organization_data(response.data, default_organization)
+    new_organization.refresh_from_db()
+    assert_organization_data(response.data, new_organization)
 
 
 @pytest.mark.django_db
