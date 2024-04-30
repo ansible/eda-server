@@ -102,6 +102,10 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
             if required and not default:
                 errors[display_field] = ["Cannot be blank"]
                 continue
+        else:
+            if required and len(user_input.strip()) == 0:
+                errors[display_field] = ["Cannot be blank"]
+                continue
 
         if data.get("format") and user_input:
             result = _validate_format(
