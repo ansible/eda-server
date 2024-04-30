@@ -55,6 +55,38 @@ INPUTS = {
     ]
 }
 
+DUMMY_GPG_KEY = """
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBGYxK8IBEACzO/jIqIvEPsIE4xUCRC2WKiyzlD2rEmS/MYg9TMBYTVISrkGF
+WfcQE0hPYU5qFeBzsr3qa/AfQobK+sv545QblAbNLINRdoaWnDMwVO+gLeVhrhbv
+V2c7kwBe6ahQNy7cK/fh0OilNOwTC9V+HyHO/ZpUm5dniny+R4ScNiVtkegfg7mh
+dDiFgAKOLgxElPUJiD/crnIqAWn2OAAqKb1LDGFOdHMJCwI1KH6XRjtmGxy5XX22
+NC8zsE0TXfx4Oa8I7cxumZdh9Kw2wWxitSbpQnCT+8LapCwz36BjOjuEVw1c9AxN
+UbFuVks1XhBG08SBnkFkAYD5ogTx2hs12PhWCIB2XneHBR7LmgaZzJiYtYoeehQ2
+j6JPtIjdPEFgoVxYmSe74+VD/hIYg70Z0tpOpbB/xfvyvVZII/G2hha4l7YCCbN8
+a14mN7HLTkaBx2NG7UtcZ5V1ahHznvtSVVqzkJQQqyJyD0sr8oivU3Aq0Cf8pqwL
+PIg0Z2h7xCZ0pfxceMB4xFxJGosV+oq25QpasrbDWBhhQw91XpYnRvATYWn3ucU/
+20Mn8ZeJOLQxGZLhOfV8rrzGan1czIURlsfnrCC81md3Q3mQTBVhrhTqXrrp7a1f
+8ca6xL4d0yAntDudCPEpAOvYYbLsEwqRNNLu1/4uYgCDPsfXNGcTX8Ld9QARAQAB
+tCN1c2VyQGFuc2libGUuY29tIDx1c2VyQGFuc2libGUuY29tPokCVAQTAQgAPhYh
+BApWMhVpMJ19gBJOItYYZlMrZT/sBQJmMSvCAhsDBQkDwmcABQsJCAcCBhUKCQgL
+AgQWAgMBAh4BAheAAAoJENYYZlMrZT/s56wP/1lvAntBZSCMZmTQ3AvpoIyGr2Hc
+XwjUlDajYI9A/CdJuOTx/FEZCsfy64K3QCyE9fshozIjiLyuoFb9DPAQ6FKagV0b
+Q1sCSSPk+ahaqSUGMQ7Lx8v+Xj0px9qYveeX1s5TisYBFZZPoiZcyhiJxdVZxP0D
+kkN+frIfndtzCCEqnYG9XZMDe4LpAmQUExMhp/SvNnuLtEofnIau0ZFyrT+ZG2vm
+KAIHyk2yE+N0fn+PzxYJJz77t8htOj/g+4XQZq/U4MhnMdge2raI7fCvh+OixFb0
+7QGQpvxlAB0lO5vHf48PPYAgxgjXyiGWG0gpYAcx+t35BJRYlUWOzkjQYDzUvYfs
+zGuOVnZbmlX4vtDaU27bMP0575IDtgRYa/p7J1M4BqNUicyelzbeCeSBd6NEyraU
+c/deAZFD1MviBzFnbA5yXmxycbiEBmfpypfrsN8k/i4OU+bgZ2GgTLV3TcQcVulh
+Z9yJGOc2CcGW9+bCPWOtxzb6ENAv4CmMyL9BmaXKYKXrKKOFnFgjVZU/SqsURoOD
+FejSpTMyKeMS174YVm0qh7xw7nX1ph5mibHsS7sCfZCNywQfl91/hpalty7OeXqY
+drC6WsDeShPiZlJT47AJgRfEMkZlA6DumlLikkbdCb4Mty2EhaGJ13WCGOzJ3z3k
+RMVE39lIPjN2AKyK
+=MlEN
+-----END PGP PUBLIC KEY BLOCK-----
+"""
+
 
 # fixture for a running redis server
 @pytest.fixture
@@ -122,17 +154,17 @@ def user_credential_type(
 
 
 @pytest.fixture
-def default_eda_credential(
+def default_registry_credential(
     default_organization: models.Organization,
     preseed_credential_types,
 ) -> models.EdaCredential:
-    """Return a default Credential"""
+    """Return a default Container Registry Credential"""
     registry_credential_type = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.REGISTRY
     )
     return models.EdaCredential.objects.create(
         name="default-eda-credential",
-        description="Default EDA Credential",
+        description="Default Registry Credential",
         credential_type=registry_credential_type,
         inputs=inputs_to_store(
             {"username": "dummy-user", "password": "dummy-password"}
@@ -171,8 +203,8 @@ def default_scm_credential(
         name=enums.DefaultCredentialType.SOURCE_CONTROL
     )
     return models.EdaCredential.objects.create(
-        name="managed-eda-credential",
-        description="Default EDA Credential",
+        name="managed-scm-credential",
+        description="Default SCM Credential",
         credential_type=scm_credential_type,
         inputs=inputs_to_store(
             {"username": "dummy-user", "password": "dummy-password"}
@@ -182,7 +214,7 @@ def default_scm_credential(
 
 
 @pytest.fixture
-def managed_eda_credential(
+def managed_registry_credential(
     default_organization: models.Organization,
     preseed_credential_types,
 ) -> models.EdaCredential:
@@ -192,7 +224,7 @@ def managed_eda_credential(
     )
     return models.EdaCredential.objects.create(
         name="managed-eda-credential",
-        description="Managed EDA Credential",
+        description="Managed Registry Credential",
         credential_type=scm_credential_type,
         inputs=inputs_to_store(
             {"username": "dummy-user", "password": "dummy-password"}
@@ -264,3 +296,21 @@ def preseed_credential_types(
 ) -> list[models.CredentialType]:
     """Preseed Credential Types."""
     return populate_credential_types(CREDENTIAL_TYPES)
+
+
+@pytest.fixture
+def default_gpg_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a default GPG Credential"""
+    gpg_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.GPG
+    )
+    return models.EdaCredential.objects.create(
+        name="default-gpg-credential",
+        description="Default GPG Credential",
+        credential_type=gpg_credential_type,
+        inputs=inputs_to_store({"gpg_public_key": DUMMY_GPG_KEY}),
+        organization=default_organization,
+    )
