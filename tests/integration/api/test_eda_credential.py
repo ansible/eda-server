@@ -67,6 +67,24 @@ def test_create_eda_credential_with_type(
     }
 
 
+@pytest.mark.django_db
+def test_create_eda_credential_with_empty_required_field(
+    client: APIClient, preseed_credential_types
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+
+    data_in = {
+        "name": "eda-credential",
+        "inputs": {"host": ""},
+        "credential_type_id": credential_type.id,
+    }
+    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Cannot be blank" in response.data["inputs.host"]
+
+
 @pytest.mark.parametrize(
     ("credential_type", "status_code", "key", "error_message"),
     [
