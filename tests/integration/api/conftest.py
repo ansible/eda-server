@@ -100,14 +100,14 @@ def check_permission_mock():
 @pytest.fixture
 def default_de(
     default_organization: models.Organization,
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
 ) -> models.DecisionEnvironment:
     """Return a default DE."""
     return models.DecisionEnvironment.objects.create(
         name="default_de",
         image_url="quay.io/ansible/ansible-rulebook:latest",
         description="Default DE",
-        eda_credential=default_eda_credential,
+        eda_credential=default_registry_credential,
         organization=default_organization,
     )
 
@@ -135,8 +135,8 @@ def default_user_awx_token(default_user: models.User):
 
 @pytest.fixture
 def default_project(
-    default_vault_credential: models.EdaCredential,
-    default_eda_credential: models.EdaCredential,
+    default_gpg_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
     default_organization: models.Organization,
 ) -> models.Project:
     """Return a default Project."""
@@ -145,8 +145,8 @@ def default_project(
         description="Default Project",
         url="https://git.example.com/acme/project-01",
         git_hash="684f62df18ce5f8d5c428e53203b9b975426eed0",
-        eda_credential=default_eda_credential,
-        signature_validation_credential=default_vault_credential,
+        eda_credential=default_scm_credential,
+        signature_validation_credential=default_gpg_credential,
         scm_branch="main",
         proxy="http://user:secret@myproxy.com",
         organization=default_organization,
@@ -508,7 +508,7 @@ def default_activation(
     default_extra_var_data: str,
     default_organization: models.Organization,
     default_user: models.User,
-    default_eda_credential: models.EdaCredential,
+    default_vault_credential: models.EdaCredential,
 ) -> models.Activation:
     """Return a default Activation"""
     activation = models.Activation.objects.create(
@@ -522,7 +522,7 @@ def default_activation(
         user=default_user,
         log_level="debug",
     )
-    activation.eda_credentials.add(default_eda_credential)
+    activation.eda_credentials.add(default_vault_credential)
     return activation
 
 

@@ -166,21 +166,21 @@ def test_retrieve_eda_credential(
 @pytest.mark.django_db
 def test_list_eda_credentials(
     client: APIClient,
-    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
     default_vault_credential: models.EdaCredential,
-    managed_eda_credential: models.EdaCredential,
+    managed_registry_credential: models.EdaCredential,
 ):
     response = client.get(f"{api_url_v1}/eda-credentials/")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 2
-    assert response.data["results"][0]["name"] == default_eda_credential.name
+    assert response.data["results"][0]["name"] == default_scm_credential.name
     assert response.data["results"][1]["name"] == default_vault_credential.name
 
 
 @pytest.mark.django_db
 def test_list_eda_credentials_with_kind_filter(
     client: APIClient,
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
 ):
     response = client.get(
@@ -210,7 +210,7 @@ def test_list_eda_credentials_with_kind_filter(
     )
     assert len(response.data["results"]) == 2
 
-    name_prefix = default_eda_credential.name[0]
+    name_prefix = default_registry_credential.name[0]
     response = client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         f"&credential_type__kind=registry&name={name_prefix}",
@@ -220,7 +220,7 @@ def test_list_eda_credentials_with_kind_filter(
 
 @pytest.mark.django_db
 def test_list_eda_credentials_filter_credential_type_id(
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
     client: APIClient,
     preseed_credential_types,
@@ -256,17 +256,20 @@ def test_list_eda_credentials_filter_credential_type_id(
 
 @pytest.mark.django_db
 def test_list_eda_credentials_filter_name(
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
     client: APIClient,
     preseed_credential_types,
 ):
     response = client.get(
-        f"{api_url_v1}/eda-credentials/?name={default_eda_credential.name}"
+        f"{api_url_v1}/eda-credentials/"
+        f"?name={default_registry_credential.name}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["name"] == default_eda_credential.name
+    assert (
+        response.data["results"][0]["name"] == default_registry_credential.name
+    )
 
     response = client.get(
         f"{api_url_v1}/eda-credentials/?name={default_scm_credential.name}"
@@ -467,29 +470,12 @@ def test_retrieve_eda_credential_with_refs(
         assert response.data["references"] is not None
         references = response.data["references"]
 
-        assert len(references) == 3
+        assert len(references) == 1
         references[0] = {
             "type": "Activation",
             "id": default_activation.id,
             "name": default_activation.name,
             "url": f"api/eda/v1/activations/{default_activation.id}/",
-        }
-        references[1] = (
-            {
-                "type": "DecisionEnvironment",
-                "id": default_activation.decision_environment.id,
-                "name": default_activation.decision_environment.name,
-                "url": (
-                    "api/eda/v1/decision_environments/"
-                    f"{default_activation.decision_environment.id}/"
-                ),
-            },
-        )
-        references[1] = {
-            "type": "Project",
-            "id": default_activation.project.id,
-            "name": default_activation.project.name,
-            "url": (f"api/eda/v1/projects/{default_activation.project.id}/"),
         }
     else:
         assert response.data["references"] is None

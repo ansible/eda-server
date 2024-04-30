@@ -21,7 +21,7 @@ def test_list_decision_environments(
 
 @pytest.mark.django_db
 def test_create_decision_environment(
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
     default_organization: models.Organization,
     client: APIClient,
 ):
@@ -30,7 +30,7 @@ def test_create_decision_environment(
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
         "organization_id": default_organization.id,
-        "eda_credential_id": default_eda_credential.id,
+        "eda_credential_id": default_registry_credential.id,
     }
     response = client.post(
         f"{api_url_v1}/decision-environments/", data=data_in

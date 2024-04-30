@@ -352,7 +352,8 @@ def test_update_project_with_400(
 @pytest.mark.django_db
 def test_partial_update_project(
     new_project: models.Project,
-    default_eda_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
+    default_gpg_credential: models.EdaCredential,
     client: APIClient,
 ):
     assert new_project.eda_credential_id is None
@@ -361,8 +362,8 @@ def test_partial_update_project(
 
     new_data = {
         "name": "new-project-updated",
-        "eda_credential_id": default_eda_credential.id,
-        "signature_validation_credential_id": default_eda_credential.id,
+        "eda_credential_id": default_scm_credential.id,
+        "signature_validation_credential_id": default_gpg_credential.id,
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": True,
@@ -379,7 +380,7 @@ def test_partial_update_project(
     assert new_project.eda_credential.id == new_data["eda_credential_id"]
     assert (
         new_project.signature_validation_credential.id
-        == new_data["eda_credential_id"]
+        == new_data["signature_validation_credential_id"]
     )
     assert new_project.verify_ssl is new_data["verify_ssl"]
 
