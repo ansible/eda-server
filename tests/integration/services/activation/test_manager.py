@@ -177,6 +177,7 @@ def job_mock():
 def test_get_container_request(
     activation_with_instance: models.Activation,
     settings: SettingsWrapper,
+    container_engine_mock: MagicMock,
 ):
     """Test build_cmdline."""
     override_settings = {
@@ -185,7 +186,10 @@ def test_get_container_request(
         "RULEBOOK_LIVENESS_CHECK_SECONDS": 73,
     }
     apply_settings(settings, **override_settings)
-    activation_manager = ActivationManager(activation_with_instance)
+    activation_manager = ActivationManager(
+        activation_with_instance,
+        container_engine=container_engine_mock,
+    )
     request = activation_manager._get_container_request()
     assert isinstance(request, ContainerRequest)
     cmdline = request.cmdline
@@ -200,17 +204,25 @@ def test_get_container_request(
 
 
 @pytest.mark.django_db
-def test_get_container_request_no_instance(basic_activation):
+def test_get_container_request_no_instance(
+    basic_activation, container_engine_mock
+):
     """Test build_cmdline when no instance exists."""
-    activation_manager = ActivationManager(basic_activation)
+    activation_manager = ActivationManager(
+        basic_activation, container_engine_mock
+    )
     with pytest.raises(exceptions.ActivationManagerError):
         activation_manager._get_container_request()
 
 
 @pytest.mark.django_db
-def test_start_deleted_activation(activation_with_instance):
+def test_start_deleted_activation(
+    activation_with_instance, container_engine_mock
+):
     """Test start verb when activation is deleted."""
-    activation_manager = ActivationManager(activation_with_instance)
+    activation_manager = ActivationManager(
+        activation_with_instance, container_engine_mock
+    )
     activation_with_instance.delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
@@ -218,10 +230,14 @@ def test_start_deleted_activation(activation_with_instance):
 
 
 @pytest.mark.django_db
-def test_start_disabled_activation(activation_with_instance, eda_caplog):
+def test_start_disabled_activation(
+    activation_with_instance, eda_caplog, container_engine_mock
+):
     """Test start verb when activation is deleted."""
     err_msg = "is disabled. Can not be started."
-    activation_manager = ActivationManager(activation_with_instance)
+    activation_manager = ActivationManager(
+        activation_with_instance, container_engine_mock
+    )
     activation_with_instance.is_enabled = False
     activation_with_instance.save(update_fields=["is_enabled"])
     with pytest.raises(exceptions.ActivationStartError) as exc:
@@ -232,12 +248,17 @@ def test_start_disabled_activation(activation_with_instance, eda_caplog):
 
 @pytest.mark.django_db
 def test_start_no_awx_token(
-    basic_activation, rulebook_with_job_template, preseed_credential_types
+    basic_activation,
+    rulebook_with_job_template,
+    container_engine_mock,
+    preseed_credential_types,
 ):
     """Test start verb when no AWX token is present."""
     basic_activation.rulebook = rulebook_with_job_template
     basic_activation.save(update_fields=["rulebook"])
-    activation_manager = ActivationManager(basic_activation)
+    activation_manager = ActivationManager(
+        basic_activation, container_engine_mock
+    )
     basic_activation.user.awxtoken_set.all().delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
@@ -249,9 +270,13 @@ def test_start_no_awx_token(
 
 
 @pytest.mark.django_db
-def test_start_no_decision_environment(basic_activation):
+def test_start_no_decision_environment(
+    basic_activation, container_engine_mock
+):
     """Test start verb when no decision environment is present."""
-    activation_manager = ActivationManager(basic_activation)
+    activation_manager = ActivationManager(
+        basic_activation, container_engine_mock
+    )
     basic_activation.decision_environment.delete()
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
@@ -655,11 +680,14 @@ def test_start_max_running_activations(
     settings: SettingsWrapper,
     eda_caplog: LogCaptureFixture,
     job_mock: MagicMock,
+    container_engine_mock: MagicMock,
     preseed_credential_types,
 ):
     """Test start verb when max running activations is reached."""
     apply_settings(settings, MAX_RUNNING_ACTIVATIONS=1)
-    activation_manager = ActivationManager(basic_activation)
+    activation_manager = ActivationManager(
+        basic_activation, container_engine_mock
+    )
 
     with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
         "aap_eda.services.activation.activation_manager.get_current_job",

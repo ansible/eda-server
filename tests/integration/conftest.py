@@ -14,6 +14,7 @@
 
 import logging
 from typing import Any, Dict
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 import redis
@@ -26,6 +27,7 @@ from aap_eda.core.management.commands.create_initial_data import (
 )
 from aap_eda.core.tasking import Queue
 from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.services.activation.engine.common import ContainerEngine
 
 ADMIN_USERNAME = "test.admin"
 ADMIN_PASSWORD = "test.admin.123"
@@ -314,3 +316,8 @@ def default_gpg_credential(
         inputs=inputs_to_store({"gpg_public_key": DUMMY_GPG_KEY}),
         organization=default_organization,
     )
+
+
+@pytest.fixture
+def container_engine_mock() -> MagicMock:
+    return create_autospec(ContainerEngine, instance=True)
