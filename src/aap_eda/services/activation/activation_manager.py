@@ -1017,7 +1017,7 @@ class ActivationManager(StatusManager):
                 f"Activation {self.db_instance.id} not valid, "
                 "container request cannot be built."
             )
-            LOGGER.exception(msg)
+            LOGGER.error(msg, exc_info=settings.DEBUG)
             raise exceptions.ActivationManagerError(msg)
 
     def check_new_process_allowed(self) -> bool:
