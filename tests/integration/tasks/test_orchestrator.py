@@ -154,16 +154,21 @@ def test_manage_not_start(
     job_mock,
     activation,
     max_running_processes,
+    container_engine_mock,
 ):
     queue.push(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
 
     with mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
-        return_value=job_mock,
+        "aap_eda.services.activation.activation_manager.new_container_engine",
+        return_value=container_engine_mock,
     ):
-        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+        with mock.patch(
+            "aap_eda.services.activation.activation_manager.get_current_job",
+            return_value=job_mock,
+        ):
+            orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
 
     start_mock.assert_not_called()
     assert (
@@ -255,6 +260,7 @@ def test_max_running_activation_after_start_job(
     job_mock,
     activation,
     max_running_processes,
+    container_engine_mock,
 ):
     """Check if the max running processes error is handled correctly
     when the limit is reached after the request is started."""
@@ -277,10 +283,14 @@ def test_max_running_activation_after_start_job(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
     with mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
-        return_value=job_mock,
+        "aap_eda.services.activation.activation_manager.new_container_engine",
+        return_value=container_engine_mock,
     ):
-        orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
+        with mock.patch(
+            "aap_eda.services.activation.activation_manager.get_current_job",
+            return_value=job_mock,
+        ):
+            orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
     assert start_mock.call_count == 1
     running_processes = models.RulebookProcess.objects.filter(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
