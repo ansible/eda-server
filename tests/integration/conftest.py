@@ -587,6 +587,14 @@ def activation_payload(
 
 
 @pytest.fixture
+def activation_payload_blank_text(activation_payload: dict) -> dict:
+    activation_payload["description"] = ""
+    activation_payload["extra_var"] = ""
+    activation_payload["k8s_service_name"] = ""
+    return activation_payload
+
+
+@pytest.fixture
 def default_activation(
     default_decision_environment: models.DecisionEnvironment,
     default_project: models.Project,

@@ -269,6 +269,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         help_text="Service name of the activation",
     )
 
@@ -381,6 +382,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     extra_var = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         validators=[validators.is_extra_var_dict],
     )
     decision_environment_id = serializers.IntegerField(
@@ -407,6 +409,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
 
@@ -522,6 +525,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         help_text="Service name of the activation",
     )
 
@@ -669,6 +673,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
 

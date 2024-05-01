@@ -240,6 +240,49 @@ def test_create_event_stream(
 
 
 @pytest.mark.django_db
+def test_create_event_stream_blank_text(
+    client: APIClient,
+    default_de: models.DecisionEnvironment,
+):
+    models.Rulebook.objects.create(
+        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
+        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    )
+
+    args = {"limit": 5, "delay": 1}
+    source_type = "ansible.eda.range"
+    data_in = {
+        "name": "test_event_stream",
+        "source_type": f"{source_type}",
+        "source_args": f"{args}",
+        "decision_environment_id": default_de.id,
+        "description": "",
+        "extra_vars": "",
+        "k8s_service_name": "",
+    }
+    response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    result = response.data
+    assert result["name"] == "test_event_stream"
+    assert result["source_type"] == source_type
+    assert result["user"] == "test.admin"
+    assert result["description"] == data_in["description"]
+
+    # An extra_var empty string is outbound serialized as None; it's considered
+    # a "no value" situation.
+    assert result["extra_var"] is None
+
+    assert result["k8s_service_name"] == data_in["k8s_service_name"]
+    assert yaml.safe_load(response.data["source_args"]) == args
+
+    event_stream = models.EventStream.objects.first()
+    rulesets = yaml.safe_load(event_stream.rulebook_rulesets)
+    source = rulesets[0]["sources"][0]
+    assert source[source_type] == args
+    assert source["name"] == "test_event_stream"
+
+
+@pytest.mark.django_db
 def test_create_event_stream_with_different_default_channel_names(
     admin_client: APIClient,
     default_decision_environment: models.DecisionEnvironment,
