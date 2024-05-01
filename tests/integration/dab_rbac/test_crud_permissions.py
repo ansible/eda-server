@@ -160,10 +160,21 @@ def test_change_permissions(
     response = user_api_client.patch(url, data={})
     assert response.status_code == 403, response.data
 
+    # Test OPTIONS without sufficient permissions
+    response = user_api_client.options(url)
+    assert response.status_code == 200
+    assert "actions" not in response.data  # no PATCH or PUT
+
     # Give object change permission
     give_obj_perm(user, obj, "change")
     response = user_api_client.patch(url, data={})
     assert response.status_code == 200, response.data
+
+    # Test OPTIONS
+    response = user_api_client.options(url)
+    assert response.status_code == 200
+    assert "actions" in response.data  # no PATCH or PUT
+    assert "PATCH" in response.data["actions"]
 
 
 @pytest.mark.django_db
