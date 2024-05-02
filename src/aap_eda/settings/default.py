@@ -308,6 +308,7 @@ REST_FRAMEWORK = {
         "ansible_base.rbac.api.permissions.AnsibleBaseObjectPermissions",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_METADATA_CLASS": "aap_eda.api.metadata.EDAMetadata",
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
 
