@@ -42,7 +42,7 @@ INPUTS = {
 )
 @pytest.mark.django_db
 def test_create_eda_credential(
-    client: APIClient,
+    admin_client: APIClient,
     credential_type: models.CredentialType,
     inputs,
 ):
@@ -51,7 +51,9 @@ def test_create_eda_credential(
         "inputs": inputs,
         "credential_type_id": credential_type.id,
     }
-    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "eda-credential"
     assert response.data["managed"] is False
@@ -75,7 +77,7 @@ def test_create_eda_credential(
 )
 @pytest.mark.django_db
 def test_create_eda_credential_with_gpg_key_data(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
     key_file,
     status_code,
@@ -92,21 +94,25 @@ def test_create_eda_credential_with_gpg_key_data(
         "inputs": {"gpg_public_key": key_data},
         "credential_type_id": gpg_type.id,
     }
-    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
     assert response.status_code == status_code
     assert status_message in response.data.get("inputs.gpg_public_key", "")
 
 
 @pytest.mark.django_db
 def test_create_eda_credential_with_type(
-    client: APIClient, credential_type: models.CredentialType
+    admin_client: APIClient, credential_type: models.CredentialType
 ):
     data_in = {
         "name": "eda-credential",
         "inputs": {"username": "adam", "password": "secret"},
         "credential_type_id": credential_type.id,
     }
-    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "eda-credential"
     assert response.data["managed"] is False
@@ -154,7 +160,7 @@ def test_create_eda_credential_with_type(
 )
 @pytest.mark.django_db
 def test_create_eda_credential_with_empty_inputs_fields(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
     credential_type,
     status_code,
@@ -168,7 +174,9 @@ def test_create_eda_credential_with_empty_inputs_fields(
         "inputs": {},
         "credential_type_id": credential_type.id,
     }
-    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
     assert response.status_code == status_code
     if error_message:
         assert error_message in response.data[key]
@@ -176,7 +184,7 @@ def test_create_eda_credential_with_empty_inputs_fields(
 
 @pytest.mark.django_db
 def test_retrieve_eda_credential(
-    client: APIClient, credential_type: models.CredentialType
+    admin_client: APIClient, credential_type: models.CredentialType
 ):
     obj = models.EdaCredential.objects.create(
         name="eda_credential",
@@ -184,7 +192,7 @@ def test_retrieve_eda_credential(
         managed=False,
         credential_type_id=credential_type.id,
     )
-    response = client.get(f"{api_url_v1}/eda-credentials/{obj.id}/")
+    response = admin_client.get(f"{api_url_v1}/eda-credentials/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == "eda_credential"
     assert response.data["inputs"] == {
@@ -196,12 +204,12 @@ def test_retrieve_eda_credential(
 
 @pytest.mark.django_db
 def test_list_eda_credentials(
-    client: APIClient,
+    admin_client: APIClient,
     default_scm_credential: models.EdaCredential,
     default_vault_credential: models.EdaCredential,
     managed_registry_credential: models.EdaCredential,
 ):
-    response = client.get(f"{api_url_v1}/eda-credentials/")
+    response = admin_client.get(f"{api_url_v1}/eda-credentials/")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 2
     assert response.data["results"][0]["name"] == default_scm_credential.name
@@ -210,39 +218,39 @@ def test_list_eda_credentials(
 
 @pytest.mark.django_db
 def test_list_eda_credentials_with_kind_filter(
-    client: APIClient,
+    admin_client: APIClient,
     default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
     )
     assert len(response.data["results"]) == 1
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=registry"
     )
     assert len(response.data["results"]) == 1
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=vault"
     )
     assert len(response.data["results"]) == 0
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         "&credential_type__kind=vault",
     )
     assert len(response.data["results"]) == 1
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         "&credential_type__kind=registry",
     )
     assert len(response.data["results"]) == 2
 
     name_prefix = default_registry_credential.name[0]
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
         f"&credential_type__kind=registry&name={name_prefix}",
     )
@@ -253,7 +261,7 @@ def test_list_eda_credentials_with_kind_filter(
 def test_list_eda_credentials_filter_credential_type_id(
     default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     registry_credential_type = models.CredentialType.objects.get(
@@ -262,7 +270,7 @@ def test_list_eda_credentials_filter_credential_type_id(
     scm_credential_type = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.SOURCE_CONTROL
     )
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type_id="
         f"{registry_credential_type.id}"
     )
@@ -273,7 +281,7 @@ def test_list_eda_credentials_filter_credential_type_id(
         == registry_credential_type.name
     )
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type_id="
         f"{scm_credential_type.id}"
     )
@@ -289,10 +297,10 @@ def test_list_eda_credentials_filter_credential_type_id(
 def test_list_eda_credentials_filter_name(
     default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/"
         f"?name={default_registry_credential.name}"
     )
@@ -302,7 +310,7 @@ def test_list_eda_credentials_filter_name(
         response.data["results"][0]["name"] == default_registry_credential.name
     )
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?name={default_scm_credential.name}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -311,24 +319,24 @@ def test_list_eda_credentials_filter_name(
 
 
 @pytest.mark.django_db
-def test_delete_eda_credential(client: APIClient):
+def test_delete_eda_credential(admin_client: APIClient):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
     )
-    response = client.delete(f"{api_url_v1}/eda-credentials/{obj.id}/")
+    response = admin_client.delete(f"{api_url_v1}/eda-credentials/{obj.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert models.EdaCredential.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_delete_managed_eda_credential(client: APIClient):
+def test_delete_managed_eda_credential(admin_client: APIClient):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
         inputs={"username": "adam", "password": "secret"},
         managed=True,
     )
-    response = client.delete(f"{api_url_v1}/eda-credentials/{obj.id}/")
+    response = admin_client.delete(f"{api_url_v1}/eda-credentials/{obj.id}/")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         response.data["errors"] == "Managed EDA credential cannot be deleted"
@@ -337,7 +345,7 @@ def test_delete_managed_eda_credential(client: APIClient):
 
 @pytest.mark.django_db
 def test_partial_update_eda_credential_without_inputs(
-    client: APIClient, credential_type: models.CredentialType
+    admin_client: APIClient, credential_type: models.CredentialType
 ):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
@@ -346,7 +354,7 @@ def test_partial_update_eda_credential_without_inputs(
         managed=True,
     )
     data = {"inputs": {"username": "bearny", "password": "demo"}}
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )
     assert response.status_code == status.HTTP_200_OK
@@ -387,7 +395,7 @@ def test_partial_update_eda_credential_without_inputs(
 )
 @pytest.mark.django_db
 def test_partial_update_eda_credentials(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
     credential_type,
     inputs,
@@ -403,7 +411,7 @@ def test_partial_update_eda_credentials(
     new_description = "new-eda-credential description"
     # update name, description with empty inputs
     data = {"name": new_name, "description": new_description, "inputs": inputs}
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )
     assert response.status_code == status.HTTP_200_OK
@@ -413,7 +421,7 @@ def test_partial_update_eda_credentials(
 
     data = {"inputs": inputs}
     # update inputs
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )
     result = response.data
@@ -424,7 +432,7 @@ def test_partial_update_eda_credentials(
 
 @pytest.mark.django_db
 def test_partial_update_eda_credential_with_encrypted_output(
-    client: APIClient, credential_type: models.CredentialType
+    admin_client: APIClient, credential_type: models.CredentialType
 ):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",
@@ -433,7 +441,7 @@ def test_partial_update_eda_credential_with_encrypted_output(
         managed=True,
     )
     data = {"name": "demo2"}
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
     )
     assert response.status_code == status.HTTP_200_OK
@@ -448,12 +456,12 @@ def test_partial_update_eda_credential_with_encrypted_output(
 
 @pytest.mark.django_db
 def test_delete_credential_with_de_reference(
-    default_de: models.Activation,
-    client: APIClient,
+    default_decision_environment: models.Activation,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
-    eda_credential = default_de.eda_credential
-    response = client.delete(
+    eda_credential = default_decision_environment.eda_credential
+    response = admin_client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
@@ -466,11 +474,11 @@ def test_delete_credential_with_de_reference(
 @pytest.mark.django_db
 def test_delete_credential_with_project_reference(
     default_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     eda_credential = default_project.eda_credential
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
@@ -483,11 +491,11 @@ def test_delete_credential_with_project_reference(
 @pytest.mark.django_db
 def test_delete_credential_with_activation_reference(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     eda_credential = default_activation.eda_credentials.all()[0]
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
@@ -500,11 +508,11 @@ def test_delete_credential_with_activation_reference(
 @pytest.mark.django_db
 def test_delete_credential_used_by_activation_forced(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     eda_credential = default_activation.eda_credentials.all()[0]
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/?force=true",
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -513,7 +521,7 @@ def test_delete_credential_used_by_activation_forced(
 
 @pytest.mark.django_db
 def test_delete_credential_used_by_project_with_gpg_credential(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     gpg_credential_type = models.CredentialType.objects.get(
@@ -535,7 +543,7 @@ def test_delete_credential_used_by_project_with_gpg_credential(
         import_state=models.Project.ImportState.COMPLETED,
         import_task_id="c8a7a0e3-05e7-4376-831a-6b8af80107bd",
     )
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/",
     )
 
@@ -550,13 +558,13 @@ def test_delete_credential_used_by_project_with_gpg_credential(
 @pytest.mark.django_db
 def test_retrieve_eda_credential_with_refs(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     refs,
     preseed_credential_types,
 ):
     eda_credential = default_activation.eda_credentials.all()[0]
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/?refs={refs}",
     )
     assert response.status_code == status.HTTP_200_OK
@@ -578,7 +586,7 @@ def test_retrieve_eda_credential_with_refs(
 
 @pytest.mark.django_db
 def test_retrieve_eda_credential_with_empty_encrypted_fields(
-    client: APIClient, preseed_credential_types
+    admin_client: APIClient, preseed_credential_types
 ):
     scm_type = models.CredentialType.objects.filter(name="Source Control")[0]
     data_in = {
@@ -590,7 +598,9 @@ def test_retrieve_eda_credential_with_empty_encrypted_fields(
         },
         "credential_type_id": scm_type.id,
     }
-    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
     assert response.status_code == status.HTTP_201_CREATED
     key_list = list(response.data["inputs"].keys())
     assert "ssh_key_unlock" not in key_list
