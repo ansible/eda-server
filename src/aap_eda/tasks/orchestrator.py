@@ -155,10 +155,12 @@ def dispatch(
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
 ):
+    request_type_text = f" type {request_type}" if request_type else ""
+
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
     LOGGER.info(
-        f"Dispatching request type {request_type} for {process_parent_type} "
-        f"{process_parent_id}",
+        "Dispatching request"
+        f"{request_type_text} for {process_parent_type} {process_parent_id}",
     )
 
     queue_name = None
@@ -168,8 +170,8 @@ def dispatch(
         ActivationRequest.AUTO_START,
     ]:
         LOGGER.info(
-            f"Dispatching {process_parent_type} "
-            f"{process_parent_id} as new process.",
+            f"Dispatching {process_parent_type}"
+            f" {process_parent_id} as new process.",
         )
     else:
         queue_name = get_queue_name_by_parent_id(
@@ -185,17 +187,18 @@ def dispatch(
         ):
             if not queue_name:
                 LOGGER.info(
-                    f"Scheduling request {request_type} for "
-                    f"{process_parent_type} {process_parent_id} "
-                    "to the least busy queue; it is not currently associated "
-                    " with a queue.",
+                    "Scheduling request"
+                    f"{request_type_text} for {process_parent_type}"
+                    f" {process_parent_id} to the least busy queue"
+                    "; it is not currently associated with a queue.",
                 )
             else:
                 LOGGER.info(
-                    f"Scheduling request {request_type} for "
-                    f"{process_parent_type} {process_parent_id} "
-                    f"to the least busy queue; its associated queue "
-                    "'{queue_name}' is from previous configuation settings.",
+                    "Scheduling request"
+                    f"{request_type_text} for {process_parent_type}"
+                    f" {process_parent_id} to the least busy queue"
+                    f"; its associated queue '{queue_name}' is from"
+                    " previous configuation settings.",
                 )
             queue_name = None
 
@@ -203,16 +206,16 @@ def dispatch(
         # The queue is unhealthy; log this fact.
         # We'll try to find another queue on which to run.
         msg = (
-            f"{process_parent_type} {process_parent_id} is in an "
-            "unknown state. The workers of its associated queue "
-            f"'{queue_name}' are failing liveness checks. "
-            "There may be an issue with the node; please contact "
-            "the administrator."
+            f"{process_parent_type} {process_parent_id} is in an"
+            " unknown state. The workers of its associated queue"
+            f" '{queue_name}' are failing liveness checks."
+            " There may be an issue with the node; please contact"
+            " the administrator."
         )
         LOGGER.warning(
-            f"Request {request_type} for "
-            f"{process_parent_type} {process_parent_id} will be run on the "
-            "least busy queue."
+            "Request"
+            f"{request_type_text} for {process_parent_type}"
+            f" {process_parent_id} will be run on the least busy queue."
         )
         queue_name = None
 
@@ -223,11 +226,10 @@ def dispatch(
             # The are no healthy queues on which to run the request. For any
             # request that isn't a restart set its status to "workers offline."
             msg = (
-                "There are no healthy queues on which to run "
-                f"request {request_type} for {process_parent_type} "
-                f"{process_parent_id}. "
-                "There may be an issue with the node; please contact "
-                "the administrator."
+                "There are no healthy queues on which to run the request"
+                f"{request_type_text} for {process_parent_type}"
+                f" {process_parent_id}. There may be an issue with the node"
+                "; please contact the administrator."
             )
             LOGGER.warning(
                 msg,
