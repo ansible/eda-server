@@ -159,6 +159,7 @@ class ScmRepository:
             if key_data:  # ssh
                 key_file = tempfile.NamedTemporaryFile("w+t")
                 key_file.write(key_data)
+                key_file.write("\n")
                 key_file.flush()
                 extra_vars["key_file"] = key_file.name
                 key_password = inputs.get("ssh_key_unlock")
@@ -170,6 +171,7 @@ class ScmRepository:
             gpg_key = gpg_inputs.get("gpg_public_key")
             gpg_key_file = tempfile.NamedTemporaryFile("w+t")
             gpg_key_file.write(gpg_key)
+            gpg_key_file.write("\n")
             gpg_key_file.flush()
             extra_vars["verify_commit"] = "true"
 
@@ -201,6 +203,7 @@ class ScmRepository:
             msg = str(e)
             if secret:
                 msg = msg.replace(secret, "****", 1)
+                msg = msg.replace(quote(secret), "****", 1)
             logger.warning("SCM clone failed: %s", msg)
             raise ScmError(msg) from None
         finally:
