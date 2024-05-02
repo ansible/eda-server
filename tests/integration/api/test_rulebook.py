@@ -67,10 +67,10 @@ DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 def test_list_rulebooks(
     default_rulebook: models.Rulebook,
     rulebook_with_job_template: models.Rulebook,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     rulebooks = [default_rulebook, rulebook_with_job_template]
-    response = client.get(f"{api_url_v1}/rulebooks/")
+    response = admin_client.get(f"{api_url_v1}/rulebooks/")
     assert response.status_code == status.HTTP_200_OK
 
     for data, rulebook in zip(response.data["results"], rulebooks):
@@ -81,11 +81,11 @@ def test_list_rulebooks(
 def test_list_rulebooks_filter_name(
     default_rulebook: models.Rulebook,
     rulebook_with_job_template: models.Rulebook,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     filter_name = default_rulebook.name
-    response = client.get(f"{api_url_v1}/rulebooks/")
-    response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
+    response = admin_client.get(f"{api_url_v1}/rulebooks/")
+    response = admin_client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
     assert_rulebook_data(data, default_rulebook)
@@ -93,10 +93,10 @@ def test_list_rulebooks_filter_name(
 
 @pytest.mark.django_db
 def test_list_rulebooks_filter_name_non_existant(
-    default_rulebook: models.Rulebook, client: APIClient
+    default_rulebook: models.Rulebook, admin_client: APIClient
 ):
     filter_name = "doesn't exist"
-    response = client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
+    response = admin_client.get(f"{api_url_v1}/rulebooks/?name={filter_name}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -106,9 +106,9 @@ def test_list_rulebooks_filter_name_non_existant(
 def test_list_rulebooks_filter_project(
     default_project: models.Project,
     default_rulebook: models.Rulebook,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/rulebooks/?project_id={default_project.id}"
     )
     data = response.json()["results"][0]
@@ -119,10 +119,10 @@ def test_list_rulebooks_filter_project(
 
 @pytest.mark.django_db
 def test_list_rulebooks_filter_project_non_existant(
-    default_rulebook: models.Rulebook, client: APIClient
+    default_rulebook: models.Rulebook, admin_client: APIClient
 ):
     filter_project = "10000"
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/rulebooks/?project_id={filter_project}"
     )
     data = response.json()["results"]
@@ -132,25 +132,27 @@ def test_list_rulebooks_filter_project_non_existant(
 
 @pytest.mark.django_db
 def test_retrieve_rulebook(
-    default_rulebook: models.Rulebook, client: APIClient
+    default_rulebook: models.Rulebook, admin_client: APIClient
 ):
-    response = client.get(f"{api_url_v1}/rulebooks/{default_rulebook.id}/")
+    response = admin_client.get(
+        f"{api_url_v1}/rulebooks/{default_rulebook.id}/"
+    )
 
     assert response.status_code == status.HTTP_200_OK
     assert_rulebook_data(response.json(), default_rulebook)
 
 
 @pytest.mark.django_db
-def test_retrieve_rulebook_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/rulebooks/42/")
+def test_retrieve_rulebook_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/rulebooks/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_retrieve_json_rulebook(
-    default_rulebook: models.Rulebook, client: APIClient
+    default_rulebook: models.Rulebook, admin_client: APIClient
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/rulebooks/{default_rulebook.id}/json/"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -166,8 +168,8 @@ def test_retrieve_json_rulebook(
 
 
 @pytest.mark.django_db
-def test_retrieve_json_rulebook_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/rulebooks/42/json/")
+def test_retrieve_json_rulebook_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/rulebooks/42/json/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -191,9 +193,9 @@ def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
 def test_list_audit_rules(
     audit_rule_1: models.AuditRule,
     audit_rule_2: models.AuditRule,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/audit-rules/")
+    response = admin_client.get(f"{api_url_v1}/audit-rules/")
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
 
@@ -214,10 +216,12 @@ def test_list_audit_rules(
 def test_list_audit_rules_filter_name(
     audit_rule_1: models.AuditRule,
     audit_rule_2: models.AuditRule,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     filter_name = audit_rule_1.name
-    response = client.get(f"{api_url_v1}/audit-rules/?name={filter_name}")
+    response = admin_client.get(
+        f"{api_url_v1}/audit-rules/?name={filter_name}"
+    )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
 
@@ -235,10 +239,12 @@ def test_list_audit_rules_filter_name(
 
 @pytest.mark.django_db
 def test_list_audit_rules_filter_name_non_existent(
-    audit_rule_1: models.AuditRule, client: APIClient
+    audit_rule_1: models.AuditRule, admin_client: APIClient
 ):
     filter_name = "doesn't exist"
-    response = client.get(f"{api_url_v1}/audit-rules/?name={filter_name}")
+    response = admin_client.get(
+        f"{api_url_v1}/audit-rules/?name={filter_name}"
+    )
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -256,10 +262,10 @@ def test_list_audit_rules_filter_name_non_existent(
 def test_list_audit_rules_ordering(
     audit_rule_1: models.AuditRule,
     audit_rule_2: models.AuditRule,
-    client: APIClient,
+    admin_client: APIClient,
     ordering_field,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -269,7 +275,7 @@ def test_list_audit_rules_ordering(
         audit_rule_1, ordering_field
     )
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/?ordering=-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -284,10 +290,10 @@ def test_list_audit_rules_ordering(
 def test_list_audit_rules_ordering_activation_name(
     audit_rule_1: models.AuditRule,
     audit_rule_2: models.AuditRule,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     ordering_field = "activation_instance__name"
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -298,7 +304,7 @@ def test_list_audit_rules_ordering_activation_name(
         == audit_rule_1.activation_instance.name
     )
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/?ordering=-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -312,9 +318,9 @@ def test_list_audit_rules_ordering_activation_name(
 
 @pytest.mark.django_db
 def test_retrieve_audit_rule(
-    audit_rule_1: models.AuditRule, client: APIClient
+    audit_rule_1: models.AuditRule, admin_client: APIClient
 ):
-    response = client.get(f"{api_url_v1}/audit-rules/{audit_rule_1.id}/")
+    response = admin_client.get(f"{api_url_v1}/audit-rules/{audit_rule_1.id}/")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == audit_rule_1.name
@@ -322,8 +328,8 @@ def test_retrieve_audit_rule(
 
 
 @pytest.mark.django_db
-def test_retrieve_audit_rule_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/audit-rules/42/")
+def test_retrieve_audit_rule_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/audit-rules/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -332,9 +338,9 @@ def test_list_actions_from_audit_rule(
     audit_rule_2: models.AuditRule,
     audit_action_2: models.AuditAction,
     audit_action_3: models.AuditAction,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -348,9 +354,9 @@ def test_list_actions_from_audit_rule(
 def test_list_actions_from_audit_rule_filter_name(
     audit_rule_2: models.AuditRule,
     audit_action_3: models.AuditAction,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/"
         f"?name={audit_action_3.name}"
     )
@@ -380,10 +386,10 @@ def test_list_actions_from_audit_rule_ordering(
     audit_rule_2: models.AuditRule,
     audit_action_2: models.AuditAction,
     audit_action_3: models.AuditAction,
-    client: APIClient,
+    admin_client: APIClient,
     ordering_field,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
         f"{ordering_field}"
     )
@@ -394,7 +400,7 @@ def test_list_actions_from_audit_rule_ordering(
         audit_action_2, ordering_field
     )
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
         f"-{ordering_field}"
     )
@@ -408,11 +414,11 @@ def test_list_actions_from_audit_rule_ordering(
 
 @pytest.mark.django_db
 def test_list_actions_from_audit_rule_filter_name_non_existent(
-    audit_rule_2: models.AuditRule, client: APIClient
+    audit_rule_2: models.AuditRule, admin_client: APIClient
 ):
     filter_name = "doesn't exist"
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/"
         f"?name={filter_name}"
     )
@@ -426,9 +432,9 @@ def test_list_events_from_audit_rule(
     audit_rule_2: models.AuditRule,
     audit_event_2: models.AuditEvent,
     audit_event_3: models.AuditEvent,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -449,10 +455,10 @@ def test_list_events_from_audit_rule_ordering(
     audit_rule_2: models.AuditRule,
     audit_event_2: models.AuditEvent,
     audit_event_3: models.AuditEvent,
-    client: APIClient,
+    admin_client: APIClient,
     ordering_field,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
         f"{ordering_field}"
     )
@@ -461,7 +467,7 @@ def test_list_events_from_audit_rule_ordering(
     assert len(events) == 2
     assert events[0][ordering_field] == getattr(audit_event_2, ordering_field)
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
         f"-{ordering_field}"
     )
@@ -478,9 +484,11 @@ def test_delete_project_and_rulebooks(
     default_rulebook: models.Rulebook,
     ruleset_1: models.Ruleset,
     default_rule: models.Rule,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.delete(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.delete(
+        f"{api_url_v1}/projects/{default_project.id}/"
+    )
     assert response.status_code == status.HTTP_204_NO_CONTENT
     activation = models.Activation.objects.get(pk=default_activation.id)
     assert activation.project is None

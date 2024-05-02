@@ -17,17 +17,6 @@ from aap_eda.core import models
 
 
 @pytest.fixture()
-def new_user():
-    return models.User.objects.create(
-        username="tester",
-        password="secret",
-        first_name="Adam",
-        last_name="Tester",
-        email="adam@example.com",
-    )
-
-
-@pytest.fixture()
 def new_activation(new_user):
     return models.Activation.objects.create(
         name="activation",
