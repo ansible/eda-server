@@ -173,7 +173,7 @@ def test_change_permissions(
     # Test OPTIONS
     response = user_api_client.options(url)
     assert response.status_code == 200
-    assert "actions" in response.data  # no PATCH or PUT
+    assert "actions" in response.data
     assert "PATCH" in response.data["actions"]
 
 
