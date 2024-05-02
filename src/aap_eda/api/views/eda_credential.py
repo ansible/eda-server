@@ -190,9 +190,10 @@ class EdaCredentialViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        if serializer.validated_data.get("inputs"):
+        inputs = serializer.validated_data.get("inputs")
+        if inputs or inputs == {}:
             serializer.validated_data["inputs"] = inputs_to_store(
-                serializer.validated_data["inputs"],
+                inputs,
                 eda_credential.inputs,
             )
 
