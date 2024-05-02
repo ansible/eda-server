@@ -23,8 +23,8 @@ from tests.integration.constants import api_url_v1
 
 
 @pytest.mark.django_db
-def test_list_teams(default_team: models.Team, client: APIClient):
-    response = client.get(f"{api_url_v1}/teams/")
+def test_list_teams(default_team: models.Team, admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/teams/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data["results"][0]
     assert_team_data(result, default_team)
@@ -34,48 +34,52 @@ def test_list_teams(default_team: models.Team, client: APIClient):
 def test_list_teams_filter_by_name(
     default_team: models.Organization,
     new_team: models.Organization,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     filter = default_team.name
-    response = client.get(f"{api_url_v1}/teams/?name={filter}")
+    response = admin_client.get(f"{api_url_v1}/teams/?name={filter}")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     result = response.data["results"][0]
     assert_team_data(result, default_team)
 
-    response = client.get(f"{api_url_v1}/teams/?name=non-existent-org")
+    response = admin_client.get(f"{api_url_v1}/teams/?name=non-existent-org")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
 
 
 @pytest.mark.django_db
 def test_list_teams_filter_by_description(
-    default_team: models.Team, new_team: models.Team, client: APIClient
+    default_team: models.Team, new_team: models.Team, admin_client: APIClient
 ):
     filter = default_team.description
-    response = client.get(f"{api_url_v1}/teams/?description={filter}")
+    response = admin_client.get(f"{api_url_v1}/teams/?description={filter}")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     result = response.data["results"][0]
     assert_team_data(result, default_team)
 
-    response = client.get(f"{api_url_v1}/teams/?description=non-existent-org")
+    response = admin_client.get(
+        f"{api_url_v1}/teams/?description=non-existent-org"
+    )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
 
 
 @pytest.mark.django_db
 def test_list_teams_filter_by_ansible_id(
-    default_team: models.Team, new_team: models.Team, client: APIClient
+    default_team: models.Team, new_team: models.Team, admin_client: APIClient
 ):
     filter = new_team.resource.ansible_id
-    response = client.get(f"{api_url_v1}/teams/?resource__ansible_id={filter}")
+    response = admin_client.get(
+        f"{api_url_v1}/teams/?resource__ansible_id={filter}"
+    )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     result = response.data["results"][0]
     assert_team_data(result, new_team)
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/teams/?resource__ansible_id=non-existent-org"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -85,14 +89,14 @@ def test_list_teams_filter_by_ansible_id(
 @pytest.mark.django_db
 def test_create_team(
     default_organization: models.Organization,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     data_in = {
         "name": "test-team",
         "description": "Test Team",
         "organization_id": default_organization.id,
     }
-    response = client.post(f"{api_url_v1}/teams/", data=data_in)
+    response = admin_client.post(f"{api_url_v1}/teams/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED
     team_id = response.data["id"]
     result = response.data
@@ -103,26 +107,26 @@ def test_create_team(
 
 
 @pytest.mark.django_db
-def test_retrieve_team(default_team: models.Team, client: APIClient):
-    response = client.get(f"{api_url_v1}/teams/{default_team.id}/")
+def test_retrieve_team(default_team: models.Team, admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/teams/{default_team.id}/")
     assert response.status_code == status.HTTP_200_OK
 
     assert_team_data(response.data, default_team)
 
 
 @pytest.mark.django_db
-def test_retrieve_team_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/teams/42/")
+def test_retrieve_team_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/teams/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_partial_update_team(
     default_team: models.Team,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     new_data = {"name": "new-name", "description": "New Description"}
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/teams/{default_team.id}/", data=new_data
     )
     assert response.status_code == status.HTTP_200_OK
@@ -132,16 +136,18 @@ def test_partial_update_team(
 
 
 @pytest.mark.django_db
-def test_delete_team_success(default_team: models.Team, client: APIClient):
-    response = client.delete(f"{api_url_v1}/teams/{default_team.id}/")
+def test_delete_team_success(
+    default_team: models.Team, admin_client: APIClient
+):
+    response = admin_client.delete(f"{api_url_v1}/teams/{default_team.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.Team.objects.filter(pk=int(default_team.id)).count() == 0
 
 
 @pytest.mark.django_db
-def test_delete_team_not_exist(client: APIClient):
-    response = client.delete(f"{api_url_v1}/teams/100/")
+def test_delete_team_not_exist(admin_client: APIClient):
+    response = admin_client.delete(f"{api_url_v1}/teams/100/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

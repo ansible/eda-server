@@ -19,19 +19,19 @@ def raise_exception(self, request):
 @mock.patch(
     "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
 )
-def test_debug_unexpected_exception(client: APIClient, settings):
+def test_debug_unexpected_exception(admin_client: APIClient, settings):
     settings.DEBUG = True
     with pytest.raises(FallbackException):
-        client.get(f"{api_url_v1}/projects/")
+        admin_client.get(f"{api_url_v1}/projects/")
 
 
 @pytest.mark.django_db
 @mock.patch(
     "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
 )
-def test_non_debug_unexpected_exception(client: APIClient, settings):
+def test_non_debug_unexpected_exception(admin_client: APIClient, settings):
     settings.DEBUG = False
-    response = client.get(f"{api_url_v1}/projects/")
+    response = admin_client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     data = response.json()
