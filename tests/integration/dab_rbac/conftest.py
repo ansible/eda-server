@@ -38,9 +38,6 @@ def initial_data():
 class ModelFactory:
     """Factory to build resources post data based on existing fixtures."""
 
-    def __init__(self):
-        pass
-
     def get_model_name(self, model):
         name = model._meta.verbose_name.replace(" ", "_")
         if model == models.RulebookProcess:

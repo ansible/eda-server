@@ -81,8 +81,7 @@ def test_retrieve_current_user(
 
 @pytest.mark.django_db
 def test_retrieve_current_user_unauthenticated(base_client: APIClient):
-    admin_client = base_client
-    response = admin_client.get(f"{api_url_v1}/users/me/")
+    response = base_client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {
         "detail": "Authentication credentials were not provided."
