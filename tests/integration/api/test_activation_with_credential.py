@@ -114,7 +114,7 @@ def test_validate_for_aap_credential(
 
 @pytest.mark.django_db
 def test_is_activation_valid_with_token_and_run_job_template(
-    default_de: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook_with_run_job_template: models.Rulebook,
     default_project: models.Project,
     default_user_awx_token: models.AwxToken,
@@ -125,7 +125,7 @@ def test_is_activation_valid_with_token_and_run_job_template(
         name="test",
         description="test activation",
         rulebook_id=default_rulebook_with_run_job_template.id,
-        decision_environment_id=default_de.id,
+        decision_environment_id=default_decision_environment.id,
         project_id=default_project.id,
         awx_token_id=default_user_awx_token.id,
         user_id=default_user.id,
@@ -158,7 +158,7 @@ def test_is_activation_valid_with_aap_credential_and_run_job_template(
 
 @pytest.mark.django_db
 def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
-    default_de: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook_with_run_job_template: models.Rulebook,
     default_project: models.Project,
     default_user: models.User,
@@ -168,7 +168,7 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
         name="test",
         description="test activation",
         rulebook_id=default_rulebook_with_run_job_template.id,
-        decision_environment_id=default_de.id,
+        decision_environment_id=default_decision_environment.id,
         project_id=default_project.id,
         user_id=default_user.id,
     )
@@ -186,7 +186,7 @@ def test_is_activation_valid_with_updated_credential(
     default_activation: models.Activation,
     default_organization: models.Organization,
     user_credential_type: models.CredentialType,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     credential = models.EdaCredential.objects.create(
@@ -202,7 +202,7 @@ def test_is_activation_valid_with_updated_credential(
     )
     default_activation.eda_credentials.add(credential)
 
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/{default_activation.id}/restart/"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -215,7 +215,7 @@ def test_is_activation_valid_with_updated_credential(
 
 @pytest.mark.django_db
 def test_create_activation_with_eda_credential(
-    client: APIClient,
+    admin_client: APIClient,
     kafka_credential_type: models.CredentialType,
     activation_payload: Dict[str, Any],
     preseed_credential_types,
@@ -233,12 +233,14 @@ def test_create_activation_with_eda_credential(
         "inputs": {"sasl_username": "adam", "sasl_password": "secret"},
         "credential_type_id": kafka_credential_type.id,
     }
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/eda-credentials/", data=test_eda_credential
     )
     test_activation["eda_credentials"] = [response.data["id"]]
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_201_CREATED
     data = response.data
     assert data["eda_credentials"][0]["credential_type"] == {
@@ -266,15 +268,15 @@ def test_create_activation_with_eda_credential(
 
 @pytest.mark.django_db
 def test_create_activation_with_key_conflict(
-    client: APIClient,
-    default_de: models.DecisionEnvironment,
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
     kafka_credential_type: models.CredentialType,
     preseed_credential_types,
 ):
     test_activation = {
         "name": "test_activation",
-        "decision_environment_id": default_de.id,
+        "decision_environment_id": default_decision_environment.id,
         "rulebook_id": default_rulebook.id,
         "extra_var": OVERLAP_EXTRA_VAR,
     }
@@ -286,7 +288,9 @@ def test_create_activation_with_key_conflict(
     )
     test_activation["eda_credentials"] = [test_eda_credential.id]
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         "Key: sasl_plain_password already exists "
@@ -297,7 +301,7 @@ def test_create_activation_with_key_conflict(
 
 @pytest.mark.django_db
 def test_create_activation_with_conflict_credentials(
-    client: APIClient,
+    admin_client: APIClient,
     activation_payload: Dict[str, Any],
     user_credential_type: models.CredentialType,
     preseed_credential_types,
@@ -328,7 +332,9 @@ def test_create_activation_with_conflict_credentials(
     eda_credential_ids = [credential.id for credential in eda_credentials]
     test_activation["eda_credentials"] = eda_credential_ids
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         "Key: sasl_password already exists "
@@ -339,15 +345,15 @@ def test_create_activation_with_conflict_credentials(
 
 @pytest.mark.django_db
 def test_create_activation_without_extra_vars_single_credential(
-    client: APIClient,
-    default_de: models.DecisionEnvironment,
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
     user_credential_type: models.CredentialType,
     preseed_credential_types,
 ):
     test_activation = {
         "name": "test_activation",
-        "decision_environment_id": default_de.id,
+        "decision_environment_id": default_decision_environment.id,
         "rulebook_id": default_rulebook.id,
         "extra_var": None,
     }
@@ -362,7 +368,9 @@ def test_create_activation_without_extra_vars_single_credential(
     test_activation["eda_credentials"] = eda_credential_ids
 
     assert not test_activation["extra_var"]
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["extra_var"]
     extra_var = yaml.safe_load(response.data["extra_var"])
@@ -372,15 +380,15 @@ def test_create_activation_without_extra_vars_single_credential(
 
 @pytest.mark.django_db
 def test_create_activation_without_extra_vars_duplicate_credentials(
-    client: APIClient,
-    default_de: models.DecisionEnvironment,
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
     user_credential_type: models.CredentialType,
     preseed_credential_types,
 ):
     test_activation = {
         "name": "test_activation",
-        "decision_environment_id": default_de.id,
+        "decision_environment_id": default_decision_environment.id,
         "rulebook_id": default_rulebook.id,
     }
 
@@ -402,7 +410,9 @@ def test_create_activation_without_extra_vars_duplicate_credentials(
     eda_credential_ids = [credential.id for credential in eda_credentials]
     test_activation["eda_credentials"] = eda_credential_ids
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         "Key: sasl_password already exists in extra var. It conflicts with"

@@ -76,7 +76,7 @@ INPUT_SANS_TYPE = {
 
 
 @pytest.mark.django_db
-def test_create_credential_type(client: APIClient):
+def test_create_credential_type(admin_client: APIClient):
     injectors = {
         "extra_vars": {
             "host": "localhost",
@@ -92,13 +92,15 @@ def test_create_credential_type(client: APIClient):
         "injectors": injectors,
     }
 
-    response = client.post(f"{api_url_v1}/credential-types/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "credential_type_1"
 
 
 @pytest.mark.django_db
-def test_create_credential_type_sans_type(client: APIClient):
+def test_create_credential_type_sans_type(admin_client: APIClient):
     injectors = {
         "extra_vars": {
             "host": "localhost",
@@ -114,7 +116,9 @@ def test_create_credential_type_sans_type(client: APIClient):
         "injectors": injectors,
     }
 
-    response = client.post(f"{api_url_v1}/credential-types/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "credential_type_1"
     assert response.data["inputs"]["fields"][0]["type"] == "string"
@@ -148,7 +152,7 @@ def test_create_credential_type_sans_type(client: APIClient):
     ],
 )
 def test_create_credential_type_with_schema_validate_errors(
-    client: APIClient, inputs, injectors, status_code, error_message
+    admin_client: APIClient, inputs, injectors, status_code, error_message
 ):
     data_in = {
         "name": "credential_type_1",
@@ -157,22 +161,24 @@ def test_create_credential_type_with_schema_validate_errors(
         "injectors": injectors,
     }
 
-    response = client.post(f"{api_url_v1}/credential-types/", data=data_in)
+    response = admin_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
     assert response.status_code == status_code
     assert error_message in response.data["inputs"]
 
 
 @pytest.mark.django_db
-def test_retrieve_credential_type(client: APIClient):
+def test_retrieve_credential_type(admin_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1", inputs={"fields": [{"a": "b"}]}, injectors={}
     )
-    response = client.get(f"{api_url_v1}/credential-types/{obj.id}/")
+    response = admin_client.get(f"{api_url_v1}/credential-types/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db
-def test_list_credential_types(client: APIClient):
+def test_list_credential_types(admin_client: APIClient):
     objects = models.CredentialType.objects.bulk_create(
         [
             models.CredentialType(
@@ -183,38 +189,38 @@ def test_list_credential_types(client: APIClient):
             ),
         ]
     )
-    response = client.get(f"{api_url_v1}/credential-types/")
+    response = admin_client.get(f"{api_url_v1}/credential-types/")
     assert response.status_code == status.HTTP_200_OK
     assert len(objects) == 2
 
 
 @pytest.mark.django_db
-def test_delete_managed_credential_type(client: APIClient):
+def test_delete_managed_credential_type(admin_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1",
         inputs={"fields": [{"a": "b"}]},
         injectors={},
         managed=True,
     )
-    response = client.delete(f"{api_url_v1}/credential-types/{obj.id}/")
+    response = admin_client.delete(f"{api_url_v1}/credential-types/{obj.id}/")
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.django_db
-def test_delete_credential_type(client: APIClient):
+def test_delete_credential_type(admin_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1",
         inputs={"fields": [{"a": "b"}]},
         injectors={},
         managed=False,
     )
-    response = client.delete(f"{api_url_v1}/credential-types/{obj.id}/")
+    response = admin_client.delete(f"{api_url_v1}/credential-types/{obj.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
 def test_delete_credential_type_with_credentials(
-    client: APIClient, preseed_credential_types
+    admin_client: APIClient, preseed_credential_types
 ):
     credential_type = models.CredentialType.objects.create(
         name="user_type",
@@ -229,7 +235,7 @@ def test_delete_credential_type_with_credentials(
         credential_type=credential_type,
     )
 
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/credential-types/{credential_type.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
@@ -260,7 +266,12 @@ def test_delete_credential_type_with_credentials(
     ],
 )
 def test_partial_update_inputs_credential_type(
-    client: APIClient, old_inputs, new_inputs, status_code, passed, message
+    admin_client: APIClient,
+    old_inputs,
+    new_inputs,
+    status_code,
+    passed,
+    message,
 ):
     obj = models.CredentialType.objects.create(
         name="type",
@@ -269,7 +280,7 @@ def test_partial_update_inputs_credential_type(
         managed=False,
     )
     data = {"inputs": new_inputs}
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/credential-types/{obj.id}/", data=data
     )
     assert response.status_code == status_code
@@ -283,13 +294,13 @@ def test_partial_update_inputs_credential_type(
 
 @pytest.mark.django_db
 def test_update_managed_credential_type(
-    client: APIClient, preseed_credential_types
+    admin_client: APIClient, preseed_credential_types
 ):
     scm = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.SOURCE_CONTROL,
     )
     data = {"name": "new_name"}
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/credential-types/{scm.id}/", data=data
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -342,7 +353,7 @@ def test_update_managed_credential_type(
     ],
 )
 def test_update_credential_type_with_created_credentials(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
     data,
     status_code,
@@ -361,7 +372,7 @@ def test_update_credential_type_with_created_credentials(
         credential_type_id=user_type.id,
     )
 
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/credential-types/{user_type.id}/", data=data
     )
     assert response.status_code == status_code

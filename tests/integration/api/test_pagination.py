@@ -23,14 +23,14 @@ from tests.integration.constants import api_url_v1
 def test_get_next_link(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/projects/?page_size=1")
+    response = admin_client.get(f"{api_url_v1}/projects/?page_size=1")
     assert (
         response.data["next"] == f"{api_url_v1}/projects/?page=2&page_size=1"
     )
 
-    response = client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
+    response = admin_client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
     assert response.data["next"] is None
 
 
@@ -38,15 +38,15 @@ def test_get_next_link(
 def test_get_previous_link(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
+    response = admin_client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
     assert (
         response.data["previous"]
         == f"{api_url_v1}/projects/?page=1&page_size=1"
     )
 
-    response = client.get(f"{api_url_v1}/projects/?page=1&page_size=1")
+    response = admin_client.get(f"{api_url_v1}/projects/?page=1&page_size=1")
     assert response.data["previous"] is None
 
 
@@ -54,9 +54,9 @@ def test_get_previous_link(
 def test_return_page(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
+    response = admin_client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
     assert response.data["page"] == 2
 
 
@@ -64,7 +64,7 @@ def test_return_page(
 def test_return_page_size(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
+    response = admin_client.get(f"{api_url_v1}/projects/?page=2&page_size=1")
     assert response.data["page_size"] == 1
