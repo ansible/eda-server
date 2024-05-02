@@ -14,6 +14,7 @@
 
 import re
 
+import gnupg
 import jinja2
 import yaml
 from django.core.exceptions import ValidationError
@@ -102,6 +103,10 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
             if required and not default:
                 errors[display_field] = ["Cannot be blank"]
                 continue
+        else:
+            if required and len(user_input.strip()) == 0:
+                errors[display_field] = ["Cannot be blank"]
+                continue
 
         if data.get("format") and user_input:
             result = _validate_format(
@@ -115,6 +120,11 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                     errors["inputs.ssh_key_unlock"] = result
                 else:
                     errors[display_field] = result
+
+        if field == "gpg_public_key":
+            result = _validate_gpg_public_key(user_input)
+            if bool(result):
+                errors[display_field] = result
 
         if data.get("type") == "boolean":
             if user_input and not isinstance(user_input, bool):
@@ -340,5 +350,21 @@ def _validate_ssh_key(schema: dict, data: str, inputs: dict) -> list[str]:
                 errors.append(PROTECTED_PASSPHRASE_ERROR)
     except ValidationError as e:
         errors.append(str(e))
+
+    return errors
+
+
+def _validate_gpg_public_key(key_data: str) -> list[str]:
+    errors = []
+
+    gpg = gnupg.GPG()
+    import_result = gpg.import_keys(key_data)
+
+    if import_result.returncode != 0:
+        errors.append("No valid GPG data found.")
+        return errors
+
+    if import_result.sec_read > 0:
+        errors.append("Key is not a public key")
 
     return errors
