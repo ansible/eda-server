@@ -78,12 +78,14 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
     eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_credential_exists],
+        validators=[
+            validators.check_credential_types_for_scm,
+        ],
     )
     signature_validation_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_credential_exists],
+        validators=[validators.check_credential_types_for_gpg],
     )
 
     class Meta:
@@ -126,7 +128,9 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         help_text="EdaCredential id of the project",
-        validators=[validators.check_if_credential_exists],
+        validators=[
+            validators.check_credential_types_for_scm,
+        ],
     )
     signature_validation_credential_id = serializers.IntegerField(
         required=False,
@@ -135,7 +139,9 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "ID of an optional credential used for validating files in the "
             "project against unexpected changes"
         ),
-        validators=[validators.check_if_credential_exists],
+        validators=[
+            validators.check_credential_types_for_gpg,
+        ],
     )
     verify_ssl = serializers.BooleanField(
         required=False,
