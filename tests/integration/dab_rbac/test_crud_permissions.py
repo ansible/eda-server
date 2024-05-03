@@ -123,7 +123,6 @@ def test_add_permissions(
     assert default_user.has_obj_perm(obj, "view")
 
 
-@override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_view_permissions(
