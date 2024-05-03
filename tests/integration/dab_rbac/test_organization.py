@@ -15,7 +15,6 @@
 import pytest
 from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist
-from django.test import override_settings
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse
 
@@ -35,7 +34,6 @@ ORG_MODELS = [
 ]
 
 
-@override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
 def test_create_with_default_org(cls_factory, model, admin_client, request):
@@ -72,7 +70,6 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
     assert obj.organization.name == "Default"
 
 
-@override_settings(DEBUG=True)
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
 def test_create_with_custom_org(
