@@ -22,27 +22,11 @@ from aap_eda.core import models
 from tests.integration.constants import api_url_v1
 
 
-@pytest.fixture
-def user() -> models.User:
-    return models.User.objects.create_user(
-        username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
-    )
-
-
-@pytest.fixture
-def client(base_client: APIClient, user: models.User) -> APIClient:
-    client = base_client
-    client.login(username=user.username, password="secret")
-    return client
-
-
 @pytest.mark.django_db
-def test_create_controller_token(client: APIClient, user: models.User):
-    response = client.post(
+def test_create_controller_token(
+    user_client: APIClient, default_user: models.User
+):
+    response = user_client.post(
         f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "Test token 1",
@@ -53,7 +37,7 @@ def test_create_controller_token(client: APIClient, user: models.User):
     data = response.json()
     assert data["name"] == "Test token 1"
     assert data["description"] == ""
-    assert data["user_id"] == user.id
+    assert data["user_id"] == default_user.id
     assert "token" not in data
 
     obj = models.AwxToken.objects.get(pk=data["id"])
@@ -67,7 +51,7 @@ def test_create_controller_token(client: APIClient, user: models.User):
         row = cursor.fetchone()
         assert row[0].startswith("$encrypted$fernet-256$")
 
-    response = client.post(
+    response = user_client.post(
         f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "Test token 2",
@@ -79,13 +63,15 @@ def test_create_controller_token(client: APIClient, user: models.User):
     data = response.json()
     assert data["name"] == "Test token 2"
     assert data["description"] == "Token description"
-    assert data["user_id"] == user.id
+    assert data["user_id"] == default_user.id
     assert "token" not in data
 
 
 @pytest.mark.django_db
-def test_create_token_missing_field(client: APIClient, user: models.User):
-    response = client.post(
+def test_create_token_missing_field(
+    user_client: APIClient, default_user: models.User
+):
+    response = user_client.post(
         f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "token": "test-token-value",
@@ -96,7 +82,7 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
         "name": ["This field is required."],
     }
 
-    response = client.post(
+    response = user_client.post(
         f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "test-token",
@@ -109,12 +95,14 @@ def test_create_token_missing_field(client: APIClient, user: models.User):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_create_token_duplicate_name(client: APIClient, user: models.User):
+def test_create_token_duplicate_name(
+    user_client: APIClient, default_user: models.User
+):
     models.AwxToken.objects.create(
-        user=user, name="test-token", token="test-token-value"
+        user=default_user, name="test-token", token="test-token-value"
     )
 
-    response = client.post(
+    response = user_client.post(
         f"{api_url_v1}/users/me/awx-tokens/",
         data={
             "name": "test-token",
@@ -128,18 +116,20 @@ def test_create_token_duplicate_name(client: APIClient, user: models.User):
 
 
 @pytest.mark.django_db
-def test_list_controller_tokens(client: APIClient, user: models.User):
+def test_list_controller_tokens(
+    user_client: APIClient, default_user: models.User
+):
     tokens = models.AwxToken.objects.bulk_create(
         [
             models.AwxToken(
-                name="token-01", token="token-value-01", user=user
+                name="token-01", token="token-value-01", user=default_user
             ),
             models.AwxToken(
-                name="token-02", token="token-value-02", user=user
+                name="token-02", token="token-value-02", user=default_user
             ),
         ]
     )
-    response = client.get(f"{api_url_v1}/users/me/awx-tokens/")
+    response = user_client.get(f"{api_url_v1}/users/me/awx-tokens/")
     data = response.json()
     assert data["count"] == 2
     for token_response, token_db in zip(data["results"], tokens):
@@ -147,29 +137,35 @@ def test_list_controller_tokens(client: APIClient, user: models.User):
 
 
 @pytest.mark.django_db
-def test_retrieve_controller_token(client: APIClient, user: models.User):
+def test_retrieve_controller_token(
+    user_client: APIClient, default_user: models.User
+):
     obj = models.AwxToken.objects.create(
-        name="token-01", token="token-value-01", user=user
+        name="token-01", token="token-value-01", user=default_user
     )
-    response = client.get(f"{api_url_v1}/users/me/awx-tokens/{obj.id}/")
+    response = user_client.get(f"{api_url_v1}/users/me/awx-tokens/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_token_data(response.json(), obj)
 
 
 @pytest.mark.django_db
 def test_retrieve_controller_token_not_found(
-    client: APIClient, user: models.User
+    user_client: APIClient, default_user: models.User
 ):
-    response = client.get(f"{api_url_v1}/users/me/awx-tokens/42/")
+    response = user_client.get(f"{api_url_v1}/users/me/awx-tokens/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_delete_controller_token(client: APIClient, user: models.User):
+def test_delete_controller_token(
+    user_client: APIClient, default_user: models.User
+):
     obj = models.AwxToken.objects.create(
-        name="token-01", token="token-value-01", user=user
+        name="token-01", token="token-value-01", user=default_user
     )
-    response = client.delete(f"{api_url_v1}/users/me/awx-tokens/{obj.id}/")
+    response = user_client.delete(
+        f"{api_url_v1}/users/me/awx-tokens/{obj.id}/"
+    )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     exists = models.AwxToken.objects.filter(id=obj.id).exists()
@@ -178,9 +174,9 @@ def test_delete_controller_token(client: APIClient, user: models.User):
 
 @pytest.mark.django_db
 def test_delete_controller_token_not_found(
-    client: APIClient, user: models.User
+    user_client: APIClient, default_user: models.User
 ):
-    response = client.delete(f"{api_url_v1}/users/me/awx-tokens/42/")
+    response = user_client.delete(f"{api_url_v1}/users/me/awx-tokens/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

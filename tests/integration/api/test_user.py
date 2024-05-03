@@ -21,16 +21,14 @@ from rest_framework.test import APIClient
 from aap_eda.core import models
 from tests.integration.constants import api_url_v1
 
-from .conftest import ADMIN_USERNAME
-
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 @pytest.fixture
 def user_api_client(default_user):
-    client = APIClient()
-    client.force_authenticate(user=default_user)
-    return client
+    admin_client = APIClient()
+    admin_client.force_authenticate(user=default_user)
+    return admin_client
 
 
 @pytest.fixture
@@ -60,8 +58,10 @@ def org_member_rd():
 
 
 @pytest.mark.django_db
-def test_retrieve_current_user(client: APIClient, admin_user: models.User):
-    response = client.get(f"{api_url_v1}/users/me/")
+def test_retrieve_current_user(
+    admin_client: APIClient, admin_user: models.User
+):
+    response = admin_client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
         "id": admin_user.id,
@@ -81,8 +81,7 @@ def test_retrieve_current_user(client: APIClient, admin_user: models.User):
 
 @pytest.mark.django_db
 def test_retrieve_current_user_unauthenticated(base_client: APIClient):
-    client = base_client
-    response = client.get(f"{api_url_v1}/users/me/")
+    response = base_client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {
         "detail": "Authentication credentials were not provided."
@@ -90,8 +89,8 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
 
 
 @pytest.mark.django_db
-def test_update_current_user(client: APIClient, admin_user: models.User):
-    response = client.patch(
+def test_update_current_user(admin_client: APIClient, admin_user: models.User):
+    response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={
             "first_name": "Darth",
@@ -106,9 +105,9 @@ def test_update_current_user(client: APIClient, admin_user: models.User):
 
 @pytest.mark.django_db
 def test_update_current_user_password(
-    client: APIClient, admin_user: models.User
+    admin_client: APIClient, admin_user: models.User
 ):
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={"password": "updated-password"},
     )
@@ -122,9 +121,11 @@ def test_update_current_user_password(
 
 @pytest.mark.django_db
 def test_update_current_user_username_fail(
-    client: APIClient, admin_user: models.User
+    admin_client: APIClient,
+    admin_user: models.User,
+    admin_info: dict,
 ):
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={"username": "darth.vader"},
     )
@@ -136,11 +137,11 @@ def test_update_current_user_username_fail(
     assert data["username"] == admin_user.username
 
     admin_user.refresh_from_db()
-    assert admin_user.username == ADMIN_USERNAME
+    assert admin_user.username == admin_info["username"]
 
 
 @pytest.mark.django_db
-def test_create_user(client: APIClient):
+def test_create_user(admin_client: APIClient):
     create_user_data = {
         "username": "test.user",
         "first_name": "Test",
@@ -149,7 +150,7 @@ def test_create_user(client: APIClient):
         "password": "secret",
     }
 
-    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
+    response = admin_client.post(f"{api_url_v1}/users/", data=create_user_data)
 
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["is_superuser"] is False
@@ -286,10 +287,10 @@ def test_retrieve_user_details(
 
 @pytest.mark.django_db
 def test_list_users(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
-    response = client.get(f"{api_url_v1}/users/")
+    response = admin_client.get(f"{api_url_v1}/users/")
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
 
@@ -309,11 +310,13 @@ def test_list_users(
 
 @pytest.mark.django_db
 def test_partial_update_user(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
     data = {"first_name": "Anakin"}
-    response = client.patch(f"{api_url_v1}/users/{admin_user.id}/", data=data)
+    response = admin_client.patch(
+        f"{api_url_v1}/users/{admin_user.id}/", data=data
+    )
     assert response.status_code == status.HTTP_200_OK
 
     updated_user = models.User.objects.get(id=admin_user.id)
@@ -335,10 +338,10 @@ def test_partial_update_user(
 
 @pytest.mark.django_db
 def test_delete_user(
-    client: APIClient,
+    admin_client: APIClient,
     default_user: models.User,
 ):
-    response = client.delete(f"{api_url_v1}/users/{default_user.id}/")
+    response = admin_client.delete(f"{api_url_v1}/users/{default_user.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.User.objects.filter(id=default_user.id).count() == 0
@@ -346,10 +349,10 @@ def test_delete_user(
 
 @pytest.mark.django_db
 def test_delete_user_not_allowed(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
-    response = client.delete(f"{api_url_v1}/users/{admin_user.id}/")
+    response = admin_client.delete(f"{api_url_v1}/users/{admin_user.id}/")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
     assert models.User.objects.filter(id=admin_user.id).count() == 1
@@ -357,11 +360,11 @@ def test_delete_user_not_allowed(
 
 @pytest.mark.django_db
 def test_list_users_filter_username(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
     default_user: models.User,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/users/?username={admin_user.username}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -383,10 +386,10 @@ def test_list_users_filter_username(
 
 @pytest.mark.django_db
 def test_list_users_filter_username_non_exist(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
-    response = client.get(f"{api_url_v1}/users/?username=test")
+    response = admin_client.get(f"{api_url_v1}/users/?username=test")
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
 
@@ -395,12 +398,14 @@ def test_list_users_filter_username_non_exist(
 
 @pytest.mark.django_db
 def test_list_users_filter_by_ansible_id(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
     default_user: models.User,
 ):
     filter = default_user.resource.ansible_id
-    response = client.get(f"{api_url_v1}/users/?resource__ansible_id={filter}")
+    response = admin_client.get(
+        f"{api_url_v1}/users/?resource__ansible_id={filter}"
+    )
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
     assert len(results) == 1
@@ -416,7 +421,7 @@ def test_list_users_filter_by_ansible_id(
         },
     }
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/users/?resource__ansible_id=non-existent-org"
     )
     assert response.status_code == status.HTTP_200_OK
