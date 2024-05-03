@@ -38,13 +38,27 @@ INPUTS = {
 
 
 @pytest.mark.parametrize(
-    "inputs", [{}, {"username": "adam", "password": "secret"}]
+    ("inputs", "status_code", "status_message"),
+    [
+        (
+            {"username": "adam", "password": "secret"},
+            status.HTTP_201_CREATED,
+            None,
+        ),
+        (
+            {"username": "adam", "password": "secret", "invalid_key": "bad"},
+            status.HTTP_400_BAD_REQUEST,
+            None,
+        ),
+    ],
 )
 @pytest.mark.django_db
 def test_create_eda_credential(
     admin_client: APIClient,
     credential_type: models.CredentialType,
     inputs,
+    status_code,
+    status_message,
 ):
     data_in = {
         "name": "eda-credential",
@@ -54,9 +68,15 @@ def test_create_eda_credential(
     response = admin_client.post(
         f"{api_url_v1}/eda-credentials/", data=data_in
     )
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["name"] == "eda-credential"
-    assert response.data["managed"] is False
+    assert response.status_code == status_code
+    if status_code == status.HTTP_201_CREATED:
+        assert response.data["name"] == "eda-credential"
+        assert response.data["managed"] is False
+    else:
+        assert (
+            "Input keys {'invalid_key'} are not defined in the schema"
+            in response.data["inputs"][0]
+        )
 
 
 @pytest.mark.parametrize(
@@ -99,27 +119,6 @@ def test_create_eda_credential_with_gpg_key_data(
     )
     assert response.status_code == status_code
     assert status_message in response.data.get("inputs.gpg_public_key", "")
-
-
-@pytest.mark.django_db
-def test_create_eda_credential_with_type(
-    admin_client: APIClient, credential_type: models.CredentialType
-):
-    data_in = {
-        "name": "eda-credential",
-        "inputs": {"username": "adam", "password": "secret"},
-        "credential_type_id": credential_type.id,
-    }
-    response = admin_client.post(
-        f"{api_url_v1}/eda-credentials/", data=data_in
-    )
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.data["name"] == "eda-credential"
-    assert response.data["managed"] is False
-    assert response.data["inputs"] == {
-        "password": "$encrypted$",
-        "username": "adam",
-    }
 
 
 @pytest.mark.parametrize(
@@ -364,6 +363,33 @@ def test_partial_update_eda_credential_without_inputs(
         "username": "bearny",
         "key": "private",
     }
+
+
+@pytest.mark.django_db
+def test_partial_update_eda_credential_with_invalid_inputs(
+    admin_client: APIClient, credential_type: models.CredentialType
+):
+    obj = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": "secret"},
+        credential_type_id=credential_type.id,
+        managed=True,
+    )
+    data = {
+        "inputs": {
+            "username": "bearny",
+            "password": "demo",
+            "invalid_key": "bad",
+        }
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Input keys {'invalid_key'} are not defined in the schema"
+        in response.data["inputs"][0]
+    )
 
 
 @pytest.mark.parametrize(
