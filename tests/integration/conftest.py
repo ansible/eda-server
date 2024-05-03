@@ -23,6 +23,7 @@ import redis
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.test import override_settings
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
@@ -770,6 +771,13 @@ RMVE39lIPjN2AKyK
 """
 
 
+@pytest.fixture(autouse=True)
+def use_debug_setting():
+    with override_settings(DEBUG=True):
+        yield
+
+
+# fixture for a running redis server
 @pytest.fixture
 def default_credential_type() -> models.CredentialType:
     """Return a default Credential Type."""
