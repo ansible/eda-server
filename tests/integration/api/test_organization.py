@@ -136,7 +136,7 @@ def test_retrieve_organization_not_exist(admin_client: APIClient):
 
 
 @pytest.mark.django_db
-def test_partial_update_organization(
+def test_partial_update_organization_success(
     new_organization: models.Organization,
     superuser_client: APIClient,
 ):
@@ -148,6 +148,23 @@ def test_partial_update_organization(
 
     new_organization.refresh_from_db()
     assert_organization_data(response.data, new_organization)
+
+
+@pytest.mark.django_db
+def test_partial_update_default_organization_exception(
+    default_organization: models.Organization,
+    superuser_client: APIClient,
+):
+    new_data = {"name": "new-name", "description": "New Description"}
+    response = superuser_client.patch(
+        f"{api_url_v1}/organizations/{default_organization.id}/", data=new_data
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        response.data["detail"]
+        == "The default organization cannot be modified."
+    )
+    assert models.Organization.objects.get(id=default_organization.id)
 
 
 @pytest.mark.django_db

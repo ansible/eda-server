@@ -47,6 +47,9 @@ class ModelFactory:
     def get_fixture_object(self, request, name):
         if name == "rulebook_process":
             name = "activation_instance"
+        # default org is immutable
+        elif name == "organization":
+            return request.getfixturevalue("new_organization")
         return request.getfixturevalue(f"default_{name}")
 
     def get_post_data(self, model_obj):
