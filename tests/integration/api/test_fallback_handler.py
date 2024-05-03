@@ -1,6 +1,7 @@
 from unittest import mock
 
 import pytest
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -20,9 +21,9 @@ def raise_exception(self, request):
     "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
 )
 def test_debug_unexpected_exception(admin_client: APIClient, settings):
-    settings.DEBUG = True
-    with pytest.raises(FallbackException):
-        admin_client.get(f"{api_url_v1}/projects/")
+    with override_settings(DEBUG=True):
+        with pytest.raises(FallbackException):
+            admin_client.get(f"{api_url_v1}/projects/")
 
 
 @pytest.mark.django_db
@@ -30,9 +31,9 @@ def test_debug_unexpected_exception(admin_client: APIClient, settings):
     "aap_eda.api.views.project.ProjectViewSet.list", new=raise_exception
 )
 def test_non_debug_unexpected_exception(admin_client: APIClient, settings):
-    settings.DEBUG = False
-    response = admin_client.get(f"{api_url_v1}/projects/")
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    with override_settings(DEBUG=False):
+        response = admin_client.get(f"{api_url_v1}/projects/")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    data = response.json()
-    assert data["detail"].startswith("Unexpected server error")
+        data = response.json()
+        assert data["detail"].startswith("Unexpected server error")
