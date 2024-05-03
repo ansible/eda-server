@@ -122,6 +122,12 @@ def test_add_permissions(
     # Assure that user gets some creator permissions
     assert default_user.has_obj_perm(obj, "view")
 
+    # Assure OPTIONS show POST action since user has add permission
+    response = user_client.options(url)
+    assert response.status_code == 200
+    assert "actions" in response.data
+    assert "POST" in response.data["actions"]
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
@@ -143,6 +149,11 @@ def test_view_permissions(
     response = user_client.get(url, data={})
     assert response.status_code == 200, response.data
 
+    # Assure no POST action on OPTIONS since user has no add permission
+    response = user_client.options(url)
+    assert response.status_code == 200
+    assert "actions" not in response.data
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
@@ -162,7 +173,7 @@ def test_change_permissions(
     assert response.status_code == 403, response.data
 
     # Test OPTIONS without sufficient permissions
-    response = user_api_client.options(url)
+    response = user_client.options(url)
     assert response.status_code == 200
     assert "actions" not in response.data  # no PATCH or PUT
 
@@ -172,9 +183,9 @@ def test_change_permissions(
     assert response.status_code == 200, response.data
 
     # Test OPTIONS
-    response = user_api_client.options(url)
+    response = user_client.options(url)
     assert response.status_code == 200
-    assert "actions" in response.data  # no PATCH or PUT
+    assert "actions" in response.data
     assert "PATCH" in response.data["actions"]
 
 
