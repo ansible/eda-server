@@ -20,8 +20,9 @@ from rest_framework.test import APIClient
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.api.serializers.activation import is_activation_valid
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from aap_eda.core.enums import DefaultCredentialType
+from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.core.utils.crypto.base import SecretValue
 from tests.integration.constants import api_url_v1
 
@@ -213,57 +214,99 @@ def test_is_activation_valid_with_updated_credential(
     assert extra_var["sasl_password"] == "secret"
 
 
+@pytest.mark.parametrize(
+    ("credential_type", "status_code"),
+    [
+        (
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_201_CREATED,
+        ),
+        (
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_201_CREATED,
+        ),
+        (
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+    ],
+)
 @pytest.mark.django_db
-def test_create_activation_with_eda_credential(
+def test_create_activation_with_eda_credentials(
     admin_client: APIClient,
-    kafka_credential_type: models.CredentialType,
     activation_payload: Dict[str, Any],
+    kafka_credential_type: models.CredentialType,
     preseed_credential_types,
+    credential_type,
+    status_code,
 ):
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(
+            {"username": "dummy-user", "password": "dummy-password"}
+        ),
+    )
+    kafka_eda_credential = models.EdaCredential.objects.create(
+        name="kafka-eda-credential",
+        inputs=inputs_to_store(
+            {"sasl_username": "adam", "sasl_password": "secret"},
+        ),
+        credential_type=kafka_credential_type,
+    )
     test_activation = {
         "name": "test_activation",
         "decision_environment_id": activation_payload[
             "decision_environment_id"
         ],
         "rulebook_id": activation_payload["rulebook_id"],
+        "eda_credentials": [credential.id, kafka_eda_credential.id],
     }
-
-    test_eda_credential = {
-        "name": "eda-credential",
-        "inputs": {"sasl_username": "adam", "sasl_password": "secret"},
-        "credential_type_id": kafka_credential_type.id,
-    }
-    response = admin_client.post(
-        f"{api_url_v1}/eda-credentials/", data=test_eda_credential
-    )
-    test_activation["eda_credentials"] = [response.data["id"]]
 
     response = admin_client.post(
         f"{api_url_v1}/activations/", data=test_activation
     )
-    assert response.status_code == status.HTTP_201_CREATED
-    data = response.data
-    assert data["eda_credentials"][0]["credential_type"] == {
-        "id": kafka_credential_type.id,
-        "name": kafka_credential_type.name,
-        "namespace": None,
-        "kind": "cloud",
-        "organization_id": kafka_credential_type.organization.id,
-    }
-    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert response.status_code == status_code
 
-    assert activation.eda_system_vault_credential is not None
-    assert activation.eda_system_vault_credential.name.startswith(
-        EDA_SERVER_VAULT_LABEL
-    )
-    assert activation.eda_system_vault_credential.managed is True
-    assert isinstance(
-        activation.eda_system_vault_credential.inputs, SecretValue
-    )
+    if status_code == status.HTTP_201_CREATED:
+        data = response.data
+        assert len(data["eda_credentials"]) == 2
 
-    assert activation.eda_system_vault_credential.credential_type is not None
-    credential_type = activation.eda_system_vault_credential.credential_type
-    assert credential_type.name == DefaultCredentialType.VAULT
+        activation = models.Activation.objects.filter(id=data["id"]).first()
+
+        assert activation.eda_system_vault_credential is not None
+        assert activation.eda_system_vault_credential.name.startswith(
+            EDA_SERVER_VAULT_LABEL
+        )
+        assert activation.eda_system_vault_credential.managed is True
+        assert isinstance(
+            activation.eda_system_vault_credential.inputs, SecretValue
+        )
+
+        assert (
+            activation.eda_system_vault_credential.credential_type is not None
+        )
+        credential_type = (
+            activation.eda_system_vault_credential.credential_type
+        )
+        assert credential_type.name == DefaultCredentialType.VAULT
+    else:
+        assert (
+            "The type of credential can not be one of ['Container Registry', "
+            "'GPG Public Key', 'Source Control']"
+            in response.data["eda_credentials"]
+        )
 
 
 @pytest.mark.django_db
