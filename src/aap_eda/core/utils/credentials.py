@@ -90,7 +90,18 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
     errors = {}
     required_fields = schema.get("required", [])
 
-    for data in schema.get("fields", []):
+    schema_fields = schema.get("fields", [])
+    schema_keys = {field["id"] for field in schema_fields}
+    invalid_keys = inputs.keys() - schema_keys
+    if bool(invalid_keys):
+        errors["inputs"] = (
+            f"Input keys {invalid_keys} are not defined "
+            f"in the schema. Allowed keys are: {schema_keys}"
+        )
+
+        return errors
+
+    for data in schema_fields:
         field = data["id"]
         required = field in required_fields
         default = data.get("default")
