@@ -98,6 +98,30 @@ def test_create_credential_type(admin_client: APIClient):
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "credential_type_1"
 
+    data_in = {
+        "name": "credential_type_2",
+        "description": "desc here",
+        "inputs": INPUT,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "This field is required." in response.data["injectors"]
+
+    data_in = {
+        "name": "credential_type_3",
+        "description": "desc here",
+        "injectors": injectors,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "This field is required." in response.data["inputs"]
+
 
 @pytest.mark.django_db
 def test_create_credential_type_sans_type(admin_client: APIClient):
@@ -309,8 +333,8 @@ def test_partial_update_inputs_credential_type(
         (
             {},
             status.HTTP_400_BAD_REQUEST,
-            "non_field_errors",
-            "Injectors field cannot be empty",
+            "injectors",
+            "Injectors must have keys defined in ['extra_vars']",
         ),
         (
             {"c": "d"},

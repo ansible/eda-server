@@ -731,7 +731,7 @@ INPUTS = {
         },
     ]
 }
-INJECTORS = {"extra_vars": {"username": "Fred"}}
+INJECTORS = {"extra_vars": {"password": "{{ password }}"}}
 
 DUMMY_GPG_KEY = """
 -----BEGIN PGP PUBLIC KEY BLOCK-----

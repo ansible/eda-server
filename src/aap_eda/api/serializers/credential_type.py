@@ -43,8 +43,13 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
     inputs = serializers.JSONField(
         required=True,
         allow_null=False,
-        help_text="Name of the credential type",
+        help_text="Inputs of the credential type",
         validators=[validators.check_if_schema_valid],
+    )
+    injectors = serializers.JSONField(
+        required=True,
+        allow_null=False,
+        help_text="Injectors of the credential type",
     )
     organization_id = serializers.IntegerField(
         required=False,
@@ -57,31 +62,9 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
         inputs = data.get("inputs")
 
         if self.partial:
-            # updating allow injectors/inputs be None, but not empty dict
-            if injectors is not None and not bool(injectors):
-                raise serializers.ValidationError(
-                    "Injectors field cannot be empty"
-                )
-
-            if inputs is not None and not bool(inputs):
-                raise serializers.ValidationError(
-                    "inputs field cannot be empty"
-                )
-
-            injectors = injectors or self.instance.injectors
             inputs = inputs or self.instance.inputs
-        else:
-            if not bool(injectors):
-                raise serializers.ValidationError(
-                    "Injectors field cannot be empty"
-                )
 
-            if not bool(inputs):
-                raise serializers.ValidationError(
-                    "Inputs field cannot be empty"
-                )
-
-        if injectors and inputs:
+        if injectors or injectors == {}:
             errors = validate_injectors(inputs, injectors)
             if bool(errors):
                 raise serializers.ValidationError(errors)

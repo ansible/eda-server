@@ -236,13 +236,9 @@ def validate_schema(schema: dict) -> list[str]:
 
 def validate_injectors(schema: dict, injectors: dict) -> dict:
     errors = []
-    context = _default_context(schema)
 
     if not isinstance(injectors, dict):
-        errors.append(
-            "Injectors must be a dict type and defines keys"
-            f" in {SUPPORTED_KEYS_IN_INJECTORS}"
-        )
+        errors.append("Injectors must be in Key-Value pairs format")
 
     if not any(
         support_key in injectors.keys()
@@ -252,6 +248,8 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
             "Injectors must have keys defined in"
             f" {SUPPORTED_KEYS_IN_INJECTORS}"
         )
+
+    context = _default_context(schema)
 
     for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
@@ -284,7 +282,7 @@ def _get_id_fields(schema: dict) -> list[str]:
 def _default_context(schema: dict) -> dict:
     results = {}
 
-    fields = schema.get("fields")
+    fields = schema.get("fields", [])
 
     for field in fields:
         field_type = field.get("type")
