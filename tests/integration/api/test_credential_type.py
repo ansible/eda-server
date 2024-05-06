@@ -250,7 +250,14 @@ def test_delete_credential_type_with_credentials(
     ("old_inputs", "new_inputs", "status_code", "passed", "message"),
     [
         (
-            {"a": "b"},
+            {"fields": [{"id": "username", "label": "Username"}]},
+            {},
+            status.HTTP_400_BAD_REQUEST,
+            False,
+            "'fields' must exist and non empty",
+        ),
+        (
+            {"fields": [{"id": "username", "label": "Username"}]},
             {"c": "d"},
             status.HTTP_400_BAD_REQUEST,
             False,
@@ -279,7 +286,10 @@ def test_partial_update_inputs_credential_type(
         injectors={},
         managed=False,
     )
-    data = {"inputs": new_inputs}
+    data = {
+        "inputs": new_inputs,
+        "injectors": {"extra_vars": {"username": "Fred"}},
+    }
     response = admin_client.patch(
         f"{api_url_v1}/credential-types/{obj.id}/", data=data
     )
@@ -290,6 +300,56 @@ def test_partial_update_inputs_credential_type(
         assert obj.inputs == new_inputs
     else:
         assert message in response.data["inputs"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("new_injectors", "status_code", "key", "message"),
+    [
+        (
+            {},
+            status.HTTP_400_BAD_REQUEST,
+            "non_field_errors",
+            "Injectors field cannot be empty",
+        ),
+        (
+            {"c": "d"},
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            "Injectors must have keys defined in ['extra_vars']",
+        ),
+        (
+            {"extra_vars": {"username": "Adam"}},
+            status.HTTP_200_OK,
+            None,
+            None,
+        ),
+    ],
+)
+def test_partial_update_injectors_credential_type(
+    admin_client: APIClient,
+    new_injectors,
+    status_code,
+    key,
+    message,
+):
+    obj = models.CredentialType.objects.create(
+        name="type",
+        inputs={"fields": [{"id": "username", "label": "Username"}]},
+        injectors={"extra_vars": {"username": "Fred"}},
+        managed=False,
+    )
+    data = {"injectors": new_injectors}
+    response = admin_client.patch(
+        f"{api_url_v1}/credential-types/{obj.id}/", data=data
+    )
+    assert response.status_code == status_code
+
+    if status_code == status.HTTP_200_OK:
+        obj.refresh_from_db()
+        assert obj.injectors == new_injectors
+    else:
+        assert message in response.data[key]
 
 
 @pytest.mark.django_db

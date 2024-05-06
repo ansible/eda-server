@@ -53,10 +53,36 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        if data.get("injectors") and data.get("inputs"):
-            errors = validate_injectors(
-                data.get("inputs"), data.get("injectors")
-            )
+        injectors = data.get("injectors")
+        inputs = data.get("inputs")
+
+        if self.partial:
+            # updating allow injectors/inputs be None, but not empty dict
+            if injectors is not None and not bool(injectors):
+                raise serializers.ValidationError(
+                    "Injectors field cannot be empty"
+                )
+
+            if inputs is not None and not bool(inputs):
+                raise serializers.ValidationError(
+                    "inputs field cannot be empty"
+                )
+
+            injectors = injectors or self.instance.injectors
+            inputs = inputs or self.instance.inputs
+        else:
+            if not bool(injectors):
+                raise serializers.ValidationError(
+                    "Injectors field cannot be empty"
+                )
+
+            if not bool(inputs):
+                raise serializers.ValidationError(
+                    "Inputs field cannot be empty"
+                )
+
+        if injectors and inputs:
+            errors = validate_injectors(inputs, injectors)
             if bool(errors):
                 raise serializers.ValidationError(errors)
 
