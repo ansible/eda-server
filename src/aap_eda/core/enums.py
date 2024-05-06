@@ -70,6 +70,7 @@ class ActivationStatus(DjangoStrEnum):
     STARTING = "starting"
     RUNNING = "running"
     PENDING = "pending"
+    PENDING_WORKERS_OFFLINE = "pending (workers offline)"
     FAILED = "failed"
     STOPPING = "stopping"
     STOPPED = "stopped"
@@ -102,6 +103,9 @@ class DefaultCredentialType(DjangoStrEnum):
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
 ACTIVATION_STATUS_MESSAGE_MAP = {
     ActivationStatus.PENDING: "Wait for a worker to be available to start activation",  # noqa: E501
+    ActivationStatus.PENDING_WORKERS_OFFLINE: "Wait for a worker to be available to"  # noqa: E501
+    " start activation (all workers in the"  # noqa: E501
+    " node are offline)",  # noqa: E501
     ActivationStatus.STARTING: "Worker is starting activation",
     ActivationStatus.RUNNING: "Container running activation",
     ActivationStatus.STOPPING: "Activation is being disabled",

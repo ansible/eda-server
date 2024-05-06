@@ -447,6 +447,7 @@ def test_enable_activation(
     for state in [
         enums.ActivationStatus.COMPLETED,
         enums.ActivationStatus.PENDING,
+        enums.ActivationStatus.PENDING_WORKERS_OFFLINE,
         enums.ActivationStatus.STOPPED,
         enums.ActivationStatus.FAILED,
     ]:

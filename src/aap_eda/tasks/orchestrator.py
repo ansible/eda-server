@@ -156,16 +156,15 @@ def dispatch(
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
 ):
-    request_type_text = f" type {request_type}" if request_type else ""
-
-    job_id = _manage_process_job_id(process_parent_type, process_parent_id)
-    LOGGER.info(
-        "Dispatching request"
-        f"{request_type_text} for {process_parent_type} {process_parent_id}",
-    )
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
+
+    job_id = _manage_process_job_id(process_parent_type, process_parent_id)
+    LOGGER.info(
+        f"Dispatching request type {request_type} for"
+        f" {process_parent_type} {process_parent_id}",
+    )
 
     queue_name = None
     # new processes
@@ -174,8 +173,8 @@ def dispatch(
         ActivationRequest.AUTO_START,
     ]:
         LOGGER.info(
-            f"Dispatching {process_parent_type}"
-            f" {process_parent_id} as new process.",
+            f"Dispatching {process_parent_type} {process_parent_id}"
+            " as new process.",
         )
     else:
         queue_name = get_queue_name_by_parent_id(
@@ -192,14 +191,14 @@ def dispatch(
             if not queue_name:
                 LOGGER.info(
                     "Scheduling request"
-                    f"{request_type_text} for {process_parent_type}"
+                    f" type {request_type} for {process_parent_type}"
                     f" {process_parent_id} to the least busy queue"
                     "; it is not currently associated with a queue.",
                 )
             else:
                 LOGGER.info(
                     "Scheduling request"
-                    f"{request_type_text} for {process_parent_type}"
+                    f" type {request_type} for {process_parent_type}"
                     f" {process_parent_id} to the least busy queue"
                     f"; its associated queue '{queue_name}' is from"
                     " previous configuation settings.",
@@ -218,7 +217,7 @@ def dispatch(
         )
         LOGGER.warning(
             "Request"
-            f"{request_type_text} for {process_parent_type}"
+            f" type {request_type} for {process_parent_type}"
             f" {process_parent_id} will be run on the least busy queue."
         )
         queue_name = None
@@ -230,31 +229,45 @@ def dispatch(
             # The are no healthy queues on which to run the request. For any
             # request that isn't a restart set its status to "workers offline."
             msg = (
-                "There are no healthy queues on which to run the request"
-                f"{request_type_text} for {process_parent_type}"
-                f" {process_parent_id}. There may be an issue with the node"
-                "; please contact the administrator."
+                f"The workers available to process request type {request_type}"
+                f" for {process_parent_type} {process_parent_id}"
+                " are failing liveness checks.  There may be an issue with the"
+                " node; please contact the administrator."
             )
             LOGGER.warning(
                 msg,
             )
 
-            if request_type not in [
-                ActivationRequest.RESTART,
-            ]:
-                status_manager = StatusManager(
-                    get_process_parent(process_parent_type, process_parent_id),
-                )
-                status_manager.set_status(
-                    ActivationStatus.WORKERS_OFFLINE,
-                    msg,
-                )
-                # There may not be a latest instance.
-                if status_manager.latest_instance:
-                    status_manager.set_latest_instance_status(
-                        ActivationStatus.WORKERS_OFFLINE,
-                        msg,
-                    )
+            status_manager = StatusManager(
+                get_process_parent(process_parent_type, process_parent_id),
+            )
+
+            status = ActivationStatus.WORKERS_OFFLINE
+            # If the request is start/auto-start we know the request isn't
+            # running.
+            # If the request is in one of the pending states that also
+            # indicates it's not running; this check is for previous
+            # failures to start that got dispatched from the monitor
+            # task.
+            if (
+                request_type
+                in [
+                    ActivationRequest.START,
+                    ActivationRequest.AUTO_START,
+                ]
+            ) or (
+                status_manager.db_instance.status
+                in [
+                    ActivationStatus.PENDING,
+                    ActivationStatus.PENDING_WORKERS_OFFLINE,
+                ]
+            ):
+                status = ActivationStatus.PENDING_WORKERS_OFFLINE
+
+            status_manager.set_status(status, msg)
+            # There may not be a latest instance.
+            if status_manager.latest_instance:
+                status_manager.set_latest_instance_status(status, msg)
 
     if queue_name:
         unique_enqueue(
@@ -436,6 +449,7 @@ def monitor_rulebook_processes() -> None:
     for process in models.RulebookProcess.objects.filter(
         status__in=[
             ActivationStatus.RUNNING,
+            ActivationStatus.PENDING_WORKERS_OFFLINE,
             ActivationStatus.WORKERS_OFFLINE,
         ]
     ):
