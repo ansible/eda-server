@@ -179,6 +179,22 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "proxy",
         ]
 
+    def validate(self, data):
+        if "proxy" in data and ENCRYPTED_STRING in data["proxy"]:
+            project = self.instance
+            unchanged = (
+                project.proxy
+                and get_proxy_for_display(project.proxy.get_secret_value())
+                == data["proxy"]
+            )
+            if unchanged:
+                data.pop("proxy")
+            else:
+                raise serializers.ValidationError(
+                    "The password in the proxy field should be unencrypted"
+                )
+        return data
+
 
 class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     """Serializer for reading the Project with embedded objects."""

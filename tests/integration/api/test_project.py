@@ -632,9 +632,8 @@ def test_partial_update_project_bad_proxy(
         data,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        response.data["errors"]
-        == "The password in the proxy field should be unencrypted"
+    assert "The password in the proxy field should be unencrypted" in str(
+        response.data
     )
 
 

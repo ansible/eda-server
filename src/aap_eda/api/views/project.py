@@ -27,10 +27,6 @@ from rest_framework.response import Response
 
 from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
-from aap_eda.api.serializers.project import (
-    ENCRYPTED_STRING,
-    get_proxy_for_display,
-)
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 
@@ -170,23 +166,6 @@ class ProjectViewSet(
     )
     def partial_update(self, request, pk):
         project = self.get_object()
-        if "proxy" in request.data:
-            new_proxy = request.data["proxy"]
-            if ENCRYPTED_STRING in new_proxy:
-                unchanged = (
-                    project.proxy
-                    and get_proxy_for_display(project.proxy.get_secret_value())
-                    == new_proxy
-                )
-                if unchanged:
-                    request.data.pop("proxy")
-                else:
-                    error = (
-                        "The password in the proxy field should be unencrypted"
-                    )
-                    return Response(
-                        {"errors": error}, status=status.HTTP_400_BAD_REQUEST
-                    )
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )
