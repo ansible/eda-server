@@ -159,8 +159,11 @@ def dispatch(
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
     LOGGER.info(
         f"Dispatching request type {request_type} for {process_parent_type} "
-        "{process_parent_id}",
+        f"{process_parent_id}",
     )
+    # TODO: add "monitor" type to ActivationRequestQueue
+    if request_type is None:
+        request_type = "Monitor"
 
     # new processes
     if request_type in [
@@ -195,7 +198,7 @@ def dispatch(
                 LOGGER.info(
                     f"Scheduling {process_parent_type} {process_parent_id} "
                     f"to the least busy queue; its associated queue "
-                    "'{queue_name}' is from previous configuation settings.",
+                    f"'{queue_name}' is from previous configuation settings.",
                 )
             queue_name = get_least_busy_queue_name()
         elif not check_rulebook_queue_health(queue_name):
