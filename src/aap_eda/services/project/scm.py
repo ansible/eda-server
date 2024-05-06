@@ -142,6 +142,7 @@ class ScmRepository:
         final_url = url
         secret = ""
         key_file = None
+        key_password = None
         gpg_key_file = None
         if credential:
             inputs = inputs_from_store(credential.inputs.get_secret_value())
@@ -162,8 +163,6 @@ class ScmRepository:
                 key_file.flush()
                 extra_vars["key_file"] = key_file.name
                 key_password = inputs.get("ssh_key_unlock")
-                if key_password:
-                    cls.decrypt_key_file(key_file.name, key_password)
 
         if gpg_credential:
             gpg_inputs = inputs_from_store(
@@ -175,7 +174,6 @@ class ScmRepository:
             gpg_key_file.write("\n")
             gpg_key_file.flush()
             extra_vars["verify_commit"] = "true"
-            cls.add_gpg_key(gpg_key_file.name)
 
         if not verify_ssl:
             extra_vars["ssl_no_verify"] = "true"
@@ -195,6 +193,10 @@ class ScmRepository:
 
         logger.info("Cloning repository: %s", url)
         try:
+            if key_password:
+                cls.decrypt_key_file(key_file.name, key_password)
+            if gpg_key_file:
+                cls.add_gpg_key(gpg_key_file.name)
             with contextlib.chdir(path):
                 git_hash = _executor(extra_vars=extra_vars, env_vars=env_vars)
         except ScmError as e:
