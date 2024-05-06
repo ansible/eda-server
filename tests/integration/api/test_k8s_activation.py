@@ -123,7 +123,7 @@ def use_k8s_setting(settings):
     ],
 )
 def test_create_k8s_activation_with_service_name(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
     activation_name,
     service_name,
@@ -138,7 +138,9 @@ def test_create_k8s_activation_with_service_name(
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["k8s_service_name"] = service_name
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status_code
 
     if response.status_code == status.HTTP_201_CREATED:
@@ -169,7 +171,7 @@ def test_create_k8s_activation_with_service_name(
     ["valid-activation-name", "invalid_activation_name"],
 )
 def test_create_podman_activation(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
     activation_name,
     settings,
@@ -182,7 +184,9 @@ def test_create_podman_activation(
     test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_201_CREATED
     activation = models.Activation.objects.get(id=response.data["id"])
     assert activation.k8s_service_name is None
@@ -190,7 +194,7 @@ def test_create_podman_activation(
 
 @pytest.mark.django_db
 def test_get_activations_with_service_name(
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     activation_name = "test-activation"
@@ -201,14 +205,16 @@ def test_get_activations_with_service_name(
     test_activation["project_id"] = fks["project_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
 
-    response = client.post(f"{api_url_v1}/activations/", data=test_activation)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
     assert response.status_code == status.HTTP_201_CREATED
 
     activation_id = response.data["id"]
-    response = client.get(f"{api_url_v1}/activations/{activation_id}/")
+    response = admin_client.get(f"{api_url_v1}/activations/{activation_id}/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["k8s_service_name"] == activation_name
 
-    response = client.get(f"{api_url_v1}/activations/")
+    response = admin_client.get(f"{api_url_v1}/activations/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data["results"][0]["k8s_service_name"] == activation_name

@@ -30,10 +30,10 @@ from tests.integration.constants import api_url_v1
 def test_list_projects(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     projects = [default_project, new_project]
-    response = client.get(f"{api_url_v1}/projects/")
+    response = admin_client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_200_OK
     for data, project in zip(response.json()["results"], projects):
         project.refresh_from_db()
@@ -44,10 +44,10 @@ def test_list_projects(
 def test_list_projects_filter_name(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     test_name = default_project.name
-    response = client.get(f"{api_url_v1}/projects/?name={test_name}")
+    response = admin_client.get(f"{api_url_v1}/projects/?name={test_name}")
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
     default_project.refresh_from_db()
@@ -57,10 +57,10 @@ def test_list_projects_filter_name(
 @pytest.mark.django_db
 def test_list_projects_filter_name_none_exist(
     default_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     test_name = "test-not-exist"
-    response = client.get(f"{api_url_v1}/projects/?name={test_name}")
+    response = admin_client.get(f"{api_url_v1}/projects/?name={test_name}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -69,20 +69,20 @@ def test_list_projects_filter_name_none_exist(
 @pytest.mark.django_db
 def test_retrieve_project(
     default_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     default_project.refresh_from_db()
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_project_data(response.json(), default_project)
 
 
 @pytest.mark.django_db
 def test_retrieve_project_failed_state(
-    new_project: models.Project, client: APIClient
+    new_project: models.Project, admin_client: APIClient
 ):
     new_project.refresh_from_db()
-    response = client.get(f"{api_url_v1}/projects/{new_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{new_project.id}/")
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
 
@@ -93,8 +93,8 @@ def test_retrieve_project_failed_state(
 
 
 @pytest.mark.django_db
-def test_retrieve_project_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/projects/42/")
+def test_retrieve_project_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/projects/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -104,7 +104,7 @@ def test_retrieve_project_not_exist(client: APIClient):
 @mock.patch("aap_eda.tasks.import_project")
 def test_create_project(
     import_project_task: mock.Mock,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
@@ -140,7 +140,7 @@ def test_create_project(
     ]
 
     for body in bodies:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/projects/",
             data=body,
         )
@@ -174,9 +174,9 @@ def test_create_project(
 
 @pytest.mark.django_db
 def test_create_project_name_conflict(
-    default_project: models.Project, client: APIClient
+    default_project: models.Project, admin_client: APIClient
 ):
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/projects/",
         data={
             "name": default_project.name,
@@ -192,7 +192,7 @@ def test_create_project_name_conflict(
 
 
 @pytest.mark.django_db
-def test_create_project_wrong_ids(client: APIClient):
+def test_create_project_wrong_ids(admin_client: APIClient):
     bodies = [
         {
             "name": "test-project-01",
@@ -212,7 +212,7 @@ def test_create_project_wrong_ids(client: APIClient):
     ]
 
     for body in bodies:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/projects/",
             data=body,
         )
@@ -234,7 +234,7 @@ def test_create_project_wrong_ids(client: APIClient):
 )
 def test_sync_project(
     sync_project_task: mock.Mock,
-    client: APIClient,
+    admin_client: APIClient,
     initial_state: models.Project.ImportState,
     default_project: models.Project,
 ):
@@ -245,7 +245,9 @@ def test_sync_project(
     job = mock.Mock(id=job_id)
     sync_project_task.delay.return_value = job
 
-    response = client.post(f"{api_url_v1}/projects/{default_project.id}/sync/")
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
     assert response.status_code == status.HTTP_202_ACCEPTED
     data = response.json()
 
@@ -272,7 +274,7 @@ def test_sync_project(
 )
 def test_sync_project_conflict_already_running(
     sync_project_task: mock.Mock,
-    client: APIClient,
+    admin_client: APIClient,
     initial_state: models.Project.ImportState,
     default_project: models.Project,
 ):
@@ -280,7 +282,9 @@ def test_sync_project_conflict_already_running(
     default_project.import_task_id = None
     default_project.save(update_fields=["import_state", "import_task_id"])
 
-    response = client.post(f"{api_url_v1}/projects/{default_project.id}/sync/")
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json() == {
         "detail": "Project import or sync is already running."
@@ -293,8 +297,8 @@ def test_sync_project_conflict_already_running(
 
 
 @pytest.mark.django_db
-def test_sync_project_not_exist(client: APIClient):
-    response = client.post(f"{api_url_v1}/projects/42/sync/")
+def test_sync_project_not_exist(admin_client: APIClient):
+    response = admin_client.post(f"{api_url_v1}/projects/42/sync/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -302,12 +306,12 @@ def test_sync_project_not_exist(client: APIClient):
 # -------------------------------------
 @pytest.mark.django_db
 def test_update_project_not_found(
-    default_project: models.Project, client: APIClient
+    default_project: models.Project, admin_client: APIClient
 ):
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
     data = response.json()
 
-    response = client.patch(f"{api_url_v1}/projects/42/", data=data)
+    response = admin_client.patch(f"{api_url_v1}/projects/42/", data=data)
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -315,22 +319,22 @@ def test_update_project_not_found(
 def test_update_project_with_400(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
     data = {
         "name": new_project.name,
         "git_hash": default_project.git_hash,
         "credential_id": default_project.credential_id,
     }
     # test empty string validator
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/", data={"name": ""}
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["name"][0] == "This field may not be blank."
     # test unique name validator
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/", data=data
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -342,7 +346,7 @@ def test_update_project_with_400(
     ]
 
     for update_data in data:
-        response = client.patch(
+        response = admin_client.patch(
             f"{api_url_v1}/projects/{default_project.id}/", data=update_data
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -352,8 +356,9 @@ def test_update_project_with_400(
 @pytest.mark.django_db
 def test_partial_update_project(
     new_project: models.Project,
-    default_eda_credential: models.EdaCredential,
-    client: APIClient,
+    default_scm_credential: models.EdaCredential,
+    default_gpg_credential: models.EdaCredential,
+    admin_client: APIClient,
 ):
     assert new_project.eda_credential_id is None
     assert new_project.signature_validation_credential_id is None
@@ -361,14 +366,14 @@ def test_partial_update_project(
 
     new_data = {
         "name": "new-project-updated",
-        "eda_credential_id": default_eda_credential.id,
-        "signature_validation_credential_id": default_eda_credential.id,
+        "eda_credential_id": default_scm_credential.id,
+        "signature_validation_credential_id": default_gpg_credential.id,
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": True,
         "proxy": "http://user:$encrypted$@myproxy.com",
     }
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{new_project.id}/",
         data=new_data,
     )
@@ -379,7 +384,7 @@ def test_partial_update_project(
     assert new_project.eda_credential.id == new_data["eda_credential_id"]
     assert (
         new_project.signature_validation_credential.id
-        == new_data["eda_credential_id"]
+        == new_data["signature_validation_credential_id"]
     )
     assert new_project.verify_ssl is new_data["verify_ssl"]
 
@@ -388,13 +393,13 @@ def test_partial_update_project(
 
 @pytest.mark.django_db
 def test_partial_update_project_bad_proxy(
-    default_project: models.Project, client: APIClient
+    default_project: models.Project, admin_client: APIClient
 ):
     data = {
         "name": "test-project-01-updated",
         "proxy": "http://new-user:$encrypted$@myproxy.com",
     }
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/",
         data,
     )
@@ -408,17 +413,17 @@ def test_partial_update_project_bad_proxy(
 @pytest.mark.django_db
 def test_delete_project(
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.delete(f"{api_url_v1}/projects/{new_project.id}/")
+    response = admin_client.delete(f"{api_url_v1}/projects/{new_project.id}/")
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not models.Project.objects.filter(pk=new_project.id).exists()
 
 
 @pytest.mark.django_db
-def test_delete_project_not_found(client: APIClient):
-    response = client.delete(f"{api_url_v1}/projects/42/")
+def test_delete_project_not_found(admin_client: APIClient):
+    response = admin_client.delete(f"{api_url_v1}/projects/42/")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
 

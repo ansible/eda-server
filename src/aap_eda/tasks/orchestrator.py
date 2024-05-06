@@ -143,9 +143,10 @@ def _run_request(
     except exceptions.MaxRunningProcessesError:
         return False
     except Exception as e:
-        LOGGER.exception(
+        LOGGER.error(
             f"Failed to process request {request.request} for "
             f"{process_parent_type} {process_parent.id}. Reason {str(e)}",
+            exc_info=settings.DEBUG,
         )
     return True
 

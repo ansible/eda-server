@@ -10,29 +10,30 @@ from tests.integration.constants import api_url_v1
 
 @pytest.mark.django_db
 def test_list_decision_environments(
-    default_de: models.DecisionEnvironment, client: APIClient
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/decision-environments/")
+    response = admin_client.get(f"{api_url_v1}/decision-environments/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data["results"][0]
-    assert_de_base_data(result, default_de)
-    assert_de_fk_data(result, default_de)
+    assert_de_base_data(result, default_decision_environment)
+    assert_de_fk_data(result, default_decision_environment)
 
 
 @pytest.mark.django_db
 def test_create_decision_environment(
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
     default_organization: models.Organization,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     data_in = {
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
         "organization_id": default_organization.id,
-        "eda_credential_id": default_eda_credential.id,
+        "eda_credential_id": default_registry_credential.id,
     }
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -45,7 +46,7 @@ def test_create_decision_environment(
 
 
 @pytest.mark.django_db
-def test_create_decision_environment_bad_ids(client: APIClient):
+def test_create_decision_environment_bad_ids(admin_client: APIClient):
     bad_ids = [
         {"organization_id": 3000001},
         {"eda_credential_id": 3000001},
@@ -56,7 +57,7 @@ def test_create_decision_environment_bad_ids(client: APIClient):
         "image_url": "registry.com/img1:tag1",
     }
     for bad_id in bad_ids:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/decision-environments/", data=data_in | bad_id
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -65,54 +66,62 @@ def test_create_decision_environment_bad_ids(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_decision_environment(
-    default_de: models.DecisionEnvironment, client: APIClient
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
-    response = client.get(
-        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    response = admin_client.get(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/"
     )
     assert response.status_code == status.HTTP_200_OK
 
-    assert_de_base_data(response.data, default_de)
-    assert_de_related_data(response.data, default_de)
+    assert_de_base_data(response.data, default_decision_environment)
+    assert_de_related_data(response.data, default_decision_environment)
 
 
 @pytest.mark.django_db
-def test_retrieve_decision_environment_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/decision-environments/42/")
+def test_retrieve_decision_environment_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/decision-environments/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_partial_update_decision_environment(
-    default_de: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_vault_credential: models.EdaCredential,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     data = {"eda_credential_id": default_vault_credential.id}
-    response = client.patch(
-        f"{api_url_v1}/decision-environments/{default_de.id}/", data=data
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/",
+        data=data,
     )
     assert response.status_code == status.HTTP_200_OK
 
-    default_de.refresh_from_db()
-    assert_de_base_data(response.data, default_de)
-    assert_de_fk_data(response.data, default_de)
+    default_decision_environment.refresh_from_db()
+    assert_de_base_data(response.data, default_decision_environment)
+    assert_de_fk_data(response.data, default_decision_environment)
 
-    assert default_de.eda_credential == default_vault_credential
+    assert (
+        default_decision_environment.eda_credential == default_vault_credential
+    )
 
 
 @pytest.mark.django_db
 def test_partial_update_decision_environment_bad_ids(
-    default_de: models.DecisionEnvironment,
-    client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
     bad_ids = [
         {"organization_id": 3000001},
         {"eda_credential_id": 3000001},
     ]
     for bad_id in bad_ids:
-        response = client.patch(
-            f"{api_url_v1}/decision-environments/{default_de.id}/", data=bad_id
+        response = admin_client.patch(
+            f"{api_url_v1}/decision-environments/"
+            f"{default_decision_environment.id}/",
+            data=bad_id,
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "id 3000001 does not exist" in str(response.json())
@@ -120,28 +129,31 @@ def test_partial_update_decision_environment_bad_ids(
 
 @pytest.mark.django_db
 def test_delete_decision_environment_conflict(
-    default_de: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.delete(
-        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    response = admin_client.delete(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db
 def test_delete_decision_environment_success(
-    default_de: models.DecisionEnvironment, client: APIClient
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
-    response = client.delete(
-        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    response = admin_client.delete(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert (
         models.DecisionEnvironment.objects.filter(
-            pk=int(default_de.id)
+            pk=int(default_decision_environment.id)
         ).count()
         == 0
     )
@@ -149,10 +161,10 @@ def test_delete_decision_environment_success(
 
 @pytest.mark.django_db
 def test_delete_decision_environment_force(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation, admin_client: APIClient
 ):
     de_id = default_activation.decision_environment.id
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/decision-environments/{de_id}/?force=True"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
