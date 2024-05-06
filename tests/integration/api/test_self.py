@@ -17,5 +17,5 @@ from rest_framework.test import APIClient
 
 
 @pytest.mark.django_db
-def test_client_fixture(client: APIClient):
-    assert isinstance(client, APIClient)
+def test_client_fixture(admin_client: APIClient):
+    assert isinstance(admin_client, APIClient)

@@ -215,9 +215,9 @@ class ContainerableMixin:
         )
 
     def _get_context(self) -> dict[str, tp.Any]:
-        """Return the context dictionary used to create a ContainerRquest."""
+        """Return the context dictionary used to create a ContainerRequest."""
         if self.extra_var:
-            context = yaml.safe_load(self.extra_var.extra_var)
+            context = yaml.safe_load(self.extra_var)
         else:
             context = {}
         return context

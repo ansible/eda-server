@@ -364,7 +364,6 @@ class Engine(ContainerEngine):
                         selector={
                             "app": "eda",
                             "job-name": self.job_name,
-                            "created-by": "eda",
                         },
                         ports=[
                             k8sclient.V1ServicePort(

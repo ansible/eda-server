@@ -27,66 +27,10 @@ from rest_framework.response import Response
 
 from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
-from aap_eda.api.serializers.project import (
-    ENCRYPTED_STRING,
-    get_proxy_for_display,
-)
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 
-from .mixins import CreateModelMixin, ResponseSerializerMixin
-
-
-@extend_schema_view(
-    retrieve=extend_schema(
-        description="Get the extra_var by its id",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ExtraVarSerializer,
-                description="Return the extra_var by its id.",
-            ),
-        },
-    ),
-    list=extend_schema(
-        description="List all extra_vars",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.ExtraVarSerializer,
-                description="Return a list of extra_vars.",
-            ),
-        },
-    ),
-    create=extend_schema(
-        description="Create an extra_var",
-        request=serializers.ExtraVarCreateSerializer,
-        responses={
-            status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.ExtraVarSerializer,
-                description="Return the created extra_var.",
-            ),
-        },
-    ),
-)
-class ExtraVarViewSet(
-    CreateModelMixin,
-    viewsets.ReadOnlyModelViewSet,
-):
-    queryset = models.ExtraVar.objects.order_by("id")
-    serializer_class = serializers.ExtraVarSerializer
-    http_method_names = ["get", "post"]
-
-    def filter_queryset(self, queryset):
-        return super().filter_queryset(
-            queryset.model.access_qs(self.request.user, queryset=queryset)
-        )
-
-    def get_serializer_class(self):
-        if self.action == "create":
-            return serializers.ExtraVarCreateSerializer
-        return super().get_serializer_class()
-
-    def get_response_serializer_class(self):
-        return serializers.ExtraVarSerializer
+from .mixins import ResponseSerializerMixin
 
 
 @extend_schema_view(
@@ -222,23 +166,6 @@ class ProjectViewSet(
     )
     def partial_update(self, request, pk):
         project = self.get_object()
-        if "proxy" in request.data:
-            new_proxy = request.data["proxy"]
-            if ENCRYPTED_STRING in new_proxy:
-                unchanged = (
-                    project.proxy
-                    and get_proxy_for_display(project.proxy.get_secret_value())
-                    == new_proxy
-                )
-                if unchanged:
-                    request.data.pop("proxy")
-                else:
-                    error = (
-                        "The password in the proxy field should be unencrypted"
-                    )
-                    return Response(
-                        {"errors": error}, status=status.HTTP_400_BAD_REQUEST
-                    )
         serializer = serializers.ProjectUpdateRequestSerializer(
             instance=project, data=request.data, partial=True
         )

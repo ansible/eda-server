@@ -48,7 +48,9 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_credential_exists],
+        validators=[
+            validators.check_credential_types_for_registry,
+        ],
     )
 
     class Meta:

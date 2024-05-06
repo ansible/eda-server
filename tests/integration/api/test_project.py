@@ -19,7 +19,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
 from tests.integration.constants import api_url_v1
 
@@ -30,10 +30,10 @@ from tests.integration.constants import api_url_v1
 def test_list_projects(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     projects = [default_project, new_project]
-    response = client.get(f"{api_url_v1}/projects/")
+    response = admin_client.get(f"{api_url_v1}/projects/")
     assert response.status_code == status.HTTP_200_OK
     for data, project in zip(response.json()["results"], projects):
         project.refresh_from_db()
@@ -44,10 +44,10 @@ def test_list_projects(
 def test_list_projects_filter_name(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     test_name = default_project.name
-    response = client.get(f"{api_url_v1}/projects/?name={test_name}")
+    response = admin_client.get(f"{api_url_v1}/projects/?name={test_name}")
     data = response.json()["results"][0]
     assert response.status_code == status.HTTP_200_OK
     default_project.refresh_from_db()
@@ -57,10 +57,10 @@ def test_list_projects_filter_name(
 @pytest.mark.django_db
 def test_list_projects_filter_name_none_exist(
     default_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     test_name = "test-not-exist"
-    response = client.get(f"{api_url_v1}/projects/?name={test_name}")
+    response = admin_client.get(f"{api_url_v1}/projects/?name={test_name}")
     data = response.json()["results"]
     assert response.status_code == status.HTTP_200_OK
     assert data == []
@@ -69,20 +69,20 @@ def test_list_projects_filter_name_none_exist(
 @pytest.mark.django_db
 def test_retrieve_project(
     default_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
     default_project.refresh_from_db()
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
     assert response.status_code == status.HTTP_200_OK
     assert_project_data(response.json(), default_project)
 
 
 @pytest.mark.django_db
 def test_retrieve_project_failed_state(
-    new_project: models.Project, client: APIClient
+    new_project: models.Project, admin_client: APIClient
 ):
     new_project.refresh_from_db()
-    response = client.get(f"{api_url_v1}/projects/{new_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{new_project.id}/")
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
 
@@ -93,66 +93,139 @@ def test_retrieve_project_failed_state(
 
 
 @pytest.mark.django_db
-def test_retrieve_project_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/projects/42/")
+def test_retrieve_project_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/projects/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 # Test: Create project
 # -------------------------------------
+@pytest.mark.parametrize(
+    ("action", "credential_type", "status_code"),
+    [
+        (
+            "create",
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_201_CREATED,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_200_OK,
+        ),
+    ],
+)
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.import_project")
-def test_create_project(
+def test_create_or_update_project_with_right_signature_credential(
     import_project_task: mock.Mock,
-    client: APIClient,
+    admin_client: APIClient,
+    new_project: models.Project,
+    preseed_credential_types,
+    default_gpg_credential,
+    action,
+    credential_type,
+    status_code,
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
 
-    cred_type = models.CredentialType.objects.create(
-        name="type1", inputs={"fields": [{"id": "user", "type": "string"}]}
-    )
     cred_inputs = inputs_to_store({"user": "me"})
-    eda_credential = models.EdaCredential.objects.create(
-        name="credential1", credential_type=cred_type, inputs=cred_inputs
-    )
-    sv_cred_inputs = inputs_to_store({"user": "him"})
-    sv_credential = models.EdaCredential.objects.create(
-        name="svcred1", credential_type=cred_type, inputs=sv_cred_inputs
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    credential = models.EdaCredential.objects.create(
+        name="credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=cred_inputs,
     )
 
-    bodies = [
-        {
+    if action == "create":
+        body = {
             "name": "test-project-01",
             "url": "https://git.example.com/acme/project-01",
-            "eda_credential_id": eda_credential.id,
-            "signature_validation_credential_id": sv_credential.id,
+            "eda_credential_id": credential.id,
+            "signature_validation_credential_id": default_gpg_credential.id,
             "scm_branch": "main",
             "scm_refspec": "ref1",
-        },
-        {
-            "name": "test-project-02",
-            "url": "https://git.example.com/acme/project-02",
-            "verify_ssl": False,
-            "proxy": "myproxy.com",
-        },
-    ]
+        }
 
-    for body in bodies:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/projects/",
             data=body,
         )
+    else:
+        assert new_project.eda_credential_id is None
+        assert new_project.signature_validation_credential_id is None
+        assert new_project.verify_ssl is False
+        new_data = {
+            "name": "new-project-updated",
+            "eda_credential_id": credential.id,
+            "signature_validation_credential_id": default_gpg_credential.id,
+            "scm_branch": "main",
+            "scm_refspec": "ref1",
+            "verify_ssl": True,
+            "proxy": "http://user:$encrypted$@myproxy.com",
+        }
+        response = admin_client.patch(
+            f"{api_url_v1}/projects/{new_project.id}/",
+            data=new_data,
+        )
 
-        assert response.status_code == status.HTTP_201_CREATED
+    assert response.status_code == status_code
+    if status_code == status.HTTP_200_OK:
+        new_project.refresh_from_db()
+        assert new_project.name == new_data["name"]
+        assert new_project.eda_credential.id == new_data["eda_credential_id"]
+        assert (
+            new_project.signature_validation_credential.id
+            == new_data["signature_validation_credential_id"]
+        )
+        assert new_project.verify_ssl is new_data["verify_ssl"]
 
-        data = response.json()
-
-        try:
-            project = models.Project.objects.get(pk=data["id"])
-        except models.Project.DoesNotExist:
-            raise AssertionError("Project doesn't exist in the database")
+        assert_project_data(response.json(), new_project)
+    elif status_code == status.HTTP_201_CREATED:
+        project = models.Project.objects.get(id=response.data["id"])
 
         # Check that project was created with valid data
         assert project.name == body["name"]
@@ -166,17 +239,172 @@ def test_create_project(
         assert str(project.import_task_id) == job_id
 
         # Check that response returned the valid representation of the project
-        assert_project_data(data, project)
+        assert_project_data(response.data, project)
 
         # Check that import task job was created
         import_project_task.delay.assert_called_with(project_id=project.id)
+    else:
+        assert (
+            "The type of credential can only be one of ['Source Control']"
+            in response.data["eda_credential_id"]
+        )
+
+
+@pytest.mark.parametrize(
+    ("action", "credential_type", "status_code"),
+    [
+        (
+            "create",
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_201_CREATED,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "create",
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_200_OK,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            "update",
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+    ],
+)
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.import_project")
+def test_create_or_update_project_with_right_eda_credential(
+    import_project_task: mock.Mock,
+    admin_client: APIClient,
+    new_project: models.Project,
+    preseed_credential_types,
+    default_scm_credential,
+    action,
+    credential_type,
+    status_code,
+):
+    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
+    job = mock.Mock(id=job_id)
+    import_project_task.delay.return_value = job
+
+    cred_inputs = inputs_to_store({"user": "me"})
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    credential = models.EdaCredential.objects.create(
+        name="credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=cred_inputs,
+    )
+
+    if action == "create":
+        body = {
+            "name": "test-project-01",
+            "url": "https://git.example.com/acme/project-01",
+            "eda_credential_id": default_scm_credential.id,
+            "signature_validation_credential_id": credential.id,
+            "scm_branch": "main",
+            "scm_refspec": "ref1",
+        }
+
+        response = admin_client.post(
+            f"{api_url_v1}/projects/",
+            data=body,
+        )
+    else:
+        assert new_project.eda_credential_id is None
+        assert new_project.signature_validation_credential_id is None
+        assert new_project.verify_ssl is False
+        new_data = {
+            "name": "new-project-updated",
+            "eda_credential_id": default_scm_credential.id,
+            "signature_validation_credential_id": credential.id,
+            "scm_branch": "main",
+            "scm_refspec": "ref1",
+            "verify_ssl": True,
+            "proxy": "http://user:$encrypted$@myproxy.com",
+        }
+        response = admin_client.patch(
+            f"{api_url_v1}/projects/{new_project.id}/",
+            data=new_data,
+        )
+
+    assert response.status_code == status_code
+    if status_code == status.HTTP_200_OK:
+        new_project.refresh_from_db()
+        assert new_project.name == new_data["name"]
+        assert new_project.eda_credential.id == new_data["eda_credential_id"]
+        assert (
+            new_project.signature_validation_credential.id
+            == new_data["signature_validation_credential_id"]
+        )
+        assert new_project.verify_ssl is new_data["verify_ssl"]
+
+        assert_project_data(response.json(), new_project)
+    elif status_code == status.HTTP_201_CREATED:
+        project = models.Project.objects.get(id=response.data["id"])
+
+        # Check that project was created with valid data
+        assert project.name == body["name"]
+        assert project.url == body["url"]
+        assert (
+            project.verify_ssl is body["verify_ssl"]
+            if "verify_ssl" in body
+            else True
+        )
+        assert project.import_state == "pending"
+        assert str(project.import_task_id) == job_id
+
+        # Check that response returned the valid representation of the project
+        assert_project_data(response.data, project)
+
+        # Check that import task job was created
+        import_project_task.delay.assert_called_with(project_id=project.id)
+    else:
+        assert (
+            "The type of credential can only be one of ['GPG Public Key']"
+            in response.data["signature_validation_credential_id"]
+        )
 
 
 @pytest.mark.django_db
 def test_create_project_name_conflict(
-    default_project: models.Project, client: APIClient
+    default_project: models.Project, admin_client: APIClient
 ):
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/projects/",
         data={
             "name": default_project.name,
@@ -192,7 +420,7 @@ def test_create_project_name_conflict(
 
 
 @pytest.mark.django_db
-def test_create_project_wrong_ids(client: APIClient):
+def test_create_project_wrong_ids(admin_client: APIClient):
     bodies = [
         {
             "name": "test-project-01",
@@ -212,7 +440,7 @@ def test_create_project_wrong_ids(client: APIClient):
     ]
 
     for body in bodies:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/projects/",
             data=body,
         )
@@ -234,7 +462,7 @@ def test_create_project_wrong_ids(client: APIClient):
 )
 def test_sync_project(
     sync_project_task: mock.Mock,
-    client: APIClient,
+    admin_client: APIClient,
     initial_state: models.Project.ImportState,
     default_project: models.Project,
 ):
@@ -245,7 +473,9 @@ def test_sync_project(
     job = mock.Mock(id=job_id)
     sync_project_task.delay.return_value = job
 
-    response = client.post(f"{api_url_v1}/projects/{default_project.id}/sync/")
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
     assert response.status_code == status.HTTP_202_ACCEPTED
     data = response.json()
 
@@ -272,7 +502,7 @@ def test_sync_project(
 )
 def test_sync_project_conflict_already_running(
     sync_project_task: mock.Mock,
-    client: APIClient,
+    admin_client: APIClient,
     initial_state: models.Project.ImportState,
     default_project: models.Project,
 ):
@@ -280,7 +510,9 @@ def test_sync_project_conflict_already_running(
     default_project.import_task_id = None
     default_project.save(update_fields=["import_state", "import_task_id"])
 
-    response = client.post(f"{api_url_v1}/projects/{default_project.id}/sync/")
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json() == {
         "detail": "Project import or sync is already running."
@@ -293,8 +525,8 @@ def test_sync_project_conflict_already_running(
 
 
 @pytest.mark.django_db
-def test_sync_project_not_exist(client: APIClient):
-    response = client.post(f"{api_url_v1}/projects/42/sync/")
+def test_sync_project_not_exist(admin_client: APIClient):
+    response = admin_client.post(f"{api_url_v1}/projects/42/sync/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -302,12 +534,12 @@ def test_sync_project_not_exist(client: APIClient):
 # -------------------------------------
 @pytest.mark.django_db
 def test_update_project_not_found(
-    default_project: models.Project, client: APIClient
+    default_project: models.Project, admin_client: APIClient
 ):
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
     data = response.json()
 
-    response = client.patch(f"{api_url_v1}/projects/42/", data=data)
+    response = admin_client.patch(f"{api_url_v1}/projects/42/", data=data)
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -315,22 +547,22 @@ def test_update_project_not_found(
 def test_update_project_with_400(
     default_project: models.Project,
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
     data = {
         "name": new_project.name,
         "git_hash": default_project.git_hash,
         "credential_id": default_project.credential_id,
     }
     # test empty string validator
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/", data={"name": ""}
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.data["name"][0] == "This field may not be blank."
     # test unique name validator
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/", data=data
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -342,7 +574,7 @@ def test_update_project_with_400(
     ]
 
     for update_data in data:
-        response = client.patch(
+        response = admin_client.patch(
             f"{api_url_v1}/projects/{default_project.id}/", data=update_data
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -352,8 +584,9 @@ def test_update_project_with_400(
 @pytest.mark.django_db
 def test_partial_update_project(
     new_project: models.Project,
-    default_eda_credential: models.EdaCredential,
-    client: APIClient,
+    default_scm_credential: models.EdaCredential,
+    default_gpg_credential: models.EdaCredential,
+    admin_client: APIClient,
 ):
     assert new_project.eda_credential_id is None
     assert new_project.signature_validation_credential_id is None
@@ -361,14 +594,14 @@ def test_partial_update_project(
 
     new_data = {
         "name": "new-project-updated",
-        "eda_credential_id": default_eda_credential.id,
-        "signature_validation_credential_id": default_eda_credential.id,
+        "eda_credential_id": default_scm_credential.id,
+        "signature_validation_credential_id": default_gpg_credential.id,
         "scm_branch": "main",
         "scm_refspec": "ref1",
         "verify_ssl": True,
         "proxy": "http://user:$encrypted$@myproxy.com",
     }
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{new_project.id}/",
         data=new_data,
     )
@@ -379,7 +612,7 @@ def test_partial_update_project(
     assert new_project.eda_credential.id == new_data["eda_credential_id"]
     assert (
         new_project.signature_validation_credential.id
-        == new_data["eda_credential_id"]
+        == new_data["signature_validation_credential_id"]
     )
     assert new_project.verify_ssl is new_data["verify_ssl"]
 
@@ -388,37 +621,36 @@ def test_partial_update_project(
 
 @pytest.mark.django_db
 def test_partial_update_project_bad_proxy(
-    default_project: models.Project, client: APIClient
+    default_project: models.Project, admin_client: APIClient
 ):
     data = {
         "name": "test-project-01-updated",
         "proxy": "http://new-user:$encrypted$@myproxy.com",
     }
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/",
         data,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        response.data["errors"]
-        == "The password in the proxy field should be unencrypted"
+    assert "The password in the proxy field should be unencrypted" in str(
+        response.data
     )
 
 
 @pytest.mark.django_db
 def test_delete_project(
     new_project: models.Project,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.delete(f"{api_url_v1}/projects/{new_project.id}/")
+    response = admin_client.delete(f"{api_url_v1}/projects/{new_project.id}/")
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
     assert not models.Project.objects.filter(pk=new_project.id).exists()
 
 
 @pytest.mark.django_db
-def test_delete_project_not_found(client: APIClient):
-    response = client.delete(f"{api_url_v1}/projects/42/")
+def test_delete_project_not_found(admin_client: APIClient):
+    response = admin_client.delete(f"{api_url_v1}/projects/42/")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
 

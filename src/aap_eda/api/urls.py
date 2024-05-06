@@ -34,7 +34,6 @@ from . import views
 router = routers.SimpleRouter()
 # basename has to be set when queryset is user-dependent
 # which is any model with permissions
-router.register("extra-vars", views.ExtraVarViewSet)
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
 router.register("activations", views.ActivationViewSet)

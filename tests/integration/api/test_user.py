@@ -11,24 +11,57 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from unittest import mock
-
 import pytest
+from ansible_base.rbac.models import RoleDefinition
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
+from rest_framework.reverse import reverse
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
 from tests.integration.constants import api_url_v1
-
-from .conftest import ADMIN_USERNAME
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
+@pytest.fixture
+def user_api_client(default_user):
+    admin_client = APIClient()
+    admin_client.force_authenticate(user=default_user)
+    return admin_client
+
+
+@pytest.fixture
+def org_admin_rd():
+    return RoleDefinition.objects.create_from_permissions(
+        name="organization-admin",
+        permissions=[
+            "change_organization",
+            "member_organization",
+            "view_organization",
+            "delete_organization",
+        ],
+        content_type=ContentType.objects.get_for_model(models.Organization),
+    )
+
+
+@pytest.fixture
+def org_member_rd():
+    return RoleDefinition.objects.create_from_permissions(
+        name="organization-member",
+        permissions=[
+            "member_organization",
+            "view_organization",
+        ],
+        content_type=ContentType.objects.get_for_model(models.Organization),
+    )
+
+
 @pytest.mark.django_db
-def test_retrieve_current_user(client: APIClient, admin_user: models.User):
-    response = client.get(f"{api_url_v1}/users/me/")
+def test_retrieve_current_user(
+    admin_client: APIClient, admin_user: models.User
+):
+    response = admin_client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
         "id": admin_user.id,
@@ -48,8 +81,7 @@ def test_retrieve_current_user(client: APIClient, admin_user: models.User):
 
 @pytest.mark.django_db
 def test_retrieve_current_user_unauthenticated(base_client: APIClient):
-    client = base_client
-    response = client.get(f"{api_url_v1}/users/me/")
+    response = base_client.get(f"{api_url_v1}/users/me/")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {
         "detail": "Authentication credentials were not provided."
@@ -57,8 +89,8 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
 
 
 @pytest.mark.django_db
-def test_update_current_user(client: APIClient, admin_user: models.User):
-    response = client.patch(
+def test_update_current_user(admin_client: APIClient, admin_user: models.User):
+    response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={
             "first_name": "Darth",
@@ -73,9 +105,9 @@ def test_update_current_user(client: APIClient, admin_user: models.User):
 
 @pytest.mark.django_db
 def test_update_current_user_password(
-    client: APIClient, admin_user: models.User
+    admin_client: APIClient, admin_user: models.User
 ):
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={"password": "updated-password"},
     )
@@ -89,9 +121,11 @@ def test_update_current_user_password(
 
 @pytest.mark.django_db
 def test_update_current_user_username_fail(
-    client: APIClient, admin_user: models.User
+    admin_client: APIClient,
+    admin_user: models.User,
+    admin_info: dict,
 ):
-    response = client.patch(
+    response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={"username": "darth.vader"},
     )
@@ -103,12 +137,11 @@ def test_update_current_user_username_fail(
     assert data["username"] == admin_user.username
 
     admin_user.refresh_from_db()
-    assert admin_user.username == ADMIN_USERNAME
+    assert admin_user.username == admin_info["username"]
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
-def test_create_user(client: APIClient):
+def test_create_user(admin_client: APIClient):
     create_user_data = {
         "username": "test.user",
         "first_name": "Test",
@@ -117,18 +150,18 @@ def test_create_user(client: APIClient):
         "password": "secret",
     }
 
-    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
+    response = admin_client.post(f"{api_url_v1}/users/", data=create_user_data)
 
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["is_superuser"] is False
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_create_superuser(
-    client: APIClient,
-    check_permission_mock: mock.Mock,
-    init_db,
+    superuser_client: APIClient,
+    user_api_client: APIClient,
+    org_admin_rd,
+    default_user,
 ):
     create_user_data = {
         "username": "test.user",
@@ -139,25 +172,103 @@ def test_create_superuser(
         "is_superuser": True,
     }
 
-    response = client.post(f"{api_url_v1}/users/", data=create_user_data)
-
+    response = superuser_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["is_superuser"] is True
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.CREATE
+    create_user_data["username"] += "-2"  # avoid integrity errors
+
+    response = user_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
     )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    # Even if user is org admin, would NORMALLY have permission
+    # this should still be denied because it is creating a superuser
+    org = models.Organization.objects.first()
+    org_admin_rd.give_permission(default_user, org)
+    response = user_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
+@pytest.mark.django_db
+def test_modify_superuser_as_superuser(superuser_client: APIClient):
+    other_user = models.User.objects.create(username="other-user")
+    assert other_user.is_superuser is False  # sanity
+    url = reverse("user-detail", kwargs={"pk": other_user.pk})
+    response = superuser_client.patch(url, data={"is_superuser": True})
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["is_superuser"] is True
+
+
+@pytest.mark.django_db
+def test_modify_superuser_as_org_admin(
+    user_api_client: APIClient,
+    org_admin_rd,
+    org_member_rd,
+    default_user,
+):
+    # Set up, giving admin access allows user to modify other_user
+    other_user = models.User.objects.create(username="other-user")
+    org = models.Organization.objects.first()
+    # NOTE: default_user is the user for user_api_client
+    org_admin_rd.give_permission(default_user, org)
+    org_member_rd.give_permission(other_user, org)
+
+    # Changing any ordinary field is fine
+    url = reverse("user-detail", kwargs={"pk": other_user.pk})
+    r = user_api_client.patch(url, data={"last_name": "Meyers"})
+    assert r.status_code == status.HTTP_200_OK
+
+    # Promoting other_user to superuser is not something user can do
+    r = user_api_client.patch(url, data={"is_superuser": True})
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    # User should not be able to promote themself to superuser
+    # but this serializer does not list is_superuser field
+    # so response may be a 200 and that is still okay
+    assert default_user.is_superuser is False  # sanity
+    r = user_api_client.patch(
+        f"{api_url_v1}/users/me/", data={"is_superuser": True}
+    )
+    default_user.refresh_from_db()
+    assert default_user.is_superuser is False
+
+
+@pytest.mark.django_db
+def test_organization_admin_can_create_user(
+    default_user, user_api_client, org_admin_rd
+):
+    create_user_data = {
+        "username": "test.user",
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "test.user@example.com",
+        "password": "secret",
+        "is_superuser": False,
+    }
+    org = models.Organization.objects.first()
+    org_admin_rd.give_permission(default_user, org)
+    response = user_api_client.post(
+        f"{api_url_v1}/users/", data=create_user_data
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
 @pytest.mark.django_db
 def test_retrieve_user_details(
-    client: APIClient,
+    superuser_client: APIClient,
+    user_api_client: APIClient,
     default_user: models.User,
-    check_permission_mock: mock.Mock,
 ):
-    response = client.get(f"{api_url_v1}/users/{default_user.id}/")
+    response = superuser_client.get(f"{api_url_v1}/users/{default_user.id}/")
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {
+    response_data = response.data.copy()
+    response_data.pop("resource", None)
+    assert response_data == {
         "id": default_user.id,
         "username": default_user.username,
         "first_name": default_user.first_name,
@@ -168,17 +279,18 @@ def test_retrieve_user_details(
         "modified_at": default_user.modified_at.strftime(DATETIME_FORMAT),
     }
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.READ
-    )
+    # user can see themselves and admins, but not unrelated users
+    other_user = models.User.objects.create_user(username="another-user")
+    response = user_api_client.get(f"{api_url_v1}/users/{other_user.id}/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_list_users(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
-    response = client.get(f"{api_url_v1}/users/")
+    response = admin_client.get(f"{api_url_v1}/users/")
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
 
@@ -196,14 +308,15 @@ def test_list_users(
     }
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_partial_update_user(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
     data = {"first_name": "Anakin"}
-    response = client.patch(f"{api_url_v1}/users/{admin_user.id}/", data=data)
+    response = admin_client.patch(
+        f"{api_url_v1}/users/{admin_user.id}/", data=data
+    )
     assert response.status_code == status.HTTP_200_OK
 
     updated_user = models.User.objects.get(id=admin_user.id)
@@ -223,42 +336,35 @@ def test_partial_update_user(
     }
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_delete_user(
-    client: APIClient,
+    admin_client: APIClient,
     default_user: models.User,
 ):
-    response = client.delete(f"{api_url_v1}/users/{default_user.id}/")
+    response = admin_client.delete(f"{api_url_v1}/users/{default_user.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.User.objects.filter(id=default_user.id).count() == 0
 
 
-@pytest.mark.skip("Org Admin has no user permissions, depends on AAP-21811")
 @pytest.mark.django_db
 def test_delete_user_not_allowed(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
-    check_permission_mock: mock.Mock,
 ):
-    response = client.delete(f"{api_url_v1}/users/{admin_user.id}/")
+    response = admin_client.delete(f"{api_url_v1}/users/{admin_user.id}/")
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
     assert models.User.objects.filter(id=admin_user.id).count() == 1
 
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.USER, Action.DELETE
-    )
-
 
 @pytest.mark.django_db
 def test_list_users_filter_username(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
     default_user: models.User,
 ):
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/users/?username={admin_user.username}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -280,10 +386,10 @@ def test_list_users_filter_username(
 
 @pytest.mark.django_db
 def test_list_users_filter_username_non_exist(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
 ):
-    response = client.get(f"{api_url_v1}/users/?username=test")
+    response = admin_client.get(f"{api_url_v1}/users/?username=test")
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
 
@@ -292,12 +398,14 @@ def test_list_users_filter_username_non_exist(
 
 @pytest.mark.django_db
 def test_list_users_filter_by_ansible_id(
-    client: APIClient,
+    admin_client: APIClient,
     admin_user: models.User,
     default_user: models.User,
 ):
     filter = default_user.resource.ansible_id
-    response = client.get(f"{api_url_v1}/users/?resource__ansible_id={filter}")
+    response = admin_client.get(
+        f"{api_url_v1}/users/?resource__ansible_id={filter}"
+    )
     assert response.status_code == status.HTTP_200_OK
     results = response.json()["results"]
     assert len(results) == 1
@@ -313,7 +421,7 @@ def test_list_users_filter_by_ansible_id(
         },
     }
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/users/?resource__ansible_id=non-existent-org"
     )
     assert response.status_code == status.HTTP_200_OK

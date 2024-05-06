@@ -143,9 +143,10 @@ def _run_request(
     except exceptions.MaxRunningProcessesError:
         return False
     except Exception as e:
-        LOGGER.exception(
+        LOGGER.error(
             f"Failed to process request {request.request} for "
             f"{process_parent_type} {process_parent.id}. Reason {str(e)}",
+            exc_info=settings.DEBUG,
         )
     return True
 
@@ -155,81 +156,114 @@ def dispatch(
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
 ):
+    request_type_text = f" type {request_type}" if request_type else ""
+
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
     LOGGER.info(
-        f"Dispatching request type {request_type} for {process_parent_type} "
-        "{process_parent_id}",
+        "Dispatching request"
+        f"{request_type_text} for {process_parent_type} {process_parent_id}",
     )
+    # TODO: add "monitor" type to ActivationRequestQueue
+    if request_type is None:
+        request_type = "Monitor"
 
+    queue_name = None
     # new processes
     if request_type in [
         ActivationRequest.START,
         ActivationRequest.AUTO_START,
     ]:
         LOGGER.info(
-            f"Dispatching {process_parent_type} "
-            f"{process_parent_id} as new process.",
+            f"Dispatching {process_parent_type}"
+            f" {process_parent_id} as new process.",
         )
-
-        queue_name = get_least_busy_queue_name()
     else:
         queue_name = get_queue_name_by_parent_id(
             process_parent_type,
             process_parent_id,
         )
 
-        # If the queue is old or doesn't exist, we use a valid one
-        # to make sure the request is processed and the restart
-        # policy is respected. Same if the request is restart and
-        # the queue is not healthy.
-        if not queue_name or queue_name not in settings.RULEBOOK_WORKER_QUEUES:
-            LOGGER.info(
-                f"Queue {queue_name} doesn't exist or is not valid. "
-                f"Rescheduling {process_parent_type} {process_parent_id}"
-                f" to the most free queue.",
-            )
-            queue_name = get_least_busy_queue_name()
-
-        elif (
-            request_type == ActivationRequest.RESTART
-            and not check_rulebook_queue_health(queue_name)
+        # If there is not an associated queue or the queue does not exist
+        # within the configured queues (i.e., it is from a previous deployment
+        # with different queues) we get a queue to use.
+        if (not queue_name) or (
+            queue_name not in settings.RULEBOOK_WORKER_QUEUES
         ):
-            LOGGER.warning(
-                f"Expected queue {queue_name} is not available. "
-                f"Restarting {process_parent_type} {process_parent_id}"
-                " to the most free queue.",
-            )
+            if not queue_name:
+                LOGGER.info(
+                    "Scheduling request"
+                    f"{request_type_text} for {process_parent_type}"
+                    f" {process_parent_id} to the least busy queue"
+                    "; it is not currently associated with a queue.",
+                )
+            else:
+                LOGGER.info(
+                    "Scheduling request"
+                    f"{request_type_text} for {process_parent_type}"
+                    f" {process_parent_id} to the least busy queue"
+                    f"; its associated queue '{queue_name}' is from"
+                    " previous configuation settings.",
+                )
+            queue_name = None
+
+    if queue_name and (not check_rulebook_queue_health(queue_name)):
+        # The queue is unhealthy; log this fact.
+        # We'll try to find another queue on which to run.
+        msg = (
+            f"{process_parent_type} {process_parent_id} is in an"
+            " unknown state. The workers of its associated queue"
+            f" '{queue_name}' are failing liveness checks."
+            " There may be an issue with the node; please contact"
+            " the administrator."
+        )
+        LOGGER.warning(
+            "Request"
+            f"{request_type_text} for {process_parent_type}"
+            f" {process_parent_id} will be run on the least busy queue."
+        )
+        queue_name = None
+
+    if not queue_name:
+        try:
             queue_name = get_least_busy_queue_name()
-
-        elif not check_rulebook_queue_health(queue_name):
+        except HealthyQueueNotFoundError:
+            # The are no healthy queues on which to run the request. For any
+            # request that isn't a restart set its status to "workers offline."
             msg = (
-                f"Queue {queue_name} has no workers. "
-                f"{process_parent_type} {process_parent_id} "
-                "is in unknown state. Waiting for readiness. "
-                "There might be a problem in the node, please contact "
-                "the administrator."
+                "There are no healthy queues on which to run the request"
+                f"{request_type_text} for {process_parent_type}"
+                f" {process_parent_id}. There may be an issue with the node"
+                "; please contact the administrator."
             )
-            status_manager = StatusManager(
-                get_process_parent(process_parent_type, process_parent_id),
-            )
-            status_manager.set_status(
-                ActivationStatus.WORKERS_OFFLINE,
+            LOGGER.warning(
                 msg,
             )
-            status_manager.set_latest_instance_status(
-                ActivationStatus.WORKERS_OFFLINE,
-                msg,
-            )
-            LOGGER.warning(msg)
-            return
 
-    unique_enqueue(
-        queue_name,
-        job_id,
-        _manage,
-        process_parent_type,
-        process_parent_id,
-    )
+            if request_type not in [
+                ActivationRequest.RESTART,
+            ]:
+                status_manager = StatusManager(
+                    get_process_parent(process_parent_type, process_parent_id),
+                )
+                status_manager.set_status(
+                    ActivationStatus.WORKERS_OFFLINE,
+                    msg,
+                )
+                # There may not be a latest instance.
+                if status_manager.latest_instance:
+                    status_manager.set_latest_instance_status(
+                        ActivationStatus.WORKERS_OFFLINE,
+                        msg,
+                    )
+
+    if queue_name:
+        unique_enqueue(
+            queue_name,
+            job_id,
+            _manage,
+            process_parent_type,
+            process_parent_id,
+        )
 
 
 def get_least_busy_queue_name() -> str:

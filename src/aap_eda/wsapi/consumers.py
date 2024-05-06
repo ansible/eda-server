@@ -112,7 +112,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         )
         if extra_var:
             extra_var_message = ExtraVars(
-                data=base64.b64encode(extra_var.extra_var.encode()).decode()
+                data=base64.b64encode(extra_var.encode()).decode()
             )
             await self.send(text_data=extra_var_message.json())
 
@@ -318,22 +318,13 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return job_instance
 
     @database_sync_to_async
-    def get_resources(
-        self, rulebook_process_id: str
-    ) -> tuple[str, models.ExtraVar]:
+    def get_resources(self, rulebook_process_id: str) -> tuple[str, str]:
         rulebook_process_instance = models.RulebookProcess.objects.get(
             id=rulebook_process_id
         )
         activation = rulebook_process_instance.get_parent()
 
-        if activation.extra_var_id:
-            extra_var = models.ExtraVar.objects.filter(
-                id=activation.extra_var_id
-            ).first()
-        else:
-            extra_var = None
-
-        return activation.rulebook_rulesets, extra_var
+        return activation.rulebook_rulesets, activation.extra_var
 
     @database_sync_to_async
     def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
