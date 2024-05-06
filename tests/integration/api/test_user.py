@@ -338,10 +338,12 @@ def test_partial_update_user(
 
 @pytest.mark.django_db
 def test_delete_user(
-    admin_client: APIClient,
+    superuser_client: APIClient,
     default_user: models.User,
 ):
-    response = admin_client.delete(f"{api_url_v1}/users/{default_user.id}/")
+    response = superuser_client.delete(
+        f"{api_url_v1}/users/{default_user.id}/"
+    )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.User.objects.filter(id=default_user.id).count() == 0
