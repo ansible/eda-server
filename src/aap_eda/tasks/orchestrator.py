@@ -163,6 +163,9 @@ def dispatch(
         "Dispatching request"
         f"{request_type_text} for {process_parent_type} {process_parent_id}",
     )
+    # TODO: add "monitor" type to ActivationRequestQueue
+    if request_type is None:
+        request_type = "Monitor"
 
     queue_name = None
     # new processes
