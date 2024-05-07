@@ -229,10 +229,10 @@ def dispatch(
             # The are no healthy queues on which to run the request. For any
             # request that isn't a restart set its status to "workers offline."
             msg = (
-                f"The workers available to process request type {request_type}"
+                f"The workers for request type {request_type}"
                 f" for {process_parent_type} {process_parent_id}"
-                " are failing liveness checks.  There may be an issue with the"
-                " node; please contact the administrator."
+                " are failing liveness checks.  There may be an"
+                " issue with the node; please contact the administrator."
             )
             LOGGER.warning(
                 msg,
