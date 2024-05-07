@@ -63,6 +63,7 @@ class Action(DjangoStrEnum):
     ENABLE = "enable"
     DISABLE = "disable"
     RESTART = "restart"
+    SYNC = "sync"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

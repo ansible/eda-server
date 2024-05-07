@@ -36,7 +36,31 @@ def test_activation_actions(
     response = user_client.post(url)
     assert response.status_code == 403, response.data
 
-    # no permission, denied
+    # give action permission, successful request
     give_obj_perm(default_user, default_activation, action)
     response = user_client.post(url)
     assert response.status_code == 204, response.data
+
+
+@pytest.mark.django_db
+def test_project_sync_action(
+    default_project,
+    default_user,
+    user_client,
+    give_obj_perm,
+):
+    url = reverse("project-sync", kwargs={"pk": default_project.pk})
+
+    # assure GET is not enabled, so we do not have to permission check it
+    response = user_client.get(url)
+    assert response.status_code == 405, response.data
+
+    # no action permission, denied
+    give_obj_perm(default_user, default_project, "view")
+    response = user_client.post(url)
+    assert response.status_code == 403, response.data
+
+    # give sync permission, successful request
+    give_obj_perm(default_user, default_project, "sync")
+    response = user_client.post(url)
+    assert response.status_code == 202, response.data
