@@ -42,6 +42,9 @@ class Project(BaseOrgModel, UniqueNamedModel):
                 name="ck_empty_project_name",
             )
         ]
+        permissions = [
+            ("sync_project", "Can sync a project"),
+        ]
 
     class ImportState(models.TextChoices):
         PENDING = "pending"

@@ -196,14 +196,22 @@ class ProjectViewSet(
     @action(
         methods=["post"],
         detail=True,
-        rbac_action=Action.UPDATE,
+        rbac_action=Action.SYNC,
     )
     @transaction.atomic
     def sync(self, request, pk):
+        # get only projects user has access to
         try:
-            project = self.get_queryset().select_for_update().get(pk=pk)
+            project = (
+                models.Project.access_qs(request.user)
+                .select_for_update()
+                .get(pk=pk)
+            )
         except models.Project.DoesNotExist:
-            raise api_exc.NotFound
+            raise api_exc.NotFound(f"Project with ID={pk} does not exist.")
+        # user might have only view permission, so we still have to check if
+        # user has sync permission for this project
+        self.check_object_permissions(request, project)
 
         if project.import_state in [
             models.Project.ImportState.PENDING,
