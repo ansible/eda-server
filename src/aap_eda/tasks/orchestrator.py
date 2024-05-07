@@ -151,6 +151,52 @@ def _run_request(
     return True
 
 
+def _set_request_cannot_be_run_status(
+    request_type: ActivationRequest,
+    process_parent_type: ProcessParentType,
+    process_parent_id: int,
+    status_text: str,
+) -> None:
+    """Set the request status to indicate it cannot be run on this node.
+
+    The request cannot be run on this node due to detected functional issues.
+    While it cannot be run on this node anothter functional node can run it.
+    This method sets the request's state such that other nodes can identify
+    it as something to be run, if possible.  This identification is performed
+    as part of monitor_rulebook_processes.
+    """
+    status_manager = StatusManager(
+        get_process_parent(process_parent_type, process_parent_id),
+    )
+
+    status = ActivationStatus.WORKERS_OFFLINE
+    # If the request is start/auto-start we know the request isn't
+    # running.
+    # If the request is in one of the pending states that also
+    # indicates it's not running; this check is for previous
+    # failures to start that got dispatched from the monitor
+    # task.
+    if (
+        request_type
+        in [
+            ActivationRequest.START,
+            ActivationRequest.AUTO_START,
+        ]
+    ) or (
+        status_manager.db_instance.status
+        in [
+            ActivationStatus.PENDING,
+            ActivationStatus.PENDING_WORKERS_OFFLINE,
+        ]
+    ):
+        status = ActivationStatus.PENDING_WORKERS_OFFLINE
+
+    status_manager.set_status(status, status_text)
+    # There may not be a latest instance.
+    if status_manager.latest_instance:
+        status_manager.set_latest_instance_status(status, status_text)
+
+
 def dispatch(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
@@ -238,36 +284,11 @@ def dispatch(
                 msg,
             )
 
-            status_manager = StatusManager(
-                get_process_parent(process_parent_type, process_parent_id),
+            # Set the request status such that, if possible, a functional
+            # node can pick it up and run it.
+            _set_request_cannot_be_run_status(
+                request_type, process_parent_type, process_parent_id, msg
             )
-
-            status = ActivationStatus.WORKERS_OFFLINE
-            # If the request is start/auto-start we know the request isn't
-            # running.
-            # If the request is in one of the pending states that also
-            # indicates it's not running; this check is for previous
-            # failures to start that got dispatched from the monitor
-            # task.
-            if (
-                request_type
-                in [
-                    ActivationRequest.START,
-                    ActivationRequest.AUTO_START,
-                ]
-            ) or (
-                status_manager.db_instance.status
-                in [
-                    ActivationStatus.PENDING,
-                    ActivationStatus.PENDING_WORKERS_OFFLINE,
-                ]
-            ):
-                status = ActivationStatus.PENDING_WORKERS_OFFLINE
-
-            status_manager.set_status(status, msg)
-            # There may not be a latest instance.
-            if status_manager.latest_instance:
-                status_manager.set_latest_instance_status(status, msg)
 
     if queue_name:
         unique_enqueue(
