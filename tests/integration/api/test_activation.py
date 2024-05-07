@@ -71,6 +71,56 @@ def test_create_activation(
 
 
 @pytest.mark.django_db
+def test_create_activation_blank_text(
+    admin_awx_token: models.AwxToken,
+    activation_payload_blank_text: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload_blank_text
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert_activation_base_data(
+        data,
+        activation,
+    )
+    assert data["description"] == activation_payload_blank_text["description"]
+
+    # An extra_var empty string is outbound serialized as None; it's considered
+    # a "no value" situation.  Consequently, a data content of None for
+    # extra_var may be sourced from either None or an empty string.
+    if activation_payload_blank_text["extra_var"] == "":
+        assert data["extra_var"] is None
+    else:
+        assert data["extra_var"] == activation_payload_blank_text["extra_var"]
+
+    assert (
+        data["k8s_service_name"]
+        == activation_payload_blank_text["k8s_service_name"]
+    )
+    assert data["log_level"] == activation_payload_blank_text["log_level"]
+    assert data["project"]["id"] == activation_payload_blank_text["project_id"]
+    assert (
+        data["rulebook"]["id"] == activation_payload_blank_text["rulebook_id"]
+    )
+    assert (
+        data["decision_environment"]["id"]
+        == activation_payload_blank_text["decision_environment_id"]
+    )
+    assert activation.rulebook_name == default_rulebook.name
+    assert activation.rulebook_rulesets == default_rulebook.rulesets
+    assert data["restarted_at"] is None
+    assert activation.status == enums.ActivationStatus.PENDING
+    assert (
+        activation.status_message
+        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    )
+
+
+@pytest.mark.django_db
 def test_create_activation_disabled(
     activation_payload: Dict[str, Any],
     admin_awx_token: models.AwxToken,
@@ -553,7 +603,15 @@ def assert_activation_base_data(
     assert data["name"] == activation.name
     assert data["description"] == activation.description
     assert data["is_enabled"] == activation.is_enabled
-    assert data["extra_var"] == converted_extra_var(activation.extra_var)
+
+    # An extra_var empty string is outbound serialized as None; it's considered
+    # a "no value" situation.  Consequently, a data content of None for
+    # extra_var may be sourced from either None or an empty string.
+    if (activation.extra_var is None) or (activation.extra_var == ""):
+        assert data["extra_var"] is None
+    else:
+        assert data["extra_var"] == converted_extra_var(activation.extra_var)
+
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
     assert data["rulebook_name"] == activation.rulebook_name
