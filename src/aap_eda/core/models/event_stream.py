@@ -31,7 +31,7 @@ class EventStream(
 ):
     """Model representing an event stream."""
 
-    description = models.TextField(default="")
+    description = models.TextField(default="", blank=True)
     is_enabled = models.BooleanField(default=True)
     decision_environment = models.ForeignKey(
         "DecisionEnvironment",
@@ -43,7 +43,7 @@ class EventStream(
         on_delete=models.SET_NULL,
         null=True,
     )
-    extra_var = models.TextField(null=True)
+    extra_var = models.TextField(null=True, blank=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
@@ -89,6 +89,7 @@ class EventStream(
     k8s_service_name = models.TextField(
         null=True,
         default=None,
+        blank=True,
         help_text="Name of the kubernetes service",
     )
 

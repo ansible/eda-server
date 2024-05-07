@@ -163,6 +163,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
 
