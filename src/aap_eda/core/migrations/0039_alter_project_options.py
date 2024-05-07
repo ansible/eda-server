@@ -3,7 +3,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0037_alter_activation_extra_var_and_more"),
+        ("core", "0038_alter_activation_description_and_more"),
     ]
 
     operations = [
