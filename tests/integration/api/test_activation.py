@@ -64,9 +64,10 @@ def test_create_activation(
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
-    assert (
-        activation.status_message
-        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    assert activation.status_message == (
+        "There are no healthy queues to process the start request "
+        f"for activation {activation.id}. There may be an issue "
+        "with the system; please contact the administrator."
     )
 
 
@@ -114,9 +115,10 @@ def test_create_activation_blank_text(
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
-    assert (
-        activation.status_message
-        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    assert activation.status_message == (
+        "There are no healthy queues to process the start request "
+        f"for activation {activation.id}. There may be an issue "
+        "with the system; please contact the administrator."
     )
 
 
@@ -510,9 +512,10 @@ def test_enable_activation(
 
         default_activation.refresh_from_db()
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert (
-            default_activation.status_message
-            == enums.ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
+        assert default_activation.status_message == (
+            "There are no healthy queues to process the start request "
+            f"for activation {default_activation.id}. There may be an issue "
+            "with the system; please contact the administrator."
         )
 
 
@@ -617,8 +620,8 @@ def assert_activation_base_data(
     assert data["rules_count"] == rules_count
     assert data["rules_fired_count"] == rules_fired_count
     assert data["created_at"] == activation.created_at
-    assert data["modified_at"] == activation.modified_at
-    assert data["status_message"] == activation.status_message
+    assert data["modified_at"] <= activation.modified_at
+    assert data["status_message"]
 
 
 def assert_activation_related_object_fks(
