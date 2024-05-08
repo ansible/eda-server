@@ -153,48 +153,47 @@ def _run_request(
 
 def _set_request_cannot_be_run_status(
     request_type: ActivationRequest,
-    process_parent_type: ProcessParentType,
-    process_parent_id: int,
+    process_parent: Union[Activation, EventStream],
     status_text: str,
 ) -> None:
     """Set the request status to indicate it cannot be run on this node.
 
     The request cannot be run on this node due to detected functional issues.
-    While it cannot be run on this node anothter functional node can run it.
-    This method sets the request's state such that other nodes can identify
-    it as something to be run, if possible.  This identification is performed
-    as part of monitor_rulebook_processes.
+    While it cannot be run on this node anothter functional node may be able
+    to.
     """
-    status_manager = StatusManager(
-        get_process_parent(process_parent_type, process_parent_id),
-    )
-
     status = ActivationStatus.WORKERS_OFFLINE
     # If the request is start/auto-start we know the request isn't
-    # running.
+    # running and can be put into the appropriate pending state.
+    # If a restart it can also be put in the appropriate pending
+    # state.
+    #
     # If the request is in one of the pending states that also
     # indicates it's not running; this check is for previous
     # failures to start that got dispatched from the monitor
     # task.
-    if (
-        request_type
-        in [
-            ActivationRequest.START,
-            ActivationRequest.AUTO_START,
-        ]
-    ) or (
-        status_manager.db_instance.status
-        in [
-            ActivationStatus.PENDING,
-            ActivationStatus.PENDING_WORKERS_OFFLINE,
-        ]
-    ):
-        status = ActivationStatus.PENDING_WORKERS_OFFLINE
+    if request_type in [
+        ActivationRequest.START,
+        ActivationRequest.AUTO_START,
+        ActivationRequest.RESTART,
+    ]:
+        status = ActivationStatus.PENDING
 
-    status_manager.set_status(status, status_text)
-    # There may not be a latest instance.
-    if status_manager.latest_instance:
-        status_manager.set_latest_instance_status(status, status_text)
+    # If the target status is WORKERS_OFFLINE and the process already has that
+    # status there's nothing to do.  For any other situation we need to be
+    # certain to set the status text.
+    if (status != ActivationStatus.WORKERS_OFFLINE) or (
+        process_parent.status != ActivationStatus.WORKERS_OFFLINE
+    ):
+        status_manager = StatusManager(process_parent)
+        status_manager.set_status(status, status_text)
+
+        # Set the latest instance's status only if there is a latest instance
+        # and only if the status is WORKERS_OFFLINE.
+        if status_manager.latest_instance and (
+            status == ActivationStatus.WORKERS_OFFLINE
+        ):
+            status_manager.set_latest_instance_status(status, status_text)
 
 
 def dispatch(
@@ -289,17 +288,13 @@ def dispatch(
             )
 
     if not enqueable:
-        # The request is not enqueable.  If not a restart set the request
-        # status to "workers offline".
-        if request_type != ActivationRequest.RESTART:
-            # Set the request status such that, if possible, a functional
-            # node can pick it up and run it.
-            _set_request_cannot_be_run_status(
-                request_type,
-                process_parent_type,
-                process_parent_id,
-                status_msg,
-            )
+        # The request is not enqueable. Set the request status such that, if
+        # possible, a functional node can pick it up and run it.
+        _set_request_cannot_be_run_status(
+            request_type,
+            get_process_parent(process_parent_type, process_parent_id),
+            status_msg,
+        )
     else:
         unique_enqueue(
             queue_name,
@@ -480,7 +475,6 @@ def monitor_rulebook_processes() -> None:
     for process in models.RulebookProcess.objects.filter(
         status__in=[
             ActivationStatus.RUNNING,
-            ActivationStatus.PENDING_WORKERS_OFFLINE,
             ActivationStatus.WORKERS_OFFLINE,
         ]
     ):

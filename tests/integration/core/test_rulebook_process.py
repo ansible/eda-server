@@ -85,7 +85,6 @@ def test_rulebook_process_save(init_data):
         enums.ActivationStatus.UNRESPONSIVE,
         enums.ActivationStatus.ERROR,
         enums.ActivationStatus.PENDING,
-        enums.ActivationStatus.PENDING_WORKERS_OFFLINE,
     ]:
         instance.status = status
         instance.save(update_fields=["status"])
