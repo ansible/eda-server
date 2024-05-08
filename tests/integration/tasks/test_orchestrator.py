@@ -91,15 +91,14 @@ def max_running_processes():
         status = (
             ActivationStatus.STARTING if i == 0 else ActivationStatus.RUNNING
         )
-        processes.append(
-            models.RulebookProcess.objects.create(
-                name=f"running{i}",
-                activation=activation,
-                status=status,
-            )
+        process = models.RulebookProcess.objects.create(
+            name=f"running{i}",
+            activation=activation,
+            status=status,
         )
+        processes.append(process)
         models.RulebookProcessQueue.objects.create(
-            process=processes[-1],
+            process=process,
             queue_name="queue_name_test",
         )
     return processes
@@ -188,9 +187,15 @@ def test_manage_not_start(
     ],
 )
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_activation_requests(
-    enqueue_mock, activation, command, queued_request
+    get_queue_name_mock,
+    enqueue_mock,
+    activation,
+    command,
+    queued_request,
 ):
+    get_queue_name_mock.return_value = "activation"
     command(ProcessParentType.ACTIVATION, activation.id)
     enqueue_args = [
         "activation",
@@ -211,9 +216,11 @@ def test_activation_requests(
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_monitor_rulebook_processes(
-    enqueue_mock, activation, max_running_processes
+    get_queue_name_mock, enqueue_mock, activation, max_running_processes
 ):
+    get_queue_name_mock.return_value = "activation"
     call_args = [
         mock.call(
             "activation",

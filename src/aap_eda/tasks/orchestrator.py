@@ -157,12 +157,6 @@ def dispatch(
     request_type: Optional[ActivationRequest],
 ):
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
-    process_parent = get_process_parent(
-        process_parent_type,
-        process_parent_id,
-    )
-    status_manager = StatusManager(process_parent)
-
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
@@ -171,6 +165,18 @@ def dispatch(
         f"Dispatching request {request_type} for {process_parent_type} "
         f"{process_parent_id}",
     )
+
+    try:
+        process_parent = get_process_parent(
+            process_parent_type, process_parent_id
+        )
+    except ObjectDoesNotExist:
+        LOGGER.warning(
+            f"{process_parent_type} {process_parent_id} no longer exists, "
+            f"request {request_type} can not be dispatched.",
+        )
+        return
+    status_manager = StatusManager(process_parent)
 
     # new processes
     if request_type in [
