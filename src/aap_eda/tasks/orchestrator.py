@@ -213,6 +213,8 @@ def dispatch(
     )
 
     queue_name = None
+    enqueable = True
+
     # new processes
     if request_type in [
         ActivationRequest.START,
@@ -251,46 +253,54 @@ def dispatch(
                 )
             queue_name = None
 
+    status_msg = (
+        f"{process_parent_type} {process_parent_id} is in an "
+        "unknown state. The workers of its associated queue "
+        f"'{queue_name}' are failing liveness checks. "
+        "There may be an issue with the node; please contact "
+        "the administrator."
+    )
     if queue_name and (not check_rulebook_queue_health(queue_name)):
         # The queue is unhealthy; log this fact.
-        # We'll try to find another queue on which to run.
-        msg = (
-            f"{process_parent_type} {process_parent_id} is in an"
-            " unknown state. The workers of its associated queue"
-            f" '{queue_name}' are failing liveness checks."
-            " There may be an issue with the node; please contact"
-            " the administrator."
-        )
-        LOGGER.warning(
-            "Request"
-            f" type {request_type} for {process_parent_type}"
-            f" {process_parent_id} will be run on the least busy queue."
-        )
-        queue_name = None
+        # If it's a restart we'll try a different queue below.
+        LOGGER.warning(status_msg)
 
-    if not queue_name:
+        if request_type == ActivationRequest.RESTART:
+            queue_name = None
+
+            LOGGER.warning(
+                "Request"
+                f" type {request_type} for {process_parent_type}"
+                f" {process_parent_id} will be run on the least busy queue."
+            )
+        else:
+            enqueable = False
+
+    if enqueable and (not queue_name):
         try:
             queue_name = get_least_busy_queue_name()
         except HealthyQueueNotFoundError:
-            # The are no healthy queues on which to run the request. For any
-            # request that isn't a restart set its status to "workers offline."
-            msg = (
+            enqueable = False
+            status_msg = (
                 f"The workers for request type {request_type}"
                 f" for {process_parent_type} {process_parent_id}"
                 " are failing liveness checks.  There may be an"
                 " issue with the node; please contact the administrator."
             )
-            LOGGER.warning(
-                msg,
-            )
 
+    if not enqueable:
+        # The request is not enqueable.  If not a restart set the request
+        # status to "workers offline".
+        if request_type != ActivationRequest.RESTART:
             # Set the request status such that, if possible, a functional
             # node can pick it up and run it.
             _set_request_cannot_be_run_status(
-                request_type, process_parent_type, process_parent_id, msg
+                request_type,
+                process_parent_type,
+                process_parent_id,
+                status_msg,
             )
-
-    if queue_name:
+    else:
         unique_enqueue(
             queue_name,
             job_id,
