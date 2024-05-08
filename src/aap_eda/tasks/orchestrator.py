@@ -157,13 +157,18 @@ def dispatch(
     request_type: Optional[ActivationRequest],
 ):
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
+    process_parent = get_process_parent(
+        process_parent_type,
+        process_parent_id,
+    )
+    status_manager = StatusManager(process_parent)
 
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
 
     LOGGER.info(
-        f"Dispatching request type {request_type} for {process_parent_type} "
+        f"Dispatching request {request_type} for {process_parent_type} "
         f"{process_parent_id}",
     )
 
@@ -182,13 +187,10 @@ def dispatch(
             msg = (
                 f"There are no healthy queues to process the start request "
                 f"for {process_parent_type} {process_parent_id}. "
-                "There may be an issue with the node; please contact "
+                "There may be an issue with the system; please contact "
                 "the administrator."
             )
             LOGGER.warning(msg)
-            status_manager = StatusManager(
-                get_process_parent(process_parent_type, process_parent_id),
-            )
             status_manager.set_status(
                 ActivationStatus.PENDING,
                 msg,
@@ -209,30 +211,43 @@ def dispatch(
         ):
             if not queue_name:
                 LOGGER.info(
-                    f"Scheduling {process_parent_type} {process_parent_id} "
-                    "to the least busy queue; it is not currently associated "
-                    " with a queue.",
+                    "Scheduling request "
+                    f"{request_type} for {process_parent_type} "
+                    f"{process_parent_id} to the least busy queue; "
+                    "it is not currently associated with a queue.",
                 )
             else:
                 LOGGER.info(
-                    f"Scheduling {process_parent_type} {process_parent_id} "
-                    f"to the least busy queue; its associated queue "
-                    f"'{queue_name}' is from previous configuation settings.",
+                    "Scheduling request"
+                    f"{request_type} for {process_parent_type} "
+                    f"{process_parent_id} to the least busy queue; "
+                    f"its associated queue '{queue_name}' is from "
+                    "previous configuation settings.",
                 )
-            queue_name = get_least_busy_queue_name()
+            try:
+                queue_name = get_least_busy_queue_name()
+            except HealthyQueueNotFoundError:
+                msg = (
+                    f"There are no healthy queues to process operation "
+                    f"{request_type} for {process_parent_type} "
+                    f"{process_parent_id}. Waiting for a worker. "
+                    "There may be an issue with the system; please "
+                    "contact the administrator."
+                )
+                LOGGER.warning(msg)
+                status_manager.set_status(
+                    ActivationStatus.PENDING,
+                    msg,
+                )
+                return
         elif not check_rulebook_queue_health(queue_name):
             # The queue is unhealthy.  If we're not restarting it there's
             # nothing we can do except update its status to WORKERS_OFFLINE.
             if request_type != ActivationRequest.RESTART:
-                process_parent = get_process_parent(
-                    process_parent_type,
-                    process_parent_id,
-                )
-
                 # A process in PENDING status don't need to update its status.
-                # A monitor can be scheduled for an activation in PENDING status
-                # if its latest process is in workers-offline status and it is
-                # scheduled for restart.
+                # A monitor can be scheduled for an activation in PENDING
+                # status if its latest process is in workers-offline status
+                # and it is scheduled for restart.
                 if process_parent.status == ActivationStatus.PENDING:
                     return
 
@@ -245,10 +260,9 @@ def dispatch(
                     f"{process_parent_type} {process_parent_id} is in an "
                     "unknown state. The workers of its associated queue "
                     f"'{queue_name}' are failing liveness checks. "
-                    "There may be an issue with the node; please contact "
-                    "the administrator."
+                    "There may be an issue with the worker node; "
+                    "please contact the administrator."
                 )
-                status_manager = StatusManager(process_parent)
                 status_manager.set_status(
                     ActivationStatus.WORKERS_OFFLINE,
                     msg,
@@ -267,25 +281,19 @@ def dispatch(
                 f"Restarting {process_parent_type} {process_parent_id} "
                 "on the least busy queue; The workers of its associated queue "
                 f"'{queue_name}' are failing liveness checks. "
-                "There may be an issue with the node; please contact "
+                "There may be an issue with the worker node; please contact "
                 "the administrator.",
             )
             try:
                 queue_name = get_least_busy_queue_name()
             except HealthyQueueNotFoundError:
                 msg = (
-                    f"There are no healthy queues to process the restart request "
-                    f"for {process_parent_type} {process_parent_id}. "
-                    "There may be an issue with the node; please contact "
-                    "the administrator."
+                    f"There are no healthy queues to process the "
+                    f"restart request for {process_parent_type} "
+                    f"{process_parent_id}. There may be an issue "
+                    "with the system; please contact the administrator."
                 )
                 LOGGER.warning(msg)
-                status_manager = StatusManager(
-                    get_process_parent(
-                        process_parent_type,
-                        process_parent_id,
-                    ),
-                )
                 status_manager.set_status(
                     ActivationStatus.PENDING,
                     msg,
@@ -303,9 +311,6 @@ def dispatch(
 
 def get_least_busy_queue_name() -> str:
     """Return the queue name with the least running processes."""
-    if len(settings.RULEBOOK_WORKER_QUEUES) == 1:
-        return settings.RULEBOOK_WORKER_QUEUES[0]
-
     queue_counter = Counter()
 
     for queue_name in settings.RULEBOOK_WORKER_QUEUES:
