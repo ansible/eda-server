@@ -82,12 +82,12 @@ def max_running_processes():
         email="luke.skywalker@example.com",
         password="secret",
     )
-    activation = models.Activation.objects.create(
-        name="test",
-        user=user,
-    )
     processes = []
     for i in range(settings.MAX_RUNNING_ACTIVATIONS):
+        activation = models.Activation.objects.create(
+            name=f"test_max_running{i}",
+            user=user,
+        )
         status = (
             ActivationStatus.STARTING if i == 0 else ActivationStatus.RUNNING
         )
@@ -99,7 +99,7 @@ def max_running_processes():
         processes.append(process)
         models.RulebookProcessQueue.objects.create(
             process=process,
-            queue_name="queue_name_test",
+            queue_name="activation",
         )
     return processes
 
@@ -107,7 +107,7 @@ def max_running_processes():
 @pytest.fixture
 def job_mock():
     mock_job = mock.MagicMock()
-    mock_job.origin = "queue_name_test"
+    mock_job.origin = "activation"
     return mock_job
 
 
@@ -237,11 +237,11 @@ def test_monitor_rulebook_processes(
             mock.call(
                 "activation",
                 orchestrator._manage_process_job_id(
-                    ProcessParentType.ACTIVATION, running.id
+                    ProcessParentType.ACTIVATION, running.activation.id
                 ),
                 orchestrator._manage,
                 ProcessParentType.ACTIVATION,
-                running.id,
+                running.activation.id,
             )
         )
 
@@ -250,7 +250,9 @@ def test_monitor_rulebook_processes(
     )
     for running in max_running_processes:
         queue.push(
-            ProcessParentType.ACTIVATION, running.id, ActivationRequest.START
+            ProcessParentType.ACTIVATION,
+            running.activation.id,
+            ActivationRequest.START,
         )
     orchestrator.monitor_rulebook_processes()
 
