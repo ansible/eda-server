@@ -26,6 +26,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
+from aap_eda.core.enums import Action
 
 from .mixins import PartialUpdateOnlyModelMixin
 
@@ -123,15 +124,24 @@ class OrganizationViewSet(
         ],
     )
     @action(
-        detail=True,
+        detail=False,
         methods=["get"],
         queryset=models.Team.objects.order_by("id"),
         filterset_class=filters.OrganizationTeamFilter,
+        rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/teams",
     )
-    def teams(self, request, pk):
-        organization = self.get_object()
+    def teams(self, request, id):
+        org_exists = (
+            models.Organization.access_qs(request.user).filter(id=id).exists()
+        )
+        if not org_exists:
+            raise api_exc.NotFound(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Organization with ID={id} does not exist.",
+            )
 
-        teams = models.Team.objects.filter(organization_id=organization.id)
+        teams = models.Team.objects.filter(organization_id=id)
         filtered_teams = self.filter_queryset(teams)
         result = self.paginate_queryset(filtered_teams)
         serializer = serializers.TeamSerializer(result, many=True)

@@ -44,7 +44,6 @@ class ResourceType(DjangoStrEnum):
     AUDIT_RULE = "audit_rule"
     USER = "user"
     PROJECT = "project"
-    EXTRA_VAR = "extra_var"
     RULEBOOK = "rulebook"
     ROLE = "role"
     DECISION_ENVIRONMENT = "decision_environment"
@@ -64,6 +63,7 @@ class Action(DjangoStrEnum):
     ENABLE = "enable"
     DISABLE = "disable"
     RESTART = "restart"
+    SYNC = "sync"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

@@ -22,14 +22,16 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel, UniqueNamedModel
 from .mixins import StatusHandlerModelMixin
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
 
 
-class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
+class Activation(
+    StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel, UniqueNamedModel
+):
     class Meta:
         db_table = "core_activation"
         indexes = [models.Index(fields=["name"], name="ix_activation_name")]
@@ -41,8 +43,10 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
         ]
         default_permissions = ["add", "view", "delete"]
 
-    name = models.TextField(null=False, unique=True)
-    description = models.TextField(default="")
+    description = models.TextField(
+        default="",
+        blank=True,
+    )
     is_enabled = models.BooleanField(default=True)
     git_hash = models.TextField(null=False, default="")
     # TODO(alex) Since local activations are no longer supported
@@ -56,9 +60,7 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
     rulebook = models.ForeignKey(
         "Rulebook", on_delete=models.SET_NULL, null=True
     )
-    extra_var = models.ForeignKey(
-        "ExtraVar", on_delete=models.CASCADE, null=True
-    )
+    extra_var = models.TextField(null=True, blank=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
@@ -122,5 +124,6 @@ class Activation(StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel):
     k8s_service_name = models.TextField(
         null=True,
         default=None,
+        blank=True,
         help_text="Name of the kubernetes service",
     )

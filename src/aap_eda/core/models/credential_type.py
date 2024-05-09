@@ -14,12 +14,12 @@
 
 from django.db import models
 
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel, UniqueNamedModel
 
 __all__ = ("CredentialType",)
 
 
-class CredentialType(BaseOrgModel):
+class CredentialType(BaseOrgModel, UniqueNamedModel):
     class Meta:
         db_table = "core_credential_type"
         constraints = [
@@ -29,7 +29,6 @@ class CredentialType(BaseOrgModel):
             )
         ]
 
-    name = models.TextField(null=False, unique=True)
     description = models.TextField(default="", blank=True, null=False)
     inputs = models.JSONField(default=dict)
     injectors = models.JSONField(default=dict)

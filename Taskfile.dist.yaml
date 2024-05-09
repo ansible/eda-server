@@ -178,7 +178,7 @@ tasks:
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: down --volumes
+          CLI_ARGS: down --volumes --remove-orphans
 
   docker:psql:
     desc: "Open PostgreSQL console."

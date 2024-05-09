@@ -7,6 +7,7 @@
 * [Docker Compose plugin](https://docs.docker.com/compose/) or `docker-compose` python package.
 * [Poetry](https://python-poetry.org/) >= 1.4.0
 * [Taskfile](https://taskfile.dev/)
+* [gnupg](https://www.gnupg.org/)
 * [pre-commit](https://pre-commit.com/)
 
 For running services locally:
@@ -118,6 +119,14 @@ The instructions below assume your Taskfile binary is named `task`, but please k
 
 **Note:** For Macs with the M1 or M2 chip make sure you
 [download](https://github.com/go-task/task/releases) Task for the `arm64` architecture.
+
+### gnupg
+
+Linux environments have gpg installed by default. On macOS its optional so you can install it using brew.
+
+```shell
+brew install gpg
+```
 
 ### Pre-commit (optional)
 

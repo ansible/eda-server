@@ -39,8 +39,7 @@ class TeamSerializer(serializers.ModelSerializer):
 
 class TeamCreateSerializer(serializers.ModelSerializer):
     organization_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
+        required=True,
         validators=[validators.check_if_organization_exists],
     )
 

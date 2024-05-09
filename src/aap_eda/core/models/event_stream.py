@@ -22,14 +22,16 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
+from .base import UniqueNamedModel
 from .mixins import StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
+class EventStream(
+    StatusHandlerModelMixin, ContainerableMixin, UniqueNamedModel
+):
     """Model representing an event stream."""
 
-    name = models.TextField(null=False, unique=True)
-    description = models.TextField(default="")
+    description = models.TextField(default="", blank=True)
     is_enabled = models.BooleanField(default=True)
     decision_environment = models.ForeignKey(
         "DecisionEnvironment",
@@ -41,11 +43,7 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         on_delete=models.SET_NULL,
         null=True,
     )
-    extra_var = models.ForeignKey(
-        "ExtraVar",
-        on_delete=models.CASCADE,
-        null=True,
-    )
+    extra_var = models.TextField(null=True, blank=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
@@ -91,6 +89,7 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     k8s_service_name = models.TextField(
         null=True,
         default=None,
+        blank=True,
         help_text="Name of the kubernetes service",
     )
 

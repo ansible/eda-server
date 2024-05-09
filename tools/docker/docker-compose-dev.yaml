@@ -245,6 +245,17 @@ services:
       retries: 3
       start_period: 5s
 
+  squid:
+    profiles:
+      - proxy
+    image: 'quay.io/openshifttest/squid-proxy:1.2.0'
+    hostname: squid
+    volumes:
+      - './squid/squid.conf:/etc/squid/squid.conf:z'
+      - './squid/htpass:/etc/squid/htpass:z'
+    ports:
+      - '${EDA_PROXY_PORT:-3128}:3128'
+
 volumes:
   postgres_data: {}
   podman_data_node1: {}
