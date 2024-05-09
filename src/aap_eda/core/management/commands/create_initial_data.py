@@ -22,6 +22,7 @@ from django.core.management import BaseCommand
 from django.db import transaction
 
 from aap_eda.core import enums, models
+from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
 
 CRUD = ["add", "view", "change", "delete"]
@@ -388,6 +389,7 @@ class Command(BaseCommand):
         self._copy_scm_credentials()
         self._create_org_roles()
         self._create_obj_roles()
+        enable_redis_prefix()
 
     def _preload_credential_types(self):
         for credential_type in populate_credential_types(CREDENTIAL_TYPES):
