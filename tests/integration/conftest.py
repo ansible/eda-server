@@ -729,22 +729,9 @@ INPUTS = {
             "type": "string",
             "secret": True,
         },
-        {
-            "id": "ssh_key_data",
-            "label": "SCM Private Key",
-            "type": "string",
-            "format": "ssh_private_key",
-            "secret": True,
-            "multiline": True,
-        },
-        {
-            "id": "ssh_key_unlock",
-            "label": "Private Key Passphrase",
-            "type": "string",
-            "secret": True,
-        },
     ]
 }
+INJECTORS = {"extra_vars": {"password": "{{ password }}"}}
 
 DUMMY_GPG_KEY = """
 -----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -790,7 +777,7 @@ def use_debug_setting():
 def default_credential_type() -> models.CredentialType:
     """Return a default Credential Type."""
     credential_type = models.CredentialType.objects.create(
-        name="default_credential_type", inputs=INPUTS, injectors={}
+        name="default_credential_type", inputs=INPUTS, injectors=INJECTORS
     )
 
     return credential_type
@@ -800,7 +787,7 @@ def default_credential_type() -> models.CredentialType:
 def credential_type() -> models.CredentialType:
     """Return a default Credential Type."""
     credential_type = models.CredentialType.objects.create(
-        name="default_credential_type", inputs=INPUTS, injectors={}
+        name="default_credential_type", inputs=INPUTS, injectors=INJECTORS
     )
 
     return credential_type
