@@ -319,9 +319,11 @@ REST_FRAMEWORK = {
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
-WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
-    "ws://", "http://"
-).replace("wss://", "https://")
+WEBSOCKET_TOKEN_BASE_URL = settings.get("WEBSOCKET_TOKEN_BASE_URL", None)
+if WEBSOCKET_TOKEN_BASE_URL is None:
+    WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+        "ws://", "http://"
+    ).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
