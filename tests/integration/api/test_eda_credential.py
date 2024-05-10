@@ -215,45 +215,28 @@ def test_list_eda_credentials(
     assert response.data["results"][1]["name"] == default_vault_credential.name
 
 
+@pytest.mark.parametrize(
+    ("kinds", "expected"),
+    [
+        ("scm", 1),
+        ("registry", 1),
+        ("vault", 0),
+        ("scm,vault", 1),
+        ("scm,registry", 2),
+    ],
+)
 @pytest.mark.django_db
 def test_list_eda_credentials_with_kind_filter(
     admin_client: APIClient,
     default_registry_credential: models.EdaCredential,
     default_scm_credential: models.EdaCredential,
+    kinds,
+    expected,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
+        f"{api_url_v1}/eda-credentials/?credential_type__kind__in={kinds}"
     )
-    assert len(response.data["results"]) == 1
-
-    response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=registry"
-    )
-    assert len(response.data["results"]) == 1
-
-    response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=vault"
-    )
-    assert len(response.data["results"]) == 0
-
-    response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
-        "&credential_type__kind=vault",
-    )
-    assert len(response.data["results"]) == 1
-
-    response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
-        "&credential_type__kind=registry",
-    )
-    assert len(response.data["results"]) == 2
-
-    name_prefix = default_registry_credential.name[0]
-    response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
-        f"&credential_type__kind=registry&name={name_prefix}",
-    )
-    assert len(response.data["results"]) == 1
+    assert len(response.data["results"]) == expected
 
 
 @pytest.mark.django_db

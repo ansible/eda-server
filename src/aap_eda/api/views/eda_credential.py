@@ -16,6 +16,9 @@ import logging
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rest_filters.rest_framework.field_lookup_backend import (
+    FieldLookupBackend,
+)
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
@@ -25,7 +28,6 @@ from drf_spectacular.utils import (
     extend_schema,
 )
 from rest_framework import mixins, status, viewsets
-from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions, filters, serializers
@@ -43,14 +45,6 @@ from .mixins import (
 logger = logging.getLogger(__name__)
 
 
-class KindFilterBackend(BaseFilterBackend):
-    def filter_queryset(self, request, queryset, _view):
-        kinds = request.GET.getlist("credential_type__kind")
-        if bool(kinds):
-            return queryset.filter(credential_type__kind__in=kinds)
-        return queryset
-
-
 class EdaCredentialViewSet(
     ResponseSerializerMixin,
     CreateModelMixin,
@@ -63,10 +57,16 @@ class EdaCredentialViewSet(
     queryset = models.EdaCredential.objects.all()
     serializer_class = serializers.EdaCredentialSerializer
     filter_backends = (
-        KindFilterBackend,
+        FieldLookupBackend,
         defaultfilters.DjangoFilterBackend,
     )
     filterset_class = filters.EdaCredentialFilter
+    rest_filters_reserved_names = [
+        "refs",
+        "force",
+        "name",
+        "credential_type_id",
+    ]
     ordering_fields = ["name"]
 
     def filter_queryset(self, queryset):
@@ -150,9 +150,9 @@ class EdaCredentialViewSet(
         description="List all EDA credentials",
         parameters=[
             OpenApiParameter(
-                "credential_type__kind",
+                "credential_type__kind__in",
                 type=str,
-                description="Kind of CredentialType",
+                description="Kinds of CredentialType, comma delimited list",
             ),
         ],
         responses={
