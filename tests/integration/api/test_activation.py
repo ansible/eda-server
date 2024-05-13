@@ -64,10 +64,18 @@ def test_create_activation(
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
-    assert activation.status_message == (
-        "There are no healthy queues to process the start request "
-        f"for activation {activation.id}. There may be an issue "
-        "with the system; please contact the administrator."
+    # PENDING has two possible status messages depending on the
+    # nature of the PENDING: "normal" or "workers offline".
+    assert (
+        activation.status_message
+        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    ) or (
+        activation.status_message
+        == (
+            "There are no healthy queues to process the start request "
+            f"for activation {activation.id}. There may be an issue "
+            "with the system; please contact the administrator."
+        )
     )
 
 
@@ -115,10 +123,18 @@ def test_create_activation_blank_text(
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
-    assert activation.status_message == (
-        "There are no healthy queues to process the start request "
-        f"for activation {activation.id}. There may be an issue "
-        "with the system; please contact the administrator."
+    # PENDING has two possible status messages depending on the
+    # nature of the PENDING: "normal" or "workers offline".
+    assert (
+        activation.status_message
+        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+    ) or (
+        activation.status_message
+        == (
+            "There are no healthy queues to process the start request "
+            f"for activation {activation.id}. There may be an issue "
+            "with the system; please contact the administrator."
+        )
     )
 
 
@@ -512,10 +528,21 @@ def test_enable_activation(
 
         default_activation.refresh_from_db()
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert default_activation.status_message == (
-            "There are no healthy queues to process the start request "
-            f"for activation {default_activation.id}. There may be an issue "
-            "with the system; please contact the administrator."
+        # PENDING has two possible status messages depending on the
+        # nature of the PENDING: "normal" or "workers offline".
+        assert (
+            default_activation.status_message
+            == enums.ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
+        ) or (
+            (default_activation.status == enums.ActivationStatus.PENDING)
+            and (
+                default_activation.status_message
+                == (
+                    "There are no healthy queues to process the start request "
+                    f"for activation {default_activation.id}. There may be an "
+                    "issue with the system; please contact the administrator."
+                )
+            )
         )
 
 
