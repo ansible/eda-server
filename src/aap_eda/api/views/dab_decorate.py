@@ -20,6 +20,8 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 
+from aap_eda.api.views.dab_base import convert_to_create_serializer
+
 for viewset_cls in [
     views.RoleDefinitionViewSet,
     views.RoleUserAssignmentViewSet,
@@ -29,6 +31,7 @@ for viewset_cls in [
     extend_schema_view(
         create=extend_schema(
             description=f"Create a {cls_name}.",
+            request=convert_to_create_serializer(viewset_cls.serializer_class),
             responses={
                 status.HTTP_201_CREATED: OpenApiResponse(
                     viewset_cls.serializer_class,
