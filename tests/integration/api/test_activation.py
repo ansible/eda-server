@@ -12,9 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from typing import Any, Dict, List
+from unittest.mock import patch
 
 import pytest
 import yaml
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -34,6 +36,7 @@ def converted_extra_var(var: str) -> str:
 
 
 @pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_create_activation(
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
@@ -72,6 +75,7 @@ def test_create_activation(
 
 
 @pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_create_activation_blank_text(
     admin_awx_token: models.AwxToken,
     activation_payload_blank_text: Dict[str, Any],
@@ -470,6 +474,7 @@ def test_restart_activation_without_de(
 
 
 @pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_enable_activation(
     default_activation: models.Activation,
     admin_client: APIClient,
