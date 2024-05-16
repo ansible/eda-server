@@ -43,8 +43,13 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
     inputs = serializers.JSONField(
         required=True,
         allow_null=False,
-        help_text="Name of the credential type",
+        help_text="Inputs of the credential type",
         validators=[validators.check_if_schema_valid],
+    )
+    injectors = serializers.JSONField(
+        required=True,
+        allow_null=False,
+        help_text="Injectors of the credential type",
     )
     organization_id = serializers.IntegerField(
         required=False,
@@ -53,10 +58,14 @@ class CredentialTypeCreateSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        if data.get("injectors") and data.get("inputs"):
-            errors = validate_injectors(
-                data.get("inputs"), data.get("injectors")
-            )
+        injectors = data.get("injectors")
+        inputs = data.get("inputs")
+
+        if self.partial:
+            inputs = inputs or self.instance.inputs
+
+        if injectors or injectors == {}:
+            errors = validate_injectors(inputs, injectors)
             if bool(errors):
                 raise serializers.ValidationError(errors)
 

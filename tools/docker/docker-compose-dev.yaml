@@ -143,6 +143,8 @@ services:
       - >-
         aap-eda-manage scheduler
     depends_on:
+      eda-api:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
