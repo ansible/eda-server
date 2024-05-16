@@ -237,7 +237,7 @@ def _get_databases_settings() -> dict:
             "PASSWORD": settings.get("DB_PASSWORD"),
             "NAME": settings.get("DB_NAME", "eda"),
             "OPTIONS": {
-                "sslmode": settings.get("PGSSLMODE", default="prefer"),
+                "sslmode": settings.get("PGSSLMODE", default="allow"),
                 "sslcert": settings.get("PGSSLCERT", default=""),
                 "sslkey": settings.get("PGSSLKEY", default=""),
                 "sslrootcert": settings.get("PGSSLROOTCERT", default=""),
