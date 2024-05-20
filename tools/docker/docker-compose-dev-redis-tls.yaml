@@ -171,14 +171,13 @@ services:
     restart: always
 
   certs:
-    image: quay.io/fedora/fedora-minimal
+    image: certbot/certbot
     volumes:
-      - ./postgres_ssl_config/certs:/etc/ssl/certs 
+      - ./postgres_ssl_config/certs:/etc/ssl/certs:z
     entrypoint: 
       - sh
       - -c
       - |
-        dnf -y install openssl
         openssl genrsa -out /etc/ssl/certs/ca.key 2048
         openssl req -new -x509 -key /etc/ssl/certs/ca.key -out /etc/ssl/certs/ca.crt -subj "/CN=EDA" -days 3650
         openssl genrsa -out /etc/ssl/certs/server.key 2048
