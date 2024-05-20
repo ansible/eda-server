@@ -193,7 +193,7 @@ services:
       - --bind
       - 0.0.0.0
       - --port
-      - 0
+      - "0"
       - --tls-port
       - "${EDA_MQ_PORT:-6379}"
       - --tls-cert-file
