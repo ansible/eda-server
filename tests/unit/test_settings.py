@@ -21,6 +21,7 @@ from aap_eda.settings.default import (
     DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
     ImproperlyConfigured,
     RulebookProcessLogLevel,
+    _get_debug,
     get_rq_queues,
     get_rulebook_process_log_level,
 )
@@ -140,3 +141,32 @@ def test_rq_queues_custom_host_multiple_queues():
         == "somepath"
     )
     assert "activation" not in queues
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("true", True),
+        ("True", True),
+        ("False", False),
+        ("false", False),
+        ("yes", True),
+        ("no", False),
+        ("1", True),
+        ("0", False),
+        ("", False),
+        ("anything", False),
+    ],
+)
+@patch("aap_eda.settings.default.settings")
+def test_get_debug(mock_settings, value, expected):
+    mock_settings.get.return_value = value
+    result = _get_debug()
+    assert result == expected
+
+
+@patch("aap_eda.settings.default.settings")
+def test_get_debug_exception(mock_settings):
+    mock_settings.get.return_value = ["something", "else"]
+    with pytest.raises(ImproperlyConfigured):
+        _get_debug()

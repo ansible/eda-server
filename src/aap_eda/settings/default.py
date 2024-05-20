@@ -92,6 +92,7 @@ from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
 from aap_eda.core.enums import RulebookProcessLogLevel
+from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -126,11 +127,17 @@ def _get_secret_key() -> str:
 
 SECRET_KEY = _get_secret_key()
 
-DEBUG = settings.get("DEBUG", False)
-if isinstance(DEBUG, str):
-    DEBUG = DEBUG.lower() in ["true", "yes", "1"]
-if not isinstance(DEBUG, bool):
-    raise ImproperlyConfigured("DEBUG setting must be a boolean value.")
+
+def _get_debug() -> bool:
+    debug = settings.get("DEBUG", False)
+    if isinstance(debug, str):
+        debug = str_to_bool(debug)
+    if not isinstance(debug, bool):
+        raise ImproperlyConfigured("DEBUG setting must be a boolean value.")
+    return debug
+
+
+DEBUG = _get_debug()
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 ALLOWED_HOSTS = (
