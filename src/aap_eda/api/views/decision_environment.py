@@ -24,6 +24,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
+from aap_eda.utils import str_to_bool
 
 from .mixins import (
     CreateModelMixin,
@@ -142,13 +143,15 @@ class DecisionEnvironmentViewSet(
     )
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        force_delete = request.query_params.get("force", "false").lower()
+        force_delete = str_to_bool(
+            request.query_params.get("force", "false"),
+        )
 
         activations_exist = models.Activation.objects.filter(
             decision_environment_id=instance.id
         ).exists()
 
-        if activations_exist and force_delete not in ["true", "1", "yes"]:
+        if activations_exist and not force_delete:
             raise api_exc.Conflict(
                 "Decision Environment is being used by Activations "
                 "and cannot be deleted. If you want to force delete, "

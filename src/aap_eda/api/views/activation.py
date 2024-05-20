@@ -42,17 +42,6 @@ from aap_eda.tasks.orchestrator import (
 logger = logging.getLogger(__name__)
 
 
-@extend_schema_view(
-    destroy=extend_schema(
-        description="Delete an existing Activation",
-        responses={
-            status.HTTP_204_NO_CONTENT: OpenApiResponse(
-                None,
-                description="The Activation has been deleted.",
-            ),
-        },
-    ),
-)
 class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
@@ -111,6 +100,34 @@ class ActivationViewSet(
         )
 
     @extend_schema(
+        description="Delete an existing Activation",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None,
+                description="The Activation has been deleted.",
+            ),
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        activation = self.get_object()
+
+        if activation.status == ActivationStatus.WORKERS_OFFLINE:
+            raise api_exc.Conflict(
+                f"An Activation in state '{activation.status}' cannot be "
+                "deleted.",
+            )
+
+        activation.status = ActivationStatus.DELETING
+        activation.save(update_fields=["status"])
+        logger.info(f"Now deleting {activation.name} ...")
+        delete_rulebook_process(
+            process_parent_type=ProcessParentType.ACTIVATION,
+            process_parent_id=activation.id,
+        )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
         responses={status.HTTP_200_OK: serializers.ActivationReadSerializer},
     )
     def retrieve(self, request, pk: int):
@@ -136,15 +153,6 @@ class ActivationViewSet(
         result = self.paginate_queryset(serializer.data)
 
         return self.get_paginated_response(result)
-
-    def perform_destroy(self, activation):
-        activation.status = ActivationStatus.DELETING
-        activation.save(update_fields=["status"])
-        logger.info(f"Now deleting {activation.name} ...")
-        delete_rulebook_process(
-            process_parent_type=ProcessParentType.ACTIVATION,
-            process_parent_id=activation.id,
-        )
 
     @extend_schema(
         description="List all instances for the Activation",
