@@ -416,15 +416,33 @@ def test_retrieve_activation_not_exist(admin_client: APIClient):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("activation_status", "expected_response"),
+    [
+        (
+            enums.ActivationStatus.PENDING,
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            enums.ActivationStatus.WORKERS_OFFLINE,
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+)
 def test_delete_activation(
+    activation_status: enums.ActivationStatus,
+    expected_response: int,
     default_activation: models.Activation,
     admin_client: APIClient,
     preseed_credential_types,
 ):
+    default_activation.status = activation_status
+    default_activation.save(update_fields=["status"])
+
     response = admin_client.delete(
         f"{api_url_v1}/activations/{default_activation.id}/"
     )
-    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert response.status_code == expected_response
 
 
 @pytest.mark.django_db
