@@ -35,8 +35,8 @@ drf-spectacular = ">=0.26.5,<0.27"
 channels = { version = "4.0.*", extras = ["daphne"] }
 psycopg2 = { version = "2.9.*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
-django-rq = ">=2.5,<2.9"
-rq = ">=1.10.1,<1.14"
+django-rq = "^2.8.0"
+rq = "^1.13.0"
 django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=38,<43"

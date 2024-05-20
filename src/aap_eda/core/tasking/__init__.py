@@ -2,13 +2,19 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timedelta
+from types import MethodType
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+import rq
+import rq_scheduler
+from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
+from django.db.utils import ProgrammingError
 from django_rq import enqueue, get_queue, get_scheduler, job
 from django_rq.queues import Queue as _Queue
-from rq import Connection, Worker as _Worker
+from rq import Connection, Worker as _Worker, results
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
     DEFAULT_RESULT_TTL,
@@ -39,6 +45,76 @@ _ErrorHandlersArgType = Union[
     ErrorHandlerType,
     None,
 ]
+
+
+def enable_redis_prefix():
+    if rq.worker_registration.REDIS_WORKER_KEYS != "rq:workers":
+        # changes have been made
+        return
+
+    try:
+        redis_prefix = f"EDA-{service_id()[0:8]}-rq"
+    except ProgrammingError:
+        # service_id() will fail at the first migration when
+        # dab_resource_registry_serviceid has not been created
+        logger.info("Failed to get service id")
+        return
+
+    rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
+    rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"
+    rq.queue.Queue.redis_queue_namespace_prefix = f"{redis_prefix}:queue:"
+    rq.queue.Queue.redis_queues_keys = f"{redis_prefix}:queues"
+    rq.worker.Worker.redis_worker_namespace_prefix = f"{redis_prefix}:worker:"
+    rq.worker.Worker.redis_workers_keys = f"{redis_prefix}:workers"
+    rq.job.Job.redis_job_namespace_prefix = f"{redis_prefix}:job:"
+    rq.registry.BaseRegistry.key_template = f"{redis_prefix}:registry:{0}"
+    rq.registry.StartedJobRegistry.key_template = f"{redis_prefix}:wip:{0}"
+    rq.registry.FinishedJobRegistry.key_template = (
+        f"{redis_prefix}:finished:{0}"
+    )
+    rq.registry.FailedJobRegistry.key_template = f"{redis_prefix}:failed:{0}"
+    rq.registry.DeferredJobRegistry.key_template = (
+        f"{redis_prefix}:deferred:{0}"
+    )
+    rq.registry.ScheduledJobRegistry.key_template = (
+        f"{redis_prefix}:scheduled:{0}"
+    )
+    rq.registry.CanceledJobRegistry.key_template = (
+        f"{redis_prefix}:canceled:{0}"
+    )
+
+    rq_scheduler.Scheduler.redis_scheduler_namespace_prefix = (
+        f"{redis_prefix}:scheduler_instance:"
+    )
+    rq_scheduler.Scheduler.scheduler_key = f"{redis_prefix}:scheduler"
+    rq_scheduler.Scheduler.scheduler_lock_key = (
+        f"{redis_prefix}:scheduler_lock"
+    )
+    rq_scheduler.Scheduler.scheduled_jobs_key = (
+        f"{redis_prefix}:scheduler:scheduled_jobs"
+    )
+
+    def eda_get_key(job_id):
+        return f"{redis_prefix}:results:{job_id}"
+
+    results.get_key = eda_get_key
+
+    def cls_get_key(cls, job_id):
+        return f"{redis_prefix}:results:{job_id}"
+
+    results.Result.get_key = MethodType(cls_get_key, results.Result)
+
+    def property_registry_cleaning_key(self):
+        return f"{redis_prefix}:clean_registries:{self.name}"
+
+    setattr(  # noqa: B010
+        rq.queue.Queue,
+        "registry_cleaning_key",
+        property(property_registry_cleaning_key),
+    )
+
+
+enable_redis_prefix()
 
 
 class SerializerProtocol(Protocol):
