@@ -46,7 +46,10 @@ for viewset_cls in [
 
 
 for url, viewset, view_name in rbac_router.registry:
-    if view_name in ('roledefinition-user_assignments', 'roledefinition-team_assignments'):
+    if view_name in (
+        "roledefinition-user_assignments",
+        "roledefinition-team_assignments",
+    ):
         extend_schema_view(
             list=extend_schema(
                 request=None,
