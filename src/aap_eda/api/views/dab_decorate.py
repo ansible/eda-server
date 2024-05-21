@@ -14,11 +14,14 @@
 
 from ansible_base.rbac.api import views
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
+
+from ansible_base.rbac.api.router import router as rbac_router
 
 from aap_eda.api.views.dab_base import convert_to_create_serializer
 
@@ -40,3 +43,20 @@ for viewset_cls in [
             },
         ),
     )(viewset_cls)
+
+
+for url, viewset, view_name in rbac_router.registry:
+    if view_name in ('roledefinition-user_assignments', 'roledefinition-team_assignments'):
+        extend_schema_view(
+            list=extend_schema(
+                request=None,
+                parameters=[
+                    OpenApiParameter(
+                        name="id",
+                        type=int,
+                        location=OpenApiParameter.PATH,
+                        description="A unique integer value identifying this assignment.",  # noqa: E501
+                    )
+                ],
+            )
+        )(viewset)
