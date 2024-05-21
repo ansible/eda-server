@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from ansible_base.rbac.api import views
+from ansible_base.rbac.api.router import router as rbac_router
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -20,8 +21,6 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import status
-
-from ansible_base.rbac.api.router import router as rbac_router
 
 from aap_eda.api.views.dab_base import convert_to_create_serializer
 
