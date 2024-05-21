@@ -34,7 +34,6 @@ from aap_eda.core.management.commands.create_initial_data import (
 from aap_eda.core.tasking import Queue
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
-from aap_eda.settings import default
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
 
@@ -1009,31 +1008,25 @@ def new_team(default_organization: models.Organization) -> models.Team:
 #################################################################
 # Redis
 #################################################################
-@pytest.fixture
-def redis_parameters() -> dict:
-    """Provide redis parameters based on settings values."""
-    params = (
-        default._rq_common_parameters() | default._rq_redis_client_parameters()
-    )
-    # Convert to lowercase for use in establishing a redis client.
-    return {k.lower(): v for (k, v) in params.items()}
-
-
 # fixture for a running redis server
 @pytest.fixture
 def redis_external(redis_parameters):
     client = redis.Redis(**redis_parameters)
     yield client
-    client.flushall()
+    client.flushdb()
 
 
 @pytest.fixture
-def test_queue_name():
+def test_queue_name(redis_parameters):
     # Use a separately named copy of the default queue to prevent
     # cross-environment issues.  Using the eda-server default queue results in
     # tasks run by tests to execute within eda-server context, if the
     # eda-server default worker is running, rather than the test context.
     settings.RQ_QUEUES["test-default"] = settings.RQ_QUEUES["default"]
+
+    # The redis parameters provide the DB to use in an effort to avoid
+    # stepping on a deployed environment.
+    settings.RQ_QUEUES["test-default"]["DB"] = redis_parameters["db"]
     return "test-default"
 
 
