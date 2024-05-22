@@ -28,6 +28,10 @@ x-environment:
   - EDA_DEBUG=${EDA_DEBUG:-True}
   - EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT=${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
   - EDA_ANSIBLE_BASE_JWT_KEY=${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
+  - EDA_PGSSLMODE=${EDA_PGSSLMODE:-allow}
+  - EDA_PGSSLCERT=${EDA_PGSSLCERT:-./postgres_ssl_config/certs/server.crt}
+  - EDA_PGSSLKEY=${EDA_PGSSLKEY:-./postgres_ssl_config/certs/server.key}
+  - EDA_PGSSLROOTCERT=${EDA_PGSSLROOTCERT:-./postgres_ssl_config/certs/ca.crt}
 
 services:
   podman-pre-setup:
@@ -166,6 +170,23 @@ services:
       - '../../:/app/src:z'
     restart: always
 
+  certs:
+    image: certbot/certbot
+    volumes:
+      - ./postgres_ssl_config/certs:/etc/ssl/certs:z
+    entrypoint: 
+      - sh
+      - -c
+      - |
+        openssl genrsa -out /etc/ssl/certs/ca.key 2048
+        openssl req -new -x509 -key /etc/ssl/certs/ca.key -out /etc/ssl/certs/ca.crt -subj "/CN=EDA" -days 3650
+        openssl genrsa -out /etc/ssl/certs/server.key 2048
+        openssl req -new -key /etc/ssl/certs/server.key -out /etc/ssl/certs/server.csr -subj "/CN=eda-postgres-1"
+        openssl x509 -req -in /etc/ssl/certs/server.csr -CA /etc/ssl/certs/ca.crt -CAkey /etc/ssl/certs/ca.key -CAcreateserial -out /etc/ssl/certs/server.crt -days 3650
+        chmod 640 /etc/ssl/certs/*.crt
+        chmod 640 /etc/ssl/certs/*.key
+    restart: on-failure
+
   postgres:
     image: 'quay.io/sclorg/postgresql-15-c9s:latest'
     environment:
@@ -177,12 +198,16 @@ services:
       - '${EDA_PG_PORT:-5432}:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
+      - "${EDA_PGSSL_PATHCONFIG:-./postgres_ssl_config/postgresql-cfg}:/opt/app-root/src/postgresql-cfg:z"
+      - "${EDA_PGSSL_PATHCERT:-./postgres_ssl_config/certs}:/opt/app-root/src/certs:z"
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
       timeout: 5s
       retries: 3
       start_period: 5s
+    depends_on:
+          - certs
 
   redis:
     image: 'quay.io/fedora/redis-6:latest'
