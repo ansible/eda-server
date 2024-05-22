@@ -44,7 +44,7 @@ for viewset_cls in [
     )(viewset_cls)
 
 
-for url, viewset, view_name in rbac_router.registry:
+for _url, viewset, view_name in rbac_router.registry:
     if view_name in (
         "roledefinition-user_assignments",
         "roledefinition-team_assignments",
