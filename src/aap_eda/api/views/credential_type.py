@@ -16,10 +16,14 @@ import logging
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rest_filters.rest_framework.field_lookup_backend import (
+    FieldLookupBackend,
+)
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
@@ -27,7 +31,7 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 
@@ -52,6 +56,25 @@ logger = logging.getLogger(__name__)
     ),
     list=extend_schema(
         description="List all credential types",
+        parameters=[
+            OpenApiParameter(
+                name="queryParams",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type={
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                    },
+                    "example": {
+                        "name__startswith": "test",
+                    },
+                },
+                description=(
+                    "Any additional query parameters as key-value pairs"
+                ),
+            ),
+        ],
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.CredentialTypeSerializer(many=True),
@@ -71,8 +94,7 @@ class CredentialTypeViewSet(
 ):
     queryset = models.CredentialType.objects.all()
     serializer_class = serializers.CredentialTypeSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.CredentialTypeFilter
+    filter_backends = (FieldLookupBackend, defaultfilters.DjangoFilterBackend)
     ordering_fields = ["name"]
 
     def filter_queryset(self, queryset):

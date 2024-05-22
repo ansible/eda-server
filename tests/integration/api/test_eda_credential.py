@@ -301,6 +301,69 @@ def test_list_eda_credentials_filter_name(
 
 
 @pytest.mark.django_db
+def test_list_eda_credentials_filter_startswith(
+    admin_client: APIClient,
+    user_credential_type: models.CredentialType,
+    preseed_credential_types,
+):
+    # NOTE: bulk_create shouldn't be used here because RBAC uses signals which
+    # won't update the permissions. If you use bulk_create, you have to call
+    # compute_object_role_permissions() to refresh permissions
+    # ansible_base.rbac.caching.compute_object_role_permissions
+    credential_type_id = user_credential_type.id
+    models.EdaCredential.objects.create(
+        name="new-credential-1",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=credential_type_id,
+    ),
+    models.EdaCredential.objects.create(
+        name="new-credential-2",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=credential_type_id,
+    ),
+    models.EdaCredential.objects.create(
+        name="new-credential-3",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=credential_type_id,
+    ),
+    models.EdaCredential.objects.create(
+        name="old-credential-1",
+        inputs={"sasl_username": "adam", "sasl_password": "secret"},
+        credential_type_id=credential_type_id,
+    ),
+
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/?name__istartswith=new-"
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 3
+
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/?"
+        f"credential_type_id={credential_type_id}",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 4
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_name_in(
+    admin_client: APIClient,
+    default_registry_credential: models.EdaCredential,
+    default_scm_credential: models.EdaCredential,
+    preseed_credential_types,
+):
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/?name__in="
+        f"{default_registry_credential.name},{default_scm_credential.name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 2
+
+
+@pytest.mark.django_db
 def test_delete_eda_credential(admin_client: APIClient):
     obj = models.EdaCredential.objects.create(
         name="eda-credential",

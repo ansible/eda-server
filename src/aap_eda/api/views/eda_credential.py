@@ -30,7 +30,7 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api import exceptions, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
 from aap_eda.core.utils.credentials import inputs_to_store
@@ -60,13 +60,7 @@ class EdaCredentialViewSet(
         FieldLookupBackend,
         defaultfilters.DjangoFilterBackend,
     )
-    filterset_class = filters.EdaCredentialFilter
-    rest_filters_reserved_names = [
-        "refs",
-        "force",
-        "name",
-        "credential_type_id",
-    ]
+    rest_filters_reserved_names = ["refs", "force"]
     ordering_fields = ["name"]
 
     def filter_queryset(self, queryset):
@@ -150,9 +144,21 @@ class EdaCredentialViewSet(
         description="List all EDA credentials",
         parameters=[
             OpenApiParameter(
-                "credential_type__kind__in",
-                type=str,
-                description="Kinds of CredentialType, comma delimited list",
+                name="queryParams",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                type={
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                    },
+                    "example": {
+                        "name__startswith": "test",
+                    },
+                },
+                description=(
+                    "Any additional query parameters as key-value pairs"
+                ),
             ),
         ],
         responses={

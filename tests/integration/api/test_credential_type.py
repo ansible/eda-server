@@ -219,6 +219,28 @@ def test_list_credential_types(admin_client: APIClient):
 
 
 @pytest.mark.django_db
+def test_list_credential_types_filter(admin_client: APIClient):
+    models.CredentialType.objects.create(
+        name="new-type", inputs={"fields": [{"a": "b"}]}, injectors={}
+    ),
+    models.CredentialType.objects.create(
+        name="old-type", inputs={"fields": [{"a": "b"}]}, injectors={}
+    ),
+
+    response = admin_client.get(
+        f"{api_url_v1}/credential-types/?name__in=new-type,old-type"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 2
+
+    response = admin_client.get(
+        f"{api_url_v1}/credential-types/?name__startswith=new-"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+
+@pytest.mark.django_db
 def test_delete_managed_credential_type(admin_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1",
