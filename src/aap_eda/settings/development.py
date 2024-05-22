@@ -21,4 +21,7 @@ os.environ.setdefault("EDA_DB_PASSWORD", "secret")
 os.environ.setdefault("EDA_DB_HOST", "localhost")
 os.environ.setdefault("EDA_MQ_HOST", "localhost")
 
+PYINSTRUMENT_PROFILE_DIR = 'profiles'
+
 from .default import *
+

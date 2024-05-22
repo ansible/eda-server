@@ -193,6 +193,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "crum.CurrentRequestUserMiddleware",
+    "pyinstrument.middleware.ProfilerMiddleware",
 ]
 
 ROOT_URLCONF = "aap_eda.urls"
