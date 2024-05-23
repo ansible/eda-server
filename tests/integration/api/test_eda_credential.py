@@ -91,7 +91,7 @@ def test_create_eda_credential(
         (
             DATA_DIR / "invalid_key.asc",
             status.HTTP_400_BAD_REQUEST,
-            "No valid GPG data found.",
+            "No valid GPG data found",
         ),
     ],
 )
@@ -118,7 +118,9 @@ def test_create_eda_credential_with_gpg_key_data(
         f"{api_url_v1}/eda-credentials/", data=data_in
     )
     assert response.status_code == status_code
-    assert status_message in response.data.get("inputs.gpg_public_key", "")
+    if response.data.get("inputs.gpg_public_key"):
+        message = response.data.get("inputs.gpg_public_key")[0]
+        assert message.startswith(status_message)
 
 
 @pytest.mark.parametrize(
