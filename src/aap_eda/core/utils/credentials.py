@@ -366,14 +366,19 @@ def _validate_ssh_key(schema: dict, data: str, inputs: dict) -> list[str]:
 def _validate_gpg_public_key(key_data: str) -> list[str]:
     errors = []
 
-    gpg = gnupg.GPG()
-    import_result = gpg.import_keys(key_data)
+    try:
+        gpg = gnupg.GPG()
+        import_result = gpg.import_keys(key_data)
+        error = import_result.stderr
 
-    if import_result.returncode != 0:
-        errors.append("No valid GPG data found.")
-        return errors
+        if import_result.returncode != 0:
+            errors.append(f"No valid GPG data found: {error}")
+            return errors
 
-    if import_result.sec_read > 0:
-        errors.append("Key is not a public key")
+        if import_result.sec_read > 0:
+            errors.append(f"Key is not a public key: {error}")
+    except Exception as e:
+        msg = f"Failed to validate GPG key: {str(e)}"
+        errors.append(msg)
 
     return errors
