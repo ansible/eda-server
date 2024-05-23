@@ -48,6 +48,12 @@ class KindFilterBackend(BaseFilterBackend):
         kinds = request.GET.getlist("credential_type__kind")
         if bool(kinds):
             return queryset.filter(credential_type__kind__in=kinds)
+
+        kinds = request.GET.get("credential_type__kind__in")
+        if bool(kinds):
+            kinds = kinds.split(",")
+            return queryset.filter(credential_type__kind__in=kinds)
+
         return queryset
 
 

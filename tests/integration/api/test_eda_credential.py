@@ -248,6 +248,12 @@ def test_list_eda_credentials_with_kind_filter(
     )
     assert len(response.data["results"]) == 2
 
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/?"
+        "credential_type__kind__in=scm,registry",
+    )
+    assert len(response.data["results"]) == 2
+
     name_prefix = default_registry_credential.name[0]
     response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
