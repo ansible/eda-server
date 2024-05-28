@@ -25,6 +25,7 @@ x-environment: &common-env
   EDA_RULEBOOK_WORKER_QUEUES: "activation-node1,activation-node2"
   EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT: ${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
   EDA_ANSIBLE_BASE_JWT_KEY: ${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
+  EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER: ${EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER:-100}
 
 services:
   podman-pre-setup-node1:

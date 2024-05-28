@@ -202,7 +202,6 @@ class RulebookProcessLog(models.Model):
     activation_instance = models.ForeignKey(
         "RulebookProcess", on_delete=models.CASCADE
     )
-    line_number = models.IntegerField()
     log = models.TextField()
     log_timestamp = models.BigIntegerField(null=False, default=0)
 

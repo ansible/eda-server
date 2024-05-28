@@ -576,7 +576,9 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
 
 
 ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
-ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get(
+    "ANSIBLE_RULEBOOK_FLUSH_AFTER", 100
+)
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE SETTINGS
