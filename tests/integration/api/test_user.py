@@ -104,6 +104,22 @@ def test_update_current_user(admin_client: APIClient, admin_user: models.User):
 
 
 @pytest.mark.django_db
+def test_update_current_user_forbidden(
+    use_shared_resource_setting,
+    admin_client: APIClient,
+    admin_user: models.User,
+):
+    response = admin_client.patch(
+        f"{api_url_v1}/users/me/",
+        data={
+            "first_name": "Darth",
+            "last_name": "Vader",
+        },
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_update_current_user_password(
     admin_client: APIClient, admin_user: models.User
 ):
@@ -154,6 +170,23 @@ def test_create_user(admin_client: APIClient):
 
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["is_superuser"] is False
+
+
+@pytest.mark.django_db
+def test_create_user_forbidden(
+    use_shared_resource_setting, admin_client: APIClient
+):
+    create_user_data = {
+        "username": "test.user",
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "test.user@example.com",
+        "password": "secret",
+    }
+
+    response = admin_client.post(f"{api_url_v1}/users/", data=create_user_data)
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -337,6 +370,19 @@ def test_partial_update_user(
 
 
 @pytest.mark.django_db
+def test_partial_update_user_forbidden(
+    use_shared_resource_setting,
+    admin_client: APIClient,
+    admin_user: models.User,
+):
+    data = {"first_name": "Anakin"}
+    response = admin_client.patch(
+        f"{api_url_v1}/users/{admin_user.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_delete_user(
     superuser_client: APIClient,
     default_user: models.User,
@@ -347,6 +393,18 @@ def test_delete_user(
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.User.objects.filter(id=default_user.id).count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_user_forbidden(
+    use_shared_resource_setting,
+    superuser_client: APIClient,
+    default_user: models.User,
+):
+    response = superuser_client.delete(
+        f"{api_url_v1}/users/{default_user.id}/"
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db

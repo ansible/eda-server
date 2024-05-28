@@ -28,7 +28,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 
-from .mixins import PartialUpdateOnlyModelMixin
+from .mixins import PartialUpdateOnlyModelMixin, SharedResourceViewMixin
 
 
 @extend_schema_view(
@@ -42,6 +42,7 @@ from .mixins import PartialUpdateOnlyModelMixin
         },
     ),
     create=extend_schema(
+        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
         description="Create a new organization",
         request=serializers.OrganizationCreateSerializer,
         responses={
@@ -49,16 +50,23 @@ from .mixins import PartialUpdateOnlyModelMixin
                 serializers.OrganizationSerializer,
                 description="Return the new organization.",
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Create is prohibited"
+            ),
         },
     ),
     partial_update=extend_schema(
+        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
         description="Partially update an organization",
         request=serializers.OrganizationCreateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.OrganizationSerializer,
                 description="Update successful. Return an updated organization.",  # noqa: E501
-            )
+            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Update is prohibited"
+            ),
         },
     ),
 )
@@ -69,6 +77,7 @@ class OrganizationViewSet(
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
+    SharedResourceViewMixin,
 ):
     queryset = models.Organization.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
@@ -87,6 +96,7 @@ class OrganizationViewSet(
         return serializers.OrganizationSerializer
 
     @extend_schema(
+        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
         description="Delete an organization by id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
@@ -95,9 +105,13 @@ class OrganizationViewSet(
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 None, description="Default Organization cannot be deleted."
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Delete is prohibited"
+            ),
         },
     )
     def destroy(self, request, *args, **kwargs):
+        self.validate_shared_resource()
         instance = self.get_object()
 
         if instance.name == settings.DEFAULT_ORGANIZATION_NAME:
