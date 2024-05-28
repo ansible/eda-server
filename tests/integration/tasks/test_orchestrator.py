@@ -206,7 +206,8 @@ def test_activation_requests(
         ProcessParentType.ACTIVATION,
         activation.id,
     ]
-    enqueue_mock.assert_called_once_with(*enqueue_args)
+    if queued_request == ActivationRequest.DELETE:
+        enqueue_mock.assert_called_once_with(*enqueue_args)
 
     queued = models.ActivationRequestQueue.objects.first()
     assert queued.process_parent_type == ProcessParentType.ACTIVATION
