@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """Module for Activation Manager."""
-
 import contextlib
 import logging
 import typing as tp
@@ -20,6 +19,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from pydantic import ValidationError
@@ -247,8 +247,9 @@ class ActivationManager(StatusManager):
 
         # update status
         self.set_status(ActivationStatus.RUNNING)
-        self.set_latest_instance_status(ActivationStatus.RUNNING)
-        self._set_activation_pod_id(pod_id=container_id)
+        with transaction.atomic():
+            self.set_latest_instance_status(ActivationStatus.RUNNING)
+            self._set_activation_pod_id(pod_id=container_id)
         self._reset_failure_count()
 
         # update logs
@@ -974,6 +975,7 @@ class ActivationManager(StatusManager):
             # For now, we are not changing the status of the activation
             return
 
+    @transaction.atomic
     def _create_activation_instance(self):
         git_hash = (
             self.db_instance.git_hash
