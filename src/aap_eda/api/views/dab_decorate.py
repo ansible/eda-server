@@ -41,6 +41,16 @@ for viewset_cls in [
                 ),
             },
         ),
+        update=extend_schema(
+            description=f"Update a {cls_name}.",
+            request=convert_to_create_serializer(viewset_cls.serializer_class),
+            responses={
+                status.HTTP_200_OK: OpenApiResponse(
+                    viewset_cls.serializer_class,
+                    description=f"Return an updated {cls_name}.",
+                ),
+            },
+        ),
     )(viewset_cls)
 
 
