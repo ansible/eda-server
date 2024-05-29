@@ -33,6 +33,8 @@ x-environment:
   - EDA_PGSSLKEY=${EDA_PGSSLKEY:-./postgres_ssl_config/certs/server.key}
   - EDA_PGSSLROOTCERT=${EDA_PGSSLROOTCERT:-./postgres_ssl_config/certs/ca.crt}
   - EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER: ${EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER:-100}
+  - EDA_DEFAULT_QUEUE_TIMEOUT: ${EDA_DEFAULT_QUEUE_TIMEOUT:-300}
+  - EDA_DEFAULT_RULEBOOK_QUEUE_TIMEOUT: ${EDA_DEFAULT_RULEBOOK_QUEUE_TIMEOUT:-120}
 
 services:
   podman-pre-setup:
@@ -175,7 +177,7 @@ services:
     image: certbot/certbot
     volumes:
       - ./postgres_ssl_config/certs:/etc/ssl/certs:z
-    entrypoint: 
+    entrypoint:
       - sh
       - -c
       - |
