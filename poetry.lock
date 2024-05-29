@@ -605,7 +605,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.5.18"
+version = "2024.4.25"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -622,20 +622,19 @@ djangorestframework = "*"
 inflection = "*"
 
 [package.extras]
-all = ["channels", "cryptography", "django-auth-ldap", "django-oauth-toolkit", "django-redis", "drf-spectacular", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+all = ["channels", "cryptography", "django-auth-ldap", "django-redis", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular"]
-authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 jwt-consumer = ["pyjwt", "requests"]
-oauth2-provider = ["django-oauth-toolkit"]
 redis-client = ["django-redis", "redis"]
 testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2024.5.18"
-resolved_reference = "08128f40c19367f126b3d1565d8296062cd66b53"
+reference = "2024.5.23"
+resolved_reference = "cac08144580bf6f579f3cf5b409c2b23a5db15ab"
 
 [[package]]
 name = "django-crum"
@@ -2406,4 +2405,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "0b6b34e24d025135025cbbc6b634bf9af8223556fc578c9c72938cbdb9707390"
+content-hash = "9a5a5c98a128f507505a84b1086212418ac5e3b95f15b4d45553bcff3ff0f8ba"
