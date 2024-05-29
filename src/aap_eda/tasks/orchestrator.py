@@ -480,3 +480,12 @@ def monitor_rulebook_processes() -> None:
             process_parent_id,
             None,
         )
+
+
+def monitor_rulebook_processes_unique() -> None:
+    """Wrap monitor_rulebook_processes to ensure only one task is enqueued."""
+    unique_enqueue(
+        "default",
+        "monitor_rulebook_processes",
+        monitor_rulebook_processes,
+    )
