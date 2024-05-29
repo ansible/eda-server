@@ -36,6 +36,7 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
+import time
 
 LOGGER = logging.getLogger(__name__)
 
@@ -471,7 +472,18 @@ def monitor_rulebook_processes() -> None:
     activation.
     """
     # run pending user requests
+    add_delay = False
     for request in requests_queue.list_requests():
+        if request.request in [
+            ActivationRequest.START,
+            ActivationRequest.AUTO_START,
+        ]:
+            if add_delay:
+                # Add a delay to avoid starting all processes at once
+                time.sleep(3)
+            else:
+                add_delay = True
+
         dispatch(
             request.process_parent_type,
             request.process_parent_id,
