@@ -174,7 +174,7 @@ services:
 
   eda-activation-worker-node1:
     deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-1}
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment:
       <<: *common-env
@@ -198,7 +198,7 @@ services:
 
   eda-activation-worker-node2:
     deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-1}
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
     image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment:
       <<: *common-env
