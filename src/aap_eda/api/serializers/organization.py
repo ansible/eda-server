@@ -19,9 +19,13 @@ from aap_eda.api import exceptions as api_exc
 from aap_eda.core.models import Organization
 
 from .fields.ansible_resource import AnsibleResourceFieldSerializer
+from .mixins import SharedResourceSerializerMixin
 
 
-class OrganizationSerializer(NamedCommonModelSerializer):
+class OrganizationSerializer(
+    NamedCommonModelSerializer,
+    SharedResourceSerializerMixin,
+):
     reverse_url_name = "organization-detail"
 
     resource = AnsibleResourceFieldSerializer(read_only=True)
@@ -40,6 +44,7 @@ class OrganizationSerializer(NamedCommonModelSerializer):
         ]
 
     def validate(self, data):
+        self.validate_shared_resource()
         # when creating a new org, self.instance is empty
         if (
             self.instance

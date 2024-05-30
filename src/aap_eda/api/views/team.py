@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django.conf import settings
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
@@ -19,6 +20,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.response import Response
 
 from aap_eda.api.filters import TeamFilter
 from aap_eda.api.serializers import (
@@ -29,7 +31,11 @@ from aap_eda.api.serializers import (
 )
 from aap_eda.core import models
 
-from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
+from .mixins import (
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
+    SharedResourceViewMixin,
+)
 
 
 @extend_schema_view(
@@ -43,12 +49,16 @@ from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
         },
     ),
     create=extend_schema(
+        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
         description="Create a new team",
         request=TeamCreateSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 TeamSerializer,
                 description="Return the new team.",
+            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Create is prohibited"
             ),
         },
     ),
@@ -61,13 +71,17 @@ from .mixins import CreateModelMixin, PartialUpdateOnlyModelMixin
         },
     ),
     partial_update=extend_schema(
+        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
         description="Partially update a team",
         request=TeamUpdateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 TeamSerializer,
                 description="Update successful. Return an updated team.",
-            )
+            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Update is prohibited"
+            ),
         },
     ),
 )
@@ -78,6 +92,7 @@ class TeamViewSet(
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
+    SharedResourceViewMixin,
 ):
     queryset = models.Team.objects.order_by("id")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
@@ -91,7 +106,7 @@ class TeamViewSet(
     def get_serializer_class(self):
         if self.action == "create":
             return TeamCreateSerializer
-        elif self.action == "update":
+        elif self.action == "partial_update":
             return TeamUpdateSerializer
         elif self.action == "retrieve":
             return TeamDetailSerializer
@@ -99,3 +114,22 @@ class TeamViewSet(
 
     def get_response_serializer_class(self):
         return TeamSerializer
+
+    @extend_schema(
+        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        description="Delete a team by id",
+        responses={
+            status.HTTP_204_NO_CONTENT: OpenApiResponse(
+                None, description="Delete successful."
+            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Delete is prohibited"
+            ),
+        },
+    )
+    def destroy(self, request, *args, **kwargs):
+        self.validate_shared_resource()
+
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
