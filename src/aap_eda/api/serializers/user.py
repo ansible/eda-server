@@ -1,3 +1,17 @@
+#  Copyright 2024 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -6,6 +20,7 @@ from aap_eda.api.exceptions import Conflict
 from aap_eda.core import models
 
 from .fields.ansible_resource import AnsibleResourceFieldSerializer
+from .mixins import SharedResourceSerializerMixin
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -73,7 +88,10 @@ class UserListSerializer(serializers.Serializer):
     resource = AnsibleResourceFieldSerializer(read_only=True)
 
 
-class UserUpdateSerializerBase(serializers.ModelSerializer):
+class UserUpdateSerializerBase(
+    serializers.ModelSerializer,
+    SharedResourceSerializerMixin,
+):
     username = serializers.CharField(
         help_text="The user's log in name.",
     )
@@ -95,6 +113,10 @@ class UserUpdateSerializerBase(serializers.ModelSerializer):
             if not self.context["request"].user.is_superuser:
                 raise PermissionDenied
         return value
+
+    def validate(self, data):
+        self.validate_shared_resource()
+        return data
 
 
 class UserCreateUpdateSerializer(UserUpdateSerializerBase):

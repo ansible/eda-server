@@ -107,6 +107,21 @@ def test_create_team(
 
 
 @pytest.mark.django_db
+def test_create_team_forbidden(
+    use_shared_resource_setting,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+):
+    data_in = {
+        "name": "test-team",
+        "description": "Test Team",
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(f"{api_url_v1}/teams/", data=data_in)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_retrieve_team(default_team: models.Team, admin_client: APIClient):
     response = admin_client.get(f"{api_url_v1}/teams/{default_team.id}/")
     assert response.status_code == status.HTTP_200_OK
@@ -136,6 +151,19 @@ def test_partial_update_team(
 
 
 @pytest.mark.django_db
+def test_partial_update_team_forbidden(
+    use_shared_resource_setting,
+    default_team: models.Team,
+    admin_client: APIClient,
+):
+    new_data = {"name": "new-name", "description": "New Description"}
+    response = admin_client.patch(
+        f"{api_url_v1}/teams/{default_team.id}/", data=new_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_delete_team_success(
     default_team: models.Team, admin_client: APIClient
 ):
@@ -143,6 +171,16 @@ def test_delete_team_success(
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert models.Team.objects.filter(pk=int(default_team.id)).count() == 0
+
+
+@pytest.mark.django_db
+def test_delete_team_forbidden(
+    use_shared_resource_setting,
+    default_team: models.Team,
+    admin_client: APIClient,
+):
+    response = admin_client.delete(f"{api_url_v1}/teams/{default_team.id}/")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db

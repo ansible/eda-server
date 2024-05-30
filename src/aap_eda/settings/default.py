@@ -600,6 +600,10 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
 
+DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED = settings.get(
+    "DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED", False
+)
+
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
 # ---------------------------------------------------------
