@@ -311,7 +311,7 @@ def test_max_running_activation_after_start_job(
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
 def test_monitor_rulebook_processes_unique(enqueue_mock):
-    orchestrator.monitor_rulebook_processes_unique()
+    orchestrator.enqueue_monitor_rulebook_processes()
     enqueue_mock.assert_called_once_with(
         "default",
         "monitor_rulebook_processes",
