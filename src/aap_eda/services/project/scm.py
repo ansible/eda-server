@@ -144,6 +144,7 @@ class ScmRepository:
         key_file = None
         key_password = None
         gpg_key_file = None
+        gpg_home_dir = None
         if credential:
             inputs = inputs_from_store(credential.inputs.get_secret_value())
             secret = inputs.get("password", "")
@@ -174,6 +175,8 @@ class ScmRepository:
             gpg_key_file.write("\n")
             gpg_key_file.flush()
             extra_vars["verify_commit"] = "true"
+            gpg_home_dir = tempfile.TemporaryDirectory()
+            env_vars["GNUPGHOME"] = gpg_home_dir.name
 
         if not verify_ssl:
             extra_vars["ssl_no_verify"] = "true"
@@ -196,7 +199,7 @@ class ScmRepository:
             if key_password:
                 cls.decrypt_key_file(key_file.name, key_password)
             if gpg_key_file:
-                cls.add_gpg_key(gpg_key_file.name)
+                cls.add_gpg_key(gpg_key_file.name, gpg_home_dir.name)
             with contextlib.chdir(path):
                 git_hash = _executor(extra_vars=extra_vars, env_vars=env_vars)
         except ScmError as e:
@@ -211,6 +214,7 @@ class ScmRepository:
                 key_file.close()
             if gpg_key_file:
                 gpg_key_file.close()
+                gpg_home_dir.cleanup()
         instance = cls(path, _executor=_executor)
         instance.git_hash = git_hash
         return instance
@@ -261,9 +265,12 @@ class ScmRepository:
             raise ScmError(msg)
 
     @classmethod
-    def add_gpg_key(cls, key_file: str) -> None:
+    def add_gpg_key(cls, key_file: str, home_dir: str) -> None:
         result = subprocess.run(
-            [GPG_COMMAND, "--import", key_file], capture_output=True, text=True
+            [GPG_COMMAND, "--import", key_file],
+            capture_output=True,
+            text=True,
+            env={"GNUPGHOME": home_dir},
         )
         if result.returncode != 0:
             logger.error(
