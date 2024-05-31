@@ -444,7 +444,9 @@ RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
     {
-        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
+        "func": (
+            "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
+        ),
         "interval": 5,
     },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
