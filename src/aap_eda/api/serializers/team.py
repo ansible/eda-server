@@ -17,6 +17,7 @@ from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
 
 from .fields.ansible_resource import AnsibleResourceFieldSerializer
+from .mixins import SharedResourceSerializerMixin
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -37,7 +38,10 @@ class TeamSerializer(serializers.ModelSerializer):
         ]
 
 
-class TeamCreateSerializer(serializers.ModelSerializer):
+class TeamCreateSerializer(
+    serializers.ModelSerializer,
+    SharedResourceSerializerMixin,
+):
     organization_id = serializers.IntegerField(
         required=True,
         validators=[validators.check_if_organization_exists],
@@ -50,6 +54,10 @@ class TeamCreateSerializer(serializers.ModelSerializer):
             "description",
             "organization_id",
         ]
+
+    def validate(self, data):
+        self.validate_shared_resource()
+        return data
 
 
 class TeamDetailSerializer(serializers.ModelSerializer):
@@ -71,10 +79,17 @@ class TeamDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-class TeamUpdateSerializer(serializers.ModelSerializer):
+class TeamUpdateSerializer(
+    serializers.ModelSerializer,
+    SharedResourceSerializerMixin,
+):
     class Meta:
         model = models.Team
         fields = [
             "name",
             "description",
         ]
+
+    def validate(self, data):
+        self.validate_shared_resource()
+        return data

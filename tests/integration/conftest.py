@@ -772,6 +772,12 @@ def use_debug_setting():
         yield
 
 
+@pytest.fixture
+def use_shared_resource_setting():
+    with override_settings(DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED=True):
+        yield
+
+
 # fixture for a running redis server
 @pytest.fixture
 def default_credential_type() -> models.CredentialType:
