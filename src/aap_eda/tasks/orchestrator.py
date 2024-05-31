@@ -403,11 +403,6 @@ def start_rulebook_process(
         process_parent_id,
         ActivationRequest.START,
     )
-    dispatch(
-        process_parent_type,
-        process_parent_id,
-        ActivationRequest.START,
-    )
 
 
 def stop_rulebook_process(
@@ -416,11 +411,6 @@ def stop_rulebook_process(
 ) -> None:
     """Create a request to stop the activation with the given id."""
     requests_queue.push(
-        process_parent_type,
-        process_parent_id,
-        ActivationRequest.STOP,
-    )
-    dispatch(
         process_parent_type,
         process_parent_id,
         ActivationRequest.STOP,
@@ -450,11 +440,6 @@ def restart_rulebook_process(
 ) -> None:
     """Create a request to restart the activation with the given id."""
     requests_queue.push(
-        process_parent_type,
-        process_parent_id,
-        ActivationRequest.RESTART,
-    )
-    dispatch(
         process_parent_type,
         process_parent_id,
         ActivationRequest.RESTART,
@@ -495,3 +480,12 @@ def monitor_rulebook_processes() -> None:
             process_parent_id,
             None,
         )
+
+
+def enqueue_monitor_rulebook_processes() -> None:
+    """Wrap monitor_rulebook_processes to ensure only one task is enqueued."""
+    unique_enqueue(
+        "default",
+        "monitor_rulebook_processes",
+        monitor_rulebook_processes,
+    )

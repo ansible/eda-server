@@ -407,8 +407,10 @@ if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
 if not RULEBOOK_WORKER_QUEUES:
     RULEBOOK_WORKER_QUEUES = ["activation"]
 
-DEFAULT_QUEUE_TIMEOUT = 300
-DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
+DEFAULT_QUEUE_TIMEOUT = settings.get("DEFAULT_QUEUE_TIMEOUT", 300)
+DEFAULT_RULEBOOK_QUEUE_TIMEOUT = settings.get(
+    "DEFAULT_RULEBOOK_QUEUE_TIMEOUT", 120
+)
 
 # Time window in seconds to consider a worker as dead
 DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
@@ -442,7 +444,9 @@ RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 RQ_STARTUP_JOBS = []
 RQ_PERIODIC_JOBS = [
     {
-        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
+        "func": (
+            "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
+        ),
         "interval": 5,
     },
     {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
@@ -576,7 +580,9 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
 
 
 ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
-ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get(
+    "ANSIBLE_RULEBOOK_FLUSH_AFTER", 100
+)
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE SETTINGS

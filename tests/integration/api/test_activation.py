@@ -68,9 +68,7 @@ def test_create_activation(
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
     assert activation.status_message == (
-        "There are no healthy queues to process the start request "
-        f"for activation {activation.id}. There may be an issue "
-        "with the system; please contact the administrator."
+        "Wait for a worker to be available to start activation"
     )
 
 
@@ -120,9 +118,7 @@ def test_create_activation_blank_text(
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
     assert activation.status_message == (
-        "There are no healthy queues to process the start request "
-        f"for activation {activation.id}. There may be an issue "
-        "with the system; please contact the administrator."
+        "Wait for a worker to be available to start activation"
     )
 
 
@@ -536,9 +532,7 @@ def test_enable_activation(
         default_activation.refresh_from_db()
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert default_activation.status_message == (
-            "There are no healthy queues to process the start request "
-            f"for activation {default_activation.id}. There may be an issue "
-            "with the system; please contact the administrator."
+            "Wait for a worker to be available to start activation"
         )
 
 

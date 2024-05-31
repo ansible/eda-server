@@ -206,7 +206,8 @@ def test_activation_requests(
         ProcessParentType.ACTIVATION,
         activation.id,
     ]
-    enqueue_mock.assert_called_once_with(*enqueue_args)
+    if queued_request == ActivationRequest.DELETE:
+        enqueue_mock.assert_called_once_with(*enqueue_args)
 
     queued = models.ActivationRequestQueue.objects.first()
     assert queued.process_parent_type == ProcessParentType.ACTIVATION
@@ -305,3 +306,14 @@ def test_max_running_activation_after_start_job(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
     ).count()
     assert running_processes == settings.MAX_RUNNING_ACTIVATIONS
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+def test_monitor_rulebook_processes_unique(enqueue_mock):
+    orchestrator.enqueue_monitor_rulebook_processes()
+    enqueue_mock.assert_called_once_with(
+        "default",
+        "monitor_rulebook_processes",
+        orchestrator.monitor_rulebook_processes,
+    )

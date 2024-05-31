@@ -704,12 +704,10 @@ def default_activation_instance_logs(
         [
             models.RulebookProcessLog(
                 log="activation-instance-log-1",
-                line_number=1,
                 activation_instance=default_activation_instances[0],
             ),
             models.RulebookProcessLog(
                 log="activation-instance-log-2",
-                line_number=2,
                 activation_instance=default_activation_instances[0],
             ),
         ]
