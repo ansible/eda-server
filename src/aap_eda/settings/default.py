@@ -407,8 +407,10 @@ if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
 if not RULEBOOK_WORKER_QUEUES:
     RULEBOOK_WORKER_QUEUES = ["activation"]
 
-DEFAULT_QUEUE_TIMEOUT = 300
-DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
+DEFAULT_QUEUE_TIMEOUT = settings.get("DEFAULT_QUEUE_TIMEOUT", 300)
+DEFAULT_RULEBOOK_QUEUE_TIMEOUT = settings.get(
+    "DEFAULT_RULEBOOK_QUEUE_TIMEOUT", 120
+)
 
 # Time window in seconds to consider a worker as dead
 DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
@@ -576,7 +578,9 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
 
 
 ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
-ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get(
+    "ANSIBLE_RULEBOOK_FLUSH_AFTER", 100
+)
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE SETTINGS

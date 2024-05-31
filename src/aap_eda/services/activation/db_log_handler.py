@@ -31,16 +31,13 @@ LOGGER = logging.getLogger(__name__)
 class DBLogger(LogHandler):
     def __init__(self, activation_instance_id: int):
         self.activation_instance_id = activation_instance_id
-        self.line_number = self.num_of_log_lines()
+        self.line_count = 0
         self.activation_instance_log_buffer = []
         if str(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER) == "end":
             self.incremental_flush = False
         else:
             self.flush_after = int(settings.ANSIBLE_RULEBOOK_FLUSH_AFTER)
             self.incremental_flush = True
-
-    def lines_written(self) -> int:
-        return self.line_number
 
     def write(
         self,
@@ -49,7 +46,9 @@ class DBLogger(LogHandler):
         timestamp: bool = True,
         log_timestamp: int = 0,
     ) -> None:
-        if self.incremental_flush and self.line_number % self.flush_after == 0:
+        if self.incremental_flush and (
+            (self.line_count % self.flush_after) == 0
+        ):
             self.flush()
 
         if not isinstance(lines, list):
@@ -62,13 +61,12 @@ class DBLogger(LogHandler):
 
             self.activation_instance_log_buffer.append(
                 models.RulebookProcessLog(
-                    line_number=self.num_of_log_lines(),
                     log=line,
                     activation_instance_id=self.activation_instance_id,
                     log_timestamp=log_timestamp,
                 )
             )
-            self.line_number += 1
+            self.line_count += 1
 
         if flush:
             self.flush()

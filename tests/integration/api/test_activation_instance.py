@@ -109,7 +109,6 @@ def test_list_logs_from_activation_instance(
     assert response_logs[0]["log"] == "activation-instance-log-1"
     assert list(response_logs[0]) == [
         "id",
-        "line_number",
         "log",
         "log_timestamp",
         "activation_instance",
