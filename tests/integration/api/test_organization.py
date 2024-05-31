@@ -118,6 +118,21 @@ def test_create_organization(
 
 
 @pytest.mark.django_db
+def test_create_organization_forbidden(
+    use_shared_resource_setting,
+    base_client: APIClient,
+    super_user: models.User,
+):
+    base_client.force_authenticate(user=super_user)
+    data_in = {
+        "name": "test-organization",
+        "description": "Test Organization",
+    }
+    response = base_client.post(f"{api_url_v1}/organizations/", data=data_in)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
 def test_retrieve_organization(
     default_organization: models.Organization, admin_client: APIClient
 ):
@@ -148,6 +163,19 @@ def test_partial_update_organization_success(
 
     new_organization.refresh_from_db()
     assert_organization_data(response.data, new_organization)
+
+
+@pytest.mark.django_db
+def test_partial_update_organization_forbidden(
+    use_shared_resource_setting,
+    new_organization: models.Organization,
+    superuser_client: APIClient,
+):
+    new_data = {"name": "new-name", "description": "New Description"}
+    response = superuser_client.patch(
+        f"{api_url_v1}/organizations/{new_organization.id}/", data=new_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
@@ -190,6 +218,18 @@ def test_delete_organization_conflict(
         f"{api_url_v1}/organizations/{default_organization.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
+
+
+@pytest.mark.django_db
+def test_delete_organization_forbidden(
+    use_shared_resource_setting,
+    new_organization: models.Organization,
+    superuser_client: APIClient,
+):
+    response = superuser_client.delete(
+        f"{api_url_v1}/organizations/{new_organization.id}/"
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
