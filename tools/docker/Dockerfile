@@ -11,6 +11,9 @@ RUN mkdir -p /var/lib/eda/redis-tls \
     && chmod 0775 /var/lib/eda/redis-tls
 COPY ./tools/docker/redis-tls /var/lib/eda/redis-tls
 
+
+COPY ./tools/docker/assets/wait-for-migrations /var/lib/eda/wait-for-migrations
+
 RUN DNF=dnf \
     INSTALL_PACKAGES="python3.11 \
     python3.11-devel \
