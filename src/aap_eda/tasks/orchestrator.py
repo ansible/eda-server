@@ -14,6 +14,7 @@
 
 import logging
 import random
+import time
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional, Union
@@ -463,7 +464,16 @@ def monitor_rulebook_processes() -> None:
     activation.
     """
     # run pending user requests
+    add_delay = False
     for request in requests_queue.list_requests():
+        if request.request in [
+            ActivationRequest.START,
+            ActivationRequest.AUTO_START,
+        ]:
+            if add_delay:
+                time.sleep(random.randint(2, 5))
+            else:
+                add_delay = True
         dispatch(
             request.process_parent_type,
             request.process_parent_id,
