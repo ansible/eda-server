@@ -195,6 +195,8 @@ class ActivationManager(StatusManager):
             "Creating a new activation instance for "
             f"activation: {self.db_instance.id}",
         )
+        if not self.check_new_process_allowed():
+            raise exceptions.MaxRunningProcessesError
         self._create_activation_instance()
 
         self.db_instance.refresh_from_db()
@@ -982,9 +984,6 @@ class ActivationManager(StatusManager):
             if hasattr(self.db_instance, "git_hash")
             else ""
         )
-
-        if not self.check_new_process_allowed():
-            raise exceptions.MaxRunningProcessesError
         args = {
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
