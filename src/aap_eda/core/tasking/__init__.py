@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import uuid
 from datetime import datetime, timedelta
 from types import MethodType
@@ -47,17 +48,33 @@ _ErrorHandlersArgType = Union[
 ]
 
 
+class NoServiceIdError(Exception):
+    ...
+
+
+def get_redis_prefix():
+    try:
+        return f"EDA-{service_id()[0:8]}-rq"
+    except ProgrammingError:
+        # service_id() will fail at the first migration when
+        # dab_resource_registry_serviceid has not been created
+        if any(
+            arg in sys.argv for arg in ["runserver", "scheduler", "rqworker"]
+        ):
+            raise NoServiceIdError(
+                "service_id is required to start the service"
+            )
+        logger.info("Failed ot get service_id. Continue")
+        return ""
+
+
 def enable_redis_prefix():
     if rq.worker_registration.REDIS_WORKER_KEYS != "rq:workers":
         # changes have been made
         return
 
-    try:
-        redis_prefix = f"EDA-{service_id()[0:8]}-rq"
-    except ProgrammingError:
-        # service_id() will fail at the first migration when
-        # dab_resource_registry_serviceid has not been created
-        logger.info("Failed to get service id")
+    redis_prefix = get_redis_prefix()
+    if not redis_prefix:
         return
 
     rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
