@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import random
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional, Union
@@ -333,7 +334,13 @@ def get_least_busy_queue_name() -> str:
             "No healthy queue found to dispatch the request",
         )
 
-    return queue_counter.most_common()[-1][0]
+    min_count = queue_counter.most_common()[-1][1]
+    least_common = [
+        queue for queue, count in queue_counter.items() if count == min_count
+    ]
+    if len(least_common) == 1:
+        return least_common[0]
+    return random.choice(least_common)
 
 
 def get_queue_name_by_parent_id(
