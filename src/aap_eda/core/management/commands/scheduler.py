@@ -127,7 +127,7 @@ def add_periodic_jobs(scheduler: Scheduler) -> None:
 def add_cron_jobs(scheduler: Scheduler) -> None:
     """Schedule cron jobs."""
     if not RQ_CRON_JOBS:
-        logger.info("No scheduled jobs. Skipping.")
+        logger.info("No cron jobs. Skipping.")
         return
 
     for entry in RQ_CRON_JOBS:
