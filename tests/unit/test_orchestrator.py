@@ -213,6 +213,33 @@ def two_queues_neither_responsive(monkeypatch):
     )
 
 
+@pytest.fixture
+def three_queues_two_candidates(monkeypatch):
+    return _mock_up_queues(
+        monkeypatch,
+        {
+            "queue1": {
+                "workers": {
+                    "worker1_1": {"responsive": True},
+                },
+                "process_count": 1,
+            },
+            "queue2": {
+                "workers": {
+                    "worker2_1": {"responsive": True},
+                },
+                "process_count": 1,
+            },
+            "queue3": {
+                "workers": {
+                    "worker3_1": {"responsive": True},
+                },
+                "process_count": 2,
+            },
+        },
+    )
+
+
 @pytest.mark.parametrize(
     "fixture",
     [
@@ -238,6 +265,17 @@ def test_get_least_busy_queue_name(fixture, request):
     else:
         with pytest.raises(HealthyQueueNotFoundError):
             get_least_busy_queue_name()
+
+
+def test_get_least_busy_queue_name_multiple_queues(
+    three_queues_two_candidates,
+):
+    expected_queues = [
+        "queue1",
+        "queue2",
+    ]
+    queue = get_least_busy_queue_name()
+    assert queue in expected_queues
 
 
 @pytest.fixture
