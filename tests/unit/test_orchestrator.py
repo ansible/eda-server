@@ -274,10 +274,8 @@ def test_get_least_busy_queue_name_multiple_queues(
         "queue1",
         "queue2",
     ]
-    unexpected_queue = "queue3"
     queue = get_least_busy_queue_name()
     assert queue in expected_queues
-    assert queue != unexpected_queue
 
 
 @pytest.fixture
