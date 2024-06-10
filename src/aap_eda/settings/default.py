@@ -83,6 +83,16 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
                              "target": "/var/run/containers/storage",
                              "type": "bind"}]'
 
+
+Django Ansible Base settings:
+For Resource Server the following are required when
+DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED is turned on:
+* RESOURCE_SERVER__URL - The URL to connect to the resource server
+* RESOURCE_SERVER__SECRET_KEY - The secret key needed to pull the resource list
+* RESOURCE_SERVER__VALIDATE_HTTPS - Whether to validate https, default to False
+* RESOURCE_JWT_USER_ID - The user id to connect to the resource server
+* RESOURCE_SERVICE_PATH - The path in the service server to fetch resources
+
 """
 import os
 from datetime import timedelta
@@ -635,6 +645,39 @@ ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
 
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}
+
+# --------------------------------------------------------
+# DJANGO ANSIBLE BASE RESOURCE API CLIENT
+# --------------------------------------------------------
+RESOURCE_SERVER = {
+    "URL": settings.get("RESOURCE_SERVER__URL", "https://localhost"),
+    "SECRET_KEY": settings.get("RESOURCE_SERVER__SECRET_KEY", ""),
+    "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
+}
+RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", "")
+RESOURCE_SERVICE_PATH = settings.get(
+    "RESOURCE_SERVICE_PATH", "/api/gateway/v1/service-index/"
+)
+
+if DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED:
+    if (
+        RESOURCE_SERVER["URL"]
+        and RESOURCE_SERVER["SECRET_KEY"]
+        and RESOURCE_JWT_USER_ID
+    ):
+        RQ_PERIODIC_JOBS.append(
+            {
+                "func": "aap_eda.tasks.shared_resources.resync_shared_resources",  # noqa E501
+                "interval": 900,
+                "id": "resync_shared_resources",
+            }
+        )
+    else:
+        raise ImproperlyConfigured(
+            "RESOURCE_SERVER__URL, RESOURCE_SERVER__SECRET_KEY, "
+            "and RESOURCE_JWT_USER_ID settings must be properly configured"
+        )
+
 
 ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
