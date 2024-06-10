@@ -18,9 +18,25 @@ from django.db.utils import IntegrityError
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
-from aap_eda.core.tasking import enqueue_delay
+from aap_eda.core.tasking import enqueue_delay, queue_cancel_job
 
 LOGGER = logging.getLogger(__name__)
+
+
+def auto_start_job_id(process_parent_type: str, id: int) -> str:
+    """Generate the auto-start job id for use in enqueuing and cancelling."""
+    return f"auto-start-{process_parent_type}-{id}"
+
+
+def system_cancel_restart_activation(
+    process_parent_type: str, id: int
+) -> None:
+    """Cancel the restart for the activation.
+
+    The restart may not exist.
+    """
+    LOGGER.debug(f"Cancelling auto-start for {process_parent_type} {id}")
+    queue_cancel_job("default", auto_start_job_id(process_parent_type, id))
 
 
 def system_restart_activation(
@@ -37,6 +53,7 @@ def system_restart_activation(
     )
     enqueue_delay(
         "default",
+        auto_start_job_id(process_parent_type, id),
         delay_seconds,
         _queue_auto_start,
         process_parent_type,

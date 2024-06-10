@@ -20,6 +20,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ProcessParentType
 from aap_eda.services.activation.restart_helper import (
     _queue_auto_start,
+    auto_start_job_id,
     system_restart_activation,
 )
 
@@ -45,6 +46,7 @@ def test_system_restart_activation(enqueue_mock, activation):
     system_restart_activation(ProcessParentType.ACTIVATION, activation.id, 5)
     enqueue_args = [
         "default",
+        auto_start_job_id(ProcessParentType.ACTIVATION, activation.id),
         5,
         _queue_auto_start,
         ProcessParentType.ACTIVATION,
