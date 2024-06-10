@@ -23,9 +23,9 @@ from aap_eda.core.enums import ProcessParentType
 from aap_eda.core.models import Activation, EventStream, RulebookProcess
 from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
+from aap_eda.tasks.exceptions import UnknownProcessParentType
 from aap_eda.tasks.orchestrator import (
     HealthyQueueNotFoundError,
-    UnknownProcessParentType,
     check_rulebook_queue_health,
     get_least_busy_queue_name,
     get_process_parent,

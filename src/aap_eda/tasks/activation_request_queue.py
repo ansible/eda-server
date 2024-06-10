@@ -12,18 +12,36 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django.db import transaction
 from django.db.models.query import QuerySet
+from django.db.utils import IntegrityError
 
-from aap_eda.core.enums import ActivationRequest
-from aap_eda.core.models import ActivationRequestQueue
+from aap_eda.core.enums import ActivationRequest, ProcessParentType
+from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
+
+from .exceptions import UnknownProcessParentType
 
 
+@transaction.atomic
 def push(parent_type: str, parent_id: int, request: ActivationRequest) -> None:
+    if parent_type == ProcessParentType.ACTIVATION:
+        model = Activation
+    elif parent_type == ProcessParentType.EVENT_STREAM:
+        model = EventStream
+    else:
+        raise UnknownProcessParentType(
+            f"Unknown parent type {parent_type}",
+        )
+
     ActivationRequestQueue.objects.create(
         process_parent_type=parent_type,
         process_parent_id=parent_id,
         request=request,
     )
+
+    # Check that the parent referenced still exists.
+    if not model.objects.filter(id=parent_id).exists():
+        raise IntegrityError
 
 
 def peek_all(parent_type: str, parent_id: int) -> list[ActivationRequestQueue]:

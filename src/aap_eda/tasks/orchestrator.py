@@ -38,17 +38,13 @@ from aap_eda.services.activation.activation_manager import (
     StatusManager,
 )
 
+from .exceptions import UnknownProcessParentType
+
 LOGGER = logging.getLogger(__name__)
 
 
 class HealthyQueueNotFoundError(Exception):
     """Raised when a queue is not found."""
-
-    ...
-
-
-class UnknownProcessParentType(Exception):
-    """Raised when the process parent type is unknown."""
 
     ...
 
