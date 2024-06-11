@@ -16,6 +16,7 @@ from django.db import models
 
 from aap_eda.core.enums import (
     ActivationStatus,
+    ProcessParentType,
     RestartPolicy,
     RulebookProcessLogLevel,
 )
@@ -23,11 +24,14 @@ from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .base import UniqueNamedModel
-from .mixins import StatusHandlerModelMixin
+from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 
 
 class EventStream(
-    StatusHandlerModelMixin, ContainerableMixin, UniqueNamedModel
+    StatusHandlerModelMixin,
+    ContainerableMixin,
+    OnDeleteProcessParentMixin,
+    UniqueNamedModel,
 ):
     """Model representing an event stream."""
 
@@ -107,3 +111,6 @@ class EventStream(
     def _get_skip_audit_events(self) -> bool:
         """Event stream skips audit events."""
         return True
+
+    def get_parent_type(self) -> str:
+        return ProcessParentType.EVENT_STREAM
