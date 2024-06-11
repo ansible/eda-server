@@ -49,7 +49,7 @@ from .mixins import (
         },
     ),
     create=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Create a new team",
         request=TeamCreateSerializer,
         responses={
@@ -71,7 +71,7 @@ from .mixins import (
         },
     ),
     partial_update=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Partially update a team",
         request=TeamUpdateSerializer,
         responses={
@@ -116,7 +116,7 @@ class TeamViewSet(
         return TeamSerializer
 
     @extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Delete a team by id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
