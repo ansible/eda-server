@@ -235,3 +235,16 @@ def check_credential_types(
         raise serializers.ValidationError(
             f"The type of credential can only be one of {names}"
         )
+
+
+def check_if_team_name_exists(name: str, organization_id: int):
+    if models.Team.objects.filter(
+        name=name, organization_id=organization_id
+    ).exists():
+        raise serializers.ValidationError(
+            {
+                "name": [
+                    "A team with this name already exists in the organization."
+                ]
+            }
+        )
