@@ -86,12 +86,11 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
 
 Django Ansible Base settings:
 For Resource Server the following are required when
-DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED is turned on:
+ALLOW_LOCAL_RESOURCE_MANAGEMENT is False:
 * RESOURCE_SERVER__URL - The URL to connect to the resource server
 * RESOURCE_SERVER__SECRET_KEY - The secret key needed to pull the resource list
 * RESOURCE_SERVER__VALIDATE_HTTPS - Whether to validate https, default to False
-* RESOURCE_JWT_USER_ID - The user id to connect to the resource server
-* RESOURCE_SERVICE_PATH - The path in the service server to fetch resources
+
 
 """
 import os
@@ -624,8 +623,8 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
 
-DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED = settings.get(
-    "DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED", False
+ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
+    "ALLOW_LOCAL_RESOURCE_MANAGEMENT", True
 )
 
 # ---------------------------------------------------------
@@ -654,29 +653,17 @@ RESOURCE_SERVER = {
     "SECRET_KEY": settings.get("RESOURCE_SERVER__SECRET_KEY", ""),
     "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
 }
-RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", "")
-RESOURCE_SERVICE_PATH = settings.get(
-    "RESOURCE_SERVICE_PATH", "/api/gateway/v1/service-index/"
-)
+RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
+RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
 
-if DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED:
-    if (
-        RESOURCE_SERVER["URL"]
-        and RESOURCE_SERVER["SECRET_KEY"]
-        and RESOURCE_JWT_USER_ID
-    ):
-        RQ_PERIODIC_JOBS.append(
-            {
-                "func": "aap_eda.tasks.shared_resources.resync_shared_resources",  # noqa E501
-                "interval": 900,
-                "id": "resync_shared_resources",
-            }
-        )
-    else:
-        raise ImproperlyConfigured(
-            "RESOURCE_SERVER__URL, RESOURCE_SERVER__SECRET_KEY, "
-            "and RESOURCE_JWT_USER_ID settings must be properly configured"
-        )
+if RESOURCE_SERVER["URL"] and RESOURCE_SERVER["SECRET_KEY"]:
+    RQ_PERIODIC_JOBS.append(
+        {
+            "func": "aap_eda.tasks.shared_resources.resync_shared_resources",
+            "interval": 900,
+            "id": "resync_shared_resources",
+        }
+    )
 
 
 ACTIVATION_DB_HOST = settings.get(

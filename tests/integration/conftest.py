@@ -771,7 +771,7 @@ def use_debug_setting():
 
 @pytest.fixture
 def use_shared_resource_setting():
-    with override_settings(DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED=True):
+    with override_settings(ALLOW_LOCAL_RESOURCE_MANAGEMENT=False):
         yield
 
 
