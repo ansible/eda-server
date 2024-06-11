@@ -57,7 +57,7 @@ class CurrentUserView(views.APIView):
         return Response(data=serializer.data)
 
     @extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         operation_id="update_current_user",
         description="Update current user.",
         request=serializers.CurrentUserUpdateSerializer,
@@ -164,7 +164,7 @@ class CurrentUserAwxTokenViewSet(
 
 @extend_schema_view(
     create=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Create a user",
         request=serializers.UserCreateUpdateSerializer,
         responses={
@@ -196,7 +196,7 @@ class CurrentUserAwxTokenViewSet(
         },
     ),
     partial_update=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Partial update of a user.",
         request=serializers.UserCreateUpdateSerializer,
         responses={
@@ -210,7 +210,7 @@ class CurrentUserAwxTokenViewSet(
         },
     ),
     destroy=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Delete a user by id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(

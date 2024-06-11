@@ -42,7 +42,7 @@ from .mixins import PartialUpdateOnlyModelMixin, SharedResourceViewMixin
         },
     ),
     create=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Create a new organization",
         request=serializers.OrganizationCreateSerializer,
         responses={
@@ -56,7 +56,7 @@ from .mixins import PartialUpdateOnlyModelMixin, SharedResourceViewMixin
         },
     ),
     partial_update=extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Partially update an organization",
         request=serializers.OrganizationCreateSerializer,
         responses={
@@ -96,7 +96,7 @@ class OrganizationViewSet(
         return serializers.OrganizationSerializer
 
     @extend_schema(
-        exclude=settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED,
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Delete an organization by id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(

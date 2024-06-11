@@ -19,7 +19,7 @@ from aap_eda.api import exceptions as api_exc
 
 class SharedResourceSerializerMixin:
     def validate_shared_resource(self):
-        if settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED:
+        if not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
             view = self.context.get("view")
             action = view.action.capitalize() if view else "Action"
             raise api_exc.Forbidden(
