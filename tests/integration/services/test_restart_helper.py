@@ -12,15 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import time
 from unittest import mock
 
 import pytest
+from django_rq import get_scheduler
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ProcessParentType
 from aap_eda.services.activation.restart_helper import (
     _queue_auto_start,
     auto_start_job_id,
+    system_cancel_restart_activation,
     system_restart_activation,
 )
 
@@ -38,6 +41,33 @@ def activation():
         name="test1",
         user=user,
     )
+
+
+@pytest.mark.django_db
+def test_system_cancel_restart_activation(activation):
+    job_id = auto_start_job_id(ProcessParentType.ACTIVATION, activation.id)
+
+    scheduler = get_scheduler(name="default")
+
+    delay = 5
+    system_restart_activation(
+        ProcessParentType.ACTIVATION, activation.id, delay
+    )
+
+    # Sleep for half the delay and verify the job is still in the scheduler.
+    time.sleep(delay / 2)
+    assert job_id in scheduler
+
+    # Cancel the job and verify that it's not in the scheduler.
+    system_cancel_restart_activation(
+        ProcessParentType.ACTIVATION, activation.id
+    )
+    assert job_id not in scheduler
+
+    # Sleep for half the delay and verify the job didn't somehow run; i.e., we
+    # really canceled it.
+    time.sleep(delay / 2)
+    assert models.ActivationRequestQueue.objects.count() == 0
 
 
 @pytest.mark.django_db
