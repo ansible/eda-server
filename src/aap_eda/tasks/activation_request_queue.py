@@ -41,7 +41,10 @@ def push(parent_type: str, parent_id: int, request: ActivationRequest) -> None:
 
     # Check that the parent referenced still exists.
     if not model.objects.filter(id=parent_id).exists():
-        raise IntegrityError
+        raise IntegrityError(
+            f"{parent_type} {parent_id} no longer exists, "
+            f"{request} request will not be processed",
+        )
 
 
 def peek_all(parent_type: str, parent_id: int) -> list[ActivationRequestQueue]:

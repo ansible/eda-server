@@ -67,8 +67,5 @@ def _queue_auto_start(process_parent_type: str, id: int) -> None:
         requests_queue.push(
             process_parent_type, id, ActivationRequest.AUTO_START
         )
-    except IntegrityError:
-        LOGGER.warning(
-            f"{process_parent_type} {id} no longer exists, "
-            "auto-start request will not be processed",
-        )
+    except IntegrityError as exc:
+        LOGGER.warning(exc)
