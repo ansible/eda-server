@@ -106,7 +106,7 @@ class ResponseSerializerMixin(object):
 
 class SharedResourceViewMixin:
     def validate_shared_resource(self):
-        if settings.DIRECT_SHARED_RESOURCE_MANAGEMENT_ENABLED:
+        if not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
             raise api_exc.Forbidden(
                 f"{self.action} should be done through the platform ingress"
             )
