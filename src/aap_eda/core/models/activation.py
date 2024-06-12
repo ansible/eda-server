@@ -16,6 +16,7 @@ from django.db import models
 
 from aap_eda.core.enums import (
     ActivationStatus,
+    ProcessParentType,
     RestartPolicy,
     RulebookProcessLogLevel,
 )
@@ -23,14 +24,18 @@ from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .base import BaseOrgModel, UniqueNamedModel
-from .mixins import StatusHandlerModelMixin
+from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
 
 
 class Activation(
-    StatusHandlerModelMixin, ContainerableMixin, BaseOrgModel, UniqueNamedModel
+    StatusHandlerModelMixin,
+    ContainerableMixin,
+    OnDeleteProcessParentMixin,
+    BaseOrgModel,
+    UniqueNamedModel,
 ):
     class Meta:
         db_table = "core_activation"
@@ -127,3 +132,6 @@ class Activation(
         blank=True,
         help_text="Name of the kubernetes service",
     )
+
+    def get_parent_type(self) -> str:
+        return ProcessParentType.ACTIVATION

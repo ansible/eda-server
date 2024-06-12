@@ -14,6 +14,7 @@
 
 import typing as tp
 
+from django.apps import apps
 from django.db import models
 
 from aap_eda.core.enums import ACTIVATION_STATUS_MESSAGE_MAP, ActivationStatus
@@ -98,3 +99,18 @@ class StatusHandlerModelMixin:
             ActivationStatus(self.status)
         except ValueError as error:
             raise UnknownStatusError(error) from None
+
+
+class OnDeleteProcessParentMixin:
+    """Mixin to delete related objects when the parent is deleted."""
+
+    def _delete_request_queue(self):
+        model = apps.get_model("core", "ActivationRequestQueue")
+        model.objects.filter(
+            process_parent_id=self.id,
+            process_parent_type=self.get_parent_type(),
+        ).delete()
+
+    def delete(self, *args, **kwargs):
+        self._delete_request_queue()
+        super().delete(*args, **kwargs)
