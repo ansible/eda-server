@@ -85,12 +85,11 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
 
 
 Django Ansible Base settings:
-For Resource Server the following are required when
-ALLOW_LOCAL_RESOURCE_MANAGEMENT is False:
+To configure a Resource Server for syncing of managed resources:
 * RESOURCE_SERVER__URL - The URL to connect to the resource server
 * RESOURCE_SERVER__SECRET_KEY - The secret key needed to pull the resource list
 * RESOURCE_SERVER__VALIDATE_HTTPS - Whether to validate https, default to False
-
+* ANSIBLE_BASE_MANAGED_ROLE_REGISTRY - Syncing of the Platform Auditor role
 
 """
 import os
@@ -655,6 +654,9 @@ RESOURCE_SERVER = {
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
 RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
+ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
+    "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
+)
 
 if RESOURCE_SERVER["URL"] and RESOURCE_SERVER["SECRET_KEY"]:
     RQ_PERIODIC_JOBS.append(
