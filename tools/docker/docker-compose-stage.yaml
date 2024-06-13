@@ -48,7 +48,7 @@ services:
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
-      - 8888:8888
+      - '${EDA_PODMAN_PORT:-8888}:8888'
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
     depends_on:
@@ -58,7 +58,7 @@ services:
     image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
     environment: *common-env
     ports:
-      - '8443:443'
+      - '${EDA_UI_PORT:-8443}:443'
     depends_on:
       eda-api:
         condition: service_healthy
@@ -77,7 +77,7 @@ services:
         -w ${EDA_API_WORKERS:-4} aap_eda.wsgi
         --access-logfile -
     ports:
-      - '8000:8000'
+      - '${EDA_API_PORT:-8000}:8000'
     depends_on:
       redis:
         condition: service_healthy
@@ -98,7 +98,7 @@ services:
       - >-
         daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
     ports:
-      - '8001:8000'
+      - '${EDA_WS_PORT:-8001}:8000'
     depends_on:
       eda-api:
         condition: service_healthy
@@ -167,7 +167,7 @@ services:
       POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
     ports:
-      - '5432:5432'
+      - '${EDA_PG_PORT:-5432}:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
     healthcheck:
@@ -180,7 +180,7 @@ services:
   redis:
     image: 'quay.io/fedora/redis-6:latest'
     ports:
-      - '6379:6379'
+      - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
       test: [ 'CMD', 'redis-cli', 'ping' ]
       interval: 5s
