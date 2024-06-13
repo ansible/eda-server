@@ -70,5 +70,25 @@ You can build an image with your changes and use that image in docker-compose
 
 You can now access the UI at <https://localhost:8443/overview/> with default login username and password(admin/testpass).
 
+## Start the app with aap-gateway
+
+To run EDA with aap-gateway service, we need to reconfigure the port numbers of api, ui and postgres pods to avoid conflicts with aap-gateway settings.
+By default aap-gateway service registers eda-api to the port 8010. We need to set following environmental variables:
+
+```
+# sync with the preset number
+export EDA_API_PORT=8010
+
+# solve the conflicts with gateway
+export EDA_PG_PORT=5433
+# only needs when 8443 is used in gateway side
+export EDA_UI_PORT=9443
+
+# The EDA_ANSIBLE_BASE_JWT_KEY has to match with the aap-gateway service settings
+# export EDA_ANSIBLE_BASE_JWT_KEY=https://{GATEWAY_HOST_ADDRESS}:{GATEWAY_PROXY_PORT}
+
+export EDA_ANSIBLE_BASE_JWT_KEY=https://host.containers.internal:8443
+```
+
 ## Layout
 ![Alt_PodmanDeployment](./podman_deployment.png?raw=true)
