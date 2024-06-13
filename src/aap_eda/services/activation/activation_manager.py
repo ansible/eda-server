@@ -32,6 +32,7 @@ from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerRequest
 from aap_eda.services.activation.restart_helper import (
+    system_cancel_restart_activation,
     system_restart_activation,
 )
 
@@ -772,6 +773,8 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg)
 
+        # Save the id; once the db instance is deleted the id is set to None.
+        saved_id = self.db_instance.id
         try:
             self.db_instance.delete()
         except (ObjectDoesNotExist, ValueError):
@@ -781,8 +784,15 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg)
             raise exceptions.ActivationManagerError(msg) from None
+
+        # Cancel any outstanding restart.
+        system_cancel_restart_activation(
+            self.db_instance_type,
+            saved_id,
+        )
+
         LOGGER.info(
-            f"Delete operation for activation id: {self.db_instance.id} "
+            f"Delete operation for activation id: {saved_id} "
             "Activation deleted.",
         )
 

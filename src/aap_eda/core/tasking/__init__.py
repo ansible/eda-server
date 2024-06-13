@@ -286,12 +286,22 @@ class ActivationWorker(_Worker):
         )
 
 
-def enqueue_delay(queue_name: str, delay: int, *args, **kwargs) -> Job:
+def enqueue_delay(
+    queue_name: str, job_id: str, delay: int, *args, **kwargs
+) -> Job:
     """Enqueue a job to run after specific seconds."""
     scheduler = get_scheduler(name=queue_name)
     return scheduler.enqueue_at(
-        datetime.utcnow() + timedelta(seconds=delay), *args, **kwargs
+        datetime.utcnow() + timedelta(seconds=delay),
+        job_id=job_id,
+        *args,
+        **kwargs,
     )
+
+
+def queue_cancel_job(queue_name: str, job_id: str) -> None:
+    scheduler = get_scheduler(name=queue_name)
+    scheduler.cancel(job_id)
 
 
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
