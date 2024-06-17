@@ -2,7 +2,7 @@
 repos:
   - repo: local
     hooks:
-      # This allows using either task or go-task, depending on what is installed
+      # This allows using task or go-task, depending on what is installed
       - id: black
         name: black
         language: system
