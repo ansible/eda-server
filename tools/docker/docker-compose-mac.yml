@@ -170,7 +170,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'quay.io/fedora/redis-6:latest'
+    image: 'docker.io/library/redis:6.2.14'
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
