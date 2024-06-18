@@ -79,22 +79,35 @@ openapi_urls = [
     ),
 ]
 
-v1_urls = [
-    path("status/", core_views.StatusView.as_view()),
-    path("", include(dab_urls)),
-    path("", include(resource_api_urls)),
+eda_v1_urls = [
+    path("status/", core_views.StatusView.as_view(), name="status"),
     path("", include(openapi_urls)),
-    path("auth/session/login/", views.SessionLoginView.as_view()),
-    path("auth/session/logout/", views.SessionLogoutView.as_view()),
+    path(
+        "auth/session/login/",
+        views.SessionLoginView.as_view(),
+        name="session-login",
+    ),
+    path(
+        "auth/session/logout/",
+        views.SessionLogoutView.as_view(),
+        name="session-logout",
+    ),
     path(
         "auth/token/refresh/",
         jwt_views.TokenRefreshView.as_view(),
-        name="token_refresh",
+        name="token-refresh",
     ),
-    path("users/me/", views.CurrentUserView.as_view()),
+    path("users/me/", views.CurrentUserView.as_view(), name="current-user"),
     *router.urls,
 ]
 
+dab_urls = [
+    path("", include(dab_urls)),
+    path("", include(resource_api_urls)),
+]
+
+v1_urls = eda_v1_urls + dab_urls
 urlpatterns = [
+    path("v1/", views.ApiV1RootView.as_view()),
     path("v1/", include(v1_urls)),
 ]
