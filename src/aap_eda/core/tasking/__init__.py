@@ -45,7 +45,7 @@ _ErrorHandlersArgType = Union[
 
 
 def enable_redis_prefix():
-    redis_prefix = settings.REDIS_PREFIX
+    redis_prefix = settings.RQ_REDIS_PREFIX
 
     rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
     rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"

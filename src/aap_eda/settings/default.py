@@ -369,7 +369,7 @@ REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
 REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
 REDIS_DB = settings.get("MQ_DB", 0)
-REDIS_PREFIX = settings.get("REDIS_PREFIX", "eda-rq")
+RQ_REDIS_PREFIX = settings.get("RQ_REDIS_PREFIX", "eda-rq")
 
 
 def _rq_common_parameters():
