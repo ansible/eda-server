@@ -2,17 +2,13 @@
 from __future__ import annotations
 
 import logging
-import sys
-import uuid
 from datetime import datetime, timedelta
 from types import MethodType
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
 import rq
 import rq_scheduler
-from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
-from django.db.utils import ProgrammingError
 from django_rq import enqueue, get_queue, get_scheduler, job
 from django_rq.queues import Queue as _Queue
 from rq import Connection, Worker as _Worker, results
@@ -48,34 +44,8 @@ _ErrorHandlersArgType = Union[
 ]
 
 
-class NoServiceIdError(Exception):
-    ...
-
-
-def get_redis_prefix():
-    try:
-        return f"EDA-{service_id()[0:8]}-rq"
-    except ProgrammingError:
-        # service_id() will fail at the first migration when
-        # dab_resource_registry_serviceid has not been created
-        if any(
-            arg in sys.argv for arg in ["runserver", "scheduler", "rqworker"]
-        ):
-            raise NoServiceIdError(
-                "service_id is required to start the service"
-            )
-        logger.info("Failed ot get service_id. Continue")
-        return ""
-
-
 def enable_redis_prefix():
-    if rq.worker_registration.REDIS_WORKER_KEYS != "rq:workers":
-        # changes have been made
-        return
-
-    redis_prefix = get_redis_prefix()
-    if not redis_prefix:
-        return
+    redis_prefix = settings.RQ_REDIS_PREFIX
 
     rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
     rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"
