@@ -1,6 +1,7 @@
 FROM quay.io/centos/centos:stream9
 
 ARG USER_ID=${USER_ID:-1001}
+ARG STATIC_ROOT=/var/lib/eda/static
 RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && mkdir -p /app/.local /var/lib/eda/ \
     && chown -R "${USER_ID}:0" /app/.local /var/lib/eda \
@@ -52,6 +53,7 @@ RUN poetry install -E all --no-root --no-cache \
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 RUN pip install ansible-core
+RUN EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear
 
 USER 0
 RUN for dir in \
