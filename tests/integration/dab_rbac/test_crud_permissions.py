@@ -149,10 +149,12 @@ def test_view_permissions(
     response = user_client.get(url, data={})
     assert response.status_code == 200, response.data
 
+    # Assure GET action is on OPTIONS
     # Assure no POST action on OPTIONS since user has no add permission
     response = user_client.options(url)
     assert response.status_code == 200
-    assert "actions" not in response.data
+    assert "GET" in response.data["actions"]
+    assert "POST" not in response.data["actions"]
 
 
 @pytest.mark.django_db
@@ -175,7 +177,10 @@ def test_change_permissions(
     # Test OPTIONS without sufficient permissions
     response = user_client.options(url)
     assert response.status_code == 200
-    assert "actions" not in response.data  # no PATCH or PUT
+    actions = response.data["actions"]
+    assert "GET" in actions
+    assert "PATCH" not in actions  # no PATCH or PUT
+    assert "PUT" not in actions
 
     # Give object change permission
     give_obj_perm(default_user, obj, "change")
@@ -185,8 +190,9 @@ def test_change_permissions(
     # Test OPTIONS
     response = user_client.options(url)
     assert response.status_code == 200
-    assert "actions" in response.data
-    assert "PATCH" in response.data["actions"]
+    actions = response.data["actions"]
+    assert "GET" in actions
+    assert "PATCH" in actions
 
 
 @pytest.mark.django_db

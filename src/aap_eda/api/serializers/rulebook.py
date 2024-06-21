@@ -91,7 +91,6 @@ class AuditRuleSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "description",
             "status",
             "created_at",
             "fired_at",
@@ -101,7 +100,6 @@ class AuditRuleSerializer(serializers.ModelSerializer):
             "activation_instance_id",
             "job_instance_id",
             "organization_id",
-            "definition",
         ]
         read_only_fields = ["id", "organization_id", "created_at"]
 
