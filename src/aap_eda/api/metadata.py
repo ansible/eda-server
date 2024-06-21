@@ -13,7 +13,9 @@ class EDAMetadata(metadata.SimpleMetadata):
         the fields that are accepted for 'PUT' and 'POST' methods.
         """
         actions = {}
-        for method in {"PUT", "PATCH", "POST"} & set(view.allowed_methods):
+        for method in {"GET", "PUT", "PATCH", "POST"} & set(
+            view.allowed_methods
+        ):
             view.request = clone_request(request, method)
             try:
                 # Test global permissions
