@@ -20,6 +20,8 @@ __all__ = ("CredentialType",)
 
 
 class CredentialType(BaseOrgModel, UniqueNamedModel):
+    router_basename = "credentialtype"
+
     class Meta:
         db_table = "core_credential_type"
         constraints = [

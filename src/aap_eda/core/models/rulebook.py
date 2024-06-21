@@ -87,6 +87,8 @@ class Rule(models.Model):
 
 
 class AuditRule(BaseOrgModel):
+    router_basename = "auditrule"
+
     class Meta:
         db_table = "core_audit_rule"
         indexes = [

@@ -22,6 +22,8 @@ __all__ = ("EdaCredential",)
 
 
 class EdaCredential(BaseOrgModel, UniqueNamedModel):
+    router_basename = "edacredential"
+
     class Meta:
         db_table = "core_eda_credential"
         constraints = [
