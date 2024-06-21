@@ -46,6 +46,7 @@ class ActionMessage(Message):
     delay: Optional[float]
     message: Optional[str]
     kind: Optional[str]
+    controller_job_id: Optional[str]
 
 
 class AnsibleEventMessage(Message):
