@@ -689,3 +689,7 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
     "SAFE_PLUGINS_FOR_PORT_FORWARD",
     ["ansible.eda.webhook", "ansible.eda.alertmanager"],
 )
+
+API_PATH_TO_UI_PATH_MAP = settings.get(
+    "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
+)
