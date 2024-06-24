@@ -39,7 +39,7 @@ x-environment: &common-env
 services:
   podman-pre-setup-node1:
     user: "0"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       chown -R podman /home/podman/.local/share/containers/storage
@@ -48,7 +48,7 @@ services:
 
   podman-pre-setup-node2:
     user: "0"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       chown -R podman /home/podman/.local/share/containers/storage
@@ -57,7 +57,7 @@ services:
 
   podman-node1:
     user: "1000"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
@@ -70,7 +70,7 @@ services:
 
   podman-node2:
     user: "1000"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
@@ -82,7 +82,7 @@ services:
      - podman-pre-setup-node2
 
   eda-ui:
-    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
     environment: *common-env
     ports:
       - '${EDA_UI_PORT:-8443}:443'
@@ -91,7 +91,7 @@ services:
         condition: service_healthy
 
   eda-api:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     build:
       context: ../../
       dockerfile: tools/docker/Dockerfile
@@ -123,7 +123,7 @@ services:
       - default
 
   eda-ws:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     environment: *common-env
     command:
       - /bin/bash
@@ -139,7 +139,7 @@ services:
       - '../../:/app/src:z'
 
   eda-scheduler:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
       replicas: ${EDA_SCHEDULER_WORKERS:-2}
     environment: *common-env
@@ -159,9 +159,9 @@ services:
       - '../../:/app/src:z'
 
   eda-default-worker:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
       replicas: ${EDA_DEFAULT_WORKERS:-2}
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
     command:
       - aap-eda-manage
@@ -180,9 +180,9 @@ services:
     restart: always
 
   eda-activation-worker-node1:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
       replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment:
       <<: *common-env
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node1'
@@ -204,9 +204,9 @@ services:
     restart: always
 
   eda-activation-worker-node2:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
       replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment:
       <<: *common-env
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
@@ -229,7 +229,7 @@ services:
 
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
+    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
@@ -247,7 +247,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'quay.io/fedora/redis-6:latest'
+    image: ${EDA_REDIS_IMAGE:-quay.io/fedora/redis-6}:${EDA_REDIS_VERSION:-latest}
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
@@ -258,9 +258,9 @@ services:
       start_period: 5s
 
   squid:
+    image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
     profiles:
       - proxy
-    image: 'quay.io/openshifttest/squid-proxy:1.2.0'
     hostname: squid
     volumes:
       - './squid/squid.conf:/etc/squid/squid.conf:z'
