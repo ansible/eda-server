@@ -45,7 +45,7 @@ x-environment:
 services:
   podman-pre-setup:
     user: "0"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       chown -R podman /home/podman/.local/share/containers/storage
@@ -54,7 +54,7 @@ services:
 
   podman:
     user: "1000"
-    image: quay.io/containers/podman:${EDA_PODMAN_VERSION:-v4}
+    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
@@ -66,7 +66,7 @@ services:
      - podman-pre-setup
 
   eda-ui:
-    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
     environment: *common-env
     ports:
       - '${EDA_UI_PORT:-8443}:443'
@@ -75,7 +75,7 @@ services:
         condition: service_healthy
 
   eda-api:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     build:
       context: ../../
       dockerfile: tools/docker/Dockerfile
@@ -104,7 +104,7 @@ services:
       - '../../:/app/src:z'
 
   eda-ws:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     environment: *common-env
     command:
       - /bin/bash
@@ -120,7 +120,7 @@ services:
       - '../../:/app/src:z'
 
   eda-scheduler:
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     environment: *common-env
     command:
       - /bin/bash
@@ -138,9 +138,9 @@ services:
       - '../../:/app/src:z'
 
   eda-default-worker:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
       replicas: ${EDA_DEFAULT_WORKERS:-1}
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
     environment: *common-env
     command:
       - aap-eda-manage
@@ -159,9 +159,9 @@ services:
     restart: always
 
   eda-activation-worker:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
       replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    image: "${EDA_IMAGE:-localhost/aap-eda}"
     command:
       - aap-eda-manage
       - rqworker
@@ -180,7 +180,7 @@ services:
     restart: always
 
   certs:
-    image: certbot/certbot
+    image: ${EDA_CERTBOT_IMAGE:-certbot/certbot}:${EDA_CERTBOT_VERSION:-latest}
     volumes:
       - ./postgres_ssl_config/certs:/etc/ssl/certs:z
     entrypoint:
@@ -192,12 +192,12 @@ services:
         openssl genrsa -out /etc/ssl/certs/server.key 2048
         openssl req -new -key /etc/ssl/certs/server.key -out /etc/ssl/certs/server.csr -subj "/CN=eda-postgres-1"
         openssl x509 -req -in /etc/ssl/certs/server.csr -CA /etc/ssl/certs/ca.crt -CAkey /etc/ssl/certs/ca.key -CAcreateserial -out /etc/ssl/certs/server.crt -days 3650
-        chmod 640 /etc/ssl/certs/*.crt
-        chmod 640 /etc/ssl/certs/*.key
+        chmod 600 /etc/ssl/certs/*.crt
+        chmod 600 /etc/ssl/certs/*.key
     restart: on-failure
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
+    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
@@ -216,10 +216,10 @@ services:
       retries: 3
       start_period: 5s
     depends_on:
-          - certs
+      - certs
 
   redis:
-    image: 'quay.io/fedora/redis-6:latest'
+    image: ${EDA_REDIS_IMAGE:-quay.io/fedora/redis-6}:${EDA_REDIS_VERSION:-latest}
     ports:
       - '${EDA_MQ_PORT:-6379}:6379'
     command:
