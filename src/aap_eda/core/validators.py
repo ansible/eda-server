@@ -77,14 +77,6 @@ def check_credential_types_for_activation(eda_credential_id: int) -> int:
     return eda_credential_id
 
 
-def check_credential_types_for_registry(eda_credential_id: int) -> int:
-    check_credential_types(
-        eda_credential_id, [enums.DefaultCredentialType.REGISTRY]
-    )
-
-    return eda_credential_id
-
-
 def check_credential_types_for_gpg(eda_credential_id: int) -> int:
     check_credential_types(
         eda_credential_id, [enums.DefaultCredentialType.GPG]
@@ -235,3 +227,22 @@ def check_credential_types(
         raise serializers.ValidationError(
             f"The type of credential can only be one of {names}"
         )
+
+
+def check_credential_registry_username_password(
+    eda_credential_id: int,
+) -> int:
+    credential = get_credential_if_exists(eda_credential_id)
+    name = credential.credential_type.name
+    if name != enums.DefaultCredentialType.REGISTRY.value:
+        raise serializers.ValidationError(
+            "The type of credential can only be one of "
+            f"['{enums.DefaultCredentialType.REGISTRY}']"
+        )
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    password = inputs.get("password", "")
+    if not password:
+        raise serializers.ValidationError(
+            "Need username and password or just token in credential"
+        )
+    return eda_credential_id

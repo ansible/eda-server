@@ -49,7 +49,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         validators=[
-            validators.check_credential_types_for_registry,
+            validators.check_credential_registry_username_password,
         ],
     )
 
