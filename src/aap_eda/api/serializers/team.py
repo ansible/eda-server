@@ -57,6 +57,9 @@ class TeamCreateSerializer(
 
     def validate(self, data):
         self.validate_shared_resource()
+        validators.check_if_team_name_exists(
+            data["name"], data["organization_id"]
+        )
         return data
 
 
