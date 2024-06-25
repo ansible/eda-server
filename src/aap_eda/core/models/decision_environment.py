@@ -20,6 +20,8 @@ __all__ = ("DecisionEnvironment",)
 
 
 class DecisionEnvironment(BaseOrgModel, UniqueNamedModel):
+    router_basename = "decisionenvironment"
+
     class Meta:
         db_table = "core_decision_environment"
         constraints = [
