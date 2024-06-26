@@ -35,6 +35,8 @@ class EventStream(
 ):
     """Model representing an event stream."""
 
+    router_basename = "eventstream"
+
     description = models.TextField(default="", blank=True)
     is_enabled = models.BooleanField(default=True)
     decision_environment = models.ForeignKey(

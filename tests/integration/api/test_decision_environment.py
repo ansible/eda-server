@@ -92,6 +92,60 @@ def test_create_decision_environment(
         assert status_message in response.data["eda_credential_id"]
 
 
+@pytest.mark.parametrize(
+    ("credential_inputs", "status_code", "status_message"),
+    [
+        (
+            {"host": "quay.io"},
+            status.HTTP_400_BAD_REQUEST,
+            "Need username and password or just token in credential",
+        ),
+        (
+            {"host": "quay.io", "username": "fred"},
+            status.HTTP_400_BAD_REQUEST,
+            "Need username and password or just token in credential",
+        ),
+        (
+            {"host": "quay.io", "password": "token1"},
+            status.HTTP_201_CREATED,
+            "",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_decision_environment_with_empty_credential(
+    default_registry_credential: models.EdaCredential,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+    credential_inputs,
+    status_code,
+    status_message,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(credential_inputs),
+    )
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "registry.com/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status_code
+    if status_message:
+        assert status_message in response.data["eda_credential_id"]
+
+
 @pytest.mark.django_db
 def test_create_decision_environment_bad_ids(admin_client: APIClient):
     bad_ids = [
