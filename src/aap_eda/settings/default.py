@@ -645,6 +645,8 @@ ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}
 
+ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
+
 # --------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCE API CLIENT
 # --------------------------------------------------------
