@@ -241,6 +241,9 @@ class UserViewSet(
 
     def filter_queryset(self, qs):
         qs = visible_users(self.request.user, queryset=qs)
+        if not self.kwargs or "pk" not in self.kwargs:
+            # TODO: hardcode for now, will need to use settings.SYSTEM_USERNAME
+            qs = qs.exclude(username="_system")
         return super().filter_queryset(qs)
 
     def get_serializer_class(self):

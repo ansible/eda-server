@@ -81,6 +81,11 @@ def admin_info() -> dict:
 
 
 @pytest.fixture
+def system_user():
+    return models.User.objects.create(username="_system")
+
+
+@pytest.fixture
 def admin_user(default_organization, admin_info):
     user = models.User.objects.create_user(
         username=admin_info["username"],
