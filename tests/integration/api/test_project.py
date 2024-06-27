@@ -586,14 +586,16 @@ def test_partial_update_project(
     new_project: models.Project,
     default_scm_credential: models.EdaCredential,
     default_gpg_credential: models.EdaCredential,
-    admin_client: APIClient,
+    superuser_client: APIClient,
 ):
     assert new_project.eda_credential_id is None
     assert new_project.signature_validation_credential_id is None
     assert new_project.verify_ssl is False
 
+    new_org = models.Organization.objects.create(name="new org")
     new_data = {
         "name": "new-project-updated",
+        "organization_id": new_org.id,
         "eda_credential_id": default_scm_credential.id,
         "signature_validation_credential_id": default_gpg_credential.id,
         "scm_branch": "main",
@@ -601,7 +603,7 @@ def test_partial_update_project(
         "verify_ssl": True,
         "proxy": "http://user:$encrypted$@myproxy.com",
     }
-    response = admin_client.patch(
+    response = superuser_client.patch(
         f"{api_url_v1}/projects/{new_project.id}/",
         data=new_data,
     )
@@ -609,6 +611,7 @@ def test_partial_update_project(
 
     new_project.refresh_from_db()
     assert new_project.name == new_data["name"]
+    assert new_project.organization.id == new_data["organization_id"]
     assert new_project.eda_credential.id == new_data["eda_credential_id"]
     assert (
         new_project.signature_validation_credential.id

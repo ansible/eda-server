@@ -43,6 +43,8 @@ class RulebookProcess(BaseOrgModel):
     that is created when an activation or event stream is started.
     """
 
+    router_basename = "activationinstance"
+
     name = models.TextField(null=False, default="")
     status = models.TextField(
         choices=ActivationStatus.choices(),

@@ -106,6 +106,11 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        validators=[validators.check_if_organization_exists],
+    )
     name = serializers.CharField(
         required=False,
         allow_blank=False,
@@ -171,6 +176,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
+            "organization_id",
             "eda_credential_id",
             "signature_validation_credential_id",
             "scm_branch",
