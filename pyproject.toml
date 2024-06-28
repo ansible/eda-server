@@ -52,6 +52,10 @@ django-split-settings = "^1.2.0"
 pexpect = "^4.9.0"
 ansible-runner = ">=2.3"
 python-gnupg = "^0.5.2"
+psycopg = "^3.1.17"
+xxhash = "*"
+pyjwt = { version="*", extras = ["cryptography"] }
+ecdsa = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

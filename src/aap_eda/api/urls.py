@@ -55,6 +55,12 @@ router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
 router.register("organizations", views.OrganizationViewSet)
 router.register("teams", views.TeamViewSet)
+router.register("webhooks", views.WebhookViewSet)
+router.register(
+    "external_webhook",
+    views.ExternalWebhookViewSet,
+    basename="external_webhook",
+)
 
 openapi_urls = [
     path(
