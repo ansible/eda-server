@@ -20,7 +20,7 @@ from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
 from .organization import OrganizationViewSet
 from .project import ProjectViewSet
-from .root import ApiV1RootView
+from .root import ApiRootView, ApiV1RootView
 from .rulebook import AuditRuleViewSet, RulebookViewSet
 from .team import TeamViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
@@ -53,4 +53,5 @@ __all__ = (
     "TeamViewSet",
     # root
     "ApiV1RootView",
+    "ApiRootView",
 )

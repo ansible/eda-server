@@ -17,6 +17,7 @@ import logging
 
 from django.conf import settings
 from django.urls import URLPattern, URLResolver
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -24,6 +25,18 @@ from rest_framework.views import APIView
 LOGGER = logging.getLogger(__name__)
 
 
+@extend_schema(exclude=True)
+class ApiRootView(APIView):
+    def get(self, request, *args, **kwargs):
+        v1 = reverse("api-v1-root", request=request)
+        data = {
+            "current_version": v1,
+            "available_versions": {"v1": v1},
+        }
+        return Response(data)
+
+
+@extend_schema(exclude=True)
 class ApiV1RootView(APIView):
     def get(self, request, *args, **kwargs):
         urls = get_api_v1_urls(request=request)
