@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import pytest
+from django.conf import settings
 
 from tests.integration.constants import api_url_v1
 
@@ -97,3 +98,14 @@ def test_v1_root(admin_client, request, expected_slugs, use_shared_resource):
         assert any(
             slug in url for url in response.data.values()
         ), f"Expected slug {slug} not found in response"
+
+
+@pytest.mark.django_db
+def test_api_root(admin_client):
+    response = admin_client.get(f"/{settings.API_PREFIX}/")
+    assert response.status_code == 200
+    assert "current_version" in response.data
+    assert "available_versions" in response.data
+    assert "v1" in response.data["available_versions"]
+    assert api_url_v1 in response.data["current_version"]
+    assert api_url_v1 in response.data["available_versions"]["v1"]
