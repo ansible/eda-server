@@ -319,9 +319,19 @@ def test_retrieve_user_details(
 
 
 @pytest.mark.django_db
+def test_retrieve_system_user(
+    superuser_client: APIClient, system_user: models.User
+):
+    response = superuser_client.get(f"{api_url_v1}/users/{system_user.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["id"] == system_user.id
+
+
+@pytest.mark.django_db
 def test_list_users(
     admin_client: APIClient,
     admin_user: models.User,
+    system_user: models.User,
 ):
     response = admin_client.get(f"{api_url_v1}/users/")
     assert response.status_code == status.HTTP_200_OK
@@ -339,6 +349,7 @@ def test_list_users(
             "resource_type": admin_user.resource.resource_type,
         },
     }
+    assert results[0]["id"] != system_user.id
 
 
 @pytest.mark.django_db
