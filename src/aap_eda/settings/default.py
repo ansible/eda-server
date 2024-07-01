@@ -301,7 +301,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = settings.get("STATIC_URL", "static/")
+STATIC_ROOT = settings.get("STATIC_ROOT", "/var/lib/eda/static")
 
 MEDIA_ROOT = settings.get("MEDIA_ROOT", "/var/lib/eda/files")
 
