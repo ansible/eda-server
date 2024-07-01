@@ -107,7 +107,9 @@ dab_urls = [
 ]
 
 v1_urls = eda_v1_urls + dab_urls
+
 urlpatterns = [
-    path("v1/", views.ApiV1RootView.as_view()),
     path("v1/", include(v1_urls)),
+    path("v1/", views.ApiV1RootView.as_view(), name="api-v1-root"),
+    path("", views.ApiRootView.as_view(), name="api-root"),
 ]
