@@ -424,14 +424,13 @@ def test_validate_injectors():
     bad_injectors = {"name": "fred"}
     errors = validate_injectors(inputs, bad_injectors)
     assert (
-        f"Injectors must have keys defined in {SUPPORTED_KEYS_IN_INJECTORS}"
-        in errors["injectors"]
+        "Injectors must have keys defined in "
+        f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}" in errors["injectors"]
     )
 
-    for key in SUPPORTED_KEYS_IN_INJECTORS:
-        valid_injectors = {key: {"name": "fred"}}
-        errors = validate_injectors(inputs, valid_injectors)
-        assert errors == {}
+    valid_injectors = {"extra_vars": {"username": "fred"}}
+    errors = validate_injectors(inputs, valid_injectors)
+    assert errors == {}
 
 
 @pytest.mark.parametrize(

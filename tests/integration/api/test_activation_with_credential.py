@@ -375,7 +375,7 @@ def test_create_activation_with_key_conflict(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         "Key: sasl_plain_password already exists "
-        "in extra var. It conflicts with credential type: type1. "
+        "in extra_vars. It conflicts with credential type: type1. "
         "Please check injectors." in response.data["non_field_errors"]
     )
 
@@ -423,7 +423,7 @@ def test_create_activation_with_conflict_credentials(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         "Key: sasl_password already exists "
-        "in extra var. It conflicts with credential type: user_type. "
+        "in extra_vars. It conflicts with credential type: user_type. "
         "Please check injectors." in response.data["non_field_errors"]
     )
 
@@ -507,7 +507,7 @@ def test_create_activation_without_extra_vars_duplicate_credentials(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        "Key: sasl_password already exists in extra var. It conflicts with"
+        "Key: sasl_password already exists in extra_vars. It conflicts with"
         " credential type: user_type. Please check injectors."
         in response.data["non_field_errors"]
     )
@@ -706,3 +706,85 @@ def test_create_activation_with_multip_aap_credentials(
         f"{len(aap_credentials)} RH AAP credentials"
         " are provided instead of 1" in response.data["eda_credentials"]
     )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_conflict_key_file_contents(
+    admin_client: APIClient,
+    activation_payload: Dict[str, Any],
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": activation_payload[
+            "decision_environment_id"
+        ],
+        "rulebook_id": activation_payload["rulebook_id"],
+        "organization_id": default_organization.id,
+    }
+
+    credential_type_inputs = {
+        "fields": [
+            {"id": "cert", "label": "Certificate", "type": "string"},
+            {"id": "key", "label": "Key", "type": "string"},
+        ]
+    }
+    credential_type_injectors = {
+        "file": {
+            "template.cert_file": "[mycert]\n{{ cert }}",
+        },
+    }
+    credential_type = models.CredentialType.objects.create(
+        name="sample_credential_type",
+        inputs=credential_type_inputs,
+        injectors=credential_type_injectors,
+    )
+
+    eda_credentials = [
+        _create_credential(
+            admin_client,
+            "credential-1",
+            {"cert": "my_pem_data", "key": "my_pem_key"},
+            credential_type.id,
+            default_organization.id,
+        ),
+        _create_credential(
+            admin_client,
+            "credential-2",
+            {"cert": "my_pem_data", "key": "my_pem_key"},
+            credential_type.id,
+            default_organization.id,
+        ),
+    ]
+
+    eda_credential_ids = [credential["id"] for credential in eda_credentials]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Key: template.cert_file already exists in file. "
+        "It conflicts with credential type: sample_credential_type. "
+        "Please check injectors." in response.data["non_field_errors"]
+    )
+
+
+def _create_credential(
+    api_client,
+    name: str,
+    inputs: dict,
+    credential_type_id: int,
+    organization_id: int,
+) -> dict:
+    data = {
+        "name": name,
+        "inputs": inputs,
+        "credential_type_id": credential_type_id,
+        "organization_id": organization_id,
+    }
+    response = api_client.post(f"{api_url_v1}/eda-credentials/", data=data)
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.data
