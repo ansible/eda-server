@@ -96,6 +96,7 @@ services:
       - /bin/bash
       - -c
       - >-
+        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
     ports:
       - '${EDA_WS_PORT:-8001}:8000'
@@ -110,6 +111,7 @@ services:
       - /bin/bash
       - -c
       - >-
+        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage scheduler
     depends_on:
       eda-api:
@@ -126,10 +128,12 @@ services:
       replicas: ${EDA_DEFAULT_WORKERS:-1}
     environment: *common-env
     command:
-      - aap-eda-manage
-      - rqworker
-      - --worker-class
-      - aap_eda.core.tasking.DefaultWorker
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -146,10 +150,12 @@ services:
       replicas: ${EDA_ACTIVATION_WORKERS:-2}
     environment: *common-env
     command:
-      - aap-eda-manage
-      - rqworker
-      - --worker-class
-      - aap_eda.core.tasking.ActivationWorker
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
