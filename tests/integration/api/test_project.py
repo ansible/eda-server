@@ -623,6 +623,21 @@ def test_partial_update_project(
 
 
 @pytest.mark.django_db
+def test_partial_update_project_null_organization_id(
+    default_project: models.Project, admin_client: APIClient
+):
+    data = {
+        "organization_id": None,
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/",
+        data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "This field may not be null." in str(response.data)
+
+
+@pytest.mark.django_db
 def test_partial_update_project_bad_proxy(
     default_project: models.Project, admin_client: APIClient
 ):

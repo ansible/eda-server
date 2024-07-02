@@ -108,7 +108,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
     organization_id = serializers.IntegerField(
         required=False,
-        allow_null=True,
+        allow_null=False,
         validators=[validators.check_if_organization_exists],
     )
     name = serializers.CharField(
