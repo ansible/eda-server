@@ -1022,7 +1022,19 @@ class ActivationManager(StatusManager):
 
     def _get_container_request(self) -> ContainerRequest:
         try:
-            return self.db_instance.get_container_request()
+            request = self.db_instance.get_container_request()
+
+            if request.credential and not request.image_url.startswith(
+                request.credential.host
+            ):
+                msg = (
+                    f"DecisionEnvironment image url: {request.image_url} does "
+                    "not match with the credential host: "
+                    f"{request.credential.host}"
+                )
+                raise engine_exceptions.ContainerRequestError(msg)
+
+            return request
         except ContainerableInvalidError:
             msg = (
                 f"Activation {self.db_instance.id} not valid, "

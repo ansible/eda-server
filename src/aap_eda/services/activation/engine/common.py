@@ -103,6 +103,7 @@ class AnsibleRulebookCmdLine(BaseModel):
 
 
 class Credential(BaseModel):
+    host: tp.Optional[str] = None
     username: str
     secret: str
 
@@ -228,6 +229,7 @@ class ContainerableMixin:
         if credential:
             inputs = inputs_from_store(credential.inputs.get_secret_value())
             return Credential(
+                host=inputs["host"],
                 username=inputs["username"],
                 secret=inputs["password"],
             )

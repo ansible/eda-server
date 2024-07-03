@@ -16,6 +16,7 @@
 import pytest
 
 from aap_eda.core import models
+from aap_eda.core.enums import DefaultCredentialType
 
 
 @pytest.fixture
@@ -24,6 +25,31 @@ def default_decision_environment() -> models.DecisionEnvironment:
     return models.DecisionEnvironment.objects.create(
         name="test-decision-environment",
         image_url="localhost:14000/test-image-url",
+    )
+
+
+@pytest.fixture
+def mismatch_decision_environment(
+    preseed_credential_types,
+) -> models.DecisionEnvironment:
+    """Return a default decision environment whose image_url does not
+    match with credential's host."""
+    aap_credential_type = models.CredentialType.objects.get(
+        name=DefaultCredentialType.AAP,
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mismatch_credential",
+        inputs={
+            "host": "mismatch.io",
+            "username": "Fred",
+            "password": "secret",
+        },
+        credential_type=aap_credential_type,
+    )
+    return models.DecisionEnvironment.objects.create(
+        name="test-decision-environment",
+        image_url="localhost:14000/test-image-url",
+        eda_credential_id=credential.id,
     )
 
 
