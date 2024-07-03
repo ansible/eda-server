@@ -224,7 +224,10 @@ class ActivationManager(StatusManager):
             self._error_instance(msg)
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
-        except engine_exceptions.ContainerImagePullError as exc:
+        except (
+            engine_exceptions.ContainerImagePullError,
+            engine_exceptions.ContainerLoginError,
+        ) as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: {exc}"
