@@ -150,4 +150,4 @@ jobs:
           EDAQA_ENV: default
           EDAQA_MULTINODE_EDA_SERVER_PATH: "../"
         run: |
-          pytest -vv -s eda_qa/tests/multinode-upstream
+          pytest -vv -s eda_qa/tests/whitebox/upstream
