@@ -28,6 +28,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from aap_eda.api import filters, serializers
 from aap_eda.core import models
+from aap_eda.utils import str_to_bool
 
 from .mixins import (
     CreateModelMixin,
@@ -177,15 +178,6 @@ class CurrentUserAwxTokenViewSet(
             ),
         },
     ),
-    list=extend_schema(
-        description="List all users",
-        responses={
-            status.HTTP_200_OK: OpenApiResponse(
-                serializers.UserListSerializer,
-                description="Return a list of users.",
-            ),
-        },
-    ),
     retrieve=extend_schema(
         description="Retrieve a user by their id",
         responses={
@@ -258,6 +250,27 @@ class UserViewSet(
 
     def get_response_serializer_class(self):
         return serializers.UserDetailSerializer
+
+    @extend_schema(
+        description="List all users",
+        request=None,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                serializers.UserListSerializer(many=True),
+                description="Return a list of users.",
+            ),
+        },
+    )
+    def list(self, request):
+        users = self.filter_queryset(self.get_queryset())
+        filter_superuser = request.query_params.get("is_superuser")
+        if filter_superuser:
+            users = users.filter(is_superuser=str_to_bool(filter_superuser))
+
+        serializer = serializers.UserListSerializer(users, many=True)
+        result = self.paginate_queryset(serializer.data)
+
+        return self.get_paginated_response(result)
 
     def destroy(self, request, *args, **kwargs):
         self.validate_shared_resource()

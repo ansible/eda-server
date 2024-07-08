@@ -353,6 +353,34 @@ def test_list_users(
 
 
 @pytest.mark.django_db
+def test_list_users_filter_superuser(
+    admin_client: APIClient,
+    admin_user: models.User,
+    super_user: models.User,
+):
+    response = admin_client.get(f"{api_url_v1}/users/")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+    assert len(results) == 2
+
+    # retrieve only superusers
+    response = admin_client.get(f"{api_url_v1}/users/?is_superuser=true")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+    assert len(results) == 1
+    assert results[0]["id"] == super_user.id
+    assert results[0]["is_superuser"] is True
+
+    # retrieve only non-superusers
+    response = admin_client.get(f"{api_url_v1}/users/?is_superuser=false")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.json()["results"]
+    assert len(results) == 1
+    assert results[0]["id"] == admin_user.id
+    assert results[0]["is_superuser"] is False
+
+
+@pytest.mark.django_db
 def test_partial_update_user(
     admin_client: APIClient,
     admin_user: models.User,
