@@ -13,10 +13,6 @@ class ContainerStartError(ContainerEngineError):
     """Raised when a container fails to start."""
 
 
-class ContainerRequestError(ContainerEngineError):
-    """Raised when a container request has mismatch error."""
-
-
 class ContainerImagePullError(ContainerEngineError):
     """Raised when a container fails to pull image."""
 

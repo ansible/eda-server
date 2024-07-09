@@ -82,17 +82,6 @@ def activation_with_instance(
 
 
 @pytest.fixture
-def activation_with_de_credential_instance(
-    activation_with_de_credential: models.Activation,
-) -> models.Activation:
-    """Return an activation with an instance."""
-    models.RulebookProcess.objects.create(
-        activation=activation_with_de_credential
-    )
-    return activation_with_de_credential
-
-
-@pytest.fixture
 def running_activation(activation_with_instance: models.Activation):
     """Return a running activation."""
     activation = activation_with_instance
@@ -117,24 +106,6 @@ def basic_activation(
         name="test-activation",
         user=default_user,
         decision_environment=default_decision_environment,
-        rulebook=default_rulebook,
-        # rulebook_rulesets is populated by the serializer
-        rulebook_rulesets=default_rulebook.rulesets,
-        log_level=enums.RulebookProcessLogLevel.INFO,
-    )
-
-
-@pytest.fixture
-def activation_with_de_credential(
-    default_user: models.User,
-    mismatch_decision_environment: models.DecisionEnvironment,
-    default_rulebook: models.Rulebook,
-) -> models.Activation:
-    """Return the minimal activation."""
-    return models.Activation.objects.create(
-        name="test-activation",
-        user=default_user,
-        decision_environment=mismatch_decision_environment,
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
@@ -242,20 +213,6 @@ def test_get_container_request_no_instance(
     )
     with pytest.raises(exceptions.ActivationManagerError):
         activation_manager._get_container_request()
-
-
-@pytest.mark.django_db
-def test_get_container_request_with_exception(
-    activation_with_de_credential_instance: models.Activation,
-    container_engine_mock: MagicMock,
-):
-    """Test to raise ContainerRequestError when mismatch."""
-    activation_manager = ActivationManager(
-        activation_with_de_credential_instance, container_engine_mock
-    )
-    with pytest.raises(engine_exceptions.ContainerRequestError) as exc:
-        activation_manager._get_container_request()
-    assert "does not match with the credential host" in str(exc.value)
 
 
 @pytest.mark.django_db
