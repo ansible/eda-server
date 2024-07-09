@@ -252,7 +252,7 @@ class UserViewSet(
         return serializers.UserDetailSerializer
 
     @extend_schema(
-        description="List all users",
+        description="List users",
         request=None,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
