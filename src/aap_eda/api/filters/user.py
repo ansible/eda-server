@@ -28,7 +28,11 @@ class UserFilter(django_filters.FilterSet):
         lookup_expr="iexact",
         label="Filter by resource ansible ID.",
     )
+    is_superuser = django_filters.BooleanFilter(
+        field_name="is_superuser",
+        label="Filter by superuser status.",
+    )
 
     class Meta:
         model = models.User
-        fields = ["username", "resource__ansible_id"]
+        fields = ["username", "resource__ansible_id", "is_superuser"]
