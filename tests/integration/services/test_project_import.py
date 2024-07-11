@@ -34,6 +34,8 @@ DATA_DIR = Path(__file__).parent / "data"
 
 
 class TestTempdirFactory:
+    __test__ = False
+
     def __init__(self):
         self.last_name = None
 
