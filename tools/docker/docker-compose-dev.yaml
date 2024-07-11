@@ -129,7 +129,6 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - "${EDA_WS_PORT:-8001}:8000"
@@ -148,7 +147,6 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage scheduler
     depends_on:
       eda-api:
@@ -166,12 +164,10 @@ services:
       replicas: ${EDA_DEFAULT_WORKERS:-2}
     environment: *common-env
     command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.DefaultWorker
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -192,12 +188,10 @@ services:
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node1'
       EDA_PODMAN_SOCKET_URL: tcp://podman-node1:8888
     command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -218,12 +212,10 @@ services:
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
       EDA_PODMAN_SOCKET_URL: tcp://podman-node2:8888
     command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
+      - aap-eda-manage
+      - rqworker
+      - --worker-class
+      - aap_eda.core.tasking.ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -234,6 +226,7 @@ services:
     volumes:
       - '../../:/app/src:z'
     restart: always
+
 
   postgres:
     image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
