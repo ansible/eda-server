@@ -198,6 +198,7 @@ INSTALLED_APPS = [
     "django_filters",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
+    "ansible_base.jwt_consumer",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
