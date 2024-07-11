@@ -110,7 +110,6 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - "${EDA_WS_PORT:-8001}:8000"
@@ -127,7 +126,6 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage scheduler
     depends_on:
       eda-api:
@@ -148,7 +146,6 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage rqworker
         --worker-class aap_eda.core.tasking.DefaultWorker
     depends_on:
@@ -170,7 +167,6 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage wait_for_migrations -t ${EDA_WAIT_FOR_MIGRATIONS_TIMEOUT:-30};
         aap-eda-manage rqworker
         --worker-class aap_eda.core.tasking.ActivationWorker
     environment: *common-env
