@@ -67,7 +67,11 @@ def test_create_decision_environment(
         description="Default Credential",
         credential_type=credential_type,
         inputs=inputs_to_store(
-            {"username": "dummy-user", "password": "dummy-password"}
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "registry.com",
+            }
         ),
     )
     data_in = {
@@ -107,6 +111,16 @@ def test_create_decision_environment(
         ),
         (
             {"host": "quay.io", "password": "token1"},
+            status.HTTP_400_BAD_REQUEST,
+            "does not match with the credential host",
+        ),
+        (
+            {"username": "Fred", "password": "token1"},
+            status.HTTP_400_BAD_REQUEST,
+            "needs to have host information",
+        ),
+        (
+            {"host": "registry.com", "password": "token1"},
             status.HTTP_201_CREATED,
             "",
         ),
@@ -143,7 +157,10 @@ def test_create_decision_environment_with_empty_credential(
     )
     assert response.status_code == status_code
     if status_message:
-        assert status_message in response.data["eda_credential_id"]
+        errors = response.data.get("eda_credential_id") or response.data.get(
+            "non_field_errors"
+        )
+        assert status_message in str(errors)
 
 
 @pytest.mark.django_db
@@ -231,7 +248,11 @@ def test_partial_update_decision_environment(
         description="Default Credential",
         credential_type=credential_type,
         inputs=inputs_to_store(
-            {"username": "dummy-user", "password": "dummy-password"}
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "quay.io",
+            }
         ),
     )
     data = {"eda_credential_id": credential.id}
@@ -243,6 +264,61 @@ def test_partial_update_decision_environment(
     assert response.status_code == status_code
     if status_message:
         assert status_message in response.data["eda_credential_id"]
+
+
+@pytest.mark.parametrize(
+    ("inputs", "status_code", "status_message"),
+    [
+        (
+            {
+                "username": "dummy-user",
+                "password": "secret",
+                "host": "quay.io",
+            },
+            status.HTTP_200_OK,
+            None,
+        ),
+        (
+            {
+                "username": "dummy-user",
+                "password": "secret",
+                "host": "registry.com",
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "does not match with the credential host",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_partial_update_decision_environment_with_image_url_and_host(
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
+    preseed_credential_types,
+    inputs,
+    status_code,
+    status_message,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(inputs),
+    )
+    data = {"eda_credential_id": credential.id, "image_url": "quay.io"}
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/",
+        data=data,
+    )
+    assert response.status_code == status_code
+    if status_message:
+        errors = response.data.get("eda_credential_id") or response.data.get(
+            "non_field_errors"
+        )
+        assert status_message in str(errors)
 
 
 @pytest.mark.django_db

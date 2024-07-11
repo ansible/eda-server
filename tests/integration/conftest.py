@@ -842,7 +842,11 @@ def default_registry_credential(
         description="Default Registry Credential",
         credential_type=registry_credential_type,
         inputs=inputs_to_store(
-            {"username": "dummy-user", "password": "dummy-password"}
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "quay.io",
+            }
         ),
         organization=default_organization,
     )
