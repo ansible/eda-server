@@ -45,17 +45,31 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     try:
         de = models.DecisionEnvironment.objects.get(pk=decision_environment_id)
         if de.eda_credential_id:
-            models.EdaCredential.objects.get(pk=de.eda_credential_id)
-    except models.EdaCredential.DoesNotExist:
-        raise serializers.ValidationError(
-            f"EdaCredential with id {de.eda_credential_id} does not exist"
-        )
+            check_if_de_valid(de.image_url, de.eda_credential_id)
     except models.DecisionEnvironment.DoesNotExist:
         raise serializers.ValidationError(
             f"DecisionEnvironment with id {decision_environment_id} "
             "does not exist"
         )
     return decision_environment_id
+
+
+def check_if_de_valid(image_url: str, eda_credential_id: int):
+    credential = get_credential_if_exists(eda_credential_id)
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    host = inputs.get("host")
+
+    if not host:
+        raise serializers.ValidationError(
+            f"Credential {credential.name} needs to have host information"
+        )
+
+    if not image_url.startswith(host):
+        msg = (
+            f"DecisionEnvironment image url: {image_url} does "
+            f"not match with the credential host: {host}"
+        )
+        raise serializers.ValidationError(msg)
 
 
 def get_credential_if_exists(eda_credential_id: int) -> models.EdaCredential:
