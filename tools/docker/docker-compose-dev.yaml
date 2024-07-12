@@ -81,14 +81,34 @@ services:
     depends_on:
      - podman-pre-setup-node2
 
-  eda-ui:
-    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
-    environment: *common-env
+  postgres:
+    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
+    environment:
+      POSTGRESQL_USER: eda
+      POSTGRESQL_PASSWORD: secret
+      POSTGRESQL_ADMIN_PASSWORD: secret
+      POSTGRESQL_DATABASE: eda
     ports:
-      - '${EDA_UI_PORT:-8443}:443'
-    depends_on:
-      eda-api:
-        condition: service_healthy
+      - '${EDA_PG_PORT:-5432}:5432'
+    volumes:
+      - 'postgres_data:/var/lib/pgsql/data'
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  redis:
+    image: ${EDA_REDIS_IMAGE:-quay.io/fedora/redis-6}:${EDA_REDIS_VERSION:-latest}
+    ports:
+      - '${EDA_REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: [ 'CMD', 'redis-cli', 'ping' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   eda-api:
     image: ${EDA_IMAGE:-localhost/aap-eda}
@@ -151,10 +171,6 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     volumes:
       - '../../:/app/src:z'
 
@@ -171,10 +187,6 @@ services:
         --worker-class aap_eda.core.tasking.DefaultWorker
     depends_on:
       eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     volumes:
       - '../../:/app/src:z'
@@ -197,10 +209,6 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     volumes:
       - '../../:/app/src:z'
     restart: always
@@ -222,42 +230,9 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     volumes:
       - '../../:/app/src:z'
     restart: always
-
-  postgres:
-    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
-    environment:
-      POSTGRESQL_USER: eda
-      POSTGRESQL_PASSWORD: secret
-      POSTGRESQL_ADMIN_PASSWORD: secret
-      POSTGRESQL_DATABASE: eda
-    ports:
-      - '${EDA_PG_PORT:-5432}:5432'
-    volumes:
-      - 'postgres_data:/var/lib/pgsql/data'
-    healthcheck:
-      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
-  redis:
-    image: ${EDA_REDIS_IMAGE:-quay.io/fedora/redis-6}:${EDA_REDIS_VERSION:-latest}
-    ports:
-      - '${EDA_REDIS_PORT:-6379}:6379'
-    healthcheck:
-      test: [ 'CMD', 'redis-cli', 'ping' ]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
 
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
@@ -269,6 +244,15 @@ services:
       - './squid/htpass:/etc/squid/htpass:z'
     ports:
       - '${EDA_PROXY_PORT:-3128}:3128'
+
+  eda-ui:
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
+    environment: *common-env
+    ports:
+      - '${EDA_UI_PORT:-8443}:443'
+    depends_on:
+      eda-api:
+        condition: service_healthy
 
 volumes:
   postgres_data: {}
