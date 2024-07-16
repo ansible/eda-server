@@ -13,10 +13,12 @@
 #  limitations under the License.
 
 import pytest
+from django.db.utils import IntegrityError
 
 import aap_eda.tasks.activation_request_queue as queue
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationRequest, ProcessParentType
+from aap_eda.tasks.exceptions import UnknownProcessParentType
 
 
 @pytest.fixture()
@@ -73,6 +75,28 @@ def test_queue(activations):
     assert (
         len(queue.peek_all(ProcessParentType.ACTIVATION, activations[0].id))
         == 0
+    )
+
+
+@pytest.mark.django_db
+def test_queue_push_exceptions():
+    parent_type = "unknown"
+    parent_id = 1
+
+    with pytest.raises(UnknownProcessParentType) as info:
+        queue.push(parent_type, parent_id, ActivationRequest.AUTO_START)
+    assert str(info.value) == f"Unknown parent type {parent_type}"
+
+    with pytest.raises(IntegrityError) as info:
+        queue.push(
+            ProcessParentType.ACTIVATION,
+            parent_id,
+            ActivationRequest.AUTO_START,
+        )
+    assert (
+        str(info.value)
+        == f"{ProcessParentType.ACTIVATION} {parent_id} no longer exists, "
+        f"{ActivationRequest.AUTO_START} request will not be processed"
     )
 
 

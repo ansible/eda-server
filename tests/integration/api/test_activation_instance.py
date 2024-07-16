@@ -30,9 +30,9 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 @pytest.mark.django_db
 def test_list_activation_instances(
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/activation-instances/")
+    response = admin_client.get(f"{api_url_v1}/activation-instances/")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == len(default_activation_instances)
 
@@ -40,10 +40,10 @@ def test_list_activation_instances(
 @pytest.mark.django_db
 def test_list_activation_instances_filter_name(
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
 ):
     filter_name = default_activation_instances[0].name
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activation-instances/?name={filter_name}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -57,10 +57,10 @@ def test_list_activation_instances_filter_name(
 @pytest.mark.django_db
 def test_list_activation_instances_filter_status(
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
 ):
     filter_name = enums.ActivationStatus.FAILED
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activation-instances/?status={filter_name}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -74,18 +74,20 @@ def test_list_activation_instances_filter_status(
 @pytest.mark.django_db
 def test_retrieve_activation_instance(
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
 ):
     instance = default_activation_instances[0]
-    response = client.get(f"{api_url_v1}/activation-instances/{instance.id}/")
+    response = admin_client.get(
+        f"{api_url_v1}/activation-instances/{instance.id}/"
+    )
 
     assert response.status_code == status.HTTP_200_OK
     assert_activation_instance_data(response.json(), instance)
 
 
 @pytest.mark.django_db
-def test_retrieve_activation_instance_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/activation-instances/42/")
+def test_retrieve_activation_instance_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/activation-instances/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -93,11 +95,11 @@ def test_retrieve_activation_instance_not_exist(client: APIClient):
 def test_list_logs_from_activation_instance(
     default_activation_instances: List[models.RulebookProcess],
     default_activation_instance_logs: List[models.RulebookProcessLog],
-    client: APIClient,
+    admin_client: APIClient,
 ):
     instance = default_activation_instances[0]
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activation-instances/{instance.id}/logs/"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -107,7 +109,6 @@ def test_list_logs_from_activation_instance(
     assert response_logs[0]["log"] == "activation-instance-log-1"
     assert list(response_logs[0]) == [
         "id",
-        "line_number",
         "log",
         "log_timestamp",
         "activation_instance",
@@ -118,11 +119,11 @@ def test_list_logs_from_activation_instance(
 def test_list_activation_instance_logs_filter(
     default_activation_instances: List[models.RulebookProcess],
     default_activation_instance_logs: List[models.RulebookProcessLog],
-    client: APIClient,
+    admin_client: APIClient,
 ):
     instance = default_activation_instances[0]
     filter_log = "log-1"
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activation-instances/{instance.id}"
         f"/logs/?log={filter_log}"
     )
@@ -138,12 +139,12 @@ def test_list_activation_instance_logs_filter(
 def test_list_activation_instance_logs_filter_non_existent(
     default_activation_instances: List[models.RulebookProcess],
     default_activation_instance_logs: List[models.RulebookProcessLog],
-    client: APIClient,
+    admin_client: APIClient,
 ):
     instance = default_activation_instances[0]
     filter_log = "doesn't exist"
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activation-instances/{instance.id}"
         f"/logs/?log={filter_log}"
     )
@@ -166,4 +167,5 @@ def assert_activation_instance_data(
         "ended_at": instance.ended_at,
         "status_message": enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
         "event_stream_id": None,
+        "queue_name": instance.rulebookprocessqueue.queue_name,
     }

@@ -13,15 +13,30 @@
 #  limitations under the License.
 
 import pytest
+import redis
 
 from aap_eda.settings import default
 
 
+#################################################################
+# Redis
+#################################################################
 @pytest.fixture
 def redis_parameters() -> dict:
     """Provide redis parameters based on settings values."""
     params = (
         default._rq_common_parameters() | default._rq_redis_client_parameters()
     )
+
     # Convert to lowercase for use in establishing a redis client.
-    return {k.lower(): v for (k, v) in params.items()}
+    params = {k.lower(): v for (k, v) in params.items()}
+
+    # We try to avoid conflicting with a deployed environment by using a
+    # different database from that of the settings.
+    # This is not guaranteed as the deployed environment could be differently
+    # configured from the default, but in development it should be fine.
+    client = redis.Redis(**params)
+    max_dbs = int(client.config_get("databases")["databases"])
+    params["db"] = (params["db"] + 1) % max_dbs
+
+    return params

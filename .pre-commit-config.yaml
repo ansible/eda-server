@@ -2,32 +2,33 @@
 repos:
   - repo: local
     hooks:
+      # CMD logic allows using task or go-task, depending on what is installed
       - id: black
         name: black
         language: system
         types: [python]
-        entry: task lint:black --
+        entry: command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} lint:black --
       - id: isort
         name: isort
         language: system
         types: [python]
-        entry: task lint:isort --
+        entry: command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} lint:isort --
       - id: ruff
         name: ruff
         language: system
         types: [python]
-        entry: task lint:ruff --
+        entry: command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} lint:ruff --
       - id: flake8
         name: flake8
         language: system
         types: [python]
-        entry: task lint:flake8 --
+        entry: command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} lint:flake8 --
       - id: migrations
         name: migrations
         language: system
         types: [python]
         pass_filenames: false
-        entry: task lint:migrations
+        entry: command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} lint:migrations
   - repo: https://github.com/python-poetry/poetry
     rev: '1.4.0'
     hooks:

@@ -4,48 +4,167 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import inputs_to_store
 from tests.integration.constants import api_url_v1
 
 
 @pytest.mark.django_db
 def test_list_decision_environments(
-    default_de: models.DecisionEnvironment, client: APIClient
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
-    response = client.get(f"{api_url_v1}/decision-environments/")
+    response = admin_client.get(f"{api_url_v1}/decision-environments/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data["results"][0]
-    assert_de_base_data(result, default_de)
-    assert_de_fk_data(result, default_de)
+    assert_de_base_data(result, default_decision_environment)
+    assert_de_fk_data(result, default_decision_environment)
 
 
+@pytest.mark.parametrize(
+    ("credential_type", "status_code", "status_message"),
+    [
+        (
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_201_CREATED,
+            None,
+        ),
+    ],
+)
 @pytest.mark.django_db
 def test_create_decision_environment(
-    default_eda_credential: models.EdaCredential,
+    default_registry_credential: models.EdaCredential,
     default_organization: models.Organization,
-    client: APIClient,
+    admin_client: APIClient,
+    preseed_credential_types,
+    credential_type,
+    status_code,
+    status_message,
 ):
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "registry.com",
+            }
+        ),
+    )
     data_in = {
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
         "organization_id": default_organization.id,
-        "eda_credential_id": default_eda_credential.id,
+        "eda_credential_id": credential.id,
     }
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
     )
-    assert response.status_code == status.HTTP_201_CREATED
-    id_ = response.data["id"]
-    result = response.data
-    result.pop("created_at")
-    result.pop("modified_at")
-    assert result == {"id": id_, **data_in}
-    assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
+    assert response.status_code == status_code
+    if status_code == status.HTTP_201_CREATED:
+        id_ = response.data["id"]
+        result = response.data
+        result.pop("created_at")
+        result.pop("modified_at")
+        assert result == {"id": id_, **data_in}
+        assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
+    else:
+        assert status_message in response.data["eda_credential_id"]
+
+
+@pytest.mark.parametrize(
+    ("credential_inputs", "status_code", "status_message"),
+    [
+        (
+            {"host": "quay.io"},
+            status.HTTP_400_BAD_REQUEST,
+            "Need username and password or just token in credential",
+        ),
+        (
+            {"host": "quay.io", "username": "fred"},
+            status.HTTP_400_BAD_REQUEST,
+            "Need username and password or just token in credential",
+        ),
+        (
+            {"host": "quay.io", "password": "token1"},
+            status.HTTP_400_BAD_REQUEST,
+            "does not match with the credential host",
+        ),
+        (
+            {"username": "Fred", "password": "token1"},
+            status.HTTP_400_BAD_REQUEST,
+            "needs to have host information",
+        ),
+        (
+            {"host": "registry.com", "password": "token1"},
+            status.HTTP_201_CREATED,
+            "",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_decision_environment_with_empty_credential(
+    default_registry_credential: models.EdaCredential,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+    credential_inputs,
+    status_code,
+    status_message,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(credential_inputs),
+    )
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "registry.com/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status_code
+    if status_message:
+        errors = response.data.get("eda_credential_id") or response.data.get(
+            "non_field_errors"
+        )
+        assert status_message in str(errors)
 
 
 @pytest.mark.django_db
-def test_create_decision_environment_bad_ids(client: APIClient):
+def test_create_decision_environment_bad_ids(admin_client: APIClient):
     bad_ids = [
         {"organization_id": 3000001},
         {"eda_credential_id": 3000001},
@@ -56,7 +175,7 @@ def test_create_decision_environment_bad_ids(client: APIClient):
         "image_url": "registry.com/img1:tag1",
     }
     for bad_id in bad_ids:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/decision-environments/", data=data_in | bad_id
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -65,54 +184,157 @@ def test_create_decision_environment_bad_ids(client: APIClient):
 
 @pytest.mark.django_db
 def test_retrieve_decision_environment(
-    default_de: models.DecisionEnvironment, client: APIClient
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
-    response = client.get(
-        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    response = admin_client.get(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/"
     )
     assert response.status_code == status.HTTP_200_OK
 
-    assert_de_base_data(response.data, default_de)
-    assert_de_related_data(response.data, default_de)
+    assert_de_base_data(response.data, default_decision_environment)
+    assert_de_related_data(response.data, default_decision_environment)
 
 
 @pytest.mark.django_db
-def test_retrieve_decision_environment_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/decision-environments/42/")
+def test_retrieve_decision_environment_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/decision-environments/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.parametrize(
+    ("credential_type", "status_code", "status_message"),
+    [
+        (
+            enums.DefaultCredentialType.VAULT,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.AAP,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.GPG,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.SOURCE_CONTROL,
+            status.HTTP_400_BAD_REQUEST,
+            "The type of credential can only be one of ['Container Registry']",
+        ),
+        (
+            enums.DefaultCredentialType.REGISTRY,
+            status.HTTP_200_OK,
+            None,
+        ),
+    ],
+)
 @pytest.mark.django_db
 def test_partial_update_decision_environment(
-    default_de: models.DecisionEnvironment,
-    default_vault_credential: models.EdaCredential,
-    client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
+    preseed_credential_types,
+    credential_type,
+    status_code,
+    status_message,
 ):
-    data = {"eda_credential_id": default_vault_credential.id}
-    response = client.patch(
-        f"{api_url_v1}/decision-environments/{default_de.id}/", data=data
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "quay.io",
+            }
+        ),
     )
-    assert response.status_code == status.HTTP_200_OK
+    data = {"eda_credential_id": credential.id}
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/",
+        data=data,
+    )
+    assert response.status_code == status_code
+    if status_message:
+        assert status_message in response.data["eda_credential_id"]
 
-    default_de.refresh_from_db()
-    assert_de_base_data(response.data, default_de)
-    assert_de_fk_data(response.data, default_de)
 
-    assert default_de.eda_credential == default_vault_credential
+@pytest.mark.parametrize(
+    ("inputs", "status_code", "status_message"),
+    [
+        (
+            {
+                "username": "dummy-user",
+                "password": "secret",
+                "host": "quay.io",
+            },
+            status.HTTP_200_OK,
+            None,
+        ),
+        (
+            {
+                "username": "dummy-user",
+                "password": "secret",
+                "host": "registry.com",
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "does not match with the credential host",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_partial_update_decision_environment_with_image_url_and_host(
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
+    preseed_credential_types,
+    inputs,
+    status_code,
+    status_message,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        inputs=inputs_to_store(inputs),
+    )
+    data = {"eda_credential_id": credential.id, "image_url": "quay.io"}
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/",
+        data=data,
+    )
+    assert response.status_code == status_code
+    if status_message:
+        errors = response.data.get("eda_credential_id") or response.data.get(
+            "non_field_errors"
+        )
+        assert status_message in str(errors)
 
 
 @pytest.mark.django_db
 def test_partial_update_decision_environment_bad_ids(
-    default_de: models.DecisionEnvironment,
-    client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
     bad_ids = [
         {"organization_id": 3000001},
         {"eda_credential_id": 3000001},
     ]
     for bad_id in bad_ids:
-        response = client.patch(
-            f"{api_url_v1}/decision-environments/{default_de.id}/", data=bad_id
+        response = admin_client.patch(
+            f"{api_url_v1}/decision-environments/"
+            f"{default_decision_environment.id}/",
+            data=bad_id,
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "id 3000001 does not exist" in str(response.json())
@@ -120,28 +342,31 @@ def test_partial_update_decision_environment_bad_ids(
 
 @pytest.mark.django_db
 def test_delete_decision_environment_conflict(
-    default_de: models.DecisionEnvironment,
+    default_decision_environment: models.DecisionEnvironment,
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.delete(
-        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    response = admin_client.delete(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db
 def test_delete_decision_environment_success(
-    default_de: models.DecisionEnvironment, client: APIClient
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
 ):
-    response = client.delete(
-        f"{api_url_v1}/decision-environments/{default_de.id}/"
+    response = admin_client.delete(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     assert (
         models.DecisionEnvironment.objects.filter(
-            pk=int(default_de.id)
+            pk=int(default_decision_environment.id)
         ).count()
         == 0
     )
@@ -149,10 +374,10 @@ def test_delete_decision_environment_success(
 
 @pytest.mark.django_db
 def test_delete_decision_environment_force(
-    default_activation: models.Activation, client: APIClient
+    default_activation: models.Activation, admin_client: APIClient
 ):
     de_id = default_activation.decision_environment.id
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/decision-environments/{de_id}/?force=True"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT

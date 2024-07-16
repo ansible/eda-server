@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from types import MethodType
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+import rq
+import rq_scheduler
 from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
 from django_rq.queues import Queue as _Queue
-from rq import Connection, Worker as _Worker
+from rq import Connection, Worker as _Worker, results
 from rq.defaults import (
     DEFAULT_JOB_MONITORING_INTERVAL,
     DEFAULT_RESULT_TTL,
@@ -39,6 +42,66 @@ _ErrorHandlersArgType = Union[
     ErrorHandlerType,
     None,
 ]
+
+
+def enable_redis_prefix():
+    redis_prefix = settings.RQ_REDIS_PREFIX
+
+    rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
+    rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"
+    rq.queue.Queue.redis_queue_namespace_prefix = f"{redis_prefix}:queue:"
+    rq.queue.Queue.redis_queues_keys = f"{redis_prefix}:queues"
+    rq.worker.Worker.redis_worker_namespace_prefix = f"{redis_prefix}:worker:"
+    rq.worker.Worker.redis_workers_keys = f"{redis_prefix}:workers"
+    rq.job.Job.redis_job_namespace_prefix = f"{redis_prefix}:job:"
+    rq.registry.BaseRegistry.key_template = f"{redis_prefix}:registry:{0}"
+    rq.registry.StartedJobRegistry.key_template = f"{redis_prefix}:wip:{0}"
+    rq.registry.FinishedJobRegistry.key_template = (
+        f"{redis_prefix}:finished:{0}"
+    )
+    rq.registry.FailedJobRegistry.key_template = f"{redis_prefix}:failed:{0}"
+    rq.registry.DeferredJobRegistry.key_template = (
+        f"{redis_prefix}:deferred:{0}"
+    )
+    rq.registry.ScheduledJobRegistry.key_template = (
+        f"{redis_prefix}:scheduled:{0}"
+    )
+    rq.registry.CanceledJobRegistry.key_template = (
+        f"{redis_prefix}:canceled:{0}"
+    )
+
+    rq_scheduler.Scheduler.redis_scheduler_namespace_prefix = (
+        f"{redis_prefix}:scheduler_instance:"
+    )
+    rq_scheduler.Scheduler.scheduler_key = f"{redis_prefix}:scheduler"
+    rq_scheduler.Scheduler.scheduler_lock_key = (
+        f"{redis_prefix}:scheduler_lock"
+    )
+    rq_scheduler.Scheduler.scheduled_jobs_key = (
+        f"{redis_prefix}:scheduler:scheduled_jobs"
+    )
+
+    def eda_get_key(job_id):
+        return f"{redis_prefix}:results:{job_id}"
+
+    results.get_key = eda_get_key
+
+    def cls_get_key(cls, job_id):
+        return f"{redis_prefix}:results:{job_id}"
+
+    results.Result.get_key = MethodType(cls_get_key, results.Result)
+
+    def property_registry_cleaning_key(self):
+        return f"{redis_prefix}:clean_registries:{self.name}"
+
+    setattr(  # noqa: B010
+        rq.queue.Queue,
+        "registry_cleaning_key",
+        property(property_registry_cleaning_key),
+    )
+
+
+enable_redis_prefix()
 
 
 class SerializerProtocol(Protocol):
@@ -193,12 +256,22 @@ class ActivationWorker(_Worker):
         )
 
 
-def enqueue_delay(queue_name: str, delay: int, *args, **kwargs) -> Job:
+def enqueue_delay(
+    queue_name: str, job_id: str, delay: int, *args, **kwargs
+) -> Job:
     """Enqueue a job to run after specific seconds."""
     scheduler = get_scheduler(name=queue_name)
     return scheduler.enqueue_at(
-        datetime.utcnow() + timedelta(seconds=delay), *args, **kwargs
+        datetime.utcnow() + timedelta(seconds=delay),
+        job_id=job_id,
+        *args,
+        **kwargs,
     )
+
+
+def queue_cancel_job(queue_name: str, job_id: str) -> None:
+    scheduler = get_scheduler(name=queue_name)
+    scheduler.cancel(job_id)
 
 
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:

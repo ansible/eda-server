@@ -142,7 +142,9 @@ class ScmRepository:
         final_url = url
         secret = ""
         key_file = None
+        key_password = None
         gpg_key_file = None
+        gpg_home_dir = None
         if credential:
             inputs = inputs_from_store(credential.inputs.get_secret_value())
             secret = inputs.get("password", "")
@@ -158,11 +160,10 @@ class ScmRepository:
             if key_data:  # ssh
                 key_file = tempfile.NamedTemporaryFile("w+t")
                 key_file.write(key_data)
+                key_file.write("\n")
                 key_file.flush()
                 extra_vars["key_file"] = key_file.name
                 key_password = inputs.get("ssh_key_unlock")
-                if key_password:
-                    cls.decrypt_key_file(key_file.name, key_password)
 
         if gpg_credential:
             gpg_inputs = inputs_from_store(
@@ -171,9 +172,11 @@ class ScmRepository:
             gpg_key = gpg_inputs.get("gpg_public_key")
             gpg_key_file = tempfile.NamedTemporaryFile("w+t")
             gpg_key_file.write(gpg_key)
+            gpg_key_file.write("\n")
             gpg_key_file.flush()
             extra_vars["verify_commit"] = "true"
-            cls.add_gpg_key(gpg_key_file.name)
+            gpg_home_dir = tempfile.TemporaryDirectory()
+            env_vars["GNUPGHOME"] = gpg_home_dir.name
 
         if not verify_ssl:
             extra_vars["ssl_no_verify"] = "true"
@@ -193,12 +196,17 @@ class ScmRepository:
 
         logger.info("Cloning repository: %s", url)
         try:
+            if key_password:
+                cls.decrypt_key_file(key_file.name, key_password)
+            if gpg_key_file:
+                cls.add_gpg_key(gpg_key_file.name, gpg_home_dir.name)
             with contextlib.chdir(path):
                 git_hash = _executor(extra_vars=extra_vars, env_vars=env_vars)
         except ScmError as e:
             msg = str(e)
             if secret:
                 msg = msg.replace(secret, "****", 1)
+                msg = msg.replace(quote(secret), "****", 1)
             logger.warning("SCM clone failed: %s", msg)
             raise ScmError(msg) from None
         finally:
@@ -206,6 +214,7 @@ class ScmRepository:
                 key_file.close()
             if gpg_key_file:
                 gpg_key_file.close()
+                gpg_home_dir.cleanup()
         instance = cls(path, _executor=_executor)
         instance.git_hash = git_hash
         return instance
@@ -243,7 +252,7 @@ class ScmRepository:
     @classmethod
     def decrypt_key_file(cls, key_file: str, password: str) -> None:
         result = subprocess.run(
-            [KEYGEN_COMMAND, "-p", "-P", password, "-N", '""', "-f", key_file],
+            [KEYGEN_COMMAND, "-p", "-P", password, "-N", "", "-f", key_file],
             capture_output=True,
             text=True,
         )
@@ -252,13 +261,16 @@ class ScmRepository:
                 "Failed to load key using the passphrase. Exit code "
                 f"{result.returncode}: {result.stderr} {result.stdout}"
             )
-            msg = "Incorrect passhprase for the private key"
+            msg = "Failed to decrypt the private key using the passphrase"
             raise ScmError(msg)
 
     @classmethod
-    def add_gpg_key(cls, key_file: str) -> None:
+    def add_gpg_key(cls, key_file: str, home_dir: str) -> None:
         result = subprocess.run(
-            [GPG_COMMAND, "--import", key_file], capture_output=True, text=True
+            [GPG_COMMAND, "--import", key_file],
+            capture_output=True,
+            text=True,
+            env={"GNUPGHOME": home_dir},
         )
         if result.returncode != 0:
             logger.error(

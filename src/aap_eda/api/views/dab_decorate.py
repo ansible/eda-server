@@ -13,12 +13,16 @@
 #  limitations under the License.
 
 from ansible_base.rbac.api import views
+from ansible_base.rbac.api.router import router as rbac_router
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
+
+from aap_eda.api.views.dab_base import convert_to_create_serializer
 
 for viewset_cls in [
     views.RoleDefinitionViewSet,
@@ -29,6 +33,7 @@ for viewset_cls in [
     extend_schema_view(
         create=extend_schema(
             description=f"Create a {cls_name}.",
+            request=convert_to_create_serializer(viewset_cls.serializer_class),
             responses={
                 status.HTTP_201_CREATED: OpenApiResponse(
                     viewset_cls.serializer_class,
@@ -36,4 +41,34 @@ for viewset_cls in [
                 ),
             },
         ),
+        update=extend_schema(
+            description=f"Update a {cls_name}.",
+            request=convert_to_create_serializer(viewset_cls.serializer_class),
+            responses={
+                status.HTTP_200_OK: OpenApiResponse(
+                    viewset_cls.serializer_class,
+                    description=f"Return an updated {cls_name}.",
+                ),
+            },
+        ),
     )(viewset_cls)
+
+
+for _url, viewset, view_name in rbac_router.registry:
+    if view_name in (
+        "roledefinition-user_assignments",
+        "roledefinition-team_assignments",
+    ):
+        extend_schema_view(
+            list=extend_schema(
+                request=None,
+                parameters=[
+                    OpenApiParameter(
+                        name="id",
+                        type=int,
+                        location=OpenApiParameter.PATH,
+                        description="A unique integer value identifying this assignment.",  # noqa: E501
+                    )
+                ],
+            )
+        )(viewset)

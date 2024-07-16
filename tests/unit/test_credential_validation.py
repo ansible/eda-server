@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -517,3 +518,68 @@ def test_validate_ssh_keys_without_phrase():
     inputs = {"ssh_key_data": data}
     errors = validate_inputs(schema, inputs)
     assert errors == {}
+
+
+@pytest.mark.parametrize(
+    ("key_file", "status_message"),
+    [
+        (DATA_DIR / "public_key.asc", ""),
+        (DATA_DIR / "private_key.asc", "Key is not a public key"),
+        (DATA_DIR / "invalid_key.asc", "No valid GPG data found"),
+    ],
+)
+def test_validate_gpg_keys(key_file, status_message):
+    with open(key_file) as f:
+        data = f.read()
+
+    schema = {
+        "fields": [
+            {
+                "id": "gpg_public_key",
+                "label": "GPG Public Key",
+                "type": "string",
+                "secret": True,
+                "multiline": True,
+                "help_text": (
+                    "GPG Public Key used to validate content signatures."
+                ),
+            },
+        ]
+    }
+    inputs = {"gpg_public_key": data}
+
+    errors = validate_inputs(schema, inputs)
+
+    if errors.get("inputs.gpg_public_key"):
+        message = errors.get("inputs.gpg_public_key")[0]
+        assert message.startswith(status_message)
+
+
+@mock.patch("gnupg.GPG")
+def test_validate_gpg_keys_with_exceptions(mock_gpg: mock.Mock):
+    def raise_exception(*args, **kwargs):
+        raise OSError("Unable to run gpg")
+
+    mock_gpg.side_effect = raise_exception
+
+    schema = {
+        "fields": [
+            {
+                "id": "gpg_public_key",
+                "label": "GPG Public Key",
+                "type": "string",
+                "secret": True,
+                "multiline": True,
+                "help_text": (
+                    "GPG Public Key used to validate content signatures."
+                ),
+            },
+        ]
+    }
+    inputs = {"gpg_public_key": "corrupted_data"}
+
+    errors = validate_inputs(schema, inputs)
+
+    assert errors.get("inputs.gpg_public_key")[0].startswith(
+        "Failed to validate GPG key: Unable to run gpg"
+    )

@@ -332,7 +332,7 @@ class Engine(ContainerEngine):
                 f"{credential.username} login succeeded to {registry}"
             )
         except APIError as e:
-            LOGGER.exception("Login failed: f{e}")
+            LOGGER.error("Login failed: f{e}", exc_info=settings.DEBUG)
             raise exceptions.ContainerStartError(str(e))
 
     def _pull_image(

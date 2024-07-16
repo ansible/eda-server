@@ -48,8 +48,18 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
-        validators=[validators.check_if_credential_exists],
+        validators=[
+            validators.check_credential_registry_username_password,
+        ],
     )
+
+    def validate(self, data):
+        eda_credential_id = data.get("eda_credential_id")
+        if eda_credential_id:
+            image_url = data.get("image_url") or self.instance.image_url
+            validators.check_if_de_valid(image_url, eda_credential_id)
+
+        return data
 
     class Meta:
         model = models.DecisionEnvironment

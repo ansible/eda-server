@@ -28,7 +28,7 @@ from aap_eda.core.exceptions import (
     UpdateFieldsRequiredError,
 )
 
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel
 
 __all__ = (
     "RulebookProcess",
@@ -42,6 +42,8 @@ class RulebookProcess(BaseOrgModel):
     Rulebook Process is an instance of ansible-rulebook process
     that is created when an activation or event stream is started.
     """
+
+    router_basename = "activationinstance"
 
     name = models.TextField(null=False, default="")
     status = models.TextField(
@@ -185,6 +187,12 @@ class RulebookProcess(BaseOrgModel):
             update_fields=update_fields,
         )
 
+    def summary_fields(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+        }
+
 
 class RulebookProcessLog(models.Model):
     class Meta:
@@ -196,7 +204,6 @@ class RulebookProcessLog(models.Model):
     activation_instance = models.ForeignKey(
         "RulebookProcess", on_delete=models.CASCADE
     )
-    line_number = models.IntegerField()
     log = models.TextField()
     log_timestamp = models.BigIntegerField(null=False, default=0)
 

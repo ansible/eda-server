@@ -18,11 +18,17 @@ import yaml
 from django.conf import settings
 from rest_framework import serializers
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import validate_schema
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
 
 logger = logging.getLogger(__name__)
+
+NOT_ACCEPTABLE_TYPES_FOR_ACTIVATION = [
+    enums.DefaultCredentialType.REGISTRY,
+    enums.DefaultCredentialType.GPG,
+    enums.DefaultCredentialType.SOURCE_CONTROL,
+]
 
 
 def check_if_rulebook_exists(rulebook_id: int) -> int:
@@ -39,11 +45,7 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     try:
         de = models.DecisionEnvironment.objects.get(pk=decision_environment_id)
         if de.eda_credential_id:
-            models.EdaCredential.objects.get(pk=de.eda_credential_id)
-    except models.EdaCredential.DoesNotExist:
-        raise serializers.ValidationError(
-            f"EdaCredential with id {de.eda_credential_id} does not exist"
-        )
+            check_if_de_valid(de.image_url, de.eda_credential_id)
     except models.DecisionEnvironment.DoesNotExist:
         raise serializers.ValidationError(
             f"DecisionEnvironment with id {decision_environment_id} "
@@ -52,14 +54,65 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     return decision_environment_id
 
 
-def check_if_credential_exists(eda_credential_id: int) -> int:
+def check_if_de_valid(image_url: str, eda_credential_id: int):
+    credential = get_credential_if_exists(eda_credential_id)
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    host = inputs.get("host")
+
+    if not host:
+        raise serializers.ValidationError(
+            f"Credential {credential.name} needs to have host information"
+        )
+
+    if not image_url.startswith(host):
+        msg = (
+            f"DecisionEnvironment image url: {image_url} does "
+            f"not match with the credential host: {host}"
+        )
+        raise serializers.ValidationError(msg)
+
+
+def get_credential_if_exists(eda_credential_id: int) -> models.EdaCredential:
     try:
-        models.EdaCredential.objects.get(pk=eda_credential_id)
+        return models.EdaCredential.objects.get(pk=eda_credential_id)
     except models.EdaCredential.DoesNotExist:
         raise serializers.ValidationError(
             f"EdaCredential with id {eda_credential_id} does not exist"
         )
+
+
+def check_credential_types_for_activation(eda_credential_id: int) -> int:
+    check_credential_types(
+        eda_credential_id,
+        types=NOT_ACCEPTABLE_TYPES_FOR_ACTIVATION,
+        negative=True,
+    )
+
     return eda_credential_id
+
+
+def check_credential_types_for_gpg(eda_credential_id: int) -> int:
+    check_credential_types(
+        eda_credential_id, [enums.DefaultCredentialType.GPG]
+    )
+
+    return eda_credential_id
+
+
+def check_credential_types_for_scm(eda_credential_id: int) -> int:
+    check_credential_types(
+        eda_credential_id,
+        [enums.DefaultCredentialType.SOURCE_CONTROL],
+    )
+
+    return eda_credential_id
+
+
+def check_multiple_credentials(eda_credential_ids: list[int]) -> int:
+    for eda_credential_id in eda_credential_ids:
+        check_credential_types_for_activation(eda_credential_id)
+
+    return eda_credential_ids
 
 
 def check_if_credential_type_exists(credential_type_id: int) -> int:
@@ -169,3 +222,41 @@ def check_if_rfc_1035_compliant(service_name: str):
         raise serializers.ValidationError(
             f"{service_name} must be a valid RFC 1035 label name"
         )
+
+
+def check_credential_types(
+    eda_credential_id: int,
+    types: list[enums.DefaultCredentialType],
+    negative: bool = False,
+) -> None:
+    credential = get_credential_if_exists(eda_credential_id)
+    name = credential.credential_type.name
+
+    names = [ctype.value for ctype in types]
+    if negative and name in names:
+        raise serializers.ValidationError(
+            f"The type of credential can not be one of {names}"
+        )
+    if not negative and name not in names:
+        raise serializers.ValidationError(
+            f"The type of credential can only be one of {names}"
+        )
+
+
+def check_credential_registry_username_password(
+    eda_credential_id: int,
+) -> int:
+    credential = get_credential_if_exists(eda_credential_id)
+    name = credential.credential_type.name
+    if name != enums.DefaultCredentialType.REGISTRY.value:
+        raise serializers.ValidationError(
+            "The type of credential can only be one of "
+            f"['{enums.DefaultCredentialType.REGISTRY}']"
+        )
+    inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    password = inputs.get("password", "")
+    if not password:
+        raise serializers.ValidationError(
+            "Need username and password or just token in credential"
+        )
+    return eda_credential_id

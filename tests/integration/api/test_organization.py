@@ -24,9 +24,9 @@ from tests.integration.constants import api_url_v1
 
 @pytest.mark.django_db
 def test_list_organizations(
-    default_organization: models.Organization, client: APIClient
+    default_organization: models.Organization, admin_client: APIClient
 ):
-    response = client.get(f"{api_url_v1}/organizations/")
+    response = admin_client.get(f"{api_url_v1}/organizations/")
     assert response.status_code == status.HTTP_200_OK
     result = response.data["results"][0]
     assert_organization_data(result, default_organization)
@@ -118,10 +118,25 @@ def test_create_organization(
 
 
 @pytest.mark.django_db
-def test_retrieve_organization(
-    default_organization: models.Organization, client: APIClient
+def test_create_organization_forbidden(
+    use_shared_resource_setting,
+    base_client: APIClient,
+    super_user: models.User,
 ):
-    response = client.get(
+    base_client.force_authenticate(user=super_user)
+    data_in = {
+        "name": "test-organization",
+        "description": "Test Organization",
+    }
+    response = base_client.post(f"{api_url_v1}/organizations/", data=data_in)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_retrieve_organization(
+    default_organization: models.Organization, admin_client: APIClient
+):
+    response = admin_client.get(
         f"{api_url_v1}/organizations/{default_organization.id}/"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -130,24 +145,54 @@ def test_retrieve_organization(
 
 
 @pytest.mark.django_db
-def test_retrieve_organization_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/organizations/42/")
+def test_retrieve_organization_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/organizations/42/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
-def test_partial_update_organization(
-    default_organization: models.Organization,
-    client: APIClient,
+def test_partial_update_organization_success(
+    new_organization: models.Organization,
+    superuser_client: APIClient,
 ):
     new_data = {"name": "new-name", "description": "New Description"}
-    response = client.patch(
-        f"{api_url_v1}/organizations/{default_organization.id}/", data=new_data
+    response = superuser_client.patch(
+        f"{api_url_v1}/organizations/{new_organization.id}/", data=new_data
     )
     assert response.status_code == status.HTTP_200_OK
 
-    default_organization.refresh_from_db()
-    assert_organization_data(response.data, default_organization)
+    new_organization.refresh_from_db()
+    assert_organization_data(response.data, new_organization)
+
+
+@pytest.mark.django_db
+def test_partial_update_organization_forbidden(
+    use_shared_resource_setting,
+    new_organization: models.Organization,
+    superuser_client: APIClient,
+):
+    new_data = {"name": "new-name", "description": "New Description"}
+    response = superuser_client.patch(
+        f"{api_url_v1}/organizations/{new_organization.id}/", data=new_data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_partial_update_default_organization_exception(
+    default_organization: models.Organization,
+    superuser_client: APIClient,
+):
+    new_data = {"name": "new-name", "description": "New Description"}
+    response = superuser_client.patch(
+        f"{api_url_v1}/organizations/{default_organization.id}/", data=new_data
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        response.data["detail"]
+        == "The default organization cannot be modified."
+    )
+    assert models.Organization.objects.get(id=default_organization.id)
 
 
 @pytest.mark.django_db
@@ -167,17 +212,29 @@ def test_delete_organization_success(
 
 @pytest.mark.django_db
 def test_delete_organization_conflict(
-    default_organization: models.Organization, client: APIClient
+    default_organization: models.Organization, admin_client: APIClient
 ):
-    response = client.delete(
+    response = admin_client.delete(
         f"{api_url_v1}/organizations/{default_organization.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.django_db
-def test_delete_organization_not_exist(client: APIClient):
-    response = client.delete(f"{api_url_v1}/organizations/100/")
+def test_delete_organization_forbidden(
+    use_shared_resource_setting,
+    new_organization: models.Organization,
+    superuser_client: APIClient,
+):
+    response = superuser_client.delete(
+        f"{api_url_v1}/organizations/{new_organization.id}/"
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_delete_organization_not_exist(admin_client: APIClient):
+    response = admin_client.delete(f"{api_url_v1}/organizations/100/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 

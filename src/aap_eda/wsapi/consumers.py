@@ -4,6 +4,7 @@ import logging
 import typing as tp
 from datetime import datetime
 from enum import Enum
+from urllib.parse import urlparse, urlunparse
 
 import yaml
 from channels.db import database_sync_to_async
@@ -112,7 +113,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         )
         if extra_var:
             extra_var_message = ExtraVars(
-                data=base64.b64encode(extra_var.extra_var.encode()).decode()
+                data=base64.b64encode(extra_var.encode()).decode()
             )
             await self.send(text_data=extra_var_message.json())
 
@@ -224,10 +225,11 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         audit_rule = models.AuditRule.objects.filter(
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
         ).first()
+
+        activation_instance = models.RulebookProcess.objects.filter(
+            id=message.activation_id
+        ).first()
         if audit_rule is None:
-            activation_instance = models.RulebookProcess.objects.filter(
-                id=message.activation_id
-            ).first()
             activation_org = models.Organization.objects.filter(
                 id=activation_instance.organization.id
             ).first()
@@ -259,11 +261,27 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         ).first()
 
         if audit_action is None:
+            inputs = {}
+            aap_credential_type = models.CredentialType.objects.filter(
+                name=DefaultCredentialType.AAP
+            )
+            if aap_credential_type:
+                credentials = (
+                    activation_instance.get_parent().eda_credentials.filter(
+                        credential_type_id=aap_credential_type[0].id
+                    )
+                )
+                if credentials:
+                    inputs = yaml.safe_load(
+                        credentials[0].inputs.get_secret_value()
+                    )
+
+            url = self._get_url(message, inputs)
             audit_action = models.AuditAction.objects.create(
                 id=message.action_uuid,
                 fired_at=message.run_at,
                 name=message.action,
-                url=message.url,
+                url=url,
                 status=message.status,
                 rule_fired_at=message.rule_run_at,
                 audit_rule_id=audit_rule.id,
@@ -318,22 +336,13 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return job_instance
 
     @database_sync_to_async
-    def get_resources(
-        self, rulebook_process_id: str
-    ) -> tuple[str, models.ExtraVar]:
+    def get_resources(self, rulebook_process_id: str) -> tuple[str, str]:
         rulebook_process_instance = models.RulebookProcess.objects.get(
             id=rulebook_process_id
         )
         activation = rulebook_process_instance.get_parent()
 
-        if activation.extra_var_id:
-            extra_var = models.ExtraVar.objects.filter(
-                id=activation.extra_var_id
-            ).first()
-        else:
-            extra_var = None
-
-        return activation.rulebook_rulesets, extra_var
+        return activation.rulebook_rulesets, activation.extra_var
 
     @database_sync_to_async
     def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
@@ -426,3 +435,41 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
         return vault_passwords
+
+    def _get_url(self, message: ActionMessage, inputs: dict) -> str:
+        if message.action not in ("run_job_template", "run_workflow_template"):
+            return ""
+        url = message.url
+
+        if not message.controller_job_id:
+            return url
+
+        if not inputs:
+            return url
+
+        api_url = inputs["host"]
+        urlparts = urlparse(api_url)
+
+        path = urlparts.path.rstrip("/")
+        if path == "":
+            path = "/"
+        if path in settings.API_PATH_TO_UI_PATH_MAP:
+            path = settings.API_PATH_TO_UI_PATH_MAP[path]
+
+        if message.action == "run_job_template":
+            slug = f"{path}/jobs/playbook/{message.controller_job_id}/details/"
+        else:
+            slug = f"{path}/jobs/workflow/{message.controller_job_id}/details/"
+
+        result = urlunparse(
+            [
+                urlparts.scheme,
+                urlparts.netloc,
+                slug,
+                urlparts.params,
+                urlparts.query,
+                urlparts.fragment,
+            ]
+        )
+        logger.debug("Updated Job URL %s", result)
+        return result

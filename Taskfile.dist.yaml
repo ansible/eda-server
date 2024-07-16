@@ -15,7 +15,7 @@ tasks:
   default:
     desc: "Show this message and exit"
     cmds:
-      - task -l
+      - command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} -l
     silent: true
 
   dev:init:
@@ -178,7 +178,7 @@ tasks:
     cmds:
       - task: docker
         vars:
-          CLI_ARGS: down --volumes
+          CLI_ARGS: down --volumes --remove-orphans
 
   docker:psql:
     desc: "Open PostgreSQL console."

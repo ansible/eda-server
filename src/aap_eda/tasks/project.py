@@ -14,6 +14,8 @@
 
 import logging
 
+from django.conf import settings
+
 from aap_eda.core import models
 from aap_eda.core.tasking import get_queue, job, unique_enqueue
 from aap_eda.services.project import ProjectImportError, ProjectImportService
@@ -30,7 +32,7 @@ def import_project(project_id: int):
     try:
         ProjectImportService().import_project(project)
     except ProjectImportError as e:
-        logger.exception(e)
+        logger.error(e, exc_info=settings.DEBUG)
 
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
@@ -43,7 +45,7 @@ def sync_project(project_id: int):
     try:
         ProjectImportService().sync_project(project)
     except ProjectImportError as e:
-        logger.exception(e)
+        logger.error(e, exc_info=settings.DEBUG)
 
     logger.info(f"Task complete: Sync project ( project_id={project.id} )")
 

@@ -83,6 +83,14 @@ PODMAN_MOUNTS - A list of dicts with mount options. Each dict must contain
                              "target": "/var/run/containers/storage",
                              "type": "bind"}]'
 
+
+Django Ansible Base settings:
+To configure a Resource Server for syncing of managed resources:
+* RESOURCE_SERVER__URL - The URL to connect to the resource server
+* RESOURCE_SERVER__SECRET_KEY - The secret key needed to pull the resource list
+* RESOURCE_SERVER__VALIDATE_HTTPS - Whether to validate https, default to False
+* ANSIBLE_BASE_MANAGED_ROLE_REGISTRY - Syncing of the Platform Auditor role
+
 """
 import os
 from datetime import timedelta
@@ -92,6 +100,7 @@ from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
 from aap_eda.core.enums import RulebookProcessLogLevel
+from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -126,7 +135,17 @@ def _get_secret_key() -> str:
 
 SECRET_KEY = _get_secret_key()
 
-DEBUG = settings.get("DEBUG", False)
+
+def _get_debug() -> bool:
+    debug = settings.get("DEBUG", False)
+    if isinstance(debug, str):
+        debug = str_to_bool(debug)
+    if not isinstance(debug, bool):
+        raise ImproperlyConfigured("DEBUG setting must be a boolean value.")
+    return debug
+
+
+DEBUG = _get_debug()
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 ALLOWED_HOSTS = (
@@ -179,6 +198,7 @@ INSTALLED_APPS = [
     "django_filters",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
+    "ansible_base.jwt_consumer",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
@@ -237,7 +257,7 @@ def _get_databases_settings() -> dict:
             "PASSWORD": settings.get("DB_PASSWORD"),
             "NAME": settings.get("DB_NAME", "eda"),
             "OPTIONS": {
-                "sslmode": settings.get("PGSSLMODE", default="prefer"),
+                "sslmode": settings.get("PGSSLMODE", default="allow"),
                 "sslcert": settings.get("PGSSLCERT", default=""),
                 "sslkey": settings.get("PGSSLKEY", default=""),
                 "sslrootcert": settings.get("PGSSLROOTCERT", default=""),
@@ -282,7 +302,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = settings.get("STATIC_URL", "static/")
+STATIC_ROOT = settings.get("STATIC_ROOT", "/var/lib/eda/static")
 
 MEDIA_ROOT = settings.get("MEDIA_ROOT", "/var/lib/eda/files")
 
@@ -308,6 +329,7 @@ REST_FRAMEWORK = {
         "ansible_base.rbac.api.permissions.AnsibleBaseObjectPermissions",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_METADATA_CLASS": "aap_eda.api.metadata.EDAMetadata",
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
 
@@ -318,9 +340,11 @@ REST_FRAMEWORK = {
 DEPLOYMENT_TYPE = settings.get("DEPLOYMENT_TYPE", "podman")
 WEBSOCKET_BASE_URL = settings.get("WEBSOCKET_BASE_URL", "ws://localhost:8000")
 WEBSOCKET_SSL_VERIFY = settings.get("WEBSOCKET_SSL_VERIFY", "yes")
-WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
-    "ws://", "http://"
-).replace("wss://", "https://")
+WEBSOCKET_TOKEN_BASE_URL = settings.get("WEBSOCKET_TOKEN_BASE_URL", None)
+if WEBSOCKET_TOKEN_BASE_URL is None:
+    WEBSOCKET_TOKEN_BASE_URL = WEBSOCKET_BASE_URL.replace(
+        "ws://", "http://"
+    ).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
@@ -347,6 +371,7 @@ REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
 REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
 REDIS_DB = settings.get("MQ_DB", 0)
+RQ_REDIS_PREFIX = settings.get("RQ_REDIS_PREFIX", "eda-rq")
 
 
 def _rq_common_parameters():
@@ -393,8 +418,10 @@ if len(set(RULEBOOK_WORKER_QUEUES)) != len(RULEBOOK_WORKER_QUEUES):
 if not RULEBOOK_WORKER_QUEUES:
     RULEBOOK_WORKER_QUEUES = ["activation"]
 
-DEFAULT_QUEUE_TIMEOUT = 300
-DEFAULT_RULEBOOK_QUEUE_TIMEOUT = 120
+DEFAULT_QUEUE_TIMEOUT = settings.get("DEFAULT_QUEUE_TIMEOUT", 300)
+DEFAULT_RULEBOOK_QUEUE_TIMEOUT = settings.get(
+    "DEFAULT_RULEBOOK_QUEUE_TIMEOUT", 120
+)
 
 # Time window in seconds to consider a worker as dead
 DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
@@ -426,12 +453,22 @@ RQ_QUEUES = get_rq_queues()
 RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
 RQ_STARTUP_JOBS = []
+
+# Id of the scheduler job it's required when we have multiple instances of
+# the scheduler running to avoid duplicate jobs
 RQ_PERIODIC_JOBS = [
     {
-        "func": "aap_eda.tasks.orchestrator.monitor_rulebook_processes",
+        "func": (
+            "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
+        ),
         "interval": 5,
+        "id": "enqueue_monitor_rulebook_processes",
     },
-    {"func": "aap_eda.tasks.project.monitor_project_tasks", "interval": 30},
+    {
+        "func": "aap_eda.tasks.project.monitor_project_tasks",
+        "interval": 30,
+        "id": "monitor_project_tasks",
+    },
 ]
 RQ_CRON_JOBS = []
 RQ_SCHEDULER_JOB_INTERVAL = settings.get("SCHEDULER_JOB_INTERVAL", 5)
@@ -562,7 +599,9 @@ def get_rulebook_process_log_level() -> RulebookProcessLogLevel:
 
 
 ANSIBLE_RULEBOOK_LOG_LEVEL = get_rulebook_process_log_level()
-ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get("ANSIBLE_RULEBOOK_FLUSH_AFTER", 1)
+ANSIBLE_RULEBOOK_FLUSH_AFTER = settings.get(
+    "ANSIBLE_RULEBOOK_FLUSH_AFTER", 100
+)
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE SETTINGS
@@ -574,6 +613,8 @@ dab_settings = os.path.join(
 )
 include(dab_settings)
 
+ANSIBLE_BASE_CUSTOM_VIEW_PARENT = "aap_eda.api.views.dab_base.BaseAPIView"
+
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE JWT SETTINGS
 # ---------------------------------------------------------
@@ -582,6 +623,10 @@ ANSIBLE_BASE_JWT_VALIDATE_CERT = settings.get(
 )
 ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
+)
+
+ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
+    "ALLOW_LOCAL_RESOURCE_MANAGEMENT", True
 )
 
 # ---------------------------------------------------------
@@ -601,6 +646,32 @@ ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
 
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}
+
+ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
+
+# --------------------------------------------------------
+# DJANGO ANSIBLE BASE RESOURCE API CLIENT
+# --------------------------------------------------------
+RESOURCE_SERVER = {
+    "URL": settings.get("RESOURCE_SERVER__URL", "https://localhost"),
+    "SECRET_KEY": settings.get("RESOURCE_SERVER__SECRET_KEY", ""),
+    "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
+}
+RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
+RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
+ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
+    "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
+)
+
+if RESOURCE_SERVER["URL"] and RESOURCE_SERVER["SECRET_KEY"]:
+    RQ_PERIODIC_JOBS.append(
+        {
+            "func": "aap_eda.tasks.shared_resources.resync_shared_resources",
+            "interval": 900,
+            "id": "resync_shared_resources",
+        }
+    )
+
 
 ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
@@ -622,4 +693,6 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
     ["ansible.eda.webhook", "ansible.eda.alertmanager"],
 )
 
-ANSIBLE_BASE_CUSTOM_VIEW_PARENT = "aap_eda.api.views.dab_base.BaseAPIView"
+API_PATH_TO_UI_PATH_MAP = settings.get(
+    "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
+)

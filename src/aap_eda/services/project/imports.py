@@ -21,6 +21,7 @@ from functools import wraps
 from typing import Any, Callable, Final, Iterator, Optional, Type
 
 import yaml
+from django.conf import settings
 from django.core import exceptions
 
 from aap_eda.core import models
@@ -225,10 +226,11 @@ class ProjectImportService:
                 try:
                     info = self._try_load_rulebook(rulebooks_dir, path)
                 except Exception:
-                    logger.exception(
+                    logger.error(
                         "Unexpected exception when scanning file %s."
                         " Skipping.",
                         path,
+                        exc_info=settings.DEBUG,
                     )
                     continue
                 if not info:

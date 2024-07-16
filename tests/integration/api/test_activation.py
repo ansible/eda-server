@@ -12,8 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from typing import Any, Dict, List
+from unittest.mock import patch
 
 import pytest
+import yaml
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -21,20 +24,26 @@ from aap_eda.api.serializers.activation import (
     get_rules_count,
     is_activation_valid,
 )
+from aap_eda.api.serializers.project import ENCRYPTED_STRING
 from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
 
 PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
 
 
+def converted_extra_var(var: str) -> str:
+    return yaml.safe_dump(yaml.safe_load(var))
+
+
 @pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_create_activation(
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
-    client: APIClient,
+    admin_client: APIClient,
 ):
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -51,14 +60,65 @@ def test_create_activation(
         data["decision_environment"]["id"]
         == activation_payload["decision_environment_id"]
     )
-    assert data["extra_var"]["id"] == activation_payload["extra_var_id"]
+    assert data["extra_var"] == converted_extra_var(
+        activation_payload["extra_var"]
+    )
     assert activation.rulebook_name == default_rulebook.name
     assert activation.rulebook_rulesets == default_rulebook.rulesets
     assert data["restarted_at"] is None
     assert activation.status == enums.ActivationStatus.PENDING
+    assert activation.status_message == (
+        "Wait for a worker to be available to start activation"
+    )
+
+
+@pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+def test_create_activation_blank_text(
+    admin_awx_token: models.AwxToken,
+    activation_payload_blank_text: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload_blank_text
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert_activation_base_data(
+        data,
+        activation,
+    )
+    assert data["description"] == activation_payload_blank_text["description"]
+
+    # An extra_var empty string is outbound serialized as None; it's considered
+    # a "no value" situation.  Consequently, a data content of None for
+    # extra_var may be sourced from either None or an empty string.
+    if activation_payload_blank_text["extra_var"] == "":
+        assert data["extra_var"] is None
+    else:
+        assert data["extra_var"] == activation_payload_blank_text["extra_var"]
+
     assert (
-        activation.status_message
-        == enums.ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
+        data["k8s_service_name"]
+        == activation_payload_blank_text["k8s_service_name"]
+    )
+    assert data["log_level"] == activation_payload_blank_text["log_level"]
+    assert data["project"]["id"] == activation_payload_blank_text["project_id"]
+    assert (
+        data["rulebook"]["id"] == activation_payload_blank_text["rulebook_id"]
+    )
+    assert (
+        data["decision_environment"]["id"]
+        == activation_payload_blank_text["decision_environment_id"]
+    )
+    assert activation.rulebook_name == default_rulebook.name
+    assert activation.rulebook_rulesets == default_rulebook.rulesets
+    assert data["restarted_at"] is None
+    assert activation.status == enums.ActivationStatus.PENDING
+    assert activation.status_message == (
+        "Wait for a worker to be available to start activation"
     )
 
 
@@ -67,16 +127,18 @@ def test_create_activation_disabled(
     activation_payload: Dict[str, Any],
     admin_awx_token: models.AwxToken,
     default_rulebook: models.Rulebook,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     activation_payload["is_enabled"] = False
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED
 
-    response = client.get(f"{api_url_v1}/activations/{response.data['id']}/")
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{response.data['id']}/"
+    )
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.rulebook_name == default_rulebook.name
@@ -87,13 +149,13 @@ def test_create_activation_disabled(
 
 
 @pytest.mark.django_db
-def test_create_activation_bad_entity(client: APIClient):
+def test_create_activation_bad_entity(admin_client: APIClient):
     test_activation = {
         "name": "test-activation",
         "description": "test activation",
         "is_enabled": True,
     }
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/",
         data=test_activation,
     )
@@ -107,19 +169,18 @@ def test_create_activation_bad_entity(client: APIClient):
             "decision_environment": "DecisionEnvironment with id 0 does not exist"  # noqa: E501
         },
         {"rulebook": "Rulebook with id 0 does not exist"},
-        {"extra_var": "ExtraVar with id 0 does not exist"},
     ],
 )
 @pytest.mark.django_db
 def test_create_activation_with_bad_entity(
     activation_payload: Dict[str, Any],
     admin_awx_token: models.AwxToken,
-    client: APIClient,
+    admin_client: APIClient,
     dependent_object: str,
     preseed_credential_types,
 ):
     for key in dependent_object:
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/activations/",
             data={
                 **activation_payload,
@@ -133,14 +194,97 @@ def test_create_activation_with_bad_entity(
     # permission checks, which is why check_permission_mock is not checked here
 
 
+NOT_OBJECT_ERROR_MSG = "Extra var is not in object format"
+NOT_YAML_JSON_ERROR_MSG = "Extra var must be in JSON or YAML format"
+
+
+@pytest.mark.parametrize(
+    "extra_var,error_message",
+    [
+        ("John", NOT_OBJECT_ERROR_MSG),
+        ("John, ", NOT_OBJECT_ERROR_MSG),
+        ("[John, 3,]", NOT_OBJECT_ERROR_MSG),
+        ('{"name": "John" - 2 }', NOT_YAML_JSON_ERROR_MSG),
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_bad_extra_var(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    admin_client: APIClient,
+    preseed_credential_types,
+    extra_var: str,
+    error_message: str,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "extra_var": extra_var,
+        },
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert str(response.data["extra_var"][0]) == error_message
+
+
+@pytest.mark.parametrize(
+    "extra_var",
+    [
+        "John: Doe",
+        "John: 2",
+        '{"name": "John"}',
+        '"age": 20',
+        "---\nname: hello\nhosts: localhost\ngather_facts: false",
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_valid_extra_var(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    admin_client: APIClient,
+    preseed_credential_types,
+    extra_var: str,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "extra_var": extra_var,
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_create_activation_with_vault_extra_var(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    admin_client: APIClient,
+    preseed_credential_types,
+    vault_extra_var_data: str,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "extra_var": vault_extra_var_data,
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    id = response.data["id"]
+    assert response.data["extra_var"] == f"limit: {ENCRYPTED_STRING}\n"
+    assert models.Activation.objects.filter(pk=id).exists()
+    assert models.Activation.objects.first().extra_var == vault_extra_var_data
+
+
 @pytest.mark.django_db
 def test_list_activations(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     activations = [default_activation]
-    response = client.get(f"{api_url_v1}/activations/")
+    response = admin_client.get(f"{api_url_v1}/activations/")
     assert response.status_code == status.HTTP_200_OK
     for data, activation in zip(response.data["results"], activations):
         assert_activation_base_data(data, activation)
@@ -151,13 +295,15 @@ def test_list_activations(
 def test_list_activations_filter_name(
     default_activation: models.Activation,
     new_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     filter_name = "new"
     activations = [default_activation, new_activation]
 
-    response = client.get(f"{api_url_v1}/activations/?name={filter_name}")
+    response = admin_client.get(
+        f"{api_url_v1}/activations/?name={filter_name}"
+    )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.data["results"]
     assert len(response_data) == 1
@@ -168,12 +314,14 @@ def test_list_activations_filter_name(
 def test_list_activations_filter_name_none_exist(
     default_activation: models.Activation,
     new_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     filter_name = "noname"
 
-    response = client.get(f"{api_url_v1}/activations/?name={filter_name}")
+    response = admin_client.get(
+        f"{api_url_v1}/activations/?name={filter_name}"
+    )
     assert response.status_code == status.HTTP_200_OK
     assert response.data["results"] == []
 
@@ -182,7 +330,7 @@ def test_list_activations_filter_name_none_exist(
 def test_list_activations_filter_status(
     default_activation: models.Activation,
     new_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     filter_status = enums.ActivationStatus.FAILED
@@ -190,7 +338,9 @@ def test_list_activations_filter_status(
     new_activation.save(update_fields=["status"])
     activations = [default_activation, new_activation]
 
-    response = client.get(f"{api_url_v1}/activations/?status={filter_status}")
+    response = admin_client.get(
+        f"{api_url_v1}/activations/?status={filter_status}"
+    )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.data["results"]
     assert_activation_base_data(response_data[0], activations[1])
@@ -200,20 +350,20 @@ def test_list_activations_filter_status(
 def test_list_activations_filter_decision_environment_id(
     default_activation: models.Activation,
     new_activation: models.Activation,
-    default_de: models.DecisionEnvironment,
-    client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     activations = [default_activation, new_activation]
-    de_id = default_de.id
+    de_id = default_decision_environment.id
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activations/?decision_environment_id={de_id}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == len(activations)
 
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activations/?decision_environment_id=0"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -223,10 +373,12 @@ def test_list_activations_filter_decision_environment_id(
 @pytest.mark.django_db
 def test_retrieve_activation(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
-    response = client.get(f"{api_url_v1}/activations/{default_activation.id}/")
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, default_activation)
@@ -242,7 +394,6 @@ def test_retrieve_activation(
         data["decision_environment"]["id"]
         == default_activation.decision_environment.id
     )
-    assert data["extra_var"]["id"] == default_activation.extra_var.id
     activation_instances = models.RulebookProcess.objects.filter(
         activation_id=default_activation.id
     )
@@ -255,30 +406,48 @@ def test_retrieve_activation(
 
 
 @pytest.mark.django_db
-def test_retrieve_activation_not_exist(client: APIClient):
-    response = client.get(f"{api_url_v1}/activations/77/")
+def test_retrieve_activation_not_exist(admin_client: APIClient):
+    response = admin_client.get(f"{api_url_v1}/activations/77/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("activation_status", "expected_response"),
+    [
+        (
+            enums.ActivationStatus.PENDING,
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            enums.ActivationStatus.WORKERS_OFFLINE,
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+)
 def test_delete_activation(
+    activation_status: enums.ActivationStatus,
+    expected_response: int,
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
-    response = client.delete(
+    default_activation.status = activation_status
+    default_activation.save(update_fields=["status"])
+
+    response = admin_client.delete(
         f"{api_url_v1}/activations/{default_activation.id}/"
     )
-    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert response.status_code == expected_response
 
 
 @pytest.mark.django_db
 def test_restart_activation(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/{default_activation.id}/restart/"
     )
 
@@ -289,8 +458,8 @@ def test_restart_activation(
 @pytest.mark.parametrize("action", [enums.Action.RESTART, enums.Action.ENABLE])
 def test_restart_activation_without_de(
     default_activation: models.Activation,
-    default_de: models.DecisionEnvironment,
-    client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
     action,
     preseed_credential_types,
 ):
@@ -298,8 +467,10 @@ def test_restart_activation_without_de(
         default_activation.is_enabled = False
         default_activation.save(update_fields=["is_enabled"])
 
-    models.DecisionEnvironment.objects.filter(id=default_de.id).delete()
-    response = client.post(
+    models.DecisionEnvironment.objects.filter(
+        id=default_decision_environment.id
+    ).delete()
+    response = admin_client.post(
         f"{api_url_v1}/activations/{default_activation.id}/{action}/"
     )
 
@@ -317,9 +488,10 @@ def test_restart_activation_without_de(
 
 
 @pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_enable_activation(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     for state in [
@@ -333,7 +505,7 @@ def test_enable_activation(
         default_activation.status = state
         default_activation.save(update_fields=["is_enabled", "status"])
 
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/activations/{default_activation.id}/enable/"
         )
 
@@ -353,25 +525,24 @@ def test_enable_activation(
         default_activation.status = state
         default_activation.save(update_fields=["is_enabled", "status"])
 
-        response = client.post(
+        response = admin_client.post(
             f"{api_url_v1}/activations/{default_activation.id}/enable/"
         )
 
         default_activation.refresh_from_db()
         assert response.status_code == status.HTTP_204_NO_CONTENT
-        assert (
-            default_activation.status_message
-            == enums.ACTIVATION_STATUS_MESSAGE_MAP[default_activation.status]
+        assert default_activation.status_message == (
+            "Wait for a worker to be available to start activation"
         )
 
 
 @pytest.mark.django_db
 def test_disable_activation(
     default_activation: models.Activation,
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/{default_activation.id}/disable/"
     )
 
@@ -382,13 +553,13 @@ def test_disable_activation(
 def test_list_activation_instances(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     instances = sorted(
         default_activation_instances, key=lambda x: x.started_at
     )
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activations/{default_activation.id}/instances/"
     )
     data = sorted(response.data["results"], key=lambda x: x["started_at"])
@@ -405,13 +576,13 @@ def test_list_activation_instances(
 def test_list_activation_instances_filter_name(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     instances = default_activation_instances
 
     filter_name = "instance-1"
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activations/{default_activation.id}"
         f"/instances/?name={filter_name}"
     )
@@ -424,13 +595,13 @@ def test_list_activation_instances_filter_name(
 def test_list_activation_instances_filter_status(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
-    client: APIClient,
+    admin_client: APIClient,
     preseed_credential_types,
 ):
     instances = default_activation_instances
 
     filter_status = enums.ActivationStatus.FAILED
-    response = client.get(
+    response = admin_client.get(
         f"{api_url_v1}/activations/{default_activation.id}"
         f"/instances/?status={filter_status}"
     )
@@ -451,14 +622,23 @@ def assert_activation_base_data(
     assert data["name"] == activation.name
     assert data["description"] == activation.description
     assert data["is_enabled"] == activation.is_enabled
+
+    # An extra_var empty string is outbound serialized as None; it's considered
+    # a "no value" situation.  Consequently, a data content of None for
+    # extra_var may be sourced from either None or an empty string.
+    if (activation.extra_var is None) or (activation.extra_var == ""):
+        assert data["extra_var"] is None
+    else:
+        assert data["extra_var"] == converted_extra_var(activation.extra_var)
+
     assert data["restart_policy"] == activation.restart_policy
     assert data["restart_count"] == activation.restart_count
     assert data["rulebook_name"] == activation.rulebook_name
     assert data["rules_count"] == rules_count
     assert data["rules_fired_count"] == rules_fired_count
     assert data["created_at"] == activation.created_at
-    assert data["modified_at"] == activation.modified_at
-    assert data["status_message"] == activation.status_message
+    assert data["modified_at"] <= activation.modified_at
+    assert data["status_message"]
 
 
 def assert_activation_related_object_fks(
@@ -472,7 +652,6 @@ def assert_activation_related_object_fks(
         assert data["rulebook_id"] == activation.rulebook.id
     else:
         assert not data["rulebook_id"]
-    assert data["extra_var_id"] == activation.extra_var.id
     assert (
         data["decision_environment_id"] == activation.decision_environment.id
     )
@@ -529,11 +708,11 @@ def test_is_activation_valid(
 
 @pytest.mark.django_db
 def test_create_activation_no_token_no_required(
-    activation_payload, client: APIClient, preseed_credential_types
+    activation_payload, admin_client: APIClient, preseed_credential_types
 ):
     """Test that an activation can be created without a token if the
     rulebook does not require one."""
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -541,7 +720,7 @@ def test_create_activation_no_token_no_required(
 
 @pytest.mark.django_db
 def test_create_activation_no_token_but_required(
-    client: APIClient,
+    admin_client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     activation_payload: Dict[str, Any],
     preseed_credential_types,
@@ -550,7 +729,7 @@ def test_create_activation_no_token_but_required(
     rulebook requires one."""
     activation_payload["rulebook_id"] = rulebook_with_job_template.id
 
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -562,7 +741,7 @@ def test_create_activation_no_token_but_required(
 
 @pytest.mark.django_db
 def test_create_activation_with_invalid_token(
-    client: APIClient,
+    admin_client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     default_user_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
@@ -573,7 +752,7 @@ def test_create_activation_with_invalid_token(
     activation_payload["rulebook_id"] = rulebook_with_job_template.id
     activation_payload["awx_token_id"] = default_user_awx_token.id
 
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -585,7 +764,7 @@ def test_create_activation_with_invalid_token(
 
 @pytest.mark.django_db
 def test_restart_activation_with_required_token_deleted(
-    client: APIClient,
+    admin_client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
@@ -595,14 +774,14 @@ def test_restart_activation_with_required_token_deleted(
     required is deleted."""
     activation_payload["rulebook_id"] = rulebook_with_job_template.id
     activation_payload["awx_token_id"] = admin_awx_token.id
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED
     token = models.AwxToken.objects.get(id=admin_awx_token.id)
     token.delete()
 
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/{response.data['id']}/restart/",
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -614,7 +793,7 @@ def test_restart_activation_with_required_token_deleted(
 
 @pytest.mark.django_db
 def test_create_activation_with_awx_token(
-    client: APIClient,
+    admin_client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
@@ -625,7 +804,7 @@ def test_create_activation_with_awx_token(
     activation_payload["rulebook_id"] = rulebook_with_job_template.id
     activation_payload["awx_token_id"] = admin_awx_token.id
 
-    response = client.post(
+    response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED

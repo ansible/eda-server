@@ -14,11 +14,14 @@
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
+from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
+
+from aap_eda.api import exceptions as api_exc
 
 
 # TODO: need revisit from cuwater
@@ -99,3 +102,11 @@ class ResponseSerializerMixin(object):
 
     def get_response_serializer_class(self):
         return self.get_serializer_class()
+
+
+class SharedResourceViewMixin:
+    def validate_shared_resource(self):
+        if not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
+            raise api_exc.Forbidden(
+                f"{self.action} should be done through the platform ingress"
+            )

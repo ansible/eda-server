@@ -448,6 +448,120 @@ async def test_multiple_rules_for_one_event(
         assert await get_audit_event_action_count(event) == 2
 
 
+job_url_test_data = [
+    (
+        "run_job_template",
+        "55",
+        "http://gw/api/controller",
+        "http://controller.com/jobs/1/",
+        "http://gw/execution/jobs/playbook/55/details/",
+    ),
+    (
+        "run_workflow_template",
+        "55",
+        "http://gw/api/controller",
+        "http://controller.com/jobs/workflow/55/",
+        "http://gw/execution/jobs/workflow/55/details/",
+    ),
+    (
+        "run_job_template",
+        "55",
+        "http://gw/api/controller/",
+        "http://controller.com/jobs/1/",
+        "http://gw/execution/jobs/playbook/55/details/",
+    ),
+    (
+        "run_workflow_template",
+        "55",
+        "http://gw/api/controller/",
+        "http://controller.com/jobs/workflow/55/",
+        "http://gw/execution/jobs/workflow/55/details/",
+    ),
+    (
+        "run_job_template",
+        "55",
+        "http://controller.com",
+        "http://controller.com/jobs/playbook/2/",
+        "http://controller.com/#/jobs/playbook/55/details/",
+    ),
+    (
+        "run_workflow_template",
+        "55",
+        "http://controller.com",
+        "http://controller.com/jobs/workflow/2/",
+        "http://controller.com/#/jobs/workflow/55/details/",
+    ),
+    (
+        "run_job_template",
+        "55",
+        "http://controller.com/",
+        "http://controller.com/jobs/playbook/2/",
+        "http://controller.com/#/jobs/playbook/55/details/",
+    ),
+    (
+        "run_workflow_template",
+        "55",
+        "http://controller.com/",
+        "http://controller.com/jobs/workflow/2/",
+        "http://controller.com/#/jobs/workflow/55/details/",
+    ),
+    (
+        "run_workflow_template",
+        "",
+        "http://controller.com",
+        "http://controller.com/jobs/workflow/2/",
+        "http://controller.com/jobs/workflow/2/",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "action_type, controller_job_id, api_url, old_url, new_url",
+    job_url_test_data,
+)
+@pytest.mark.django_db(transaction=True)
+async def test_controller_job_url(
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    action_type,
+    controller_job_id,
+    api_url,
+    old_url,
+    new_url,
+):
+    my_aap_inputs = {
+        "host": api_url,
+        "username": "adam",
+        "password": "secret",
+        "ssl_verify": "no",
+        "oauth_token": "",
+    }
+    rulebook_process_id = await _prepare_activation_with_controller_info(
+        my_aap_inputs
+    )
+    job_instance = await _prepare_job_instance()
+
+    assert (await get_audit_rule_count()) == 0
+    payload = create_action_payload(
+        DUMMY_UUID,
+        rulebook_process_id,
+        job_instance.uuid,
+        DUMMY_UUID,
+        "2023-03-29T15:00:17.260803Z",
+        _matching_events(),
+        "successful",
+        action_type,
+        old_url,
+        controller_job_id,
+    )
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
+
+    assert (await get_audit_action_count()) == 1
+    action = await get_audit_action_first()
+    assert action.url == new_url
+
+
 @database_sync_to_async
 def get_rulebook_process(instance_id):
     return models.RulebookProcess.objects.get(pk=instance_id)
@@ -459,6 +573,16 @@ def get_audit_events():
         models.AuditEvent.objects.first(),
         models.AuditEvent.objects.last(),
     )
+
+
+@database_sync_to_async
+def get_audit_events_first():
+    return models.AuditEvent.objects.first()
+
+
+@database_sync_to_async
+def get_audit_action_first():
+    return models.AuditAction.objects.first()
 
 
 @database_sync_to_async
@@ -557,7 +681,7 @@ def _prepare_activation_instance_with_eda_system_vault_credential():
 
 
 @database_sync_to_async
-def _prepare_activation_with_controller_info():
+def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
@@ -589,7 +713,7 @@ def _prepare_activation_with_controller_info():
 
     credential = models.EdaCredential.objects.create(
         name="eda_credential",
-        inputs=AAP_INPUTS,
+        inputs=inputs,
         managed=False,
         credential_type=aap_credential_type,
     )
@@ -619,12 +743,6 @@ def _prepare_db_data():
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
     )
 
-    extra_var, _ = models.ExtraVar.objects.get_or_create(
-        name="test-extra_var",
-        extra_var=TEST_EXTRA_VAR,
-        project=project,
-    )
-
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
@@ -651,7 +769,7 @@ def _prepare_db_data():
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy=enums.RestartPolicy.ALWAYS,
-        extra_var=extra_var,
+        extra_var=TEST_EXTRA_VAR,
         rulebook=rulebook,
         project=project,
         user=user,
@@ -810,10 +928,13 @@ def create_action_payload(
     rule_run_at,
     matching_events,
     action_status="successful",
+    action_name="run_playbook",
+    action_url="https://www.example.com/",
+    controller_job_id="55",
 ):
     return {
         "type": "Action",
-        "action": "run_playbook",
+        "action": action_name,
         "action_uuid": action_uuid,
         "activation_id": activation_instance_id,
         "job_id": job_instance_uuid,
@@ -826,6 +947,8 @@ def create_action_payload(
         "matching_events": matching_events,
         "status": action_status,
         "message": "Action run successfully",
+        "url": action_url,
+        "controller_job_id": controller_job_id,
     }
 
 

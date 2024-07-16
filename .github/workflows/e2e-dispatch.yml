@@ -96,3 +96,61 @@ jobs:
         run: |
           docker compose -p eda -f docker-compose-dev.yaml logs
 
+  api-e2e-multinode-tests:
+    if: >
+      (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
+      (github.repository == 'ansible/eda-server' && github.event_name == 'pull_request_target' &&
+        contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: >-
+            ${{
+              github.event_name == 'pull_request_target' && github.event.pull_request.head.ref
+              || github.sha
+            }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Fetch test suite
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          repository: ansible/eda-qa
+          ref: ${{ github.event.inputs.edaqa_ref }}
+          path: ${{ env.EDA_QA_PATH }}
+          token: ${{ secrets.EDA_QA_GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        working-directory: ${{ env.EDA_QA_PATH }}
+        run: pip install .
+
+      - name: Build eda-server images
+        working-directory: .
+        run: |
+          docker compose -p eda-multinode -f tools/docker/docker-compose-dev.yaml build
+
+      - name: Run multinode tests
+        working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
+          EDAQA_ENV: default
+          EDAQA_MULTINODE_EDA_SERVER_PATH: "../"
+          # multinode-upstream tests require a longer timeout
+          # to allow for the time it takes to start the workers inside the tests
+          EDAQA_DEFAULT_TIMEOUT: 120
+        run: |
+          pytest -vv -s eda_qa/tests/whitebox/upstream

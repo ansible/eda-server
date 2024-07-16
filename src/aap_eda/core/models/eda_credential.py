@@ -16,12 +16,14 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
-from .base_org import BaseOrgModel
+from .base import BaseOrgModel, UniqueNamedModel
 
 __all__ = ("EdaCredential",)
 
 
-class EdaCredential(BaseOrgModel):
+class EdaCredential(BaseOrgModel, UniqueNamedModel):
+    router_basename = "edacredential"
+
     class Meta:
         db_table = "core_eda_credential"
         constraints = [
@@ -31,7 +33,6 @@ class EdaCredential(BaseOrgModel):
             )
         ]
 
-    name = models.TextField(null=False, unique=True)
     description = models.TextField(default="", blank=True, null=False)
     inputs = EncryptedTextField(default="", blank=True, null=False)
     managed = models.BooleanField(default=False)

@@ -22,6 +22,7 @@ from django.core.management import BaseCommand
 from django.db import transaction
 
 from aap_eda.core import enums, models
+from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
 
 CRUD = ["add", "view", "change", "delete"]
@@ -46,8 +47,7 @@ ORG_ROLES = [
             "audit_rule": ["view"],
             "organization": ["view", "change", "delete"],
             "team": CRUD + ["member"],
-            "project": CRUD,
-            "extra_var": ["add", "view"],
+            "project": CRUD + ["sync"],
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "credential_type": CRUD,
@@ -70,8 +70,7 @@ ORG_ROLES = [
             "audit_rule": ["view"],
             "organization": ["view"],
             "team": ["view"],
-            "project": CRUD,
-            "extra_var": ["add", "view"],
+            "project": CRUD + ["sync"],
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "credential_type": ["add", "view"],
@@ -97,8 +96,7 @@ ORG_ROLES = [
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
             "organization": ["view"],
-            "project": CRUD,
-            "extra_var": ["add", "view"],
+            "project": CRUD + ["sync"],
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "credential_type": ["add", "view"],
@@ -117,7 +115,6 @@ ORG_ROLES = [
             "audit_rule": ["view"],
             "organization": ["view"],
             "project": ["view"],
-            "extra_var": ["view"],
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "credential_type": ["view"],
@@ -134,7 +131,6 @@ ORG_ROLES = [
             "organization": ["view"],
             "team": ["view"],
             "project": ["view"],
-            "extra_var": ["view"],
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "credential_type": ["view"],
@@ -151,7 +147,6 @@ ORG_ROLES = [
             "organization": ["view"],
             "team": ["view"],
             "project": ["view"],
-            "extra_var": ["view"],
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "credential_type": ["view"],
@@ -394,6 +389,7 @@ class Command(BaseCommand):
         self._copy_scm_credentials()
         self._create_org_roles()
         self._create_obj_roles()
+        enable_redis_prefix()
 
     def _preload_credential_types(self):
         for credential_type in populate_credential_types(CREDENTIAL_TYPES):

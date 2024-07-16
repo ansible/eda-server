@@ -13,7 +13,9 @@
 #  limitations under the License.
 
 import re
+import tempfile
 
+import gnupg
 import jinja2
 import yaml
 from django.core.exceptions import ValidationError
@@ -89,7 +91,18 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
     errors = {}
     required_fields = schema.get("required", [])
 
-    for data in schema.get("fields", []):
+    schema_fields = schema.get("fields", [])
+    schema_keys = {field["id"] for field in schema_fields}
+    invalid_keys = inputs.keys() - schema_keys
+    if bool(invalid_keys):
+        errors["inputs"] = (
+            f"Input keys {invalid_keys} are not defined "
+            f"in the schema. Allowed keys are: {schema_keys}"
+        )
+
+        return errors
+
+    for data in schema_fields:
         field = data["id"]
         required = field in required_fields
         default = data.get("default")
@@ -99,7 +112,11 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
         if user_input is None:
             if default:
                 inputs[field] = default
-            elif required:
+            if required and not default:
+                errors[display_field] = ["Cannot be blank"]
+                continue
+        else:
+            if required and len(user_input.strip()) == 0:
                 errors[display_field] = ["Cannot be blank"]
                 continue
 
@@ -115,6 +132,11 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                     errors["inputs.ssh_key_unlock"] = result
                 else:
                     errors[display_field] = result
+
+        if field == "gpg_public_key":
+            result = _validate_gpg_public_key(user_input)
+            if bool(result):
+                errors[display_field] = result
 
         if data.get("type") == "boolean":
             if user_input and not isinstance(user_input, bool):
@@ -215,13 +237,9 @@ def validate_schema(schema: dict) -> list[str]:
 
 def validate_injectors(schema: dict, injectors: dict) -> dict:
     errors = []
-    context = _default_context(schema)
 
     if not isinstance(injectors, dict):
-        errors.append(
-            "Injectors must be a dict type and defines keys"
-            f" in {SUPPORTED_KEYS_IN_INJECTORS}"
-        )
+        errors.append("Injectors must be in Key-Value pairs format")
 
     if not any(
         support_key in injectors.keys()
@@ -231,6 +249,8 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
             "Injectors must have keys defined in"
             f" {SUPPORTED_KEYS_IN_INJECTORS}"
         )
+
+    context = _default_context(schema)
 
     for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
@@ -263,7 +283,7 @@ def _get_id_fields(schema: dict) -> list[str]:
 def _default_context(schema: dict) -> dict:
     results = {}
 
-    fields = schema.get("fields")
+    fields = schema.get("fields", [])
 
     for field in fields:
         field_type = field.get("type")
@@ -340,5 +360,27 @@ def _validate_ssh_key(schema: dict, data: str, inputs: dict) -> list[str]:
                 errors.append(PROTECTED_PASSPHRASE_ERROR)
     except ValidationError as e:
         errors.append(str(e))
+
+    return errors
+
+
+def _validate_gpg_public_key(key_data: str) -> list[str]:
+    errors = []
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            gpg = gnupg.GPG(gnupghome=temp_dir)
+            import_result = gpg.import_keys(key_data)
+            error = import_result.stderr
+
+            if import_result.returncode != 0:
+                errors.append(f"No valid GPG data found: {error}")
+                return errors
+
+            if import_result.sec_read > 0:
+                errors.append(f"Key is not a public key: {error}")
+        except Exception as e:
+            msg = f"Failed to validate GPG key: {str(e)}"
+            errors.append(msg)
 
     return errors

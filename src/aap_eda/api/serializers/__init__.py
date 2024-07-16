@@ -22,11 +22,6 @@ from .activation import (
     PostActivationSerializer,
 )
 from .auth import LoginSerializer
-from .credential import (
-    CredentialCreateSerializer,
-    CredentialRefSerializer,
-    CredentialSerializer,
-)
 from .credential_type import (
     CredentialTypeCreateSerializer,
     CredentialTypeRefSerializer,
@@ -53,9 +48,6 @@ from .organization import (
     OrganizationSerializer,
 )
 from .project import (
-    ExtraVarCreateSerializer,
-    ExtraVarRefSerializer,
-    ExtraVarSerializer,
     ProjectCreateRequestSerializer,
     ProjectReadSerializer,
     ProjectRefSerializer,
@@ -91,9 +83,6 @@ __all__ = (
     # auth
     "LoginSerializer",
     # project
-    "ExtraVarSerializer",
-    "ExtraVarCreateSerializer",
-    "ExtraVarRefSerializer",
     "ProjectSerializer",
     "ProjectCreateRequestSerializer",
     "ProjectUpdateRequestSerializer",
@@ -121,10 +110,6 @@ __all__ = (
     "UserListSerializer",
     "UserCreateUpdateSerializer",
     "UserDetailSerializer",
-    # credential
-    "CredentialSerializer",
-    "CredentialCreateSerializer",
-    "CredentialRefSerializer",
     # credential type
     "CredentialTypeSerializer",
     "CredentialTypeCreateSerializer",

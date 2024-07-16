@@ -32,6 +32,7 @@ from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
 from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.utils import str_to_bool
 
 from .mixins import (
     CreateModelMixin,
@@ -47,6 +48,12 @@ class KindFilterBackend(BaseFilterBackend):
         kinds = request.GET.getlist("credential_type__kind")
         if bool(kinds):
             return queryset.filter(credential_type__kind__in=kinds)
+
+        kinds = request.GET.get("credential_type__kind__in")
+        if bool(kinds):
+            kinds = kinds.split(",")
+            return queryset.filter(credential_type__kind__in=kinds)
+
         return queryset
 
 
@@ -101,7 +108,8 @@ class EdaCredentialViewSet(
             eda_credential
         )
 
-        refs = request.query_params.get("refs", "false").lower() == "true"
+        refs = str_to_bool(request.query_params.get("refs", "false"))
+
         eda_credential_serializers.references = (
             get_references(eda_credential) if refs else None
         )
@@ -190,9 +198,10 @@ class EdaCredentialViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        if serializer.validated_data.get("inputs"):
+        inputs = serializer.validated_data.get("inputs")
+        if inputs or inputs == {}:
             serializer.validated_data["inputs"] = inputs_to_store(
-                serializer.validated_data["inputs"],
+                inputs,
                 eda_credential.inputs,
             )
 
@@ -230,11 +239,7 @@ class EdaCredentialViewSet(
         ],
     )
     def destroy(self, request, *args, **kwargs):
-        force = request.query_params.get("force", "false").lower() in [
-            "true",
-            "1",
-            "yes",
-        ]
+        force = str_to_bool(request.query_params.get("force", "false"))
         eda_credential = self.get_object()
         if eda_credential.managed:
             error = "Managed EDA credential cannot be deleted"

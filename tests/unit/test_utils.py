@@ -12,20 +12,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from django.db import models
+import pytest
 
-from .utils import get_default_organization_id
-
-__all__ = ("BaseOrgModel",)
+from aap_eda.utils import str_to_bool
 
 
-class BaseOrgModel(models.Model):
-    class Meta:
-        abstract = True
-
-    organization = models.ForeignKey(
-        "Organization",
-        on_delete=models.CASCADE,
-        default=get_default_organization_id,
-        null=True,
-    )
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("true", True),
+        ("True", True),
+        ("False", False),
+        ("false", False),
+        ("yes", True),
+        ("no", False),
+        ("1", True),
+        ("0", False),
+        ("", False),
+        ("anything", False),
+    ],
+)
+def test_str_to_bool(value, expected):
+    assert str_to_bool(value) == expected

@@ -11,6 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from ansible_base.rbac.api.permissions import AnsibleBaseUserPermissions
+from ansible_base.rbac.policies import visible_users
+from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -30,6 +33,7 @@ from .mixins import (
     CreateModelMixin,
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
+    SharedResourceViewMixin,
 )
 
 
@@ -53,6 +57,7 @@ class CurrentUserView(views.APIView):
         return Response(data=serializer.data)
 
     @extend_schema(
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         operation_id="update_current_user",
         description="Update current user.",
         request=serializers.CurrentUserUpdateSerializer,
@@ -159,6 +164,7 @@ class CurrentUserAwxTokenViewSet(
 
 @extend_schema_view(
     create=extend_schema(
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Create a user",
         request=serializers.UserCreateUpdateSerializer,
         responses={
@@ -166,10 +172,13 @@ class CurrentUserAwxTokenViewSet(
                 serializers.UserDetailSerializer,
                 description="Return the created user.",
             ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Create is prohibited"
+            ),
         },
     ),
     list=extend_schema(
-        description="List all users",
+        description="List users",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.UserListSerializer,
@@ -187,16 +196,21 @@ class CurrentUserAwxTokenViewSet(
         },
     ),
     partial_update=extend_schema(
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Partial update of a user.",
         request=serializers.UserCreateUpdateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.UserDetailSerializer,
                 description="Update successful. Return an updated user.",
-            )
+            ),
+            status.HTTP_403_FORBIDDEN: OpenApiResponse(
+                None, description="Update is prohibited"
+            ),
         },
     ),
     destroy=extend_schema(
+        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Delete a user by id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
@@ -205,7 +219,7 @@ class CurrentUserAwxTokenViewSet(
             ),
             status.HTTP_403_FORBIDDEN: OpenApiResponse(
                 None,
-                description="Deleting your own account is not permitted.",
+                description="Delete is prohibited",
             ),
         },
     ),
@@ -216,12 +230,21 @@ class UserViewSet(
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
     mixins.DestroyModelMixin,
+    SharedResourceViewMixin,
 ):
     queryset = models.User.objects.filter(is_service_account=False).order_by(
         "id"
     )
     filter_backends = (DjangoFilterBackend,)
+    permission_classes = [AnsibleBaseUserPermissions]
     filterset_class = filters.UserFilter
+
+    def filter_queryset(self, qs):
+        qs = visible_users(self.request.user, queryset=qs)
+        if not self.kwargs or "pk" not in self.kwargs:
+            # TODO: hardcode for now, will need to use settings.SYSTEM_USERNAME
+            qs = qs.exclude(username="_system")
+        return super().filter_queryset(qs)
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -237,6 +260,7 @@ class UserViewSet(
         return serializers.UserDetailSerializer
 
     def destroy(self, request, *args, **kwargs):
+        self.validate_shared_resource()
         instance = self.get_object()
 
         if instance == request.user:

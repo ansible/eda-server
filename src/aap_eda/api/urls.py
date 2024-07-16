@@ -34,7 +34,6 @@ from . import views
 router = routers.SimpleRouter()
 # basename has to be set when queryset is user-dependent
 # which is any model with permissions
-router.register("extra-vars", views.ExtraVarViewSet)
 router.register("projects", views.ProjectViewSet)
 router.register("rulebooks", views.RulebookViewSet)
 router.register("activations", views.ActivationViewSet)
@@ -51,7 +50,6 @@ router.register(
     views.CurrentUserAwxTokenViewSet,
     basename="controller-token",
 )
-router.register("credentials", views.CredentialViewSet)
 router.register("credential-types", views.CredentialTypeViewSet)
 router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
@@ -81,22 +79,37 @@ openapi_urls = [
     ),
 ]
 
-v1_urls = [
-    path("status/", core_views.StatusView.as_view()),
-    path("", include(dab_urls)),
-    path("", include(resource_api_urls)),
+eda_v1_urls = [
+    path("status/", core_views.StatusView.as_view(), name="status"),
     path("", include(openapi_urls)),
-    path("auth/session/login/", views.SessionLoginView.as_view()),
-    path("auth/session/logout/", views.SessionLogoutView.as_view()),
+    path(
+        "auth/session/login/",
+        views.SessionLoginView.as_view(),
+        name="session-login",
+    ),
+    path(
+        "auth/session/logout/",
+        views.SessionLogoutView.as_view(),
+        name="session-logout",
+    ),
     path(
         "auth/token/refresh/",
         jwt_views.TokenRefreshView.as_view(),
-        name="token_refresh",
+        name="token-refresh",
     ),
-    path("users/me/", views.CurrentUserView.as_view()),
+    path("users/me/", views.CurrentUserView.as_view(), name="current-user"),
     *router.urls,
 ]
 
+dab_urls = [
+    path("", include(dab_urls)),
+    path("", include(resource_api_urls)),
+]
+
+v1_urls = eda_v1_urls + dab_urls
+
 urlpatterns = [
     path("v1/", include(v1_urls)),
+    path("v1/", views.ApiV1RootView.as_view(), name="api-v1-root"),
+    path("", views.ApiRootView.as_view(), name="api-root"),
 ]

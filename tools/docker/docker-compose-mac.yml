@@ -24,10 +24,20 @@ x-environment:
   - EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT=${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
   - EDA_ANSIBLE_BASE_JWT_KEY=${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
   - EDA_DEBUG=${EDA_DEBUG:-True}
+  - EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=${EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT:-True}
+  - EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER=${EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER:-100}
+  - EDA_DEFAULT_QUEUE_TIMEOUT=${EDA_DEFAULT_QUEUE_TIMEOUT:-300}
+  - EDA_DEFAULT_RULEBOOK_QUEUE_TIMEOUT=${EDA_DEFAULT_RULEBOOK_QUEUE_TIMEOUT:-120}
+  - EDA_RESOURCE_SERVER__URL=${EDA_RESOURCE_SERVER__URL:-'@none None'}
+  - EDA_RESOURCE_SERVER__SECRET_KEY=${EDA_RESOURCE_SERVER__SECRET_KEY:-'@none None'}
+  - EDA_RESOURCE_SERVER__VALIDATE_HTTPS=${EDA_RESOURCE_SERVER__VALIDATE_HTTPS:-False}
+  - EDA_RESOURCE_JWT_USER_ID=${EDA_RESOURCE_JWT_USER_ID:-'@none None'}
+  - EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY=${EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY:-@json {}}
+
 
 services:
   eda-ui:
-    image: "${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}"
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
     environment: *common-env
     ports:
       - '${EDA_UI_PORT:-8443}:443'
@@ -36,7 +46,7 @@ services:
         condition: service_healthy
 
   eda-api:
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
     environment: *common-env
     security_opt:
       - label=disable
@@ -64,7 +74,7 @@ services:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-ws:
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
     environment: *common-env
     command:
       - /bin/bash
@@ -79,17 +89,18 @@ services:
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
     deploy:
       replicas: ${EDA_DEFAULT_WORKERS:-1}
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     security_opt:
       - label=disable
     command:
-      - aap-eda-manage
-      - rqworker
-      - --worker-class
-      - aap_eda.core.tasking.DefaultWorker
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -103,17 +114,18 @@ services:
 
   eda-activation-worker:
     user: "${EDA_POD_USER_ID:-0}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
     deploy:
       replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
     environment: *common-env
     security_opt:
       - label=disable
     command:
-      - aap-eda-manage
-      - rqworker
-      - --worker-class
-      - aap_eda.core.tasking.ActivationWorker
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -126,7 +138,7 @@ services:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
 
   eda-scheduler:
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
     environment: *common-env
     command:
       - /bin/bash
@@ -134,13 +146,15 @@ services:
       - >-
         aap-eda-manage scheduler
     depends_on:
+      eda-api:
+        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
 
   postgres:
-    image: 'quay.io/sclorg/postgresql-15-c9s:latest'
+    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
@@ -158,7 +172,7 @@ services:
       start_period: 5s
 
   redis:
-    image: 'quay.io/fedora/redis-6:latest'
+    image: ${EDA_REDIS_IMAGE:-docker.io/library/redis}:${EDA_REDIS_VERSION:-6.2.14}
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
@@ -167,6 +181,17 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+  squid:
+    image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
+    profiles:
+      - proxy
+    hostname: squid
+    volumes:
+      - ./squid/squid.conf:/etc/squid/squid.conf
+      - ./squid/htpass:/etc/squid/htpass
+    ports:
+      - '${EDA_PROXY_PORT:-3128}:3128'
 
 volumes:
   postgres_data: {}

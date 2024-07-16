@@ -74,12 +74,11 @@ def _get_default_channel_name():
     return f"{EDA_CHANNEL_PREFIX}{stream_uuid.replace('-','_')}"
 
 
-def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
+def _get_extra_var(validated_data: dict) -> dict:
     rulesets = yaml.safe_load(validated_data["rulebook_rulesets"])
     extra_vars = rulesets[0]["sources"][0]["extra_vars"]
     encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
 
-    credential_id = None
     password = ""
 
     if bool(encrypt_vars):
@@ -89,8 +88,7 @@ def _get_extra_var_and_credential_ids(validated_data: dict) -> tuple[int, int]:
         validated_data, extra_vars, encrypt_vars, password
     )
 
-    extra_var = models.ExtraVar.objects.create(extra_var=yaml.dump(extra_vars))
-    return extra_var.id, credential_id
+    return extra_vars
 
 
 def _updated_listener_ruleset(validated_data):
@@ -110,6 +108,12 @@ class EventStreamSerializer(serializers.ModelSerializer):
     )
     user = serializers.SerializerMethodField()
     source_args = YAMLSerializerField(required=False, allow_null=True)
+    queue_name = serializers.CharField(
+        source="rulebookprocessqueue.queue_name",
+        read_only=True,
+        allow_null=True,
+        default=None,
+    )
 
     class Meta:
         model = models.EventStream
@@ -130,6 +134,7 @@ class EventStreamSerializer(serializers.ModelSerializer):
             "user",
             "log_level",
             "k8s_service_name",
+            "queue_name",
             *read_only_fields,
         ]
 
@@ -158,6 +163,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
     k8s_service_name = serializers.CharField(
         required=False,
         allow_null=True,
+        allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
 
@@ -172,7 +178,7 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
             "channel_name",
             "decision_environment_id",
             "rulebook_id",
-            "extra_var_id",
+            "extra_var",
             "user",
             "restart_policy",
             "log_level",
@@ -196,10 +202,8 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()
         )
-        extra_var_id, credential_id = _get_extra_var_and_credential_ids(
-            validated_data
-        )
-        validated_data["extra_var_id"] = extra_var_id
+        extra_vars = _get_extra_var(validated_data)
+        validated_data["extra_var"] = yaml.dump(extra_vars)
         validated_data["rulebook_rulesets"] = _updated_listener_ruleset(
             validated_data
         )

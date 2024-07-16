@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """Module for Activation Manager."""
-
 import contextlib
 import logging
 import typing as tp
@@ -20,6 +19,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from pydantic import ValidationError
@@ -32,6 +32,7 @@ from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
 from aap_eda.services.activation.engine.common import ContainerRequest
 from aap_eda.services.activation.restart_helper import (
+    system_cancel_restart_activation,
     system_restart_activation,
 )
 
@@ -195,6 +196,8 @@ class ActivationManager(StatusManager):
             "Creating a new activation instance for "
             f"activation: {self.db_instance.id}",
         )
+        if not self.check_new_process_allowed():
+            raise exceptions.MaxRunningProcessesError
         self._create_activation_instance()
 
         self.db_instance.refresh_from_db()
@@ -247,8 +250,9 @@ class ActivationManager(StatusManager):
 
         # update status
         self.set_status(ActivationStatus.RUNNING)
-        self.set_latest_instance_status(ActivationStatus.RUNNING)
-        self._set_activation_pod_id(pod_id=container_id)
+        with transaction.atomic():
+            self.set_latest_instance_status(ActivationStatus.RUNNING)
+            self._set_activation_pod_id(pod_id=container_id)
         self._reset_failure_count()
 
         # update logs
@@ -769,6 +773,8 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg)
 
+        # Save the id; once the db instance is deleted the id is set to None.
+        saved_id = self.db_instance.id
         try:
             self.db_instance.delete()
         except (ObjectDoesNotExist, ValueError):
@@ -778,8 +784,15 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg)
             raise exceptions.ActivationManagerError(msg) from None
+
+        # Cancel any outstanding restart.
+        system_cancel_restart_activation(
+            self.db_instance_type,
+            saved_id,
+        )
+
         LOGGER.info(
-            f"Delete operation for activation id: {self.db_instance.id} "
+            f"Delete operation for activation id: {saved_id} "
             "Activation deleted.",
         )
 
@@ -974,15 +987,13 @@ class ActivationManager(StatusManager):
             # For now, we are not changing the status of the activation
             return
 
+    @transaction.atomic
     def _create_activation_instance(self):
         git_hash = (
             self.db_instance.git_hash
             if hasattr(self.db_instance, "git_hash")
             else ""
         )
-
-        if not self.check_new_process_allowed():
-            raise exceptions.MaxRunningProcessesError
         args = {
             "name": self.db_instance.name,
             "status": ActivationStatus.STARTING,
@@ -1017,7 +1028,7 @@ class ActivationManager(StatusManager):
                 f"Activation {self.db_instance.id} not valid, "
                 "container request cannot be built."
             )
-            LOGGER.exception(msg)
+            LOGGER.error(msg, exc_info=settings.DEBUG)
             raise exceptions.ActivationManagerError(msg)
 
     def check_new_process_allowed(self) -> bool:

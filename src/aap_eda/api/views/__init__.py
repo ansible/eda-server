@@ -14,13 +14,13 @@
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView
-from .credential import CredentialViewSet
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
 from .organization import OrganizationViewSet
-from .project import ExtraVarViewSet, ProjectViewSet
+from .project import ProjectViewSet
+from .root import ApiRootView, ApiV1RootView
 from .rulebook import AuditRuleViewSet, RulebookViewSet
 from .team import TeamViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
@@ -29,9 +29,7 @@ __all__ = (
     # auth
     "SessionLoginView",
     "SessionLogoutView",
-    "RoleViewSet",
     # project
-    "ExtraVarViewSet",
     "ProjectViewSet",
     "AuditRuleViewSet",
     "RulebookViewSet",
@@ -43,7 +41,6 @@ __all__ = (
     "CurrentUserAwxTokenViewSet",
     "UserViewSet",
     # credential
-    "CredentialViewSet",
     "CredentialTypeViewSet",
     "EdaCredentialViewSet",
     # decision_environment
@@ -54,4 +51,7 @@ __all__ = (
     "OrganizationViewSet",
     # teams
     "TeamViewSet",
+    # root
+    "ApiV1RootView",
+    "ApiRootView",
 )

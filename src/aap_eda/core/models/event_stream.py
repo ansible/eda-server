@@ -16,20 +16,28 @@ from django.db import models
 
 from aap_eda.core.enums import (
     ActivationStatus,
+    ProcessParentType,
     RestartPolicy,
     RulebookProcessLogLevel,
 )
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .mixins import StatusHandlerModelMixin
+from .base import UniqueNamedModel
+from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 
 
-class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
+class EventStream(
+    StatusHandlerModelMixin,
+    ContainerableMixin,
+    OnDeleteProcessParentMixin,
+    UniqueNamedModel,
+):
     """Model representing an event stream."""
 
-    name = models.TextField(null=False, unique=True)
-    description = models.TextField(default="")
+    router_basename = "eventstream"
+
+    description = models.TextField(default="", blank=True)
     is_enabled = models.BooleanField(default=True)
     decision_environment = models.ForeignKey(
         "DecisionEnvironment",
@@ -41,11 +49,7 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
         on_delete=models.SET_NULL,
         null=True,
     )
-    extra_var = models.ForeignKey(
-        "ExtraVar",
-        on_delete=models.CASCADE,
-        null=True,
-    )
+    extra_var = models.TextField(null=True, blank=True)
     restart_policy = models.TextField(
         choices=RestartPolicy.choices(),
         default=RestartPolicy.ON_FAILURE,
@@ -91,6 +95,7 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     k8s_service_name = models.TextField(
         null=True,
         default=None,
+        blank=True,
         help_text="Name of the kubernetes service",
     )
 
@@ -108,3 +113,6 @@ class EventStream(StatusHandlerModelMixin, ContainerableMixin, models.Model):
     def _get_skip_audit_events(self) -> bool:
         """Event stream skips audit events."""
         return True
+
+    def get_parent_type(self) -> str:
+        return ProcessParentType.EVENT_STREAM

@@ -17,7 +17,7 @@ import pytest
 from pytest_lazyfixture import lazy_fixture
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationRequest, ActivationStatus
 
 
 @pytest.mark.parametrize(
@@ -58,3 +58,30 @@ def test_latest_instance_field(instance):
     first_instance.status = ActivationStatus.COMPLETED
     first_instance.save(update_fields=["status"])
     assert instance.latest_instance == second_instance
+
+
+@pytest.mark.parametrize(
+    "instance",
+    [
+        pytest.param(
+            lazy_fixture("new_activation"),
+            id="activation",
+        ),
+        pytest.param(
+            lazy_fixture("new_event_stream"),
+            id="event_stream",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_on_delete_process_parent_mixin(instance):
+    """Test on_delete_process_parent_mixin."""
+    queue_item = models.ActivationRequestQueue.objects.create(
+        process_parent_type=instance.get_parent_type(),
+        process_parent_id=instance.id,
+        request=ActivationRequest.AUTO_START,
+    )
+    instance.delete()
+    assert not models.ActivationRequestQueue.objects.filter(
+        id=queue_item.id
+    ).exists()
