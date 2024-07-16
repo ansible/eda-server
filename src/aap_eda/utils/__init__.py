@@ -12,6 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pkg_resources
+
 
 def str_to_bool(value: str) -> bool:
     return value.lower() in ("yes", "true", "1")
+
+
+def get_eda_version():
+    """Return EDA version as defined in pyproject.toml."""
+    try:
+        return pkg_resources.get_distribution("aap-eda").version
+    except pkg_resources.DistributionNotFound:
+        return "no version defined for EDA"

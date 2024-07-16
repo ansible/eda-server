@@ -18,9 +18,12 @@ import logging
 from django.conf import settings
 from django.urls import URLPattern, URLResolver
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
+
+from aap_eda.utils import get_eda_version
 
 LOGGER = logging.getLogger(__name__)
 
@@ -70,3 +73,15 @@ def get_api_v1_urls(request=None):
         urls = urls.eda_v1_urls
 
     return list_urls(urls)
+
+
+class ApiV1ConfigView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        data = {
+            "version": get_eda_version(),
+            "deployment_type": settings.DEPLOYMENT_TYPE,
+        }
+
+        return Response(data, status=200)

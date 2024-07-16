@@ -80,6 +80,7 @@ openapi_urls = [
 ]
 
 eda_v1_urls = [
+    path("config/", views.ApiV1ConfigView.as_view(), name="config"),
     path("status/", core_views.StatusView.as_view(), name="status"),
     path("", include(openapi_urls)),
     path(
