@@ -11,20 +11,19 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import importlib.metadata
-import logging
+import pytest
+from django.conf import settings
 
-logger = logging.getLogger(__name__)
-
-
-def str_to_bool(value: str) -> bool:
-    return value.lower() in ("yes", "true", "1")
+from aap_eda.utils import get_eda_version
+from tests.integration.constants import api_url_v1
 
 
-def get_eda_version() -> str:
-    """Return EDA version as defined in the aap-eda package."""
-    try:
-        return importlib.metadata.version("aap-eda")
-    except importlib.metadata.PackageNotFoundError:
-        logger.error("Cannot read version from aap-eda package")
-        return "unknown"
+@pytest.mark.django_db
+def test_v1_config(admin_client):
+    response = admin_client.get(f"{api_url_v1}/config/")
+    assert response.status_code == 200
+    assert response.data == {
+        "time_zone": settings.TIME_ZONE,
+        "version": get_eda_version(),
+        "deployment_type": settings.DEPLOYMENT_TYPE,
+    }

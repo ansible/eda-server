@@ -22,6 +22,7 @@ from tests.integration.constants import api_url_v1
     [
         pytest.param(
             [
+                "/config/",
                 "/status/",
                 "/openapi.json",
                 "/openapi.yaml",
@@ -50,6 +51,7 @@ from tests.integration.constants import api_url_v1
         ),
         pytest.param(
             [
+                "/config/",
                 "/status/",
                 "/role_definitions/",
                 "/role_user_assignments/",
