@@ -22,6 +22,7 @@ from .activation import (
     PostActivationSerializer,
 )
 from .auth import LoginSerializer
+from .config import ConfigSerializer
 from .credential_type import (
     CredentialTypeCreateSerializer,
     CredentialTypeRefSerializer,
@@ -110,6 +111,8 @@ __all__ = (
     "UserListSerializer",
     "UserCreateUpdateSerializer",
     "UserDetailSerializer",
+    # config
+    "ConfigSerializer",
     # credential type
     "CredentialTypeSerializer",
     "CredentialTypeCreateSerializer",

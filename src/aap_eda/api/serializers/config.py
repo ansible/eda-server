@@ -11,20 +11,20 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import importlib.metadata
-import logging
-
-logger = logging.getLogger(__name__)
+from rest_framework import serializers
 
 
-def str_to_bool(value: str) -> bool:
-    return value.lower() in ("yes", "true", "1")
+class ConfigSerializer(serializers.Serializer):
+    """Serializer for ConfigView response."""
 
+    time_zone = serializers.CharField(
+        required=True,
+    )
 
-def get_eda_version() -> str:
-    """Return EDA version as defined in the aap-eda package."""
-    try:
-        return importlib.metadata.version("aap-eda")
-    except importlib.metadata.PackageNotFoundError:
-        logger.error("Cannot read version from aap-eda package")
-        return "unknown"
+    version = serializers.CharField(
+        required=True,
+    )
+
+    deployment_type = serializers.CharField(
+        required=True,
+    )

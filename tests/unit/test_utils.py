@@ -12,9 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from importlib.metadata import PackageNotFoundError, version
+from unittest.mock import patch
+
 import pytest
 
-from aap_eda.utils import str_to_bool
+from aap_eda.utils import get_eda_version, str_to_bool
 
 
 @pytest.mark.parametrize(
@@ -34,3 +37,11 @@ from aap_eda.utils import str_to_bool
 )
 def test_str_to_bool(value, expected):
     assert str_to_bool(value) == expected
+
+
+def test_get_eda_version():
+    assert get_eda_version() == version("aap-eda")
+
+    # assert outcome when aap-eda package is not found
+    with patch("importlib.metadata.version", side_effect=PackageNotFoundError):
+        assert get_eda_version() == "unknown"
