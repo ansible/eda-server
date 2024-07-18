@@ -14,7 +14,6 @@
 import pytest
 from django.conf import settings
 
-from aap_eda.utils import get_eda_version
 from tests.integration.constants import api_url_v1
 
 
@@ -112,13 +111,3 @@ def test_api_root(admin_client):
     assert "v1" in response.data["available_versions"]
     assert api_url_v1 in response.data["current_version"]
     assert api_url_v1 in response.data["available_versions"]["v1"]
-
-
-@pytest.mark.django_db
-def test_v1_config(admin_client):
-    response = admin_client.get(f"{api_url_v1}/config/")
-    assert response.status_code == 200
-    assert response.data == {
-        "version": get_eda_version(),
-        "deployment_type": settings.DEPLOYMENT_TYPE,
-    }
