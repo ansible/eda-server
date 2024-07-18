@@ -13,16 +13,28 @@
 #  limitations under the License.
 
 from django.conf import settings
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from aap_eda.api.serializers import ConfigSerializer
 from aap_eda.utils import get_eda_version
 
 
 class ConfigView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        description="Get the current configuration info of EDA.",
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(
+                ConfigSerializer,
+                description=("Return the current configuration info of EDA."),
+            )
+        },
+    )
     def get(self, request):
         data = {
             "time_zone": settings.TIME_ZONE,
@@ -30,4 +42,4 @@ class ConfigView(APIView):
             "deployment_type": settings.DEPLOYMENT_TYPE,
         }
 
-        return Response(data, status=200)
+        return Response(ConfigSerializer(data).data, status=status.HTTP_200_OK)
