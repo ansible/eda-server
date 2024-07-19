@@ -22,7 +22,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from aap_eda.api import exceptions
-from aap_eda.api.serializers import LoginSerializer
+from aap_eda.api.serializers import (
+    JWTTokenSerializer,
+    LoginSerializer,
+    RefreshTokenSerializer,
+)
+from aap_eda.services.auth import jwt_access_token
 
 
 class SessionLoginView(APIView):
@@ -92,3 +97,27 @@ class SessionLogoutView(APIView):
     def post(self, request: Request, *args, **kwargs):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TokenRefreshView(APIView):
+    permission_classes = ()
+    authentication_classes = ()
+
+    @extend_schema(
+        operation_id="token_refresh",
+        description="Refresh websocket access token",
+        request=RefreshTokenSerializer,
+        responses={
+            status.HTTP_200_OK: OpenApiResponse(JWTTokenSerializer),
+        },
+    )
+    @method_decorator(never_cache)
+    def post(self, request: Request, *args, **kwargs):
+        serializer = RefreshTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        access_token = {"access": jwt_access_token(serializer.user.id)}
+        return Response(
+            access_token,
+            status=status.HTTP_200_OK,
+        )

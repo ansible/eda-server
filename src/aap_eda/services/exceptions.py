@@ -4,3 +4,7 @@ class PodmanImagePullError(Exception):
 
 class InvalidDeploymentTypeError(Exception):
     pass
+
+
+class InvalidTokenError(Exception):
+    pass
