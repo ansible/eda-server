@@ -26,6 +26,7 @@ from typing import Optional
 from urllib.parse import quote, urlparse, urlunparse
 
 import ansible_runner
+from django.conf import settings
 
 from aap_eda.core.models import EdaCredential
 from aap_eda.core.types import StrPath
@@ -291,6 +292,8 @@ class GitAnsibleRunnerExecutor:
     ):
         with tempfile.TemporaryDirectory(prefix="EDA_RUNNER") as data_dir:
             outputs = io.StringIO()
+            env_vars["ANSIBLE_LOCAL_TEMP"] = settings.ANSIBLE_LOCAL_TEMP
+            env_vars["ANSIBLE_REMOTE_TEMP"] = settings.ANSIBLE_REMOTE_TEMP
             with contextlib.redirect_stdout(outputs):
                 runner = ansible_runner.run(
                     private_data_dir=data_dir,

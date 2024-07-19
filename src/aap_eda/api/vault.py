@@ -16,6 +16,7 @@ import shutil
 import tempfile
 
 import pexpect
+from django.conf import settings
 
 
 class AnsibleVaultNotFound(Exception):
@@ -41,8 +42,11 @@ def encrypt_string(password: str, plaintext: str, vault_id: str) -> str:
     tmp.write(password)
     tmp.flush()
     label = f"{vault_id}@{tmp.name}"
+    env = os.environ | {"ANSIBLE_LOCAL_TEMP": settings.ANSIBLE_LOCAL_TEMP}
 
-    child = pexpect.spawn(f"ansible-vault encrypt_string --vault-id {label}")
+    child = pexpect.spawn(
+        f"ansible-vault encrypt_string --vault-id {label}", env=env
+    )
     child.expect("Reading plaintext input from stdin*")
     child.sendline(plaintext)
     child.sendcontrol("D")
@@ -75,7 +79,8 @@ def encrypt_string(password: str, plaintext: str, vault_id: str) -> str:
 
 
 def decrypt(password: str, vault_string: str) -> str:
-    child = pexpect.spawn("ansible-vault decrypt")
+    env = os.environ | {"ANSIBLE_LOCAL_TEMP": settings.ANSIBLE_LOCAL_TEMP}
+    child = pexpect.spawn("ansible-vault decrypt", env=env)
     child.expect("Vault password: ")
     child.sendline(password)
     child.expect("Reading ciphertext input from stdin")

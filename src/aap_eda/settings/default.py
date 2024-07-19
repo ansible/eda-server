@@ -93,6 +93,7 @@ To configure a Resource Server for syncing of managed resources:
 
 """
 import os
+import tempfile
 from datetime import timedelta
 
 import dynaconf
@@ -696,3 +697,20 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
 API_PATH_TO_UI_PATH_MAP = settings.get(
     "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
 )
+
+
+ANSIBLE_LOCAL_TEMP = settings.get("ANSIBLE_LOCAL_TEMP", tempfile.gettempdir())
+if not os.access(ANSIBLE_LOCAL_TEMP, os.W_OK):
+    raise ImproperlyConfigured(
+        f"ANSIBLE_LOCAL_TEMP {ANSIBLE_LOCAL_TEMP} is not writable, "
+        "please define ANSIBLE_LOCAL_TEMP with a writable directory."
+    )
+
+ANSIBLE_REMOTE_TEMP = settings.get(
+    "ANSIBLE_REMOTE_TEMP", tempfile.gettempdir()
+)
+if not os.access(ANSIBLE_REMOTE_TEMP, os.W_OK):
+    raise ImproperlyConfigured(
+        f"ANSIBLE_REMOTE_TEMP {ANSIBLE_LOCAL_TEMP} is not writable, "
+        "please define ANSIBLE_REMOTE_TEMP with a writable directory."
+    )
