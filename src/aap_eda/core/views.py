@@ -29,11 +29,11 @@ class HealthView(APIView):
     def get(self, request):
         try:
             connection.ensure_connection()
-            return Response({"status": "OK"}, status=200)
+            return Response({"status": "OK"}, status=status.HTTP_200_OK)
         except OperationalError:
             return Response(
                 {"status": "error", "message": "Database connection failed"},
-                status=500,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
