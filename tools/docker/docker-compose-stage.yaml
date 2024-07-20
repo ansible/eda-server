@@ -2,7 +2,7 @@ x-environment:
   &common-env
   - EDA_DB_HOST=postgres
   - EDA_MQ_HOST=redis
-  - DJANGO_SETTINGS_MODULE=aap_eda.settings.default
+  - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
   - EDA_DB_PASSWORD=secret
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
@@ -14,8 +14,8 @@ x-environment:
   - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
   - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
   - EDA_PROTOCOL=http
-  - EDA_HOST=eda-api:8000
-  - EDA_SERVER=http://eda-api:8000
+  - EDA_HOST=http://${EDA_HOST:-eda-api:8000}
+  - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
   - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
   - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
   - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
@@ -84,6 +84,9 @@ services:
       start_period: 5s
   eda-api:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    build:
+      context: ../../
+      dockerfile: tools/docker/Dockerfile
     environment: *common-env
     command:
       - /bin/bash
@@ -107,6 +110,9 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+    networks:
+      - service-mesh
+      - default
 
   eda-ws:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -191,3 +197,7 @@ services:
 volumes:
   postgres_data: {}
   podman_data: {}
+
+networks:
+  service-mesh:
+    name: service-mesh

@@ -23,3 +23,6 @@ __pycache__/
 Taskfile.yml
 Taskfile.yaml
 /tools/deploy/environment.properties
+
+# Special file placed for gateway aap-dev testing
+src/aap_eda/settings/dev_hacked_settings.py
