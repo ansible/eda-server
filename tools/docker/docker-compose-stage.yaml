@@ -2,7 +2,7 @@ x-environment:
   &common-env
   - EDA_DB_HOST=postgres
   - EDA_MQ_HOST=redis
-  - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.development}
+  - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.default}
   - EDA_DB_PASSWORD=secret
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
