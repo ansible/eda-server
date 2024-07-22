@@ -287,11 +287,11 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
                 f"Skip enqueing job: {job_id} because it is already enqueued"
             )
             return job
-    else:
-        queue = get_queue(name=queue_name)
-        kwargs["job_id"] = job_id
-        logger.info(f"Enqueing unique job: {job_id}")
-        return queue.enqueue(*args, **kwargs)
+
+    queue = get_queue(name=queue_name)
+    kwargs["job_id"] = job_id
+    logger.info(f"Enqueing unique job: {job_id}")
+    return queue.enqueue(*args, **kwargs)
 
 
 def job_from_queue(queue: Union[Queue, str], job_id: str) -> Optional[Job]:
