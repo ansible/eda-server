@@ -68,12 +68,12 @@ openapi_urls = [
         name="openapi-yaml",
     ),
     path(
-        "docs",
+        "docs/",
         SpectacularSwaggerView.as_view(url_name="openapi-json"),
         name="openapi-docs",
     ),
     path(
-        "redoc",
+        "redoc/",
         SpectacularRedocView.as_view(url_name="openapi-json"),
         name="openapi-redoc",
     ),
