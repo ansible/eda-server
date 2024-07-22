@@ -84,9 +84,6 @@ services:
       start_period: 5s
   eda-api:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
-    build:
-      context: ../../
-      dockerfile: tools/docker/Dockerfile
     environment: *common-env
     command:
       - /bin/bash
