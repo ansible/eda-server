@@ -93,7 +93,6 @@ To configure a Resource Server for syncing of managed resources:
 
 """
 import os
-from datetime import timedelta
 
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
@@ -176,12 +175,6 @@ JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
     "JWT_REFRESH_TOKEN_LIFETIME_DAYS",
     365,
 )
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=JWT_ACCESS_TOKEN_LIFETIME_MINUTES,
-    ),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
-}
 
 # Application definition
 INSTALLED_APPS = [
@@ -321,7 +314,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "aap_eda.api.authentication.WebsocketJWTAuthentication",
         "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [

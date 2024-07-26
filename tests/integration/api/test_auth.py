@@ -17,12 +17,13 @@ from rest_framework import status
 from rest_framework.test import APIClient, RequestsClient
 
 from aap_eda.core import models
+from aap_eda.services.auth import jwt_refresh_token
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
-auth_url = f"http://testserver{api_url_v1}/auth/session"
+auth_url = f"https://testserver{api_url_v1}/auth/session"
 login_url = f"{auth_url}/login/"
 logout_url = f"{auth_url}/logout/"
 
@@ -94,3 +95,24 @@ def _get_crsf_token(client: RequestsClient):
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
     return response.cookies["csrftoken"]
+
+
+@pytest.mark.django_db
+def test_refresh_token(base_client: RequestsClient):
+    user, _ = models.User.objects.get_or_create(
+        username="_token_service_user",
+        is_service_account=True,
+    )
+    data = {"refresh": jwt_refresh_token(user.id)}
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    response = base_client.post(url, data)
+    assert response.status_code == status.HTTP_200_OK
+    assert "access" in response.data
+
+
+@pytest.mark.django_db
+def test_refresh_token_with_bad_token(base_client: RequestsClient):
+    data = {"refresh": "bad token"}
+    url = f"https://testserver{api_url_v1}/auth/token/refresh/"
+    response = base_client.post(url, data)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
