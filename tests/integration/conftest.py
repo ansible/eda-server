@@ -802,9 +802,7 @@ def credential_type() -> models.CredentialType:
 
 
 @pytest.fixture
-def user_credential_type(
-    default_organization: models.Organization,
-) -> models.CredentialType:
+def user_credential_type() -> models.CredentialType:
     return models.CredentialType.objects.create(
         name="user_type",
         inputs={
@@ -819,7 +817,6 @@ def user_credential_type(
                 "sasl_password": "{{ sasl_password }}",
             }
         },
-        organization=default_organization,
     )
 
 
