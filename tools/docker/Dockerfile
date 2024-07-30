@@ -28,7 +28,7 @@ RUN DNF=dnf \
     && rm -rf /var/cache/dnf
 
 USER "$USER_ID"
-ENV POETRY_VERSION='1.7.1' \
+ENV POETRY_VERSION="1.7.1" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -37,7 +37,8 @@ ENV POETRY_VERSION='1.7.1' \
     VIRTUAL_ENV=/app/venv \
     SOURCES_DIR=/app/src \
     PATH="/app/.local/bin:$PATH" \
-    PYTHON_BIN="python3.11"
+    PYTHON_BIN="python3.11" \
+    HOME="/app"
 
 # Install poetry, create virtual environment
 RUN ${PYTHON_BIN} -m pip install --user "poetry==${POETRY_VERSION}" \
