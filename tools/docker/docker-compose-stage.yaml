@@ -30,6 +30,16 @@ x-environment:
   - EDA_RESOURCE_SERVER__VALIDATE_HTTPS=${EDA_RESOURCE_SERVER__VALIDATE_HTTPS:-False}
   - EDA_RESOURCE_JWT_USER_ID=${EDA_RESOURCE_JWT_USER_ID:-'@none None'}
   - EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY=${EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY:-@json {}}
+  - EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
+  - EDA_PG_NOTIFY_DSN="host=host.containers.internal port=5432 dbname=eda user=postgres password=secret"
+  - EDA_PG_NOTIFY_DSN_SERVER="host=postgres port=5432 dbname=eda user=postgres password=secret"
+  - EDA_WEBHOOK_URL_PREFIX=${EDA_WEBHOOK_URL_PREFIX:-https://localhost/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_WEBHOOK_MTLS_URL_PREFIX=${EDA_WEBHOOK_MTLS_URL_PREFIX:-https://localhost/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/cert.pem}
+  - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/cert.key}
+  - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/CA.pem}
 
 services:
   podman-pre-setup:
@@ -171,6 +181,25 @@ services:
         condition: service_healthy
     restart: always
 
+  eda-webhook-api:
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        gunicorn -b 0.0.0.0:8000 -w ${EDA_WEBHOOK_WORKERS:-2} aap_eda.wsgi --access-logfile -
+    ports:
+      - '8555:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
     profiles:
@@ -187,8 +216,10 @@ services:
     environment: *common-env
     ports:
       - '${EDA_UI_PORT:-8443}:443'
+    volumes:
+      - './tools/docker/my_certs:/tmp/my_certs:z'
     depends_on:
-      eda-api:
+      eda-webhook-api:
         condition: service_healthy
 
 volumes:
@@ -198,3 +229,4 @@ volumes:
 networks:
   service-mesh:
     name: service-mesh
+  default:

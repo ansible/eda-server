@@ -515,3 +515,17 @@ def test_update_credential_type_with_created_credentials(
     assert response.status_code == status_code
     if message is not None:
         assert message in response.data[key]
+
+
+@pytest.mark.django_db
+def test_credential_types_based_on_namespace(
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    response = admin_client.get(
+        f"{api_url_v1}/credential-types/?namespace=webhook"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    for credential_type in data["results"]:
+        assert credential_type["namespace"] == "webhook"

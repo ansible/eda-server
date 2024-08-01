@@ -696,3 +696,24 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
 API_PATH_TO_UI_PATH_MAP = settings.get(
     "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
 )
+
+_DEFAULT_PG_NOTIFY_DSN_SERVER = (
+    f"host={DATABASES['default']['HOST']} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
+    f"password={DATABASES['default']['PASSWORD']}"
+)
+PG_NOTIFY_DSN_SERVER = settings.get(
+    "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
+)
+SERVER_UUID = settings.get("SERVER_UUID", "abc-def-123-34567")
+WEBHOOK_URL_PREFIX = settings.get(
+    "WEBHOOK_URL_PREFIX", f"https://ui.eda.local:8443/{SERVER_UUID}"
+)
+WEBHOOK_MTLS_URL_PREFIX = settings.get(
+    "WEBHOOK_MTLS_URL_PREFIX", f"https://ui.eda.local:8443/mtls/{SERVER_UUID}"
+)
+MAX_PG_NOTIFY_MESSAGE_SIZE = int(
+    settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
+)

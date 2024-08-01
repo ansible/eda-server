@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import hashlib
 import logging
 from urllib.parse import urlparse
 
@@ -27,7 +28,10 @@ from aap_eda.core.utils.credentials import inputs_to_store
 
 CRUD = ["add", "view", "change", "delete"]
 LOGGER = logging.getLogger(__name__)
-
+AVAILABLE_ALGORITHMS = sorted(hashlib.algorithms_available)
+AUTH_TYPE_LABEL = "Webhook Authentication Type"
+SIGNATURE_ENCODING_LABEL = "Signature Encoding"
+HTTP_HEADER_LABEL = "HTTP Header Key"
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
 ORG_ROLES = [
@@ -51,6 +55,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "eda_credential": CRUD,
+            "webhook": CRUD,
         },
     },
     {
@@ -73,6 +78,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "eda_credential": ["add", "view"],
+            "webhook": ["add", "view"],
         },
     },
     {
@@ -98,6 +104,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "eda_credential": ["add", "view"],
+            "webhook": ["add", "view"],
         },
     },
     {
@@ -115,6 +122,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
+            "webhook": ["view"],
         },
     },
     {
@@ -130,6 +138,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
+            "webhook": ["view"],
         },
     },
     {
@@ -145,6 +154,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
+            "webhook": ["view"],
         },
     },
 ]
@@ -308,6 +318,538 @@ VAULT_INPUTS = {
     "required": ["vault_password"],
 }
 
+WEBHOOK_HMAC_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "hmac",
+            "hidden": True,
+        },
+        {
+            "id": "secret",
+            "label": "Secret",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The symmetrical shared secret between EDA and the Webhook "
+                "Server. Please save this value since you would need it on "
+                "the Webhook Server."
+            ),
+        },
+        {
+            "id": "hash_algorithm",
+            "label": "Hash algorithm",
+            "type": "string",
+            "default": "sha256",
+            "choices": AVAILABLE_ALGORITHMS,
+            "help_text": (
+                "The Webhook sender hashes the message being sent using one "
+                "of these algorithms, which guarantees message integrity."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": "HMAC Header Key",
+            "type": "string",
+            "default": "X-Hub-Signature-256",
+            "help_text": (
+                "The webhook sender typically uses a special HTTP header "
+                "to send the signature of the payload. e.g X-Hub-Signature-256"
+            ),
+        },
+        {
+            "id": "signature_encoding",
+            "label": SIGNATURE_ENCODING_LABEL,
+            "type": "string",
+            "default": "base64",
+            "choices": ["base64", "hex"],
+            "help_text": (
+                "The payload signature which is binary is converted as a "
+                "base64 or hex strings before being added to the HTTP header"
+            ),
+        },
+        {
+            "id": "signature_prefix",
+            "label": "Signature prefix",
+            "type": "string",
+            "help_text": (
+                "The signature might optionally have a prefix.e.g sha256="
+            ),
+        },
+    ],
+    "required": [
+        "auth_type",
+        "secret",
+        "hash_algorithm",
+        "http_header_key",
+        "signature_encoding",
+    ],
+}
+
+WEBHOOK_BASIC_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "basic",
+            "hidden": True,
+        },
+        {
+            "id": "username",
+            "label": "Username",
+            "type": "string",
+            "help_text": (
+                "The username used to authenticate the incoming webhook"
+            ),
+        },
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The password used to authenticate the incoming webhook"
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Authorization",
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "password", "username", "http_header_key"],
+}
+
+WEBHOOK_TOKEN_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "token",
+            "hidden": True,
+        },
+        {
+            "id": "token",
+            "label": "Token",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The symmetrical shared token between EDA and the Webhook "
+                "Server. Please save this value since you would need it on "
+                "the Webhook Server."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Authorization",
+            "help_text": (
+                "The HTTP header for passing in the token usually this is "
+                "Authorization but some sites use a different header, "
+                "e.g. X-Gitlab-Token"
+            ),
+        },
+    ],
+    "required": ["auth_type", "token", "http_header_key"],
+}
+
+WEBHOOK_OAUTH2_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "oauth2",
+            "hidden": True,
+        },
+        {
+            "id": "client_id",
+            "label": "Client ID",
+            "type": "string",
+            "help_text": ("The Client ID from the Authorization Server."),
+        },
+        {
+            "id": "client_secret",
+            "label": "Client Secret",
+            "type": "string",
+            "secret": True,
+            "help_text": ("The Client Secret from the Authorization Server."),
+        },
+        {
+            "id": "introspection_url",
+            "label": "Introspection URL",
+            "type": "string",
+            "help_text": (
+                "The Introspection URL from the Authorization Server "
+                "as defined in RFC 7662."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Authorization",
+            "hidden": True,
+            "help_text": (
+                "The HTTP header for passing in the token usually this is "
+                "Authorization."
+            ),
+        },
+    ],
+    "required": [
+        "auth_type",
+        "http_header_key",
+        "client_secret",
+        "client_id",
+        "introspection_url",
+    ],
+}
+
+WEBHOOK_OAUTH2_JWT_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "oauth2-jwt",
+            "hidden": True,
+        },
+        {
+            "id": "jwks_url",
+            "label": "JWKS URL",
+            "type": "string",
+            "help_text": (
+                "JSON Web Key Sets URL to fetch public keys to validate "
+                "JWT token. Its usually "
+                "https://<your auth server>/.well-known/jwks.json"
+            ),
+        },
+        {
+            "id": "audience",
+            "label": "Audience",
+            "type": "string",
+            "help_text": (
+                "Audience from the JWT claims, if specified we will "
+                "validate the audience in the JWT claims."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Authorization",
+            "hidden": True,
+            "help_text": (
+                "The HTTP header for passing in the token usually this is "
+                "Authorization."
+            ),
+        },
+    ],
+    "required": ["auth_type", "jwks_url", "http_header_key"],
+}
+
+WEBHOOK_ECDSA_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "ecdsa",
+            "hidden": True,
+        },
+        {
+            "id": "http_header_key",
+            "label": "Primary Header Key",
+            "type": "string",
+            "help_text": (
+                "The sender will use this HTTP header to pass in "
+                "the signature"
+            ),
+        },
+        {
+            "id": "public_key",
+            "label": "Public Key",
+            "type": "string",
+            "help_text": (
+                "Public Key for validating the data, this would be "
+                "available from the sender after you have created the "
+                "webhook on their side with our URL. This is usually a "
+                "2 step process"
+            ),
+            "multiline": True,
+        },
+        {
+            "id": "prefix_http_header_key",
+            "label": "Additional Prefix Header Key",
+            "type": "string",
+            "help_text": "Additional Header Key for ECDSA.",
+        },
+        {
+            "id": "signature_encoding",
+            "label": SIGNATURE_ENCODING_LABEL,
+            "type": "string",
+            "default": "base64",
+            "choices": ["base64", "hex"],
+            "help_text": (
+                "The payload signature which is binary is converted "
+                "as a base64 or hex strings before being added to "
+                "the HTTP header"
+            ),
+        },
+        {
+            "id": "hash_algorithm",
+            "label": "Hash algorithm",
+            "type": "string",
+            "default": "sha256",
+            "choices": AVAILABLE_ALGORITHMS,
+            "help_text": (
+                "The Webhook sender hashes the message being sent using one "
+                "of these algorithms, which guarantees message integrity."
+            ),
+        },
+    ],
+    "required": [
+        "auth_type",
+        "http_header_key",
+        "public_key",
+        "signature_encoding",
+        "hash_algorithm",
+    ],
+}
+
+WEBHOOK_MTLS_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "mtls",
+            "hidden": True,
+        },
+        {
+            "id": "subject",
+            "label": "Certificate Subject",
+            "type": "string",
+            "help_text": (
+                "The Subject from Certificate compliant with RFC 2253."
+                "This is optional and can be used to check the subject "
+                "defined in the certificate."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Subject",
+            "help_text": (
+                "The NGINX Server passes the certificate subject using "
+                "this HTTP header"
+            ),
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "http_header_key"],
+}
+
+WEBHOOK_GITLAB_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "token",
+            "hidden": True,
+        },
+        {
+            "id": "token",
+            "label": "Token",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The symmetrical shared token between EDA and the Gitlab "
+                "Server. Please save this value since you would need it on "
+                "the Webhook Server."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "X-Gitlab-Token",
+            "help_text": (
+                "The HTTP header for passing in the token usually "
+                "this is Authorization but some sites use a different "
+                "header, e.g. X-Gitlab-Token"
+            ),
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "token", "http_header_key"],
+}
+
+WEBHOOK_GITHUB_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "hmac",
+            "hidden": True,
+        },
+        {
+            "id": "secret",
+            "label": "HMAC Secret",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The symmetrical shared secret between EDA and "
+                "the Webhook Server. Please save this value since "
+                "you would need it on the Webhook Server."
+            ),
+        },
+        {
+            "id": "hash_algorithm",
+            "label": "HMAC Algorithm",
+            "type": "string",
+            "default": "sha256",
+            "choices": ["sha128", "sha256", "sha512", "sha1024"],
+            "help_text": (
+                "The Webhook sender hashes the message being sent "
+                "using one of these algorithms, which guarantees "
+                "message integrity."
+            ),
+            "hidden": True,
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "X-Hub-Signature-256",
+            "help_text": (
+                "The webhook sender typically uses a special "
+                "HTTP header to send the signature of the payload. "
+                "e.g X-Hub-Signature-256"
+            ),
+            "hidden": True,
+        },
+        {
+            "id": "signature_encoding",
+            "label": SIGNATURE_ENCODING_LABEL,
+            "type": "string",
+            "default": "hex",
+            "choices": ["base64", "hex"],
+            "help_text": (
+                "The payload signature which is binary is converted "
+                "as a base64 or hex strings before being added to "
+                "the HTTP header"
+            ),
+            "hidden": True,
+        },
+        {
+            "id": "signature_prefix",
+            "label": "Signature prefix",
+            "type": "string",
+            "default": "sha256=",
+            "help_text": (
+                "The signature might optionally have a prefix.e.g sha256="
+            ),
+            "hidden": True,
+        },
+    ],
+    "required": [
+        "auth_type",
+        "secret",
+        "hash_algorithm",
+        "http_header_key",
+        "signature_encoding",
+        "signature_prefix",
+    ],
+}
+
+WEBHOOK_SNOW_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "token",
+            "hidden": True,
+        },
+        {
+            "id": "token",
+            "label": "Token",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The symmetrical shared token between EDA and the ServiceNow "
+                "Server. Please save this value since you would need it on "
+                "the Webhook Server."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Authorization",
+            "help_text": (
+                "The HTTP header for passing in the token usually this "
+                "is Authorization but some sites use a different header, "
+                "e.g. X-Gitlab-Token"
+            ),
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "token", "http_header_key"],
+}
+
+WEBHOOK_DYNATRACE_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "basic",
+            "hidden": True,
+        },
+        {
+            "id": "username",
+            "label": "Username",
+            "type": "string",
+            "help_text": (
+                "The username used to authenticate the incoming webhook"
+            ),
+        },
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+            "help_text": (
+                "The password used to authenticate the incoming webhook"
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Authorization",
+            "help_text": (
+                "The HTTP header for passing in the credentials usually "
+                "this is Authorization."
+            ),
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "username", "password", "http_header_key"],
+}
+
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
@@ -348,6 +890,152 @@ CREDENTIAL_TYPES = [
         "inputs": VAULT_INPUTS,
         "injectors": {},
         "managed": True,
+    },
+    {
+        "name": enums.WebhookCredentialType.HMAC,
+        "namespace": "webhook",
+        "kind": "hmac",
+        "inputs": WEBHOOK_HMAC_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use HMAC. "
+            "This requires shared secret between the sender and receiver. "
+            "The signature can be sent as hex or base64 strings. "
+            "Most of senders will use a special HTTP header to send "
+            "the signature data."
+        ),
+    },
+    {
+        "name": enums.WebhookCredentialType.BASIC,
+        "namespace": "webhook",
+        "kind": "basic",
+        "inputs": WEBHOOK_BASIC_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use Basic Authentication. "
+            "It requires a username and password"
+        ),
+    },
+    {
+        "name": enums.WebhookCredentialType.TOKEN,
+        "namespace": "webhook",
+        "kind": "token",
+        "inputs": WEBHOOK_TOKEN_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use Token Authentication. "
+            "Usually the token is sent in the Authorization header. "
+            "Some of the senders will use a special HTTP header to send "
+            "the token."
+        ),
+    },
+    {
+        "name": enums.WebhookCredentialType.OAUTH2,
+        "namespace": "webhook",
+        "kind": "oauth2",
+        "inputs": WEBHOOK_OAUTH2_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use OAuth2. "
+            "This needs a client id and client credential and access "
+            "to an Authorization server so we can introspect the token "
+            "being sent."
+        ),
+    },
+    {
+        "name": enums.WebhookCredentialType.OAUTH2_JWT,
+        "namespace": "webhook",
+        "kind": "oauth2_jwt",
+        "inputs": WEBHOOK_OAUTH2_JWT_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use OAuth2 with JWT. "
+            "This needs a JWKS URL which will be used to fetch the "
+            "public key and validate the incoming token. If an audience "
+            "is specified we will check the audience in the JWT claims."
+        ),
+    },
+    {
+        "name": enums.WebhookCredentialType.ECDSA,
+        "namespace": "webhook",
+        "kind": "ecdsa",
+        "inputs": WEBHOOK_ECDSA_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use Elliptic Curve DSA. "
+            "This requires a public key and the headers that carry "
+            "the signature."
+        ),
+    },
+    {
+        "name": enums.WebhookCredentialType.MTLS,
+        "namespace": "webhook",
+        "kind": "mtls",
+        "inputs": WEBHOOK_MTLS_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Webhooks that use mutual TLS. "
+            "The Certificate is installed in the Web Server and "
+            "we can optionally validate the Subject defined in the "
+            "Certificate."
+        ),
+    },
+    {
+        "name": enums.CustomWebhookCredentialType.GITLAB,
+        "namespace": "webhook",
+        "kind": "gitlab",
+        "inputs": WEBHOOK_GITLAB_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Gitlab Webhook. This is a specialization of "
+            "the Token authentication with the X-Gitlab-Token header."
+        ),
+    },
+    {
+        "name": enums.CustomWebhookCredentialType.GITHUB,
+        "namespace": "webhook",
+        "kind": "github",
+        "inputs": WEBHOOK_GITHUB_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Github Webhook. This is a specialization of "
+            "the HMAC authentication which only requires a secret to be "
+            "provided."
+        ),
+    },
+    {
+        "name": enums.CustomWebhookCredentialType.SNOW,
+        "namespace": "webhook",
+        "kind": "snow",
+        "inputs": WEBHOOK_SNOW_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for ServiceNow Webhook. This is a specialization of "
+            "the Token authentication which only requires a token to be "
+            "provided."
+        ),
+    },
+    {
+        "name": enums.CustomWebhookCredentialType.DYNATRACE,
+        "namespace": "webhook",
+        "kind": "dynatrace",
+        "inputs": WEBHOOK_DYNATRACE_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Dynatrace Webhook. This is a clone of "
+            "the Basic authentication."
+        ),
     },
 ]
 
