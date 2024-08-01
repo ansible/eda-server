@@ -22,12 +22,16 @@ from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+)
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import serializers
-from aap_eda.api.filters.webhook import WebhookFilter
+from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType, WebhookAuthType
 
@@ -43,7 +47,7 @@ class WebhookViewSet(
 ):
     queryset = models.Webhook.objects.order_by("-created_at")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = WebhookFilter
+    filterset_class = filters.WebhookFilter
     rbac_resource_type = ResourceType.WEBHOOK
 
     def get_serializer_class(self):
@@ -203,3 +207,41 @@ class WebhookViewSet(
             serializers.WebhookOutSerializer(webhook).data,
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        description="List all activations for the event stream",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.ActivationListSerializer(
+                many=True
+            ),
+        },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this event stream.",  # noqa: E501
+            )
+        ],
+    )
+    @action(
+        detail=False,
+        queryset=models.Activation.objects.order_by("id"),
+        filterset_class=filters.ActivationFilter,
+        url_path="(?P<id>[^/.]+)/activations",
+    )
+    def activations(self, request, id):
+        if not models.Webhook.access_qs(request.user).filter(id=id).exists():
+            raise api_exc.NotFound(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Event stream with ID={id} does not exist.",
+            )
+
+        webhook = models.Webhook.objects.get(id=id)
+        activations = webhook.activations.all()
+
+        filtered_activations = self.filter_queryset(activations)
+        result = self.paginate_queryset(filtered_activations)
+        serializer = serializers.ActivationListSerializer(result, many=True)
+        return self.get_paginated_response(serializer.data)

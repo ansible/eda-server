@@ -247,6 +247,41 @@ def test_create_activation_with_webhooks(
 
 
 @pytest.mark.django_db
+def test_list_activations_by_webhook(
+    admin_client: APIClient,
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+    default_webhook: models.Webhook,
+):
+    response = admin_client.get(
+        f"{api_url_v1}/webhooks/{default_webhook.id}/activations/"
+    )
+
+    data = response.data["results"]
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(data) == 0
+
+    activation_1 = default_activation
+    activation_2 = new_activation
+
+    activation_1.webhooks.add(default_webhook)
+    activation_2.webhooks.add(default_webhook)
+
+    response = admin_client.get(
+        f"{api_url_v1}/webhooks/{default_webhook.id}/activations/"
+    )
+
+    data = response.data["results"]
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(data) == 2
+    assert sorted([d["name"] for d in data]) == sorted(
+        [activation_1.name, activation_2.name]
+    )
+
+
+@pytest.mark.django_db
 def test_create_activation_with_bad_webhook(admin_client: APIClient):
     fks = create_activation_related_data(["demo"])
     test_activation = TEST_ACTIVATION.copy()
