@@ -21,6 +21,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
+from django.db.models import Q
 
 from aap_eda.core import enums, models
 from aap_eda.core.tasking import enable_redis_prefix
@@ -134,7 +135,7 @@ ORG_ROLES = [
     {
         "name": "Organization Auditor",
         "description": (
-            "Has read permission to a single organization and all"
+            "Has read permission to a single organization and all "
             "objects inside of it"
         ),
         "permissions": {
@@ -1188,15 +1189,14 @@ class Command(BaseCommand):
 
     def _create_org_roles(self):
         org_ct = ContentType.objects.get(model="organization")
+        created = updated = 0
         for role_data in ORG_ROLES:
-            role, _ = RoleDefinition.objects.update_or_create(
-                name=role_data["name"],
-                defaults={
-                    "description": role_data["description"],
-                    "content_type": org_ct,
-                    "managed": True,
-                },
-            )
+            data = {
+                "name": role_data["name"],
+                "description": role_data["description"],
+                "content_type": org_ct,
+                "managed": True,
+            }
             permissions = []
             for resource_type, actions in role_data["permissions"].items():
                 model_permissions = list(
@@ -1209,21 +1209,45 @@ class Command(BaseCommand):
                 )
                 if len(model_permissions) != len(actions):
                     raise ImproperlyConfigured(
-                        f'Permission "{resource_type}" and one of "{actions}" '
-                        "actions is missing in the database, "
+                        f'Permission "{resource_type}" and one of '
+                        f'"{actions}" actions is missing in the database, '
                         f"found {[p.codename for p in model_permissions]}."
                     )
                 permissions.extend(model_permissions)
-            role.permissions.set(permissions)
-            self.stdout.write(
-                'Added role "{0}" with {1} permissions '
-                "to {2} resources".format(
-                    role_data["name"],
-                    len(permissions),
-                    len(role_data["permissions"]),
+            try:
+                role = RoleDefinition.objects.get(
+                    Q(name=role_data["name"])
+                    | Q(name=role_data["name"].split()[1])
                 )
-            )
-        self.stdout.write(f"Added {len(ORG_ROLES)} roles.")
+                for key, value in data.items():
+                    setattr(role, key, value)
+                role.save()
+                updated += 1
+                role.permissions.set(permissions)
+                self.stdout.write(
+                    'Updated role "{0}" with {1} permissions '
+                    "to {2} resources".format(
+                        role_data["name"],
+                        len(permissions),
+                        len(role_data["permissions"]),
+                    )
+                )
+            except RoleDefinition.DoesNotExist:
+                role = RoleDefinition.objects.create(**data)
+                created += 1
+                role.permissions.set(permissions)
+                self.stdout.write(
+                    'Created role "{0}" with {1} permissions '
+                    "to {2} resources".format(
+                        role_data["name"],
+                        len(permissions),
+                        len(role_data["permissions"]),
+                    )
+                )
+        if updated:
+            self.stdout.write(f"Updated {updated} organization roles.")
+        if created:
+            self.stdout.write(f"Created {created} organization roles.")
 
     def _create_permissions_for_content_type(self, ct=None) -> list:
         return [
