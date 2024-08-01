@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0040_remove_rulebookprocesslog_line_number"),
+        ("core", "0041_alter_credentialtype_options_and_more"),
     ]
 
     operations = [
