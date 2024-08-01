@@ -640,7 +640,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "86be16e62c2233cc34d28754ad9032e43dbab594"
+resolved_reference = "237aa24e8054b83fe78432172839d291ff8b4adc"
 
 [[package]]
 name = "django-crum"
@@ -1748,6 +1748,9 @@ files = [
     {file = "PyJWT-2.8.0.tar.gz", hash = "sha256:57e28d156e3d5c10088e0c68abb90bfac3df82b40a71bd0daa20c65ccd5c23de"},
 ]
 
+[package.dependencies]
+cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
+
 [package.extras]
 crypto = ["cryptography (>=3.4.0)"]
 dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
@@ -2586,4 +2589,4 @@ dev = ["psycopg2-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "1e9fe0128278201ab9c3e5f4d77cb12d3b0024ebe080eead57a6adcc0b018e7d"
+content-hash = "ce343c1addca03bc4dc0fe18a62964836eb179de1013285bfcb39314997595c8"
