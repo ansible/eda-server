@@ -36,8 +36,11 @@ HTTP_HEADER_LABEL = "HTTP Header Key"
 #  and must be updated.
 ORG_ROLES = [
     {
-        "name": "Admin",
-        "description": "Has all permissions",
+        "name": "Organization Admin",
+        "description": (
+            "Has all permissions a single organization and all objects "
+            "inside of it"
+        ),
         "permissions": {
             "activation": [
                 "add",
@@ -66,33 +69,35 @@ ORG_ROLES = [
         },
     },
     {
-        "name": "Editor",
-        "description": "Has create and edit permissions.",
+        "name": "Organization Editor",
+        "description": (
+            "Has create and update permissions to a single organization "
+            "and all objects inside of it"
+        ),
         "permissions": {
-            "activation": ["add", "view", "delete"],
+            "activation": ["add", "view"],
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
-            "organization": ["view"],
-            "team": ["view"],
-            "project": CRUD + ["sync"],
+            "organization": ["view", "change"],
+            "team": ["add", "view", "change"],
+            "project": ["add", "view", "change"],
             "rulebook": ["view"],
-            "decision_environment": CRUD,
-            "eda_credential": ["add", "view"],
-            "webhook": ["add", "view"],
+            "decision_environment": ["add", "view", "change"],
+            "eda_credential": ["add", "view", "change"],
+            "webhook": ["add", "view", "change"],
         },
     },
     {
-        "name": "Contributor",
+        "name": "Organization Contributor",
         "description": (
-            "Has create and update permissions with an "
-            "exception of users and roles. "
-            "Has enable and disable rulebook activation permissions."
+            "Has create and update permissions to a single organization "
+            "and all objects inside of it. Has enable/disable/restart "
+            "rulebook activation permissions in a single organization"
         ),
         "permissions": {
             "activation": [
                 "add",
                 "view",
-                "delete",
                 "enable",
                 "disable",
                 "restart",
@@ -100,18 +105,19 @@ ORG_ROLES = [
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
             "organization": ["view"],
-            "project": CRUD + ["sync"],
+            "project": ["add", "view", "change"],
             "rulebook": ["view"],
-            "decision_environment": CRUD,
-            "eda_credential": ["add", "view"],
-            "webhook": ["add", "view"],
+            "decision_environment": ["add", "view", "change"],
+            "eda_credential": ["add", "view", "change"],
+            "webhook": ["add", "view", "change"],
         },
     },
     {
-        "name": "Operator",
+        "name": "Organization Operator",
         "description": (
-            "Has read permissions. "
-            "Has permissions to enable and disable rulebook activations."
+            "Has read permission to a single organization and all "
+            "objects inside of it. Has enable/disable/restart "
+            "rulebook activation permissions in a single organization"
         ),
         "permissions": {
             "activation": ["view", "enable", "disable", "restart"],
@@ -126,8 +132,11 @@ ORG_ROLES = [
         },
     },
     {
-        "name": "Auditor",
-        "description": "Has all read permissions.",
+        "name": "Organization Auditor",
+        "description": (
+            "Has read permission to a single organization and all"
+            "objects inside of it"
+        ),
         "permissions": {
             "activation": ["view"],
             "rulebook_process": ["view"],
@@ -142,8 +151,11 @@ ORG_ROLES = [
         },
     },
     {
-        "name": "Viewer",
-        "description": "Has read permissions, except users and roles.",
+        "name": "Organization Viewer",
+        "description": (
+            "Has read permission to a single organization and all "
+            "objects inside of it"
+        ),
         "permissions": {
             "activation": ["view"],
             "rulebook_process": ["view"],
@@ -1177,7 +1189,7 @@ class Command(BaseCommand):
     def _create_org_roles(self):
         org_ct = ContentType.objects.get(model="organization")
         for role_data in ORG_ROLES:
-            role, _ = RoleDefinition.objects.get_or_create(
+            role, _ = RoleDefinition.objects.update_or_create(
                 name=role_data["name"],
                 defaults={
                     "description": role_data["description"],
@@ -1244,7 +1256,9 @@ class Command(BaseCommand):
                 child_names.append(child_model._meta.verbose_name)
             if child_names:
                 desc += f" and its child resources - {', '.join(child_names)}"  # noqa: E501
-            role, created = RoleDefinition.objects.get_or_create(
+
+            # create resource admin role
+            role, created = RoleDefinition.objects.update_or_create(
                 name=f"{cls._meta.verbose_name.title()} Admin",
                 defaults={
                     "description": desc,
@@ -1259,6 +1273,58 @@ class Command(BaseCommand):
                     "permissions to itself"
                 )
 
+            # create resource use role
+            # ignore team model as it makes no sense to have Use role for it
+            if cls._meta.model_name != "team":
+                (
+                    use_role,
+                    use_role_created,
+                ) = RoleDefinition.objects.update_or_create(
+                    name=f"{cls._meta.verbose_name.title()} Use",
+                    defaults={
+                        "description": f"Has use permissions to a single {cls._meta.verbose_name}",  # noqa: E501
+                        "content_type": ct,
+                        "managed": True,
+                    },
+                )
+                use_permissions = [
+                    perm
+                    for perm in permissions
+                    if not perm.codename.startswith("delete_")
+                ]
+                use_role.permissions.set(use_permissions)
+                if use_role_created:
+                    self.stdout.write(
+                        f"Added role {use_role.name} with "
+                        f"{len(use_permissions)} permissions to itself"
+                    )
+
+            # create org-level admin roles for each resource type
+            (
+                org_role,
+                org_role_created,
+            ) = RoleDefinition.objects.update_or_create(
+                name=f"Organization {cls._meta.verbose_name.title()} Admin",
+                defaults={
+                    "description": f"Has all permissions to {cls._meta.verbose_name}s within an organization",  # noqa: E501
+                    "content_type": ContentType.objects.get(
+                        model="organization"
+                    ),
+                    "managed": True,
+                },
+            )
+            permissions.extend(
+                DABPermission.objects.filter(
+                    content_type=ct, codename__startswith="add_"
+                )
+            )
+            org_role.permissions.set(permissions)
+            if org_role_created:
+                self.stdout.write(
+                    f"Added role {org_role.name} with {len(permissions)} "
+                    "permissions to itself"
+                )
+
             # Special case to create team member role
             if cls._meta.model_name == "team":
                 member_permissions = [
@@ -1267,7 +1333,7 @@ class Command(BaseCommand):
                     if p.codename in ("view_team", "member_team")
                 ]
                 desc = "Inherits permissions assigned to this team"
-                role, created = RoleDefinition.objects.get_or_create(
+                role, created = RoleDefinition.objects.update_or_create(
                     name="Team Member",
                     defaults={
                         "description": desc,
@@ -1278,6 +1344,6 @@ class Command(BaseCommand):
                 role.permissions.set(member_permissions)
                 if created:
                     self.stdout.write(
-                        f"Added role {role.name} with {len(permissions)} "
-                        "permissions to itself"
+                        f"Added role {role.name} with "
+                        f"{len(member_permissions)} permissions to itself"
                     )
