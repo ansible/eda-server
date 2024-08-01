@@ -1,0 +1,119 @@
+#  Copyright 2024 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+import uuid
+
+from django.db import models
+
+from .base import BaseOrgModel
+
+__all__ = "Webhook"
+
+EDA_WEBHOOK_CHANNEL_PREFIX = "eda_webhook_"
+
+
+class Webhook(BaseOrgModel):
+    class Meta:
+        db_table = "core_webhook"
+        indexes = [
+            models.Index(fields=["id"], name="ix_webhook_id"),
+            models.Index(fields=["name"], name="ix_webhook_name"),
+            models.Index(fields=["uuid"], name="ix_webhook_uuid"),
+        ]
+
+    name = models.TextField(
+        null=False, unique=True, help_text="The name of the webhook"
+    )
+
+    webhook_type = models.TextField(
+        null=False,
+        help_text="The type of the webhook based on credential type",
+        default="hmac",
+    )
+
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
+    additional_data_headers = models.TextField(
+        blank=True,
+        help_text=(
+            "The additional http headers which will "
+            "be added to the event data. The headers "
+            "are comma delimited"
+        ),
+    )
+
+    test_mode = models.BooleanField(
+        default=False, help_text="Enable test mode"
+    )
+
+    test_content_type = models.TextField(
+        blank=True,
+        default="",
+        help_text="The content type of test data, when in test mode",
+    )
+    test_content = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "The content recieved, when in test mode, "
+            "stored as a yaml string"
+        ),
+    )
+    test_headers = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "The headers recieved, when in test mode, "
+            "stored as a yaml string"
+        ),
+    )
+    test_error_message = models.TextField(
+        blank=True,
+        default="",
+        help_text="The error message,  when in test mode",
+    )
+
+    owner = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE,
+        null=False,
+        help_text="The user who created the webhook",
+    )
+    uuid = models.UUIDField(default=uuid.uuid4)
+    url = models.TextField(
+        null=False,
+        help_text="The URL which will be used to post the data to the webhook",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=False)
+    modified_at = models.DateTimeField(auto_now=True, null=False)
+    events_received = models.BigIntegerField(
+        default=0, help_text="The total number of events received by webhook"
+    )
+    last_event_received_at = models.DateTimeField(
+        null=True, help_text="The date/time when the last event was received"
+    )
+
+    def _get_channel_name(self) -> str:
+        """Generate the channel name based on the UUID and prefix."""
+        return (
+            f"{EDA_WEBHOOK_CHANNEL_PREFIX}"
+            f"{str(self.uuid).replace('-','_')}"
+        )
+
+    channel_name = property(_get_channel_name)

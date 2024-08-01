@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import hashlib
 import logging
 import typing as tp
 
@@ -259,4 +260,67 @@ def check_credential_registry_username_password(
         raise serializers.ValidationError(
             "Need username and password or just token in credential"
         )
+    return eda_credential_id
+
+
+def valid_hash_algorithm(algo: str):
+    """Check hash algorithm."""
+    if algo not in hashlib.algorithms_available:
+        raise serializers.ValidationError(
+            (
+                f"Invalid hash algorithm {algo} should "
+                f"be one of {hashlib.algorithms_available}"
+            )
+        )
+
+
+def valid_hash_format(fmt: str):
+    """Check hash format type."""
+    if fmt not in enums.SignatureEncodingType.values():
+        raise serializers.ValidationError(
+            (
+                f"Invalid hash format {fmt} should "
+                f"be one of {enums.SignatureEncodingType.values()}"
+            )
+        )
+    return fmt
+
+
+def valid_webhook_auth_type(auth_type: str):
+    """Check webhook auth type."""
+    if auth_type not in enums.WebhookAuthType.values():
+        raise serializers.ValidationError(
+            (
+                f"Invalid auth_type {auth_type} should "
+                f"be one of {enums.WebhookAuthType.values()}"
+            )
+        )
+    return auth_type
+
+
+def check_if_webhooks_exists(webhook_ids: list[int]) -> list[int]:
+    """Check a webhook exists."""
+    for webhook_id in webhook_ids:
+        try:
+            models.Webhook.objects.get(pk=webhook_id)
+        except models.Webhook.DoesNotExist as exc:
+            raise serializers.ValidationError(
+                f"Webhook with id {webhook_id} does not exist"
+            ) from exc
+    return webhook_ids
+
+
+def check_credential_types_for_webhook(eda_credential_id: int) -> int:
+    """Check the credential types for a webhook."""
+    credential = get_credential_if_exists(eda_credential_id)
+    name = credential.credential_type.name
+    names = (
+        enums.WebhookCredentialType.values()
+        + enums.CustomWebhookCredentialType.values()
+    )
+    if name not in names:
+        raise serializers.ValidationError(
+            f"The type of credential can only be one of {names}"
+        )
+
     return eda_credential_id

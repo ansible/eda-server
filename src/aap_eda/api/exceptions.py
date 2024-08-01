@@ -125,3 +125,10 @@ class InvalidEventStreamRulebook(APIException):
     default_detail = (
         "Configuration Error: Event stream template rulebook is invalid"
     )
+
+
+class InvalidWebhookSource(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = (
+        "Configuration Error: Webhook source could not be updated in ruleset"
+    )
