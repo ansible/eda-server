@@ -24,9 +24,7 @@ from aap_eda.settings import default
 @pytest.fixture
 def redis_parameters() -> dict:
     """Provide redis parameters based on settings values."""
-    params = (
-        default._rq_common_parameters() | default._rq_redis_client_parameters()
-    )
+    params = default._rq_redis_client_parameters()
 
     # Convert to lowercase for use in establishing a redis client.
     params = {k.lower(): v for (k, v) in params.items()}
