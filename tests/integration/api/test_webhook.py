@@ -302,6 +302,25 @@ def test_delete_webhook(
 
 
 @pytest.mark.django_db
+def test_delete_webhook_with_exception(
+    admin_client: APIClient,
+    default_activation: models.Activation,
+    default_webhook: models.Webhook,
+):
+    activation = default_activation
+    activation.webhooks.add(default_webhook)
+
+    response = admin_client.delete(
+        f"{api_url_v1}/webhooks/{default_webhook.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Event stream '{default_webhook.name}' is being referenced by "
+        "1 activation(s) and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
 def test_post_webhook_with_bad_uuid(
     admin_client: APIClient,
     default_webhook: models.Webhook,
