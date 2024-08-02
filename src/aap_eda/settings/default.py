@@ -403,8 +403,12 @@ def _rq_redis_client_additional_parameters():
     return params
 
 
-def _rq_redis_client_parameters():
-    return _rq_common_parameters() | _rq_redis_client_additional_parameters()
+def rq_redis_client_instantiation_parameters():
+    params = _rq_common_parameters() | _rq_redis_client_additional_parameters()
+
+    # Convert to lowercase for use in instantiating a redis client.
+    params = {k.lower(): v for (k, v) in params.items()}
+    return params
 
 
 # A list of queues to be used in multinode mode
