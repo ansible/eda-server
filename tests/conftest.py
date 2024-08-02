@@ -15,6 +15,7 @@
 import pytest
 import redis
 
+from aap_eda.core.tasking import get_redis_client
 from aap_eda.settings import default
 
 
@@ -30,7 +31,7 @@ def redis_parameters() -> dict:
     # different database from that of the settings.
     # This is not guaranteed as the deployed environment could be differently
     # configured from the default, but in development it should be fine.
-    client = redis.Redis(**params)
+    client = get_redis_client(**params)
     max_dbs = int(client.config_get("databases")["databases"])
     params["db"] = (params["db"] + 1) % max_dbs
 
