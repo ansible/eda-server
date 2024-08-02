@@ -22,8 +22,8 @@ aap-eda-manage = 'aap_eda.manage:main'
 # Poetry: Dependencies
 # -------------------------------------
 [tool.poetry.extras]
-all = ["psycopg2"]
-dev = ["psycopg2-binary"]
+all = ["psycopg"]
+dev = ["psycopg-binary"]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
@@ -33,8 +33,7 @@ djangorestframework_simplejwt = "5.3.*"
 dynaconf = ">=3.1.12,<3.3"
 drf-spectacular = ">=0.26.5,<0.27"
 channels = { version = "4.0.*", extras = ["daphne"] }
-psycopg2 = { version = "2.9.*", optional = true }
-psycopg2-binary = { version = "*", optional = true }
+psycopg-binary = { version = "*", optional = true }
 django-rq = "^2.8.0"
 rq = "^1.13.0"
 django-filter = ">23.2,<24"
@@ -52,10 +51,10 @@ django-split-settings = "^1.2.0"
 pexpect = "^4.9.0"
 ansible-runner = ">=2.3"
 python-gnupg = "^0.5.2"
-autobahn = {git = "https://github.com/crossbario/autobahn-python.git", rev = "v24.4.2"}
+autobahn = { git = "https://github.com/crossbario/autobahn-python.git", rev = "v24.4.2" }
 psycopg = "^3.1.17"
 xxhash = "*"
-pyjwt = { version="*", extras = ["cryptography"] }
+pyjwt = { version = "*", extras = ["crypto"] }
 ecdsa = "*"
 
 [tool.poetry.group.test.dependencies]
