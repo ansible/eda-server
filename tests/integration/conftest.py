@@ -262,6 +262,24 @@ def default_rulesets() -> str:
 
 
 @pytest.fixture
+def bad_rulesets() -> str:
+    return """
+---
+- name: "test
+  sources:
+    - ansible.eda.range:
+        limit: 10
+  rules:
+    - name: example rule"
+      condition: event.i == 8
+      actions:
+        - run_job_template:
+            organization: Default
+            name: example
+"""
+
+
+@pytest.fixture
 def default_run_job_template_rulesets() -> str:
     return """
 ---
@@ -288,6 +306,19 @@ def default_rulebook(
         name="default-rulebook.yml",
         rulesets=default_rulesets,
         description="test rulebook",
+        project=default_project,
+    )
+
+
+@pytest.fixture
+def bad_rulebook(
+    default_project: models.Project, bad_rulesets: str
+) -> models.Rulebook:
+    """Return a bad Rulebook."""
+    return models.Rulebook.objects.create(
+        name="bad-rulebook.yml",
+        rulesets=bad_rulesets,
+        description="test bad rulebook",
         project=default_project,
     )
 

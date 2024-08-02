@@ -64,6 +64,7 @@ from .rulebook import (
     RulebookRefSerializer,
     RulebookSerializer,
 )
+from .source import SourceSerializer
 from .team import (
     TeamCreateSerializer,
     TeamDetailSerializer,
@@ -130,6 +131,8 @@ __all__ = (
     "OrganizationSerializer",
     "OrganizationCreateSerializer",
     "OrganizationRefSerializer",
+    # sources
+    "SourceSerializer",
     # teams
     "TeamSerializer",
     "TeamCreateSerializer",
