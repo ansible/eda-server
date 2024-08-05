@@ -39,7 +39,7 @@ ORG_ROLES = [
     {
         "name": "Organization Admin",
         "description": (
-            "Has all permissions a single organization and all objects "
+            "Has all permissions to a single organization and all objects "
             "inside of it"
         ),
         "permissions": {
@@ -72,8 +72,8 @@ ORG_ROLES = [
     {
         "name": "Organization Editor",
         "description": (
-            "Has create and update permissions to a single organization "
-            "and all objects inside of it"
+            "Has create and update permissions to all objects within "
+            "a single organization"
         ),
         "permissions": {
             "activation": ["add", "view"],
@@ -91,9 +91,9 @@ ORG_ROLES = [
     {
         "name": "Organization Contributor",
         "description": (
-            "Has create and update permissions to a single organization "
-            "and all objects inside of it. Has enable/disable/restart "
-            "rulebook activation permissions in a single organization"
+            "Has create and update permissions to all objects and "
+            "enable/disable/restart permissions to all rulebook activations "
+            "within a single organization"
         ),
         "permissions": {
             "activation": [
@@ -117,9 +117,9 @@ ORG_ROLES = [
     {
         "name": "Organization Operator",
         "description": (
-            "Has read permission to a single organization and all "
-            "objects inside of it. Has enable/disable/restart "
-            "rulebook activation permissions in a single organization"
+            "Has read permission to all objects and enable/disable/restart "
+            "permissions for all rulebook activations within a single "
+            "organization"
         ),
         "permissions": {
             "activation": ["view", "enable", "disable", "restart"],
@@ -137,8 +137,7 @@ ORG_ROLES = [
     {
         "name": "Organization Auditor",
         "description": (
-            "Has read permission to a single organization and all "
-            "objects inside of it"
+            "Has read permission to all objects within a single organization"
         ),
         "permissions": {
             "activation": ["view"],
@@ -156,8 +155,7 @@ ORG_ROLES = [
     {
         "name": "Organization Viewer",
         "description": (
-            "Has read permission to a single organization and all "
-            "objects inside of it"
+            "Has read permission to all objects within a single organization"
         ),
         "permissions": {
             "activation": ["view"],
