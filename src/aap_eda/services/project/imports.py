@@ -62,7 +62,12 @@ def _project_import_wrapper(
             func(self, project)
             project.import_state = models.Project.ImportState.COMPLETED
         except Exception as e:
-            project.import_state = models.Project.ImportState.FAILED
+            # if a project is empty, sync status should show completed
+            project.import_state = (
+                models.Project.ImportState.COMPLETED
+                if "Project folder is empty" in e.args[0]
+                else models.Project.ImportState.FAILED
+            )
             project.import_error = str(e)
             error = e
         finally:
