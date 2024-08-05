@@ -183,6 +183,17 @@ class Job(_Job):
         super().__init__(id, connection, serializer)
 
 
+# django-rq's rqworker command does not support --connection-class so
+# we cannot specify the DAB redis client that way.  Even if it did we
+# couldn't use it as DAB requires a url parameter that Redis does not.
+# If the connection a worker is given is not from DAB we replace it
+# with one that is.
+def _get_necessary_client_connection(connection: Connection) -> Connection:
+    if type(connection) not in [DABRedis, DABRedisCluster]:
+        connection = get_redis_client(**default.rq_redis_client_instantiation_parameters())
+    return connection
+
+
 class DefaultWorker(_Worker):
     """Custom default worker class used for non-activation tasks.
 
@@ -210,14 +221,7 @@ class DefaultWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-
-        # django-rq's rqworker command does not support --connection-class so
-        # we cannot specify the DAB redis client that way.  Even if it did we
-        # couldn't use it as DAB requires a url parameter that Redis does not.
-        # If the connection we're given is not from DAB we replace it with one
-        # that is.
-        if type(connection) not in [DABRedis, DABRedisCluster]:
-            connection = get_redis_client(**default.rq_redis_client_instantiation_parameters())
+        connection = _get_necessary_client_connection(connection)
 
         super().__init__(
             queues=queues,
@@ -264,15 +268,7 @@ class ActivationWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-
-        # django-rq's rqworker command does not support --connection-class so
-        # we cannot specify the DAB redis client that way.  Even if it did we
-        # couldn't use it as DAB requires a url parameter that Redis does not.
-        # If the connection we're given is not from DAB we replace it with one
-        # that is.
-        if type(connection) not in [DABRedis, DABRedisCluster]:
-            connection = get_redis_client(**default.rq_redis_client_instantiation_parameters())
-
+        connection = _get_necessary_client_connection(connection)
         queue_name = settings.RULEBOOK_QUEUE_NAME
 
         super().__init__(
