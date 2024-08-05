@@ -45,8 +45,8 @@ rq-scheduler = "^0.10"
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
     "channel_auth",
     "rbac",
+    "redis_client",
 ] }
-django-redis = "5.4.*"
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
 pexpect = "^4.9.0"
