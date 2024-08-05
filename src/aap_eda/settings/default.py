@@ -711,9 +711,11 @@ SERVER_UUID = settings.get("SERVER_UUID", "abc-def-123-34567")
 WEBHOOK_URL_PREFIX = settings.get(
     "WEBHOOK_URL_PREFIX", f"https://ui.eda.local:8443/{SERVER_UUID}"
 )
+WEBHOOK_URL_PREFIX = WEBHOOK_URL_PREFIX.rstrip("/") + "/"
 WEBHOOK_MTLS_URL_PREFIX = settings.get(
     "WEBHOOK_MTLS_URL_PREFIX", f"https://ui.eda.local:8443/mtls/{SERVER_UUID}"
 )
+WEBHOOK_MTLS_URL_PREFIX = WEBHOOK_MTLS_URL_PREFIX.rstrip("/") + "/"
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
