@@ -1301,6 +1301,7 @@ class Command(BaseCommand):
 
             # create resource use role
             # ignore team model as it makes no sense to have Use role for it
+            # and should be managed by Admin users only
             if cls._meta.model_name != "team":
                 (
                     use_role,
@@ -1325,31 +1326,31 @@ class Command(BaseCommand):
                         f"{len(use_permissions)} permissions to itself"
                     )
 
-            # create org-level admin roles for each resource type
-            (
-                org_role,
-                org_role_created,
-            ) = RoleDefinition.objects.update_or_create(
-                name=f"Organization {cls._meta.verbose_name.title()} Admin",
-                defaults={
-                    "description": f"Has all permissions to {cls._meta.verbose_name}s within an organization",  # noqa: E501
-                    "content_type": ContentType.objects.get(
-                        model="organization"
-                    ),
-                    "managed": True,
-                },
-            )
-            permissions.extend(
-                DABPermission.objects.filter(
-                    content_type=ct, codename__startswith="add_"
+                # create org-level admin roles for each resource type
+                (
+                    org_role,
+                    org_role_created,
+                ) = RoleDefinition.objects.update_or_create(
+                    name=f"Organization {cls._meta.verbose_name.title()} Admin",  # noqa: E501
+                    defaults={
+                        "description": f"Has all permissions to {cls._meta.verbose_name}s within an organization",  # noqa: E501
+                        "content_type": ContentType.objects.get(
+                            model="organization"
+                        ),
+                        "managed": True,
+                    },
                 )
-            )
-            org_role.permissions.set(permissions)
-            if org_role_created:
-                self.stdout.write(
-                    f"Added role {org_role.name} with {len(permissions)} "
-                    "permissions to itself"
+                permissions.extend(
+                    DABPermission.objects.filter(
+                        content_type=ct, codename__startswith="add_"
+                    )
                 )
+                org_role.permissions.set(permissions)
+                if org_role_created:
+                    self.stdout.write(
+                        f"Added role {org_role.name} with {len(permissions)} "
+                        "permissions to itself"
+                    )
 
             # Special case to create team member role
             if cls._meta.model_name == "team":
