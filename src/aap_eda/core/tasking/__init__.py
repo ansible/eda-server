@@ -10,9 +10,9 @@ import redis
 import rq
 import rq_scheduler
 from ansible_base.lib.redis.client import (
-    get_redis_client as _get_redis_client,
     DABRedis,
     DABRedisCluster,
+    get_redis_client as _get_redis_client,
 )
 from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
@@ -50,6 +50,7 @@ _ErrorHandlersArgType = Union[
     ErrorHandlerType,
     None,
 ]
+
 
 def get_redis_client(**kwargs):
     """Instantiate a Redis client via DAB.
@@ -190,7 +191,9 @@ class Job(_Job):
 # with one that is.
 def _get_necessary_client_connection(connection: Connection) -> Connection:
     if type(connection) not in [DABRedis, DABRedisCluster]:
-        connection = get_redis_client(**default.rq_redis_client_instantiation_parameters())
+        connection = get_redis_client(
+            **default.rq_redis_client_instantiation_parameters()
+        )
     return connection
 
 

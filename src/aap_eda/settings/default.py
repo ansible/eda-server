@@ -443,13 +443,17 @@ def get_rq_queues() -> dict:
     # Configure the default queue
     queues["default"] = _rq_common_parameters()
     queues["default"]["DEFAULT_TIMEOUT"] = DEFAULT_QUEUE_TIMEOUT
-    queues["default"]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_additional_parameters()
+    queues["default"][
+        "REDIS_CLIENT_KWARGS"
+    ] = _rq_redis_client_additional_parameters()
 
     # Configure the worker queues
     for queue in RULEBOOK_WORKER_QUEUES:
         queues[queue] = _rq_common_parameters()
         queues[queue]["DEFAULT_TIMEOUT"] = DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_additional_parameters()
+        queues[queue][
+            "REDIS_CLIENT_KWARGS"
+        ] = _rq_redis_client_additional_parameters()
 
     return queues
 

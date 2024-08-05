@@ -14,18 +14,16 @@
 
 
 import pytest
-
 import redis
 
 from aap_eda.core.tasking import (
     DABRedis,
     DefaultWorker,
+    Queue,
     get_redis_client,
     logger,
-    Queue,
-    unique_enqueue
+    unique_enqueue,
 )
-
 from aap_eda.settings import default
 
 
@@ -77,12 +75,16 @@ def test_worker_dab_client(default_queue: Queue):
     # Verify if given a redis.Redis connection the worker gets a DABRedis.
     worker = DefaultWorker(
         [default_queue],
-        connection=redis.Redis(**default.rq_redis_client_instantiation_parameters())
+        connection=redis.Redis(
+            **default.rq_redis_client_instantiation_parameters()
+        ),
     )
     assert type(worker.connection) is DABRedis
 
     # Verify if given a DABRedis connection the worker uses it.
-    connection = get_redis_client(**default.rq_redis_client_instantiation_parameters())
+    connection = get_redis_client(
+        **default.rq_redis_client_instantiation_parameters()
+    )
     worker = DefaultWorker(
         [default_queue],
         connection=connection,

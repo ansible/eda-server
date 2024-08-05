@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import pytest
-import redis
 
 from aap_eda.core.tasking import get_redis_client
 from aap_eda.settings import default
