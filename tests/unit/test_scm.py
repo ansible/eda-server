@@ -108,6 +108,28 @@ def test_git_clone_without_ssl_verification():
         )
 
 
+@pytest.mark.django_db
+def test_git_clone_empty_project(
+    credential: EdaCredential,
+):
+    executor = mock.MagicMock()
+
+    def raise_error(**kwargs):
+        raise ScmError("Project folder is empty.")
+
+    executor.side_effect = raise_error
+
+    with pytest.raises(ScmError) as exc_info:
+        with tempfile.TemporaryDirectory() as dest_path:
+            ScmRepository.clone(
+                "https://git.example.com/repo.git",
+                dest_path,
+                credential=credential,
+                _executor=executor,
+            )
+    assert "Project folder is empty." in str(exc_info)
+
+
 def test_git_rev_parse_head():
     executor = mock.Mock()
     executor.return_value = "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
