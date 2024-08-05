@@ -15,7 +15,18 @@
 
 import pytest
 
-from aap_eda.core.tasking import logger, unique_enqueue
+import redis
+
+from aap_eda.core.tasking import (
+    DABRedis,
+    DefaultWorker,
+    get_redis_client,
+    logger,
+    Queue,
+    unique_enqueue
+)
+
+from aap_eda.settings import default
 
 
 @pytest.fixture
@@ -54,3 +65,34 @@ def test_unique_enqueue_new_job(default_queue, eda_caplog):
     job = unique_enqueue(default_queue.name, "fake_task", fake_task, number=2)
     assert job.kwargs["number"] == 2
     assert "Enqueing unique job" in eda_caplog.text
+
+
+def test_worker_dab_client(default_queue: Queue):
+    """Test that workers end up with a DABRedis client connection."""
+
+    # Verify if given no connection the worker gets a DABRedis.
+    worker = DefaultWorker([default_queue])
+    assert type(worker.connection) is DABRedis
+
+    # Verify if given a redis.Redis connection the worker gets a DABRedis.
+    worker = DefaultWorker(
+        [default_queue],
+        connection=redis.Redis(**default.rq_redis_client_instantiation_parameters())
+    )
+    assert type(worker.connection) is DABRedis
+
+    # Verify if given a DABRedis connection the worker uses it.
+    connection = get_redis_client(**default.rq_redis_client_instantiation_parameters())
+    worker = DefaultWorker(
+        [default_queue],
+        connection=connection,
+    )
+    assert worker.connection is connection
+
+    # Verify if given the queue's DABRedis connection the worker uses it.
+    # The queue is created with a DABRedis connection.
+    worker = DefaultWorker(
+        [default_queue],
+        connection=default_queue.connection,
+    )
+    assert worker.connection is default_queue.connection
