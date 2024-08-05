@@ -14,12 +14,12 @@
 
 from django.db import models
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import UniqueNamedModel
 
 __all__ = ("CredentialType",)
 
 
-class CredentialType(BaseOrgModel, UniqueNamedModel):
+class CredentialType(UniqueNamedModel):
     router_basename = "credentialtype"
 
     class Meta:

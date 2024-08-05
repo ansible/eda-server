@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import pytest
+from pytest_lazyfixture import lazy_fixture
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -76,7 +77,7 @@ INPUT_SANS_TYPE = {
 
 
 @pytest.mark.django_db
-def test_create_credential_type(admin_client: APIClient):
+def test_create_credential_type(superuser_client: APIClient):
     injectors = {
         "extra_vars": {
             "host": "localhost",
@@ -92,7 +93,7 @@ def test_create_credential_type(admin_client: APIClient):
         "injectors": injectors,
     }
 
-    response = admin_client.post(
+    response = superuser_client.post(
         f"{api_url_v1}/credential-types/", data=data_in
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -104,7 +105,7 @@ def test_create_credential_type(admin_client: APIClient):
         "inputs": INPUT,
     }
 
-    response = admin_client.post(
+    response = superuser_client.post(
         f"{api_url_v1}/credential-types/", data=data_in
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -116,7 +117,7 @@ def test_create_credential_type(admin_client: APIClient):
         "injectors": injectors,
     }
 
-    response = admin_client.post(
+    response = superuser_client.post(
         f"{api_url_v1}/credential-types/", data=data_in
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -124,7 +125,45 @@ def test_create_credential_type(admin_client: APIClient):
 
 
 @pytest.mark.django_db
-def test_create_credential_type_sans_type(admin_client: APIClient):
+@pytest.mark.parametrize(
+    ("client", "expected_code"),
+    [
+        pytest.param(
+            lazy_fixture("admin_client"),
+            status.HTTP_403_FORBIDDEN,
+            id="org_admin",
+        ),
+        pytest.param(
+            lazy_fixture("base_client"),
+            status.HTTP_401_UNAUTHORIZED,
+            id="no_authenticated",
+        ),
+    ],
+)
+def test_create_credential_type_no_superuser(
+    client: APIClient, expected_code: int
+):
+    injectors = {
+        "extra_vars": {
+            "host": "localhost",
+            "username": "adam",
+            "password": "password",
+            "verify_ssl": False,
+        }
+    }
+    data_in = {
+        "name": "credential_type_1",
+        "description": "desc here",
+        "inputs": INPUT,
+        "injectors": injectors,
+    }
+
+    response = client.post(f"{api_url_v1}/credential-types/", data=data_in)
+    assert response.status_code == expected_code
+
+
+@pytest.mark.django_db
+def test_create_credential_type_sans_type(superuser_client: APIClient):
     injectors = {
         "extra_vars": {
             "host": "localhost",
@@ -140,7 +179,7 @@ def test_create_credential_type_sans_type(admin_client: APIClient):
         "injectors": injectors,
     }
 
-    response = admin_client.post(
+    response = superuser_client.post(
         f"{api_url_v1}/credential-types/", data=data_in
     )
     assert response.status_code == status.HTTP_201_CREATED
@@ -176,7 +215,7 @@ def test_create_credential_type_sans_type(admin_client: APIClient):
     ],
 )
 def test_create_credential_type_with_schema_validate_errors(
-    admin_client: APIClient, inputs, injectors, status_code, error_message
+    superuser_client: APIClient, inputs, injectors, status_code, error_message
 ):
     data_in = {
         "name": "credential_type_1",
@@ -185,7 +224,7 @@ def test_create_credential_type_with_schema_validate_errors(
         "injectors": injectors,
     }
 
-    response = admin_client.post(
+    response = superuser_client.post(
         f"{api_url_v1}/credential-types/", data=data_in
     )
     assert response.status_code == status_code
@@ -193,16 +232,26 @@ def test_create_credential_type_with_schema_validate_errors(
 
 
 @pytest.mark.django_db
-def test_retrieve_credential_type(admin_client: APIClient):
+def test_retrieve_credential_type(user_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1", inputs={"fields": [{"a": "b"}]}, injectors={}
     )
-    response = admin_client.get(f"{api_url_v1}/credential-types/{obj.id}/")
+    response = user_client.get(f"{api_url_v1}/credential-types/{obj.id}/")
     assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.django_db
-def test_list_credential_types(admin_client: APIClient):
+def test_retrieve_credential_type_no_auth(
+    base_client: APIClient, credential_type: models.CredentialType
+):
+    response = base_client.get(
+        f"{api_url_v1}/credential-types/{credential_type.id}/"
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.django_db
+def test_list_credential_types(superuser_client: APIClient):
     objects = models.CredentialType.objects.bulk_create(
         [
             models.CredentialType(
@@ -213,38 +262,42 @@ def test_list_credential_types(admin_client: APIClient):
             ),
         ]
     )
-    response = admin_client.get(f"{api_url_v1}/credential-types/")
+    response = superuser_client.get(f"{api_url_v1}/credential-types/")
     assert response.status_code == status.HTTP_200_OK
     assert len(objects) == 2
 
 
 @pytest.mark.django_db
-def test_delete_managed_credential_type(admin_client: APIClient):
+def test_delete_managed_credential_type(superuser_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1",
         inputs={"fields": [{"a": "b"}]},
         injectors={},
         managed=True,
     )
-    response = admin_client.delete(f"{api_url_v1}/credential-types/{obj.id}/")
+    response = superuser_client.delete(
+        f"{api_url_v1}/credential-types/{obj.id}/"
+    )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 @pytest.mark.django_db
-def test_delete_credential_type(admin_client: APIClient):
+def test_delete_credential_type(superuser_client: APIClient):
     obj = models.CredentialType.objects.create(
         name="type1",
         inputs={"fields": [{"a": "b"}]},
         injectors={},
         managed=False,
     )
-    response = admin_client.delete(f"{api_url_v1}/credential-types/{obj.id}/")
+    response = superuser_client.delete(
+        f"{api_url_v1}/credential-types/{obj.id}/"
+    )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @pytest.mark.django_db
 def test_delete_credential_type_with_credentials(
-    admin_client: APIClient, preseed_credential_types
+    superuser_client: APIClient, preseed_credential_types
 ):
     credential_type = models.CredentialType.objects.create(
         name="user_type",
@@ -259,7 +312,7 @@ def test_delete_credential_type_with_credentials(
         credential_type=credential_type,
     )
 
-    response = admin_client.delete(
+    response = superuser_client.delete(
         f"{api_url_v1}/credential-types/{credential_type.id}/"
     )
     assert response.status_code == status.HTTP_409_CONFLICT
@@ -297,7 +350,7 @@ def test_delete_credential_type_with_credentials(
     ],
 )
 def test_partial_update_inputs_credential_type(
-    admin_client: APIClient,
+    superuser_client: APIClient,
     old_inputs,
     new_inputs,
     status_code,
@@ -314,7 +367,7 @@ def test_partial_update_inputs_credential_type(
         "inputs": new_inputs,
         "injectors": {"extra_vars": {"username": "Fred"}},
     }
-    response = admin_client.patch(
+    response = superuser_client.patch(
         f"{api_url_v1}/credential-types/{obj.id}/", data=data
     )
     assert response.status_code == status_code
@@ -351,7 +404,7 @@ def test_partial_update_inputs_credential_type(
     ],
 )
 def test_partial_update_injectors_credential_type(
-    admin_client: APIClient,
+    superuser_client: APIClient,
     new_injectors,
     status_code,
     key,
@@ -364,7 +417,7 @@ def test_partial_update_injectors_credential_type(
         managed=False,
     )
     data = {"injectors": new_injectors}
-    response = admin_client.patch(
+    response = superuser_client.patch(
         f"{api_url_v1}/credential-types/{obj.id}/", data=data
     )
     assert response.status_code == status_code
@@ -378,13 +431,13 @@ def test_partial_update_injectors_credential_type(
 
 @pytest.mark.django_db
 def test_update_managed_credential_type(
-    admin_client: APIClient, preseed_credential_types
+    superuser_client: APIClient, preseed_credential_types
 ):
     scm = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.SOURCE_CONTROL,
     )
     data = {"name": "new_name"}
-    response = admin_client.patch(
+    response = superuser_client.patch(
         f"{api_url_v1}/credential-types/{scm.id}/", data=data
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -437,7 +490,7 @@ def test_update_managed_credential_type(
     ],
 )
 def test_update_credential_type_with_created_credentials(
-    admin_client: APIClient,
+    superuser_client: APIClient,
     preseed_credential_types,
     data,
     status_code,
@@ -456,7 +509,7 @@ def test_update_credential_type_with_created_credentials(
         credential_type_id=user_type.id,
     )
 
-    response = admin_client.patch(
+    response = superuser_client.patch(
         f"{api_url_v1}/credential-types/{user_type.id}/", data=data
     )
     assert response.status_code == status_code

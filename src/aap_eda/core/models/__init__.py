@@ -79,7 +79,6 @@ __all__ = [
 
 permission_registry.register(
     Activation,
-    CredentialType,
     EdaCredential,
     DecisionEnvironment,
     Project,
