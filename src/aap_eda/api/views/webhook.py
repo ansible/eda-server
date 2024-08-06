@@ -145,10 +145,10 @@ class WebhookViewSet(
             sub_path = f"{WEBHOOK_EXTERNAL_PATH}/{response.uuid}/post/"
             if inputs["auth_type"] == WebhookAuthType.MTLS:
                 response.url = urljoin(
-                    settings.WEBHOOK_MTLS_URL_PREFIX, sub_path
+                    settings.WEBHOOK_MTLS_BASE_URL, sub_path
                 )
             else:
-                response.url = urljoin(settings.WEBHOOK_URL_PREFIX, sub_path)
+                response.url = urljoin(settings.WEBHOOK_BASE_URL, sub_path)
             response.save(update_fields=["url"])
 
         return Response(
