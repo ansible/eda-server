@@ -53,7 +53,7 @@ ORG_ROLES = [
             ],
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
-            "organization": ["view", "change", "delete"],
+            "organization": ["view", "change", "delete", "member"],
             "team": CRUD + ["member"],
             "project": CRUD + ["sync"],
             "rulebook": ["view"],
