@@ -708,11 +708,18 @@ PG_NOTIFY_DSN_SERVER = settings.get(
     "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
 )
 SERVER_UUID = settings.get("SERVER_UUID", "abc-def-123-34567")
-WEBHOOK_URL_PREFIX = settings.get(
-    "WEBHOOK_URL_PREFIX", f"https://ui.eda.local:8443/{SERVER_UUID}"
+WEBHOOK_BASE_URL = (
+    settings.get(
+        "WEBHOOK_BASE_URL", f"https://ui.eda.local:8443/{SERVER_UUID}"
+    ).strip("/")
+    + "/"
 )
-WEBHOOK_MTLS_URL_PREFIX = settings.get(
-    "WEBHOOK_MTLS_URL_PREFIX", f"https://ui.eda.local:8443/mtls/{SERVER_UUID}"
+WEBHOOK_MTLS_BASE_URL = (
+    settings.get(
+        "WEBHOOK_MTLS_BASE_URL",
+        f"https://ui.eda.local:8443/mtls/{SERVER_UUID}",
+    ).strip("/")
+    + "/"
 )
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
