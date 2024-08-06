@@ -93,6 +93,13 @@ class WebhookViewSet(
     )
     def destroy(self, request, *args, **kwargs):
         webhook = self.get_object()
+
+        ref_count = webhook.activations.count()
+        if ref_count > 0:
+            raise api_exc.Conflict(
+                f"Event stream '{webhook.name}' is being referenced by "
+                f"{ref_count} activation(s) and cannot be deleted"
+            )
         self.perform_destroy(webhook)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
