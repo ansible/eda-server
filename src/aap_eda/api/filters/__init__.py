@@ -31,6 +31,7 @@ from .rulebook import (
 )
 from .team import OrganizationTeamFilter, TeamFilter
 from .user import UserFilter
+from .webhook import WebhookFilter
 
 __all__ = (
     # project
@@ -58,4 +59,6 @@ __all__ = (
     # team
     "TeamFilter",
     "OrganizationTeamFilter",
+    # Webhook
+    "WebhookFilter",
 )

@@ -133,7 +133,9 @@ class Activation(
         blank=True,
         help_text="Name of the kubernetes service",
     )
-    webhooks = models.ManyToManyField(Webhook, default=None)
+    webhooks = models.ManyToManyField(
+        Webhook, related_name="activations", default=None
+    )
     swap_single_source = models.BooleanField(
         default=False,
         help_text=(
