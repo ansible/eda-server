@@ -19,7 +19,6 @@ from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-import redis
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -31,7 +30,7 @@ from aap_eda.core.management.commands.create_initial_data import (
     CREDENTIAL_TYPES,
     populate_credential_types,
 )
-from aap_eda.core.tasking import Queue
+from aap_eda.core.tasking import Queue, get_redis_client
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
 
@@ -1022,7 +1021,7 @@ def new_team(default_organization: models.Organization) -> models.Team:
 # fixture for a running redis server
 @pytest.fixture
 def redis_external(redis_parameters):
-    client = redis.Redis(**redis_parameters)
+    client = get_redis_client(**redis_parameters)
     yield client
     client.flushdb()
 

@@ -6,8 +6,14 @@ from datetime import datetime, timedelta
 from types import MethodType
 from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
+import redis
 import rq
 import rq_scheduler
+from ansible_base.lib.redis.client import (
+    DABRedis,
+    DABRedisCluster,
+    get_redis_client as _get_redis_client,
+)
 from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
 from django_rq.queues import Queue as _Queue
@@ -19,6 +25,8 @@ from rq.defaults import (
 )
 from rq.job import Job as _Job, JobStatus
 from rq.serializers import JSONSerializer
+
+from aap_eda.settings import default
 
 __all__ = [
     "Job",
@@ -42,6 +50,20 @@ _ErrorHandlersArgType = Union[
     ErrorHandlerType,
     None,
 ]
+
+
+def get_redis_client(**kwargs):
+    """Instantiate a Redis client via DAB.
+
+    DAB will return an appropriate client for HA based on the passed
+    parameters.
+    """
+    # Make the URL that DAB expects as part of the creation.
+    schema = "redis"
+    if kwargs.get("ssl", False):
+        schema = "rediss"
+    url = f"{schema}://{kwargs.get('host')}:{kwargs.get('port')}"
+    return _get_redis_client(url, **kwargs)
 
 
 def enable_redis_prefix():
@@ -162,6 +184,19 @@ class Job(_Job):
         super().__init__(id, connection, serializer)
 
 
+# django-rq's rqworker command does not support --connection-class so
+# we cannot specify the DAB redis client that way.  Even if it did we
+# couldn't use it as DAB requires a url parameter that Redis does not.
+# If the connection a worker is given is not from DAB we replace it
+# with one that is.
+def _get_necessary_client_connection(connection: Connection) -> Connection:
+    if not isinstance(connection, (DABRedis, DABRedisCluster)):
+        connection = get_redis_client(
+            **default.rq_redis_client_instantiation_parameters()
+        )
+    return connection
+
+
 class DefaultWorker(_Worker):
     """Custom default worker class used for non-activation tasks.
 
@@ -189,6 +224,7 @@ class DefaultWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
+        connection = _get_necessary_client_connection(connection)
 
         super().__init__(
             queues=queues,
@@ -235,7 +271,7 @@ class ActivationWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-
+        connection = _get_necessary_client_connection(connection)
         queue_name = settings.RULEBOOK_QUEUE_NAME
 
         super().__init__(
