@@ -18,6 +18,7 @@ import redis
 
 from aap_eda.core.tasking import (
     DABRedis,
+    DABRedisCluster,
     DefaultWorker,
     Queue,
     get_redis_client,
@@ -68,20 +69,21 @@ def test_unique_enqueue_new_job(default_queue, eda_caplog):
 def test_worker_dab_client(default_queue: Queue):
     """Test that workers end up with a DABRedis client connection."""
 
-    # Verify if given no connection the worker gets a DABRedis.
+    # Verify if given no connection the worker gets DABRedis/DABRedisCluster.
     worker = DefaultWorker([default_queue])
-    assert type(worker.connection) is DABRedis
+    assert isinstance(worker.connection, (DABRedis, DABRedisCluster))
 
-    # Verify if given a redis.Redis connection the worker gets a DABRedis.
+    # Verify if given a redis.Redis connection the worker gets a
+    # DABRedis/DABRedisCluster.
     worker = DefaultWorker(
         [default_queue],
         connection=redis.Redis(
             **default.rq_redis_client_instantiation_parameters()
         ),
     )
-    assert type(worker.connection) is DABRedis
+    assert isinstance(worker.connection, (DABRedis, DABRedisCluster))
 
-    # Verify if given a DABRedis connection the worker uses it.
+    # Verify if given a DABRedis/DABRedisCluster connection the worker uses it.
     connection = get_redis_client(
         **default.rq_redis_client_instantiation_parameters()
     )
@@ -91,8 +93,9 @@ def test_worker_dab_client(default_queue: Queue):
     )
     assert worker.connection is connection
 
-    # Verify if given the queue's DABRedis connection the worker uses it.
-    # The queue is created with a DABRedis connection.
+    # Verify if given the queue's DABRedis/DABRedisCluster connection the
+    # worker uses it.
+    # The queue is created with a DABRedis/DABRedisCluster connection.
     worker = DefaultWorker(
         [default_queue],
         connection=default_queue.connection,
