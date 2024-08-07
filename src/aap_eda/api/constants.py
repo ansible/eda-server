@@ -45,3 +45,5 @@ PG_NOTIFY_TEMPLATE_RULEBOOK_DATA = """
           channel: "{{ EDA_PG_NOTIFY_CHANNEL }}"
           event: "{{ event }}"
 """
+
+SOURCE_MAPPING_ERROR_KEY = "rulebook"

@@ -200,6 +200,15 @@ def test_list_sources_from_rulebook_with_exception(
     assert response.data["errors"] == "Failed to parse rulebook data"
 
 
+@pytest.mark.django_db
+def test_list_sources_from_rulebook_with_404_exception(
+    admin_client: APIClient, bad_rulebook: models.Rulebook
+):
+    response = admin_client.get(f"{api_url_v1}/rulebooks/1492/sources/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.data["detail"] == "Rulebook with ID=1492 does not exist."
+
+
 def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
     assert data == {
         "id": rulebook.id,

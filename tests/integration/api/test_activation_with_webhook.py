@@ -19,11 +19,16 @@ import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.constants import SOURCE_MAPPING_ERROR_KEY
 from aap_eda.core import models
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
     ActivationStatus,
     RestartPolicy,
+)
+from aap_eda.core.utils.rulebook import (
+    DEFAULT_SOURCE_NAME_PREFIX,
+    get_rulebook_hash,
 )
 from tests.integration.constants import api_url_v1
 
@@ -99,6 +104,24 @@ LEGACY_TEST_RULESETS = """
   hosts: localhost
   gather_facts: false
   sources:
+   - ansible.eda.range:
+       limit: 10
+  rules:
+    - name: rule1
+      condition: true
+      action:
+         debug:
+"""
+
+LEGACY_TEST_RULESETS_MULTIPLE_SOURCES = """
+---
+- name: hello
+  hosts: localhost
+  sources:
+   - ansible.eda.range:
+       limit: 10
+   - ansible.eda.range:
+       limit: 10
    - ansible.eda.range:
        limit: 10
   rules:
@@ -220,7 +243,17 @@ def test_create_activation_with_webhooks(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
-    test_activation["webhooks"] = [webhook.id for webhook in fks["webhooks"]]
+    source_mappings = []
+    for webhook in fks["webhooks"]:
+        source_mappings.append(
+            {
+                "webhook_name": webhook.name,
+                "webhook_id": webhook.id,
+                "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
+                "source_name": "demo",
+            }
+        )
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
 
     admin_client.post(
         f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
@@ -282,12 +315,95 @@ def test_list_activations_by_webhook(
 
 
 @pytest.mark.django_db
-def test_create_activation_with_bad_webhook(admin_client: APIClient):
+def test_create_activation_with_bad_format_in_mappings(
+    admin_client: APIClient, preseed_credential_types
+):
     fks = create_activation_related_data(["demo"])
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
-    test_activation["webhooks"] = [1492]
+    test_activation["source_mappings"] = "bad_format"
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert str(response.data[SOURCE_MAPPING_ERROR_KEY][0]) == (
+        "Input source mappings should be a list of mappings"
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_corrupted_mappings(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(["demo"])
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["source_mappings"] = "corrupted\n  key: value\n"
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Faild to parse source mappings: " in str(
+        response.data[SOURCE_MAPPING_ERROR_KEY][0]
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_missing_keys_in_mappings(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(["demo"])
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    source_mappings = [
+        {
+            "webhook_name": "fake",
+            "source_name": "demo",
+        }
+    ]
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert str(response.data[SOURCE_MAPPING_ERROR_KEY][0]) == (
+        "The source mapping {'source_name': 'demo', 'webhook_name': 'fake'} "
+        "is missing the required keys: ['webhook_id', 'rulebook_hash']"
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_bad_webhook(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(["demo"])
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    source_mappings = [
+        {
+            "webhook_name": "fake",
+            "webhook_id": 1492,
+            "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
+            "source_name": "demo",
+        }
+    ]
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
 
     admin_client.post(
         f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
@@ -297,104 +413,237 @@ def test_create_activation_with_bad_webhook(admin_client: APIClient):
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        str(response.data["webhooks"][0])
-        == "Webhook with id 1492 does not exist"
+        str(response.data[SOURCE_MAPPING_ERROR_KEY][0])
+        == "Event stream id 1492 not found"
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_bad_webhook_name(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(["demo"])
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    source_mappings = [
+        {
+            "webhook_name": "missing_name",
+            "webhook_id": fks["webhooks"][0].id,
+            "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
+            "source_name": "demo",
+        }
+    ]
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        str(response.data[SOURCE_MAPPING_ERROR_KEY][0])
+        == "Event stream missing_name did not match with webhook demo"
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_bad_rulebook_hash(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(["demo"])
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    source_mappings = [
+        {
+            "webhook_name": fks["webhooks"][0].name,
+            "webhook_id": fks["webhooks"][0].id,
+            "rulebook_hash": "abdd",
+            "source_name": "demo",
+        }
+    ]
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert str(response.data[SOURCE_MAPPING_ERROR_KEY][0]) == (
+        "Rulebook has changed since the sources were mapped."
+        " Please reattach Event streams again"
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_duplicate_source_name(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(
+        ["demo"], rulesets=LEGACY_TEST_RULESETS_MULTIPLE_SOURCES
+    )
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    source_mappings = [
+        {
+            "webhook_name": fks["webhooks"][0].name,
+            "webhook_id": fks["webhooks"][0].id,
+            "rulebook_hash": "abdd",
+            "source_name": "demo",
+        },
+        {
+            "webhook_name": f"{fks['webhooks'][0].name}_1",
+            "webhook_id": fks["webhooks"][0].id,
+            "rulebook_hash": get_rulebook_hash(
+                LEGACY_TEST_RULESETS_MULTIPLE_SOURCES
+            ),
+            "source_name": "demo",
+        },
+    ]
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "The following sources demo are being used multiple times"
+        == response.data[SOURCE_MAPPING_ERROR_KEY][0]
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_duplicate_webhook_name(
+    admin_client: APIClient, preseed_credential_types
+):
+    fks = create_activation_related_data(
+        ["demo"], rulesets=LEGACY_TEST_RULESETS_MULTIPLE_SOURCES
+    )
+    test_activation = TEST_ACTIVATION.copy()
+    test_activation["decision_environment_id"] = fks["decision_environment_id"]
+    test_activation["rulebook_id"] = fks["rulebook_id"]
+    source_mappings = [
+        {
+            "webhook_name": fks["webhooks"][0].name,
+            "webhook_id": fks["webhooks"][0].id,
+            "rulebook_hash": "abdd",
+            "source_name": "demo",
+        },
+        {
+            "webhook_name": fks["webhooks"][0].name,
+            "webhook_id": fks["webhooks"][0].id,
+            "rulebook_hash": get_rulebook_hash(
+                LEGACY_TEST_RULESETS_MULTIPLE_SOURCES
+            ),
+            "source_name": "demo1",
+        },
+    ]
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    admin_client.post(
+        f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
+    )
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "The following event streams demo are being used multiple times"
+        == response.data[SOURCE_MAPPING_ERROR_KEY][0]
     )
 
 
 webhook_src_test_data = [
     (
-        ["demo"],
-        {},
+        [("missing_source", "demo")],
         LEGACY_TEST_RULESETS,
         status.HTTP_400_BAD_REQUEST,
-        (
-            "No matching sources found for the following Event stream(s): "
-            "demo. None of the sources in the rulebook have name. "
-            "Please consider adding name to all the sources in your "
-            "rulebook."
-        ),
-        "webhooks",
+        "The source missing_source does not exist",
+        SOURCE_MAPPING_ERROR_KEY,
     ),
     (
-        ["demo"],
-        {"swap_single_source": True},
+        [(f"{DEFAULT_SOURCE_NAME_PREFIX}1", "demo")],
         LEGACY_TEST_RULESETS,
         status.HTTP_201_CREATED,
         "",
-        "webhooks",
+        SOURCE_MAPPING_ERROR_KEY,
     ),
     (
-        ["demo1", "demo2"],
-        {},
+        [("demo1", "demo1"), ("demo2", "demo3")],
         PARTIAL_TEST_RULESETS,
         status.HTTP_400_BAD_REQUEST,
-        (
-            "No matching sources found for the following Event stream(s): "
-            "demo2. The current source names in the rulebook are: "
-            "demo1, demo3."
-        ),
-        "webhooks",
+        "The source demo2 does not exist",
+        SOURCE_MAPPING_ERROR_KEY,
     ),
     (
-        ["demo1", "demo2"],
-        {"swap_single_source": True},
+        [
+            (f"{DEFAULT_SOURCE_NAME_PREFIX}1", "demo1"),
+            (f"{DEFAULT_SOURCE_NAME_PREFIX}2", "demo2"),
+        ],
         LEGACY_TEST_RULESETS,
         status.HTTP_400_BAD_REQUEST,
-        (
-            "You have more than 1 event stream attached to the rulebook, "
-            "whilst there is only source in the rulebook."
-        ),
-        "webhooks",
+        "The rulebook has 1 source(s) while you have provided 2 event streams",
+        SOURCE_MAPPING_ERROR_KEY,
     ),
     (
-        ["demo11", "demo21"],
-        {},
+        [("demo11", "demo1"), ("demo21", "demo3")],
         PARTIAL_TEST_RULESETS,
         status.HTTP_400_BAD_REQUEST,
-        (
-            "No matching sources found for the following Event stream(s): "
-            "demo11, demo21. The current source names in the "
-            "rulebook are: demo1, demo3."
-        ),
-        "webhooks",
+        "The source demo11 does not exist",
+        SOURCE_MAPPING_ERROR_KEY,
     ),
     (
-        ["demo1"],
-        {"swap_single_source": True},
-        PARTIAL_TEST_RULESETS,
-        status.HTTP_400_BAD_REQUEST,
-        (
-            "You have more than 1 source in the rulebook. Please add "
-            "name to your sources and disable this option."
-        ),
-        "swap_single_source",
+        [(f"{DEFAULT_SOURCE_NAME_PREFIX}3", "demo1")],
+        LEGACY_TEST_RULESETS_MULTIPLE_SOURCES,
+        status.HTTP_201_CREATED,
+        "",
+        SOURCE_MAPPING_ERROR_KEY,
     ),
 ]
 
 
 @pytest.mark.parametrize(
-    "webhook_names, extra_args, rulesets, status_code, message, error_key",
+    "source_tuples, rulesets, status_code, message, error_key",
     webhook_src_test_data,
 )
 @pytest.mark.django_db
 def test_bad_src_activation_with_webhooks(
     admin_client: APIClient,
     preseed_credential_types,
-    webhook_names,
-    extra_args,
+    source_tuples,
     rulesets,
     status_code,
     message,
     error_key,
 ):
-    fks = create_activation_related_data(webhook_names, True, rulesets)
+    names = [webhook_name for _, webhook_name in source_tuples]
+    fks = create_activation_related_data(names, True, rulesets)
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
-    test_activation["webhooks"] = [webhook.id for webhook in fks["webhooks"]]
-    for key, value in extra_args.items():
-        test_activation[key] = value
+
+    source_mappings = []
+
+    for src, webhook_name in source_tuples:
+        webhook = models.Webhook.objects.get(name=webhook_name)
+        source_mappings.append(
+            {
+                "source_name": src,
+                "rulebook_hash": get_rulebook_hash(rulesets),
+                "webhook_name": webhook_name,
+                "webhook_id": webhook.id,
+            }
+        )
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
 
     admin_client.post(
         f"{api_url_v1}/users/me/awx-tokens/", data=TEST_AWX_TOKEN
