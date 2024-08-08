@@ -207,7 +207,7 @@ def test_engine_start(init_data, podman_engine):
 
     engine.client.containers.run.assert_called_once()
     assert models.RulebookProcessLog.objects.count() == 4
-    assert models.RulebookProcessLog.objects.last().log.endswith("is started.")
+    assert models.RulebookProcessLog.objects.last().log.endswith("is running.")
 
 
 @pytest.mark.django_db

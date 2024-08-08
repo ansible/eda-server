@@ -160,7 +160,7 @@ class Engine(ContainerEngine):
                 f"pod_args: {pod_args}"
             )
 
-            log_handler.write(f"Container {container.id} is started.", True)
+            log_handler.write(f"Container {container.id} is running.", True)
             return str(container.id)
         except (
             ContainerError,
