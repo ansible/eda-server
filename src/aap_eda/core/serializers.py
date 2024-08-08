@@ -12,23 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import django_filters
 
-from aap_eda.core import models
+from rest_framework import serializers
 
 
-class CredentialTypeFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="istartswith",
-        label="Filter by credential type name.",
-    )
-    namespace = django_filters.CharFilter(
-        field_name="namespace",
-        lookup_expr="istartswith",
-        label="Filter by credential type namespace.",
-    )
-
-    class Meta:
-        model = models.CredentialType
-        fields = ["name", "namespace"]
+class StatusResponseSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    message = serializers.CharField(required=False)

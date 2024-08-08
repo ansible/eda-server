@@ -33,17 +33,47 @@ x-environment:
   - EDA_RESOURCE_SERVER__VALIDATE_HTTPS=${EDA_RESOURCE_SERVER__VALIDATE_HTTPS:-False}
   - EDA_RESOURCE_JWT_USER_ID=${EDA_RESOURCE_JWT_USER_ID:-'@none None'}
   - EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY=${EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY:-@json {}}
+  - EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
+  - EDA_PG_NOTIFY_DSN="host=host.containers.internal port=5432 dbname=eda user=postgres password=secret"
+  - EDA_PG_NOTIFY_DSN_SERVER="host=postgres port=5432 dbname=eda user=postgres password=secret"
+  - EDA_WEBHOOK_BASE_URL=${EDA_WEBHOOK_BASE_URL:-https://localhost/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_WEBHOOK_MTLS_BASE_URL=${EDA_WEBHOOK_MTLS_BASE_URL:-https://localhost/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/cert.pem}
+  - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/cert.key}
+  - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/CA.pem}
 
 
 services:
-  eda-ui:
-    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
-    environment: *common-env
+  postgres:
+    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
+    environment:
+      POSTGRESQL_USER: eda
+      POSTGRESQL_PASSWORD: secret
+      POSTGRESQL_ADMIN_PASSWORD: secret
+      POSTGRESQL_DATABASE: eda
     ports:
-      - '${EDA_UI_PORT:-8443}:443'
-    depends_on:
-      eda-api:
-        condition: service_healthy
+      - '${EDA_PG_PORT:-5432}:5432'
+    volumes:
+      - 'postgres_data:/var/lib/pgsql/data'
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  redis:
+    image: ${EDA_REDIS_IMAGE:-docker.io/library/redis}:${EDA_REDIS_VERSION:-6.2.14}
+    ports:
+      - '${EDA_REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: [ 'CMD', 'redis-cli', 'ping' ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   eda-api:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -104,10 +134,6 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
@@ -129,10 +155,6 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
@@ -148,39 +170,28 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
 
-  postgres:
-    image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
-    environment:
-      POSTGRESQL_USER: eda
-      POSTGRESQL_PASSWORD: secret
-      POSTGRESQL_ADMIN_PASSWORD: secret
-      POSTGRESQL_DATABASE: eda
+  eda-webhook-api:
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    environment: *common-env
+    security_opt:
+      - label=disable
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage runserver 0.0.0.0:8000
     ports:
-      - '${EDA_PG_PORT:-5432}:5432'
-    volumes:
-      - 'postgres_data:/var/lib/pgsql/data'
+      - '8555:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
     healthcheck:
-      test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
-      interval: 5s
+      test: [ 'CMD', 'curl', '-q', 'http://0.0.0.0:8000/_healthz' ]
+      interval: 30s
       timeout: 5s
-      retries: 3
-      start_period: 5s
-
-  redis:
-    image: ${EDA_REDIS_IMAGE:-docker.io/library/redis}:${EDA_REDIS_VERSION:-6.2.14}
-    ports:
-      - '${EDA_REDIS_PORT:-6379}:6379'
-    healthcheck:
-      test: [ 'CMD', 'redis-cli', 'ping' ]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
+      retries: 10
+      start_period: 15s
 
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
@@ -192,6 +203,17 @@ services:
       - ./squid/htpass:/etc/squid/htpass
     ports:
       - '${EDA_PROXY_PORT:-3128}:3128'
+
+  eda-ui:
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
+    environment: *common-env
+    ports:
+      - '${EDA_UI_PORT:-8443}:443'
+    volumes:
+      - './tools/docker/my_certs:/tmp/my_certs:z'
+    depends_on:
+      eda-webhook-api:
+        condition: service_healthy
 
 volumes:
   postgres_data: {}

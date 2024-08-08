@@ -22,6 +22,7 @@ from tests.integration.constants import api_url_v1
     [
         pytest.param(
             [
+                "/config/",
                 "/status/",
                 "/openapi.json",
                 "/openapi.yaml",
@@ -44,12 +45,14 @@ from tests.integration.constants import api_url_v1
                 "/decision-environments/",
                 "/organizations/",
                 "/teams/",
+                "/webhooks/",
             ],
             True,
             id="with_shared_resource",
         ),
         pytest.param(
             [
+                "/config/",
                 "/status/",
                 "/role_definitions/",
                 "/role_user_assignments/",
@@ -81,6 +84,7 @@ from tests.integration.constants import api_url_v1
                 "/decision-environments/",
                 "/organizations/",
                 "/teams/",
+                "/webhooks/",
             ],
             False,
             id="no_shared_resource",

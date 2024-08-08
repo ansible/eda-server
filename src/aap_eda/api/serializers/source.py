@@ -12,23 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import django_filters
+from rest_framework import serializers
 
-from aap_eda.core import models
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 
 
-class CredentialTypeFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="istartswith",
-        label="Filter by credential type name.",
-    )
-    namespace = django_filters.CharFilter(
-        field_name="namespace",
-        lookup_expr="istartswith",
-        label="Filter by credential type namespace.",
+class SourceSerializer(serializers.Serializer):
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the source",
     )
 
-    class Meta:
-        model = models.CredentialType
-        fields = ["name", "namespace"]
+    source_info = YAMLSerializerField(
+        required=True,
+        help_text="The information about the source",
+        sort_keys=False,
+    )
+
+    rulebook_hash = serializers.CharField(
+        required=True,
+        help_text="Hash of the rulebook",
+    )

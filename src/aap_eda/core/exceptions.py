@@ -29,3 +29,10 @@ class PostRunError(Exception):
         self.status = status
         self.tb = tb
         super(PostRunError, self).__init__(msg)
+
+class PGNotifyError(Exception):
+    pass
+
+
+class ParseError(Exception):
+    pass

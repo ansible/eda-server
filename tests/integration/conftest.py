@@ -19,7 +19,6 @@ from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-import redis
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -31,11 +30,12 @@ from aap_eda.core.management.commands.create_initial_data import (
     CREDENTIAL_TYPES,
     populate_credential_types,
 )
-from aap_eda.core.tasking import Queue
+from aap_eda.core.tasking import Queue, get_redis_client
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
+DUMMY_URL = "https://www.example.com"
 
 
 #################################################################
@@ -262,6 +262,24 @@ def default_rulesets() -> str:
 
 
 @pytest.fixture
+def bad_rulesets() -> str:
+    return """
+---
+- name: "test
+  sources:
+    - ansible.eda.range:
+        limit: 10
+  rules:
+    - name: example rule"
+      condition: event.i == 8
+      actions:
+        - run_job_template:
+            organization: Default
+            name: example
+"""
+
+
+@pytest.fixture
 def default_run_job_template_rulesets() -> str:
     return """
 ---
@@ -288,6 +306,19 @@ def default_rulebook(
         name="default-rulebook.yml",
         rulesets=default_rulesets,
         description="test rulebook",
+        project=default_project,
+    )
+
+
+@pytest.fixture
+def bad_rulebook(
+    default_project: models.Project, bad_rulesets: str
+) -> models.Rulebook:
+    """Return a bad Rulebook."""
+    return models.Rulebook.objects.create(
+        name="bad-rulebook.yml",
+        rulesets=bad_rulesets,
+        description="test bad rulebook",
         project=default_project,
     )
 
@@ -802,9 +833,7 @@ def credential_type() -> models.CredentialType:
 
 
 @pytest.fixture
-def user_credential_type(
-    default_organization: models.Organization,
-) -> models.CredentialType:
+def user_credential_type() -> models.CredentialType:
     return models.CredentialType.objects.create(
         name="user_type",
         inputs={
@@ -819,7 +848,6 @@ def user_credential_type(
                 "sasl_password": "{{ sasl_password }}",
             }
         },
-        organization=default_organization,
     )
 
 
@@ -1024,7 +1052,7 @@ def new_team(default_organization: models.Organization) -> models.Team:
 # fixture for a running redis server
 @pytest.fixture
 def redis_external(redis_parameters):
-    client = redis.Redis(**redis_parameters)
+    client = get_redis_client(**redis_parameters)
     yield client
     client.flushdb()
 
@@ -1061,3 +1089,74 @@ def caplog_factory(caplog):
 @pytest.fixture
 def container_engine_mock() -> MagicMock:
     return create_autospec(ContainerEngine, instance=True)
+
+
+@pytest.fixture
+def default_hmac_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a default HMAC Credential"""
+    hmac_credential_type = models.CredentialType.objects.get(
+        name=enums.WebhookCredentialType.HMAC
+    )
+    return models.EdaCredential.objects.create(
+        name="default-hmac-credential",
+        description="Default HMAC Credential",
+        credential_type=hmac_credential_type,
+        inputs=inputs_to_store(
+            {
+                "auth_type": "hmac",
+                "hmac_algorithm": "sha256",
+                "secret": "secret",
+                "header_key": "X-Hub-Signature-256",
+                "hmac_format": "hex",
+                "hmac_signature_prefix": "sha256=",
+            }
+        ),
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def default_webhooks(
+    default_organization: models.Organization,
+    default_user: models.User,
+    default_hmac_credential: models.EdaCredential,
+) -> List[models.Webhook]:
+    return models.Webhook.objects.bulk_create(
+        [
+            models.Webhook(
+                uuid=uuid.uuid4(),
+                name="test-webhook-1",
+                owner=default_user,
+                organization=default_organization,
+                url=DUMMY_URL,
+                eda_credential=default_hmac_credential,
+            ),
+            models.Webhook(
+                uuid=uuid.uuid4(),
+                name="test-webhook-2",
+                owner=default_user,
+                organization=default_organization,
+                url=DUMMY_URL,
+                eda_credential=default_hmac_credential,
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def default_webhook(
+    default_organization: models.Organization,
+    default_user: models.User,
+    default_hmac_credential: models.EdaCredential,
+) -> models.Webhook:
+    return models.Webhook.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-webhook-1",
+        owner=default_user,
+        organization=default_organization,
+        url=DUMMY_URL,
+        eda_credential=default_hmac_credential,
+    )

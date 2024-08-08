@@ -393,7 +393,7 @@ def _rq_common_parameters():
     return params
 
 
-def _rq_redis_client_parameters():
+def _rq_redis_client_additional_parameters():
     params = {}
     if (not REDIS_UNIX_SOCKET_PATH) and REDIS_CLIENT_CERT_PATH:
         params |= {
@@ -401,6 +401,14 @@ def _rq_redis_client_parameters():
             "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
             "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
         }
+    return params
+
+
+def rq_redis_client_instantiation_parameters():
+    params = _rq_common_parameters() | _rq_redis_client_additional_parameters()
+
+    # Convert to lowercase for use in instantiating a redis client.
+    params = {k.lower(): v for (k, v) in params.items()}
     return params
 
 
@@ -436,13 +444,17 @@ def get_rq_queues() -> dict:
     # Configure the default queue
     queues["default"] = _rq_common_parameters()
     queues["default"]["DEFAULT_TIMEOUT"] = DEFAULT_QUEUE_TIMEOUT
-    queues["default"]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
+    queues["default"][
+        "REDIS_CLIENT_KWARGS"
+    ] = _rq_redis_client_additional_parameters()
 
     # Configure the worker queues
     for queue in RULEBOOK_WORKER_QUEUES:
         queues[queue] = _rq_common_parameters()
         queues[queue]["DEFAULT_TIMEOUT"] = DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
+        queues[queue][
+            "REDIS_CLIENT_KWARGS"
+        ] = _rq_redis_client_additional_parameters()
 
     return queues
 
@@ -718,6 +730,34 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
 
 API_PATH_TO_UI_PATH_MAP = settings.get(
     "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
+)
+
+_DEFAULT_PG_NOTIFY_DSN_SERVER = (
+    f"host={DATABASES['default']['HOST']} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
+    f"password={DATABASES['default']['PASSWORD']}"
+)
+PG_NOTIFY_DSN_SERVER = settings.get(
+    "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
+)
+SERVER_UUID = settings.get("SERVER_UUID", "abc-def-123-34567")
+WEBHOOK_BASE_URL = (
+    settings.get(
+        "WEBHOOK_BASE_URL", f"https://ui.eda.local:8443/{SERVER_UUID}"
+    ).strip("/")
+    + "/"
+)
+WEBHOOK_MTLS_BASE_URL = (
+    settings.get(
+        "WEBHOOK_MTLS_BASE_URL",
+        f"https://ui.eda.local:8443/mtls/{SERVER_UUID}",
+    ).strip("/")
+    + "/"
+)
+MAX_PG_NOTIFY_MESSAGE_SIZE = int(
+    settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
 
 # Settings related to external logger configuration

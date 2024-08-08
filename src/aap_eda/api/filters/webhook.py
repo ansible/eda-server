@@ -17,18 +17,13 @@ import django_filters
 from aap_eda.core import models
 
 
-class CredentialTypeFilter(django_filters.FilterSet):
+class WebhookFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter by credential type name.",
-    )
-    namespace = django_filters.CharFilter(
-        field_name="namespace",
-        lookup_expr="istartswith",
-        label="Filter by credential type namespace.",
+        label="Filter by webhook name.",
     )
 
     class Meta:
-        model = models.CredentialType
-        fields = ["name", "namespace"]
+        model = models.Webhook
+        fields = ["name"]

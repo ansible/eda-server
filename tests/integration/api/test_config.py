@@ -11,24 +11,19 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import pytest
+from django.conf import settings
 
-import django_filters
+from aap_eda.utils import get_eda_version
+from tests.integration.constants import api_url_v1
 
-from aap_eda.core import models
 
-
-class CredentialTypeFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(
-        field_name="name",
-        lookup_expr="istartswith",
-        label="Filter by credential type name.",
-    )
-    namespace = django_filters.CharFilter(
-        field_name="namespace",
-        lookup_expr="istartswith",
-        label="Filter by credential type namespace.",
-    )
-
-    class Meta:
-        model = models.CredentialType
-        fields = ["name", "namespace"]
+@pytest.mark.django_db
+def test_v1_config(admin_client):
+    response = admin_client.get(f"{api_url_v1}/config/")
+    assert response.status_code == 200
+    assert response.data == {
+        "time_zone": settings.TIME_ZONE,
+        "version": get_eda_version(),
+        "deployment_type": settings.DEPLOYMENT_TYPE,
+    }

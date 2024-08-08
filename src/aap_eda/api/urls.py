@@ -55,6 +55,12 @@ router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
 router.register("organizations", views.OrganizationViewSet)
 router.register("teams", views.TeamViewSet)
+router.register("webhooks", views.WebhookViewSet)
+router.register(
+    "external_webhook",
+    views.ExternalWebhookViewSet,
+    basename="external_webhook",
+)
 
 openapi_urls = [
     path(
@@ -68,18 +74,19 @@ openapi_urls = [
         name="openapi-yaml",
     ),
     path(
-        "docs",
+        "docs/",
         SpectacularSwaggerView.as_view(url_name="openapi-json"),
         name="openapi-docs",
     ),
     path(
-        "redoc",
+        "redoc/",
         SpectacularRedocView.as_view(url_name="openapi-json"),
         name="openapi-redoc",
     ),
 ]
 
 eda_v1_urls = [
+    path("config/", views.ConfigView.as_view(), name="config"),
     path("status/", core_views.StatusView.as_view(), name="status"),
     path("", include(openapi_urls)),
     path(

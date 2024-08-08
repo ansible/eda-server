@@ -14,16 +14,19 @@
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView
+from .config import ConfigView
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
+from .external_webhook import ExternalWebhookViewSet
 from .organization import OrganizationViewSet
 from .project import ProjectViewSet
 from .root import ApiRootView, ApiV1RootView
 from .rulebook import AuditRuleViewSet, RulebookViewSet
 from .team import TeamViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
+from .webhook import WebhookViewSet
 
 __all__ = (
     # auth
@@ -54,4 +57,10 @@ __all__ = (
     # root
     "ApiV1RootView",
     "ApiRootView",
+    # config
+    "ConfigView",
+    # webhook
+    "WebhookViewSet",
+    # External webhook
+    "ExternalWebhookViewSet",
 )

@@ -282,7 +282,11 @@ class ScmRepository:
 
 
 class GitAnsibleRunnerExecutor:
-    ERROR_PREFIX = "Failed to clone the project:"
+    ERROR_PREFIX = "Project Import Error:"
+    PROJECT_EMPTY_ERROR_MSG = (
+        "Project folder is empty. Please add "
+        "content to your project and try syncing it again."
+    )
 
     def __call__(
         self,
@@ -320,5 +324,7 @@ class GitAnsibleRunnerExecutor:
                 ):
                     err_msg = "Credentials not provided or incorrect"
                     raise ScmAuthenticationError(err_msg)
+                if "did not match any file" in err_msg:
+                    raise ScmError(self.PROJECT_EMPTY_ERROR_MSG)
                 raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
             raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")

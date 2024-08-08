@@ -25,10 +25,13 @@ from drf_spectacular.utils import (
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
+from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
+from aap_eda.core.exceptions import ParseError
+from aap_eda.core.utils.rulebook import build_source_list
 
 
 @extend_schema_view(
@@ -78,6 +81,51 @@ class RulebookViewSet(
         data["rulesets"] = yaml.safe_load(data["rulesets"])
 
         return JsonResponse(data)
+
+    @extend_schema(
+        description="Source list of a rulebook by its id",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.SourceSerializer(many=True),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                None,
+                description="Rulebook not parseable.",
+            ),
+        },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="A unique integer value identifying this rulebook.",  # noqa: E501
+            )
+        ],
+    )
+    @action(
+        detail=False,
+        rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/sources",
+    )
+    def sources(self, request, id):
+        if not models.Rulebook.access_qs(request.user).filter(id=id).exists():
+            raise api_exc.NotFound(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Rulebook with ID={id} does not exist.",
+            )
+
+        rulebook = models.Rulebook.objects.get(id=id)
+
+        try:
+            results = build_source_list(rulebook.rulesets)
+        except ParseError as e:
+            return Response(
+                {"errors": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = self.paginate_queryset(results)
+        serializer = serializers.SourceSerializer(results, many=True)
+
+        return self.get_paginated_response(serializer.data)
 
 
 @extend_schema_view(
