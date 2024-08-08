@@ -33,10 +33,9 @@ djangorestframework_simplejwt = "5.3.*"
 dynaconf = ">=3.1.12,<3.3"
 drf-spectacular = ">=0.26.5,<0.27"
 channels = { version = "4.0.*", extras = ["daphne"] }
-psycopg2 = { version = "2.9.*", optional = true }
 psycopg2-binary = { version = "*", optional = true }
 django-rq = "^2.8.0"
-rq = "^1.13.0"
+rq = "1.13.0"
 django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=38,<43"
@@ -44,6 +43,7 @@ kubernetes = "26.1.*"
 podman = "4.9.*"
 rq-scheduler = "^0.10"
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
+    "redis_client",
     "channel_auth",
     "rbac",
 ] }
@@ -53,10 +53,27 @@ pexpect = "^4.9.0"
 ansible-runner = ">=2.3"
 python-gnupg = "^0.5.2"
 
+django-guid = "3.2.1"
+django-dynamic-preferences = "1.16.0"
+opentelemetry-api = "1.24.0"
+opentelemetry-exporter-otlp = "1.24.0"
+opentelemetry-exporter-otlp-proto-common = "1.24.0"
+opentelemetry-exporter-otlp-proto-grpc = "1.24.0"
+opentelemetry-exporter-otlp-proto-http = "1.24.0"
+opentelemetry-instrumentation = "0.45b0"
+opentelemetry-instrumentation-logging = "0.45b0"
+opentelemetry-proto = "1.24.0"
+opentelemetry-sdk = "1.24.0"
+opentelemetry-semantic-conventions = "0.45b0"
+pyparsing = "2.4.6"
+logutils = "^0.3.5"
+psycopg2 = "^2.9.9"
+
 [tool.poetry.group.test.dependencies]
-pytest = "*"
-pytest-django = "*"
+pytest = "<8.0.0"
+pytest-django = "4.5.2"
 pytest-asyncio = "*"
+pytest-mock = "*"
 requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-lazy-fixture = "^0.6.3"

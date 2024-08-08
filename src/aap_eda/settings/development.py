@@ -22,3 +22,5 @@ os.environ.setdefault("EDA_DB_HOST", "localhost")
 os.environ.setdefault("EDA_MQ_HOST", "localhost")
 
 from .default import *
+
+del LOG_AGGREGATOR_RSYSLOGD_CONF_DIR

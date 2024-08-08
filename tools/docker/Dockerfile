@@ -20,12 +20,15 @@ RUN DNF=dnf \
     gcc \
     gettext \
     git-core \
-    java-17-openjdk-headless" \
+    java-17-openjdk-headless \
+    supervisor" \
+    && $DNF -y install  https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
     && $DNF -y install dnf-plugins-core \
     && $DNF -y config-manager --set-enabled crb \
     && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf
+COPY ./tools/docker/supervisord/supervisord.conf /etc/supervisord.conf
 
 USER "$USER_ID"
 ENV POETRY_VERSION='1.7.1' \
@@ -53,13 +56,20 @@ RUN poetry install -E all --no-root --no-cache \
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 RUN pip install ansible-core
+RUN for dir in \
+    /var/lib/eda \
+    /var/lib/eda/rsyslog ; \
+    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; done
+
 RUN EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear
 
 USER 0
 RUN for dir in \
     /app \
     /app/venv \
-    /app/venv/bin ; \
+    /app/venv/bin \
+    /var/lib/eda \
+    /var/lib/eda/rsyslog ; \
     do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done
 
 USER "$USER_ID"

@@ -45,3 +45,13 @@ PG_NOTIFY_TEMPLATE_RULEBOOK_DATA = """
           channel: "{{ EDA_PG_NOTIFY_CHANNEL }}"
           event: "{{ event }}"
 """
+
+
+LOGGER_BLOCKLIST = (
+    'aap_eda.utils.handlers',
+    'aap_eda.utils.formatters',
+    'aap_eda.utils.filters',
+)
+
+LOG_AGGREGATOR_TYPE_SPLUNK = 'splunk'
+LOG_AGGREGATOR_TYPE_LOGSTASH = 'logstash'
