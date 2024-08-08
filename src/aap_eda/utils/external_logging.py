@@ -11,7 +11,7 @@ from aap_eda.utils.reload import supervisor_service_command
 def construct_rsyslog_conf_template(settings=settings):
     tmpl = ""
     parts = []
-    enabled = getattr(settings, "LOG_AGGREGATOR_ENABLED")
+    enabled = getattr(settings, "LOG_AGGREGATOR_ENABLED")  # noqa: B009
     host = getattr(settings, "LOG_AGGREGATOR_HOST", "")
     port = getattr(settings, "LOG_AGGREGATOR_PORT", "")
     protocol = getattr(settings, "LOG_AGGREGATOR_PROTOCOL", "")
@@ -73,8 +73,6 @@ def construct_rsyslog_conf_template(settings=settings):
         tmpl = "\n".join(parts)
         return tmpl
 
-    print(f"PROTOCOL: {protocol}")
-
     if protocol.startswith("http"):
         # urlparse requires '//' to be provided if scheme is not specified
         original_parsed = urlparse.urlsplit(host)
@@ -122,7 +120,6 @@ def construct_rsyslog_conf_template(settings=settings):
         password = escape_quotes(
             getattr(settings, "LOG_AGGREGATOR_PASSWORD", "")
         )
-        print(f"PASSWORD: {password}")
         if getattr(settings, "LOG_AGGREGATOR_TYPE", None) == "splunk":
             # splunk has a weird authorization header <shrug>
             if password:
@@ -177,6 +174,5 @@ def reconfigure_rsyslog(restart_rsyslogd=True):
             os.chmod(path, 0o640)
             f.write(tmpl + "\n")
         shutil.move(path, f"{config_dir}/rsyslog.conf")
-    print(f"{config_dir}/rsyslog.conf")
     if restart_rsyslogd:
         supervisor_service_command(command="restart", service="eda-rsyslogd")

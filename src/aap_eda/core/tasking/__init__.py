@@ -292,14 +292,14 @@ class ActivationWorker(_Worker):
 
 
 def enqueue_delay(
-    queue_name: str, job_id: str, delay: int, *args, **kwargs  # noqa: E261
+    queue_name: str, job_id: str, delay: int, *args, **kwargs
 ) -> Job:
     """Enqueue a job to run after specific seconds."""
     scheduler = get_scheduler(name=queue_name)
     return scheduler.enqueue_at(
         datetime.utcnow() + timedelta(seconds=delay),
         job_id=job_id,
-        *args,
+        *args,  # noqa: B026
         **kwargs,
     )
 

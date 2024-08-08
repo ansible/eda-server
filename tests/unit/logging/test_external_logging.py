@@ -118,20 +118,20 @@ data_loggly = {
                 ]
             ),
         ),
-        # (
-        #     True,  # https, custom port explicitly specified
-        #     'splunk',
-        #     'https://yoursplunk/services/collector/event',
-        #     8088,
-        #     None,
-        #     '/var/log/eda/rsyslog.err',
-        #     '\n'.join(
-        #         [
-        #             'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
-        #             'action(type="omhttp" server="yoursplunk" serverport="8088" usehttps="on" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
-        #         ]
-        #     ),
-        # ),
+        (
+            True,  # https, custom port explicitly specified
+            "splunk",
+            "https://yoursplunk/services/collector/event",
+            8088,
+            None,
+            "/var/log/eda/rsyslog.err",
+            "\n".join(
+                [
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
+                    'action(type="omhttp" server="yoursplunk" serverport="8088" usehttps="on" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
+                ]
+            ),
+        ),
         (
             True,  # no scheme specified in URL, default to https, respect custom port # noqa
             "splunk",
@@ -180,7 +180,7 @@ def test_rsyslog_conf_template(
     enabled, log_type, host, port, protocol, errorfile, expected_config, mocker
 ):
     # Set test settings
-    logging_defaults = getattr(settings, "LOGGING")
+    logging_defaults = getattr(settings, "LOGGING")  # noqa: B009
     if port:
         with override_settings(
             LOGGING=logging_defaults,
@@ -203,12 +203,11 @@ def test_rsyslog_conf_template(
             MAX_EVENT_RES_DATA=700000,
         ):
             tmpl = construct_rsyslog_conf_template()
-            print(tmpl)
             assert expected_config in tmpl
 
 
 def test_splunk_auth(mocker):
-    logging_defaults = getattr(settings, "LOGGING")
+    logging_defaults = getattr(settings, "LOGGING")  # noqa: B009
     with override_settings(
         LOGGING=logging_defaults,
         LOG_AGGREGATOR_ENABLED=True,

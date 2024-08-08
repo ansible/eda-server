@@ -17,7 +17,6 @@ from pyparsing import (
     opAssoc,
 )
 
-# from awx import MODE
 from aap_eda.api.constants import LOGGER_BLOCKLIST
 from aap_eda.utils.common import get_search_fields
 
@@ -153,11 +152,11 @@ class SmartFilter(object):
 
     class BoolOperand(object):
         def __init__(self, t):
-            kwargs = dict()
+            kwargs = dict()  # noqa: C408
             k, v = self._extract_key_value(t)
             k, v = self._json_path_to_contains(k, v)
 
-            Host = get_model("host")
+            Host = get_model("host")  # noqa: N806
             search_kwargs = self._expand_search(k, v)
             if search_kwargs:
                 kwargs.update(search_kwargs)
@@ -210,7 +209,7 @@ class SmartFilter(object):
                 return (k, v)
 
             for match in models.JSONField.get_lookups().keys():
-                match = "__{}".format(match)
+                match = "__{}".format(match)  # noqa: P101
                 if k.endswith(match):
                     if match == "__exact":
                         # appending __exact is basically a no-op,
@@ -241,13 +240,13 @@ class SmartFilter(object):
             last_v = None
             last_kv = None
 
-            for i, piece in enumerate(pieces):
-                new_kv = dict()
+            for i, piece in enumerate(pieces):  # noqa: B007
+                new_kv = dict()  # noqa: C408
                 if piece.endswith("[]"):
                     new_v = []
                     new_kv[piece[0:-2]] = new_v
                 else:
-                    new_v = dict()
+                    new_v = dict()  # noqa: C408
                     new_kv[piece] = new_v
 
                 if last_kv is None:
@@ -293,7 +292,7 @@ class SmartFilter(object):
                 and t[v_offset + 2] == '"'
             ):
                 v = '"' + str(t[v_offset + 1]) + '"'
-                # v = t[v_offset + 1]
+                # v = t[v_offset + 1]  # noqa: E800
             # empty ""
             elif t_len > (v_offset + 1):
                 v = ""
@@ -365,7 +364,7 @@ class SmartFilter(object):
         filter_string = str(filter_string)
 
         unicode_spaces = list(
-            set(str(c) for c in filter_string if c.isspace())
+            set(str(c) for c in filter_string if c.isspace())  # noqa: C401
         )
         unicode_spaces_other = unicode_spaces + ["(", ")", "=", '"']
         atom = CharsNotIn(unicode_spaces_other)
@@ -373,12 +372,12 @@ class SmartFilter(object):
         atom_quoted = (
             Literal('"') + Optional(atom_inside_quotes) + Literal('"')
         )
-        EQUAL = Literal("=")
+        EQUAL = Literal("=")  # noqa: N806
 
         grammar = (atom_quoted | atom) + EQUAL + Optional((atom_quoted | atom))
         grammar.setParseAction(cls.BoolOperand)
 
-        boolExpr = infixNotation(
+        boolExpr = infixNotation(  # noqa: N806
             grammar,
             [
                 ("and", 2, opAssoc.LEFT, cls.BoolAnd),
@@ -402,7 +401,5 @@ class SmartFilter(object):
 class DefaultCorrelationId(CorrelationId):
     def filter(self, record):
         guid = get_guid() or "-"
-        # if MODE == 'development':
-        #     guid = guid[:8]
         record.guid = guid
         return True

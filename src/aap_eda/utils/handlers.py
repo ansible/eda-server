@@ -37,7 +37,7 @@ class RSysLogHandler(logging.handlers.SysLogHandler):
         super(RSysLogHandler, self)._connect_unixsocket(address)
         self.socket.setblocking(False)
 
-    def handleError(self, record):
+    def handleError(self, record):  # noqa: N802
         # for any number of reasons, rsyslogd has gone to lunch;
         # this usually means that it's just been restarted (due to
         # a configuration change) unfortunately, we can't log that
@@ -126,7 +126,7 @@ class SpecialInventoryHandler(logging.Handler):
         n_lines = len(
             msg.strip().split("\n")
         )  # don't count line breaks at boundry of text
-        dispatch_data = dict(
+        dispatch_data = dict(  # noqa: C408
             created=now().isoformat(),
             event="verbose",
             counter=self.counter,
