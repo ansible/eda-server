@@ -24,11 +24,13 @@ class StatusRequiredError(Exception):
 class UnknownStatusError(Exception):
     pass
 
+
 class PostRunError(Exception):
-    def __init__(self, msg, status='failed', tb=''):
+    def __init__(self, msg, status="failed", tb=""):
         self.status = status
         self.tb = tb
         super(PostRunError, self).__init__(msg)
+
 
 class PGNotifyError(Exception):
     pass

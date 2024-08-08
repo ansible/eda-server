@@ -513,21 +513,21 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         vault = _get_vault_credential_type()
 
         if validated_data.get("eda_credentials"):
-            validated_data[
-                "extra_var"
-            ] = _update_extra_vars_from_eda_credentials(
-                validated_data=validated_data,
-                vault_data=vault_data,
-                creating=True,
+            validated_data["extra_var"] = (
+                _update_extra_vars_from_eda_credentials(
+                    validated_data=validated_data,
+                    vault_data=vault_data,
+                    creating=True,
+                )
             )
 
         if vault_data.password_used:
-            validated_data[
-                "eda_system_vault_credential"
-            ] = _create_system_eda_credential(
-                vault_data.password,
-                vault,
-                validated_data.get("organization_id"),
+            validated_data["eda_system_vault_credential"] = (
+                _create_system_eda_credential(
+                    vault_data.password,
+                    vault,
+                    validated_data.get("organization_id"),
+                )
             )
 
         return super().create(validated_data)

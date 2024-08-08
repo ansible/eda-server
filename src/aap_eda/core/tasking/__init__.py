@@ -1,4 +1,5 @@
 """Tools for running background tasks."""
+
 from __future__ import annotations
 
 import logging
@@ -128,12 +129,10 @@ enable_redis_prefix()
 
 class SerializerProtocol(Protocol):
     @staticmethod
-    def dumps(obj: Any) -> bytes:
-        ...
+    def dumps(obj: Any) -> bytes: ...
 
     @staticmethod
-    def loads(data: bytes) -> Any:
-        ...
+    def loads(data: bytes) -> Any: ...
 
 
 class Queue(_Queue):

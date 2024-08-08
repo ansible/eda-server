@@ -1,23 +1,21 @@
 # Copyright (c) 2017 Ansible Tower by Red Hat
 # All Rights Reserved.
 
-from copy import copy
 import json
 import logging
-import traceback
 import socket
+import traceback
+from copy import copy
 from datetime import datetime
 
 from dateutil.tz import tzutc
-from django.utils.timezone import now
-from django.core.serializers.json import DjangoJSONEncoder
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
+from django.utils.timezone import now
 
 
 class TimeFormatter(logging.Formatter):
-    """
-    Custom log formatter used for inventory imports
-    """
+    """Custom log formatter used for inventory imports."""
 
     def __init__(self, start_time=None, **kwargs):
         if start_time is None:
@@ -33,7 +31,7 @@ class TimeFormatter(logging.Formatter):
 
 class LogstashFormatterBase(logging.Formatter):
     """Base class taken from python-logstash=0.4.6
-    modified here since that version
+    modified here since that version.
 
     For compliance purposes, this was the license at the point of divergence:
 
@@ -58,9 +56,9 @@ class LogstashFormatterBase(logging.Formatter):
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
-    """
+    """ # noqa
 
-    def __init__(self, message_type='Logstash', fqdn=False):
+    def __init__(self, message_type="Logstash", fqdn=False):
         self.message_type = message_type
 
         if fqdn:
@@ -72,30 +70,30 @@ class LogstashFormatterBase(logging.Formatter):
         # The list contains all the attributes listed in
         # http://docs.python.org/library/logging.html#logrecord-attributes
         skip_list = (
-            'args',
-            'asctime',
-            'created',
-            'exc_info',
-            'exc_text',
-            'filename',
-            'funcName',
-            'id',
-            'levelname',
-            'levelno',
-            'lineno',
-            'module',
-            'msecs',
-            'msecs',
-            'message',
-            'msg',
-            'name',
-            'pathname',
-            'process',
-            'processName',
-            'relativeCreated',
-            'thread',
-            'threadName',
-            'extra',
+            "args",
+            "asctime",
+            "created",
+            "exc_info",
+            "exc_text",
+            "filename",
+            "funcName",
+            "id",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "msecs",
+            "message",
+            "msg",
+            "name",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "extra",
         )
 
         easy_types = (str, bool, dict, float, int, list, type(None))
@@ -113,95 +111,110 @@ class LogstashFormatterBase(logging.Formatter):
 
     def get_debug_fields(self, record):
         return {
-            'stack_trace': self.format_exception(record.exc_info),
-            'lineno': record.lineno,
-            'process': record.process,
-            'thread_name': record.threadName,
-            'funcName': record.funcName,
-            'processName': record.processName,
+            "stack_trace": self.format_exception(record.exc_info),
+            "lineno": record.lineno,
+            "process": record.process,
+            "thread_name": record.threadName,
+            "funcName": record.funcName,
+            "processName": record.processName,
         }
 
     @classmethod
     def format_exception(cls, exc_info):
-        return ''.join(traceback.format_exception(*exc_info)) if exc_info else ''
+        return (
+            "".join(traceback.format_exception(*exc_info)) if exc_info else ""
+        )
 
     @classmethod
     def serialize(cls, message):
-        return json.dumps(message, cls=DjangoJSONEncoder) + '\n'
+        return json.dumps(message, cls=DjangoJSONEncoder) + "\n"
 
 
 class LogstashFormatter(LogstashFormatterBase):
     def __init__(self, *args, **kwargs):
         self.cluster_host_id = settings.CLUSTER_HOST_ID
         self.tower_uuid = None
-        uuid = getattr(settings, 'LOG_AGGREGATOR_TOWER_UUID', None) or getattr(settings, 'INSTALL_UUID', None)
+        uuid = getattr(settings, "LOG_AGGREGATOR_TOWER_UUID", None) or getattr(
+            settings, "INSTALL_UUID", None
+        )
         if uuid:
             self.tower_uuid = uuid
         super(LogstashFormatter, self).__init__(*args, **kwargs)
 
     def reformat_data_for_log(self, raw_data, kind=None):
         """
-        Process dictionaries from various contexts (job events, activity stream
+        Process dictionaries from various contexts.
+
+        (job events, activity stream
         changes, etc.) to give meaningful information
         Output a dictionary which will be passed in logstash or syslog format
-        to the logging receiver
+        to the logging receiver.
         """
-        if kind == 'activity_stream':
+        if kind == "activity_stream":
             try:
-                raw_data['changes'] = json.loads(raw_data.get('changes', '{}'))
+                raw_data["changes"] = json.loads(raw_data.get("changes", "{}"))
             except Exception:
                 pass  # best effort here, if it's not valid JSON, then meh
             return raw_data
-        elif kind == 'system_tracking':
-            data = copy(raw_data.get('ansible_facts', {}))
+        elif kind == "system_tracking":
+            data = copy(raw_data.get("ansible_facts", {}))
         else:
             data = copy(raw_data)
         if isinstance(data, str):
             data = json.loads(data)
         data_for_log = {}
 
-        if kind == 'job_events' and raw_data.get('python_objects', {}).get('job_event'):
-            job_event = raw_data['python_objects']['job_event']
-            guid = job_event.event_data.pop('guid', None)
+        if kind == "job_events" and raw_data.get("python_objects", {}).get(
+            "job_event"
+        ):
+            job_event = raw_data["python_objects"]["job_event"]
+            guid = job_event.event_data.pop("guid", None)
             if guid:
-                data_for_log['guid'] = guid
+                data_for_log["guid"] = guid
             for field_object in job_event._meta.fields:
-                if not field_object.__class__ or not field_object.__class__.__name__:
-                    field_class_name = ''
+                if (
+                    not field_object.__class__
+                    or not field_object.__class__.__name__
+                ):
+                    field_class_name = ""
                 else:
                     field_class_name = field_object.__class__.__name__
-                if field_class_name in ['ManyToOneRel', 'ManyToManyField']:
+                if field_class_name in ["ManyToOneRel", "ManyToManyField"]:
                     continue
 
                 fd = field_object.name
                 key = fd
-                if field_class_name == 'ForeignKey':
-                    fd = '{}_id'.format(field_object.name)
+                if field_class_name == "ForeignKey":
+                    fd = "{}_id".format(field_object.name)
 
                 try:
                     data_for_log[key] = getattr(job_event, fd)
                 except Exception as e:
-                    data_for_log[key] = 'Exception `{}` producing field'.format(e)
+                    data_for_log[key] = (
+                        "Exception `{}` producing field".format(e)
+                    )
 
-            data_for_log['event_display'] = job_event.get_event_display2()
-            if hasattr(job_event, 'workflow_job_id'):
-                data_for_log['workflow_job_id'] = job_event.workflow_job_id
+            data_for_log["event_display"] = job_event.get_event_display2()
+            if hasattr(job_event, "workflow_job_id"):
+                data_for_log["workflow_job_id"] = job_event.workflow_job_id
 
-        elif kind == 'system_tracking':
-            data.pop('ansible_python_version', None)
-            if 'ansible_python' in data:
-                data['ansible_python'].pop('version_info', None)
+        elif kind == "system_tracking":
+            data.pop("ansible_python_version", None)
+            if "ansible_python" in data:
+                data["ansible_python"].pop("version_info", None)
 
-            data_for_log['ansible_facts'] = data
-            data_for_log['ansible_facts_modified'] = raw_data.get('ansible_facts_modified')
-            data_for_log['inventory_id'] = raw_data.get('inventory_id')
-            data_for_log['host_name'] = raw_data.get('host_name')
-            data_for_log['job_id'] = raw_data.get('job_id')
-        elif kind == 'performance':
+            data_for_log["ansible_facts"] = data
+            data_for_log["ansible_facts_modified"] = raw_data.get(
+                "ansible_facts_modified"
+            )
+            data_for_log["inventory_id"] = raw_data.get("inventory_id")
+            data_for_log["host_name"] = raw_data.get("host_name")
+            data_for_log["job_id"] = raw_data.get("job_id")
+        elif kind == "performance":
 
             def convert_to_type(t, val):
                 if t is float:
-                    val = val[:-1] if val.endswith('s') else val
+                    val = val[:-1] if val.endswith("s") else val
                     try:
                         return float(val)
                     except ValueError:
@@ -214,41 +227,45 @@ class LogstashFormatter(LogstashFormatterBase):
                 elif t is str:
                     return val
 
-            request = raw_data['python_objects']['request']
-            response = raw_data['python_objects']['response']
+            request = raw_data["python_objects"]["request"]
+            response = raw_data["python_objects"]["response"]
 
             # Note: All of the below keys may not be in the response "dict"
             # For example, X-API-Query-Time and X-API-Query-Count will only
             # exist if SQL_DEBUG is turned on in settings.
             headers = [
-                (float, 'X-API-Time'),  # may end with an 's' "0.33s"
-                (float, 'X-API-Total-Time'),
-                (int, 'X-API-Query-Count'),
-                (float, 'X-API-Query-Time'),  # may also end with an 's'
-                (str, 'X-API-Node'),
+                (float, "X-API-Time"),  # may end with an 's' "0.33s"
+                (float, "X-API-Total-Time"),
+                (int, "X-API-Query-Count"),
+                (float, "X-API-Query-Time"),  # may also end with an 's'
+                (str, "X-API-Node"),
             ]
-            data_for_log['x_api'] = {k: convert_to_type(t, response[k]) for (t, k) in headers if k in response}
-
-            data_for_log['request'] = {
-                'method': request.method,
-                'path': request.path,
-                'path_info': request.path_info,
-                'query_string': request.META['QUERY_STRING'],
+            data_for_log["x_api"] = {
+                k: convert_to_type(t, response[k])
+                for (t, k) in headers
+                if k in response
             }
 
-            if hasattr(request, 'data'):
-                data_for_log['request']['data'] = request.data
+            data_for_log["request"] = {
+                "method": request.method,
+                "path": request.path,
+                "path_info": request.path_info,
+                "query_string": request.META["QUERY_STRING"],
+            }
+
+            if hasattr(request, "data"):
+                data_for_log["request"]["data"] = request.data
 
         return data_for_log
 
     def get_extra_fields(self, record):
         fields = super(LogstashFormatter, self).get_extra_fields(record)
-        if record.name.startswith('eda.analytics'):
-            log_kind = record.name[len('eda.analytics.') :]
+        if record.name.startswith("eda.analytics"):
+            log_kind = record.name[len("eda.analytics.") :]
             fields = self.reformat_data_for_log(fields, kind=log_kind)
         # General EDA metadata
-        fields['cluster_host_id'] = self.cluster_host_id
-        fields['tower_uuid'] = self.tower_uuid
+        fields["cluster_host_id"] = self.cluster_host_id
+        fields["tower_uuid"] = self.tower_uuid
         return fields
 
     def format(self, record):
@@ -257,12 +274,12 @@ class LogstashFormatter(LogstashFormatterBase):
         message = {
             # Field not included, but exist in related logs
             # 'path': record.pathname
-            '@timestamp': stamp,
-            'message': record.getMessage(),
-            'host': self.host,
+            "@timestamp": stamp,
+            "message": record.getMessage(),
+            "host": self.host,
             # Extra Fields
-            'level': record.levelname,
-            'logger_name': record.name,
+            "level": record.levelname,
+            "logger_name": record.name,
         }
 
         # Add extra fields
@@ -272,8 +289,11 @@ class LogstashFormatter(LogstashFormatterBase):
         if record.exc_info:
             message.update(self.get_debug_fields(record))
 
-        if settings.LOG_AGGREGATOR_TYPE == 'splunk':
-            # splunk messages must have a top level "event" key when using the /services/collector/event receiver.
-            # The event receiver wont scan an event for a timestamp field therefore a time field must also be supplied containing epoch timestamp
-            message = {'time': record.created, 'event': message}
+        if settings.LOG_AGGREGATOR_TYPE == "splunk":
+            # splunk messages must have a top level "event" key when
+            # using the /services/collector/event receiver.
+            # The event receiver wont scan an event for a timestamp field
+            # therefore a time field must also be supplied containing 
+            # epoch timestamp
+            message = {"time": record.created, "event": message}
         return self.serialize(message)

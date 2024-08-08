@@ -92,7 +92,7 @@ black = "*"
 flake8-broken-line = { version = "*", python = "<4.0" }
 flake8-string-format = "*"
 # This is an experimental linter.
-ruff = "*"
+ruff = "0.0.262"
 # The rull claims that the flake8 plugins listed below are re-implemented,
 #   These plugins will remain included until it's verified.
 pep8-naming = "*"

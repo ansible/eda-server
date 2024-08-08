@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import socket
+
 """
 Django settings.
 
@@ -514,35 +515,59 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "filters": {
-        'require_debug_false': {'()': 'django.utils.log.RequireDebugFalse'},
-        'external_log_enabled': {'()': 'aap_eda.utils.filters.ExternalLoggerEnabled'},
-        "dynamic_level_filter": {'()': 'aap_eda.utils.filters.DynamicLevelFilter'},
-        'guid': {'()': 'aap_eda.utils.filters.DefaultCorrelationId'},
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+        "external_log_enabled": {
+            "()": "aap_eda.utils.filters.ExternalLoggerEnabled"
+        },
+        "dynamic_level_filter": {
+            "()": "aap_eda.utils.filters.DynamicLevelFilter"
+        },
+        "guid": {"()": "aap_eda.utils.filters.DefaultCorrelationId"},
     },
-    'formatters': {
-        'simple': {'format': '%(asctime)s %(levelname)-8s [%(guid)s] %(name)s %(message)s'},
-        'json': {'()': 'aap_eda.utils.formatters.LogstashFormatter'},
-        'timed_import': {'()': 'aap_eda.utils.formatters.TimeFormatter', 'format': '%(relativeSeconds)9.3f %(levelname)-8s %(message)s'},
-        'dispatcher': {'format': '%(asctime)s %(levelname)-8s [%(guid)s] %(name)s PID:%(process)d %(message)s'},
+    "formatters": {
+        "simple": {
+            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s %(message)s" # noqa
+        },
+        "json": {"()": "aap_eda.utils.formatters.LogstashFormatter"},
+        "timed_import": {
+            "()": "aap_eda.utils.formatters.TimeFormatter",
+            "format": "%(relativeSeconds)9.3f %(levelname)-8s %(message)s",
+        },
+        "dispatcher": {
+            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s PID:%(process)d %(message)s" # noqa
+        },
     },
     "handlers": {
         "console": {
-            '()': 'logging.StreamHandler',
-            'level': 'DEBUG',
-            'filters': ['dynamic_level_filter', 'guid'],
-            'formatter': 'simple',
+            "()": "logging.StreamHandler",
+            "level": "DEBUG",
+            "filters": ["dynamic_level_filter", "guid"],
+            "formatter": "simple",
         },
-        'null': {'class': 'logging.NullHandler'},
-        'file': {'class': 'logging.NullHandler', 'formatter': 'simple'},
-        'syslog': {'level': 'WARNING', 'filters': ['require_debug_false'], 'class': 'logging.NullHandler', 'formatter': 'simple'},
-        'inventory_import': {'level': 'DEBUG', 'class': 'logging.StreamHandler', 'formatter': 'timed_import'},
-        'external_logger': {
-            'class': 'aap_eda.utils.handlers.RSysLogHandler',
-            'formatter': 'json',
-            'address': '/var/run/eda-rsyslog/rsyslog.sock',
-            'filters': ['external_log_enabled', 'dynamic_level_filter', 'guid'],
+        "null": {"class": "logging.NullHandler"},
+        "file": {"class": "logging.NullHandler", "formatter": "simple"},
+        "syslog": {
+            "level": "WARNING",
+            "filters": ["require_debug_false"],
+            "class": "logging.NullHandler",
+            "formatter": "simple",
         },
-        'otel': {'class': 'logging.NullHandler'},
+        "inventory_import": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "timed_import",
+        },
+        "external_logger": {
+            "class": "aap_eda.utils.handlers.RSysLogHandler",
+            "formatter": "json",
+            "address": "/var/run/eda-rsyslog/rsyslog.sock",
+            "filters": [
+                "external_log_enabled",
+                "dynamic_level_filter",
+                "guid",
+            ],
+        },
+        "otel": {"class": "logging.NullHandler"},
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {

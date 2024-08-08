@@ -48,10 +48,10 @@ PG_NOTIFY_TEMPLATE_RULEBOOK_DATA = """
 
 
 LOGGER_BLOCKLIST = (
-    'aap_eda.utils.handlers',
-    'aap_eda.utils.formatters',
-    'aap_eda.utils.filters',
+    "aap_eda.utils.handlers",
+    "aap_eda.utils.formatters",
+    "aap_eda.utils.filters",
 )
 
-LOG_AGGREGATOR_TYPE_SPLUNK = 'splunk'
-LOG_AGGREGATOR_TYPE_LOGSTASH = 'logstash'
+LOG_AGGREGATOR_TYPE_SPLUNK = "splunk"
+LOG_AGGREGATOR_TYPE_LOGSTASH = "logstash"
