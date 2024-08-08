@@ -20,6 +20,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from aap_eda.core.utils.rulebook import DEFAULT_SOURCE_NAME_PREFIX
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -171,6 +172,32 @@ def test_retrieve_json_rulebook(
 def test_retrieve_json_rulebook_not_exist(admin_client: APIClient):
     response = admin_client.get(f"{api_url_v1}/rulebooks/42/json/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_list_sources_from_rulebook(
+    admin_client: APIClient, default_rulebook: models.Rulebook
+):
+    response = admin_client.get(
+        f"{api_url_v1}/rulebooks/{default_rulebook.id}/sources/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    sources = response.data["results"]
+    assert len(sources) == 2
+    assert sources[0]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}1"
+    assert sources[1]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}2"
+
+
+@pytest.mark.django_db
+def test_list_sources_from_rulebook_with_exception(
+    admin_client: APIClient, bad_rulebook: models.Rulebook
+):
+    response = admin_client.get(
+        f"{api_url_v1}/rulebooks/{bad_rulebook.id}/sources/"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["errors"] == "Failed to parse rulebook data"
 
 
 def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):

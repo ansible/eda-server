@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2024 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,22 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from rest_framework import serializers
 
-class UpdateFieldsRequiredError(Exception):
-    pass
-
-
-class StatusRequiredError(Exception):
-    pass
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 
 
-class UnknownStatusError(Exception):
-    pass
+class SourceSerializer(serializers.Serializer):
+    name = serializers.CharField(
+        required=True,
+        help_text="Name of the source",
+    )
 
+    source_info = YAMLSerializerField(
+        required=True,
+        help_text="The information about the source",
+        sort_keys=False,
+    )
 
-class PGNotifyError(Exception):
-    pass
-
-
-class ParseError(Exception):
-    pass
+    rulebook_hash = serializers.CharField(
+        required=True,
+        help_text="Hash of the rulebook",
+    )
