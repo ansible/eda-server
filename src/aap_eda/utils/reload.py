@@ -27,7 +27,7 @@ def supervisor_service_command(command, service="*", communicate=True):
 
     args.extend([command, ":".join(["tower-processes", service])])
     logger.debug(
-        "Issuing command to {} services, args={}".format(
+        "Issuing command to {} services, args={}".format(  # noqa: P101
             command, args
         )  # noqa: P101, E501
     )
@@ -52,7 +52,7 @@ def supervisor_service_command(command, service="*", communicate=True):
             )
         else:
             logger.debug(
-                "supervisorctl {} {} succeeded".format(
+                "supervisorctl {} {} succeeded".format(  # noqa: P101
                     command, service
                 )  # noqa: P101, E501
             )

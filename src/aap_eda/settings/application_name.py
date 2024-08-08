@@ -25,8 +25,8 @@ def get_application_name(CLUSTER_HOST_ID, function=""):  # noqa: E261, N803
 
 
 def set_application_name(
-    DATABASES, CLUSTER_HOST_ID, function=""
-):  # noqa: N803, E501
+    DATABASES, CLUSTER_HOST_ID, function=""  # noqa: N803
+):
     # If settings files were not properly passed DATABASES could be {} at which point we don't need to set the app name. # noqa
     if not DATABASES or "default" not in DATABASES:
         return
@@ -34,8 +34,8 @@ def set_application_name(
     if "sqlite3" in DATABASES["default"]["ENGINE"]:
         return
     options_dict = DATABASES["default"].setdefault(
-        "OPTIONS", dict()
-    )  # noqa: C408, E501
+        "OPTIONS", dict()  # noqa: C408, E501
+    )
     options_dict["application_name"] = get_application_name(
         CLUSTER_HOST_ID, function
     )

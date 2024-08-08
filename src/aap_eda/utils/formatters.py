@@ -153,8 +153,8 @@ class LogstashFormatter(LogstashFormatterBase):
         if kind == "activity_stream":
             try:
                 raw_data["changes"] = json.loads(
-                    raw_data.get("changes", "{}")
-                )  # noqa: P103, E501
+                    raw_data.get("changes", "{}")  # noqa: P103, 501
+                )
             except Exception:
                 pass  # best effort here, if it's not valid JSON, then meh
             return raw_data
@@ -193,9 +193,9 @@ class LogstashFormatter(LogstashFormatterBase):
                     data_for_log[key] = getattr(job_event, fd)
                 except Exception as e:
                     data_for_log[key] = (
-                        "Exception `{}` producing field".format(
+                        "Exception `{}` producing field".format(  # noqa: P101
                             e
-                        )  # noqa: P101, E501
+                        )
                     )
 
             data_for_log["event_display"] = job_event.get_event_display2()
