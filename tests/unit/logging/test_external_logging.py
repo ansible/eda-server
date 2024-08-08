@@ -4,7 +4,6 @@ from django.test.utils import override_settings
 
 from aap_eda.utils.external_logging import construct_rsyslog_conf_template
 
-# noqa
 """
 # Example User Data
 data_logstash = {
@@ -27,7 +26,7 @@ data_loggly = {
     "LOG_AGGREGATOR_PORT": 8080,
     "LOG_AGGREGATOR_PROTOCOL": "https"
 }
-"""
+"""  # noqa: E501
 
 
 # Test reconfigure logging settings function
@@ -38,7 +37,7 @@ data_loggly = {
         (
             True,
             "loggly",
-            "http://logs-01.loggly.com/inputs/1fd38090-2af1-4e1e-8d80-492899da0f71/tag/http/",
+            "http://logs-01.loggly.com/inputs/1fd38090-2af1-4e1e-8d80-492899da0f71/tag/http/",  # noqa: E501
             None,
             "https",
             "/var/log/eda/rsyslog.err",

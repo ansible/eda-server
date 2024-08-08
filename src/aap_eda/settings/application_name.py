@@ -16,7 +16,7 @@ def get_service_name(argv):
         return arg
 
 
-def get_application_name(CLUSTER_HOST_ID, function=""):
+def get_application_name(CLUSTER_HOST_ID, function=""):  # noqa: E261
     if function:
         function = f"_{function}"
     return f"eda-{os.getpid()}-{get_service_name(sys.argv)}{function}-{CLUSTER_HOST_ID}"[  # noqa
