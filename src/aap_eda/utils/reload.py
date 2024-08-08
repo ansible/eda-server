@@ -15,8 +15,8 @@ def supervisor_service_command(command, service="*", communicate=True):
     """
     Do read this example use pattern of supervisorctl.
 
-    # supervisorctl restart 
-    #   tower-processes:receiver 
+    # supervisorctl restart
+    #   tower-processes:receiver
     #   tower-processes:factcacher
     """
     args = ["supervisorctl"]
@@ -40,7 +40,7 @@ def supervisor_service_command(command, service="*", communicate=True):
         restart_code = supervisor_process.returncode
         if restart_code or restart_err:
             logger.error(
-                "supervisorctl {} {} errored with exit code `{}`, stdout:\n{}stderr:\n{}".format( # noqa
+                "supervisorctl {} {} errored with exit code `{}`, stdout:\n{}stderr:\n{}".format(  # noqa
                     command,
                     service,
                     restart_code,
@@ -54,7 +54,7 @@ def supervisor_service_command(command, service="*", communicate=True):
             )
     else:
         logger.info(
-            "Submitted supervisorctl {} command, not waiting for result".format( # noqa
+            "Submitted supervisorctl {} command, not waiting for result".format(  # noqa
                 command
             )
         )

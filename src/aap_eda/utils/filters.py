@@ -31,7 +31,7 @@ class FieldFromSettings(object):
     Field interface - defaults to getting value from setting
     if otherwise set, provided value will take precedence
         over value in settings.
-    """ # noqa
+    """  # noqa
 
     def __init__(self, setting_name):
         self.setting_name = setting_name
@@ -54,7 +54,7 @@ class FieldFromSettings(object):
 def record_is_blocked(record):
     """Given a log record, return True if it is considered to be
     blocked, return False if not.
-    """ # noqa
+    """  # noqa
     for logger_name in LOGGER_BLOCKLIST:
         if record.name.startswith(logger_name):
             return True
@@ -84,7 +84,7 @@ class ExternalLoggerEnabled(Filter):
 
         False - should not be logged
         True - should be logged
-        """ # noqa
+        """  # noqa
         # Do not send exceptions to external logger
         if record_is_blocked(record):
             return False
@@ -111,7 +111,7 @@ class DynamicLevelFilter(Filter):
     def filter(self, record):
         """Filters out logs that have a level below the threshold defined
         by the databse setting LOG_AGGREGATOR_LEVEL.
-        """ # noqa
+        """  # noqa
         if record_is_blocked(record):
             # Fine to write denied loggers to file,
             # apply default filtering level
@@ -172,7 +172,7 @@ class SmartFilter(object):
             else:
                 # detect loops and restrict access to sensitive fields
                 # this import is intentional here to avoid a circular import
-                from ansible_base.rest_filters.rest_framework.field_lookup_backend import ( # noqa
+                from ansible_base.rest_filters.rest_framework.field_lookup_backend import (  # noqa
                     FieldLookupBackend,
                 )
 
@@ -213,13 +213,13 @@ class SmartFilter(object):
                 match = "__{}".format(match)
                 if k.endswith(match):
                     if match == "__exact":
-                        # appending __exact is basically a no-op, 
+                        # appending __exact is basically a no-op,
                         # because that's
                         # what the query means if you leave it off
                         k = k[: -len(match)]
                     else:
                         logger.error(
-                            "host_filter:{} does not support searching with {}".format( # noqa
+                            "host_filter:{} does not support searching with {}".format(  # noqa
                                 SmartFilter.SEARCHABLE_RELATIONSHIP, match
                             )
                         )
@@ -338,7 +338,7 @@ class SmartFilter(object):
                 """
                 Do NOT observe self.result. It will cause the sql query to be executed.
                 We do not want that. We only want to build the query.
-                """ # noqa
+                """  # noqa
                 if isinstance(self.result, type(None)):
                     self.result = t[0][0].result
                 right = t[0][i].result
@@ -360,7 +360,7 @@ class SmartFilter(object):
         * handle values with " via: a.b.c.d="hello\"world"
         * handle keys with " via: a.\"b.c="yeah"
         * handle key with __ in it.
-        """ # noqa
+        """  # noqa
         filter_string_raw = filter_string
         filter_string = str(filter_string)
 

@@ -19,13 +19,13 @@ def get_service_name(argv):
 def get_application_name(CLUSTER_HOST_ID, function=""):
     if function:
         function = f"_{function}"
-    return f"eda-{os.getpid()}-{get_service_name(sys.argv)}{function}-{CLUSTER_HOST_ID}"[
+    return f"eda-{os.getpid()}-{get_service_name(sys.argv)}{function}-{CLUSTER_HOST_ID}"[  # noqa
         :63
     ]
 
 
 def set_application_name(DATABASES, CLUSTER_HOST_ID, function=""):
-    # If settings files were not properly passed DATABASES could be {} at which point we don't need to set the app name.
+    # If settings files were not properly passed DATABASES could be {} at which point we don't need to set the app name. # noqa
     if not DATABASES or "default" not in DATABASES:
         return
 

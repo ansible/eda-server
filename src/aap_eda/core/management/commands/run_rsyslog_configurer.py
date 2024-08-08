@@ -11,7 +11,7 @@ class Command(BaseCommand):
     """
     Rsyslog Configurer
     Configures <settings.LOG_AGGREGATOR_RSYSLOGD_CONF_DIR>/rsyslog.conf with values from dynamic preferences (settings).
-    """
+    """  # noqa
 
     help = "Launch the rsyslog_configurer, updates rsyslog.conf"
 
@@ -19,7 +19,7 @@ class Command(BaseCommand):
         try:
             reconfigure_rsyslog(False)
         except Exception as e:
-            # Log unanticipated exception in addition to writing to stderr to get timestamps and other metadata
+            # Log unanticipated exception in addition to writing to stderr to get timestamps and other metadata # noqa
             raise CommandError(
                 f"Unhandled Exception in reconfigure_rsyslog: {str(e)}"
             )

@@ -3,6 +3,7 @@ from django.conf import settings
 from django.test.utils import override_settings
 
 from aap_eda.utils.external_logging import construct_rsyslog_conf_template
+
 # noqa
 """
 # Example User Data
@@ -43,7 +44,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="logs-01.loggly.com" serverport="80" usehttps="off" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="inputs/1fd38090-2af1-4e1e-8d80-492899da0f71/tag/http/")',  # noqa
                 ]
             ),
@@ -57,7 +58,7 @@ data_loggly = {
             "",  # empty errorfile
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")',  # noqa
                     'action(type="omfwd" target="localhost" port="9000" protocol="udp" action.resumeRetryCount="-1" action.resumeInterval="5" template="eda" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5")',  # noqa
                 ]
             ),
@@ -71,7 +72,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")',  # noqa
                     'action(type="omfwd" target="localhost" port="9000" protocol="tcp" action.resumeRetryCount="-1" action.resumeInterval="5" template="eda" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5")',  # noqa
                 ]
             ),
@@ -85,7 +86,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="yoursplunk" serverport="443" usehttps="on" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
                 ]
             ),
@@ -99,7 +100,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="yoursplunk" serverport="80" usehttps="off" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
                 ]
             ),
@@ -113,7 +114,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="yoursplunk" serverport="8088" usehttps="on" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
                 ]
             ),
@@ -141,7 +142,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="yoursplunk.org" serverport="8088" usehttps="on" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
                 ]
             ),
@@ -155,7 +156,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="yoursplunk.org" serverport="8088" usehttps="off" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="services/collector/event")',  # noqa
                 ]
             ),
@@ -169,7 +170,7 @@ data_loggly = {
             "/var/log/eda/rsyslog.err",
             "\n".join(
                 [
-                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")', # noqa
+                    'template(name="eda" type="string" string="%rawmsg-after-pri%")\nmodule(load="omhttp")',  # noqa
                     'action(type="omhttp" server="endpoint5.collection.us2.sumologic.com" serverport="443" usehttps="on" allowunsignedcerts="off" skipverifyhost="off" action.resumeRetryCount="-1" template="eda" action.resumeInterval="5" queue.spoolDirectory="/var/lib/eda" queue.filename="eda-external-logger-action-queue" queue.maxDiskSpace="1g" queue.maxFileSize="100m" queue.type="LinkedList" queue.saveOnShutdown="on" queue.syncqueuefiles="on" queue.checkpointInterval="1000" queue.size="131072" queue.highwaterMark="98304" queue.discardMark="117964" queue.discardSeverity="5" errorfile="/var/log/eda/rsyslog.err" restpath="receiver/v1/http/ZaVnC4dhaV0qoiETY0MrM3wwLoDgO1jFgjOxE6-39qokkj3LGtOroZ8wNaN2M6DtgYrJZsmSi4-36_Up5TbbN_8hosYonLKHSSOSKY845LuLZBCBwStrHQ==")',  # noqa
                 ]
             ),
@@ -220,6 +221,6 @@ def test_splunk_auth(mocker):
     ):
         tmpl = construct_rsyslog_conf_template()
         assert (
-            'httpheaderkey="Authorization" httpheadervalue="Splunk SECRET-TOKEN"' # noqa
+            'httpheaderkey="Authorization" httpheadervalue="Splunk SECRET-TOKEN"'  # noqa
             in tmpl
         )

@@ -56,7 +56,7 @@ class LogstashFormatterBase(logging.Formatter):
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
-    """ # noqa
+    """  # noqa
 
     def __init__(self, message_type="Logstash", fqdn=False):
         self.message_type = message_type
@@ -293,7 +293,7 @@ class LogstashFormatter(LogstashFormatterBase):
             # splunk messages must have a top level "event" key when
             # using the /services/collector/event receiver.
             # The event receiver wont scan an event for a timestamp field
-            # therefore a time field must also be supplied containing 
+            # therefore a time field must also be supplied containing
             # epoch timestamp
             message = {"time": record.created, "event": message}
         return self.serialize(message)

@@ -12,6 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import socket
+import os
+from datetime import timedelta
+
+import dynaconf
+from django.core.exceptions import ImproperlyConfigured
+from split_settings.tools import include
+
+from aap_eda.core.enums import RulebookProcessLogLevel
+from aap_eda.utils import str_to_bool
 
 """
 Django settings.
@@ -94,15 +103,7 @@ To configure a Resource Server for syncing of managed resources:
 * ANSIBLE_BASE_MANAGED_ROLE_REGISTRY - Syncing of the Platform Auditor role
 
 """
-import os
-from datetime import timedelta
 
-import dynaconf
-from django.core.exceptions import ImproperlyConfigured
-from split_settings.tools import include
-
-from aap_eda.core.enums import RulebookProcessLogLevel
-from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -526,7 +527,7 @@ LOGGING = {
     },
     "formatters": {
         "simple": {
-            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s %(message)s" # noqa
+            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s %(message)s"  # noqa
         },
         "json": {"()": "aap_eda.utils.formatters.LogstashFormatter"},
         "timed_import": {
@@ -534,7 +535,7 @@ LOGGING = {
             "format": "%(relativeSeconds)9.3f %(levelname)-8s %(message)s",
         },
         "dispatcher": {
-            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s PID:%(process)d %(message)s" # noqa
+            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s PID:%(process)d %(message)s"  # noqa
         },
     },
     "handlers": {
