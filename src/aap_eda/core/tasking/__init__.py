@@ -52,18 +52,28 @@ _ErrorHandlersArgType = Union[
 ]
 
 
+def _create_url_from_parameters(**kwargs):
+    # Make the URL that DAB will expect for instantiation.
+    schema = "unix"
+    try:
+        path = kwargs["unix_socket_path"]
+    except KeyError:
+        schema = "redis"
+        if kwargs.get("ssl", False):
+            schema = "rediss"
+        path = f"{kwargs.get('host')}:{kwargs.get('port')}"
+
+    url = f"{schema}://{path}"
+    return url
+
+
 def get_redis_client(**kwargs):
     """Instantiate a Redis client via DAB.
 
     DAB will return an appropriate client for HA based on the passed
     parameters.
     """
-    # Make the URL that DAB expects as part of the creation.
-    schema = "redis"
-    if kwargs.get("ssl", False):
-        schema = "rediss"
-    url = f"{schema}://{kwargs.get('host')}:{kwargs.get('port')}"
-    return _get_redis_client(url, **kwargs)
+    return _get_redis_client(_create_url_from_parameters(**kwargs), **kwargs)
 
 
 def enable_redis_prefix():
