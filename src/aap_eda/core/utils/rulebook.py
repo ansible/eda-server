@@ -40,7 +40,7 @@ def build_source_list(rulesets_data: str) -> list[dict]:
 
     try:
         rulesets = yaml.safe_load(rulesets_data)
-    except yaml.parser.ParserError as ex:
+    except yaml.MarkedYAMLError as ex:
         LOGGER.error("Invalid rulesets: %s", str(ex))
         raise ParseError("Failed to parse rulebook data") from ex
 
@@ -88,3 +88,66 @@ def get_rulebook_hash(rulebook: str) -> str:
     sha256.update(rulebook)
 
     return sha256.hexdigest()
+
+
+def swap_webhook_sources(
+    data: str, webhook_sources: dict, mappings: list[dict]
+) -> str:
+    """Swap out the sources with webhook sources that match the name.
+
+    Preserve the filters if they exist for the source.
+    """
+    rulesets = yaml.safe_load(data)
+    counter = 1
+    current_names = set()
+
+    mapping_dict = {
+        mapping["source_name"]: mapping["webhook_name"] for mapping in mappings
+    }
+
+    for ruleset in rulesets:
+        new_sources = []
+        for source in ruleset.get("sources", []):
+            default_name = f"{DEFAULT_SOURCE_NAME_PREFIX}{counter}"
+            counter += 1
+
+            src_name = source.get("name", default_name)
+            if src_name in current_names:
+                src_name = default_name
+
+            current_names.add(src_name)
+
+            if src_name in mapping_dict:
+                webhook_name = mapping_dict[src_name]
+
+                if webhook_name in webhook_sources:
+                    updated_source = _updated_webhook_source(
+                        webhook_name, source, webhook_sources
+                    )
+                    new_sources.append(updated_source)
+                    LOGGER.debug(
+                        "Source %s updated with Webhook Source", webhook_name
+                    )
+                else:
+                    msg = f"No event stream found for source {src_name}"
+                    LOGGER.warning(msg)
+                    new_sources.append(source)
+            else:
+                LOGGER.debug("Source %s left intact", src_name)
+                new_sources.append(source)
+
+        ruleset["sources"] = new_sources
+
+    return yaml.dump(rulesets, sort_keys=False)
+
+
+def _updated_webhook_source(
+    name: str, source: dict, webhook_sources: dict
+) -> dict:
+    updated_source = {"name": name}
+    source_type = next(iter(webhook_sources[name]))
+    updated_source[source_type] = webhook_sources[name][source_type]
+    if "filters" in source:
+        updated_source["filters"] = source["filters"]
+    LOGGER.debug("Source %s updated with Webhook Source", name)
+    return updated_source

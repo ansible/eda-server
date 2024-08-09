@@ -11,11 +11,13 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import pytest
 import yaml
 
 from aap_eda.core.utils.rulebook import (
     DEFAULT_SOURCE_NAME_PREFIX,
     build_source_list,
+    swap_webhook_sources,
 )
 
 
@@ -243,3 +245,95 @@ def test_multple_rulesets_with_duplicate_names():
     assert results[0]["source_info"] == sources[0]["sources"][0]
     assert results[1]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}2"
     assert results[0]["name"] == "my source"
+
+
+TEST_RULESETS = """
+---
+- name: hello
+  hosts: localhost
+  sources:
+   - name: demo
+     ansible.eda.range:
+       limit: 10
+  rules:
+    - name: rule1
+      condition: true
+      action:
+         debug:
+"""
+
+
+EXPECT_RULESETS = """
+---
+- name: hello
+  hosts: localhost
+  sources:
+  - name: swap_me
+    ansible.eda.pg_listener:
+      "dsn": "encrypted_dsn"
+      "channels": ["channel_name"]
+  rules:
+    - name: rule1
+      condition: true
+      action:
+         debug:
+"""
+
+
+@pytest.mark.parametrize(
+    "input_rulesets, source_mappings, output_rulesets",
+    [
+        (
+            TEST_RULESETS,
+            [
+                {
+                    "webhook_id": 1,
+                    "webhook_name": "swap_me",
+                    "rulebook_hash": "hash",
+                    "source_name": "demo",
+                }
+            ],
+            EXPECT_RULESETS,
+        ),
+        (
+            TEST_RULESETS,
+            [
+                {
+                    "webhook_id": 1,
+                    "webhook_name": "unmatched",
+                    "rulebook_hash": "hash",
+                    "source_name": "demo",
+                }
+            ],
+            TEST_RULESETS,
+        ),
+        (
+            TEST_RULESETS,
+            [
+                {
+                    "webhook_id": 1,
+                    "webhook_name": "unmatched",
+                    "rulebook_hash": "hash",
+                    "source_name": "unmatched",
+                }
+            ],
+            TEST_RULESETS,
+        ),
+    ],
+)
+def test_swap_webhook_sources(
+    input_rulesets, source_mappings, output_rulesets
+):
+    webhook_source = {}
+
+    webhook_source["swap_me"] = {
+        "ansible.eda.pg_listener": {
+            "dsn": "encrypted_dsn",
+            "channels": ["channel_name"],
+        },
+    }
+
+    result = swap_webhook_sources(
+        input_rulesets, webhook_source, source_mappings
+    )
+    assert yaml.safe_load(result) == yaml.safe_load(output_rulesets)
