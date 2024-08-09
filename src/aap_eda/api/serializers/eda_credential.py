@@ -185,6 +185,9 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
     resources = []
 
     used_activations = eda_credential.activations.all()
+    used_webhooks = models.Webhook.objects.filter(
+        eda_credential=eda_credential
+    )
     used_decision_environments = models.DecisionEnvironment.objects.filter(
         eda_credential=eda_credential
     )
@@ -199,6 +202,15 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
             "id": activation.id,
             "name": activation.name,
             "url": f"api/eda/v1/activations/{activation.id}/",
+        }
+        resources.append(resource)
+
+    for webhook in used_webhooks:
+        resource = {
+            "type": "Webhook",
+            "id": webhook.id,
+            "name": webhook.name,
+            "url": (f"api/eda/v1/webhooks/{webhook.id}/"),
         }
         resources.append(resource)
 
