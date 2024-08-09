@@ -195,9 +195,9 @@ class EventStreamCreateSerializer(serializers.ModelSerializer):
         else:
             validated_data["rulebook_name"] = PG_NOTIFY_TEMPLATE_RULEBOOK_NAME
             validated_data["rulebook_id"] = None
-            validated_data[
-                "rulebook_rulesets"
-            ] = PG_NOTIFY_TEMPLATE_RULEBOOK_DATA
+            validated_data["rulebook_rulesets"] = (
+                PG_NOTIFY_TEMPLATE_RULEBOOK_DATA
+            )
 
         validated_data["channel_name"] = validated_data.get(
             "channel_name", _get_default_channel_name()

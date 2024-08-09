@@ -11,6 +11,17 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
+import socket
+from datetime import timedelta
+
+import dynaconf
+from django.core.exceptions import ImproperlyConfigured
+from split_settings.tools import include
+
+from aap_eda.core.enums import RulebookProcessLogLevel
+from aap_eda.utils import str_to_bool
+
 """
 Django settings.
 
@@ -92,15 +103,7 @@ To configure a Resource Server for syncing of managed resources:
 * ANSIBLE_BASE_MANAGED_ROLE_REGISTRY - Syncing of the Platform Auditor role
 
 """
-import os
-from datetime import timedelta
 
-import dynaconf
-from django.core.exceptions import ImproperlyConfigured
-from split_settings.tools import include
-
-from aap_eda.core.enums import RulebookProcessLogLevel
-from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -512,14 +515,60 @@ APP_LOG_LEVEL = settings.get("APP_LOG_LEVEL", "INFO")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+        "external_log_enabled": {
+            "()": "aap_eda.utils.filters.ExternalLoggerEnabled"
+        },
+        "dynamic_level_filter": {
+            "()": "aap_eda.utils.filters.DynamicLevelFilter"
+        },
+        "guid": {"()": "aap_eda.utils.filters.DefaultCorrelationId"},
+    },
     "formatters": {
         "simple": {
-            "format": "{asctime} {name} {levelname:<8} {message}",
-            "style": "{",
+            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s %(message)s"  # noqa
+        },
+        "json": {"()": "aap_eda.utils.formatters.LogstashFormatter"},
+        "timed_import": {
+            "()": "aap_eda.utils.formatters.TimeFormatter",
+            "format": "%(relativeSeconds)9.3f %(levelname)-8s %(message)s",
+        },
+        "dispatcher": {
+            "format": "%(asctime)s %(levelname)-8s [%(guid)s] %(name)s PID:%(process)d %(message)s"  # noqa
         },
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+        "console": {
+            "()": "logging.StreamHandler",
+            "level": "DEBUG",
+            "filters": ["dynamic_level_filter", "guid"],
+            "formatter": "simple",
+        },
+        "null": {"class": "logging.NullHandler"},
+        "file": {"class": "logging.NullHandler", "formatter": "simple"},
+        "syslog": {
+            "level": "WARNING",
+            "filters": ["require_debug_false"],
+            "class": "logging.NullHandler",
+            "formatter": "simple",
+        },
+        "inventory_import": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "timed_import",
+        },
+        "external_logger": {
+            "class": "aap_eda.utils.handlers.RSysLogHandler",
+            "formatter": "json",
+            "address": "/var/run/eda-rsyslog/rsyslog.sock",
+            "filters": [
+                "external_log_enabled",
+                "dynamic_level_filter",
+                "guid",
+            ],
+        },
+        "otel": {"class": "logging.NullHandler"},
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
@@ -736,3 +785,13 @@ WEBHOOK_MTLS_BASE_URL = (
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
+
+# Settings related to external logger configuration
+LOG_AGGREGATOR_ENABLED = False
+# The maximum size of the ansible callback event's res data structure
+# beyond this limit and the value will be removed
+MAX_EVENT_RES_DATA = 700000
+LOG_AGGREGATOR_RSYSLOGD_DEBUG = False
+CLUSTER_HOST_ID = socket.gethostname()
+COLOR_LOGS = False
+LOG_AGGREGATOR_RSYSLOGD_CONF_DIR = "/var/lib/eda/rsyslog"
