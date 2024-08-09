@@ -136,12 +136,10 @@ class Activation(
     webhooks = models.ManyToManyField(
         Webhook, related_name="activations", default=None
     )
-    swap_single_source = models.BooleanField(
-        default=False,
-        help_text=(
-            "Allow swapping of single sources "
-            "in a rulebook without name match"
-        ),
+    source_mappings = models.TextField(
+        default="",
+        blank=True,
+        help_text="Mapping between sources and event streams",
     )
 
     def get_parent_type(self) -> str:
