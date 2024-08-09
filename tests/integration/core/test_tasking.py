@@ -111,7 +111,7 @@ def test_worker_dab_client(default_queue: Queue):
     worker = DefaultWorker(
         [default_queue],
         connection=redis.Redis(
-            **default.rq_redis_client_instantiation_parameters()
+            **default.rq_standalone_redis_client_instantiation_parameters()
         ),
     )
     assert isinstance(worker.connection, (DABRedis, DABRedisCluster))

@@ -8,7 +8,6 @@ from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
 
 import redis
 import rq
-import rq_scheduler
 from ansible_base.lib.redis.client import (
     DABRedis,
     DABRedisCluster,
@@ -25,6 +24,7 @@ from rq.defaults import (
 )
 from rq.job import Job as _Job, JobStatus
 from rq.serializers import JSONSerializer
+from rq_scheduler import Scheduler as _Scheduler
 
 from aap_eda.settings import default
 
@@ -73,7 +73,46 @@ def get_redis_client(**kwargs):
     DAB will return an appropriate client for HA based on the passed
     parameters.
     """
+    # HA cluster does not support an alternate redis db and will
+    # generate an exception if we pass a value (even the default).
+    # If we're in that situation we drop the db and, if the db
+    # is anything other than the default log an informational
+    # message.
+    db = kwargs.get("db", None)
+    if (db is not None) and kwargs.get("clustered", False):
+        del kwargs["db"]
+        if db != default.DEFAULT_REDIS_DB:
+            logger.info(
+                f"clustered redis supports only the default db"
+                f"; db specified: {db}"
+            )
+
     return _get_redis_client(_create_url_from_parameters(**kwargs), **kwargs)
+
+
+class Scheduler(_Scheduler):
+    """Custom scheduler class."""
+
+    def __init__(
+        self,
+        queue_name="default",
+        queue=None,
+        interval=60,
+        connection=None,
+        job_class=None,
+        queue_class=None,
+        name=None,
+    ):
+        connection = _get_necessary_client_connection(connection)
+        super().__init__(
+            queue_name=queue_name,
+            queue=queue,
+            interval=interval,
+            connection=connection,
+            job_class=job_class,
+            queue_class=queue_class,
+            name=name,
+        )
 
 
 def enable_redis_prefix():
@@ -102,16 +141,12 @@ def enable_redis_prefix():
         f"{redis_prefix}:canceled:{0}"
     )
 
-    rq_scheduler.Scheduler.redis_scheduler_namespace_prefix = (
+    Scheduler.redis_scheduler_namespace_prefix = (
         f"{redis_prefix}:scheduler_instance:"
     )
-    rq_scheduler.Scheduler.scheduler_key = f"{redis_prefix}:scheduler"
-    rq_scheduler.Scheduler.scheduler_lock_key = (
-        f"{redis_prefix}:scheduler_lock"
-    )
-    rq_scheduler.Scheduler.scheduled_jobs_key = (
-        f"{redis_prefix}:scheduler:scheduled_jobs"
-    )
+    Scheduler.scheduler_key = f"{redis_prefix}:scheduler"
+    Scheduler.scheduler_lock_key = f"{redis_prefix}:scheduler_lock"
+    Scheduler.scheduled_jobs_key = f"{redis_prefix}:scheduler:scheduled_jobs"
 
     def eda_get_key(job_id):
         return f"{redis_prefix}:results:{job_id}"
