@@ -381,7 +381,7 @@ RQ_REDIS_PREFIX = settings.get("RQ_REDIS_PREFIX", "eda-rq")
 #
 # In establishing an HA Cluster Redis client connection DAB ignores
 # the host and port kwargs.
-REDIS_HA_CLUSTER_HOSTS = settings.get("REDIS_HA_CLUSTER_HOSTS", "").strip()
+REDIS_HA_CLUSTER_HOSTS = settings.get("MQ_REDIS_HA_CLUSTER_HOSTS", "").strip()
 
 
 def _rq_common_parameters():
