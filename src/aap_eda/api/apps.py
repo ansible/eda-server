@@ -7,4 +7,4 @@ class ApiConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "aap_eda.api"
 
-    reconfigure_rsyslog()
+    reconfigure_rsyslog(restart_rsyslogd=False)

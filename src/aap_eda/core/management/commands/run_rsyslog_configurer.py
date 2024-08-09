@@ -1,11 +1,10 @@
 import logging
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management import BaseCommand, CommandError
 
 from aap_eda.utils.external_logging import reconfigure_rsyslog
 
-logger = logging.getLogger("aap.gateway.rsyslog_configurer")
-
+# logger = logging.getLogger("aap.eda.rsyslog_configurer")
 
 class Command(BaseCommand):
     """
@@ -17,7 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *arg, **options):
         try:
-            reconfigure_rsyslog(False)
+            reconfigure_rsyslog(restart_rsyslogd=False)
         except Exception as e:
             # Log unanticipated exception in addition to writing to stderr to get timestamps and other metadata # noqa
             raise CommandError(

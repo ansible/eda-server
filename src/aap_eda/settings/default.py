@@ -517,6 +517,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "filters": {
         "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+        'require_debug_true': {'()': 'django.utils.log.RequireDebugTrue'},
         "external_log_enabled": {
             "()": "aap_eda.utils.filters.ExternalLoggerEnabled"
         },
@@ -570,7 +571,6 @@ LOGGING = {
         },
         "otel": {"class": "logging.NullHandler"},
     },
-    "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
         "django": {
             "handlers": ["console"],
@@ -596,6 +596,14 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
+        },
+        'aap': {
+            'handlers': ['console', 'external_logger'],
+            'level': 'INFO',
+        },
+        'aap.eda.rsyslog_configurer': {
+            'handlers': ['console', 'external_logger'],
+            'level': 'INFO',
         },
     },
 }

@@ -12,6 +12,7 @@ RUN mkdir -p /var/lib/eda/redis-tls \
     && chmod 0775 /var/lib/eda/redis-tls
 COPY ./tools/docker/redis-tls /var/lib/eda/redis-tls
 
+ADD https://copr.fedorainfracloud.org/coprs/ansible/Rsyslog/repo/epel-9/ansible-Rsyslog-epel-9.repo /etc/yum.repos.d/ansible-Rsyslog-epel-9.repo
 RUN DNF=dnf \
     INSTALL_PACKAGES="python3.11 \
     python3.11-devel \
@@ -21,6 +22,8 @@ RUN DNF=dnf \
     gettext \
     git-core \
     java-17-openjdk-headless \
+    inotify-tools \
+    rsyslog-8.2102.0-106.el9 \
     supervisor" \
     && $DNF -y install  https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
     && $DNF -y install dnf-plugins-core \
@@ -28,7 +31,6 @@ RUN DNF=dnf \
     && $DNF -y install $INSTALL_PACKAGES \
     && $DNF -y clean all \
     && rm -rf /var/cache/dnf
-COPY ./tools/docker/supervisord/supervisord.conf /etc/supervisord.conf
 
 USER "$USER_ID"
 ENV POETRY_VERSION="1.7.1" \
@@ -57,12 +59,19 @@ RUN poetry install -E all --no-root --no-cache \
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 RUN pip install ansible-core
+
+USER 0
 RUN for dir in \
     /var/lib/eda \
-    /var/lib/eda/rsyslog ; \
-    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; done
+    /var/lib/eda/rsyslog  \
+    /var/lib/eda/rsyslog/conf.d  \
+    /var/run/eda-rsyslog ; \
+    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done
 
-RUN EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear
+RUN  EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear
+
+COPY ./tools/docker/supervisord/supervisord.conf /etc/supervisord.conf
+ADD tools/docker/rsyslog/rsyslog.conf /var/lib/eda/rsyslog/rsyslog.conf
 
 USER 0
 RUN for dir in \
@@ -70,8 +79,15 @@ RUN for dir in \
     /app/venv \
     /app/venv/bin \
     /var/lib/eda \
-    /var/lib/eda/rsyslog ; \
-    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done
+    /var/lib/eda/rsyslog  \
+    /var/lib/eda/rsyslog/conf.d  \
+    /var/log/supervisor \
+    /var/run/supervisor \
+    /var/run/eda-rsyslog ; \
+    do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done && \
+    for file in \
+        /var/lib/eda/rsyslog/rsyslog.conf ; \
+    do touch $file ; chmod g+rw $file ; chgrp root $file ; done
 
 USER "$USER_ID"
 

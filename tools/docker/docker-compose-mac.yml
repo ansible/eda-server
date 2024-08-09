@@ -87,7 +87,8 @@ services:
         aap-eda-manage migrate
         && aap-eda-manage create_initial_data
         && scripts/create_superuser.sh
-        && aap-eda-manage runserver 0.0.0.0:8000
+        && supervisord -c /etc/supervisord.conf
+        && aap-eda-manage runserver --verbosity 0 0.0.0.0:8000
     ports:
       - '${EDA_API_PORT:-8000}:8000'
     depends_on:

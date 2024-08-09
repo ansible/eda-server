@@ -9,15 +9,14 @@ import subprocess
 
 logger = logging.getLogger("eda.main.utils.reload")
 
-
 def supervisor_service_command(command, service="*", communicate=True):
     # noqa
     """
     Do read this example use pattern of supervisorctl.
 
     # supervisorctl restart
-    #   tower-processes:receiver
-    #   tower-processes:factcacher
+    #   eda-processes:receiver
+    #   eda-processes:factcacher
     """
     args = ["supervisorctl"]
 
@@ -25,7 +24,7 @@ def supervisor_service_command(command, service="*", communicate=True):
     if supervisor_config_path:
         args.extend(["-c", supervisor_config_path])
 
-    args.extend([command, ":".join(["tower-processes", service])])
+    args.extend([command, ":".join(["eda-processes", service])])
     logger.debug(
         "Issuing command to {} services, args={}".format(  # noqa: P101
             command, args

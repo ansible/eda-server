@@ -652,7 +652,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.8.8.1.dev2+g7a8873d"
+version = "2024.8.8.1.dev4+gc29dee1"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -684,7 +684,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "7a8873dec0f386d2ef76e50946341f179dd3d0e8"
+resolved_reference = "c29dee148f1e9d535da13ba718ab91f3246b50a6"
 
 [[package]]
 name = "django-crum"
@@ -1623,37 +1623,6 @@ opentelemetry-exporter-otlp-proto-common = "1.24.0"
 opentelemetry-proto = "1.24.0"
 opentelemetry-sdk = ">=1.24.0,<1.25.0"
 requests = ">=2.7,<3.0"
-
-[[package]]
-name = "opentelemetry-instrumentation"
-version = "0.45b0"
-description = "Instrumentation Tools & Auto Instrumentation for OpenTelemetry Python"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "opentelemetry_instrumentation-0.45b0-py3-none-any.whl", hash = "sha256:06c02e2c952c1b076e8eaedf1b82f715e2937ba7eeacab55913dd434fbcec258"},
-    {file = "opentelemetry_instrumentation-0.45b0.tar.gz", hash = "sha256:6c47120a7970bbeb458e6a73686ee9ba84b106329a79e4a4a66761f933709c7e"},
-]
-
-[package.dependencies]
-opentelemetry-api = ">=1.4,<2.0"
-setuptools = ">=16.0"
-wrapt = ">=1.0.0,<2.0.0"
-
-[[package]]
-name = "opentelemetry-instrumentation-logging"
-version = "0.45b0"
-description = "OpenTelemetry Logging instrumentation"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "opentelemetry_instrumentation_logging-0.45b0-py3-none-any.whl", hash = "sha256:bfaaca6862e84bb41b434178fba69afdb622f226cfdee243acb3959b65c97b48"},
-    {file = "opentelemetry_instrumentation_logging-0.45b0.tar.gz", hash = "sha256:48bfb6161a09f210c28a30295c4d217c4703e2d05d1df04fd3ab19ea30837978"},
-]
-
-[package.dependencies]
-opentelemetry-api = ">=1.12,<2.0"
-opentelemetry-instrumentation = "0.45b0"
 
 [[package]]
 name = "opentelemetry-proto"
@@ -3230,4 +3199,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "4828be0902a96e01fe10564857d50d217d22fedfddfc1929bd8d1984b2702fa9"
+content-hash = "134cd0d8303f59bc42a8087a48e8e27f192874708e2769f345a26bdb8f4bb3e2"
