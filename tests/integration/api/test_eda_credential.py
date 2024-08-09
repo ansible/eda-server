@@ -523,6 +523,23 @@ def test_delete_credential_with_project_reference(
 
 
 @pytest.mark.django_db
+def test_delete_credential_with_webhook_reference(
+    default_webhook: models.Webhook,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    eda_credential = default_webhook.eda_credential
+    response = admin_client.delete(
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {eda_credential.name} is being referenced by other "
+        "resources and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
 def test_delete_credential_with_activation_reference(
     default_activation: models.Activation,
     admin_client: APIClient,
