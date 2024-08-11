@@ -26,6 +26,7 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.core.management.commands import create_initial_data
 from aap_eda.core.management.commands.create_initial_data import (
     CREDENTIAL_TYPES,
     populate_credential_types,
@@ -1044,6 +1045,20 @@ def new_team(default_organization: models.Organization) -> models.Team:
         description="This is a new team.",
         organization=default_organization,
     )
+
+
+# TODO(doston): creating managed roles should be exported to its own
+# management command
+@pytest.fixture
+def create_initial_data_command():
+    """Create all managed roles using create_initial_data command."""
+    return create_initial_data.Command()
+
+
+@pytest.fixture
+def create_managed_org_roles(create_initial_data_command):
+    """Create managed org roles using create_initial_data command."""
+    create_initial_data_command._create_org_roles()
 
 
 #################################################################
