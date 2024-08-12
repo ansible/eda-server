@@ -284,6 +284,9 @@ services:
     depends_on:
       eda-webhook-api:
         condition: service_healthy
+    networks:
+      - service-mesh
+      - default
 
 volumes:
   postgres_data: {}
