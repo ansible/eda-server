@@ -1160,3 +1160,9 @@ def default_webhook(
         url=DUMMY_URL,
         eda_credential=default_hmac_credential,
     )
+
+
+@pytest.fixture
+def activation_payload_skip_audit_events(activation_payload: dict) -> dict:
+    activation_payload["skip_audit_events"] = True
+    return activation_payload

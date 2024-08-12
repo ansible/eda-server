@@ -141,6 +141,14 @@ class Activation(
         blank=True,
         help_text="Mapping between sources and event streams",
     )
+    skip_audit_events = models.BooleanField(
+        default=False,
+        help_text=("Skip audit events for activation"),
+    )
 
     def get_parent_type(self) -> str:
         return ProcessParentType.ACTIVATION
+
+    def _get_skip_audit_events(self) -> bool:
+        """Activation can optionally skip audit events."""
+        return self.skip_audit_events

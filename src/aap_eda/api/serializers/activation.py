@@ -291,6 +291,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "log_level",
             "webhooks",
+            "skip_audit_events",
         ]
         read_only_fields = [
             "id",
@@ -357,6 +358,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "k8s_service_name",
             "webhooks",
             "source_mappings",
+            "skip_audit_events",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -409,6 +411,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "k8s_service_name": activation.k8s_service_name,
             "webhooks": webhooks,
             "source_mappings": activation.source_mappings,
+            "skip_audit_events": activation.skip_audit_events,
         }
 
 
@@ -433,6 +436,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "k8s_service_name",
             "source_mappings",
+            "skip_audit_events",
         ]
 
     organization_id = serializers.IntegerField(
@@ -636,6 +640,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "k8s_service_name",
             "webhooks",
             "source_mappings",
+            "skip_audit_events",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -727,6 +732,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "k8s_service_name": activation.k8s_service_name,
             "webhooks": webhooks,
             "source_mappings": activation.source_mappings,
+            "skip_audit_events": activation.skip_audit_events,
         }
 
 
@@ -782,6 +788,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "k8s_service_name",
             "source_mappings",
+            "skip_audit_events",
         ]
         read_only_fields = [
             "id",
