@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
 import logging
 import uuid
 from typing import Any, Dict, List
@@ -1059,14 +1060,18 @@ def redis_external(redis_parameters):
 
 @pytest.fixture
 def test_queue_name(redis_parameters):
-    # Use a separately named copy of the default queue to prevent
-    # cross-environment issues.  Using the eda-server default queue results in
-    # tasks run by tests to execute within eda-server context, if the
-    # eda-server default worker is running, rather than the test context.
-    settings.RQ_QUEUES["test-default"] = settings.RQ_QUEUES["default"]
+    # Use a separately named deep copy of the default queue to prevent
+    # cross-environment issues.  If not using a deep copy the same queue entry
+    # is used as value for the two queues and modifying via either affects the
+    # other.
+    # Using the eda-server default queue results in tasks run by tests to
+    # execute within eda-server context, if the eda-server default worker is
+    # running, rather than the test context.
+    settings.RQ_QUEUES["test-default"] = copy.deepcopy(
+        settings.RQ_QUEUES["default"]
+    )
 
-    # The redis parameters provide the DB to use in an effort to avoid
-    # stepping on a deployed environment.
+    # The redis parameters provide the DB to use.
     settings.RQ_QUEUES["test-default"]["DB"] = redis_parameters["db"]
     return "test-default"
 

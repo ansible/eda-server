@@ -14,7 +14,6 @@
 
 import pytest
 
-from aap_eda.core.tasking import get_redis_client
 from aap_eda.settings import default
 
 
@@ -26,12 +25,22 @@ def redis_parameters() -> dict:
     """Provide redis parameters based on settings values."""
     params = default.rq_redis_client_instantiation_parameters()
 
-    # We try to avoid conflicting with a deployed environment by using a
+    # TODO: figure out the db oddity described here-in.
+    #
+    # There's an oddity with non-HA unit tests and the use of
+    # an alternate db.
+    #
+    # For pragmatism we've removed the code here which attempted
+    # to avoid conflicting with a deployed environment by using a
     # different database from that of the settings.
-    # This is not guaranteed as the deployed environment could be differently
-    # configured from the default, but in development it should be fine.
-    client = get_redis_client(**params)
-    max_dbs = int(client.config_get("databases")["databases"])
-    params["db"] = (params["db"] + 1) % max_dbs
+    #
+    #
+    # One constant is that DAB RedisCluster, which does not support
+    # alternate dbs passes the EDA unit tests (which are part of
+    # CI processing) and that by using only the 0 db
+    # the same unit tests pass for non-HA whereas using an alternate
+    # db as this code previously did results in non-HA unit tests
+    # failing.
+    #
 
     return params
