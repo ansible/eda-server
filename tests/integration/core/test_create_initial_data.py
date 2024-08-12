@@ -24,6 +24,9 @@ from aap_eda.core.management.commands.create_initial_data import (
 from aap_eda.core.utils.credentials import inputs_from_store
 
 
+#################################################################
+# Roles
+#################################################################
 @pytest.mark.django_db
 def test_create_all_roles():
     assert RoleDefinition.objects.count() == 0
@@ -86,6 +89,9 @@ def test_remove_extra_permission():
     assert perm not in auditor_role.permissions.all()
 
 
+#################################################################
+# Credentials
+#################################################################
 def create_old_registry_credential():
     credential = models.Credential.objects.create(
         name="registry cred",
