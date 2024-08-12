@@ -286,16 +286,29 @@ def valid_hash_format(fmt: str):
     return fmt
 
 
-def valid_webhook_auth_type(auth_type: str):
-    """Check webhook auth type."""
-    if auth_type not in enums.WebhookAuthType.values():
+def _validate_webhook_settings(auth_type: str):
+    """Check webhook settings."""
+    if (
+        auth_type == enums.WebhookCredentialType.MTLS
+        and not settings.WEBHOOK_MTLS_BASE_URL
+    ):
         raise serializers.ValidationError(
             (
-                f"Invalid auth_type {auth_type} should "
-                f"be one of {enums.WebhookAuthType.values()}"
+                f"EventStream of type {auth_type} cannot be used "
+                "because WEBHOOK_MTLS_BASE_URL is missing in settings."
             )
         )
-    return auth_type
+
+    if (
+        auth_type != enums.WebhookCredentialType.MTLS
+        and not settings.WEBHOOK_BASE_URL
+    ):
+        raise serializers.ValidationError(
+            (
+                f"EventStream of type {auth_type} cannot be used "
+                "because WEBHOOK_BASE_URL is missing in settings."
+            )
+        )
 
 
 def check_if_webhooks_exists(webhook_ids: list[int]) -> list[int]:
@@ -323,4 +336,5 @@ def check_credential_types_for_webhook(eda_credential_id: int) -> int:
             f"The type of credential can only be one of {names}"
         )
 
+    _validate_webhook_settings(name)
     return eda_credential_id

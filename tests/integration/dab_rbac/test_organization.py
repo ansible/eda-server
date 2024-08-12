@@ -15,6 +15,7 @@
 import pytest
 from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist
+from django.test import override_settings
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse
 
@@ -51,7 +52,8 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
     except NoReverseMatch:
         pytest.skip("Not testing model for now")
 
-    response = admin_client.post(url, data=post_data, format="json")
+    with override_settings(WEBHOOK_BASE_URL="https://www.example.com/"):
+        response = admin_client.post(url, data=post_data, format="json")
 
     if response.status_code == 405:
         pytest.skip("Not testing model not allowing creation for now")
@@ -87,7 +89,8 @@ def test_create_with_custom_org(
     except NoReverseMatch:
         pytest.skip("Not testing model with no list view for now")
 
-    response = superuser_client.post(url, data=post_data, format="json")
+    with override_settings(WEBHOOK_BASE_URL="https://www.example.com/"):
+        response = superuser_client.post(url, data=post_data, format="json")
 
     if response.status_code == 405:
         pytest.skip("Not testing model not allowing creation for now")
