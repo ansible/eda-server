@@ -4,7 +4,16 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from types import MethodType
-from typing import Any, Callable, Iterable, Optional, Protocol, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Type,
+    Union,
+)
 
 import redis
 import rq
@@ -23,6 +32,7 @@ from rq.defaults import (
     DEFAULT_WORKER_TTL,
 )
 from rq.job import Job as _Job, JobStatus
+from rq.registry import StartedJobRegistry
 from rq.serializers import JSONSerializer
 from rq_scheduler import Scheduler as _Scheduler
 
@@ -73,11 +83,10 @@ def get_redis_client(**kwargs):
     DAB will return an appropriate client for HA based on the passed
     parameters.
     """
-    # HA cluster does not support an alternate redis db and will
-    # generate an exception if we pass a value (even the default).
-    # If we're in that situation we drop the db and, if the db
-    # is anything other than the default log an informational
-    # message.
+    # HA cluster does not support an alternate redis db and will generate an
+    # exception if we pass a value (even the default). If we're in that
+    # situation we drop the db and, if the db is anything other than the
+    # default log an informational message.
     db = kwargs.get("db", None)
     if (db is not None) and kwargs.get("clustered", False):
         del kwargs["db"]
@@ -203,7 +212,7 @@ class Queue(_Queue):
         super().__init__(
             name=name,
             default_timeout=default_timeout,
-            connection=connection,
+            connection=_get_necessary_client_connection(connection),
             is_async=is_async,
             job_class=job_class,
             serializer=serializer,
@@ -225,6 +234,7 @@ class Job(_Job):
     ):
         if serializer is None:
             serializer = JSONSerializer
+        connection = _get_necessary_client_connection(connection)
 
         super().__init__(id, connection, serializer)
 
@@ -242,7 +252,130 @@ def _get_necessary_client_connection(connection: Connection) -> Connection:
     return connection
 
 
-class DefaultWorker(_Worker):
+class Worker(_Worker):
+    """Custom worker class.
+
+    Provides establishment of DAB Redis client and work arounds for various
+    DABRedisCluster issues.
+    """
+
+    def __init__(
+        self,
+        queues: Iterable[Union[Queue, str]],
+        name: Optional[str] = None,
+        default_result_ttl: int = DEFAULT_RESULT_TTL,
+        connection: Optional[Connection] = None,
+        exc_handler: Any = None,
+        exception_handlers: _ErrorHandlersArgType = None,
+        default_worker_ttl: int = DEFAULT_WORKER_TTL,
+        job_class: Type[_Job] = None,
+        queue_class: Type[_Queue] = None,
+        log_job_description: bool = True,
+        job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
+        disable_default_exception_handler: bool = False,
+        prepare_for_work: bool = True,
+        serializer: Optional[SerializerProtocol] = None,
+    ):
+        connection = _get_necessary_client_connection(connection)
+        super().__init__(
+            queues=queues,
+            name=name,
+            default_result_ttl=default_result_ttl,
+            connection=connection,
+            exc_handler=exc_handler,
+            exception_handlers=exception_handlers,
+            default_worker_ttl=default_worker_ttl,
+            job_class=job_class,
+            queue_class=queue_class,
+            log_job_description=log_job_description,
+            job_monitoring_interval=job_monitoring_interval,
+            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
+            prepare_for_work=prepare_for_work,
+            serializer=JSONSerializer,
+        )
+
+    def _set_connection(
+        self,
+        connection: Union[DABRedis, DABRedisCluster],
+    ) -> Union[DABRedis, DABRedisCluster]:
+        # A DABRedis connection doesn't need intervention.
+        if isinstance(connection, DABRedis):
+            return super()._set_connection(connection)
+
+        try:
+            connection_pool = connection.connection_pool
+            current_socket_timeout = connection_pool.connection_kwargs.get(
+                "socket_timeout"
+            )
+            if current_socket_timeout is None:
+                timeout_config = {"socket_timeout": self.connection_timeout}
+                connection_pool.connection_kwargs.update(timeout_config)
+        except AttributeError:
+            nodes = connection.get_nodes()
+            for node in nodes:
+                connection_pool = node.redis_connection.connection_pool
+                current_socket_timeout = connection_pool.connection_kwargs.get(
+                    "socket_timeout"
+                )
+                if current_socket_timeout is None:
+                    timeout_config = {
+                        "socket_timeout": self.connection_timeout
+                    }
+                    connection_pool.connection_kwargs.update(timeout_config)
+        return connection
+
+    @classmethod
+    def all(
+        cls,
+        connection: Optional[Union[DABRedis, DABRedisCluster]] = None,
+        job_class: Optional[Type[Job]] = None,
+        queue_class: Optional[Type[Queue]] = None,
+        queue: Optional[Queue] = None,
+        serializer=None,
+    ) -> List[Worker]:
+        # If we don't have a queue (whose connection would be used) make
+        # certain that we have an appropriate connection and pass it
+        # to the superclass.
+        if queue is None:
+            connection = _get_necessary_client_connection(connection)
+        return super().all(
+            connection,
+            job_class,
+            queue_class,
+            queue,
+            serializer,
+        )
+
+    def handle_job_success(
+        self, job: Job, queue: Queue, started_job_registry: StartedJobRegistry
+    ):
+        # A DABRedis connection doesn't need intervention.
+        if isinstance(self.connection, DABRedis):
+            return super().handle_job_success(job, queue, started_job_registry)
+
+        # For DABRedisCluster perform success handling.
+        # DABRedisCluster doesn't provide the watch, multi, etc. methods
+        # necessary for the superclass implementation, but we don't need
+        # them as there's no dependencies in how we use the jobs.
+        with self.connection.pipeline() as pipeline:
+            self.set_current_job_id(None, pipeline=pipeline)
+            self.increment_successful_job_count(pipeline=pipeline)
+            self.increment_total_working_time(
+                job.ended_at - job.started_at,
+                pipeline,
+            )
+
+            result_ttl = job.get_result_ttl(self.default_result_ttl)
+            if result_ttl != 0:
+                job._handle_success(result_ttl, pipeline=pipeline)
+
+            job.cleanup(result_ttl, pipeline=pipeline, remove_from_queue=False)
+            started_job_registry.remove(job, pipeline=pipeline)
+
+            pipeline.execute()
+
+
+class DefaultWorker(Worker):
     """Custom default worker class used for non-activation tasks.
 
     Uses JSONSerializer as a default one.
@@ -269,7 +402,6 @@ class DefaultWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        connection = _get_necessary_client_connection(connection)
 
         super().__init__(
             queues=queues,
@@ -289,7 +421,7 @@ class DefaultWorker(_Worker):
         )
 
 
-class ActivationWorker(_Worker):
+class ActivationWorker(Worker):
     """Custom worker class used for activation related tasks.
 
     Uses JSONSerializer as a default one.
@@ -316,7 +448,6 @@ class ActivationWorker(_Worker):
             job_class = Job
         if queue_class is None:
             queue_class = Queue
-        connection = _get_necessary_client_connection(connection)
         queue_name = settings.RULEBOOK_QUEUE_NAME
 
         super().__init__(

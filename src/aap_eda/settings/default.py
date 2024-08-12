@@ -361,6 +361,7 @@ RQ = {
     "JOB_CLASS": "aap_eda.core.tasking.Job",
     "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
     "SCHEDULER_CLASS": "aap_eda.core.tasking.Scheduler",
+    "WORKER_CLASS": "aap_eda.core.tasking.Worker",
 }
 
 REDIS_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
