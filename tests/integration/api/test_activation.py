@@ -70,6 +70,7 @@ def test_create_activation(
     assert activation.status_message == (
         "Wait for a worker to be available to start activation"
     )
+    assert not activation.skip_audit_events
 
 
 @pytest.mark.django_db
@@ -808,3 +809,20 @@ def test_create_activation_with_awx_token(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+def test_create_activation_with_skip_audit_events(
+    admin_awx_token: models.AwxToken,
+    activation_payload_skip_audit_events: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload_skip_audit_events
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.skip_audit_events
