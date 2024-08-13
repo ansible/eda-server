@@ -43,9 +43,13 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
 
         super().destroy(request, *args, **kwargs)
 
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: Project / ResourceName: {project.name} / \
-Organization: {project.organization} / Action: Delete"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: Project / "
+            f"ResourceName: {project.name} / "
+            f"Organization: {project.organization} / "
+            "Action: Delete"
+        )
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -127,9 +131,13 @@ class ProjectViewSet(
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
 
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: Project / ResourceName: {project.name} / \
-Organization: {project.organization} / Action: Create"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: Project / "
+            f"ResourceName: {project.name} / "
+            f"Organization: {project.organization} / "
+            "Action: Create"
+        )
         logger.info(log_msg)
 
         return Response(
@@ -167,10 +175,13 @@ Organization: {project.organization} / Action: Create"
             else None
         )
 
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: Project / ResourceName: {project.data['name']} / \
-Organization: {project.data['organization'].name} / \
-Action: Read"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: Project / "
+            f"ResourceName: {project.data['name']} / "
+            f"Organization: {project.data['organization'].name} / "
+            "Action: Read"
+        )
         logger.info(log_msg)
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
@@ -214,9 +225,13 @@ Action: Read"
                 old_data,
                 model_to_dict(project),
             )
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: Project / ResourceName: {project.name} / \
-Organization: {project.organization} / Action: Update"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: Project / "
+            f"ResourceName: {project.name} / "
+            f"Organization: {project.organization} / "
+            "Action: Update"
+        )
         logger.info(log_msg)
         return Response(serializers.ProjectSerializer(project).data)
 
@@ -260,9 +275,13 @@ Organization: {project.organization} / Action: Update"
         project.import_error = None
         project.save()
 
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: Project / ResourceName: {project.name} / \
-Organization: {project.organization} / Action: Sync"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: Project / "
+            f"ResourceName: {project.name} / "
+            f"Organization: {project.organization} / "
+            "Action: Sync"
+        )
         logger.info(log_msg)
 
         serializer = serializers.ProjectSerializer(project)

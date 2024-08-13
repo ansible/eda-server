@@ -120,15 +120,16 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: DesicisonEnvironment / \
-ResourceName: {decision_environment.data['name']}  / \
-Organization: {decision_environment.data['organization']} / \
-Description: {decision_environment.data['description']} / \
-ImageURL: {decision_environment.data['image_url']} / \
-Credential: \
-{logging_utils.get_credential_name_from_data(decision_environment)} / \
-Action: Read"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: DesicisonEnvironment / "
+            f"ResourceName: {decision_environment.data['name']}  / "
+            f"Organization: {decision_environment.data['organization']} / "
+            f"Description: {decision_environment.data['description']} / "
+            f"ImageURL: {decision_environment.data['image_url']} / "
+            f"Credential: {logging_utils.get_credential_name_from_data(decision_environment)} / "  # noqa: E501
+            "Action: Read"
+        )
         logger.info(log_msg)
 
         return Response(
@@ -178,10 +179,15 @@ Action: Read"
         credential_name = instance.eda_credential
         if instance.credential == "None":
             credential_name = instance.eda_credential.name
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: DecisionEnvironment / ResourceName: {instance.name} / \
-Organization: {instance.organization} / \
-Credential: {credential_name} / Description: {instance.description} / \
-ImageURL: {instance.image_url} / Action: Delete"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: DecisionEnvironment / "
+            f"ResourceName: {instance.name} / "
+            f"Organization: {instance.organization} / "
+            f"Credential: {credential_name} / "
+            f"Description: {instance.description} / "
+            f"ImageURL: {instance.image_url} / "
+            "Action: Delete"
+        )
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)

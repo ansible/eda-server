@@ -94,14 +94,16 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
             )
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: RulebookActivation / ResourceName: {response.name} / \
-Organization: {response.organization} / isEnabled: {response.is_enabled} / \
-Project: {logging_utils.get_project_name_from_id(response.project_id)} / \
-Rulebook: {logging_utils.get_rulebook_name_from_id(response.rulebook_id)} / \
-DecisionEnvironment: \
-{logging_utils.get_de_name_from_id(response.decision_environment_id)} / \
-Action: Create"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            f"ResourceName: {response.name} / "
+            f"Organization: {response.organization} / isEnabled: {response.is_enabled} / "  # noqa: E501
+            f"Project: {logging_utils.get_project_name_from_id(response.project_id)} / "  # noqa: E501
+            f"Rulebook: {logging_utils.get_rulebook_name_from_id(response.rulebook_id)} / "  # noqa: E501
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(response.decision_environment_id)} / "  # noqa: E501
+            "Action: Create"
+        )
         logger.info(log_msg)
 
         return Response(
@@ -134,15 +136,17 @@ Action: Create"
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: RulebookActivation / ResourceName: {activation.name} / \
-Organization: {activation.organization} / \
-isEnabled: {activation.is_enabled} / \
-Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
-Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
-DecisionEnvironment: \
-{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
-Action: Delete"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            f"ResourceName: {activation.name} / "
+            f"Organization: {activation.organization} / "
+            f"isEnabled: {activation.is_enabled} / "
+            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
+            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
+            "Action: Delete"
+        )
         logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -152,11 +156,14 @@ Action: Delete"
     )
     def retrieve(self, request, pk: int):
         activation = self.get_object()
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: RulebookActivation / ResourceName: {activation.name} / \
-Organization: {activation.organization} / \
-isEnabled: {activation.is_enabled} / \
-Action: Read"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            f"ResourceName: {activation.name} / "
+            f"Organization: {activation.organization} / "
+            f"isEnabled: {activation.is_enabled} / "
+            "Action: Read"
+        )
         logger.info(log_msg)
         return Response(serializers.ActivationReadSerializer(activation).data)
 
@@ -177,10 +184,12 @@ Action: Read"
             activations, many=True
         )
         result = self.paginate_queryset(serializer.data)
-        log_msg = "RESOURCE UPDATE - \
-ResourceType: RulebookActivation / \
-ResourceName: '*' / Organization: '*' / \
-Action: ListActivations"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            "ResourceName: '*' / Organization: '*' / "
+            "Action: ListActivations"
+        )
         logger.info(log_msg)
 
         return self.get_paginated_response(result)
@@ -293,15 +302,17 @@ Action: ListActivations"
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=pk,
         )
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: RulebookActivation / ResourceName: {activation.name} / \
-Organization: {activation.organization} / \
-isEnabled: {activation.is_enabled} / \
-Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
-Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
-DecisionEnvironment: \
-{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
-Action: Enable"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            f"ResourceName: {activation.name} / "
+            f"Organization: {activation.organization} / "
+            f"isEnabled: {activation.is_enabled} / "
+            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
+            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
+            "Action: Enable"
+        )
         logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -332,15 +343,17 @@ Action: Enable"
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
             )
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: RulebookActivation / ResourceName: {activation.name} / \
-Organization: {activation.organization} / \
-isEnabled: {activation.is_enabled} / \
-Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
-Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
-DecisionEnvironment: \
-{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
-Action: Disable"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            f"ResourceName: {activation.name} / "
+            f"Organization: {activation.organization} / "
+            f"isEnabled: {activation.is_enabled} / "
+            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
+            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
+            "Action: Disable"
+        )
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -384,15 +397,17 @@ Action: Disable"
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-        log_msg = f"RESOURCE UPDATE - \
-ResourceType: RulebookActivation / ResourceName: {activation.name} / \
-Organization: {activation.organization} / \
-isEnabled: {activation.is_enabled} / \
-Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
-Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
-DecisionEnvironment: \
-{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
-Action: Restart"
+        log_msg = (
+            "RESOURCE UPDATE - "
+            "ResourceType: RulebookActivation / "
+            f"ResourceName: {activation.name} / "
+            f"Organization: {activation.organization} / "
+            f"isEnabled: {activation.is_enabled} / "
+            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
+            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
+            "Action: Restart"
+        )
         logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)

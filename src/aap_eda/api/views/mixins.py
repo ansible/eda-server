@@ -52,16 +52,16 @@ class CreateModelMixin:
 
         log_msg = ""
         if resource_type == "decisionenvironment":
-            log_msg = f"RESOURCE UPDATE - \
-ResourceType: DecisionEnvironment / \
-ResourceName: {response_serializer.data['name']} / \
-Organization: \
-{logging_utils.get_organization_name_from_data(response_serializer)} / \
-Description: {response_serializer.data['description']} / \
-ImageURL: {response_serializer.data['image_url']} / \
-Credential: \
-{logging_utils.get_credential_name_from_data(response_serializer)} / \
-Action: Read"
+            log_msg = (
+                "RESOURCE UPDATE - "
+                "ResourceType: DecisionEnvironment / "
+                f"ResourceName: {response_serializer.data['name']} / "
+                f"Organization: {logging_utils.get_organization_name_from_data(response_serializer)} / "  # noqa: E501
+                f"Description: {response_serializer.data['description']} / "
+                f"ImageURL: {response_serializer.data['image_url']} / "
+                f"Credential: {logging_utils.get_credential_name_from_data(response_serializer)} / "  # noqa: E501
+                "Action: Read"
+            )
         logger.info(log_msg)
         return Response(
             response_serializer.data,
@@ -108,16 +108,16 @@ class PartialUpdateOnlyModelMixin:
 
         log_msg = ""
         if resource_type == "decisionenvironment":
-            log_msg = f"RESOURCE UPDATE - \
-ResourceType: DecisionEnvironment / \
-ResourceName: {response_serializer.data['name']} / \
-Organization: \
-{logging_utils.get_organization_name_from_data(response_serializer)} / \
-Description: {response_serializer.data['description']} / \
-ImageURL: {response_serializer.data['image_url']} / \
-Credential: \
-{logging_utils.get_credential_name_from_data(response_serializer)} / \
-Action: Update"
+            log_msg = (
+                "RESOURCE UPDATE - "
+                "ResourceType: DecisionEnvironment / "
+                f"ResourceName: {response_serializer.data['name']} / "
+                f"Organization: {logging_utils.get_organization_name_from_data(response_serializer)} / "  # noqa: E501
+                f"Description: {response_serializer.data['description']} / "
+                f"ImageURL: {response_serializer.data['image_url']} / "
+                f"Credential: {logging_utils.get_credential_name_from_data(response_serializer)} / "  # noqa: E501
+                "Action: Update"
+            )
         logger.info(log_msg)
 
         return Response(response_serializer.data)
