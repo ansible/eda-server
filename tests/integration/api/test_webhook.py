@@ -25,6 +25,7 @@ import jwt
 import pytest
 import requests_mock
 import yaml
+from django.test import override_settings
 from ecdsa import SigningKey
 from ecdsa.util import sigencode_der
 from rest_framework import status
@@ -908,6 +909,77 @@ def test_post_webhook_with_mtls(
     assert response.status_code == auth_status
 
 
+@pytest.mark.django_db
+def test_post_webhook_with_mtls_missing_settings(
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    header_key = "Subject"
+    inputs = {
+        "auth_type": "mtls",
+        "subject": "Subject",
+        "http_header_key": header_key,
+    }
+
+    obj = _create_webhook_credential(
+        admin_client, enums.WebhookCredentialType.MTLS.value, inputs
+    )
+
+    data_in = {
+        "name": "test-webhook-1",
+        "eda_credential_id": obj["id"],
+        "test_mode": True,
+    }
+    with override_settings(WEBHOOK_MTLS_BASE_URL=None):
+        response = admin_client.post(f"{api_url_v1}/webhooks/", data=data_in)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == {
+            "eda_credential_id": [
+                (
+                    "EventStream of type mTLS Webhook cannot be "
+                    "used because WEBHOOK_MTLS_BASE_URL is "
+                    "missing in settings."
+                )
+            ]
+        }
+
+
+@pytest.mark.django_db
+def test_post_webhook_with_basic_auth_missing_settings(
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    secret = secrets.token_hex(32)
+    username = "fred"
+    inputs = {
+        "auth_type": "basic",
+        "username": username,
+        "password": secret,
+        "http_header_key": "Authorization",
+    }
+
+    obj = _create_webhook_credential(
+        admin_client, enums.WebhookCredentialType.BASIC.value, inputs
+    )
+
+    data_in = {
+        "name": "test-webhook-1",
+        "eda_credential_id": obj["id"],
+        "test_mode": True,
+    }
+    with override_settings(WEBHOOK_BASE_URL=None):
+        response = admin_client.post(f"{api_url_v1}/webhooks/", data=data_in)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == {
+            "eda_credential_id": [
+                (
+                    "EventStream of type Basic Webhook cannot be used because "
+                    "WEBHOOK_BASE_URL is missing in settings."
+                )
+            ]
+        }
+
+
 def _create_webhook_credential(
     client: APIClient,
     credential_type_name: str,
@@ -928,6 +1000,10 @@ def _create_webhook_credential(
 
 
 def _create_webhook(client: APIClient, data_in: dict) -> models.Webhook:
-    response = client.post(f"{api_url_v1}/webhooks/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-    return models.Webhook.objects.get(id=response.data["id"])
+    with override_settings(
+        WEBHOOK_BASE_URL="https://www.example.com/",
+        WEBHOOK_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = client.post(f"{api_url_v1}/webhooks/", data=data_in)
+        assert response.status_code == status.HTTP_201_CREATED
+        return models.Webhook.objects.get(id=response.data["id"])
