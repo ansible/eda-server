@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -32,6 +33,17 @@ from aap_eda.core.enums import Action
 
 from .mixins import ResponseSerializerMixin
 
+logger = logging.getLogger(__name__)
+
+class DestroyProjectMixin(mixins.DestroyModelMixin):
+    def destroy(self, request, *args, **kwargs):
+        project = self.get_object()
+
+        super().destroy(request, *args, **kwargs)
+
+        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Delete"
+        logger.info(log_msg)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 @extend_schema_view(
     list=extend_schema(
@@ -57,7 +69,7 @@ class ProjectViewSet(
     ResponseSerializerMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
+    DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
@@ -109,6 +121,10 @@ class ProjectViewSet(
         project.import_task_id = job.id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
+
+        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Create"
+        logger.info(log_msg)
+
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
@@ -143,6 +159,9 @@ class ProjectViewSet(
             if project.data["organization_id"]
             else None
         )
+
+        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.data['name']} / Organization: {project.data['organization'].name} / Action: Read"
+        logger.info(log_msg)
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
 
@@ -185,7 +204,8 @@ class ProjectViewSet(
                 old_data,
                 model_to_dict(project),
             )
-
+        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Update"
+        logger.info(log_msg)
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
@@ -227,6 +247,9 @@ class ProjectViewSet(
         project.import_task_id = job.id
         project.import_error = None
         project.save()
+
+        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Sync"
+        logger.info(log_msg)
 
         serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)

@@ -11,7 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+import logging
+import json
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -31,7 +32,9 @@ from .mixins import (
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
 )
+from aap_eda.core.utils import logging_utils
 
+logger = logging.getLogger(__name__)
 
 @extend_schema_view(
     list=extend_schema(
@@ -116,6 +119,9 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
+        log_msg = f"RESOURCE UPDATE - ResourceType: DesicisonEnvironment / ResourceName: {decision_environment.data['name']}  / Organization: {decision_environment.data['organization']} / Description: {decision_environment.data['description']} / ImageURL: {decision_environment.data['image_url']} / Credential: {logging_utils.get_credential_name_from_data(decision_environment)} / Action: Read"
+        logger.info(log_msg)
+
         return Response(
             serializers.DecisionEnvironmentReadSerializer(
                 decision_environment.data
@@ -159,4 +165,10 @@ class DecisionEnvironmentViewSet(
             )
 
         self.perform_destroy(instance)
+
+        credential_name = instance.eda_credential
+        if instance.credential == 'None':
+            credential_name = instance.eda_credential.name
+        log_msg = f"RESOURCE UPDATE - ResourceType: DecisionEnvironment / ResourceName: {instance.name} / Organization: {instance.organization} / Credential: {credential_name} / Description: {instance.description} / ImageURL: {instance.image_url} / Action: Delete"
+        logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
