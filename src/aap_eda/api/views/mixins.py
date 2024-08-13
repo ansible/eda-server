@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.conf import settings
@@ -20,12 +21,12 @@ from django.forms import model_to_dict
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
-from aap_eda.core import models
-from aap_eda.core.utils import logging_utils
-from rest_framework import mixins
+
 from aap_eda.api import exceptions as api_exc
+from aap_eda.core.utils import logging_utils
 
 logger = logging.getLogger(__name__)
+
 
 # TODO: need revisit from cuwater
 class CreateModelMixin:
@@ -50,8 +51,17 @@ class CreateModelMixin:
         response_serializer = response_serializer_class(serializer.instance)
 
         log_msg = ""
-        if resource_type == 'decisionenvironment':
-            log_msg = f"RESOURCE UPDATE - ResourceType: DecisionEnvironment / ResourceName: {response_serializer.data['name']} / Organization: {logging_utils.get_organization_name_from_data(response_serializer)} / Description: {response_serializer.data['description']} / ImageURL: {response_serializer.data['image_url']} / Credential: {logging_utils.get_credential_name_from_data(response_serializer)} / Action: Read"
+        if resource_type == "decisionenvironment":
+            log_msg = f"RESOURCE UPDATE - \
+ResourceType: DecisionEnvironment / \
+ResourceName: {response_serializer.data['name']} / \
+Organization: \
+{logging_utils.get_organization_name_from_data(response_serializer)} / \
+Description: {response_serializer.data['description']} / \
+ImageURL: {response_serializer.data['image_url']} / \
+Credential: \
+{logging_utils.get_credential_name_from_data(response_serializer)} / \
+Action: Read"
         logger.info(log_msg)
         return Response(
             response_serializer.data,
@@ -97,8 +107,17 @@ class PartialUpdateOnlyModelMixin:
         response_serializer = response_serializer_class(serializer.instance)
 
         log_msg = ""
-        if resource_type == 'decisionenvironment':
-            log_msg = f"RESOURCE UPDATE - ResourceType: DecisionEnvironment / ResourceName: {response_serializer.data['name']} / Organization: {logging_utils.get_organization_name_from_data(response_serializer)} / Description: {response_serializer.data['description']} / ImageURL: {response_serializer.data['image_url']} / Credential: {logging_utils.get_credential_name_from_data(response_serializer)} / Action: Update"
+        if resource_type == "decisionenvironment":
+            log_msg = f"RESOURCE UPDATE - \
+ResourceType: DecisionEnvironment / \
+ResourceName: {response_serializer.data['name']} / \
+Organization: \
+{logging_utils.get_organization_name_from_data(response_serializer)} / \
+Description: {response_serializer.data['description']} / \
+ImageURL: {response_serializer.data['image_url']} / \
+Credential: \
+{logging_utils.get_credential_name_from_data(response_serializer)} / \
+Action: Update"
         logger.info(log_msg)
 
         return Response(response_serializer.data)

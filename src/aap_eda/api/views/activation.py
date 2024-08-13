@@ -32,13 +32,13 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
+from aap_eda.core.utils import logging_utils
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
     start_rulebook_process,
     stop_rulebook_process,
 )
-from aap_eda.core.utils import logging_utils
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,14 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
             )
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: {response.name} / Organization: {response.organization} / isEnabled: {response.is_enabled} / Project: {logging_utils.get_project_name_from_id(response.project_id)} / Rulebook: {logging_utils.get_rulebook_name_from_id(response.rulebook_id)} / DecisionEnvironment: {logging_utils.get_decisionenvironment_name_from_id(response.decision_environment_id)} / Action: Create"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: RulebookActivation / ResourceName: {response.name} / \
+Organization: {response.organization} / isEnabled: {response.is_enabled} / \
+Project: {logging_utils.get_project_name_from_id(response.project_id)} / \
+Rulebook: {logging_utils.get_rulebook_name_from_id(response.rulebook_id)} / \
+DecisionEnvironment: \
+{logging_utils.get_de_name_from_id(response.decision_environment_id)} / \
+Action: Create"
         logger.info(log_msg)
 
         return Response(
@@ -127,7 +134,15 @@ class ActivationViewSet(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: {activation.name} / Organization: {activation.organization} / isEnabled: {activation.is_enabled} / Project: {logging_utils.get_project_name_from_id(activation.project_id)} / Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / DecisionEnvironment: {logging_utils.get_decisionenvironment_name_from_id(activation.decision_environment_id)} / Action: Delete"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: RulebookActivation / ResourceName: {activation.name} / \
+Organization: {activation.organization} / \
+isEnabled: {activation.is_enabled} / \
+Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
+Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
+DecisionEnvironment: \
+{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
+Action: Delete"
         logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -137,7 +152,11 @@ class ActivationViewSet(
     )
     def retrieve(self, request, pk: int):
         activation = self.get_object()
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: {activation.name} / Organization: {activation.organization} / isEnabled: {activation.is_enabled} / Action: Read"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: RulebookActivation / ResourceName: {activation.name} / \
+Organization: {activation.organization} / \
+isEnabled: {activation.is_enabled} / \
+Action: Read"
         logger.info(log_msg)
         return Response(serializers.ActivationReadSerializer(activation).data)
 
@@ -158,7 +177,10 @@ class ActivationViewSet(
             activations, many=True
         )
         result = self.paginate_queryset(serializer.data)
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: '*' / Organization: '*' / Action: ListActivations"
+        log_msg = "RESOURCE UPDATE - \
+ResourceType: RulebookActivation / \
+ResourceName: '*' / Organization: '*' / \
+Action: ListActivations"
         logger.info(log_msg)
 
         return self.get_paginated_response(result)
@@ -271,7 +293,15 @@ class ActivationViewSet(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=pk,
         )
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: {activation.name} / Organization: {activation.organization} / isEnabled: {activation.is_enabled} / Project: {logging_utils.get_project_name_from_id(activation.project_id)} / Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / DecisionEnvironment: {logging_utils.get_decisionenvironment_name_from_id(activation.decision_environment_id)} / Action: Enable"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: RulebookActivation / ResourceName: {activation.name} / \
+Organization: {activation.organization} / \
+isEnabled: {activation.is_enabled} / \
+Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
+Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
+DecisionEnvironment: \
+{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
+Action: Enable"
         logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -302,7 +332,15 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
             )
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: {activation.name} / Organization: {activation.organization} / isEnabled: {activation.is_enabled} / Project: {logging_utils.get_project_name_from_id(activation.project_id)} / Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / DecisionEnvironment: {logging_utils.get_decisionenvironment_name_from_id(activation.decision_environment_id)} / Action: Disable"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: RulebookActivation / ResourceName: {activation.name} / \
+Organization: {activation.organization} / \
+isEnabled: {activation.is_enabled} / \
+Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
+Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
+DecisionEnvironment: \
+{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
+Action: Disable"
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -346,7 +384,15 @@ class ActivationViewSet(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-        log_msg = f"RESOURCE UPDATE - ResourceType: RulebookActivation / ResourceName: {activation.name} / Organization: {activation.organization} / isEnabled: {activation.is_enabled} / Project: {logging_utils.get_project_name_from_id(activation.project_id)} / Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / DecisionEnvironment: {logging_utils.get_decisionenvironment_name_from_id(activation.decision_environment_id)} / Action: Restart"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: RulebookActivation / ResourceName: {activation.name} / \
+Organization: {activation.organization} / \
+isEnabled: {activation.is_enabled} / \
+Project: {logging_utils.get_project_name_from_id(activation.project_id)} / \
+Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / \
+DecisionEnvironment: \
+{logging_utils.get_de_name_from_id(activation.decision_environment_id)} / \
+Action: Restart"
         logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)

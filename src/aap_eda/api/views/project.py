@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
+
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -35,15 +36,19 @@ from .mixins import ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
+
 class DestroyProjectMixin(mixins.DestroyModelMixin):
     def destroy(self, request, *args, **kwargs):
         project = self.get_object()
 
         super().destroy(request, *args, **kwargs)
 
-        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Delete"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: Project / ResourceName: {project.name} / \
+Organization: {project.organization} / Action: Delete"
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -122,7 +127,9 @@ class ProjectViewSet(
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
 
-        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Create"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: Project / ResourceName: {project.name} / \
+Organization: {project.organization} / Action: Create"
         logger.info(log_msg)
 
         return Response(
@@ -160,7 +167,10 @@ class ProjectViewSet(
             else None
         )
 
-        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.data['name']} / Organization: {project.data['organization'].name} / Action: Read"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: Project / ResourceName: {project.data['name']} / \
+Organization: {project.data['organization'].name} / \
+Action: Read"
         logger.info(log_msg)
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
@@ -204,7 +214,9 @@ class ProjectViewSet(
                 old_data,
                 model_to_dict(project),
             )
-        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Update"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: Project / ResourceName: {project.name} / \
+Organization: {project.organization} / Action: Update"
         logger.info(log_msg)
         return Response(serializers.ProjectSerializer(project).data)
 
@@ -248,7 +260,9 @@ class ProjectViewSet(
         project.import_error = None
         project.save()
 
-        log_msg = f"RESOURCE UPDATE - ResourceType: Project / ResourceName: {project.name} / Organization: {project.organization} / Action: Sync"
+        log_msg = f"RESOURCE UPDATE - \
+ResourceType: Project / ResourceName: {project.name} / \
+Organization: {project.organization} / Action: Sync"
         logger.info(log_msg)
 
         serializer = serializers.ProjectSerializer(project)

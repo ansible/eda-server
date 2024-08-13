@@ -1,5 +1,6 @@
 from aap_eda.core import models
 
+
 def get_credential_name_from_data(data):
     credential_name = ""
     if data.data["eda_credential_id"]:
@@ -11,6 +12,7 @@ def get_credential_name_from_data(data):
             else None
         )
     return credential_name
+
 
 def get_organization_name_from_data(data):
     org_name = ""
@@ -24,26 +26,17 @@ def get_organization_name_from_data(data):
         )
     return org_name
 
+
 def get_project_name_from_id(id):
-    project = (
-        models.Project.objects.get(
-            pk=id
-        ).name
-    )
+    project = models.Project.objects.get(pk=id).name
     return project
 
+
 def get_rulebook_name_from_id(id):
-    rulebook = (
-        models.Rulebook.objects.get(
-            pk=id
-        ).name
-    )
+    rulebook = models.Rulebook.objects.get(pk=id).name
     return rulebook
 
-def get_decisionenvironment_name_from_id(id):
-    rulebook = (
-        models.DecisionEnvironment.objects.get(
-            pk=id
-        ).name
-    )
+
+def get_de_name_from_id(id):
+    rulebook = models.DecisionEnvironment.objects.get(pk=id).name
     return rulebook
