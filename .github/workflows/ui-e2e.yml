@@ -1,0 +1,66 @@
+name: UI e2e tests on demand
+
+on:
+  pull_request_target:
+    types:
+      - labeled
+      - synchronize
+
+env:
+  REGISTRY: quay.io
+  QUAY_USER: ansible+eda_gha
+  EDA_API_URL: "http://eda-api:8000"
+  EDA_UI_URL: "https://eda-ui"
+  DOCKER_NETWORK: docker_default
+  UI_E2E_IMAGE: "quay.io/ansible/ui-e2e"
+
+jobs:
+  ui-e2e-tests:
+    if: >
+      (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
+      (github.repository == 'ansible/eda-server' && github.event_name == 'pull_request_target' &&
+        contains(github.event.pull_request.labels.*.name, 'run-ui-e2e'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: >-
+            ${{
+              github.event_name == 'pull_request_target' && github.event.pull_request.head.ref
+              || github.sha
+            }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Run api in background
+        working-directory: .
+        env:
+          DJANGO_SETTINGS_MODULE: aap_eda.settings.default
+          EDA_DEBUG: "false"
+        run: |
+          docker compose -p eda -f tools/docker/docker-compose-dev.yaml build
+          docker compose -p eda -f tools/docker/docker-compose-dev.yaml up -d
+          while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
+            echo "Waiting for API to be ready..."
+            sleep 1
+          done
+
+      - name: Run UI E2E Tests
+        run: |
+          docker run --rm \
+          -e EDA_SERVER=${{ env.EDA_API_URL }} \
+          -e EDA_USERNAME=${{ secrets.EDA_USERNAME }} \
+          -e EDA_PASSWORD=${{ secrets.EDA_PASSWORD }} \
+          -e CYPRESS_baseUrl=${{ env.EDA_UI_URL }} \
+          -e CYPRESS_PRODUCT=EDA \
+          -e NODE_OPTIONS=--max-old-space-size=3500 \
+          --network ${{ env.DOCKER_NETWORK }} \
+          ${{ env.UI_E2E_IMAGE }} \
+          ./node_modules/.bin/cypress run --config-file=cypress.eda.config.ts --headless
