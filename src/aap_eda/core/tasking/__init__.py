@@ -88,7 +88,7 @@ def get_redis_client(**kwargs):
     # situation we drop the db and, if the db is anything other than the
     # default log an informational message.
     db = kwargs.get("db", None)
-    if (db is not None) and kwargs.get("clustered", False):
+    if (db is not None) and (kwargs.get("mode", "") == "cluster"):
         del kwargs["db"]
         if db != default.DEFAULT_REDIS_DB:
             logger.info(

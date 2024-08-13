@@ -426,8 +426,9 @@ def rq_redis_client_instantiation_parameters():
     params = rq_standalone_redis_client_instantiation_parameters()
 
     # Include the HA cluster parameters.
-    params["clustered"] = bool(REDIS_HA_CLUSTER_HOSTS)
-    params["clustered_hosts"] = REDIS_HA_CLUSTER_HOSTS
+    if REDIS_HA_CLUSTER_HOSTS:
+        params["mode"] = "cluster"
+        params["redis_hosts"] = REDIS_HA_CLUSTER_HOSTS
 
     return params
 
