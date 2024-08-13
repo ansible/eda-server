@@ -1,7 +1,9 @@
 x-environment:
   &common-env
   - EDA_DB_HOST=postgres
-  - EDA_MQ_HOST=redis
+  - EDA_MQ_HOST=${EDA_MQ_HOST:-redis}
+  - EDA_MQ_PORT=${EDA_MQ_PORT:-6379}
+  - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
   - DJANGO_SETTINGS_MODULE=aap_eda.settings.default
   - EDA_DB_PASSWORD=secret
   - EDA_SECRET_KEY=secret

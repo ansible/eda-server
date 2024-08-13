@@ -8,6 +8,7 @@ x-environment:
   - EDA_MQ_CLIENT_CERT_PATH=${EDA_MQ_CLIENT_CERT_PATH:-/var/lib/eda/redis-tls/client/client.crt}
   - EDA_MQ_CLIENT_KEY_PATH=${EDA_MQ_CLIENT_KEY_PATH:-/var/lib/eda/redis-tls/client/client.key}
   - EDA_MQ_CLIENT_CACERT_PATH=${EDA_MQ_CLIENT_CACERT_PATH:-/var/lib/eda/redis-tls/ca.crt}
+  - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
   - EDA_DB_HOST=postgres
   - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
   - EDA_ALLOWED_HOSTS=['*']

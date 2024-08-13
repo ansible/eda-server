@@ -358,8 +358,10 @@ CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
 # TASKING SETTINGS
 # ---------------------------------------------------------
 RQ = {
-    "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
     "JOB_CLASS": "aap_eda.core.tasking.Job",
+    "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
+    "SCHEDULER_CLASS": "aap_eda.core.tasking.Scheduler",
+    "WORKER_CLASS": "aap_eda.core.tasking.Worker",
 }
 
 REDIS_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
@@ -370,8 +372,17 @@ REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
 REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
 REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
-REDIS_DB = settings.get("MQ_DB", 0)
+DEFAULT_REDIS_DB = 0
+REDIS_DB = settings.get("MQ_DB", DEFAULT_REDIS_DB)
 RQ_REDIS_PREFIX = settings.get("RQ_REDIS_PREFIX", "eda-rq")
+
+# The HA cluster hosts is a string of <host>:<port>[,<host>:port>]+
+# and is exhaustive; i.e., not in addition to REDIS_HOST:REDIS_PORT.
+# EDA does not validate the content, but relies on DAB to do so.
+#
+# In establishing an HA Cluster Redis client connection DAB ignores
+# the host and port kwargs.
+REDIS_HA_CLUSTER_HOSTS = settings.get("MQ_REDIS_HA_CLUSTER_HOSTS", "").strip()
 
 
 def _rq_common_parameters():
@@ -403,11 +414,22 @@ def _rq_redis_client_additional_parameters():
     return params
 
 
-def rq_redis_client_instantiation_parameters():
+def rq_standalone_redis_client_instantiation_parameters():
     params = _rq_common_parameters() | _rq_redis_client_additional_parameters()
 
     # Convert to lowercase for use in instantiating a redis client.
     params = {k.lower(): v for (k, v) in params.items()}
+    return params
+
+
+def rq_redis_client_instantiation_parameters():
+    params = rq_standalone_redis_client_instantiation_parameters()
+
+    # Include the HA cluster parameters.
+    if REDIS_HA_CLUSTER_HOSTS:
+        params["mode"] = "cluster"
+        params["redis_hosts"] = REDIS_HA_CLUSTER_HOSTS
+
     return params
 
 
