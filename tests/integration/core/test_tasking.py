@@ -19,8 +19,6 @@ import pytest
 import redis
 
 from aap_eda.core.tasking import (
-    DABRedis,
-    DABRedisCluster,
     DefaultWorker,
     Queue,
     _create_url_from_parameters,
@@ -102,19 +100,22 @@ def test_rediss_dab_url():
 def test_worker_dab_client(default_queue: Queue):
     """Test that workers end up with a DABRedis client connection."""
 
-    # Verify if given no connection the worker gets DABRedis/DABRedisCluster.
-    worker = DefaultWorker([default_queue])
-    assert isinstance(worker.connection, (DABRedis, DABRedisCluster))
+    # The default queue has a Redis connection based on the running
+    # configuration.  We use that to check the connection type.
 
-    # Verify if given a redis.Redis connection the worker gets a
-    # DABRedis/DABRedisCluster.
+    # Verify if given no connection the worker gets the expected type.
+    worker = DefaultWorker([default_queue])
+    assert isinstance(worker.connection, type(default_queue.connection))
+
+    # Verify if given a redis.Redis connection the worker gets the
+    # expected type.
     worker = DefaultWorker(
         [default_queue],
         connection=redis.Redis(
             **default.rq_standalone_redis_client_instantiation_parameters()
         ),
     )
-    assert isinstance(worker.connection, (DABRedis, DABRedisCluster))
+    assert isinstance(worker.connection, type(default_queue.connection))
 
     # Verify if given a DABRedis/DABRedisCluster connection the worker uses it.
     connection = get_redis_client(
