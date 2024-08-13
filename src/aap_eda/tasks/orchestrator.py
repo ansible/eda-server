@@ -21,7 +21,6 @@ from typing import Optional, Union
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django_rq import get_queue
-from rq import Worker
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models
@@ -31,7 +30,7 @@ from aap_eda.core.enums import (
     ProcessParentType,
 )
 from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
-from aap_eda.core.tasking import unique_enqueue
+from aap_eda.core.tasking import Worker, unique_enqueue
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.activation_manager import (
     ActivationManager,
