@@ -5,13 +5,14 @@ on:
     types:
       - labeled
       - synchronize
+  workflow_dispatch:
 
 env:
   REGISTRY: quay.io
   QUAY_USER: ansible+eda_gha
   EDA_API_URL: "http://eda-api:8000"
   EDA_UI_URL: "https://eda-ui"
-  DOCKER_NETWORK: docker_default
+  DOCKER_NETWORK: service-mesh
   UI_E2E_IMAGE: "quay.io/ansible/ui-e2e"
 
 jobs:
