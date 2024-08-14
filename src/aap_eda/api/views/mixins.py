@@ -12,16 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Optional
+
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
+from drf_spectacular.utils import OpenApiResponse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
 from aap_eda.api import exceptions as api_exc
+from aap_eda.core.tasking import is_redis_failed
 
 
 # TODO: need revisit from cuwater
@@ -110,3 +114,38 @@ class SharedResourceViewMixin:
             raise api_exc.Forbidden(
                 f"{self.action} should be done through the platform ingress"
             )
+
+
+class RedisDependencyMixin(object):
+    """
+    Provides a method which verifies Redis is available.
+
+    Any requested action that depends on Redis (e.g., project creation or
+    activation creation with enabled true) to perform the action must validate
+    that Redis is accessible by calling the method.
+
+    This is to satisfy the requirement that if the normal and complete
+    accomplishment of the action is not achievable due to unavailability of
+    Redis that the action is not to be attempted.  This is irresepective of
+    whether or not the action would be achieved if/when Redis subsequently
+    becomes available.
+
+    The view class may override this method to incorporate checks for specific
+    conditions where Redis is/is not required and invoke the superclass method
+    for those requiring Redis.
+    """
+
+    @staticmethod
+    def redis_unavailable_response() -> dict[str, OpenApiResponse]:
+        return {
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                description="Redis is unavailable.",
+            )
+        }
+
+    def redis_is_available(
+        self,
+        message: Optional[str] = "Redis is required but unavailable.",
+    ):
+        if is_redis_failed():
+            raise api_exc.Conflict(message)
