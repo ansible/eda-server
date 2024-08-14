@@ -32,9 +32,7 @@ from aap_eda.core import models
 from aap_eda.core.utils import logging_utils
 from aap_eda.utils import str_to_bool
 
-from .mixins import (
-    ResponseSerializerMixin,
-)
+from .mixins import ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
