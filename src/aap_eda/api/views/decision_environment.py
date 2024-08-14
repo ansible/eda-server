@@ -41,16 +41,22 @@ class CreateDecisionEnvironmentMixin(CreateModelMixin):
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
 
-        log_msg = (
-            "Action: Create / "
-            "ResourceType: DecisionEnvironment / "
-            f"ResourceName: {response.data['name']} / "
-            f"Organization: {logging_utils.get_organization_name_from_data(response)} / "  # noqa: E501
-            f"Description: {response.data['description']} / "
-            f"ImageURL: {response.data['image_url']} / "
-            f"Credential: {logging_utils.get_credential_name_from_data(response)}"  # noqa: E501
+        kwargs = {
+            "Description": response.data["description"],
+            "ImageURL": response.data["image_url"],
+            "Credential": logging_utils.get_credential_name_from_data(
+                response
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                "DecisionEnvironment",
+                response.data["name"],
+                logging_utils.get_organization_name_from_data(response),
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
 
         return response
 
@@ -59,16 +65,22 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
     def partial_update(self, request, *args, **kwargs):
         response = super().partial_update(request, *args, **kwargs)
 
-        log_msg = (
-            "Action: Update / "
-            "ResourceType: DecisionEnvironment / "
-            f"ResourceName: {response.data['name']} / "
-            f"Organization: {logging_utils.get_organization_name_from_data(response)} / "  # noqa: E501
-            f"Description: {response.data['description']} / "
-            f"ImageURL: {response.data['image_url']} / "
-            f"Credential: {logging_utils.get_credential_name_from_data(response)}"  # noqa: E501
+        kwargs = {
+            "Description": response.data["description"],
+            "ImageURL": response.data["image_url"],
+            "Credential": logging_utils.get_credential_name_from_data(
+                response
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                "DecisionEnvironment",
+                response.data["name"],
+                logging_utils.get_organization_name_from_data(response),
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
 
         return response
 
@@ -156,16 +168,22 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
-        log_msg = (
-            "Action: Read / "
-            "ResourceType: DesicisonEnvironment / "
-            f"ResourceName: {decision_environment.data['name']}  / "
-            f"Organization: {decision_environment.data['organization']} / "
-            f"Description: {decision_environment.data['description']} / "
-            f"ImageURL: {decision_environment.data['image_url']} / "
-            f"Credential: {logging_utils.get_credential_name_from_data(decision_environment)}"  # noqa: E501
+        kwargs = {
+            "Description": decision_environment.data["description"],
+            "ImageURL": decision_environment.data["image_url"],
+            "Credential": logging_utils.get_credential_name_from_data(
+                decision_environment
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                "DecisionEnvironment",
+                decision_environment.data["name"],
+                decision_environment.data["organization"],
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
 
         return Response(
             serializers.DecisionEnvironmentReadSerializer(
@@ -214,14 +232,19 @@ class DecisionEnvironmentViewSet(
         credential_name = instance.eda_credential
         if instance.credential == "None":
             credential_name = instance.eda_credential.name
-        log_msg = (
-            "Action: Delete / "
-            "ResourceType: DecisionEnvironment / "
-            f"ResourceName: {instance.name} / "
-            f"Organization: {instance.organization} / "
-            f"Credential: {credential_name} / "
-            f"Description: {instance.description} / "
-            f"ImageURL: {instance.image_url}"
+
+        kwargs = {
+            "Description": instance.description,
+            "ImageURL": instance.image_url,
+            "Credential": credential_name,
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete",
+                "DecisionEnvironment",
+                instance.name,
+                instance.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -1,6 +1,22 @@
 from aap_eda.core import models
 
 
+def generate_simple_audit_log(
+    action, resource_type, resource_name, organization, **kwargs
+):
+    extra_data = ""
+    for key, value in kwargs.items():
+        extra_data += "%s: %s / " % (key, value)
+    log_msg = (
+        f"Action: {action} / "
+        f"ResourceType: {resource_type} / "
+        f"ResourceName: {resource_name} / "
+        f"Organization: {organization} / "
+        f"{extra_data}"
+    )
+    return log_msg[:-3]
+
+
 def get_credential_name_from_data(data):
     credential_name = ""
     if data.data["eda_credential_id"]:

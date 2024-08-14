@@ -94,16 +94,27 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
             )
-        log_msg = (
-            "Action: Create / "
-            "ResourceType: RulebookActivation / "
-            f"ResourceName: {response.name} / "
-            f"Organization: {response.organization} / isEnabled: {response.is_enabled} / "  # noqa: E501
-            f"Project: {logging_utils.get_project_name_from_id(response.project_id)} / "  # noqa: E501
-            f"Rulebook: {logging_utils.get_rulebook_name_from_id(response.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(response.decision_environment_id)}"  # noqa: E501
+        kwargs = {
+            "isEnabled": response.is_enabled,
+            "Project": logging_utils.get_project_name_from_id(
+                response.project_id
+            ),
+            "Rulebook": logging_utils.get_rulebook_name_from_id(
+                response.rulebook_id
+            ),
+            "DecisionEnvironment": logging_utils.get_de_name_from_id(
+                response.decision_environment_id
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                "RulebookActivation",
+                response.name,
+                response.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
 
         return Response(
             serializers.ActivationReadSerializer(response).data,
@@ -135,17 +146,28 @@ class ActivationViewSet(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-        log_msg = (
-            "Action: Delete / "
-            "ResourceType: RulebookActivation / "
-            f"ResourceName: {activation.name} / "
-            f"Organization: {activation.organization} / "
-            f"isEnabled: {activation.is_enabled} / "
-            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
-            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)}"  # noqa: E501
+
+        kwargs = {
+            "isEnabled": activation.is_enabled,
+            "Project": logging_utils.get_project_name_from_id(
+                activation.project_id
+            ),
+            "Rulebook": logging_utils.get_rulebook_name_from_id(
+                activation.rulebook_id
+            ),
+            "DecisionEnvironment": logging_utils.get_de_name_from_id(
+                activation.decision_environment_id
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete",
+                "RulebookActivation",
+                activation.name,
+                activation.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -154,14 +176,29 @@ class ActivationViewSet(
     )
     def retrieve(self, request, pk: int):
         activation = self.get_object()
-        log_msg = (
-            "Action: Read / "
-            "ResourceType: RulebookActivation / "
-            f"ResourceName: {activation.name} / "
-            f"Organization: {activation.organization} / "
-            f"isEnabled: {activation.is_enabled}"
+
+        kwargs = {
+            "isEnabled": activation.is_enabled,
+            "Project": logging_utils.get_project_name_from_id(
+                activation.project_id
+            ),
+            "Rulebook": logging_utils.get_rulebook_name_from_id(
+                activation.rulebook_id
+            ),
+            "DecisionEnvironment": logging_utils.get_de_name_from_id(
+                activation.decision_environment_id
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                "RulebookActivation",
+                activation.name,
+                activation.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
+
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
@@ -181,13 +218,12 @@ class ActivationViewSet(
             activations, many=True
         )
         result = self.paginate_queryset(serializer.data)
-        log_msg = (
-            "Action: ListActivations / "
-            "ResourceType: RulebookActivation / "
-            "ResourceName: '*' / Organization: '*'"
-        )
-        logger.info(log_msg)
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "ListActivations", "RulebookActivation", "*", "*", **{}
+            )
+        )
         return self.get_paginated_response(result)
 
     @extend_schema(
@@ -298,17 +334,28 @@ class ActivationViewSet(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=pk,
         )
-        log_msg = (
-            "Action: Enable / "
-            "ResourceType: RulebookActivation / "
-            f"ResourceName: {activation.name} / "
-            f"Organization: {activation.organization} / "
-            f"isEnabled: {activation.is_enabled} / "
-            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
-            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)}"  # noqa: E501
+
+        kwargs = {
+            "isEnabled": activation.is_enabled,
+            "Project": logging_utils.get_project_name_from_id(
+                activation.project_id
+            ),
+            "Rulebook": logging_utils.get_rulebook_name_from_id(
+                activation.rulebook_id
+            ),
+            "DecisionEnvironment": logging_utils.get_de_name_from_id(
+                activation.decision_environment_id
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Enable",
+                "RulebookActivation",
+                activation.name,
+                activation.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -338,17 +385,27 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
             )
-        log_msg = (
-            "Action: Disable / "
-            "ResourceType: RulebookActivation / "
-            f"ResourceName: {activation.name} / "
-            f"Organization: {activation.organization} / "
-            f"isEnabled: {activation.is_enabled} / "
-            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
-            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} "  # noqa: E501
+        kwargs = {
+            "isEnabled": activation.is_enabled,
+            "Project": logging_utils.get_project_name_from_id(
+                activation.project_id
+            ),
+            "Rulebook": logging_utils.get_rulebook_name_from_id(
+                activation.rulebook_id
+            ),
+            "DecisionEnvironment": logging_utils.get_de_name_from_id(
+                activation.decision_environment_id
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Disable",
+                "RulebookActivation",
+                activation.name,
+                activation.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -391,18 +448,28 @@ class ActivationViewSet(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-        log_msg = (
-            "Action: Restart / "
-            "ResourceType: RulebookActivation / "
-            f"ResourceName: {activation.name} / "
-            f"Organization: {activation.organization} / "
-            f"isEnabled: {activation.is_enabled} / "
-            f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
-            f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)}"  # noqa: E501
-        )
-        logger.info(log_msg)
 
+        kwargs = {
+            "isEnabled": activation.is_enabled,
+            "Project": logging_utils.get_project_name_from_id(
+                activation.project_id
+            ),
+            "Rulebook": logging_utils.get_rulebook_name_from_id(
+                activation.rulebook_id
+            ),
+            "DecisionEnvironment": logging_utils.get_de_name_from_id(
+                activation.decision_environment_id
+            ),
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Restart",
+                "RulebookActivation",
+                activation.name,
+                activation.organization,
+                **kwargs,
+            )
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _check_deleting(self, activation):

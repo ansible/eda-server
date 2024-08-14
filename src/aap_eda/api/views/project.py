@@ -31,6 +31,7 @@ from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
+from aap_eda.core.utils import logging_utils
 
 from .mixins import ResponseSerializerMixin
 
@@ -43,13 +44,12 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
 
         super().destroy(request, *args, **kwargs)
 
-        log_msg = (
-            "Action: Delete / "
-            "ResourceType: Project / "
-            f"ResourceName: {project.name} / "
-            f"Organization: {project.organization}"
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete", "Project", project.name, project.organization, **{}
+            )
         )
-        logger.info(log_msg)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -130,13 +130,11 @@ class ProjectViewSet(
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
 
-        log_msg = (
-            "Action: Create / "
-            "ResourceType: Project / "
-            f"ResourceName: {project.name} / "
-            f"Organization: {project.organization}"
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create", "Project", project.name, project.organization, **{}
+            )
         )
-        logger.info(log_msg)
 
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
@@ -173,13 +171,15 @@ class ProjectViewSet(
             else None
         )
 
-        log_msg = (
-            "Action: Read / "
-            "ResourceType: Project / "
-            f"ResourceName: {project.data['name']} / "
-            f"Organization: {project.data['organization'].name}"
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                "Project",
+                project.data["name"],
+                project.data["organization"].name,
+                **{},
+            )
         )
-        logger.info(log_msg)
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
 
@@ -222,13 +222,13 @@ class ProjectViewSet(
                 old_data,
                 model_to_dict(project),
             )
-        log_msg = (
-            "Action: Update / "
-            "ResourceType: Project / "
-            f"ResourceName: {project.name} / "
-            f"Organization: {project.organization}"
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update", "Project", project.name, project.organization, **{}
+            )
         )
-        logger.info(log_msg)
+
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
@@ -271,13 +271,11 @@ class ProjectViewSet(
         project.import_error = None
         project.save()
 
-        log_msg = (
-            "Action: Sync / "
-            "ResourceType: Project / "
-            f"ResourceName: {project.name} / "
-            f"Organization: {project.organization}"
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Sync", "Project", project.name, project.organization, **{}
+            )
         )
-        logger.info(log_msg)
 
         serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)

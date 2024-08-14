@@ -34,6 +34,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType, WebhookAuthType
+from aap_eda.core.utils import logging_utils
 
 logger = logging.getLogger(__name__)
 
@@ -81,14 +82,20 @@ class WebhookViewSet(
     )
     def retrieve(self, request, *args, **kwargs):
         webhook = self.get_object()
-        log_msg = (
-            "Action: Read / "
-            "ResourceType: EventStream / "
-            f"ResourceName: {webhook.name} / "
-            f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode}"
+
+        kwargs = {
+            "TestMode": webhook.test_mode,
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                "EventStream",
+                webhook.name,
+                webhook.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
+
         return Response(serializers.WebhookOutSerializer(webhook).data)
 
     @extend_schema(
@@ -108,14 +115,20 @@ class WebhookViewSet(
                 f"{ref_count} activation(s) and cannot be deleted"
             )
         self.perform_destroy(webhook)
-        log_msg = (
-            "Action: Delete / "
-            "ResourceType: EventStream / "
-            f"ResourceName: {webhook.name} / "
-            f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode}"
+
+        kwargs = {
+            "TestMode": webhook.test_mode,
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete",
+                "EventStream",
+                webhook.name,
+                webhook.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -132,13 +145,12 @@ class WebhookViewSet(
         webhooks = self.filter_queryset(webhooks)
         serializer = serializers.WebhookOutSerializer(webhooks, many=True)
         result = self.paginate_queryset(serializer.data)
-        log_msg = (
-            "Action: List / "
-            "ResourceType: EventStream / "
-            "ResourceName: '*' / "
-            "Organization: '*'"
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "List", "EventStream", "*", "*", **{}
+            )
         )
-        logger.info(log_msg)
         return self.get_paginated_response(result)
 
     @extend_schema(
@@ -237,14 +249,20 @@ class WebhookViewSet(
                 old_data,
                 model_to_dict(webhook),
             )
-        log_msg = (
-            "Action: Update / "
-            "ResourceType: EventStream / "
-            f"ResourceName: {webhook.name} / "
-            f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode}"
+
+        kwargs = {
+            "TestMode": webhook.test_mode,
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                "EventStream",
+                webhook.name,
+                webhook.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
+
         return Response(
             serializers.WebhookOutSerializer(webhook).data,
             status=status.HTTP_200_OK,
@@ -286,12 +304,17 @@ class WebhookViewSet(
         filtered_activations = self.filter_queryset(activations)
         result = self.paginate_queryset(filtered_activations)
         serializer = serializers.ActivationListSerializer(result, many=True)
-        log_msg = (
-            "Action: ListActivations / "
-            f"ResourceType: EventStream / "
-            f"ResourceName: {webhook.name} / "
-            f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode}"
+
+        kwargs = {
+            "TestMode": webhook.test_mode,
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "ListActivations",
+                "EventStream",
+                webhook.name,
+                webhook.organization,
+                **kwargs,
+            )
         )
-        logger.info(log_msg)
         return self.get_paginated_response(serializer.data)
