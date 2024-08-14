@@ -191,15 +191,15 @@ class ActivationViewSet(
                 activation.decision_environment_id
             ),
         }
-        logger.info(
-            logging_utils.generate_simple_audit_log(
-                "Read",
-                resource_name,
-                activation.name,
-                activation.organization,
-                **logging_kwargs,
-            )
-        )
+        # logger.info(
+        #     logging_utils.generate_simple_audit_log(
+        #         "Read",
+        #         resource_name,
+        #         activation.name,
+        #         activation.organization,
+        #         **logging_kwargs,
+        #     )
+        # )
 
         return Response(serializers.ActivationReadSerializer(activation).data)
 

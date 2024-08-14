@@ -88,15 +88,15 @@ class WebhookViewSet(
         logging_kwargs = {
             "TestMode": webhook.test_mode,
         }
-        logger.info(
-            logging_utils.generate_simple_audit_log(
-                "Read",
-                resource_name,
-                webhook.name,
-                webhook.organization,
-                **logging_kwargs,
-            )
-        )
+        # logger.info(
+        #     logging_utils.generate_simple_audit_log(
+        #         "Read",
+        #         resource_name,
+        #         webhook.name,
+        #         webhook.organization,
+        #         **logging_kwargs,
+        #     )
+        # )
 
         return Response(serializers.WebhookOutSerializer(webhook).data)
 

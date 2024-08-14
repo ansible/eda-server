@@ -181,15 +181,15 @@ class ProjectViewSet(
             else None
         )
 
-        logger.info(
-            logging_utils.generate_simple_audit_log(
-                "Read",
-                resource_name,
-                project.data["name"],
-                project.data["organization"].name,
-                **{},
-            )
-        )
+        # logger.info(
+        #     logging_utils.generate_simple_audit_log(
+        #         "Read",
+        #         resource_name,
+        #         project.data["name"],
+        #         project.data["organization"].name,
+        #         **{},
+        #     )
+        # )
 
         return Response(serializers.ProjectReadSerializer(project.data).data)
 
