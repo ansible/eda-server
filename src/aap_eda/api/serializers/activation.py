@@ -440,8 +440,8 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         ]
 
     organization_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
+        required=True,
+        allow_null=False,
         validators=[validators.check_if_organization_exists],
     )
     rulebook_id = serializers.IntegerField(

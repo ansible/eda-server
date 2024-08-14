@@ -163,6 +163,7 @@ def test_create_or_update_project_with_right_signature_credential(
     new_project: models.Project,
     preseed_credential_types,
     default_gpg_credential,
+    default_organization: models.Organization,
     action,
     credential_type,
     status_code,
@@ -178,6 +179,7 @@ def test_create_or_update_project_with_right_signature_credential(
         description="Default Credential",
         credential_type=credential_type,
         inputs=cred_inputs,
+        organization=default_organization,
     )
 
     if action == "create":
@@ -188,6 +190,7 @@ def test_create_or_update_project_with_right_signature_credential(
             "signature_validation_credential_id": default_gpg_credential.id,
             "scm_branch": "main",
             "scm_refspec": "ref1",
+            "organization_id": default_organization.id,
         }
 
         response = admin_client.post(
@@ -313,6 +316,7 @@ def test_create_or_update_project_with_right_eda_credential(
     new_project: models.Project,
     preseed_credential_types,
     default_scm_credential,
+    default_organization: models.Organization,
     action,
     credential_type,
     status_code,
@@ -328,6 +332,7 @@ def test_create_or_update_project_with_right_eda_credential(
         description="Default Credential",
         credential_type=credential_type,
         inputs=cred_inputs,
+        organization=default_organization,
     )
 
     if action == "create":
@@ -338,6 +343,7 @@ def test_create_or_update_project_with_right_eda_credential(
             "signature_validation_credential_id": credential.id,
             "scm_branch": "main",
             "scm_refspec": "ref1",
+            "organization_id": default_organization.id,
         }
 
         response = admin_client.post(

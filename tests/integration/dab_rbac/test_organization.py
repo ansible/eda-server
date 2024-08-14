@@ -42,7 +42,6 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
     model_obj = cls_factory.get_fixture_object(request, model_name)
     post_data = cls_factory.get_post_data(model_obj)
     assert "organization_id" in post_data  # sanity
-    post_data.pop("organization_id")
 
     if model._meta.model_name == "team":
         pytest.skip("Team model requires an organization")
@@ -59,7 +58,6 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
         pytest.skip("Not testing model not allowing creation for now")
 
     assert response.status_code == 201, response.data
-    # organization_id is inconsistently given in response so not using that
 
     if model.objects.count() == 1:
         obj = model.objects.first()

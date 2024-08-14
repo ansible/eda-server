@@ -11,21 +11,26 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+# TODO(doston): this entire test module needs to be updated to use fixtures
+
 import secrets
 import uuid
 
 import pytest
 import yaml
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.api.constants import SOURCE_MAPPING_ERROR_KEY
-from aap_eda.core import models
+from aap_eda.core import enums, models
 from aap_eda.core.enums import (
     ACTIVATION_STATUS_MESSAGE_MAP,
     ActivationStatus,
     RestartPolicy,
 )
+from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.core.utils.rulebook import (
     DEFAULT_SOURCE_NAME_PREFIX,
     get_rulebook_hash,
@@ -167,18 +172,32 @@ def create_activation_related_data(
         token=TEST_AWX_TOKEN["token"],
         user=user,
     )
-    credential_id = models.Credential.objects.create(
-        name="test-credential",
-        description="test credential",
-        credential_type="Container Registry",
-        username="dummy-user",
-        secret=secrets.token_hex(32),
+    organization = models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )[0]
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential_id = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Registry Credential",
+        credential_type=registry_credential_type,
+        inputs=inputs_to_store(
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "quay.io",
+            }
+        ),
+        organization=organization,
     ).pk
     decision_environment_id = models.DecisionEnvironment.objects.create(
         name=TEST_DECISION_ENV["name"],
         image_url=TEST_DECISION_ENV["image_url"],
         description=TEST_DECISION_ENV["description"],
-        credential_id=credential_id,
+        eda_credential_id=credential_id,
+        organization=organization,
     ).pk
     project_id = (
         models.Project.objects.create(
@@ -186,6 +205,7 @@ def create_activation_related_data(
             name=TEST_PROJECT["name"],
             url=TEST_PROJECT["url"],
             description=TEST_PROJECT["description"],
+            organization=organization,
         ).pk
         if with_project
         else None
@@ -196,6 +216,7 @@ def create_activation_related_data(
             description=TEST_RULEBOOK["description"],
             rulesets=rulesets,
             project_id=project_id,
+            organization=organization,
         ).pk
         if with_project
         else None
@@ -207,6 +228,7 @@ def create_activation_related_data(
             uuid=uuid.uuid4(),
             name=name,
             owner=user,
+            organization=organization,
         )
         webhooks.append(webhook)
 
@@ -218,6 +240,7 @@ def create_activation_related_data(
         "extra_var": TEST_EXTRA_VAR,
         "credential_id": credential_id,
         "webhooks": webhooks,
+        "organization_id": organization.id,
     }
 
 
@@ -227,6 +250,7 @@ def create_activation(fks: dict):
     activation_data["project_id"] = fks["project_id"]
     activation_data["rulebook_id"] = fks["rulebook_id"]
     activation_data["user_id"] = fks["user_id"]
+    activation_data["organization_id"] = fks["organization_id"]
     activation = models.Activation(**activation_data)
     activation.save()
     for webhook in fks["webhooks"]:
@@ -243,6 +267,7 @@ def test_create_activation_with_webhooks(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = []
     for webhook in fks["webhooks"]:
         source_mappings.append(
@@ -322,6 +347,7 @@ def test_create_activation_with_bad_format_in_mappings(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     test_activation["source_mappings"] = "bad_format"
 
     admin_client.post(
@@ -344,6 +370,7 @@ def test_create_activation_with_corrupted_mappings(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     test_activation["source_mappings"] = "corrupted\n  key: value\n"
 
     admin_client.post(
@@ -366,6 +393,7 @@ def test_create_activation_with_missing_keys_in_mappings(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
             "webhook_name": "fake",
@@ -395,6 +423,7 @@ def test_create_activation_with_bad_webhook(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
             "webhook_name": "fake",
@@ -426,6 +455,7 @@ def test_create_activation_with_bad_webhook_name(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
             "webhook_name": "missing_name",
@@ -457,6 +487,7 @@ def test_create_activation_with_bad_rulebook_hash(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
             "webhook_name": fks["webhooks"][0].name,
@@ -490,6 +521,7 @@ def test_create_activation_with_duplicate_source_name(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
             "webhook_name": fks["webhooks"][0].name,
@@ -531,6 +563,7 @@ def test_create_activation_with_duplicate_webhook_name(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
             "webhook_name": fks["webhooks"][0].name,
@@ -630,6 +663,7 @@ def test_bad_src_activation_with_webhooks(
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
     test_activation["rulebook_id"] = fks["rulebook_id"]
+    test_activation["organization_id"] = fks["organization_id"]
 
     source_mappings = []
 

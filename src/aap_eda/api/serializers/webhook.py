@@ -21,7 +21,7 @@ from aap_eda.core import models, validators
 
 
 class WebhookInSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(required=False, allow_null=True)
+    organization_id = serializers.IntegerField(required=True, allow_null=False)
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     eda_credential_id = serializers.IntegerField(
         required=True,
