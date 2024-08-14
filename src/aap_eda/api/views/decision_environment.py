@@ -39,52 +39,52 @@ logger = logging.getLogger(__name__)
 resource_name = "DecisionEnvironment"
 
 
-class CreateDecisionEnvironmentMixin(CreateModelMixin):
-    def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
+# class CreateDecisionEnvironmentMixin(CreateModelMixin):
+#     def create(self, request, *args, **kwargs):
+#         response = super().create(request, *args, **kwargs)
 
-        logging_kwargs = {
-            "Description": response.data["description"],
-            "ImageURL": response.data["image_url"],
-            "Credential": logging_utils.get_credential_name_from_data(
-                response
-            ),
-        }
-        logger.info(
-            logging_utils.generate_simple_audit_log(
-                "Create",
-                resource_name,
-                response.data["name"],
-                logging_utils.get_organization_name_from_data(response),
-                **logging_kwargs,
-            )
-        )
+#         logging_kwargs = {
+#             "Description": response.data["description"],
+#             "ImageURL": response.data["image_url"],
+#             "Credential": logging_utils.get_credential_name_from_data(
+#                 response
+#             ),
+#         }
+#         logger.info(
+#             logging_utils.generate_simple_audit_log(
+#                 "Create",
+#                 resource_name,
+#                 response.data["name"],
+#                 logging_utils.get_organization_name_from_data(response),
+#                 **logging_kwargs,
+#             )
+#         )
 
-        return response
+#         return response
 
 
-class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
-    def partial_update(self, request, *args, **kwargs):
-        response = super().partial_update(request, *args, **kwargs)
+# class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
+#     def partial_update(self, request, *args, **kwargs):
+#         response = super().partial_update(request, *args, **kwargs)
 
-        logging_kwargs = {
-            "Description": response.data["description"],
-            "ImageURL": response.data["image_url"],
-            "Credential": logging_utils.get_credential_name_from_data(
-                response
-            ),
-        }
-        logger.info(
-            logging_utils.generate_simple_audit_log(
-                "Update",
-                resource_name,
-                response.data["name"],
-                logging_utils.get_organization_name_from_data(response),
-                **logging_kwargs,
-            )
-        )
+#         logging_kwargs = {
+#             "Description": response.data["description"],
+#             "ImageURL": response.data["image_url"],
+#             "Credential": logging_utils.get_credential_name_from_data(
+#                 response
+#             ),
+#         }
+#         logger.info(
+#             logging_utils.generate_simple_audit_log(
+#                 "Update",
+#                 resource_name,
+#                 response.data["name"],
+#                 logging_utils.get_organization_name_from_data(response),
+#                 **logging_kwargs,
+#             )
+#         )
 
-        return response
+#         return response
 
 
 @extend_schema_view(
@@ -120,8 +120,10 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
 )
 class DecisionEnvironmentViewSet(
     ResponseSerializerMixin,
-    CreateDecisionEnvironmentMixin,
-    PartialUpdateOnlyDecisionEnvironmentMixin,
+    # CreateDecisionEnvironmentMixin,
+    # PartialUpdateOnlyDecisionEnvironmentMixin,
+    CreateModelMixin,
+    PartialUpdateOnlyModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
