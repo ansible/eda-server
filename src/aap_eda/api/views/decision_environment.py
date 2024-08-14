@@ -36,12 +36,14 @@ from .mixins import (
 
 logger = logging.getLogger(__name__)
 
+resource_name = "DecisionEnvironment"
+
 
 class CreateDecisionEnvironmentMixin(CreateModelMixin):
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
 
-        kwargs = {
+        logging_kwargs = {
             "Description": response.data["description"],
             "ImageURL": response.data["image_url"],
             "Credential": logging_utils.get_credential_name_from_data(
@@ -51,10 +53,10 @@ class CreateDecisionEnvironmentMixin(CreateModelMixin):
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Create",
-                "DecisionEnvironment",
+                resource_name,
                 response.data["name"],
                 logging_utils.get_organization_name_from_data(response),
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -65,7 +67,7 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
     def partial_update(self, request, *args, **kwargs):
         response = super().partial_update(request, *args, **kwargs)
 
-        kwargs = {
+        logging_kwargs = {
             "Description": response.data["description"],
             "ImageURL": response.data["image_url"],
             "Credential": logging_utils.get_credential_name_from_data(
@@ -75,10 +77,10 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Update",
-                "DecisionEnvironment",
+                resource_name,
                 response.data["name"],
                 logging_utils.get_organization_name_from_data(response),
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -168,7 +170,7 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
-        kwargs = {
+        logging_kwargs = {
             "Description": decision_environment.data["description"],
             "ImageURL": decision_environment.data["image_url"],
             "Credential": logging_utils.get_credential_name_from_data(
@@ -178,10 +180,10 @@ class DecisionEnvironmentViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
-                "DecisionEnvironment",
+                resource_name,
                 decision_environment.data["name"],
                 decision_environment.data["organization"],
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -233,7 +235,7 @@ class DecisionEnvironmentViewSet(
         if instance.credential == "None":
             credential_name = instance.eda_credential.name
 
-        kwargs = {
+        logging_kwargs = {
             "Description": instance.description,
             "ImageURL": instance.image_url,
             "Credential": credential_name,
@@ -241,10 +243,10 @@ class DecisionEnvironmentViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Delete",
-                "DecisionEnvironment",
+                resource_name,
                 instance.name,
                 instance.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
         return Response(status=status.HTTP_204_NO_CONTENT)

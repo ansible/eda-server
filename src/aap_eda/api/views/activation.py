@@ -42,6 +42,8 @@ from aap_eda.tasks.orchestrator import (
 
 logger = logging.getLogger(__name__)
 
+resource_name = "RulebookActivation"
+
 
 class ActivationViewSet(
     mixins.DestroyModelMixin,
@@ -94,7 +96,7 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
             )
-        kwargs = {
+        logging_kwargs = {
             "isEnabled": response.is_enabled,
             "Project": logging_utils.get_project_name_from_id(
                 response.project_id
@@ -109,10 +111,10 @@ class ActivationViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Create",
-                "RulebookActivation",
+                resource_name,
                 response.name,
                 response.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -147,7 +149,7 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
 
-        kwargs = {
+        logging_kwargs = {
             "isEnabled": activation.is_enabled,
             "Project": logging_utils.get_project_name_from_id(
                 activation.project_id
@@ -162,10 +164,10 @@ class ActivationViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Delete",
-                "RulebookActivation",
+                resource_name,
                 activation.name,
                 activation.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -177,7 +179,7 @@ class ActivationViewSet(
     def retrieve(self, request, pk: int):
         activation = self.get_object()
 
-        kwargs = {
+        logging_kwargs = {
             "isEnabled": activation.is_enabled,
             "Project": logging_utils.get_project_name_from_id(
                 activation.project_id
@@ -192,10 +194,10 @@ class ActivationViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
-                "RulebookActivation",
+                resource_name,
                 activation.name,
                 activation.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -221,7 +223,7 @@ class ActivationViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "ListActivations", "RulebookActivation", "*", "*", **{}
+                "ListActivations", resource_name, "*", "*", **{}
             )
         )
         return self.get_paginated_response(result)
@@ -335,7 +337,7 @@ class ActivationViewSet(
             process_parent_id=pk,
         )
 
-        kwargs = {
+        logging_kwargs = {
             "isEnabled": activation.is_enabled,
             "Project": logging_utils.get_project_name_from_id(
                 activation.project_id
@@ -350,10 +352,10 @@ class ActivationViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Enable",
-                "RulebookActivation",
+                resource_name,
                 activation.name,
                 activation.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -385,7 +387,7 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
             )
-        kwargs = {
+        logging_kwargs = {
             "isEnabled": activation.is_enabled,
             "Project": logging_utils.get_project_name_from_id(
                 activation.project_id
@@ -400,10 +402,10 @@ class ActivationViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Disable",
-                "RulebookActivation",
+                resource_name,
                 activation.name,
                 activation.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -449,7 +451,7 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
 
-        kwargs = {
+        logging_kwargs = {
             "isEnabled": activation.is_enabled,
             "Project": logging_utils.get_project_name_from_id(
                 activation.project_id
@@ -464,10 +466,10 @@ class ActivationViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Restart",
-                "RulebookActivation",
+                resource_name,
                 activation.name,
                 activation.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
         return Response(status=status.HTTP_204_NO_CONTENT)

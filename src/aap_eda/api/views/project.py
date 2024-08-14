@@ -37,6 +37,8 @@ from .mixins import ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
+resource_name = "Project"
+
 
 class DestroyProjectMixin(mixins.DestroyModelMixin):
     def destroy(self, request, *args, **kwargs):
@@ -46,7 +48,11 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "Delete", "Project", project.name, project.organization, **{}
+                "Delete",
+                resource_name,
+                project.name,
+                project.organization,
+                **{},
             )
         )
 
@@ -132,7 +138,11 @@ class ProjectViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "Create", "Project", project.name, project.organization, **{}
+                "Create",
+                resource_name,
+                project.name,
+                project.organization,
+                **{},
             )
         )
 
@@ -174,7 +184,7 @@ class ProjectViewSet(
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
-                "Project",
+                resource_name,
                 project.data["name"],
                 project.data["organization"].name,
                 **{},
@@ -225,7 +235,11 @@ class ProjectViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "Update", "Project", project.name, project.organization, **{}
+                "Update",
+                resource_name,
+                project.name,
+                project.organization,
+                **{},
             )
         )
 
@@ -273,7 +287,7 @@ class ProjectViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "Sync", "Project", project.name, project.organization, **{}
+                "Sync", resource_name, project.name, project.organization, **{}
             )
         )
 

@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
 
 WEBHOOK_EXTERNAL_PATH = "api/eda/v1/external_webhook"
 
+resource_name = "EventStream"
+
 
 class WebhookViewSet(
     mixins.CreateModelMixin,
@@ -83,16 +85,16 @@ class WebhookViewSet(
     def retrieve(self, request, *args, **kwargs):
         webhook = self.get_object()
 
-        kwargs = {
+        logging_kwargs = {
             "TestMode": webhook.test_mode,
         }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
-                "EventStream",
+                resource_name,
                 webhook.name,
                 webhook.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -116,16 +118,16 @@ class WebhookViewSet(
             )
         self.perform_destroy(webhook)
 
-        kwargs = {
+        logging_kwargs = {
             "TestMode": webhook.test_mode,
         }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Delete",
-                "EventStream",
+                resource_name,
                 webhook.name,
                 webhook.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -194,14 +196,20 @@ class WebhookViewSet(
             else:
                 response.url = urljoin(settings.WEBHOOK_BASE_URL, sub_path)
             response.save(update_fields=["url"])
-        log_msg = (
-            "Action: Create / "
-            "ResourceType: EventStream / "
-            f"ResourceName: {response.name} / "
-            f"Organization: {response.organization} / "
-            f"TestMode: {response.test_mode}"
+
+        logging_kwargs = {
+            "TestMode": response.test_mode,
+        }
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                response.name,
+                response.organization,
+                **logging_kwargs,
+            )
         )
-        logger.info(log_msg)
+
         return Response(
             serializers.WebhookOutSerializer(response).data,
             status=status.HTTP_201_CREATED,
@@ -250,16 +258,16 @@ class WebhookViewSet(
                 model_to_dict(webhook),
             )
 
-        kwargs = {
+        logging_kwargs = {
             "TestMode": webhook.test_mode,
         }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Update",
-                "EventStream",
+                resource_name,
                 webhook.name,
                 webhook.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
 
@@ -305,16 +313,16 @@ class WebhookViewSet(
         result = self.paginate_queryset(filtered_activations)
         serializer = serializers.ActivationListSerializer(result, many=True)
 
-        kwargs = {
+        logging_kwargs = {
             "TestMode": webhook.test_mode,
         }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "ListActivations",
-                "EventStream",
+                resource_name,
                 webhook.name,
                 webhook.organization,
-                **kwargs,
+                **logging_kwargs,
             )
         )
         return self.get_paginated_response(serializer.data)
