@@ -44,7 +44,6 @@ class CreateModelMixin:
 
         response_serializer_class = self.get_response_serializer_class()
         response_serializer = response_serializer_class(serializer.instance)
-
         return Response(
             response_serializer.data,
             status=status.HTTP_201_CREATED,
@@ -86,7 +85,6 @@ class PartialUpdateOnlyModelMixin:
 
         response_serializer_class = self.get_response_serializer_class()
         response_serializer = response_serializer_class(serializer.instance)
-
         return Response(response_serializer.data)
 
     def perform_update(self, serializer):
