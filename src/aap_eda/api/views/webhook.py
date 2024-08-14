@@ -82,12 +82,11 @@ class WebhookViewSet(
     def retrieve(self, request, *args, **kwargs):
         webhook = self.get_object()
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Read / "
             "ResourceType: EventStream / "
             f"ResourceName: {webhook.name} / "
             f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode} / "
-            "Action: Read"
+            f"TestMode: {webhook.test_mode}"
         )
         logger.info(log_msg)
         return Response(serializers.WebhookOutSerializer(webhook).data)
@@ -110,12 +109,11 @@ class WebhookViewSet(
             )
         self.perform_destroy(webhook)
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Delete / "
             "ResourceType: EventStream / "
             f"ResourceName: {webhook.name} / "
             f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode} / "
-            "Action: Delete"
+            f"TestMode: {webhook.test_mode}"
         )
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -135,11 +133,10 @@ class WebhookViewSet(
         serializer = serializers.WebhookOutSerializer(webhooks, many=True)
         result = self.paginate_queryset(serializer.data)
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: List / "
             "ResourceType: EventStream / "
-            "ResourceName: * / "
-            "Organization: * / "
-            "Action: List"
+            "ResourceName: '*' / "
+            "Organization: '*'"
         )
         logger.info(log_msg)
         return self.get_paginated_response(result)
@@ -186,12 +183,11 @@ class WebhookViewSet(
                 response.url = urljoin(settings.WEBHOOK_BASE_URL, sub_path)
             response.save(update_fields=["url"])
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Create / "
             "ResourceType: EventStream / "
             f"ResourceName: {response.name} / "
             f"Organization: {response.organization} / "
-            f"TestMode: {response.test_mode}  / "
-            "Action: Create"
+            f"TestMode: {response.test_mode}"
         )
         logger.info(log_msg)
         return Response(
@@ -242,12 +238,11 @@ class WebhookViewSet(
                 model_to_dict(webhook),
             )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Update / "
             "ResourceType: EventStream / "
             f"ResourceName: {webhook.name} / "
             f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode} / "
-            "Action: Update"
+            f"TestMode: {webhook.test_mode}"
         )
         logger.info(log_msg)
         return Response(
@@ -292,12 +287,11 @@ class WebhookViewSet(
         result = self.paginate_queryset(filtered_activations)
         serializer = serializers.ActivationListSerializer(result, many=True)
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: ListActivations / "
             f"ResourceType: EventStream / "
             f"ResourceName: {webhook.name} / "
             f"Organization: {webhook.organization} / "
-            f"TestMode: {webhook.test_mode} / "
-            "Action: ListActivations"
+            f"TestMode: {webhook.test_mode}"
         )
         logger.info(log_msg)
         return self.get_paginated_response(serializer.data)

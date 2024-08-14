@@ -95,14 +95,13 @@ class ActivationViewSet(
                 process_parent_id=response.id,
             )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Create / "
             "ResourceType: RulebookActivation / "
             f"ResourceName: {response.name} / "
             f"Organization: {response.organization} / isEnabled: {response.is_enabled} / "  # noqa: E501
             f"Project: {logging_utils.get_project_name_from_id(response.project_id)} / "  # noqa: E501
             f"Rulebook: {logging_utils.get_rulebook_name_from_id(response.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(response.decision_environment_id)} / "  # noqa: E501
-            "Action: Create"
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(response.decision_environment_id)}"  # noqa: E501
         )
         logger.info(log_msg)
 
@@ -137,15 +136,14 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Delete / "
             "ResourceType: RulebookActivation / "
             f"ResourceName: {activation.name} / "
             f"Organization: {activation.organization} / "
             f"isEnabled: {activation.is_enabled} / "
             f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
             f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
-            "Action: Delete"
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)}"  # noqa: E501
         )
         logger.info(log_msg)
 
@@ -157,12 +155,11 @@ class ActivationViewSet(
     def retrieve(self, request, pk: int):
         activation = self.get_object()
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Read / "
             "ResourceType: RulebookActivation / "
             f"ResourceName: {activation.name} / "
             f"Organization: {activation.organization} / "
-            f"isEnabled: {activation.is_enabled} / "
-            "Action: Read"
+            f"isEnabled: {activation.is_enabled}"
         )
         logger.info(log_msg)
         return Response(serializers.ActivationReadSerializer(activation).data)
@@ -185,10 +182,9 @@ class ActivationViewSet(
         )
         result = self.paginate_queryset(serializer.data)
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: ListActivations / "
             "ResourceType: RulebookActivation / "
-            "ResourceName: '*' / Organization: '*' / "
-            "Action: ListActivations"
+            "ResourceName: '*' / Organization: '*'"
         )
         logger.info(log_msg)
 
@@ -303,15 +299,14 @@ class ActivationViewSet(
             process_parent_id=pk,
         )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Enable / "
             "ResourceType: RulebookActivation / "
             f"ResourceName: {activation.name} / "
             f"Organization: {activation.organization} / "
             f"isEnabled: {activation.is_enabled} / "
             f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
             f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
-            "Action: Enable"
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)}"  # noqa: E501
         )
         logger.info(log_msg)
 
@@ -344,15 +339,14 @@ class ActivationViewSet(
                 process_parent_id=activation.id,
             )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Disable / "
             "ResourceType: RulebookActivation / "
             f"ResourceName: {activation.name} / "
             f"Organization: {activation.organization} / "
             f"isEnabled: {activation.is_enabled} / "
             f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
             f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
-            "Action: Disable"
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} "  # noqa: E501
         )
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -398,15 +392,14 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Restart / "
             "ResourceType: RulebookActivation / "
             f"ResourceName: {activation.name} / "
             f"Organization: {activation.organization} / "
             f"isEnabled: {activation.is_enabled} / "
             f"Project: {logging_utils.get_project_name_from_id(activation.project_id)} / "  # noqa: E501
             f"Rulebook: {logging_utils.get_rulebook_name_from_id(activation.rulebook_id)} / "  # noqa: E501
-            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)} / "  # noqa: E501
-            "Action: Restart"
+            f"DecisionEnvironment: {logging_utils.get_de_name_from_id(activation.decision_environment_id)}"  # noqa: E501
         )
         logger.info(log_msg)
 

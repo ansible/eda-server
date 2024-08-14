@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import logging
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
@@ -23,9 +22,6 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
 from aap_eda.api import exceptions as api_exc
-from aap_eda.core.utils import logging_utils
-
-logger = logging.getLogger(__name__)
 
 
 # TODO: need revisit from cuwater
@@ -33,7 +29,6 @@ class CreateModelMixin:
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        resource_type = serializer.Meta.model.router_basename
         with transaction.atomic():
             self.perform_create(serializer)
             check_related_permissions(
@@ -50,19 +45,6 @@ class CreateModelMixin:
         response_serializer_class = self.get_response_serializer_class()
         response_serializer = response_serializer_class(serializer.instance)
 
-        log_msg = ""
-        if resource_type == "decisionenvironment":
-            log_msg = (
-                "RESOURCE UPDATE - "
-                "ResourceType: DecisionEnvironment / "
-                f"ResourceName: {response_serializer.data['name']} / "
-                f"Organization: {logging_utils.get_organization_name_from_data(response_serializer)} / "  # noqa: E501
-                f"Description: {response_serializer.data['description']} / "
-                f"ImageURL: {response_serializer.data['image_url']} / "
-                f"Credential: {logging_utils.get_credential_name_from_data(response_serializer)} / "  # noqa: E501
-                "Action: Read"
-            )
-        logger.info(log_msg)
         return Response(
             response_serializer.data,
             status=status.HTTP_201_CREATED,
@@ -87,7 +69,6 @@ class PartialUpdateOnlyModelMixin:
             instance, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        resource_type = serializer.Meta.model.router_basename
 
         with transaction.atomic():
             self.perform_update(serializer)
@@ -105,20 +86,6 @@ class PartialUpdateOnlyModelMixin:
 
         response_serializer_class = self.get_response_serializer_class()
         response_serializer = response_serializer_class(serializer.instance)
-
-        log_msg = ""
-        if resource_type == "decisionenvironment":
-            log_msg = (
-                "RESOURCE UPDATE - "
-                "ResourceType: DecisionEnvironment / "
-                f"ResourceName: {response_serializer.data['name']} / "
-                f"Organization: {logging_utils.get_organization_name_from_data(response_serializer)} / "  # noqa: E501
-                f"Description: {response_serializer.data['description']} / "
-                f"ImageURL: {response_serializer.data['image_url']} / "
-                f"Credential: {logging_utils.get_credential_name_from_data(response_serializer)} / "  # noqa: E501
-                "Action: Update"
-            )
-        logger.info(log_msg)
 
         return Response(response_serializer.data)
 

@@ -44,11 +44,10 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
         super().destroy(request, *args, **kwargs)
 
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Delete / "
             "ResourceType: Project / "
             f"ResourceName: {project.name} / "
-            f"Organization: {project.organization} / "
-            "Action: Delete"
+            f"Organization: {project.organization}"
         )
         logger.info(log_msg)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -132,11 +131,10 @@ class ProjectViewSet(
         headers = self.get_success_headers(serializer.data)
 
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Create / "
             "ResourceType: Project / "
             f"ResourceName: {project.name} / "
-            f"Organization: {project.organization} / "
-            "Action: Create"
+            f"Organization: {project.organization}"
         )
         logger.info(log_msg)
 
@@ -176,11 +174,10 @@ class ProjectViewSet(
         )
 
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Read / "
             "ResourceType: Project / "
             f"ResourceName: {project.data['name']} / "
-            f"Organization: {project.data['organization'].name} / "
-            "Action: Read"
+            f"Organization: {project.data['organization'].name}"
         )
         logger.info(log_msg)
 
@@ -226,11 +223,10 @@ class ProjectViewSet(
                 model_to_dict(project),
             )
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Update / "
             "ResourceType: Project / "
             f"ResourceName: {project.name} / "
-            f"Organization: {project.organization} / "
-            "Action: Update"
+            f"Organization: {project.organization}"
         )
         logger.info(log_msg)
         return Response(serializers.ProjectSerializer(project).data)
@@ -276,11 +272,10 @@ class ProjectViewSet(
         project.save()
 
         log_msg = (
-            "RESOURCE UPDATE - "
+            "Action: Sync / "
             "ResourceType: Project / "
             f"ResourceName: {project.name} / "
-            f"Organization: {project.organization} / "
-            "Action: Sync"
+            f"Organization: {project.organization}"
         )
         logger.info(log_msg)
 
