@@ -44,7 +44,7 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
     def destroy(self, request, *args, **kwargs):
         project = self.get_object()
 
-        super().destroy(request, *args, **kwargs)
+        response = super().destroy(request, *args, **kwargs)
 
         logger.info(
             logging_utils.generate_simple_audit_log(
@@ -56,7 +56,7 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
             )
         )
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return response
 
 
 @extend_schema_view(
