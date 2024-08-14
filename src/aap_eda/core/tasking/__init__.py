@@ -245,7 +245,9 @@ class Job(_Job):
 # If the connection a worker is given is not from DAB we replace it
 # with one that is.
 def _get_necessary_client_connection(connection: Connection) -> Connection:
-    if not isinstance(connection, (DABRedis, DABRedisCluster)):
+    if (connection is not None) and (
+        not isinstance(connection, (DABRedis, DABRedisCluster))
+    ):
         connection = get_redis_client(
             **default.rq_redis_client_instantiation_parameters()
         )
