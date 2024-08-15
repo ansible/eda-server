@@ -25,7 +25,7 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
 from aap_eda.api import exceptions as api_exc
-from aap_eda.core.tasking import is_redis_failed
+from aap_eda.core import tasking
 
 
 # TODO: need revisit from cuwater
@@ -147,5 +147,5 @@ class RedisDependencyMixin(object):
         self,
         message: Optional[str] = "Redis is required but unavailable.",
     ):
-        if is_redis_failed():
+        if tasking.is_redis_failed():
             raise api_exc.Conflict(message)
