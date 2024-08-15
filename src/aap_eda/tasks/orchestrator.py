@@ -16,7 +16,7 @@ import logging
 import random
 from collections import Counter
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -29,7 +29,7 @@ from aap_eda.core.enums import (
     ActivationStatus,
     ProcessParentType,
 )
-from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
+from aap_eda.core.models import Activation, ActivationRequestQueue
 from aap_eda.core.tasking import Worker, unique_enqueue
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.activation_manager import (
@@ -56,11 +56,9 @@ def _manage_process_job_id(process_parent_type: str, id: int) -> str:
 def get_process_parent(
     process_parent_type: str,
     parent_id: int,
-) -> Union[Activation, EventStream]:
+) -> Activation:
     if process_parent_type == ProcessParentType.ACTIVATION:
         klass = Activation
-    elif process_parent_type == ProcessParentType.EVENT_STREAM:
-        klass = EventStream
     else:
         raise UnknownProcessParentType(
             f"Unknown process parent type {process_parent_type}",
@@ -108,7 +106,7 @@ def _manage(process_parent_type: str, id: int) -> None:
 
 
 def _run_request(
-    process_parent: Union[Activation, EventStream],
+    process_parent: Activation,
     request: ActivationRequestQueue,
 ) -> bool:
     """Attempt to run a request for an activation via the manager."""
@@ -473,10 +471,8 @@ def monitor_rulebook_processes() -> None:
         ]
     ):
         process_parent_type = str(process.parent_type)
-        if process_parent_type == ProcessParentType.ACTIVATION:
-            process_parent_id = process.activation_id
-        else:
-            process_parent_id = process.event_stream_id
+        process_parent_id = process.activation_id
+
         dispatch(
             process_parent_type,
             process_parent_id,

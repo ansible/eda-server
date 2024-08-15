@@ -20,7 +20,6 @@ from .activation import (
 from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .eda_credential import EdaCredentialFilter
-from .event_stream import EventStreamFilter
 from .organization import OrganizationFilter
 from .project import ProjectFilter
 from .rulebook import (
@@ -52,8 +51,6 @@ __all__ = (
     "ActivationInstanceLogFilter",
     # user
     "UserFilter",
-    # event_stream
-    "EventStreamFilter",
     # organization
     "OrganizationFilter",
     # team

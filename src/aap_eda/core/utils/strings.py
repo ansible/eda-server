@@ -60,18 +60,6 @@ def substitute_variables(
         return value
 
 
-def substitute_source_args(event_stream, source, extra_vars) -> dict:
-    context = {
-        "settings": settings.__dict__["_wrapped"].__dict__,
-        "event_stream": event_stream,
-    }
-    for key in extra_vars:
-        context[key] = extra_vars[key]
-
-    source["args"] = substitute_variables(source.get("args", {}), context)
-    return source
-
-
 def substitute_extra_vars(
     event_stream, extra_vars, encrypt_keys, password
 ) -> dict:

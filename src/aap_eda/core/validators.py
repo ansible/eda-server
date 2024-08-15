@@ -198,17 +198,6 @@ def is_extra_var_dict(extra_var: str):
         )
 
 
-def check_if_event_streams_exists(event_stream_ids: list[int]) -> list[int]:
-    for event_stream_id in event_stream_ids:
-        try:
-            models.EventStream.objects.get(pk=event_stream_id)
-        except models.EventStream.DoesNotExist:
-            raise serializers.ValidationError(
-                f"EventStream with id {event_stream_id} does not exist"
-            )
-    return event_stream_ids
-
-
 def check_if_schema_valid(schema: dict):
     errors = validate_schema(schema)
 

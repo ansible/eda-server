@@ -103,10 +103,6 @@ def test_rulebook_process_save(init_data):
             lazy_fixture("new_rulebook_process_with_activation"),
             id="activation",
         ),
-        pytest.param(
-            lazy_fixture("new_rulebook_process_with_event_stream"),
-            id="event_stream",
-        ),
     ],
 )
 @pytest.mark.django_db
@@ -125,10 +121,6 @@ def test_rulebook_process_parent_type(instance):
             lazy_fixture("new_rulebook_process_with_activation"),
             id="activation",
         ),
-        pytest.param(
-            lazy_fixture("new_rulebook_process_with_event_stream"),
-            id="event_stream",
-        ),
     ],
 )
 @pytest.mark.django_db
@@ -136,5 +128,3 @@ def test_rulebook_process_get_parent(instance):
     """Test get_parent method returns the correct parent instance."""
     if instance.activation:
         assert instance.get_parent() == instance.activation
-    else:
-        assert instance.get_parent() == instance.event_stream

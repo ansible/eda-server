@@ -20,7 +20,7 @@ import pytest
 from django.conf import settings
 
 from aap_eda.core.enums import ProcessParentType
-from aap_eda.core.models import Activation, EventStream, RulebookProcess
+from aap_eda.core.models import Activation, RulebookProcess
 from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
 from aap_eda.tasks.exceptions import UnknownProcessParentType
@@ -367,20 +367,6 @@ def test_get_process_parent_activation():
 
     Activation.objects.get.assert_called_once_with(id=activation_id)
     assert result == activation_mock
-
-
-def test_get_process_parent_event_stream():
-    event_stream_id = 1
-    event_stream_mock = mock.Mock(spec=EventStream)
-    EventStream.objects.get = mock.Mock(return_value=event_stream_mock)
-
-    result = get_process_parent(
-        ProcessParentType.EVENT_STREAM,
-        event_stream_id,
-    )
-
-    EventStream.objects.get.assert_called_once_with(id=event_stream_id)
-    assert result == event_stream_mock
 
 
 def test_get_process_parent_unknown_type():
