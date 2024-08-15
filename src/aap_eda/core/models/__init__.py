@@ -19,6 +19,7 @@ from .credential import Credential
 from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
 from .eda_credential import EdaCredential
+from .event_stream import EventStream
 from .job import (
     ActivationInstanceJobInstance,
     Job,
@@ -44,7 +45,6 @@ from .rulebook_process import (
 )
 from .team import Team
 from .user import AwxToken, User
-from .webhook import Webhook
 
 __all__ = [
     "ActivationInstanceJobInstance",
@@ -72,7 +72,7 @@ __all__ = [
     "ActivationRequestQueue",
     "Organization",
     "Team",
-    "Webhook",
+    "EventStream",
 ]
 
 permission_registry.register(
@@ -82,7 +82,7 @@ permission_registry.register(
     Project,
     Organization,
     Team,
-    Webhook,
+    EventStream,
     parent_field_name="organization",
 )
 permission_registry.register(

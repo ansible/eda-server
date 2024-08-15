@@ -5,5 +5,5 @@ description = "Global Allowlist"
 paths = [
         '''tests\/unit\/data''', 
         '''tools\/docker\/redis-tls''',
-        '''tests\/integration\/api\/test_webhook.py'''
+        '''tests\/integration\/api\/test_event_stream_ecdsa.py'''
 ]

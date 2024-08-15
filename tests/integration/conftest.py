@@ -1149,7 +1149,7 @@ def default_hmac_credential(
 ) -> models.EdaCredential:
     """Return a default HMAC Credential"""
     hmac_credential_type = models.CredentialType.objects.get(
-        name=enums.WebhookCredentialType.HMAC
+        name=enums.EventStreamCredentialType.HMAC
     )
     return models.EdaCredential.objects.create(
         name="default-hmac-credential",
@@ -1170,24 +1170,24 @@ def default_hmac_credential(
 
 
 @pytest.fixture
-def default_webhooks(
+def default_event_streams(
     default_organization: models.Organization,
     default_user: models.User,
     default_hmac_credential: models.EdaCredential,
-) -> List[models.Webhook]:
-    return models.Webhook.objects.bulk_create(
+) -> List[models.EventStream]:
+    return models.EventStream.objects.bulk_create(
         [
-            models.Webhook(
+            models.EventStream(
                 uuid=uuid.uuid4(),
-                name="test-webhook-1",
+                name="test-es-1",
                 owner=default_user,
                 organization=default_organization,
                 url=DUMMY_URL,
                 eda_credential=default_hmac_credential,
             ),
-            models.Webhook(
+            models.EventStream(
                 uuid=uuid.uuid4(),
-                name="test-webhook-2",
+                name="test-es-2",
                 owner=default_user,
                 organization=default_organization,
                 url=DUMMY_URL,
@@ -1198,14 +1198,14 @@ def default_webhooks(
 
 
 @pytest.fixture
-def default_webhook(
+def default_event_stream(
     default_organization: models.Organization,
     default_user: models.User,
     default_hmac_credential: models.EdaCredential,
-) -> models.Webhook:
-    return models.Webhook.objects.create(
+) -> models.EventStream:
+    return models.EventStream.objects.create(
         uuid=uuid.uuid4(),
-        name="test-webhook-1",
+        name="test-es-1",
         owner=default_user,
         organization=default_organization,
         url=DUMMY_URL,

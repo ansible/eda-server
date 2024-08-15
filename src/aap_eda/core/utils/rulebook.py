@@ -90,10 +90,10 @@ def get_rulebook_hash(rulebook: str) -> str:
     return sha256.hexdigest()
 
 
-def swap_webhook_sources(
-    data: str, webhook_sources: dict, mappings: list[dict]
+def swap_event_stream_sources(
+    data: str, event_stream_sources: dict, mappings: list[dict]
 ) -> str:
-    """Swap out the sources with webhook sources that match the name.
+    """Swap out the sources with event stream sources that match the name.
 
     Preserve the filters if they exist for the source.
     """
@@ -102,7 +102,8 @@ def swap_webhook_sources(
     current_names = set()
 
     mapping_dict = {
-        mapping["source_name"]: mapping["webhook_name"] for mapping in mappings
+        mapping["source_name"]: mapping["event_stream_name"]
+        for mapping in mappings
     }
 
     for ruleset in rulesets:
@@ -118,15 +119,16 @@ def swap_webhook_sources(
             current_names.add(src_name)
 
             if src_name in mapping_dict:
-                webhook_name = mapping_dict[src_name]
+                event_stream_name = mapping_dict[src_name]
 
-                if webhook_name in webhook_sources:
-                    updated_source = _updated_webhook_source(
-                        webhook_name, source, webhook_sources
+                if event_stream_name in event_stream_sources:
+                    updated_source = _updated_event_stream_source(
+                        event_stream_name, source, event_stream_sources
                     )
                     new_sources.append(updated_source)
                     LOGGER.debug(
-                        "Source %s updated with Webhook Source", webhook_name
+                        "Source %s updated with Event Stream Source",
+                        event_stream_name,
                     )
                 else:
                     msg = f"No event stream found for source {src_name}"
@@ -141,13 +143,13 @@ def swap_webhook_sources(
     return yaml.dump(rulesets, sort_keys=False)
 
 
-def _updated_webhook_source(
-    name: str, source: dict, webhook_sources: dict
+def _updated_event_stream_source(
+    name: str, source: dict, event_stream_sources: dict
 ) -> dict:
     updated_source = {"name": name}
-    source_type = next(iter(webhook_sources[name]))
-    updated_source[source_type] = webhook_sources[name][source_type]
+    source_type = next(iter(event_stream_sources[name]))
+    updated_source[source_type] = event_stream_sources[name][source_type]
     if "filters" in source:
         updated_source["filters"] = source["filters"]
-    LOGGER.debug("Source %s updated with Webhook Source", name)
+    LOGGER.debug("Source %s updated with Event Stream Source", name)
     return updated_source

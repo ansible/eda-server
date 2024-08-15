@@ -523,9 +523,9 @@ def test_credential_types_based_on_namespace(
     preseed_credential_types,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/credential-types/?namespace=webhook"
+        f"{api_url_v1}/credential-types/?namespace=event_stream"
     )
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     for credential_type in data["results"]:
-        assert credential_type["namespace"] == "webhook"
+        assert credential_type["namespace"] == "event_stream"

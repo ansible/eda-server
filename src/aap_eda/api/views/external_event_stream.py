@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Module providing external webhook post."""
+"""Module providing external event stream post."""
 
 import datetime
 import logging
@@ -19,6 +19,7 @@ import urllib.parse
 
 import yaml
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.http.request import HttpHeaders
@@ -29,7 +30,7 @@ from rest_framework.exceptions import AuthenticationFailed, ParseError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from aap_eda.api.webhook_authentication import (
+from aap_eda.api.event_stream_authentication import (
     BasicAuthentication,
     EcdsaAuthentication,
     HMACAuthentication,
@@ -38,28 +39,28 @@ from aap_eda.api.webhook_authentication import (
     Oauth2JwtAuthentication,
     TokenAuthentication,
 )
-from aap_eda.core.enums import Action, ResourceType, WebhookAuthType
+from aap_eda.core.enums import Action, EventStreamAuthType, ResourceType
 from aap_eda.core.exceptions import PGNotifyError
-from aap_eda.core.models import Webhook
+from aap_eda.core.models import EventStream
 from aap_eda.services.pg_notify import PGNotify
 
 logger = logging.getLogger(__name__)
 
 
-class ExternalWebhookViewSet(viewsets.GenericViewSet):
-    """External Webhook View Set."""
+class ExternalEventStreamViewSet(viewsets.GenericViewSet):
+    """External Event Stream View Set."""
 
     rbac_action = None
-    rbac_resource_type = ResourceType.WEBHOOK
+    rbac_resource_type = ResourceType.EVENT_STREAM
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def get_rbac_permission(self):
         """RBAC Permissions."""
-        return ResourceType.WEBHOOK, Action.READ
+        return ResourceType.EVENT_STREAM, Action.READ
 
     def __init__(self, *args, **kwargs):
-        self.webhook = None
+        self.event_stream = None
         super().__init__()
 
     def _update_test_data(
@@ -70,13 +71,14 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
         headers: str = "",
     ):
         logger.warning(
-            "The webhook: %s is currently in test mode", self.webhook.name
+            "The event stream: %s is currently in test mode",
+            self.event_stream.name,
         )
-        self.webhook.test_error_message = error_message
-        self.webhook.test_content_type = content_type
-        self.webhook.test_content = content
-        self.webhook.test_headers = headers
-        self.webhook.save(
+        self.event_stream.test_error_message = error_message
+        self.event_stream.test_content_type = content_type
+        self.event_stream.test_content = content
+        self.event_stream.test_headers = headers
+        self.event_stream.save(
             update_fields=[
                 "test_content_type",
                 "test_content",
@@ -103,8 +105,8 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
         self, headers: HttpHeaders, data: dict, header_key: str, endpoint: str
     ) -> dict:
         event_headers = {}
-        if self.webhook.additional_data_headers:
-            for key in self.webhook.additional_data_headers.split(","):
+        if self.event_stream.additional_data_headers:
+            for key in self.event_stream.additional_data_headers.split(","):
                 value = headers.get(key)
                 if value:
                     event_headers[key] = value
@@ -117,18 +119,18 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
             "payload": data,
             "meta": {
                 "endpoint": endpoint,
-                "eda_webhook_name": self.webhook.name,
+                "eda_event_stream_name": self.event_stream.name,
                 "headers": event_headers,
             },
         }
 
     @transaction.atomic
     def _update_stats(self):
-        self.webhook.events_received = F("events_received") + 1
-        self.webhook.last_event_received_at = datetime.datetime.now(
+        self.event_stream.events_received = F("events_received") + 1
+        self.event_stream.last_event_received_at = datetime.datetime.now(
             tz=datetime.timezone.utc
         )
-        self.webhook.save(
+        self.event_stream.save(
             update_fields=[
                 "events_received",
                 "last_event_received_at",
@@ -137,7 +139,7 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
 
     def _handle_auth(self, request, inputs):
         try:
-            if inputs["auth_type"] == WebhookAuthType.HMAC:
+            if inputs["auth_type"] == EventStreamAuthType.HMAC:
                 obj = HMACAuthentication(
                     signature_encoding=inputs["signature_encoding"],
                     signature_prefix=inputs.get("signature_prefix", ""),
@@ -146,33 +148,33 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
                     secret=inputs["secret"].encode("utf-8"),
                 )
                 obj.authenticate(request.body)
-            elif inputs["auth_type"] == WebhookAuthType.MTLS:
+            elif inputs["auth_type"] == EventStreamAuthType.MTLS:
                 obj = MTLSAuthentication(
                     subject=inputs.get("subject", ""),
                     value=request.headers[inputs["http_header_key"]],
                 )
                 obj.authenticate()
-            elif inputs["auth_type"] == WebhookAuthType.TOKEN:
+            elif inputs["auth_type"] == EventStreamAuthType.TOKEN:
                 obj = TokenAuthentication(
                     token=inputs["token"],
                     value=request.headers[inputs["http_header_key"]],
                 )
                 obj.authenticate()
-            elif inputs["auth_type"] == WebhookAuthType.BASIC:
+            elif inputs["auth_type"] == EventStreamAuthType.BASIC:
                 obj = BasicAuthentication(
                     password=inputs["password"],
                     username=inputs["username"],
                     authorization=request.headers[inputs["http_header_key"]],
                 )
                 obj.authenticate()
-            elif inputs["auth_type"] == WebhookAuthType.OAUTH2JWT:
+            elif inputs["auth_type"] == EventStreamAuthType.OAUTH2JWT:
                 obj = Oauth2JwtAuthentication(
                     jwks_url=inputs["jwks_url"],
                     audience=inputs["audience"],
                     access_token=request.headers[inputs["http_header_key"]],
                 )
                 obj.authenticate()
-            elif inputs["auth_type"] == WebhookAuthType.OAUTH2:
+            elif inputs["auth_type"] == EventStreamAuthType.OAUTH2:
                 obj = Oauth2Authentication(
                     introspection_url=inputs["introspection_url"],
                     token=request.headers[inputs["http_header_key"]],
@@ -180,7 +182,7 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
                     client_secret=inputs["client_secret"],
                 )
                 obj.authenticate()
-            elif inputs["auth_type"] == WebhookAuthType.ECDSA:
+            elif inputs["auth_type"] == EventStreamAuthType.ECDSA:
                 if inputs.get("prefix_http_header_key", ""):
                     content_prefix = request.headers[
                         inputs["prefix_http_header_key"]
@@ -202,7 +204,7 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
                 raise ParseError(message)
         except AuthenticationFailed as err:
             self._update_stats()
-            if self.webhook.test_mode:
+            if self.event_stream.test_mode:
                 self._update_test_data(
                     error_message=err,
                     headers=yaml.dump(dict(request.headers)),
@@ -212,21 +214,21 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
     @extend_schema(exclude=True)
     @action(detail=True, methods=["POST"], rbac_action=None)
     def post(self, request, *_args, **kwargs):
-        """Handle posts from external webhook vendors."""
+        """Handle posts from external vendors."""
         try:
-            self.webhook = Webhook.objects.get(uuid=kwargs["pk"])
-        except Webhook.DoesNotExist as exc:
+            self.event_stream = EventStream.objects.get(uuid=kwargs["pk"])
+        except (EventStream.DoesNotExist, ValidationError) as exc:
             raise ParseError("bad uuid specified") from exc
 
         logger.debug("Headers %s", request.headers)
         logger.debug("Body %s", request.body)
         inputs = yaml.safe_load(
-            self.webhook.eda_credential.inputs.get_secret_value()
+            self.event_stream.eda_credential.inputs.get_secret_value()
         )
         if inputs["http_header_key"] not in request.headers:
             message = f"{inputs['http_header_key']} header is missing"
             logger.error(message)
-            if self.webhook.test_mode:
+            if self.event_stream.test_mode:
                 self._update_test_data(
                     error_message=message,
                     headers=yaml.dump(dict(request.headers)),
@@ -254,7 +256,7 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
             request.get_full_path(),
         )
         self._update_stats()
-        if self.webhook.test_mode:
+        if self.event_stream.test_mode:
             self._update_test_data(
                 content=yaml.dump(body),
                 content_type=request.headers.get("Content-Type", "unknown"),
@@ -264,7 +266,7 @@ class ExternalWebhookViewSet(viewsets.GenericViewSet):
             try:
                 PGNotify(
                     settings.PG_NOTIFY_DSN_SERVER,
-                    self.webhook.channel_name,
+                    self.event_stream.channel_name,
                     payload,
                 )()
             except PGNotifyError as e:

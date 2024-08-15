@@ -18,27 +18,19 @@ from django.db import models
 
 from .base import BaseOrgModel
 
-__all__ = "Webhook"
+__all__ = "EventStream"
 
-EDA_WEBHOOK_CHANNEL_PREFIX = "eda_webhook_"
+EDA_EVENT_STREAM_CHANNEL_PREFIX = "eda_event_stream_"
 
 
-class Webhook(BaseOrgModel):
-    class Meta:
-        db_table = "core_webhook"
-        indexes = [
-            models.Index(fields=["id"], name="ix_webhook_id"),
-            models.Index(fields=["name"], name="ix_webhook_name"),
-            models.Index(fields=["uuid"], name="ix_webhook_uuid"),
-        ]
-
+class EventStream(BaseOrgModel):
     name = models.TextField(
         null=False, unique=True, help_text="The name of the webhook"
     )
 
-    webhook_type = models.TextField(
+    event_stream_type = models.TextField(
         null=False,
-        help_text="The type of the webhook based on credential type",
+        help_text="The type of the event stream based on credential type",
         default="hmac",
     )
 
@@ -98,12 +90,13 @@ class Webhook(BaseOrgModel):
     uuid = models.UUIDField(default=uuid.uuid4)
     url = models.TextField(
         null=False,
-        help_text="The URL which will be used to post the data to the webhook",
+        help_text="The URL which will be used to post to the event stream",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     events_received = models.BigIntegerField(
-        default=0, help_text="The total number of events received by webhook"
+        default=0,
+        help_text="The total number of events received by event stream",
     )
     last_event_received_at = models.DateTimeField(
         null=True, help_text="The date/time when the last event was received"
@@ -112,7 +105,7 @@ class Webhook(BaseOrgModel):
     def _get_channel_name(self) -> str:
         """Generate the channel name based on the UUID and prefix."""
         return (
-            f"{EDA_WEBHOOK_CHANNEL_PREFIX}"
+            f"{EDA_EVENT_STREAM_CHANNEL_PREFIX}"
             f"{str(self.uuid).replace('-','_')}"
         )
 

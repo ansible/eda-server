@@ -35,8 +35,8 @@ x-environment:
   - EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
   - EDA_PG_NOTIFY_DSN="host=host.containers.internal port=5432 dbname=eda user=postgres password=secret"
   - EDA_PG_NOTIFY_DSN_SERVER="host=postgres port=5432 dbname=eda user=postgres password=secret"
-  - EDA_WEBHOOK_BASE_URL=${EDA_WEBHOOK_BASE_URL:-https://localhost/edgecafe-beef-feed-fade-decadeedgecafe/}
-  - EDA_WEBHOOK_MTLS_BASE_URL=${EDA_WEBHOOK_MTLS_BASE_URL:-https://localhost/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_EVENT_STREAM_BASE_URL=${EDA_EVENT_STREAM_BASE_URL:-https://localhost/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_EVENT_STREAM_MTLS_BASE_URL=${EDA_EVENT_STREAM_MTLS_BASE_URL:-https://localhost/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
   - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
   - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
   - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/cert.pem}

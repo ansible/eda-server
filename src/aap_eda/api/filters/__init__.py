@@ -20,6 +20,7 @@ from .activation import (
 from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .eda_credential import EdaCredentialFilter
+from .event_stream import EventStreamFilter
 from .organization import OrganizationFilter
 from .project import ProjectFilter
 from .rulebook import (
@@ -30,7 +31,6 @@ from .rulebook import (
 )
 from .team import OrganizationTeamFilter, TeamFilter
 from .user import UserFilter
-from .webhook import WebhookFilter
 
 __all__ = (
     # project
@@ -56,6 +56,6 @@ __all__ = (
     # team
     "TeamFilter",
     "OrganizationTeamFilter",
-    # Webhook
-    "WebhookFilter",
+    # EventStream
+    "EventStreamFilter",
 )

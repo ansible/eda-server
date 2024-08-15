@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Webhook configuration API Set."""
+"""EventStream configuration API Set."""
 import logging
 from urllib.parse import urljoin
 
@@ -33,40 +33,40 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ResourceType, WebhookAuthType
+from aap_eda.core.enums import EventStreamAuthType, ResourceType
 from aap_eda.core.utils import logging_utils
 
 logger = logging.getLogger(__name__)
 
-WEBHOOK_EXTERNAL_PATH = "api/eda/v1/external_webhook"
+EVENT_STREAM_EXTERNAL_PATH = "api/eda/v1/external_event_stream"
 
 resource_name = "EventStream"
 
 
-class WebhookViewSet(
+class EventStreamViewSet(
     mixins.CreateModelMixin,
     viewsets.ReadOnlyModelViewSet,
     mixins.DestroyModelMixin,
 ):
-    queryset = models.Webhook.objects.order_by("-created_at")
+    queryset = models.EventStream.objects.order_by("-created_at")
     filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.WebhookFilter
-    rbac_resource_type = ResourceType.WEBHOOK
+    filterset_class = filters.EventStreamFilter
+    rbac_resource_type = ResourceType.EVENT_STREAM
 
     def get_serializer_class(self):
         if self.action == "list":
-            return serializers.WebhookOutSerializer
+            return serializers.EventStreamOutSerializer
         if self.action == "destroy":
-            return serializers.WebhookOutSerializer
+            return serializers.EventStreamOutSerializer
         if self.action == "create":
-            return serializers.WebhookInSerializer
+            return serializers.EventStreamInSerializer
         if self.action == "partial_update":
-            return serializers.WebhookInSerializer
+            return serializers.EventStreamInSerializer
 
-        return serializers.WebhookOutSerializer
+        return serializers.EventStreamOutSerializer
 
     def get_response_serializer_class(self):
-        return serializers.WebhookOutSerializer
+        return serializers.EventStreamOutSerializer
 
     def filter_queryset(self, queryset):
         return super().filter_queryset(
@@ -74,31 +74,33 @@ class WebhookViewSet(
         )
 
     @extend_schema(
-        description="Get the Webhook by its id",
+        description="Get the EventStream by its id",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.WebhookOutSerializer,
-                description="Return the webhook by its id.",
+                serializers.EventStreamOutSerializer,
+                description="Return the event stream by its id.",
             ),
         },
     )
     def retrieve(self, request, *args, **kwargs):
-        webhook = self.get_object()
+        event_stream = self.get_object()
 
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
                 resource_name,
-                webhook.name,
-                webhook.id,
-                webhook.organization,
+                event_stream.name,
+                event_stream.id,
+                event_stream.organization,
             )
         )
 
-        return Response(serializers.WebhookOutSerializer(webhook).data)
+        return Response(
+            serializers.EventStreamOutSerializer(event_stream).data
+        )
 
     @extend_schema(
-        description="Delete a Webhook by its id",
+        description="Delete a EventStream by its id",
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None, description="Delete successful."
@@ -106,40 +108,42 @@ class WebhookViewSet(
         },
     )
     def destroy(self, request, *args, **kwargs):
-        webhook = self.get_object()
-        ref_count = webhook.activations.count()
+        event_stream = self.get_object()
+        ref_count = event_stream.activations.count()
         if ref_count > 0:
             raise api_exc.Conflict(
-                f"Event stream '{webhook.name}' is being referenced by "
+                f"Event stream '{event_stream.name}' is being referenced by "
                 f"{ref_count} activation(s) and cannot be deleted"
             )
-        self.perform_destroy(webhook)
+        self.perform_destroy(event_stream)
 
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Delete",
                 resource_name,
-                webhook.name,
-                webhook.id,
-                webhook.organization,
+                event_stream.name,
+                event_stream.id,
+                event_stream.organization,
             )
         )
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
-        description="List all webhooks",
+        description="List all eventstreams",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.WebhookOutSerializer(many=True),
-                description="Return a list of webhook.",
+                serializers.EventStreamOutSerializer(many=True),
+                description="Return a list of eventstreams.",
             ),
         },
     )
     def list(self, request, *args, **kwargs):
-        webhooks = models.Webhook.objects.all()
-        webhooks = self.filter_queryset(webhooks)
-        serializer = serializers.WebhookOutSerializer(webhooks, many=True)
+        event_streams = models.EventStream.objects.all()
+        event_streams = self.filter_queryset(event_streams)
+        serializer = serializers.EventStreamOutSerializer(
+            event_streams, many=True
+        )
         result = self.paginate_queryset(serializer.data)
 
         logger.info(
@@ -154,20 +158,20 @@ class WebhookViewSet(
         return self.get_paginated_response(result)
 
     @extend_schema(
-        request=serializers.WebhookInSerializer,
+        request=serializers.EventStreamInSerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
-                serializers.WebhookOutSerializer,
-                description="Return the new webhook.",
+                serializers.EventStreamOutSerializer,
+                description="Return the new event stream.",
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                description="Invalid data to create webhook."
+                description="Invalid data to create event stream."
             ),
         },
     )
     def create(self, request, *args, **kwargs):
         context = {"request": request}
-        serializer = serializers.WebhookInSerializer(
+        serializer = serializers.EventStreamInSerializer(
             data=request.data,
             context=context,
         )
@@ -186,13 +190,15 @@ class WebhookViewSet(
             inputs = yaml.safe_load(
                 response.eda_credential.inputs.get_secret_value()
             )
-            sub_path = f"{WEBHOOK_EXTERNAL_PATH}/{response.uuid}/post/"
-            if inputs["auth_type"] == WebhookAuthType.MTLS:
+            sub_path = f"{EVENT_STREAM_EXTERNAL_PATH}/{response.uuid}/post/"
+            if inputs["auth_type"] == EventStreamAuthType.MTLS:
                 response.url = urljoin(
-                    settings.WEBHOOK_MTLS_BASE_URL, sub_path
+                    settings.EVENT_STREAM_MTLS_BASE_URL, sub_path
                 )
             else:
-                response.url = urljoin(settings.WEBHOOK_BASE_URL, sub_path)
+                response.url = urljoin(
+                    settings.EVENT_STREAM_BASE_URL, sub_path
+                )
             response.save(update_fields=["url"])
 
         logger.info(
@@ -206,65 +212,65 @@ class WebhookViewSet(
         )
 
         return Response(
-            serializers.WebhookOutSerializer(response).data,
+            serializers.EventStreamOutSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
 
     @extend_schema(
-        request=serializers.WebhookInSerializer,
+        request=serializers.EventStreamInSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
-                serializers.WebhookOutSerializer,
-                description="Update successful, return the new webhook.",
+                serializers.EventStreamOutSerializer,
+                description="Update successful, return the new event stream.",
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                description="Unable to update webhook."
+                description="Unable to update event stream."
             ),
         },
     )
     def partial_update(self, request, *args, **kwargs):
-        webhook = self.get_object()
-        old_data = model_to_dict(webhook)
+        event_stream = self.get_object()
+        old_data = model_to_dict(event_stream)
         context = {"request": request}
-        serializer = serializers.WebhookInSerializer(
-            webhook,
+        serializer = serializers.EventStreamInSerializer(
+            event_stream,
             data=request.data,
             context=context,
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
-        if webhook.test_mode != request.data.get(
-            "test_mode", webhook.test_mode
+        if event_stream.test_mode != request.data.get(
+            "test_mode", event_stream.test_mode
         ):
-            webhook.test_content_type = ""
-            webhook.test_content = ""
-            webhook.test_headers = ""
-            webhook.test_error_message = ""
+            event_stream.test_content_type = ""
+            event_stream.test_content = ""
+            event_stream.test_headers = ""
+            event_stream.test_error_message = ""
 
         for key, value in serializer.validated_data.items():
-            setattr(webhook, key, value)
+            setattr(event_stream, key, value)
 
         with transaction.atomic():
-            webhook.save()
+            event_stream.save()
             check_related_permissions(
                 request.user,
                 serializer.Meta.model,
                 old_data,
-                model_to_dict(webhook),
+                model_to_dict(event_stream),
             )
 
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Update",
                 resource_name,
-                webhook.name,
-                webhook.id,
-                webhook.organization,
+                event_stream.name,
+                event_stream.id,
+                event_stream.organization,
             )
         )
 
         return Response(
-            serializers.WebhookOutSerializer(webhook).data,
+            serializers.EventStreamOutSerializer(event_stream).data,
             status=status.HTTP_200_OK,
         )
 
@@ -292,14 +298,18 @@ class WebhookViewSet(
         url_path="(?P<id>[^/.]+)/activations",
     )
     def activations(self, request, id):
-        if not models.Webhook.access_qs(request.user).filter(id=id).exists():
+        if (
+            not models.EventStream.access_qs(request.user)
+            .filter(id=id)
+            .exists()
+        ):
             raise api_exc.NotFound(
                 code=status.HTTP_404_NOT_FOUND,
                 detail=f"Event stream with ID={id} does not exist.",
             )
 
-        webhook = models.Webhook.objects.get(id=id)
-        activations = webhook.activations.all()
+        event_stream = models.EventStream.objects.get(id=id)
+        activations = event_stream.activations.all()
 
         filtered_activations = self.filter_queryset(activations)
         result = self.paginate_queryset(filtered_activations)
@@ -309,9 +319,9 @@ class WebhookViewSet(
             logging_utils.generate_simple_audit_log(
                 "ListActivations",
                 resource_name,
-                webhook.name,
-                webhook.id,
-                webhook.organization,
+                event_stream.name,
+                event_stream.id,
+                event_stream.organization,
             )
         )
         return self.get_paginated_response(serializer.data)

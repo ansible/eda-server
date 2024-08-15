@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Module providing all webhook authentication types."""
+"""Module providing all event stream authentication types."""
 
 import base64
 import hashlib
@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 30
 
 
-class WebhookAuthentication(ABC):
-    """Base class for Webhook Authentication."""
+class EventStreamAuthentication(ABC):
+    """Base class for EventStream Authentication."""
 
     @abstractmethod
     def authenticate(self, body: Optional[bytes]):
@@ -46,7 +46,7 @@ class WebhookAuthentication(ABC):
 
 
 @dataclass
-class HMACAuthentication(WebhookAuthentication):
+class HMACAuthentication(EventStreamAuthentication):
     """HMAC Parameters."""
 
     signature: str
@@ -87,7 +87,7 @@ class HMACAuthentication(WebhookAuthentication):
 
 
 @dataclass
-class TokenAuthentication(WebhookAuthentication):
+class TokenAuthentication(EventStreamAuthentication):
     """Token Authentication."""
 
     token: str
@@ -102,7 +102,7 @@ class TokenAuthentication(WebhookAuthentication):
 
 
 @dataclass
-class MTLSAuthentication(WebhookAuthentication):
+class MTLSAuthentication(EventStreamAuthentication):
     """mTLS Authentication."""
 
     subject: str
@@ -117,8 +117,8 @@ class MTLSAuthentication(WebhookAuthentication):
 
 
 @dataclass
-class BasicAuthentication(WebhookAuthentication):
-    """Token Authentication."""
+class BasicAuthentication(EventStreamAuthentication):
+    """Basic Authentication."""
 
     password: str
     username: str
@@ -139,7 +139,7 @@ class BasicAuthentication(WebhookAuthentication):
 
 
 @dataclass
-class Oauth2JwtAuthentication(WebhookAuthentication):
+class Oauth2JwtAuthentication(EventStreamAuthentication):
     """OAuth2 JWT Authentication."""
 
     jwks_url: str
@@ -187,7 +187,7 @@ class Oauth2JwtAuthentication(WebhookAuthentication):
 
 
 @dataclass
-class Oauth2Authentication(WebhookAuthentication):
+class Oauth2Authentication(EventStreamAuthentication):
     """OAuth2 Authentication."""
 
     introspection_url: str
@@ -225,7 +225,7 @@ class Oauth2Authentication(WebhookAuthentication):
 
 
 @dataclass
-class EcdsaAuthentication(WebhookAuthentication):
+class EcdsaAuthentication(EventStreamAuthentication):
     """ECDSA Authentication."""
 
     public_key: str

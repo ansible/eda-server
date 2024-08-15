@@ -275,55 +275,57 @@ def valid_hash_format(fmt: str):
     return fmt
 
 
-def _validate_webhook_settings(auth_type: str):
-    """Check webhook settings."""
+def _validate_event_stream_settings(auth_type: str):
+    """Check event stream settings."""
     if (
-        auth_type == enums.WebhookCredentialType.MTLS
-        and not settings.WEBHOOK_MTLS_BASE_URL
+        auth_type == enums.EventStreamCredentialType.MTLS
+        and not settings.EVENT_STREAM_MTLS_BASE_URL
     ):
         raise serializers.ValidationError(
             (
                 f"EventStream of type {auth_type} cannot be used "
-                "because WEBHOOK_MTLS_BASE_URL is missing in settings."
+                "because EVENT_STREAM_MTLS_BASE_URL is not configured. "
+                "Please check with your site administrator."
             )
         )
 
     if (
-        auth_type != enums.WebhookCredentialType.MTLS
-        and not settings.WEBHOOK_BASE_URL
+        auth_type != enums.EventStreamCredentialType.MTLS
+        and not settings.EVENT_STREAM_BASE_URL
     ):
         raise serializers.ValidationError(
             (
                 f"EventStream of type {auth_type} cannot be used "
-                "because WEBHOOK_BASE_URL is missing in settings."
+                "because EVENT_STREAM_BASE_URL is not configured. "
+                "Please check with your site administrator."
             )
         )
 
 
-def check_if_webhooks_exists(webhook_ids: list[int]) -> list[int]:
-    """Check a webhook exists."""
-    for webhook_id in webhook_ids:
+def check_if_event_streams_exists(event_stream_ids: list[int]) -> list[int]:
+    """Check a event stream exists."""
+    for event_stream_id in event_stream_ids:
         try:
-            models.Webhook.objects.get(pk=webhook_id)
-        except models.Webhook.DoesNotExist as exc:
+            models.EventStream.objects.get(pk=event_stream_id)
+        except models.EventStream.DoesNotExist as exc:
             raise serializers.ValidationError(
-                f"Webhook with id {webhook_id} does not exist"
+                f"EventStream with id {event_stream_id} does not exist"
             ) from exc
-    return webhook_ids
+    return event_stream_ids
 
 
-def check_credential_types_for_webhook(eda_credential_id: int) -> int:
-    """Check the credential types for a webhook."""
+def check_credential_types_for_event_stream(eda_credential_id: int) -> int:
+    """Check the credential types for a event stream."""
     credential = get_credential_if_exists(eda_credential_id)
     name = credential.credential_type.name
     names = (
-        enums.WebhookCredentialType.values()
-        + enums.CustomWebhookCredentialType.values()
+        enums.EventStreamCredentialType.values()
+        + enums.CustomEventStreamCredentialType.values()
     )
     if name not in names:
         raise serializers.ValidationError(
             f"The type of credential can only be one of {names}"
         )
 
-    _validate_webhook_settings(name)
+    _validate_event_stream_settings(name)
     return eda_credential_id

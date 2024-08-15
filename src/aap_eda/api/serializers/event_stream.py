@@ -20,19 +20,19 @@ from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
 
 
-class WebhookInSerializer(serializers.ModelSerializer):
+class EventStreamInSerializer(serializers.ModelSerializer):
     organization_id = serializers.IntegerField(required=True, allow_null=False)
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     eda_credential_id = serializers.IntegerField(
         required=True,
         allow_null=False,
         validators=[
-            validators.check_credential_types_for_webhook,
+            validators.check_credential_types_for_event_stream,
         ],
     )
 
     class Meta:
-        model = models.Webhook
+        model = models.EventStream
         fields = [
             "name",
             "owner",
@@ -40,11 +40,11 @@ class WebhookInSerializer(serializers.ModelSerializer):
             "additional_data_headers",
             "eda_credential_id",
             "organization_id",
-            "webhook_type",
+            "event_stream_type",
         ]
 
 
-class WebhookOutSerializer(serializers.ModelSerializer):
+class EventStreamOutSerializer(serializers.ModelSerializer):
     owner = serializers.SerializerMethodField()
     organization = serializers.SerializerMethodField()
     eda_credential = EdaCredentialRefSerializer(
@@ -52,7 +52,7 @@ class WebhookOutSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = models.Webhook
+        model = models.EventStream
         read_only_fields = [
             "id",
             "owner",
@@ -72,7 +72,7 @@ class WebhookOutSerializer(serializers.ModelSerializer):
             "additional_data_headers",
             "organization",
             "eda_credential",
-            "webhook_type",
+            "event_stream_type",
             *read_only_fields,
         ]
 

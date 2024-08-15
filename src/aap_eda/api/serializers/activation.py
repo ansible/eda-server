@@ -26,11 +26,12 @@ from aap_eda.api.constants import (
     EDA_SERVER_VAULT_LABEL,
     SOURCE_MAPPING_ERROR_KEY,
 )
-from aap_eda.api.exceptions import InvalidWebhookSource
+from aap_eda.api.exceptions import InvalidEventStreamSource
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
+from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ANSIBLE_VAULT_STRING,
@@ -38,7 +39,6 @@ from aap_eda.api.serializers.project import (
     ProjectRefSerializer,
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
-from aap_eda.api.serializers.webhook import WebhookOutSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
@@ -51,12 +51,17 @@ from aap_eda.core.utils.k8s_service_name import (
 from aap_eda.core.utils.rulebook import (
     build_source_list,
     get_rulebook_hash,
-    swap_webhook_sources,
+    swap_event_stream_sources,
 )
 from aap_eda.core.utils.strings import substitute_variables
 
 logger = logging.getLogger(__name__)
-REQUIRED_KEYS = ["webhook_id", "webhook_name", "source_name", "rulebook_hash"]
+REQUIRED_KEYS = [
+    "event_stream_id",
+    "event_stream_name",
+    "source_name",
+    "rulebook_hash",
+]
 
 
 @dataclass
@@ -65,7 +70,9 @@ class VaultData:
     password_used: bool = False
 
 
-def _update_webhook_source(validated_data: dict, vault_data: VaultData) -> str:
+def _update_event_stream_source(
+    validated_data: dict, vault_data: VaultData
+) -> str:
     try:
         vault_data.password_used = True
         encrypted_dsn = encrypt_string(
@@ -77,8 +84,8 @@ def _update_webhook_source(validated_data: dict, vault_data: VaultData) -> str:
         source_mappings = yaml.safe_load(validated_data["source_mappings"])
         sources_info = {}
         for source_map in source_mappings:
-            webhook_id = source_map.get("webhook_id")
-            obj = models.Webhook.objects.get(id=webhook_id)
+            event_stream_id = source_map.get("event_stream_id")
+            obj = models.EventStream.objects.get(id=event_stream_id)
 
             sources_info[obj.name] = {
                 "ansible.eda.pg_listener": {
@@ -87,13 +94,15 @@ def _update_webhook_source(validated_data: dict, vault_data: VaultData) -> str:
                 },
             }
 
-        return swap_webhook_sources(
+        return swap_event_stream_sources(
             validated_data["rulebook_rulesets"], sources_info, source_mappings
         )
         # TODO: Can we catch a better exception
     except Exception as e:
-        logger.error("Failed to update webhook source in rulesets: %s", str(e))
-        raise InvalidWebhookSource(e) from e
+        logger.error(
+            "Failed to update event stream source in rulesets: %s", str(e)
+        )
+        raise InvalidEventStreamSource(e) from e
 
 
 def _update_k8s_service_name(validated_data: dict) -> str:
@@ -205,10 +214,10 @@ class ActivationSerializer(serializers.ModelSerializer):
         child=EdaCredentialSerializer(),
     )
 
-    webhooks = serializers.ListField(
+    event_streams = serializers.ListField(
         required=False,
         allow_null=True,
-        child=WebhookOutSerializer(),
+        child=EventStreamOutSerializer(),
     )
 
     class Meta:
@@ -236,7 +245,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "awx_token_id",
             "eda_credentials",
             "log_level",
-            "webhooks",
+            "event_streams",
             "skip_audit_events",
         ]
         read_only_fields = [
@@ -264,10 +273,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
         allow_blank=True,
         help_text="Service name of the activation",
     )
-    webhooks = serializers.ListField(
+    event_streams = serializers.ListField(
         required=False,
         allow_null=True,
-        child=WebhookOutSerializer(),
+        child=EventStreamOutSerializer(),
     )
 
     class Meta:
@@ -296,7 +305,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "log_level",
             "eda_credentials",
             "k8s_service_name",
-            "webhooks",
+            "event_streams",
             "source_mappings",
             "skip_audit_events",
         ]
@@ -315,9 +324,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
             if activation.extra_var
             else None
         )
-        webhooks = [
-            WebhookOutSerializer(webhook).data
-            for webhook in activation.webhooks.all()
+        event_streams = [
+            EventStreamOutSerializer(event_stream).data
+            for event_stream in activation.event_streams.all()
         ]
 
         return {
@@ -344,7 +353,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
-            "webhooks": webhooks,
+            "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
         }
@@ -412,7 +421,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
-        _validate_sources_with_webhooks(data=data)
+        _validate_sources_with_event_streams(data=data)
         return data
 
     def create(self, validated_data):
@@ -432,7 +441,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         vault_data = VaultData()
 
         if validated_data.get("source_mappings", []):
-            validated_data["rulebook_rulesets"] = _update_webhook_source(
+            validated_data["rulebook_rulesets"] = _update_event_stream_source(
                 validated_data, vault_data
             )
 
@@ -517,10 +526,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_blank=True,
         help_text="Service name of the activation",
     )
-    webhooks = serializers.ListField(
+    event_streams = serializers.ListField(
         required=False,
         allow_null=True,
-        child=WebhookOutSerializer(),
+        child=EventStreamOutSerializer(),
     )
 
     class Meta:
@@ -552,7 +561,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "log_level",
             "k8s_service_name",
-            "webhooks",
+            "event_streams",
             "source_mappings",
             "skip_audit_events",
         ]
@@ -605,9 +614,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.extra_var
             else None
         )
-        webhooks = [
-            WebhookOutSerializer(webhook).data
-            for webhook in activation.webhooks.all()
+        event_streams = [
+            EventStreamOutSerializer(event_stream).data
+            for event_stream in activation.event_streams.all()
         ]
 
         return {
@@ -639,7 +648,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
-            "webhooks": webhooks,
+            "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
         }
@@ -677,7 +686,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=False)
-        _validate_sources_with_webhooks(data=data)
+        _validate_sources_with_event_streams(data=data)
         return data
 
     class Meta:
@@ -723,7 +732,7 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
     data["eda_credentials"] = [
         obj.id for obj in activation.eda_credentials.all()
     ]
-    data["webhooks"] = [obj.id for obj in activation.webhooks.all()]
+    data["event_streams"] = [obj.id for obj in activation.event_streams.all()]
     serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
@@ -911,8 +920,8 @@ def _get_aap_credentials_if_exists(
     ]
 
 
-def _validate_sources_with_webhooks(data: dict) -> None:
-    """Ensure all webhooks have matching source names."""
+def _validate_sources_with_event_streams(data: dict) -> None:
+    """Ensure all event streams have matching source names."""
     source_mappings = data.get("source_mappings")
     if not source_mappings:
         return
@@ -969,8 +978,8 @@ def _validate_sources_with_webhooks(data: dict) -> None:
             {SOURCE_MAPPING_ERROR_KEY: [str(msg)]}
         )
 
-    # validate no duplicate sources/webhooks in provided source mappings
-    for name in ["source_name", "webhook_name"]:
+    # validate no duplicate sources/event_streams in provided source mappings
+    for name in ["source_name", "event_stream_name"]:
         _check_duplicate_names(name, source_mappings)
 
     # validate rulebook is not updated during mapping
@@ -995,8 +1004,8 @@ def _validate_sources_with_webhooks(data: dict) -> None:
                 {SOURCE_MAPPING_ERROR_KEY: [msg]}
             )
 
-    # validate webhook ids and names
-    data["webhooks"] = _get_webhook_ids(source_mappings)
+    # validate event_stream ids and names
+    data["event_streams"] = _get_event_stream_ids(source_mappings)
 
 
 def _validate_source_mappings(mappings: list[dict]) -> None:
@@ -1013,35 +1022,37 @@ def _validate_source_mappings(mappings: list[dict]) -> None:
             )
 
 
-def _get_webhook_ids(source_mappings: list[dict]) -> set:
-    """Get all the webhook ids from source mappings."""
-    webhook_ids = set()
+def _get_event_stream_ids(source_mappings: list[dict]) -> set:
+    """Get all the event stream ids from source mappings."""
+    event_stream_ids = set()
     for source_map in source_mappings:
         try:
-            webhook = models.Webhook.objects.get(id=source_map["webhook_id"])
-            if webhook.name != source_map["webhook_name"]:
+            event_stream = models.EventStream.objects.get(
+                id=source_map["event_stream_id"]
+            )
+            if event_stream.name != source_map["event_stream_name"]:
                 msg = (
-                    f"Event stream {source_map['webhook_name']} did not"
-                    f" match with webhook {webhook.name}"
+                    f"Event stream {source_map['event_stream_name']} did not"
+                    f" match with name {event_stream.name} in database"
                 )
                 raise serializers.ValidationError(
                     {SOURCE_MAPPING_ERROR_KEY: [msg]}
                 )
 
-            webhook_ids.add(webhook.id)
-        except models.Webhook.DoesNotExist as exc:
-            msg = f"Event stream id {source_map['webhook_id']} not found"
+            event_stream_ids.add(event_stream.id)
+        except models.EventStream.DoesNotExist as exc:
+            msg = f"Event stream id {source_map['event_stream_id']} not found"
             raise serializers.ValidationError(
                 {SOURCE_MAPPING_ERROR_KEY: [msg]}
             ) from exc
 
-    return webhook_ids
+    return event_stream_ids
 
 
 def _check_duplicate_names(
     check_name: str, source_mappings: list[dict]
 ) -> None:
-    msg = {"source_name": "sources", "webhook_name": "event streams"}
+    msg = {"source_name": "sources", "event_stream_name": "event streams"}
     duplicate_names = set()
     names = set()
 

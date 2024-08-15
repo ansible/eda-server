@@ -38,6 +38,7 @@ from .eda_credential import (
     EdaCredentialCreateSerializer,
     EdaCredentialSerializer,
 )
+from .event_stream import EventStreamInSerializer, EventStreamOutSerializer
 from .organization import (
     OrganizationCreateSerializer,
     OrganizationRefSerializer,
@@ -75,7 +76,6 @@ from .user import (
     UserListSerializer,
     UserSerializer,
 )
-from .webhook import WebhookInSerializer, WebhookOutSerializer
 
 __all__ = (
     # auth
@@ -129,7 +129,7 @@ __all__ = (
     "TeamCreateSerializer",
     "TeamUpdateSerializer",
     "TeamDetailSerializer",
-    # webhooks
-    "WebhookInSerializer",
-    "WebhookOutSerializer",
+    # event streams
+    "EventStreamInSerializer",
+    "EventStreamOutSerializer",
 )

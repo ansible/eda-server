@@ -17,13 +17,13 @@ import django_filters
 from aap_eda.core import models
 
 
-class WebhookFilter(django_filters.FilterSet):
+class EventStreamFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter by webhook name.",
+        label="Filter by event stream name.",
     )
 
     class Meta:
-        model = models.Webhook
+        model = models.EventStream
         fields = ["name"]
