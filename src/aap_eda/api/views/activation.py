@@ -32,6 +32,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
+from aap_eda.core.utils import logging_utils
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
@@ -40,6 +41,8 @@ from aap_eda.tasks.orchestrator import (
 )
 
 logger = logging.getLogger(__name__)
+
+resource_name = "RulebookActivation"
 
 
 class ActivationViewSet(
@@ -94,6 +97,16 @@ class ActivationViewSet(
                 process_parent_id=response.id,
             )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                response.name,
+                response.id,
+                response.organization,
+            )
+        )
+
         return Response(
             serializers.ActivationReadSerializer(response).data,
             status=status.HTTP_201_CREATED,
@@ -117,13 +130,23 @@ class ActivationViewSet(
                 "deleted.",
             )
 
+        audit_log = logging_utils.generate_simple_audit_log(
+            "Delete",
+            resource_name,
+            activation.name,
+            activation.id,
+            activation.organization,
+        )
+
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
+
         delete_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
+        logger.info(audit_log)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -132,6 +155,17 @@ class ActivationViewSet(
     )
     def retrieve(self, request, pk: int):
         activation = self.get_object()
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
+
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
@@ -152,6 +186,15 @@ class ActivationViewSet(
         )
         result = self.paginate_queryset(serializer.data)
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "ListActivations",
+                resource_name,
+                "*",
+                "*",
+                "*",
+            )
+        )
         return self.get_paginated_response(result)
 
     @extend_schema(
@@ -263,6 +306,16 @@ class ActivationViewSet(
             process_parent_id=pk,
         )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Enable",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -292,6 +345,15 @@ class ActivationViewSet(
                 process_parent_id=activation.id,
             )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Disable",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -335,6 +397,15 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Restart",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _check_deleting(self, activation):

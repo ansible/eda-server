@@ -23,3 +23,5 @@ __pycache__/
 Taskfile.yml
 Taskfile.yaml
 /tools/deploy/environment.properties
+
+venv/

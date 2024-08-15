@@ -34,10 +34,13 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType, WebhookAuthType
+from aap_eda.core.utils import logging_utils
 
 logger = logging.getLogger(__name__)
 
 WEBHOOK_EXTERNAL_PATH = "api/eda/v1/external_webhook"
+
+resource_name = "EventStream"
 
 
 class WebhookViewSet(
@@ -81,6 +84,17 @@ class WebhookViewSet(
     )
     def retrieve(self, request, *args, **kwargs):
         webhook = self.get_object()
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                webhook.name,
+                webhook.id,
+                webhook.organization,
+            )
+        )
+
         return Response(serializers.WebhookOutSerializer(webhook).data)
 
     @extend_schema(
@@ -93,7 +107,6 @@ class WebhookViewSet(
     )
     def destroy(self, request, *args, **kwargs):
         webhook = self.get_object()
-
         ref_count = webhook.activations.count()
         if ref_count > 0:
             raise api_exc.Conflict(
@@ -101,6 +114,17 @@ class WebhookViewSet(
                 f"{ref_count} activation(s) and cannot be deleted"
             )
         self.perform_destroy(webhook)
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete",
+                resource_name,
+                webhook.name,
+                webhook.id,
+                webhook.organization,
+            )
+        )
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -118,6 +142,15 @@ class WebhookViewSet(
         serializer = serializers.WebhookOutSerializer(webhooks, many=True)
         result = self.paginate_queryset(serializer.data)
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "List",
+                "EventStream",
+                "*",
+                "*",
+                "*",
+            )
+        )
         return self.get_paginated_response(result)
 
     @extend_schema(
@@ -161,6 +194,16 @@ class WebhookViewSet(
             else:
                 response.url = urljoin(settings.WEBHOOK_BASE_URL, sub_path)
             response.save(update_fields=["url"])
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                response.name,
+                response.id,
+                response.organization,
+            )
+        )
 
         return Response(
             serializers.WebhookOutSerializer(response).data,
@@ -210,6 +253,16 @@ class WebhookViewSet(
                 model_to_dict(webhook),
             )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                resource_name,
+                webhook.name,
+                webhook.id,
+                webhook.organization,
+            )
+        )
+
         return Response(
             serializers.WebhookOutSerializer(webhook).data,
             status=status.HTTP_200_OK,
@@ -251,4 +304,14 @@ class WebhookViewSet(
         filtered_activations = self.filter_queryset(activations)
         result = self.paginate_queryset(filtered_activations)
         serializer = serializers.ActivationListSerializer(result, many=True)
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "ListActivations",
+                resource_name,
+                webhook.name,
+                webhook.id,
+                webhook.organization,
+            )
+        )
         return self.get_paginated_response(serializer.data)

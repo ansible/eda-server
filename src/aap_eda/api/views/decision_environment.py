@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
 
 from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
@@ -24,6 +25,7 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
+from aap_eda.core.utils import logging_utils
 from aap_eda.utils import str_to_bool
 
 from .mixins import (
@@ -31,6 +33,44 @@ from .mixins import (
     PartialUpdateOnlyModelMixin,
     ResponseSerializerMixin,
 )
+
+logger = logging.getLogger(__name__)
+
+resource_name = "DecisionEnvironment"
+
+
+class CreateDecisionEnvironmentMixin(CreateModelMixin):
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                response.data["name"],
+                response.data["id"],
+                logging_utils.get_organization_name_from_data(response),
+            )
+        )
+
+        return response
+
+
+class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                resource_name,
+                response.data["name"],
+                response.data["id"],
+                logging_utils.get_organization_name_from_data(response),
+            )
+        )
+
+        return response
 
 
 @extend_schema_view(
@@ -66,8 +106,8 @@ from .mixins import (
 )
 class DecisionEnvironmentViewSet(
     ResponseSerializerMixin,
-    CreateModelMixin,
-    PartialUpdateOnlyModelMixin,
+    CreateDecisionEnvironmentMixin,
+    PartialUpdateOnlyDecisionEnvironmentMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
@@ -116,6 +156,16 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                decision_environment.data["name"],
+                decision_environment.data["id"],
+                decision_environment.data["organization"],
+            )
+        )
+
         return Response(
             serializers.DecisionEnvironmentReadSerializer(
                 decision_environment.data
@@ -159,4 +209,14 @@ class DecisionEnvironmentViewSet(
             )
 
         self.perform_destroy(instance)
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete",
+                resource_name,
+                instance.name,
+                instance.id,
+                instance.organization,
+            )
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
