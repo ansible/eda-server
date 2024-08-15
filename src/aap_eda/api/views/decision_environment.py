@@ -39,52 +39,36 @@ logger = logging.getLogger(__name__)
 resource_name = "DecisionEnvironment"
 
 
-# class CreateDecisionEnvironmentMixin(CreateModelMixin):
-#     def create(self, request, *args, **kwargs):
-#         response = super().create(request, *args, **kwargs)
+class CreateDecisionEnvironmentMixin(CreateModelMixin):
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
 
-#         logging_kwargs = {
-#             "Description": response.data["description"],
-#             "ImageURL": response.data["image_url"],
-#             "Credential": logging_utils.get_credential_name_from_data(
-#                 response
-#             ),
-#         }
-#         logger.info(
-#             logging_utils.generate_simple_audit_log(
-#                 "Create",
-#                 resource_name,
-#                 response.data["name"],
-#                 logging_utils.get_organization_name_from_data(response),
-#                 **logging_kwargs,
-#             )
-#         )
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                response.data["name"],
+                logging_utils.get_organization_name_from_data(response),
+            )
+        )
 
-#         return response
+        return response
 
 
-# class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
-#     def partial_update(self, request, *args, **kwargs):
-#         response = super().partial_update(request, *args, **kwargs)
+class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
 
-#         logging_kwargs = {
-#             "Description": response.data["description"],
-#             "ImageURL": response.data["image_url"],
-#             "Credential": logging_utils.get_credential_name_from_data(
-#                 response
-#             ),
-#         }
-#         logger.info(
-#             logging_utils.generate_simple_audit_log(
-#                 "Update",
-#                 resource_name,
-#                 response.data["name"],
-#                 logging_utils.get_organization_name_from_data(response),
-#                 **logging_kwargs,
-#             )
-#         )
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                resource_name,
+                response.data["name"],
+                logging_utils.get_organization_name_from_data(response),
+            )
+        )
 
-#         return response
+        return response
 
 
 @extend_schema_view(
@@ -120,10 +104,8 @@ resource_name = "DecisionEnvironment"
 )
 class DecisionEnvironmentViewSet(
     ResponseSerializerMixin,
-    # CreateDecisionEnvironmentMixin,
-    # PartialUpdateOnlyDecisionEnvironmentMixin,
-    CreateModelMixin,
-    PartialUpdateOnlyModelMixin,
+    CreateDecisionEnvironmentMixin,
+    PartialUpdateOnlyDecisionEnvironmentMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
@@ -172,20 +154,12 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
-        logging_kwargs = {
-            "Description": decision_environment.data["description"],
-            "ImageURL": decision_environment.data["image_url"],
-            "Credential": logging_utils.get_credential_name_from_data(
-                decision_environment
-            ),
-        }
         # logger.info(
         #     logging_utils.generate_simple_audit_log(
         #         "Read",
         #         resource_name,
         #         decision_environment.data["name"],
         #         decision_environment.data["organization"],
-        #         **logging_kwargs,
         #     )
         # )
 
@@ -233,22 +207,12 @@ class DecisionEnvironmentViewSet(
 
         self.perform_destroy(instance)
 
-        credential_name = instance.eda_credential
-        if instance.credential == "None":
-            credential_name = instance.eda_credential.name
-
-        logging_kwargs = {
-            "Description": instance.description,
-            "ImageURL": instance.image_url,
-            "Credential": credential_name,
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Delete",
                 resource_name,
                 instance.name,
                 instance.organization,
-                **logging_kwargs,
             )
         )
         return Response(status=status.HTTP_204_NO_CONTENT)

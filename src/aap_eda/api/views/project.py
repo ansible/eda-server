@@ -52,7 +52,6 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
                 resource_name,
                 project.name,
                 project.organization,
-                **{},
             )
         )
 
@@ -142,7 +141,6 @@ class ProjectViewSet(
                 resource_name,
                 project.name,
                 project.organization,
-                **{},
             )
         )
 
@@ -187,7 +185,6 @@ class ProjectViewSet(
         #         resource_name,
         #         project.data["name"],
         #         project.data["organization"].name,
-        #         **{},
         #     )
         # )
 
@@ -239,7 +236,6 @@ class ProjectViewSet(
                 resource_name,
                 project.name,
                 project.organization,
-                **{},
             )
         )
 
@@ -287,7 +283,10 @@ class ProjectViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "Sync", resource_name, project.name, project.organization, **{}
+                "Sync",
+                resource_name,
+                project.name,
+                project.organization,
             )
         )
 

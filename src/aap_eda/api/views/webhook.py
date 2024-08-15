@@ -85,16 +85,12 @@ class WebhookViewSet(
     def retrieve(self, request, *args, **kwargs):
         webhook = self.get_object()
 
-        logging_kwargs = {
-            "TestMode": webhook.test_mode,
-        }
         # logger.info(
         #     logging_utils.generate_simple_audit_log(
         #         "Read",
         #         resource_name,
         #         webhook.name,
         #         webhook.organization,
-        #         **logging_kwargs,
         #     )
         # )
 
@@ -118,16 +114,12 @@ class WebhookViewSet(
             )
         self.perform_destroy(webhook)
 
-        logging_kwargs = {
-            "TestMode": webhook.test_mode,
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Delete",
                 resource_name,
                 webhook.name,
                 webhook.organization,
-                **logging_kwargs,
             )
         )
 
@@ -150,7 +142,10 @@ class WebhookViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "List", "EventStream", "*", "*", **{}
+                "List",
+                "EventStream",
+                "*",
+                "*",
             )
         )
         return self.get_paginated_response(result)
@@ -197,16 +192,12 @@ class WebhookViewSet(
                 response.url = urljoin(settings.WEBHOOK_BASE_URL, sub_path)
             response.save(update_fields=["url"])
 
-        logging_kwargs = {
-            "TestMode": response.test_mode,
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Create",
                 resource_name,
                 response.name,
                 response.organization,
-                **logging_kwargs,
             )
         )
 
@@ -258,16 +249,12 @@ class WebhookViewSet(
                 model_to_dict(webhook),
             )
 
-        logging_kwargs = {
-            "TestMode": webhook.test_mode,
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Update",
                 resource_name,
                 webhook.name,
                 webhook.organization,
-                **logging_kwargs,
             )
         )
 
@@ -313,16 +300,12 @@ class WebhookViewSet(
         result = self.paginate_queryset(filtered_activations)
         serializer = serializers.ActivationListSerializer(result, many=True)
 
-        logging_kwargs = {
-            "TestMode": webhook.test_mode,
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "ListActivations",
                 resource_name,
                 webhook.name,
                 webhook.organization,
-                **logging_kwargs,
             )
         )
         return self.get_paginated_response(serializer.data)

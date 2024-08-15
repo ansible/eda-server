@@ -96,25 +96,13 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
             )
-        logging_kwargs = {
-            "isEnabled": response.is_enabled,
-            "Project": logging_utils.get_project_name_from_id(
-                response.project_id
-            ),
-            "Rulebook": logging_utils.get_rulebook_name_from_id(
-                response.rulebook_id
-            ),
-            "DecisionEnvironment": logging_utils.get_de_name_from_id(
-                response.decision_environment_id
-            ),
-        }
+
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Create",
                 resource_name,
                 response.name,
                 response.organization,
-                **logging_kwargs,
             )
         )
 
@@ -141,35 +129,22 @@ class ActivationViewSet(
                 "deleted.",
             )
 
+        audit_log = logging_utils.generate_simple_audit_log(
+            "Delete",
+            resource_name,
+            activation.name,
+            activation.organization,
+        )
+
         activation.status = ActivationStatus.DELETING
         activation.save(update_fields=["status"])
         logger.info(f"Now deleting {activation.name} ...")
+
         delete_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
         )
-
-        logging_kwargs = {
-            "isEnabled": activation.is_enabled,
-            "Project": logging_utils.get_project_name_from_id(
-                activation.project_id
-            ),
-            "Rulebook": logging_utils.get_rulebook_name_from_id(
-                activation.rulebook_id
-            ),
-            "DecisionEnvironment": logging_utils.get_de_name_from_id(
-                activation.decision_environment_id
-            ),
-        }
-        logger.info(
-            logging_utils.generate_simple_audit_log(
-                "Delete",
-                resource_name,
-                activation.name,
-                activation.organization,
-                **logging_kwargs,
-            )
-        )
+        logger.info(audit_log)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -179,25 +154,12 @@ class ActivationViewSet(
     def retrieve(self, request, pk: int):
         activation = self.get_object()
 
-        logging_kwargs = {
-            "isEnabled": activation.is_enabled,
-            "Project": logging_utils.get_project_name_from_id(
-                activation.project_id
-            ),
-            "Rulebook": logging_utils.get_rulebook_name_from_id(
-                activation.rulebook_id
-            ),
-            "DecisionEnvironment": logging_utils.get_de_name_from_id(
-                activation.decision_environment_id
-            ),
-        }
         # logger.info(
         #     logging_utils.generate_simple_audit_log(
         #         "Read",
         #         resource_name,
         #         activation.name,
         #         activation.organization,
-        #         **logging_kwargs,
         #     )
         # )
 
@@ -223,7 +185,10 @@ class ActivationViewSet(
 
         logger.info(
             logging_utils.generate_simple_audit_log(
-                "ListActivations", resource_name, "*", "*", **{}
+                "ListActivations",
+                resource_name,
+                "*",
+                "*",
             )
         )
         return self.get_paginated_response(result)
@@ -337,25 +302,12 @@ class ActivationViewSet(
             process_parent_id=pk,
         )
 
-        logging_kwargs = {
-            "isEnabled": activation.is_enabled,
-            "Project": logging_utils.get_project_name_from_id(
-                activation.project_id
-            ),
-            "Rulebook": logging_utils.get_rulebook_name_from_id(
-                activation.rulebook_id
-            ),
-            "DecisionEnvironment": logging_utils.get_de_name_from_id(
-                activation.decision_environment_id
-            ),
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Enable",
                 resource_name,
                 activation.name,
                 activation.organization,
-                **logging_kwargs,
             )
         )
 
@@ -387,25 +339,13 @@ class ActivationViewSet(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
             )
-        logging_kwargs = {
-            "isEnabled": activation.is_enabled,
-            "Project": logging_utils.get_project_name_from_id(
-                activation.project_id
-            ),
-            "Rulebook": logging_utils.get_rulebook_name_from_id(
-                activation.rulebook_id
-            ),
-            "DecisionEnvironment": logging_utils.get_de_name_from_id(
-                activation.decision_environment_id
-            ),
-        }
+
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Disable",
                 resource_name,
                 activation.name,
                 activation.organization,
-                **logging_kwargs,
             )
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -451,25 +391,12 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
 
-        logging_kwargs = {
-            "isEnabled": activation.is_enabled,
-            "Project": logging_utils.get_project_name_from_id(
-                activation.project_id
-            ),
-            "Rulebook": logging_utils.get_rulebook_name_from_id(
-                activation.rulebook_id
-            ),
-            "DecisionEnvironment": logging_utils.get_de_name_from_id(
-                activation.decision_environment_id
-            ),
-        }
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Restart",
                 resource_name,
                 activation.name,
                 activation.organization,
-                **logging_kwargs,
             )
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
