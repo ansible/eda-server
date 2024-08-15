@@ -27,10 +27,6 @@ from aap_eda.core.enums import ActivationRequest, ActivationStatus
             lazy_fixture("new_activation"),
             id="activation",
         ),
-        pytest.param(
-            lazy_fixture("new_event_stream"),
-            id="event_stream",
-        ),
     ],
 )
 @pytest.mark.django_db
@@ -45,8 +41,6 @@ def test_latest_instance_field(instance):
 
     if isinstance(instance, models.Activation):
         kwargs["activation"] = instance
-    else:
-        kwargs["event_stream"] = instance
 
     first_instance = models.RulebookProcess.objects.create(**kwargs)
     assert instance.latest_instance == first_instance
@@ -66,10 +60,6 @@ def test_latest_instance_field(instance):
         pytest.param(
             lazy_fixture("new_activation"),
             id="activation",
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream"),
-            id="event_stream",
         ),
     ],
 )

@@ -18,7 +18,6 @@ from .config import ConfigView
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
-from .event_stream import EventStreamViewSet
 from .external_webhook import ExternalWebhookViewSet
 from .organization import OrganizationViewSet
 from .project import ProjectViewSet
@@ -48,8 +47,6 @@ __all__ = (
     "EdaCredentialViewSet",
     # decision_environment
     "DecisionEnvironmentViewSet",
-    # event_stream
-    "EventStreamViewSet",
     # organizations
     "OrganizationViewSet",
     # teams

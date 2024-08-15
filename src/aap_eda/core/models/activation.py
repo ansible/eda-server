@@ -110,10 +110,6 @@ class Activation(
         null=True,
         default=None,
     )
-    event_streams = models.ManyToManyField(
-        "EventStream",
-        default=None,
-    )
     log_level = models.CharField(
         max_length=20,
         choices=RulebookProcessLogLevel.choices(),

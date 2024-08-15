@@ -19,7 +19,6 @@ from .credential import Credential
 from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
 from .eda_credential import EdaCredential
-from .event_stream import EventStream
 from .job import (
     ActivationInstanceJobInstance,
     Job,
@@ -71,7 +70,6 @@ __all__ = [
     "EdaCredential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
-    "EventStream",
     "Organization",
     "Team",
     "Webhook",

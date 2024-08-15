@@ -276,24 +276,10 @@ def kubernetes_engine(init_data):
         yield engine
 
 
-@pytest.fixture
-def kubernetes_event_stream_engine(init_data):
-    activation_id = init_data.activation.id
-    with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
-        engine = Engine(
-            activation_id=str(activation_id),
-            resource_prefix=ProcessParentType.EVENT_STREAM,
-            client=mock.Mock(),
-        )
-
-        yield engine
-
-
 @pytest.mark.parametrize(
     "resource_prefixes",
     [
         {ProcessParentType.ACTIVATION: "activation"},
-        {ProcessParentType.EVENT_STREAM: "event-stream"},
     ],
 )
 @pytest.mark.django_db
@@ -370,32 +356,6 @@ def test_engine_start(init_data, kubernetes_engine):
     )
     assert engine.pod_name == (
         f"activation-pod-{init_data.activation.id}-"
-        f"{init_data.activation_instance.id}"
-    )
-
-    assert models.RulebookProcessLog.objects.count() == 5
-    assert models.RulebookProcessLog.objects.last().log.endswith(
-        f"Job {engine.job_name} is running"
-    )
-
-
-@pytest.mark.django_db
-def test_event_stream_engine_start(init_data, kubernetes_event_stream_engine):
-    engine = kubernetes_event_stream_engine
-    request = get_request(init_data)
-    log_handler = DBLogger(init_data.activation_instance.id)
-
-    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
-        with mock.patch.object(engine.client, "core_api") as core_api_mock:
-            core_api_mock.list_namespaced_service.return_value.items = None
-            engine.start(request, log_handler)
-
-    assert engine.job_name == (
-        f"event-stream-job-{init_data.activation.id}-"
-        f"{init_data.activation_instance.id}"
-    )
-    assert engine.pod_name == (
-        f"event-stream-pod-{init_data.activation.id}-"
         f"{init_data.activation_instance.id}"
     )
 

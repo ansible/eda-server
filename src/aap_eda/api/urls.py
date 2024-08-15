@@ -44,7 +44,6 @@ router.register(
 )
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("users", views.UserViewSet)
-router.register("event-streams", views.EventStreamViewSet)
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,

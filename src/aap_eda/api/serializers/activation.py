@@ -24,18 +24,13 @@ from rest_framework import serializers
 
 from aap_eda.api.constants import (
     EDA_SERVER_VAULT_LABEL,
-    PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
     SOURCE_MAPPING_ERROR_KEY,
 )
-from aap_eda.api.exceptions import (
-    InvalidEventStreamRulebook,
-    InvalidWebhookSource,
-)
+from aap_eda.api.exceptions import InvalidWebhookSource
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
-from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ANSIBLE_VAULT_STRING,
@@ -58,12 +53,7 @@ from aap_eda.core.utils.rulebook import (
     get_rulebook_hash,
     swap_webhook_sources,
 )
-from aap_eda.core.utils.strings import (
-    substitute_extra_vars,
-    substitute_source_args,
-    substitute_variables,
-    swap_sources,
-)
+from aap_eda.core.utils.strings import substitute_variables
 
 logger = logging.getLogger(__name__)
 REQUIRED_KEYS = ["webhook_id", "webhook_name", "source_name", "rulebook_hash"]
@@ -104,43 +94,6 @@ def _update_webhook_source(validated_data: dict, vault_data: VaultData) -> str:
     except Exception as e:
         logger.error("Failed to update webhook source in rulesets: %s", str(e))
         raise InvalidWebhookSource(e) from e
-
-
-def _updated_ruleset(validated_data: dict, vault_data: VaultData):
-    try:
-        sources_info = []
-
-        for event_stream_id in validated_data["event_streams"]:
-            event_stream = models.EventStream.objects.get(id=event_stream_id)
-
-            if event_stream.rulebook:
-                rulesets = yaml.safe_load(event_stream.rulebook.rulesets)
-            else:
-                rulesets = yaml.safe_load(PG_NOTIFY_TEMPLATE_RULEBOOK_DATA)
-
-            extra_vars = rulesets[0]["sources"][0].get("extra_vars", {})
-            encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
-
-            if bool(encrypt_vars):
-                vault_data.password_used = True
-
-            extra_vars = substitute_extra_vars(
-                event_stream.__dict__,
-                extra_vars,
-                encrypt_vars,
-                vault_data.password,
-            )
-
-            source = rulesets[0]["sources"][0]["complementary_source"]
-            source = substitute_source_args(
-                event_stream.__dict__, source, extra_vars
-            )
-            sources_info.append(source)
-
-        return swap_sources(validated_data["rulebook_rulesets"], sources_info)
-    except Exception as e:
-        logger.error(f"Failed to update rulesets: {e}")
-        raise InvalidEventStreamRulebook(e)
 
 
 def _update_k8s_service_name(validated_data: dict) -> str:
@@ -246,12 +199,6 @@ def replace_vault_data(extra_var):
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=EventStreamOutSerializer(),
-    )
-
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
@@ -287,7 +234,6 @@ class ActivationSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
-            "event_streams",
             "eda_credentials",
             "log_level",
             "webhooks",
@@ -307,11 +253,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
 
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=EventStreamOutSerializer(),
-    )
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
@@ -352,7 +293,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
-            "event_streams",
             "log_level",
             "eda_credentials",
             "k8s_service_name",
@@ -366,10 +306,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
-        event_streams = [
-            EventStreamOutSerializer(event_stream).data
-            for event_stream in activation.event_streams.all()
-        ]
         eda_credentials = [
             EdaCredentialSerializer(credential).data
             for credential in activation.eda_credentials.all()
@@ -405,7 +341,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
-            "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
@@ -431,7 +366,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "awx_token_id",
-            "event_streams",
             "log_level",
             "eda_credentials",
             "k8s_service_name",
@@ -462,12 +396,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_if_awx_token_exists],
         required=False,
-    )
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=serializers.IntegerField(),
-        validators=[validators.check_if_event_streams_exists],
     )
     eda_credentials = serializers.ListField(
         required=False,
@@ -502,11 +430,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             )
 
         vault_data = VaultData()
-
-        if validated_data.get("event_streams"):
-            validated_data["rulebook_rulesets"] = _updated_ruleset(
-                validated_data, vault_data
-            )
 
         if validated_data.get("source_mappings", []):
             validated_data["rulebook_rulesets"] = _update_webhook_source(
@@ -553,7 +476,6 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "git_hash",
             "status_message",
             "activation_id",
-            "event_stream_id",
             "organization_id",
             "started_at",
             "ended_at",
@@ -584,11 +506,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=EventStreamOutSerializer(),
-    )
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
@@ -633,7 +550,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "status_message",
             "awx_token_id",
             "eda_credentials",
-            "event_streams",
             "log_level",
             "k8s_service_name",
             "webhooks",
@@ -680,10 +596,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.organization
             else None
         )
-        event_streams = [
-            EventStreamOutSerializer(event_stream).data
-            for event_stream in activation.event_streams.all()
-        ]
         eda_credentials = [
             EdaCredentialSerializer(credential).data
             for credential in activation.eda_credentials.all()
@@ -724,7 +636,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
-            "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,

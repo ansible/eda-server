@@ -57,7 +57,7 @@ class ActivationManager(StatusManager):
 
     def __init__(
         self,
-        db_instance: tp.Union[models.Activation, models.EventStream],
+        db_instance: models.Activation,
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):

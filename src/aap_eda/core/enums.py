@@ -50,7 +50,6 @@ class ResourceType(DjangoStrEnum):
     CREDENTIAL = "credential"
     CREDENTIAL_TYPE = "credential_type"
     EDA_CREDENTIAL = "eda_credential"
-    EVENT_STREAM = "event_stream"
     ORGANIZATION = "organization"
     TEAM = "team"
     WEBHOOK = "webhook"
@@ -130,7 +129,6 @@ class ProcessParentType(DjangoStrEnum):
     """Types of parent objects for a rulebook process."""
 
     ACTIVATION = "activation"
-    EVENT_STREAM = "event_stream"
 
 
 class RulebookProcessLogLevel(DjangoStrEnum):
