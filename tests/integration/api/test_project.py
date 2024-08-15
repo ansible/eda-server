@@ -171,15 +171,8 @@ def test_create_or_update_project_with_right_signature_credential(
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
-
-    cred_inputs = inputs_to_store({"user": "me"})
-    credential_type = models.CredentialType.objects.get(name=credential_type)
-    credential = models.EdaCredential.objects.create(
-        name="credential",
-        description="Default Credential",
-        credential_type=credential_type,
-        inputs=cred_inputs,
-        organization=default_organization,
+    credential = create_custom_credential(
+        credential_type=credential_type, organization=default_organization
     )
 
     if action == "create":
@@ -324,15 +317,8 @@ def test_create_or_update_project_with_right_eda_credential(
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
-
-    cred_inputs = inputs_to_store({"user": "me"})
-    credential_type = models.CredentialType.objects.get(name=credential_type)
-    credential = models.EdaCredential.objects.create(
-        name="credential",
-        description="Default Credential",
-        credential_type=credential_type,
-        inputs=cred_inputs,
-        organization=default_organization,
+    credential = create_custom_credential(
+        credential_type=credential_type, organization=default_organization
     )
 
     if action == "create":
@@ -757,3 +743,17 @@ def get_organization_details(organization: models.Organization) -> dict:
         "name": organization.name,
         "description": organization.description,
     }
+
+
+def create_custom_credential(
+    credential_type: enums.CredentialType, organization: models.Organization
+) -> models.EdaCredential:
+    cred_inputs = inputs_to_store({"user": "me"})
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    return models.EdaCredential.objects.create(
+        name="custom-credential",
+        description="Custom Credential",
+        credential_type=credential_type,
+        inputs=cred_inputs,
+        organization=organization,
+    )
