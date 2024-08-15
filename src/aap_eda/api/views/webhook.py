@@ -85,14 +85,14 @@ class WebhookViewSet(
     def retrieve(self, request, *args, **kwargs):
         webhook = self.get_object()
 
-        # logger.info(
-        #     logging_utils.generate_simple_audit_log(
-        #         "Read",
-        #         resource_name,
-        #         webhook.name,
-        #         webhook.organization,
-        #     )
-        # )
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                webhook.name,
+                webhook.organization,
+            )
+        )
 
         return Response(serializers.WebhookOutSerializer(webhook).data)
 

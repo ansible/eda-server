@@ -154,14 +154,14 @@ class DecisionEnvironmentViewSet(
             else None
         )
 
-        # logger.info(
-        #     logging_utils.generate_simple_audit_log(
-        #         "Read",
-        #         resource_name,
-        #         decision_environment.data["name"],
-        #         decision_environment.data["organization"],
-        #     )
-        # )
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                decision_environment.data["name"],
+                decision_environment.data["organization"],
+            )
+        )
 
         return Response(
             serializers.DecisionEnvironmentReadSerializer(

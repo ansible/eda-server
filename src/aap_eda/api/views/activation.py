@@ -154,14 +154,14 @@ class ActivationViewSet(
     def retrieve(self, request, pk: int):
         activation = self.get_object()
 
-        # logger.info(
-        #     logging_utils.generate_simple_audit_log(
-        #         "Read",
-        #         resource_name,
-        #         activation.name,
-        #         activation.organization,
-        #     )
-        # )
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                activation.name,
+                activation.organization,
+            )
+        )
 
         return Response(serializers.ActivationReadSerializer(activation).data)
 
