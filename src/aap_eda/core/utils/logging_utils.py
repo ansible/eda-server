@@ -2,12 +2,13 @@ from aap_eda.core import models
 
 
 def generate_simple_audit_log(
-    action, resource_type, resource_name, organization
+    action, resource_type, resource_name, resource_id, organization
 ):
     log_msg = (
         f"Action: {action} / "
         f"ResourceType: {resource_type} / "
         f"ResourceName: {resource_name} / "
+        f"ResourceID: {resource_id} / "
         f"Organization: {organization}"
     )
     return log_msg

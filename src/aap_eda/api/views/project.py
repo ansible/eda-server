@@ -51,6 +51,7 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
                 "Delete",
                 resource_name,
                 project.name,
+                project.id,
                 project.organization,
             )
         )
@@ -140,6 +141,7 @@ class ProjectViewSet(
                 "Create",
                 resource_name,
                 project.name,
+                project.id,
                 project.organization,
             )
         )
@@ -184,6 +186,7 @@ class ProjectViewSet(
                 "Read",
                 resource_name,
                 project.data["name"],
+                project.data["id"],
                 project.data["organization"].name,
             )
         )
@@ -235,6 +238,7 @@ class ProjectViewSet(
                 "Update",
                 resource_name,
                 project.name,
+                project.id,
                 project.organization,
             )
         )
@@ -286,6 +290,7 @@ class ProjectViewSet(
                 "Sync",
                 resource_name,
                 project.name,
+                project.id,
                 project.organization,
             )
         )

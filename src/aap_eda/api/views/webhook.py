@@ -90,6 +90,7 @@ class WebhookViewSet(
                 "Read",
                 resource_name,
                 webhook.name,
+                webhook.id,
                 webhook.organization,
             )
         )
@@ -119,6 +120,7 @@ class WebhookViewSet(
                 "Delete",
                 resource_name,
                 webhook.name,
+                webhook.id,
                 webhook.organization,
             )
         )
@@ -144,6 +146,7 @@ class WebhookViewSet(
             logging_utils.generate_simple_audit_log(
                 "List",
                 "EventStream",
+                "*",
                 "*",
                 "*",
             )
@@ -197,6 +200,7 @@ class WebhookViewSet(
                 "Create",
                 resource_name,
                 response.name,
+                response.id,
                 response.organization,
             )
         )
@@ -254,6 +258,7 @@ class WebhookViewSet(
                 "Update",
                 resource_name,
                 webhook.name,
+                webhook.id,
                 webhook.organization,
             )
         )
@@ -305,6 +310,7 @@ class WebhookViewSet(
                 "ListActivations",
                 resource_name,
                 webhook.name,
+                webhook.id,
                 webhook.organization,
             )
         )

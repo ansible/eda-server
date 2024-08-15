@@ -102,6 +102,7 @@ class ActivationViewSet(
                 "Create",
                 resource_name,
                 response.name,
+                response.id,
                 response.organization,
             )
         )
@@ -133,6 +134,7 @@ class ActivationViewSet(
             "Delete",
             resource_name,
             activation.name,
+            activation.id,
             activation.organization,
         )
 
@@ -159,6 +161,7 @@ class ActivationViewSet(
                 "Read",
                 resource_name,
                 activation.name,
+                activation.id,
                 activation.organization,
             )
         )
@@ -187,6 +190,7 @@ class ActivationViewSet(
             logging_utils.generate_simple_audit_log(
                 "ListActivations",
                 resource_name,
+                "*",
                 "*",
                 "*",
             )
@@ -307,6 +311,7 @@ class ActivationViewSet(
                 "Enable",
                 resource_name,
                 activation.name,
+                activation.id,
                 activation.organization,
             )
         )
@@ -345,6 +350,7 @@ class ActivationViewSet(
                 "Disable",
                 resource_name,
                 activation.name,
+                activation.id,
                 activation.organization,
             )
         )
@@ -396,6 +402,7 @@ class ActivationViewSet(
                 "Restart",
                 resource_name,
                 activation.name,
+                activation.id,
                 activation.organization,
             )
         )

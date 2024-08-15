@@ -48,6 +48,7 @@ class CreateDecisionEnvironmentMixin(CreateModelMixin):
                 "Create",
                 resource_name,
                 response.data["name"],
+                response.data["id"],
                 logging_utils.get_organization_name_from_data(response),
             )
         )
@@ -64,6 +65,7 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
                 "Update",
                 resource_name,
                 response.data["name"],
+                response.data["id"],
                 logging_utils.get_organization_name_from_data(response),
             )
         )
@@ -159,6 +161,7 @@ class DecisionEnvironmentViewSet(
                 "Read",
                 resource_name,
                 decision_environment.data["name"],
+                decision_environment.data["id"],
                 decision_environment.data["organization"],
             )
         )
@@ -212,6 +215,7 @@ class DecisionEnvironmentViewSet(
                 "Delete",
                 resource_name,
                 instance.name,
+                instance.id,
                 instance.organization,
             )
         )
