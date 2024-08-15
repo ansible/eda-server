@@ -60,7 +60,7 @@ jobs:
           -e EDA_USERNAME=${{ secrets.EDA_USERNAME }} \
           -e EDA_PASSWORD=${{ secrets.EDA_PASSWORD }} \
           -e CYPRESS_baseUrl=${{ env.EDA_UI_URL }} \
-          -e CYPRESS_PRODUCT=EDA \
+          -e CYPRESS_E2E_MODE=EDA \
           -e NODE_OPTIONS=--max-old-space-size=3500 \
           --network ${{ env.DOCKER_NETWORK }} \
           ${{ env.UI_E2E_IMAGE }} \
