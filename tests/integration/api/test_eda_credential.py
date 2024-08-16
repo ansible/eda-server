@@ -556,14 +556,17 @@ def test_delete_credential_with_event_stream_reference(
     preseed_credential_types,
 ):
     eda_credential = default_event_stream.eda_credential
-    response = admin_client.delete(
-        f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
-    )
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert (
-        f"Credential {eda_credential.name} is being referenced by other "
-        "resources and cannot be deleted"
-    ) in response.data["detail"]
+    for url in [
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/",
+        f"{api_url_v1}/eda-credentials/{eda_credential.id}/?force=true",
+    ]:
+        response = admin_client.delete(url)
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert (
+            f"Credential {eda_credential.name} is being referenced by some "
+            "event streams and cannot be deleted. "
+            "Please delete the EventStream(s) first"
+        ) in response.data["detail"]
 
 
 @pytest.mark.django_db

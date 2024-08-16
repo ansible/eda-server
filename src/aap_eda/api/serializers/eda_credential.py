@@ -185,9 +185,6 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
     resources = []
 
     used_activations = eda_credential.activations.all()
-    used_event_streams = models.EventStream.objects.filter(
-        eda_credential=eda_credential
-    )
     used_decision_environments = models.DecisionEnvironment.objects.filter(
         eda_credential=eda_credential
     )
@@ -202,15 +199,6 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
             "id": activation.id,
             "name": activation.name,
             "url": f"api/eda/v1/activations/{activation.id}/",
-        }
-        resources.append(resource)
-
-    for event_stream in used_event_streams:
-        resource = {
-            "type": "EventStream",
-            "id": event_stream.id,
-            "name": event_stream.name,
-            "url": (f"api/eda/v1/event-streams/{event_stream.id}/"),
         }
         resources.append(resource)
 
