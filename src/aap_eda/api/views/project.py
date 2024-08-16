@@ -33,7 +33,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
 
-from .mixins import ResponseSerializerMixin
+from .mixins import RedisDependencyMixin, ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ class ProjectViewSet(
     DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
+    RedisDependencyMixin,
 ):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
@@ -106,10 +107,14 @@ class ProjectViewSet(
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.ProjectSerializer,
                 description="Return a created project.",
-            ),
-        },
+            )
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
+        # We cant do anything without redis.
+        self.redis_is_available()
+
         serializer = serializers.ProjectCreateRequestSerializer(
             data=request.data
         )
@@ -246,7 +251,8 @@ class ProjectViewSet(
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
-        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer},
+        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer}
+        | RedisDependencyMixin.redis_unavailable_response(),
         request=None,
         description="Sync a project",
     )
@@ -269,6 +275,10 @@ class ProjectViewSet(
         # user might have only view permission, so we still have to check if
         # user has sync permission for this project
         self.check_object_permissions(request, project)
+
+        # Now that we've verified the user has access to the project
+        # we need Redis for what comes next.
+        self.redis_is_available()
 
         if project.import_state in [
             models.Project.ImportState.PENDING,

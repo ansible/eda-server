@@ -420,6 +420,23 @@ def test_create_project_name_conflict(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_create_project_redis_unavailable(
+    is_redis_failed: mock.Mock, admin_client: APIClient
+):
+    response = admin_client.post(
+        f"{api_url_v1}/projects/",
+        data={
+            "name": "ain't-no-redis",
+            "url": "https://git.example.com/acme/project-01",
+        },
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Redis is required but unavailable."}
+
+
+@pytest.mark.django_db
 def test_create_project_wrong_ids(admin_client: APIClient):
     bodies = [
         {
@@ -528,6 +545,21 @@ def test_sync_project_conflict_already_running(
 def test_sync_project_not_exist(admin_client: APIClient):
     response = admin_client.post(f"{api_url_v1}/projects/42/sync/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_sync_project_redis_unavailable(
+    is_redis_failed: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Redis is required but unavailable."}
 
 
 # Test: Partial update project

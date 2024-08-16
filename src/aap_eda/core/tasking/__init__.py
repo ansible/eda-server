@@ -17,10 +17,12 @@ from typing import (
 
 import redis
 import rq
+from ansible_base.lib import constants
 from ansible_base.lib.redis.client import (
     DABRedis,
     DABRedisCluster,
     get_redis_client as _get_redis_client,
+    get_redis_status as _get_redis_status,
 )
 from django.conf import settings
 from django_rq import enqueue, get_queue, get_scheduler, job
@@ -62,7 +64,7 @@ _ErrorHandlersArgType = Union[
 ]
 
 
-def _create_url_from_parameters(**kwargs):
+def _create_url_from_parameters(**kwargs) -> str:
     # Make the URL that DAB will expect for instantiation.
     schema = "unix"
     try:
@@ -77,12 +79,8 @@ def _create_url_from_parameters(**kwargs):
     return url
 
 
-def get_redis_client(**kwargs):
-    """Instantiate a Redis client via DAB.
-
-    DAB will return an appropriate client for HA based on the passed
-    parameters.
-    """
+def _prune_redis_kwargs(**kwargs) -> None:
+    """Prunes the kwargs of unsupported parameters for RedisCluster."""
     # HA cluster does not support an alternate redis db and will generate an
     # exception if we pass a value (even the default). If we're in that
     # situation we drop the db and, if the db is anything other than the
@@ -96,7 +94,28 @@ def get_redis_client(**kwargs):
                 f"; db specified: {db}"
             )
 
+
+def get_redis_client(**kwargs) -> Union[DABRedis, DABRedisCluster]:
+    """Instantiate a Redis client via DAB.
+
+    DAB will return an appropriate client for HA based on the passed
+    parameters.
+    """
+    _prune_redis_kwargs(**kwargs)
     return _get_redis_client(_create_url_from_parameters(**kwargs), **kwargs)
+
+
+def get_redis_status() -> dict:
+    """Query DAB for the status of Redis."""
+    kwargs = default.rq_redis_client_instantiation_parameters()
+    _prune_redis_kwargs(**kwargs)
+    return _get_redis_status(_create_url_from_parameters(**kwargs), **kwargs)
+
+
+def is_redis_failed() -> bool:
+    """Return a boolean indicating if Redis is in a failed state."""
+    response = get_redis_status()
+    return response["status"] == constants.STATUS_FAILED
 
 
 class Scheduler(_Scheduler):
