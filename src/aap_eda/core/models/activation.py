@@ -30,6 +30,8 @@ from .webhook import Webhook
 
 __all__ = ("Activation",)
 
+DEFAULT_ENABLED = True
+
 
 class Activation(
     StatusHandlerModelMixin,
@@ -53,7 +55,7 @@ class Activation(
         default="",
         blank=True,
     )
-    is_enabled = models.BooleanField(default=True)
+    is_enabled = models.BooleanField(default=DEFAULT_ENABLED)
     git_hash = models.TextField(null=False, default="")
     # TODO(alex) Since local activations are no longer supported
     # this field should be mandatory.

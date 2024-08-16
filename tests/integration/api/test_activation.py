@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from typing import Any, Dict, List
-from unittest.mock import patch
+from unittest import mock
 
 import pytest
 import yaml
@@ -36,7 +36,7 @@ def converted_extra_var(var: str) -> str:
 
 
 @pytest.mark.django_db
-@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_create_activation(
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
@@ -74,7 +74,7 @@ def test_create_activation(
 
 
 @pytest.mark.django_db
-@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_create_activation_blank_text(
     admin_awx_token: models.AwxToken,
     activation_payload_blank_text: Dict[str, Any],
@@ -161,6 +161,35 @@ def test_create_activation_bad_entity(admin_client: APIClient):
         data=test_activation,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.parametrize(
+    "enabled",
+    [True, False],
+)
+@pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_create_activation_redis_unavailable(
+    is_redis_failed: mock.Mock,
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    enabled: bool,
+    preseed_credential_types,
+):
+    activation_payload["is_enabled"] = enabled
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+
+    if not enabled:
+        assert response.status_code == status.HTTP_201_CREATED
+    else:
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json() == {
+            "detail": "Redis is required but unavailable."
+        }
 
 
 @pytest.mark.parametrize(
@@ -443,6 +472,21 @@ def test_delete_activation(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_delete_activation_redis_unavailable(
+    is_redis_failed: mock.Mock,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    response = admin_client.delete(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Redis is required but unavailable."}
+
+
+@pytest.mark.django_db
 def test_restart_activation(
     default_activation: models.Activation,
     admin_client: APIClient,
@@ -453,6 +497,38 @@ def test_restart_activation(
     )
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.parametrize(
+    "enabled",
+    [True, False],
+)
+@pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_restart_activation_redis_unavailable(
+    is_redis_failed: mock.Mock,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    enabled: bool,
+    preseed_credential_types,
+):
+    default_activation.is_enabled = enabled
+    default_activation.save(update_fields=["is_enabled"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{default_activation.id}/restart/"
+    )
+
+    if not enabled:
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.json() == {
+            "detail": "Activation is disabled and cannot be run."
+        }
+    else:
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json() == {
+            "detail": "Redis is required but unavailable."
+        }
 
 
 @pytest.mark.django_db
@@ -489,7 +565,7 @@ def test_restart_activation_without_de(
 
 
 @pytest.mark.django_db
-@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_enable_activation(
     default_activation: models.Activation,
     admin_client: APIClient,
@@ -537,6 +613,36 @@ def test_enable_activation(
         )
 
 
+@pytest.mark.parametrize(
+    "enabled",
+    [True, False],
+)
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_enable_activation_redis_unavailable(
+    is_redis_failed: mock.Mock,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    enabled: bool,
+    preseed_credential_types,
+):
+    default_activation.is_enabled = enabled
+    default_activation.save(update_fields=["is_enabled"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{default_activation.id}/enable/"
+    )
+
+    if enabled:
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+    else:
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json() == {
+            "detail": "Redis is required but unavailable."
+        }
+
+
 @pytest.mark.django_db
 def test_disable_activation(
     default_activation: models.Activation,
@@ -548,6 +654,35 @@ def test_disable_activation(
     )
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.parametrize(
+    "enabled",
+    [True, False],
+)
+@pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+def test_disable_activation_redis_unavailable(
+    is_redis_failed: mock.Mock,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    enabled: bool,
+    preseed_credential_types,
+):
+    default_activation.is_enabled = enabled
+    default_activation.save(update_fields=["is_enabled"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{default_activation.id}/disable/"
+    )
+
+    if not enabled:
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+    else:
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json() == {
+            "detail": "Redis is required but unavailable."
+        }
 
 
 @pytest.mark.django_db
@@ -812,7 +947,7 @@ def test_create_activation_with_awx_token(
 
 
 @pytest.mark.django_db
-@patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 def test_create_activation_with_skip_audit_events(
     admin_awx_token: models.AwxToken,
     activation_payload_skip_audit_events: Dict[str, Any],
