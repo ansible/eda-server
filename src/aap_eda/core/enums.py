@@ -164,14 +164,14 @@ class WebhookCredentialType(DjangoStrEnum):
     HMAC = "HMAC Webhook"
     BASIC = "Basic Webhook"
     TOKEN = "Token Webhook"
-    OAUTH2 = "Oauth2 Webhook"
-    OAUTH2_JWT = "Oauth2 JWT Webhook"
+    OAUTH2 = "OAuth2 Webhook"
+    OAUTH2_JWT = "OAuth2 JWT Webhook"
     ECDSA = "ECDSA Webhook"
     MTLS = "mTLS Webhook"
 
 
 class CustomWebhookCredentialType(DjangoStrEnum):
-    GITLAB = "GITLAB Webhook"
+    GITLAB = "GitLab Webhook"
     GITHUB = "GitHub Webhook"
-    SNOW = "Service Now Webhook"
+    SNOW = "ServiceNow Webhook"
     DYNATRACE = "Dynatrace Webhook"
