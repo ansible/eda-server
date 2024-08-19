@@ -301,7 +301,9 @@ def default_run_job_template_rulesets() -> str:
 
 @pytest.fixture
 def default_rulebook(
-    default_project: models.Project, default_rulesets: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    default_rulesets: str,
 ) -> models.Rulebook:
     """Return a default Rulebook"""
     return models.Rulebook.objects.create(
@@ -309,6 +311,7 @@ def default_rulebook(
         rulesets=default_rulesets,
         description="test rulebook",
         project=default_project,
+        organization=default_organization,
     )
 
 
@@ -616,7 +619,7 @@ def activation_payload(
         "project_id": default_project.id,
         "rulebook_id": default_rulebook.id,
         "extra_var": default_extra_var_data,
-        "organization": default_organization.id,
+        "organization_id": default_organization.id,
         "user_id": admin_user.id,
         "restart_policy": enums.RestartPolicy.ON_FAILURE,
         "log_level": enums.RulebookProcessLogLevel.DEBUG,

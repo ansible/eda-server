@@ -94,6 +94,7 @@ def kafka_credential_type() -> models.CredentialType:
 @pytest.mark.django_db
 def test_validate_for_aap_credential(
     default_activation: models.Activation,
+    default_organization: models.Organization,
     inputs,
     result,
     preseed_credential_types,
@@ -106,6 +107,7 @@ def test_validate_for_aap_credential(
         inputs=inputs,
         managed=False,
         credential_type_id=aap_credential_type.id,
+        organization=default_organization,
     )
     default_activation.eda_credentials.add(credential)
 
@@ -120,6 +122,7 @@ def test_is_activation_valid_with_token_and_run_job_template(
     default_project: models.Project,
     default_user_awx_token: models.AwxToken,
     default_user: models.User,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     activation = models.Activation.objects.create(
@@ -130,6 +133,7 @@ def test_is_activation_valid_with_token_and_run_job_template(
         project_id=default_project.id,
         awx_token_id=default_user_awx_token.id,
         user_id=default_user.id,
+        organization=default_organization,
     )
 
     valid, _ = is_activation_valid(activation)
@@ -139,6 +143,7 @@ def test_is_activation_valid_with_token_and_run_job_template(
 @pytest.mark.django_db
 def test_is_activation_valid_with_aap_credential_and_run_job_template(
     default_activation: models.Activation,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     aap_credential_type = models.CredentialType.objects.get(
@@ -149,6 +154,7 @@ def test_is_activation_valid_with_aap_credential_and_run_job_template(
         inputs={"username": "adam", "password": "secret"},
         managed=False,
         credential_type_id=aap_credential_type.id,
+        organization=default_organization,
     )
 
     default_activation.eda_credentials.add(credential)
@@ -163,6 +169,7 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
     default_rulebook_with_run_job_template: models.Rulebook,
     default_project: models.Project,
     default_user: models.User,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     activation = models.Activation.objects.create(
@@ -172,6 +179,7 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
         decision_environment_id=default_decision_environment.id,
         project_id=default_project.id,
         user_id=default_user.id,
+        organization=default_organization,
     )
 
     valid, message = is_activation_valid(activation)
@@ -247,6 +255,7 @@ def test_create_activation_with_eda_credentials(
     preseed_credential_types,
     credential_type,
     status_code,
+    default_organization: models.Organization,
 ):
     credential_type = models.CredentialType.objects.get(name=credential_type)
 
@@ -257,6 +266,7 @@ def test_create_activation_with_eda_credentials(
         inputs=inputs_to_store(
             {"username": "dummy-user", "password": "dummy-password"}
         ),
+        organization=default_organization,
     )
     kafka_eda_credential = models.EdaCredential.objects.create(
         name="kafka-eda-credential",
@@ -264,6 +274,7 @@ def test_create_activation_with_eda_credentials(
             {"sasl_username": "adam", "sasl_password": "secret"},
         ),
         credential_type=kafka_credential_type,
+        organization=default_organization,
     )
     test_activation = {
         "name": "test_activation",
@@ -272,6 +283,7 @@ def test_create_activation_with_eda_credentials(
         ],
         "rulebook_id": activation_payload["rulebook_id"],
         "eda_credentials": [credential.id, kafka_eda_credential.id],
+        "organization_id": default_organization.id,
     }
 
     response = admin_client.post(
@@ -315,6 +327,7 @@ def test_create_activation_with_key_conflict(
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
     kafka_credential_type: models.CredentialType,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     test_activation = {
@@ -322,12 +335,14 @@ def test_create_activation_with_key_conflict(
         "decision_environment_id": default_decision_environment.id,
         "rulebook_id": default_rulebook.id,
         "extra_var": OVERLAP_EXTRA_VAR,
+        "organization_id": default_organization.id,
     }
 
     test_eda_credential = models.EdaCredential.objects.create(
         name="eda-credential",
         inputs={"sasl_username": "adam", "sasl_password": "secret"},
         credential_type_id=kafka_credential_type.id,
+        organization=default_organization,
     )
     test_activation["eda_credentials"] = [test_eda_credential.id]
 
@@ -347,6 +362,7 @@ def test_create_activation_with_conflict_credentials(
     admin_client: APIClient,
     activation_payload: Dict[str, Any],
     user_credential_type: models.CredentialType,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     test_activation = {
@@ -355,6 +371,7 @@ def test_create_activation_with_conflict_credentials(
             "decision_environment_id"
         ],
         "rulebook_id": activation_payload["rulebook_id"],
+        "organization_id": default_organization.id,
     }
 
     eda_credentials = models.EdaCredential.objects.bulk_create(
@@ -392,6 +409,7 @@ def test_create_activation_without_extra_vars_single_credential(
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
     user_credential_type: models.CredentialType,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     test_activation = {
@@ -399,12 +417,14 @@ def test_create_activation_without_extra_vars_single_credential(
         "decision_environment_id": default_decision_environment.id,
         "rulebook_id": default_rulebook.id,
         "extra_var": None,
+        "organization_id": default_organization.id,
     }
 
     eda_credential = models.EdaCredential.objects.create(
         name="credential-1",
         inputs={"sasl_username": "adam", "sasl_password": "secret"},
         credential_type_id=user_credential_type.id,
+        organization=default_organization,
     )
 
     eda_credential_ids = [eda_credential.id]
@@ -427,12 +447,14 @@ def test_create_activation_without_extra_vars_duplicate_credentials(
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
     user_credential_type: models.CredentialType,
+    default_organization: models.Organization,
     preseed_credential_types,
 ):
     test_activation = {
         "name": "test_activation",
         "decision_environment_id": default_decision_environment.id,
         "rulebook_id": default_rulebook.id,
+        "organization_id": default_organization.id,
     }
 
     eda_credentials = models.EdaCredential.objects.bulk_create(
@@ -441,11 +463,13 @@ def test_create_activation_without_extra_vars_duplicate_credentials(
                 name="credential-1",
                 inputs={"sasl_username": "adam", "sasl_password": "secret"},
                 credential_type_id=user_credential_type.id,
+                organization=default_organization,
             ),
             models.EdaCredential(
                 name="credential-2",
                 inputs={"sasl_username": "bearny", "sasl_password": "demo"},
                 credential_type_id=user_credential_type.id,
+                organization=default_organization,
             ),
         ]
     )
