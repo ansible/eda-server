@@ -71,8 +71,8 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
     organization_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
+        required=True,
+        allow_null=False,
         validators=[validators.check_if_organization_exists],
     )
     eda_credential_id = serializers.IntegerField(
@@ -107,7 +107,7 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
 
 class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
     organization_id = serializers.IntegerField(
-        required=False,
+        required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
     )

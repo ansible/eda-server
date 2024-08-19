@@ -46,7 +46,7 @@ def test_create_activation(
     response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
-    assert response.status_code == status.HTTP_201_CREATED
+    assert response.status_code == status.HTTP_201_CREATED, response.data
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert_activation_base_data(

@@ -26,8 +26,9 @@ class BaseOrgModel(models.Model):
     organization = models.ForeignKey(
         "Organization",
         on_delete=models.CASCADE,
+        blank=False,
+        null=False,
         default=get_default_organization_id,
-        null=True,
     )
 
 

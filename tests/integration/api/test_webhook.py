@@ -25,6 +25,7 @@ import jwt
 import pytest
 import requests_mock
 import yaml
+from django.conf import settings
 from django.test import override_settings
 from ecdsa import SigningKey
 from ecdsa.util import sigencode_der
@@ -76,11 +77,14 @@ def test_retrieve_webhook(
 
 @pytest.mark.django_db
 def test_create_webhook(
-    admin_client: APIClient, default_hmac_credential: models.EdaCredential
+    admin_client: APIClient,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
 ):
     data_in = {
         "name": "test_webhook",
         "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     assert webhook.name == "test_webhook"
@@ -88,9 +92,13 @@ def test_create_webhook(
 
 
 @pytest.mark.django_db
-def test_create_webhook_without_credentials(admin_client: APIClient):
+def test_create_webhook_without_credentials(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
     data_in = {
         "name": "test_webhook",
+        "organization_id": default_organization.id,
     }
     response = admin_client.post(f"{api_url_v1}/webhooks/", data=data_in)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -118,6 +126,7 @@ def test_post_webhook(
     preseed_credential_types,
     hash_algorithm,
     digestmod,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "My-Secret-Header"
@@ -136,6 +145,7 @@ def test_post_webhook(
     data_in = {
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
+        "organization_id": default_organization.id,
     }
 
     webhook = _create_webhook(admin_client, data_in)
@@ -158,6 +168,7 @@ def test_post_webhook(
 def test_post_webhook_bad_secret(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "My-Secret-Header"
@@ -176,6 +187,7 @@ def test_post_webhook_bad_secret(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     bad_secret = secrets.token_hex(32)
@@ -202,6 +214,7 @@ def test_post_webhook_bad_secret(
 def test_post_webhook_with_prefix(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "My-Secret-Header"
@@ -222,6 +235,7 @@ def test_post_webhook_with_prefix(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -245,6 +259,7 @@ def test_post_webhook_with_prefix(
 def test_post_webhook_with_test_mode(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "My-Secret-Header"
@@ -265,6 +280,7 @@ def test_post_webhook_with_test_mode(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -338,6 +354,7 @@ def test_post_webhook_with_bad_uuid(
 def test_post_webhook_with_form_urlencoded(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "My-Secret-Header"
@@ -358,6 +375,7 @@ def test_post_webhook_with_form_urlencoded(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -385,6 +403,7 @@ def test_post_webhook_with_form_urlencoded(
 def test_post_webhook_with_base64_format(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "My-Secret-Header"
@@ -405,6 +424,7 @@ def test_post_webhook_with_base64_format(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -438,6 +458,7 @@ def test_post_webhook_with_base64_format(
 def test_post_webhook_with_basic_auth(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
     auth_status,
     bogus_password,
 ):
@@ -458,6 +479,7 @@ def test_post_webhook_with_basic_auth(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     if bogus_password:
@@ -492,6 +514,7 @@ def test_post_webhook_with_basic_auth(
 @pytest.mark.django_db
 def test_post_webhook_with_token(
     admin_client: APIClient,
+    default_organization: models.Organization,
     preseed_credential_types,
     auth_status,
     bogus_token,
@@ -512,6 +535,7 @@ def test_post_webhook_with_token(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -536,6 +560,7 @@ def test_post_webhook_with_token(
 def test_post_webhook_with_test_mode_extra_headers(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     signature_header_name = "X-Gitlab-Token"
@@ -557,6 +582,7 @@ def test_post_webhook_with_test_mode_extra_headers(
         "eda_credential_id": obj["id"],
         "test_mode": True,
         "additional_data_headers": additional_data_headers,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -607,6 +633,7 @@ def test_post_webhook_with_test_mode_extra_headers(
 def test_post_webhook_with_ecdsa(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
     auth_status,
     data,
     bogus_data,
@@ -629,6 +656,7 @@ def test_post_webhook_with_ecdsa(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     content_type = "application/json"
@@ -659,6 +687,7 @@ def test_post_webhook_with_ecdsa(
 def test_post_webhook_with_ecdsa_with_prefix(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     signature_header_name = "My-Ecdsa-Sig"
     prefix_header_name = "My-Ecdsa-Prefix"
@@ -681,6 +710,7 @@ def test_post_webhook_with_ecdsa_with_prefix(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
 
@@ -752,6 +782,7 @@ def test_fetching_webhook_credential(
 def test_post_webhook_with_oauth2(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
     auth_status,
     payload,
     post_status,
@@ -779,6 +810,7 @@ def test_post_webhook_with_oauth2(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
 
@@ -812,6 +844,7 @@ def test_post_webhook_with_oauth2(
 def test_post_webhook_with_oauth2_jwt(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
     auth_status,
     side_effect,
 ):
@@ -834,6 +867,7 @@ def test_post_webhook_with_oauth2_jwt(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
 
@@ -869,6 +903,7 @@ def test_post_webhook_with_oauth2_jwt(
 def test_post_webhook_with_mtls(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
     subject,
     auth_status,
     bogus_subject,
@@ -888,6 +923,7 @@ def test_post_webhook_with_mtls(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     webhook = _create_webhook(admin_client, data_in)
     data = {"a": 1, "b": 2}
@@ -913,6 +949,7 @@ def test_post_webhook_with_mtls(
 def test_post_webhook_with_mtls_missing_settings(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     header_key = "Subject"
     inputs = {
@@ -929,6 +966,7 @@ def test_post_webhook_with_mtls_missing_settings(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     with override_settings(WEBHOOK_MTLS_BASE_URL=None):
         response = admin_client.post(f"{api_url_v1}/webhooks/", data=data_in)
@@ -948,6 +986,7 @@ def test_post_webhook_with_mtls_missing_settings(
 def test_post_webhook_with_basic_auth_missing_settings(
     admin_client: APIClient,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     secret = secrets.token_hex(32)
     username = "fred"
@@ -966,6 +1005,7 @@ def test_post_webhook_with_basic_auth_missing_settings(
         "name": "test-webhook-1",
         "eda_credential_id": obj["id"],
         "test_mode": True,
+        "organization_id": default_organization.id,
     }
     with override_settings(WEBHOOK_BASE_URL=None):
         response = admin_client.post(f"{api_url_v1}/webhooks/", data=data_in)
@@ -989,10 +1029,15 @@ def _create_webhook_credential(
     credential_type = models.CredentialType.objects.get(
         name=credential_type_name
     )
+    organization = models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )[0]
     data_in = {
         "name": name,
         "inputs": inputs,
         "credential_type_id": credential_type.id,
+        "organization_id": organization.id,
     }
     response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
     assert response.status_code == status.HTTP_201_CREATED

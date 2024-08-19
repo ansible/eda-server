@@ -44,6 +44,7 @@ class TeamCreateSerializer(
 ):
     organization_id = serializers.IntegerField(
         required=True,
+        allow_null=False,
         validators=[validators.check_if_organization_exists],
     )
 
