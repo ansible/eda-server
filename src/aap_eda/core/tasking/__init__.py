@@ -79,7 +79,7 @@ def _create_url_from_parameters(**kwargs) -> str:
     return url
 
 
-def _prune_redis_kwargs(**kwargs) -> None:
+def _prune_redis_kwargs(**kwargs) -> dict[str, Any]:
     """Prunes the kwargs of unsupported parameters for RedisCluster."""
     # HA cluster does not support an alternate redis db and will generate an
     # exception if we pass a value (even the default). If we're in that
@@ -93,6 +93,7 @@ def _prune_redis_kwargs(**kwargs) -> None:
                 f"clustered redis supports only the default db"
                 f"; db specified: {db}"
             )
+    return kwargs
 
 
 def get_redis_client(**kwargs) -> Union[DABRedis, DABRedisCluster]:
@@ -101,14 +102,14 @@ def get_redis_client(**kwargs) -> Union[DABRedis, DABRedisCluster]:
     DAB will return an appropriate client for HA based on the passed
     parameters.
     """
-    _prune_redis_kwargs(**kwargs)
+    kwargs = _prune_redis_kwargs(**kwargs)
     return _get_redis_client(_create_url_from_parameters(**kwargs), **kwargs)
 
 
 def get_redis_status() -> dict:
     """Query DAB for the status of Redis."""
     kwargs = default.rq_redis_client_instantiation_parameters()
-    _prune_redis_kwargs(**kwargs)
+    kwargs = _prune_redis_kwargs(**kwargs)
     return _get_redis_status(_create_url_from_parameters(**kwargs), **kwargs)
 
 
