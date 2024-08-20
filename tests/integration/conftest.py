@@ -906,6 +906,34 @@ def default_vault_credential(
 
 
 @pytest.fixture
+def default_aap_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a default Vault Credential"""
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    data = "secret"
+
+    return models.EdaCredential.objects.create(
+        name="default-aap-credential",
+        description="Default RH-AAP Credential",
+        inputs=inputs_to_store(
+            {
+                "host": "https://eda_controller_url",
+                "username": "adam",
+                "password": data,
+                "ssl_verify": "no",
+                "oauth_token": "",
+            }
+        ),
+        credential_type=aap_credential_type,
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
 def default_scm_credential(
     default_organization: models.Organization,
     preseed_credential_types,

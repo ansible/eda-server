@@ -26,6 +26,12 @@ from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.core.utils.crypto.base import SecretValue
 from tests.integration.constants import api_url_v1
 
+EXTRA_VAR = """
+---
+db_host: localhost
+db_password: password
+"""
+
 OVERLAP_EXTRA_VAR = """
 ---
 sasl_plain_username: demo
@@ -72,6 +78,25 @@ INJECTORS = {
 def kafka_credential_type() -> models.CredentialType:
     return models.CredentialType.objects.create(
         name="type1", inputs=KAFKA_INPUTS, injectors=INJECTORS
+    )
+
+
+@pytest.fixture
+def custom_credential_type() -> models.CredentialType:
+    return models.CredentialType.objects.create(
+        name="custom_user_type",
+        inputs={
+            "fields": [
+                {"id": "username"},
+                {"id": "password"},
+            ]
+        },
+        injectors={
+            "extra_vars": {
+                "custom_username": "{{ username }}",
+                "custom_password": "{{ password }}",
+            }
+        },
     )
 
 
@@ -486,3 +511,134 @@ def test_create_activation_without_extra_vars_duplicate_credentials(
         " credential type: user_type. Please check injectors."
         in response.data["non_field_errors"]
     )
+
+
+@pytest.mark.django_db
+def test_create_activation_with_extra_vars_user_credential(
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+    user_credential_type: models.CredentialType,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": default_decision_environment.id,
+        "rulebook_id": default_rulebook.id,
+        "extra_var": EXTRA_VAR,
+        "organization_id": default_organization.id,
+    }
+    data = "secret"
+
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential-1",
+        inputs={"sasl_username": "adam", "sasl_password": data},
+        credential_type_id=user_credential_type.id,
+        organization=default_organization,
+    )
+
+    eda_credential_ids = [eda_credential.id]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["extra_var"]
+    original_extra_var = yaml.safe_load(EXTRA_VAR)
+    extra_var = yaml.safe_load(response.data["extra_var"])
+    assert extra_var["sasl_username"] == "adam"
+    assert extra_var["sasl_password"] == "secret"
+    for key, value in original_extra_var.items():
+        assert value == extra_var[key]
+
+
+@pytest.mark.django_db
+def test_create_activation_with_extra_vars_vault_aap_credential(
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
+    default_vault_credential: models.EdaCredential,
+    default_aap_credential: models.EdaCredential,
+    preseed_credential_types,
+):
+    test_activation = {
+        "decision_environment_id": default_decision_environment.id,
+        "rulebook_id": default_rulebook.id,
+        "extra_var": EXTRA_VAR,
+        "organization_id": default_organization.id,
+    }
+
+    for test_credential in [default_vault_credential, default_aap_credential]:
+        test_activation["name"] = f"{test_credential.name}-activation"
+        eda_credential_ids = [test_credential.id]
+        test_activation["eda_credentials"] = eda_credential_ids
+
+        response = admin_client.post(
+            f"{api_url_v1}/activations/", data=test_activation
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.data["extra_var"]
+        original_extra_var = yaml.safe_load(EXTRA_VAR)
+        extra_var = yaml.safe_load(response.data["extra_var"])
+        for key, value in original_extra_var.items():
+            assert value == extra_var[key]
+
+
+@pytest.mark.django_db
+def test_create_activation_with_extra_vars_mix_credential(
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+    default_vault_credential: models.EdaCredential,
+    user_credential_type: models.CredentialType,
+    custom_credential_type: models.CredentialType,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": default_decision_environment.id,
+        "rulebook_id": default_rulebook.id,
+        "extra_var": EXTRA_VAR,
+        "organization_id": default_organization.id,
+    }
+
+    sasl_data = "secret"
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential-1",
+        inputs={"sasl_username": "adam", "sasl_password": sasl_data},
+        credential_type_id=user_credential_type.id,
+        organization=default_organization,
+    )
+
+    data = "password"
+    custom_eda_credential = models.EdaCredential.objects.create(
+        name="credential-2",
+        inputs={"username": "fred", "password": data},
+        credential_type_id=custom_credential_type.id,
+        organization=default_organization,
+    )
+
+    eda_credential_ids = [
+        default_vault_credential.id,
+        eda_credential.id,
+        custom_eda_credential.id,
+    ]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["extra_var"]
+    original_extra_var = yaml.safe_load(EXTRA_VAR)
+    extra_var = yaml.safe_load(response.data["extra_var"])
+    assert extra_var["sasl_username"] == "adam"
+    assert extra_var["sasl_password"] == "secret"
+    assert extra_var["custom_username"] == "fred"
+    assert extra_var["custom_password"] == "password"
+    for key, value in original_extra_var.items():
+        assert value == extra_var[key]
