@@ -187,6 +187,7 @@ services:
         condition: service_healthy
     volumes:
       - '../../:/app/src:z'
+    restart: always
 
   eda-default-worker:
     image: ${EDA_IMAGE:-localhost/aap-eda}

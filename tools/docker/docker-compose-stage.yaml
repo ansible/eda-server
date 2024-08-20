@@ -148,6 +148,7 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+    restart: always
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
