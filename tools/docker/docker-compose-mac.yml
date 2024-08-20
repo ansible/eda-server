@@ -172,6 +172,7 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+    restart: always
 
   eda-webhook-api:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
