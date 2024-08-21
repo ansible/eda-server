@@ -112,13 +112,14 @@ class ProjectViewSet(
         | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
-        # We cant do anything without redis.
-        self.redis_is_available()
-
         serializer = serializers.ProjectCreateRequestSerializer(
             data=request.data
         )
         serializer.is_valid(raise_exception=True)
+
+        # We cant do anything without redis.
+        self.redis_is_available()
+
         with transaction.atomic():
             project = serializer.save()
             check_related_permissions(

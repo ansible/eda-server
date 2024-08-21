@@ -413,15 +413,36 @@ def test_create_project_name_conflict(
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+@mock.patch("aap_eda.tasks.import_project")
 def test_create_project_redis_unavailable(
-    is_redis_failed: mock.Mock, admin_client: APIClient
+    import_project_task: mock.Mock,
+    is_redis_failed: mock.Mock,
+    admin_client: APIClient,
+    default_scm_credential,
+    default_organization: models.Organization,
+    preseed_credential_types,
 ):
+    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
+    job = mock.Mock(id=job_id)
+    import_project_task.delay.return_value = job
+    credential = create_custom_credential(
+        credential_type=enums.DefaultCredentialType.GPG,
+        organization=default_organization,
+    )
+
+    body = {
+        "name": "ain't-no-redis",
+        "url": "https://git.example.com/acme/project-01",
+        "eda_credential_id": default_scm_credential.id,
+        "signature_validation_credential_id": credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
+        "organization_id": default_organization.id,
+    }
+
     response = admin_client.post(
         f"{api_url_v1}/projects/",
-        data={
-            "name": "ain't-no-redis",
-            "url": "https://git.example.com/acme/project-01",
-        },
+        data=body,
     )
 
     assert response.status_code == status.HTTP_409_CONFLICT
