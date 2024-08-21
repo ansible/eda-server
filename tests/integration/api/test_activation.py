@@ -412,6 +412,7 @@ def test_retrieve_activation(
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, default_activation)
+    assert data["ruleset_stats"] is None
     if default_activation.project:
         assert data["project"]["id"] == default_activation.project.id
     else:
@@ -433,6 +434,42 @@ def test_retrieve_activation(
         ).started_at.strftime(DATETIME_FORMAT)
     else:
         assert data["restarted_at"] is None
+
+
+@pytest.mark.django_db
+def test_retrieve_activation_with_ruleset_stats(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    stats = {
+        "ruleset": {
+            "start": "2024-08-21T17:03:01.577285Z",
+            "end": None,
+            "numberOfRules": 1,
+            "numberOfDisabledRules": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 2000,
+            "eventsMatched": 1,
+            "eventsSuppressed": 1999,
+            "permanentStorageSize": 0,
+            "asyncResponses": 0,
+            "bytesSentOnAsync": 0,
+            "sessionId": 1,
+            "ruleSetName": "ruleset",
+        }
+    }
+
+    default_activation.ruleset_stats = stats
+    default_activation.save(update_fields=["ruleset_stats"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.data
+    assert_activation_base_data(data, default_activation)
+    assert yaml.safe_load(response.data["ruleset_stats"]) == stats
 
 
 @pytest.mark.django_db

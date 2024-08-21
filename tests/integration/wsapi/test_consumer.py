@@ -378,11 +378,11 @@ async def test_handle_heartbeat(
 ):
     rulebook_process_id = await _prepare_db_data()
     rulebook_process = await get_rulebook_process(rulebook_process_id)
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+    assert activation.ruleset_stats == {}
 
-    payload = {
-        "type": "SessionStats",
-        "activation_id": rulebook_process_id,
-        "stats": {
+    stats = [
+        {
             "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
             "end": None,
             "numberOfRules": 1,
@@ -395,18 +395,50 @@ async def test_handle_heartbeat(
             "asyncResponses": 0,
             "bytesSentOnAsync": 0,
             "sessionId": 1,
-            "ruleSetName": "ruleset",
+            "ruleSetName": "ruleset1",
         },
-        "reported_at": timezone.now().strftime(DATETIME_FORMAT),
-    }
+        {
+            "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
+            "end": "2024-08-21T18:39:12.331Z",
+            "numberOfRules": 10,
+            "numberOfDisabledRules": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 4000,
+            "eventsMatched": 1,
+            "eventsSuppressed": 3999,
+            "permanentStorageSize": 0,
+            "asyncResponses": 0,
+            "bytesSentOnAsync": 0,
+            "sessionId": 1,
+            "ruleSetName": "ruleset2",
+        },
+    ]
 
-    await ws_communicator.send_json_to(payload)
+    payloads = [
+        {
+            "type": "SessionStats",
+            "activation_id": rulebook_process_id,
+            "stats": stat,
+            "reported_at": timezone.now().strftime(DATETIME_FORMAT),
+        }
+        for stat in stats
+    ]
+
+    for payload in payloads:
+        await ws_communicator.send_json_to(payload)
+
     await ws_communicator.wait()
 
     updated_rulebook_process = await get_rulebook_process(rulebook_process_id)
     assert (
         updated_rulebook_process.updated_at.strftime(DATETIME_FORMAT)
     ) == payload["reported_at"]
+
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+    assert activation.ruleset_stats is not None
+    assert list(activation.ruleset_stats.keys()) == [
+        stat["ruleSetName"] for stat in stats
+    ]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -565,6 +597,11 @@ async def test_controller_job_url(
 @database_sync_to_async
 def get_rulebook_process(instance_id):
     return models.RulebookProcess.objects.get(pk=instance_id)
+
+
+@database_sync_to_async
+def get_activation_by_rulebook_process(instance_id):
+    return models.RulebookProcess.objects.get(pk=instance_id).get_parent()
 
 
 @database_sync_to_async
