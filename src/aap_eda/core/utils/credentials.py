@@ -60,6 +60,10 @@ def get_secret_fields(schema: dict) -> list[str]:
 
 
 def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
+    return yaml.dump(inputs_to_store_dict(inputs, old_inputs_str))
+
+
+def inputs_to_store_dict(inputs: dict, old_inputs_str: str = None) -> dict:
     old_inputs = (
         inputs_from_store(old_inputs_str.get_secret_value())
         if old_inputs_str
@@ -69,7 +73,7 @@ def inputs_to_store(inputs: dict, old_inputs_str: str = None) -> str:
     old_inputs.update(
         (k, inputs[k]) for k, v in inputs.items() if v != ENCRYPTED_STRING
     )
-    return yaml.dump(old_inputs, sort_keys=False)
+    return old_inputs
 
 
 def inputs_from_store(inputs: str) -> dict:
