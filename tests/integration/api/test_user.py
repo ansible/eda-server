@@ -42,6 +42,7 @@ def org_admin_rd():
             "delete_organization",
         ],
         content_type=ContentType.objects.get_for_model(models.Organization),
+        managed=True,  # custom roles can not include these permissions
     )
 
 
@@ -54,6 +55,7 @@ def org_member_rd():
             "view_organization",
         ],
         content_type=ContentType.objects.get_for_model(models.Organization),
+        managed=True,
     )
 
 
