@@ -199,7 +199,7 @@ def _update_extra_vars_from_eda_credentials(
         )
         # when creating an activation we need to return the updated extra vars
         if creating:
-            return updated_extra_vars
+            validated_data["extra_var"] = updated_extra_vars
         # if not creating, update the existing activation object extra vars
         else:
             activation.extra_var = updated_extra_vars
@@ -516,9 +516,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         vault = _get_vault_credential_type()
 
         if validated_data.get("eda_credentials"):
-            validated_data[
-                "extra_var"
-            ] = _update_extra_vars_from_eda_credentials(
+            _update_extra_vars_from_eda_credentials(
                 validated_data=validated_data,
                 vault_data=vault_data,
                 creating=True,
