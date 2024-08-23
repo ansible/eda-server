@@ -50,10 +50,9 @@ class ResourceType(DjangoStrEnum):
     CREDENTIAL = "credential"
     CREDENTIAL_TYPE = "credential_type"
     EDA_CREDENTIAL = "eda_credential"
-    EVENT_STREAM = "event_stream"
     ORGANIZATION = "organization"
     TEAM = "team"
-    WEBHOOK = "webhook"
+    EVENT_STREAM = "event_stream"
 
 
 class Action(DjangoStrEnum):
@@ -130,7 +129,6 @@ class ProcessParentType(DjangoStrEnum):
     """Types of parent objects for a rulebook process."""
 
     ACTIVATION = "activation"
-    EVENT_STREAM = "event_stream"
 
 
 class RulebookProcessLogLevel(DjangoStrEnum):
@@ -141,8 +139,8 @@ class RulebookProcessLogLevel(DjangoStrEnum):
     ERROR = "error"
 
 
-class WebhookAuthType(DjangoStrEnum):
-    """Types of authentication for Webhook."""
+class EventStreamAuthType(DjangoStrEnum):
+    """Types of authentication for EventStream."""
 
     HMAC = "hmac"
     TOKEN = "token"
@@ -160,18 +158,18 @@ class SignatureEncodingType(DjangoStrEnum):
     HEX = "hex"
 
 
-class WebhookCredentialType(DjangoStrEnum):
-    HMAC = "HMAC Webhook"
-    BASIC = "Basic Webhook"
-    TOKEN = "Token Webhook"
-    OAUTH2 = "Oauth2 Webhook"
-    OAUTH2_JWT = "Oauth2 JWT Webhook"
-    ECDSA = "ECDSA Webhook"
-    MTLS = "mTLS Webhook"
+class EventStreamCredentialType(DjangoStrEnum):
+    HMAC = "HMAC Event Stream"
+    BASIC = "Basic Event Stream"
+    TOKEN = "Token Event Stream"
+    OAUTH2 = "OAuth2 Event Stream"
+    OAUTH2_JWT = "OAuth2 JWT Event Stream"
+    ECDSA = "ECDSA Event Stream"
+    MTLS = "mTLS Event Stream"
 
 
-class CustomWebhookCredentialType(DjangoStrEnum):
-    GITLAB = "GITLAB Webhook"
-    GITHUB = "GitHub Webhook"
-    SNOW = "Service Now Webhook"
-    DYNATRACE = "Dynatrace Webhook"
+class CustomEventStreamCredentialType(DjangoStrEnum):
+    GITLAB = "GitLab Event Stream"
+    GITHUB = "GitHub Event Stream"
+    SNOW = "ServiceNow Event Stream"
+    DYNATRACE = "Dynatrace Event Stream"

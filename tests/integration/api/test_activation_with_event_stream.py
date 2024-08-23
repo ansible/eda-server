@@ -157,7 +157,7 @@ PARTIAL_TEST_RULESETS = """
 
 
 def create_activation_related_data(
-    webhook_names, with_project=True, rulesets=TEST_RULESETS
+    event_stream_names, with_project=True, rulesets=TEST_RULESETS
 ):
     user = models.User.objects.create_user(
         username="luke.skywalker",
@@ -222,15 +222,15 @@ def create_activation_related_data(
         else None
     )
 
-    webhooks = []
-    for name in webhook_names:
-        webhook = models.Webhook.objects.create(
+    event_streams = []
+    for name in event_stream_names:
+        event_stream = models.EventStream.objects.create(
             uuid=uuid.uuid4(),
             name=name,
             owner=user,
             organization=organization,
         )
-        webhooks.append(webhook)
+        event_streams.append(event_stream)
 
     return {
         "user_id": user_id,
@@ -239,7 +239,7 @@ def create_activation_related_data(
         "rulebook_id": rulebook_id,
         "extra_var": TEST_EXTRA_VAR,
         "credential_id": credential_id,
-        "webhooks": webhooks,
+        "event_streams": event_streams,
         "organization_id": organization.id,
     }
 
@@ -253,14 +253,14 @@ def create_activation(fks: dict):
     activation_data["organization_id"] = fks["organization_id"]
     activation = models.Activation(**activation_data)
     activation.save()
-    for webhook in fks["webhooks"]:
-        activation.webhooks.add(webhook)
+    for event_stream in fks["event_streams"]:
+        activation.event_streams.add(event_stream)
 
     return activation
 
 
 @pytest.mark.django_db
-def test_create_activation_with_webhooks(
+def test_create_activation_with_event_stream(
     admin_client: APIClient, preseed_credential_types
 ):
     fks = create_activation_related_data(["demo"])
@@ -269,11 +269,11 @@ def test_create_activation_with_webhooks(
     test_activation["rulebook_id"] = fks["rulebook_id"]
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = []
-    for webhook in fks["webhooks"]:
+    for event_stream in fks["event_streams"]:
         source_mappings.append(
             {
-                "webhook_name": webhook.name,
-                "webhook_id": webhook.id,
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
                 "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
                 "source_name": "demo",
             }
@@ -301,18 +301,18 @@ def test_create_activation_with_webhooks(
         activation.status_message
         == ACTIVATION_STATUS_MESSAGE_MAP[activation.status]
     )
-    assert data["webhooks"][0]["name"] == "demo"
+    assert data["event_streams"][0]["name"] == "demo"
 
 
 @pytest.mark.django_db
-def test_list_activations_by_webhook(
+def test_list_activations_by_event_stream(
     admin_client: APIClient,
     default_activation: models.Activation,
     new_activation: models.Activation,
-    default_webhook: models.Webhook,
+    default_event_stream: models.EventStream,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/webhooks/{default_webhook.id}/activations/"
+        f"{api_url_v1}/event-streams/{default_event_stream.id}/activations/"
     )
 
     data = response.data["results"]
@@ -323,11 +323,11 @@ def test_list_activations_by_webhook(
     activation_1 = default_activation
     activation_2 = new_activation
 
-    activation_1.webhooks.add(default_webhook)
-    activation_2.webhooks.add(default_webhook)
+    activation_1.event_streams.add(default_event_stream)
+    activation_2.event_streams.add(default_event_stream)
 
     response = admin_client.get(
-        f"{api_url_v1}/webhooks/{default_webhook.id}/activations/"
+        f"{api_url_v1}/event-streams/{default_event_stream.id}/activations/"
     )
 
     data = response.data["results"]
@@ -396,7 +396,7 @@ def test_create_activation_with_missing_keys_in_mappings(
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
-            "webhook_name": "fake",
+            "event_stream_name": "fake",
             "source_name": "demo",
         }
     ]
@@ -410,13 +410,14 @@ def test_create_activation_with_missing_keys_in_mappings(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert str(response.data[SOURCE_MAPPING_ERROR_KEY][0]) == (
-        "The source mapping {'source_name': 'demo', 'webhook_name': 'fake'} "
-        "is missing the required keys: ['webhook_id', 'rulebook_hash']"
+        "The source mapping {'event_stream_name': 'fake', "
+        "'source_name': 'demo'} is missing the required keys: "
+        "['event_stream_id', 'rulebook_hash']"
     )
 
 
 @pytest.mark.django_db
-def test_create_activation_with_bad_webhook(
+def test_create_activation_with_bad_event_stream(
     admin_client: APIClient, preseed_credential_types
 ):
     fks = create_activation_related_data(["demo"])
@@ -426,8 +427,8 @@ def test_create_activation_with_bad_webhook(
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
-            "webhook_name": "fake",
-            "webhook_id": 1492,
+            "event_stream_name": "fake",
+            "event_stream_id": 1492,
             "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
             "source_name": "demo",
         }
@@ -448,7 +449,7 @@ def test_create_activation_with_bad_webhook(
 
 
 @pytest.mark.django_db
-def test_create_activation_with_bad_webhook_name(
+def test_create_activation_with_bad_event_stream_name(
     admin_client: APIClient, preseed_credential_types
 ):
     fks = create_activation_related_data(["demo"])
@@ -458,8 +459,8 @@ def test_create_activation_with_bad_webhook_name(
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
-            "webhook_name": "missing_name",
-            "webhook_id": fks["webhooks"][0].id,
+            "event_stream_name": "missing_name",
+            "event_stream_id": fks["event_streams"][0].id,
             "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
             "source_name": "demo",
         }
@@ -475,7 +476,7 @@ def test_create_activation_with_bad_webhook_name(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         str(response.data[SOURCE_MAPPING_ERROR_KEY][0])
-        == "Event stream missing_name did not match with webhook demo"
+        == "Event stream missing_name did not match with name demo in database"
     )
 
 
@@ -490,8 +491,8 @@ def test_create_activation_with_bad_rulebook_hash(
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
-            "webhook_name": fks["webhooks"][0].name,
-            "webhook_id": fks["webhooks"][0].id,
+            "event_stream_name": fks["event_streams"][0].name,
+            "event_stream_id": fks["event_streams"][0].id,
             "rulebook_hash": "abdd",
             "source_name": "demo",
         }
@@ -524,14 +525,14 @@ def test_create_activation_with_duplicate_source_name(
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
-            "webhook_name": fks["webhooks"][0].name,
-            "webhook_id": fks["webhooks"][0].id,
+            "event_stream_name": fks["event_streams"][0].name,
+            "event_stream_id": fks["event_streams"][0].id,
             "rulebook_hash": "abdd",
             "source_name": "demo",
         },
         {
-            "webhook_name": f"{fks['webhooks'][0].name}_1",
-            "webhook_id": fks["webhooks"][0].id,
+            "event_stream_name": f"{fks['event_streams'][0].name}_1",
+            "event_stream_id": fks["event_streams"][0].id,
             "rulebook_hash": get_rulebook_hash(
                 LEGACY_TEST_RULESETS_MULTIPLE_SOURCES
             ),
@@ -554,7 +555,7 @@ def test_create_activation_with_duplicate_source_name(
 
 
 @pytest.mark.django_db
-def test_create_activation_with_duplicate_webhook_name(
+def test_create_activation_with_duplicate_event_stream_name(
     admin_client: APIClient, preseed_credential_types
 ):
     fks = create_activation_related_data(
@@ -566,14 +567,14 @@ def test_create_activation_with_duplicate_webhook_name(
     test_activation["organization_id"] = fks["organization_id"]
     source_mappings = [
         {
-            "webhook_name": fks["webhooks"][0].name,
-            "webhook_id": fks["webhooks"][0].id,
+            "event_stream_name": fks["event_streams"][0].name,
+            "event_stream_id": fks["event_streams"][0].id,
             "rulebook_hash": "abdd",
             "source_name": "demo",
         },
         {
-            "webhook_name": fks["webhooks"][0].name,
-            "webhook_id": fks["webhooks"][0].id,
+            "event_stream_name": fks["event_streams"][0].name,
+            "event_stream_id": fks["event_streams"][0].id,
             "rulebook_hash": get_rulebook_hash(
                 LEGACY_TEST_RULESETS_MULTIPLE_SOURCES
             ),
@@ -595,7 +596,7 @@ def test_create_activation_with_duplicate_webhook_name(
     )
 
 
-webhook_src_test_data = [
+event_stream_src_test_data = [
     (
         [("missing_source", "demo")],
         LEGACY_TEST_RULESETS,
@@ -646,10 +647,10 @@ webhook_src_test_data = [
 
 @pytest.mark.parametrize(
     "source_tuples, rulesets, status_code, message, error_key",
-    webhook_src_test_data,
+    event_stream_src_test_data,
 )
 @pytest.mark.django_db
-def test_bad_src_activation_with_webhooks(
+def test_bad_src_activation_with_event_stream(
     admin_client: APIClient,
     preseed_credential_types,
     source_tuples,
@@ -658,7 +659,7 @@ def test_bad_src_activation_with_webhooks(
     message,
     error_key,
 ):
-    names = [webhook_name for _, webhook_name in source_tuples]
+    names = [event_stream_name for _, event_stream_name in source_tuples]
     fks = create_activation_related_data(names, True, rulesets)
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
@@ -667,14 +668,14 @@ def test_bad_src_activation_with_webhooks(
 
     source_mappings = []
 
-    for src, webhook_name in source_tuples:
-        webhook = models.Webhook.objects.get(name=webhook_name)
+    for src, event_source_name in source_tuples:
+        event_stream = models.EventStream.objects.get(name=event_source_name)
         source_mappings.append(
             {
                 "source_name": src,
                 "rulebook_hash": get_rulebook_hash(rulesets),
-                "webhook_name": webhook_name,
-                "webhook_id": webhook.id,
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
             }
         )
     test_activation["source_mappings"] = yaml.dump(source_mappings)

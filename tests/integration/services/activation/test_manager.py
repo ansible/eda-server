@@ -140,28 +140,6 @@ def new_activation_with_instance(
 
 
 @pytest.fixture
-def new_event_stream_with_instance(
-    default_user: models.User,
-    default_decision_environment: models.DecisionEnvironment,
-    default_rulebook: models.Rulebook,
-) -> models.EventStream:
-    """Return an event stream with an instance."""
-    event_stream = models.EventStream.objects.create(
-        name="new_event_stream_with_instance",
-        user=default_user,
-        decision_environment=default_decision_environment,
-        rulebook=default_rulebook,
-        # rulebook_rulesets is populated by the serializer
-        rulebook_rulesets=default_rulebook.rulesets,
-    )
-    models.RulebookProcess.objects.create(
-        event_stream=event_stream,
-        status=enums.ActivationStatus.RUNNING,
-    )
-    return event_stream
-
-
-@pytest.fixture
 def container_engine_mock() -> MagicMock:
     return create_autospec(ContainerEngine, instance=True)
 
@@ -707,27 +685,11 @@ def test_init_status_manager_with_activation(basic_activation):
     )
 
 
-@pytest.mark.django_db
-def test_init_status_manager_with_event_stream(new_event_stream_with_instance):
-    status_manager = StatusManager(new_event_stream_with_instance)
-    assert status_manager.db_instance == new_event_stream_with_instance
-    assert (
-        status_manager.latest_instance
-        == new_event_stream_with_instance.latest_instance
-    )
-    assert (
-        status_manager.db_instance_type == enums.ProcessParentType.EVENT_STREAM
-    )
-
-
 @pytest.mark.parametrize(
     "process_parent",
     [
         pytest.param(
             lazy_fixture("new_activation_with_instance"),
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream_with_instance"),
         ),
     ],
 )
@@ -751,9 +713,6 @@ def test_status_manager_set_latest_instance_status(process_parent):
     [
         pytest.param(
             lazy_fixture("new_activation_with_instance"),
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream_with_instance"),
         ),
     ],
 )

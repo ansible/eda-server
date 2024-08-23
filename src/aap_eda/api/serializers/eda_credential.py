@@ -185,7 +185,7 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
     resources = []
 
     used_activations = eda_credential.activations.all()
-    used_webhooks = models.Webhook.objects.filter(
+    used_event_streams = models.EventStream.objects.filter(
         eda_credential=eda_credential
     )
     used_decision_environments = models.DecisionEnvironment.objects.filter(
@@ -205,12 +205,12 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
         }
         resources.append(resource)
 
-    for webhook in used_webhooks:
+    for event_stream in used_event_streams:
         resource = {
-            "type": "Webhook",
-            "id": webhook.id,
-            "name": webhook.name,
-            "url": (f"api/eda/v1/webhooks/{webhook.id}/"),
+            "type": "EventStream",
+            "id": event_stream.id,
+            "name": event_stream.name,
+            "url": (f"api/eda/v1/event-streams/{event_stream.id}/"),
         }
         resources.append(resource)
 

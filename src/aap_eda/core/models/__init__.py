@@ -45,7 +45,6 @@ from .rulebook_process import (
 )
 from .team import Team
 from .user import AwxToken, User
-from .webhook import Webhook
 
 __all__ = [
     "ActivationInstanceJobInstance",
@@ -71,10 +70,9 @@ __all__ = [
     "EdaCredential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
-    "EventStream",
     "Organization",
     "Team",
-    "Webhook",
+    "EventStream",
 ]
 
 permission_registry.register(
@@ -84,7 +82,7 @@ permission_registry.register(
     Project,
     Organization,
     Team,
-    Webhook,
+    EventStream,
     parent_field_name="organization",
 )
 permission_registry.register(

@@ -44,7 +44,6 @@ router.register(
 )
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("users", views.UserViewSet)
-router.register("event-streams", views.EventStreamViewSet)
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,
@@ -55,11 +54,11 @@ router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
 router.register("organizations", views.OrganizationViewSet)
 router.register("teams", views.TeamViewSet)
-router.register("webhooks", views.WebhookViewSet)
+router.register("event-streams", views.EventStreamViewSet)
 router.register(
-    "external_webhook",
-    views.ExternalWebhookViewSet,
-    basename="external_webhook",
+    "external_event_stream",
+    views.ExternalEventStreamViewSet,
+    basename="external_event_stream",
 )
 
 openapi_urls = [

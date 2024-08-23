@@ -57,7 +57,7 @@ def test_add_permissions(
         pytest.skip("Model has no add permission")
 
     url = reverse(f"{get_basename(model)}-list")
-    with override_settings(WEBHOOK_BASE_URL="https://www.example.com/"):
+    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
         response = user_client.post(url, data=post_data)
         prior_ct = model.objects.count()
         assert response.status_code == 403, response.data
@@ -110,7 +110,7 @@ def test_add_permissions(
                     related_perm = "view"
                 give_obj_perm(default_user, related_obj, related_perm)
 
-    with override_settings(WEBHOOK_BASE_URL="https://www.example.com/"):
+    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
         response = user_client.post(url, data=post_data, format="json")
         assert response.status_code == 201, response.data
 

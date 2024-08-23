@@ -17,7 +17,7 @@ import yaml
 from aap_eda.core.utils.rulebook import (
     DEFAULT_SOURCE_NAME_PREFIX,
     build_source_list,
-    swap_webhook_sources,
+    swap_event_stream_sources,
 )
 
 
@@ -187,16 +187,16 @@ def test_multple_rulesets_with_multiple_no_source_names():
       name: my source
       filters:
         - noop:
-- name: Run a webhook listener service
+- name: Run a listener service
   hosts: all
   sources:
     - ansible.eda.webhook:
   rules:
-    - name: Webhook event
+    - name: Event Stream event
       condition: event.payload.ping == "pong"
       action:
         debug:
-          msg: "Webhook triggered!"
+          msg: "Event Stream triggered!"
 
     - name: Shutdown
       condition: event.payload.shutdown is defined
@@ -287,8 +287,8 @@ EXPECT_RULESETS = """
             TEST_RULESETS,
             [
                 {
-                    "webhook_id": 1,
-                    "webhook_name": "swap_me",
+                    "event_stream_id": 1,
+                    "event_stream_name": "swap_me",
                     "rulebook_hash": "hash",
                     "source_name": "demo",
                 }
@@ -299,8 +299,8 @@ EXPECT_RULESETS = """
             TEST_RULESETS,
             [
                 {
-                    "webhook_id": 1,
-                    "webhook_name": "unmatched",
+                    "event_stream_id": 1,
+                    "event_stream_name": "unmatched",
                     "rulebook_hash": "hash",
                     "source_name": "demo",
                 }
@@ -311,8 +311,8 @@ EXPECT_RULESETS = """
             TEST_RULESETS,
             [
                 {
-                    "webhook_id": 1,
-                    "webhook_name": "unmatched",
+                    "event_stream_id": 1,
+                    "event_stream_name": "unmatched",
                     "rulebook_hash": "hash",
                     "source_name": "unmatched",
                 }
@@ -321,19 +321,19 @@ EXPECT_RULESETS = """
         ),
     ],
 )
-def test_swap_webhook_sources(
+def test_swap_event_stream_sources(
     input_rulesets, source_mappings, output_rulesets
 ):
-    webhook_source = {}
+    event_stream_source = {}
 
-    webhook_source["swap_me"] = {
+    event_stream_source["swap_me"] = {
         "ansible.eda.pg_listener": {
             "dsn": "encrypted_dsn",
             "channels": ["channel_name"],
         },
     }
 
-    result = swap_webhook_sources(
-        input_rulesets, webhook_source, source_mappings
+    result = swap_event_stream_sources(
+        input_rulesets, event_stream_source, source_mappings
     )
     assert yaml.safe_load(result) == yaml.safe_load(output_rulesets)

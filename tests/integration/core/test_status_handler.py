@@ -31,10 +31,6 @@ from aap_eda.core.exceptions import (
             lazy_fixture("new_activation"),
             id="activation",
         ),
-        pytest.param(
-            lazy_fixture("new_event_stream"),
-            id="event_stream",
-        ),
     ],
 )
 @pytest.mark.django_db
@@ -52,10 +48,6 @@ def test_save_with_errors(instance):
         pytest.param(
             lazy_fixture("new_activation"),
             id="activation",
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream"),
-            id="event_stream",
         ),
     ],
 )
@@ -79,10 +71,6 @@ def test_save_with_invalid_status(instance):
         pytest.param(
             lazy_fixture("new_activation"),
             id="activation",
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream"),
-            id="event_stream",
         ),
     ],
 )

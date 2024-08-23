@@ -58,13 +58,6 @@ class RulebookProcess(BaseOrgModel):
         blank=True,
         related_name="activation_processes",
     )
-    event_stream = models.ForeignKey(
-        "EventStream",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="event_stream_processes",
-    )
     parent_type = models.TextField(
         choices=ProcessParentType.choices(),
         null=False,
@@ -130,14 +123,9 @@ class RulebookProcess(BaseOrgModel):
 
     def _check_parent(self):
         """Clean method for RulebookProcess model."""
-        # Check that either activation or event_stream is set, but not both
-        if (self.activation is None and self.event_stream is None) or (
-            self.activation and self.event_stream
-        ):
-            raise ValidationError(
-                "Either an activation or a event_stream must be set, "
-                "but not both."
-            )
+        # Check that activation is set
+        if self.activation is None:
+            raise ValidationError("activation must be set")
 
     def get_parent(self):
         return getattr(self, self.parent_type.lower())
@@ -146,8 +134,6 @@ class RulebookProcess(BaseOrgModel):
         self._check_parent()
         if self.activation:
             self.parent_type = ProcessParentType.ACTIVATION
-        if self.event_stream:
-            self.parent_type = ProcessParentType.EVENT_STREAM
 
     def _get_default_status_message(self):
         try:

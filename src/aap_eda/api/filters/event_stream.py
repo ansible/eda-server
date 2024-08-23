@@ -21,7 +21,7 @@ class EventStreamFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter by event source name.",
+        label="Filter by event stream name.",
     )
 
     class Meta:

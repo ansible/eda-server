@@ -550,12 +550,12 @@ def test_delete_credential_with_project_reference(
 
 
 @pytest.mark.django_db
-def test_delete_credential_with_webhook_reference(
-    default_webhook: models.Webhook,
+def test_delete_credential_with_event_stream_reference(
+    default_event_stream: models.EventStream,
     admin_client: APIClient,
     preseed_credential_types,
 ):
-    eda_credential = default_webhook.eda_credential
+    eda_credential = default_event_stream.eda_credential
     response = admin_client.delete(
         f"{api_url_v1}/eda-credentials/{eda_credential.id}/"
     )

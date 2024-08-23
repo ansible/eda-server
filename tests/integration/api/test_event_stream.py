@@ -11,548 +11,267 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from unittest import mock
+import hmac
+import secrets
+from typing import List
 
 import pytest
-import yaml
+from django.conf import settings
+from django.test import override_settings
 from rest_framework import status
+from rest_framework.renderers import JSONRenderer
 from rest_framework.test import APIClient
 
-from aap_eda.api.constants import (
-    PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
-    PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
-)
-from aap_eda.core import models
-from aap_eda.core.enums import Action, ProcessParentType, ResourceType
+from aap_eda.core import enums, models
 from tests.integration.constants import api_url_v1
-
-pytestmark = pytest.mark.skip(
-    reason="EventStream views are currently hidden, thus no need to run tests"
-)
-
-BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_TYPE = """
----
-- name: PG Notify Template Event Stream
-  hosts: all
-  sources:
-    - name: my_range
-      ansible.eda.range:
-        limit: 5
-      complementary_source:
-        name: Postgres Listener
-        args:
-          dsn: "{{ EDA_PG_NOTIFY_DSN }}"
-          channels:
-            - "{{ EDA_PG_NOTIFY_CHANNEL }}"
-      extra_vars:
-        EDA_PG_NOTIFY_DSN: "{{ settings.PG_NOTIFY_DSN }}"
-        EDA_PG_NOTIFY_CHANNEL: "{{ event_stream.channel_name }}"
-      encrypt_vars:
-        - EDA_PG_NOTIFY_DSN
-  rules:
-    - name: Post event
-      condition: true
-      action:
-        pg_notify:
-          dsn: "{{ EDA_PG_NOTIFY_DSN }}"
-          channel: "{{ EDA_PG_NOTIFY_CHANNEL }}"
-          event: "{{ event }}"
-"""
-BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_NAME = """
----
-- name: PG Notify Template Event Stream
-  hosts: all
-  sources:
-    - name: my_range
-      ansible.eda.range:
-        limit: 5
-      complementary_source:
-        type: ansible.eda.pg_listener
-        args:
-          dsn: "{{ EDA_PG_NOTIFY_DSN }}"
-          channels:
-            - "{{ EDA_PG_NOTIFY_CHANNEL }}"
-      extra_vars:
-        EDA_PG_NOTIFY_DSN: "{{ settings.PG_NOTIFY_DSN }}"
-        EDA_PG_NOTIFY_CHANNEL: "{{ event_stream.channel_name }}"
-      encrypt_vars:
-        - EDA_PG_NOTIFY_DSN
-  rules:
-    - name: Post event
-      condition: true
-      action:
-        pg_notify:
-          dsn: "{{ EDA_PG_NOTIFY_DSN }}"
-          channel: "{{ EDA_PG_NOTIFY_CHANNEL }}"
-          event: "{{ event }}"
-"""
-BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_ARGS = """
----
-- name: PG Notify Template Event Stream
-  hosts: all
-  sources:
-    - name: my_range
-      ansible.eda.range:
-        limit: 5
-      complementary_source:
-        type: ansible.eda.pg_listener
-        name: Postgres Listener
-      extra_vars:
-        EDA_PG_NOTIFY_DSN: "{{ settings.PG_NOTIFY_DSN }}"
-        EDA_PG_NOTIFY_CHANNEL: "{{ event_stream.channel_name }}"
-      encrypt_vars:
-        - EDA_PG_NOTIFY_DSN
-  rules:
-    - name: Post event
-      condition: true
-      action:
-        pg_notify:
-          dsn: "{{ EDA_PG_NOTIFY_DSN }}"
-          channel: "{{ EDA_PG_NOTIFY_CHANNEL }}"
-          event: "{{ event }}"
-"""
-BAD_PG_NOTIFY_NO_COMPLEMENTARY_SOURCE = """
----
-- name: PG Notify Template Event Stream
-  hosts: all
-  sources:
-    - name: my_range
-      ansible.eda.range:
-        limit: 5
-      extra_vars:
-        EDA_PG_NOTIFY_DSN: "{{ settings.PG_NOTIFY_DSN }}"
-        EDA_PG_NOTIFY_CHANNEL: "{{ event_stream.channel_name }}"
-      encrypt_vars:
-        - EDA_PG_NOTIFY_DSN
-  rules:
-    - name: Post event
-      condition: true
-      action:
-        pg_notify:
-          dsn: "{{ EDA_PG_NOTIFY_DSN }}"
-          channel: "{{ EDA_PG_NOTIFY_CHANNEL }}"
-          event: "{{ event }}"
-"""
 
 
 @pytest.mark.django_db
 def test_list_event_streams(
     admin_client: APIClient,
-    check_permission_mock: mock.Mock,
-    default_decision_environment: models.DecisionEnvironment,
-    default_user: models.User,
+    default_event_streams: List[models.EventStream],
+    default_vault_credential,
 ):
-    event_streams = models.EventStream.objects.bulk_create(
-        [
-            models.EventStream(
-                name="test-event_stream-1",
-                source_type="ansible.eda.range",
-                source_args={"limit": 5, "delay": 1},
-                user=default_user,
-                decision_environment_id=default_decision_environment.id,
-            ),
-            models.EventStream(
-                name="test-event_stream-2",
-                source_type="ansible.eda.range",
-                source_args={"limit": 6, "delay": 2},
-                user=default_user,
-                decision_environment_id=default_decision_environment.id,
-            ),
-        ]
-    )
-
     response = admin_client.get(f"{api_url_v1}/event-streams/")
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 2
-    assert (
-        response.data["results"][1]["source_type"]
-        == event_streams[0].source_type
-    )
-    assert response.data["results"][1]["name"] == event_streams[0].name
-    assert response.data["results"][1]["user"] == "luke.skywalker"
-
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.EVENT_STREAM, Action.READ
-    )
+    assert response.data["results"][0]["name"] == default_event_streams[0].name
+    assert response.data["results"][0]["owner"] == "luke.skywalker"
 
 
 @pytest.mark.django_db
 def test_retrieve_event_stream(
     admin_client: APIClient,
-    check_permission_mock: mock.Mock,
-    default_decision_environment: models.DecisionEnvironment,
-    default_user: models.User,
+    default_event_streams: List[models.EventStream],
+    default_vault_credential,
 ):
-    args = {"limit": 5, "delay": 1}
-    event_stream = models.EventStream.objects.create(
-        name="test-event_stream-1",
-        source_type="ansible.eda.range",
-        source_args=args,
-        user=default_user,
-        decision_environment_id=default_decision_environment.id,
-    )
-
+    event_stream = default_event_streams[0]
     response = admin_client.get(
         f"{api_url_v1}/event-streams/{event_stream.id}/"
     )
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["name"] == event_stream.name
-    assert response.data["source_type"] == event_stream.source_type
-    assert yaml.safe_load(response.data["source_args"]) == args
-    assert response.data["user"] == "luke.skywalker"
-
-    check_permission_mock.assert_called_once_with(
-        mock.ANY, mock.ANY, ResourceType.EVENT_STREAM, Action.READ
-    )
+    assert response.data["name"] == default_event_streams[0].name
+    assert response.data["url"] == default_event_streams[0].url
+    assert response.data["owner"] == "luke.skywalker"
 
 
 @pytest.mark.django_db
 def test_create_event_stream(
     admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
 ):
-    models.Rulebook.objects.create(
-        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
-        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
-    )
-
-    args = {"limit": 5, "delay": 1}
-    source_type = "ansible.eda.range"
     data_in = {
         "name": "test_event_stream",
-        "source_type": f"{source_type}",
-        "source_args": f"{args}",
-        "decision_environment_id": default_decision_environment.id,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+    assert event_stream.name == "test_event_stream"
+    assert event_stream.owner.username == "test.admin"
+
+
+@pytest.mark.django_db
+def test_create_event_stream_without_credentials(
+    admin_client: APIClient, default_organization: models.Organization
+):
+    data_in = {
+        "name": "test_es",
+        "organization_id": default_organization.id,
     }
     response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-    result = response.data
-    assert result["name"] == "test_event_stream"
-    assert result["source_type"] == source_type
-    assert result["user"] == "test.admin"
-    assert yaml.safe_load(response.data["source_args"]) == args
-
-    event_stream = models.EventStream.objects.first()
-    rulesets = yaml.safe_load(event_stream.rulebook_rulesets)
-    source = rulesets[0]["sources"][0]
-    assert source[source_type] == args
-    assert source["name"] == "test_event_stream"
-
-
-@pytest.mark.django_db
-def test_create_event_stream_blank_text(
-    client: APIClient,
-    default_de: models.DecisionEnvironment,
-):
-    models.Rulebook.objects.create(
-        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
-        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
-    )
-
-    args = {"limit": 5, "delay": 1}
-    source_type = "ansible.eda.range"
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": f"{source_type}",
-        "source_args": f"{args}",
-        "decision_environment_id": default_de.id,
-        "description": "",
-        "extra_vars": "",
-        "k8s_service_name": "",
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.json() == {
+        "eda_credential_id": ["This field is required."],
     }
-    response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-    result = response.data
-    assert result["name"] == "test_event_stream"
-    assert result["source_type"] == source_type
-    assert result["user"] == "test.admin"
-    assert result["description"] == data_in["description"]
-
-    # An extra_var empty string is outbound serialized as None; it's considered
-    # a "no value" situation.
-    assert result["extra_var"] is None
-
-    assert result["k8s_service_name"] == data_in["k8s_service_name"]
-    assert yaml.safe_load(response.data["source_args"]) == args
-
-    event_stream = models.EventStream.objects.first()
-    rulesets = yaml.safe_load(event_stream.rulebook_rulesets)
-    source = rulesets[0]["sources"][0]
-    assert source[source_type] == args
-    assert source["name"] == "test_event_stream"
 
 
 @pytest.mark.django_db
-def test_create_event_stream_with_different_default_channel_names(
+def test_delete_event_stream(
     admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
+    default_event_stream: models.EventStream,
 ):
-    models.Rulebook.objects.create(
-        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
-        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    response = admin_client.delete(
+        f"{api_url_v1}/event-streams/{default_event_stream.id}/"
     )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    args = {"limit": 5, "delay": 1}
-    source_type = "ansible.eda.range"
-    data_in_1 = {
-        "name": "test_event_stream",
-        "source_type": f"{source_type}",
-        "source_args": f"{args}",
-        "decision_environment_id": default_decision_environment.id,
-    }
-    response = admin_client.post(
-        f"{api_url_v1}/event-streams/", data=data_in_1
+
+@pytest.mark.django_db
+def test_delete_event_stream_with_exception(
+    admin_client: APIClient,
+    default_activation: models.Activation,
+    default_event_stream: models.EventStream,
+):
+    activation = default_activation
+    activation.event_streams.add(default_event_stream)
+
+    response = admin_client.delete(
+        f"{api_url_v1}/event-streams/{default_event_stream.id}/"
     )
-    assert response.status_code == status.HTTP_201_CREATED
-
-    data_in_2 = {
-        "name": "test_event_stream_2",
-        "source_type": f"{source_type}",
-        "source_args": f"{args}",
-        "decision_environment_id": default_decision_environment.id,
-    }
-    response = admin_client.post(
-        f"{api_url_v1}/event-streams/", data=data_in_2
-    )
-
-    assert response.status_code == status.HTTP_201_CREATED
-    assert models.EventStream.objects.count() == 2
+    assert response.status_code == status.HTTP_409_CONFLICT
     assert (
-        models.EventStream.objects.first().channel_name
-        != models.EventStream.objects.last().channel_name
-    )
+        f"Event stream '{default_event_stream.name}' is being referenced by "
+        "1 activation(s) and cannot be deleted"
+    ) in response.data["detail"]
 
 
 @pytest.mark.django_db
-def test_create_event_stream_with_credential(
+def test_post_event_stream_with_bad_uuid(
     admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
+    default_event_stream: models.EventStream,
 ):
-    models.Rulebook.objects.create(
-        name=PG_NOTIFY_TEMPLATE_RULEBOOK_NAME,
-        rulesets=PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    data = {"a": 1, "b": 2}
+    response = admin_client.post(
+        event_stream_post_url("gobble-de-gook"),
+        data=data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_fetching_event_stream_credential(
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    secret = secrets.token_hex(32)
+    inputs = {
+        "auth_type": "token",
+        "token": secret,
+        "http_header_key": "Authorization",
+    }
+    create_event_stream_credential(
+        admin_client,
+        enums.EventStreamCredentialType.TOKEN.value,
+        inputs,
+        "demo1",
     )
 
-    args = {"limit": 5, "delay": 1}
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": "ansible.eda.range",
-        "source_args": f"{args}",
-        "decision_environment_id": default_decision_environment.id,
+    inputs = {
+        "auth_type": "basic",
+        "password": secret,
+        "username": "fred",
+        "http_header_key": "Authorization",
     }
-    response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_201_CREATED
-    result = response.data
-    assert result["name"] == "test_event_stream"
-    assert result["source_type"] == "ansible.eda.range"
-    assert yaml.safe_load(response.data["source_args"]) == args
+    create_event_stream_credential(
+        admin_client,
+        enums.EventStreamCredentialType.BASIC.value,
+        inputs,
+        "demo2",
+    )
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/?credential_type__kind=token"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["results"][0]["name"] == "demo1"
 
 
 @pytest.mark.parametrize(
-    "bad_rulebooks",
+    ("inputs", "cred_type", "settings_key", "error_msg"),
     [
-        {"bad_rulebook_1": f"{BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_TYPE}"},
-        {"bad_rulebook_2": f"{BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_NAME}"},
-        {"bad_rulebook_3": f"{BAD_PG_NOTIFY_TEMPLATE_RULEBOOK_NO_ARGS}"},
-        {"bad_rulebook_4": f"{BAD_PG_NOTIFY_NO_COMPLEMENTARY_SOURCE}"},
+        (
+            {
+                "auth_type": "mtls",
+                "subject": "Subject",
+                "http_header_key": "Subject",
+            },
+            enums.EventStreamCredentialType.MTLS.value,
+            "EVENT_STREAM_MTLS_BASE_URL",
+            (
+                "EventStream of type mTLS Event Stream cannot be "
+                "used because EVENT_STREAM_MTLS_BASE_URL is "
+                "not configured. "
+                "Please check with your site administrator."
+            ),
+        ),
+        (
+            {
+                "auth_type": "basic",
+                "username": "fred",
+                "password": secrets.token_hex(32),
+                "http_header_key": "Authorization",
+            },
+            enums.EventStreamCredentialType.BASIC.value,
+            "EVENT_STREAM_BASE_URL",
+            (
+                "EventStream of type Basic Event Stream cannot be used "
+                "because EVENT_STREAM_BASE_URL is not configured. "
+                "Please check with your site administrator."
+            ),
+        ),
     ],
 )
 @pytest.mark.django_db
-def test_create_event_stream_with_bad_rulebook(
+def test_post_event_stream_with_missing_settings(
     admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-    settings,
-    bad_rulebooks,
+    preseed_credential_types,
+    inputs,
+    cred_type,
+    settings_key,
+    error_msg,
 ):
-    for key in bad_rulebooks:
-        settings.PG_NOTIFY_TEMPLATE_RULEBOOK = key
-        settings.PG_NOTIFY_DSN = (
-            "host=localhost port=5432 dbname=eda user=postgres password=secret"
-        )
-        models.Rulebook.objects.create(
-            name=key,
-            rulesets=bad_rulebooks[key],
-        )
+    obj = create_event_stream_credential(admin_client, cred_type, inputs)
 
-        args = {"limit": 5, "delay": 1}
-        data_in = {
-            "name": "test_event_stream",
-            "source_type": "ansible.eda.range",
-            "source_args": f"{args}",
-            "decision_environment_id": default_decision_environment.id,
-        }
+    data_in = {
+        "name": "test-es-1",
+        "eda_credential_id": obj["id"],
+        "test_mode": True,
+        "organization_id": get_default_test_org().id,
+    }
+    with override_settings(settings_key=None):
         response = admin_client.post(
             f"{api_url_v1}/event-streams/", data=data_in
         )
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.data["detail"].startswith(
-            "Configuration Error: Event stream template rulebook is missing "
-        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == {"eda_credential_id": [error_msg]}
 
 
-@pytest.mark.django_db
-def test_create_event_stream_bad_channel_name(
-    admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-):
-    args = {"limit": 5, "delay": 1}
+def create_event_stream_credential(
+    client: APIClient,
+    credential_type_name: str,
+    inputs: dict,
+    name: str = "eda-credential",
+) -> dict:
+    credential_type = models.CredentialType.objects.get(
+        name=credential_type_name
+    )
     data_in = {
-        "name": "test_event_stream",
-        "source_type": "ansible.eda.range",
-        "source_args": f"{args}",
-        "channel_name": "abc-def",
-        "decision_environment_id": default_decision_environment.id,
+        "name": name,
+        "inputs": inputs,
+        "credential_type_id": credential_type.id,
+        "organization_id": get_default_test_org().id,
     }
-    response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        str(response.data["channel_name"][0])
-        == "Channel name can only contain alphanumeric and "
-        "underscore characters"
+    response = client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()
+
+
+def create_event_stream(
+    client: APIClient, data_in: dict
+) -> models.EventStream:
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = client.post(f"{api_url_v1}/event-streams/", data=data_in)
+        assert response.status_code == status.HTTP_201_CREATED
+        return models.EventStream.objects.get(id=response.data["id"])
+
+
+def event_stream_post_url(event_stream_uuid: str) -> str:
+    return f"{api_url_v1}/external_event_stream/{event_stream_uuid}/post/"
+
+
+def hash_digest(data: dict, secret: str, digestmod) -> str:
+    data_bytes = JSONRenderer().render(data)
+    hash_object = hmac.new(
+        secret.encode("utf-8"), msg=data_bytes, digestmod=digestmod
     )
+    return hash_object.hexdigest()
 
 
-@pytest.mark.django_db
-def test_create_event_stream_bad_args(
-    admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-):
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": "ansible.eda.range",
-        "source_args": "gobbledegook",
-        "decision_environment_id": default_decision_environment.id,
-    }
-    response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    result = response.data
-    assert (
-        str(result["source_args"][0])
-        == "The input field must be a YAML object (dictionary)"
-    )
-
-
-@pytest.mark.django_db
-def test_create_event_stream_empty_args(
-    admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-):
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": "ansible.eda.generic",
-        "decision_environment_id": default_decision_environment.id,
-    }
-    response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.data["source_args"][0] == "This field is required."
-
-
-@pytest.mark.django_db
-def test_create_event_stream_bad_de(admin_client: APIClient):
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": "ansible.eda.generic",
-        "decision_environment_id": 99999,
-    }
-    response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    result = response.data
-    assert (
-        str(result["decision_environment_id"][0])
-        == "DecisionEnvironment with id 99999 does not exist"
-    )
-
-
-@pytest.mark.django_db
-def test_create_event_stream_no_de(
-    admin_client: APIClient,
-):
-    data_in = {
-        "name": "test_event_stream",
-        "source_type": "ansible.eda.generic",
-    }
-    response = admin_client.post(f"{api_url_v1}/event-streams/", data=data_in)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    result = response.data
-    assert result["decision_environment_id"][0] == "This field is required."
-
-
-@pytest.mark.django_db
-def test_list_event_stream_instances(
-    admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-    default_user: models.User,
-):
-    args = {"limit": 5, "delay": 1}
-    event_stream = models.EventStream.objects.create(
-        name="test-event_stream-1",
-        source_type="ansible.eda.range",
-        source_args=args,
-        user=default_user,
-        decision_environment_id=default_decision_environment.id,
-    )
-
-    instances = models.RulebookProcess.objects.bulk_create(
-        [
-            models.RulebookProcess(
-                name="test-activation-instance-1",
-                event_stream=event_stream,
-                parent_type=ProcessParentType.EVENT_STREAM,
-            ),
-            models.RulebookProcess(
-                name="test-activation-instance-1",
-                event_stream=event_stream,
-                parent_type=ProcessParentType.EVENT_STREAM,
-            ),
-        ]
-    )
-    models.RulebookProcessQueue.objects.create(
-        process=instances[0],
-        queue_name="activation",
-    )
-    response = admin_client.get(
-        f"{api_url_v1}/event-streams/{event_stream.id}/instances/"
-    )
-    data = response.data["results"]
-    assert response.status_code == status.HTTP_200_OK
-    assert len(data) == len(instances)
-    assert data[0]["name"] == instances[0].name
-    assert data[1]["name"] == instances[1].name
-    assert data[0]["queue_name"] == "activation"
-    assert data[1]["queue_name"] is None
-
-
-@pytest.mark.django_db
-def test_retrieve_event_stream_instance(
-    admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-    default_user: models.User,
-):
-    args = {"limit": 5, "delay": 1}
-    event_stream = models.EventStream.objects.create(
-        name="test-event_stream-1",
-        source_type="ansible.eda.range",
-        source_args=args,
-        user=default_user,
-        decision_environment_id=default_decision_environment.id,
-    )
-
-    instance = models.RulebookProcess.objects.create(
-        name="test-activation-instance-1",
-        event_stream=event_stream,
-        parent_type=ProcessParentType.EVENT_STREAM,
-    )
-    models.RulebookProcessQueue.objects.create(
-        process=instance,
-        queue_name="activation",
-    )
-    response = admin_client.get(
-        (
-            f"{api_url_v1}/event-streams/{event_stream.id}"
-            f"/instances/{instance.id}/"
-        ),
-    )
-    data = response.data
-    assert response.status_code == status.HTTP_200_OK
-    assert data["name"] == instance.name
-    assert data["queue_name"] == "activation"
+def get_default_test_org() -> models.Organization:
+    return models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )[0]

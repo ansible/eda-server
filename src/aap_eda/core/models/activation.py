@@ -24,9 +24,9 @@ from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
 from .base import BaseOrgModel, UniqueNamedModel
+from .event_stream import EventStream
 from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 from .user import AwxToken, User
-from .webhook import Webhook
 
 __all__ = ("Activation",)
 
@@ -110,10 +110,6 @@ class Activation(
         null=True,
         default=None,
     )
-    event_streams = models.ManyToManyField(
-        "EventStream",
-        default=None,
-    )
     log_level = models.CharField(
         max_length=20,
         choices=RulebookProcessLogLevel.choices(),
@@ -135,8 +131,8 @@ class Activation(
         blank=True,
         help_text="Name of the kubernetes service",
     )
-    webhooks = models.ManyToManyField(
-        Webhook, related_name="activations", default=None
+    event_streams = models.ManyToManyField(
+        EventStream, related_name="activations", default=None
     )
     source_mappings = models.TextField(
         default="",

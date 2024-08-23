@@ -30,7 +30,7 @@ from aap_eda.core.utils.credentials import inputs_to_store
 CRUD = ["add", "view", "change", "delete"]
 LOGGER = logging.getLogger(__name__)
 AVAILABLE_ALGORITHMS = sorted(hashlib.algorithms_available)
-AUTH_TYPE_LABEL = "Webhook Authentication Type"
+AUTH_TYPE_LABEL = "Event Stream Authentication Type"
 SIGNATURE_ENCODING_LABEL = "Signature Encoding"
 HTTP_HEADER_LABEL = "HTTP Header Key"
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
@@ -59,7 +59,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "eda_credential": CRUD,
-            "webhook": CRUD,
+            "event_stream": CRUD,
         },
     },
     {
@@ -85,7 +85,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["add", "view", "change"],
             "eda_credential": ["add", "view", "change"],
-            "webhook": ["add", "view", "change"],
+            "event_stream": ["add", "view", "change"],
         },
     },
     {
@@ -111,7 +111,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["add", "view", "change"],
             "eda_credential": ["add", "view", "change"],
-            "webhook": ["add", "view", "change"],
+            "event_stream": ["add", "view", "change"],
         },
     },
     {
@@ -131,7 +131,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
-            "webhook": ["view"],
+            "event_stream": ["view"],
         },
     },
     {
@@ -149,7 +149,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
-            "webhook": ["view"],
+            "event_stream": ["view"],
         },
     },
     {
@@ -167,7 +167,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
-            "webhook": ["view"],
+            "event_stream": ["view"],
         },
     },
 ]
@@ -331,7 +331,7 @@ VAULT_INPUTS = {
     "required": ["vault_password"],
 }
 
-WEBHOOK_HMAC_INPUTS = {
+EVENT_STREAM_HMAC_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -346,9 +346,9 @@ WEBHOOK_HMAC_INPUTS = {
             "type": "string",
             "secret": True,
             "help_text": (
-                "The symmetrical shared secret between EDA and the Webhook "
-                "Server. Please save this value since you would need it on "
-                "the Webhook Server."
+                "The symmetrical shared secret between EDA and the "
+                "Event Stream Server. Please save this value since "
+                "you would need it on the Event Stream Server."
             ),
         },
         {
@@ -358,8 +358,9 @@ WEBHOOK_HMAC_INPUTS = {
             "default": "sha256",
             "choices": AVAILABLE_ALGORITHMS,
             "help_text": (
-                "The Webhook sender hashes the message being sent using one "
-                "of these algorithms, which guarantees message integrity."
+                "The EventStream sender hashes the message being "
+                "sent using one of these algorithms, which guarantees "
+                "message integrity."
             ),
         },
         {
@@ -368,7 +369,7 @@ WEBHOOK_HMAC_INPUTS = {
             "type": "string",
             "default": "X-Hub-Signature-256",
             "help_text": (
-                "The webhook sender typically uses a special HTTP header "
+                "The event stream sender typically uses a special HTTP header "
                 "to send the signature of the payload. e.g X-Hub-Signature-256"
             ),
         },
@@ -401,7 +402,7 @@ WEBHOOK_HMAC_INPUTS = {
     ],
 }
 
-WEBHOOK_BASIC_INPUTS = {
+EVENT_STREAM_BASIC_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -415,7 +416,7 @@ WEBHOOK_BASIC_INPUTS = {
             "label": "Username",
             "type": "string",
             "help_text": (
-                "The username used to authenticate the incoming webhook"
+                "The username used to authenticate the incoming event stream"
             ),
         },
         {
@@ -424,7 +425,7 @@ WEBHOOK_BASIC_INPUTS = {
             "type": "string",
             "secret": True,
             "help_text": (
-                "The password used to authenticate the incoming webhook"
+                "The password used to authenticate the incoming event stream"
             ),
         },
         {
@@ -438,7 +439,7 @@ WEBHOOK_BASIC_INPUTS = {
     "required": ["auth_type", "password", "username", "http_header_key"],
 }
 
-WEBHOOK_TOKEN_INPUTS = {
+EVENT_STREAM_TOKEN_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -453,9 +454,9 @@ WEBHOOK_TOKEN_INPUTS = {
             "type": "string",
             "secret": True,
             "help_text": (
-                "The symmetrical shared token between EDA and the Webhook "
+                "The symmetrical shared token between EDA and the EventStream "
                 "Server. Please save this value since you would need it on "
-                "the Webhook Server."
+                "the EventStream Server."
             ),
         },
         {
@@ -473,7 +474,7 @@ WEBHOOK_TOKEN_INPUTS = {
     "required": ["auth_type", "token", "http_header_key"],
 }
 
-WEBHOOK_OAUTH2_INPUTS = {
+EVENT_STREAM_OAUTH2_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -525,7 +526,7 @@ WEBHOOK_OAUTH2_INPUTS = {
     ],
 }
 
-WEBHOOK_OAUTH2_JWT_INPUTS = {
+EVENT_STREAM_OAUTH2_JWT_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -568,7 +569,7 @@ WEBHOOK_OAUTH2_JWT_INPUTS = {
     "required": ["auth_type", "jwks_url", "http_header_key"],
 }
 
-WEBHOOK_ECDSA_INPUTS = {
+EVENT_STREAM_ECDSA_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -593,7 +594,7 @@ WEBHOOK_ECDSA_INPUTS = {
             "help_text": (
                 "Public Key for validating the data, this would be "
                 "available from the sender after you have created the "
-                "webhook on their side with our URL. This is usually a "
+                "event stream on their side with our URL. This is usually a "
                 "2 step process"
             ),
             "multiline": True,
@@ -623,8 +624,9 @@ WEBHOOK_ECDSA_INPUTS = {
             "default": "sha256",
             "choices": AVAILABLE_ALGORITHMS,
             "help_text": (
-                "The Webhook sender hashes the message being sent using one "
-                "of these algorithms, which guarantees message integrity."
+                "The EventStream sender hashes the message being "
+                "sent using one of these algorithms, which guarantees "
+                "message integrity."
             ),
         },
     ],
@@ -637,7 +639,7 @@ WEBHOOK_ECDSA_INPUTS = {
     ],
 }
 
-WEBHOOK_MTLS_INPUTS = {
+EVENT_STREAM_MTLS_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -671,7 +673,7 @@ WEBHOOK_MTLS_INPUTS = {
     "required": ["auth_type", "http_header_key"],
 }
 
-WEBHOOK_GITLAB_INPUTS = {
+EVENT_STREAM_GITLAB_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -688,7 +690,7 @@ WEBHOOK_GITLAB_INPUTS = {
             "help_text": (
                 "The symmetrical shared token between EDA and the Gitlab "
                 "Server. Please save this value since you would need it on "
-                "the Webhook Server."
+                "the EventStream Server."
             ),
         },
         {
@@ -707,7 +709,7 @@ WEBHOOK_GITLAB_INPUTS = {
     "required": ["auth_type", "token", "http_header_key"],
 }
 
-WEBHOOK_GITHUB_INPUTS = {
+EVENT_STREAM_GITHUB_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -723,8 +725,8 @@ WEBHOOK_GITHUB_INPUTS = {
             "secret": True,
             "help_text": (
                 "The symmetrical shared secret between EDA and "
-                "the Webhook Server. Please save this value since "
-                "you would need it on the Webhook Server."
+                "the EventStream Server. Please save this value since "
+                "you would need it on the EventStream Server."
             ),
         },
         {
@@ -734,7 +736,7 @@ WEBHOOK_GITHUB_INPUTS = {
             "default": "sha256",
             "choices": ["sha128", "sha256", "sha512", "sha1024"],
             "help_text": (
-                "The Webhook sender hashes the message being sent "
+                "The EventStream sender hashes the message being sent "
                 "using one of these algorithms, which guarantees "
                 "message integrity."
             ),
@@ -746,7 +748,7 @@ WEBHOOK_GITHUB_INPUTS = {
             "type": "string",
             "default": "X-Hub-Signature-256",
             "help_text": (
-                "The webhook sender typically uses a special "
+                "The event stream sender typically uses a special "
                 "HTTP header to send the signature of the payload. "
                 "e.g X-Hub-Signature-256"
             ),
@@ -786,7 +788,7 @@ WEBHOOK_GITHUB_INPUTS = {
     ],
 }
 
-WEBHOOK_SNOW_INPUTS = {
+EVENT_STREAM_SNOW_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -803,7 +805,7 @@ WEBHOOK_SNOW_INPUTS = {
             "help_text": (
                 "The symmetrical shared token between EDA and the ServiceNow "
                 "Server. Please save this value since you would need it on "
-                "the Webhook Server."
+                "the EventStream Server."
             ),
         },
         {
@@ -822,7 +824,7 @@ WEBHOOK_SNOW_INPUTS = {
     "required": ["auth_type", "token", "http_header_key"],
 }
 
-WEBHOOK_DYNATRACE_INPUTS = {
+EVENT_STREAM_DYNATRACE_INPUTS = {
     "fields": [
         {
             "id": "auth_type",
@@ -836,7 +838,7 @@ WEBHOOK_DYNATRACE_INPUTS = {
             "label": "Username",
             "type": "string",
             "help_text": (
-                "The username used to authenticate the incoming webhook"
+                "The username used to authenticate the incoming event stream"
             ),
         },
         {
@@ -845,7 +847,7 @@ WEBHOOK_DYNATRACE_INPUTS = {
             "type": "string",
             "secret": True,
             "help_text": (
-                "The password used to authenticate the incoming webhook"
+                "The password used to authenticate the incoming event stream"
             ),
         },
         {
@@ -905,14 +907,14 @@ CREDENTIAL_TYPES = [
         "managed": True,
     },
     {
-        "name": enums.WebhookCredentialType.HMAC,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.HMAC,
+        "namespace": "event_stream",
         "kind": "hmac",
-        "inputs": WEBHOOK_HMAC_INPUTS,
+        "inputs": EVENT_STREAM_HMAC_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use HMAC. "
+            "Credential for Event Streams that use HMAC. "
             "This requires shared secret between the sender and receiver. "
             "The signature can be sent as hex or base64 strings. "
             "Most of senders will use a special HTTP header to send "
@@ -920,133 +922,133 @@ CREDENTIAL_TYPES = [
         ),
     },
     {
-        "name": enums.WebhookCredentialType.BASIC,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.BASIC,
+        "namespace": "event_stream",
         "kind": "basic",
-        "inputs": WEBHOOK_BASIC_INPUTS,
+        "inputs": EVENT_STREAM_BASIC_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use Basic Authentication. "
+            "Credential for EventStreams that use Basic Authentication. "
             "It requires a username and password"
         ),
     },
     {
-        "name": enums.WebhookCredentialType.TOKEN,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.TOKEN,
+        "namespace": "event_stream",
         "kind": "token",
-        "inputs": WEBHOOK_TOKEN_INPUTS,
+        "inputs": EVENT_STREAM_TOKEN_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use Token Authentication. "
+            "Credential for Event Streams that use Token Authentication. "
             "Usually the token is sent in the Authorization header. "
             "Some of the senders will use a special HTTP header to send "
             "the token."
         ),
     },
     {
-        "name": enums.WebhookCredentialType.OAUTH2,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.OAUTH2,
+        "namespace": "event_stream",
         "kind": "oauth2",
-        "inputs": WEBHOOK_OAUTH2_INPUTS,
+        "inputs": EVENT_STREAM_OAUTH2_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use OAuth2. "
+            "Credential for Event Streams that use OAuth2. "
             "This needs a client id and client credential and access "
             "to an Authorization server so we can introspect the token "
             "being sent."
         ),
     },
     {
-        "name": enums.WebhookCredentialType.OAUTH2_JWT,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.OAUTH2_JWT,
+        "namespace": "event_stream",
         "kind": "oauth2_jwt",
-        "inputs": WEBHOOK_OAUTH2_JWT_INPUTS,
+        "inputs": EVENT_STREAM_OAUTH2_JWT_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use OAuth2 with JWT. "
+            "Credential for Event Streams that use OAuth2 with JWT. "
             "This needs a JWKS URL which will be used to fetch the "
             "public key and validate the incoming token. If an audience "
             "is specified we will check the audience in the JWT claims."
         ),
     },
     {
-        "name": enums.WebhookCredentialType.ECDSA,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.ECDSA,
+        "namespace": "event_stream",
         "kind": "ecdsa",
-        "inputs": WEBHOOK_ECDSA_INPUTS,
+        "inputs": EVENT_STREAM_ECDSA_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use Elliptic Curve DSA. "
+            "Credential for Event Streams that use Elliptic Curve DSA. "
             "This requires a public key and the headers that carry "
             "the signature."
         ),
     },
     {
-        "name": enums.WebhookCredentialType.MTLS,
-        "namespace": "webhook",
+        "name": enums.EventStreamCredentialType.MTLS,
+        "namespace": "event_stream",
         "kind": "mtls",
-        "inputs": WEBHOOK_MTLS_INPUTS,
+        "inputs": EVENT_STREAM_MTLS_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Webhooks that use mutual TLS. "
+            "Credential for Event Streams that use mutual TLS. "
             "The Certificate is installed in the Web Server and "
             "we can optionally validate the Subject defined in the "
             "Certificate."
         ),
     },
     {
-        "name": enums.CustomWebhookCredentialType.GITLAB,
-        "namespace": "webhook",
+        "name": enums.CustomEventStreamCredentialType.GITLAB,
+        "namespace": "event_stream",
         "kind": "gitlab",
-        "inputs": WEBHOOK_GITLAB_INPUTS,
+        "inputs": EVENT_STREAM_GITLAB_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Gitlab Webhook. This is a specialization of "
+            "Credential for Gitlab Event Streams. This is a specialization of "
             "the Token authentication with the X-Gitlab-Token header."
         ),
     },
     {
-        "name": enums.CustomWebhookCredentialType.GITHUB,
-        "namespace": "webhook",
+        "name": enums.CustomEventStreamCredentialType.GITHUB,
+        "namespace": "event_stream",
         "kind": "github",
-        "inputs": WEBHOOK_GITHUB_INPUTS,
+        "inputs": EVENT_STREAM_GITHUB_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Github Webhook. This is a specialization of "
+            "Credential for Github EventStream. This is a specialization of "
             "the HMAC authentication which only requires a secret to be "
             "provided."
         ),
     },
     {
-        "name": enums.CustomWebhookCredentialType.SNOW,
-        "namespace": "webhook",
+        "name": enums.CustomEventStreamCredentialType.SNOW,
+        "namespace": "event_stream",
         "kind": "snow",
-        "inputs": WEBHOOK_SNOW_INPUTS,
+        "inputs": EVENT_STREAM_SNOW_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for ServiceNow Webhook. This is a specialization of "
-            "the Token authentication which only requires a token to be "
-            "provided."
+            "Credential for ServiceNow Event Stream. This is a "
+            "specialization of the Token authentication which "
+            "only requires a token to be provided."
         ),
     },
     {
-        "name": enums.CustomWebhookCredentialType.DYNATRACE,
-        "namespace": "webhook",
+        "name": enums.CustomEventStreamCredentialType.DYNATRACE,
+        "namespace": "event_stream",
         "kind": "dynatrace",
-        "inputs": WEBHOOK_DYNATRACE_INPUTS,
+        "inputs": EVENT_STREAM_DYNATRACE_INPUTS,
         "injectors": {},
         "managed": True,
         "description": (
-            "Credential for Dynatrace Webhook. This is a clone of "
+            "Credential for Dynatrace Event Stream. This is a clone of "
             "the Basic authentication."
         ),
     },
