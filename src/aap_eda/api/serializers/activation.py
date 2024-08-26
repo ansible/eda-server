@@ -32,6 +32,7 @@ from aap_eda.api.serializers.decision_environment import (
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ANSIBLE_VAULT_STRING,
@@ -514,6 +515,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     organization = OrganizationRefSerializer()
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
+    ruleset_stats = YAMLSerializerField(
+        sort_keys=False,
+        help_text="The stat information about the activation",
+    )
     restarted_at = serializers.DateTimeField(required=False, allow_null=True)
     eda_credentials = serializers.ListField(
         required=False,
@@ -551,6 +556,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restart_count",
             "rulebook_name",
             "current_job_id",
+            "ruleset_stats",
             "rules_count",
             "rules_fired_count",
             "created_at",
@@ -618,6 +624,13 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             EventStreamOutSerializer(event_stream).data
             for event_stream in activation.event_streams.all()
         ]
+        ruleset_stats = (
+            YAMLSerializerField(sort_keys=False).to_representation(
+                activation.ruleset_stats
+            )
+            if activation.ruleset_stats
+            else None
+        )
 
         return {
             "id": activation.id,
@@ -638,6 +651,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
             "current_job_id": activation.current_job_id,
+            "ruleset_stats": ruleset_stats,
             "rules_count": rules_count,
             "rules_fired_count": rules_fired_count,
             "created_at": activation.created_at,
