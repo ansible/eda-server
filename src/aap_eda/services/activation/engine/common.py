@@ -105,6 +105,7 @@ class AnsibleRulebookCmdLine(BaseModel):
 class Credential(BaseModel):
     username: str
     secret: str
+    ssl_verify: str
 
 
 class ContainerRequest(BaseModel):
@@ -230,6 +231,7 @@ class ContainerableMixin:
             return Credential(
                 username=inputs["username"],
                 secret=inputs["password"],
+                ssl_verify=inputs["verify_ssl"],
             )
         return None
 

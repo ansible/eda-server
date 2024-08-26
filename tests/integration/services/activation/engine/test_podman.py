@@ -37,6 +37,7 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineInitError,
     ContainerImagePullError,
+    ContainerLoginError,
     ContainerNotFoundError,
     ContainerStartError,
     ContainerUpdateLogsError,
@@ -102,6 +103,7 @@ def get_request(data: InitData):
         mounts=[{"/dev": "/opt"}],
         env_vars={"a": 1},
         extra_args={"b": 2},
+        credential=Credential(username="me", secret="secret", ssl_verify=True),
     )
 
 
@@ -113,6 +115,7 @@ def get_request_with_never_pull_policy(data: InitData):
         process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         pull_policy="Never",
+        credential=Credential(username="me", secret="secret", ssl_verify=True),
     )
 
 
@@ -123,7 +126,7 @@ def get_request_with_credential(data: InitData):
         rulebook_process_id=data.activation_instance.id,
         process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
-        credential=Credential(username="me", secret="secret"),
+        credential=Credential(username="me", secret="secret", ssl_verify=True),
     )
 
 
@@ -223,12 +226,10 @@ def test_engine_start_with_none_image_url(init_data, podman_engine):
 
 @pytest.mark.django_db
 def test_engine_start_with_credential(init_data, podman_engine):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
+    credential = Credential(username="me", secret="secret", ssl_verify=True)
     request.credential = credential
 
     engine.start(request, log_handler)
@@ -236,6 +237,7 @@ def test_engine_start_with_credential(init_data, podman_engine):
     engine.client.login.assert_called_once()
     engine.client.images.pull.assert_called_once_with(
         request.image_url,
+        tls_verify=bool(credential.ssl_verify),
         auth_config={
             "username": credential.username,
             "password": credential.secret,
@@ -259,32 +261,26 @@ def test_engine_start_with_credential(init_data, podman_engine):
 
 @pytest.mark.django_db
 def test_engine_start_with_login_api_exception(init_data, podman_engine):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
+    credential = Credential(username="me", secret="sec1", ssl_verify=True)
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
     request.credential = credential
 
     def raise_error(*args, **kwargs):
-        raise APIError("Login failed")
+        raise ContainerLoginError("Login failed")
 
     engine.client.login.side_effect = raise_error
 
-    with pytest.raises(ContainerStartError, match="Login failed"):
+    with pytest.raises(ContainerLoginError, match="Login failed"):
         engine.start(request, log_handler)
 
 
 @pytest.mark.django_db
 def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
-    request.credential = credential
 
     def raise_not_found_error(*args, **kwargs):
         raise ImageNotFound("Image not found")
@@ -303,13 +299,9 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
 
 @pytest.mark.django_db
 def test_engine_start_with_image_api_exception(init_data, podman_engine):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
-    request.credential = credential
 
     def raise_api_error(*args, **kwargs):
         raise APIError("Image not found")
@@ -324,13 +316,9 @@ def test_engine_start_with_image_api_exception(init_data, podman_engine):
 def test_engine_start_with_image_pull_timeout_exception(
     init_data, podman_engine
 ):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
-    request.credential = credential
     error = "Task exceeded maximum timeout value 120 seconds"
 
     def raise_timeout_error(*args, **kwargs):
@@ -344,13 +332,9 @@ def test_engine_start_with_image_pull_timeout_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_image_pull_exception(init_data, podman_engine):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
-    request.credential = credential
 
     image_mock = mock.Mock()
     image_mock.pull.return_value.id = None
@@ -368,13 +352,9 @@ def test_engine_start_with_image_pull_exception(init_data, podman_engine):
 
 @pytest.mark.django_db
 def test_engine_start_with_containers_run_exception(init_data, podman_engine):
-    credential = models.Credential.objects.create(
-        name="credential1", username="me", secret="sec1"
-    )
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
-    request.credential = credential
 
     def raise_error(*args, **kwargs):
         raise ContainerError(

@@ -24,6 +24,7 @@ from podman.errors.exceptions import APIError, NotFound
 from rq.timeouts import JobTimeoutException
 
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.utils import str_to_bool
 
 from . import exceptions, messages
 from .common import (
@@ -332,8 +333,11 @@ class Engine(ContainerEngine):
                 f"{credential.username} login succeeded to {registry}"
             )
         except APIError as e:
-            LOGGER.error("Login failed: f{e}", exc_info=settings.DEBUG)
-            raise exceptions.ContainerStartError(str(e))
+            LOGGER.error(
+                f"Login failed: {e.explanation}",
+                exc_info=settings.DEBUG,
+            )
+            raise exceptions.ContainerLoginError(e.explanation)
 
     def _pull_image(
         self, request: ContainerRequest, log_handler: LogHandler
@@ -343,6 +347,9 @@ class Engine(ContainerEngine):
             LOGGER.info(f"Pulling image : {request.image_url}")
             kwargs = {}
             if request.credential:
+                kwargs = {
+                    "tls_verify": str_to_bool(request.credential.ssl_verify)
+                }
                 kwargs["auth_config"] = {
                     "username": request.credential.username,
                     "password": request.credential.secret,

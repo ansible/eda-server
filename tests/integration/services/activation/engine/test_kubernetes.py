@@ -99,7 +99,9 @@ def get_request(data: InitData):
         rulebook_process_id=data.activation_instance.id,
         process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
-        credential=Credential(username="admin", secret="secret"),
+        credential=Credential(
+            username="admin", secret="secret", ssl_verify=True
+        ),
         ports=[("localhost", 8080)],
         mem_limit="8G",
         env_vars={"a": 1},

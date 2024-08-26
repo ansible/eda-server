@@ -13,6 +13,10 @@ class ContainerStartError(ContainerEngineError):
     """Raised when a container fails to start."""
 
 
+class ContainerLoginError(ContainerEngineError):
+    """Raised when a container fails to login."""
+
+
 class ContainerImagePullError(ContainerEngineError):
     """Raised when a container fails to pull image."""
 
