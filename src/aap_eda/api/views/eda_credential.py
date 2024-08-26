@@ -247,6 +247,17 @@ class EdaCredentialViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        if models.EventStream.objects.filter(
+            eda_credential=eda_credential
+        ).exists():
+            raise exceptions.Conflict(
+                f"Credential {eda_credential.name} is being referenced by "
+                "some event streams and cannot be deleted. "
+                "Please delete the EventStream(s) first before the credential "
+                "can be deleted. The EventStream maybe in use by other users "
+                "in the system."
+            )
+
         references = get_references(eda_credential)
 
         if bool(references) and not force:
