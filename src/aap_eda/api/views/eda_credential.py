@@ -31,7 +31,10 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
-from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.core.utils.credentials import (
+    inputs_to_store,
+    inputs_to_store_dict,
+)
 from aap_eda.utils import str_to_bool
 
 from .mixins import (
@@ -193,8 +196,14 @@ class EdaCredentialViewSet(
     )
     def partial_update(self, request, pk):
         eda_credential = self.get_object()
+        data = request.data
+
+        data["inputs"] = inputs_to_store_dict(
+            data.get("inputs", {}), eda_credential.inputs
+        )
+
         serializer = serializers.EdaCredentialCreateSerializer(
-            eda_credential, data=request.data, partial=True
+            eda_credential, data=data, partial=True
         )
         serializer.is_valid(raise_exception=True)
 
@@ -245,6 +254,17 @@ class EdaCredentialViewSet(
             error = "Managed EDA credential cannot be deleted"
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if models.EventStream.objects.filter(
+            eda_credential=eda_credential
+        ).exists():
+            raise exceptions.Conflict(
+                f"Credential {eda_credential.name} is being referenced by "
+                "some event streams and cannot be deleted. "
+                "Please delete the EventStream(s) first before the credential "
+                "can be deleted. The EventStream maybe in use by other users "
+                "in the system."
             )
 
         references = get_references(eda_credential)
