@@ -98,7 +98,7 @@ jobs:
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-test-results.xml
           component_name=eda
-          git_commit_sha=$(git rev-parse HEAD)
+          git_commit_sha=${{ github.event.pull_request.head.sha }}
           git_repository_url="https://github.com/${{ github.repository }}"
 
 
@@ -175,5 +175,5 @@ jobs:
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-multinode-test-results.xml
           component_name=eda
-          git_commit_sha=$(git rev-parse HEAD)
+          git_commit_sha=${{ github.event.pull_request.head.sha }}
           git_repository_url="https://github.com/${{ github.repository }}"
