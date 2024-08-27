@@ -98,10 +98,8 @@ jobs:
       - name: Check migrations are up to date
         run: poetry run /usr/bin/env aap-eda-manage makemigrations --dry-run --check
 
-      # - name: Run tests
-      #   run: poetry run python -m pytest -vv --cov=./ --cov-report=xml --junit-xml=eda-server-test-results.xml
-      - name: Temp
-        run: echo "hello" > eda-server-test-results.xml
+      - name: Run tests
+        run: poetry run python -m pytest -vv --cov=./ --cov-report=xml --junit-xml=eda-server-test-results.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
