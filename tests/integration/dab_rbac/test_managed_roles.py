@@ -14,12 +14,14 @@
 
 import pytest
 from ansible_base.rbac.models import RoleDefinition
+from django.test import override_settings
 from rest_framework import status
 
 from aap_eda.core.management.commands.create_initial_data import ORG_ROLES
 from tests.integration.constants import api_url_v1
 
 
+@override_settings(ALLOW_LOCAL_ASSIGNING_JWT_ROLES=True)
 @pytest.mark.django_db
 def test_org_role_team_assignments(
     admin_client, default_organization, default_team, create_managed_org_roles
@@ -41,6 +43,7 @@ def test_org_role_team_assignments(
             ), response.data
 
 
+@override_settings(ALLOW_LOCAL_ASSIGNING_JWT_ROLES=True)
 @pytest.mark.django_db
 def test_org_role_user_assignments(
     admin_client, default_organization, default_user, create_managed_org_roles
