@@ -87,7 +87,7 @@ jobs:
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
             pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
           else
-            pytest -vv --junit-xml=test-results.xml
+            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
           fi
 
       - name: Upload jUnit test results (APDE CI)
