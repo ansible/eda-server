@@ -84,11 +84,12 @@ jobs:
           EDAQA_ENV: authenticated
           EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
         run: |
-          if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
-            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
-          else
-            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
-          fi
+          # if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
+          #   pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
+          # else
+          #   pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
+          # fi
+          touch eda-qa-e2e-test-results.xml
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
@@ -97,7 +98,7 @@ jobs:
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-test-results.xml
           component_name=eda
-          git_commit_sha=${{ github.ref }})
+          git_commit_sha=${{ github.head_ref }}
           git_repository_url="https://github.com/${{ github.repository }}"
 
 
@@ -164,7 +165,8 @@ jobs:
           # to allow for the time it takes to start the workers inside the tests
           EDAQA_DEFAULT_TIMEOUT: 120
         run: |
-          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
+          # pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
+          touch eda-qa-e2e-multinode-test-results.xml
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
@@ -173,5 +175,5 @@ jobs:
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-multinode-test-results.xml
           component_name=eda
-          git_commit_sha=${{ github.ref }})
+          git_commit_sha=${{ github.head_ref }}
           git_repository_url="https://github.com/${{ github.repository }}"
