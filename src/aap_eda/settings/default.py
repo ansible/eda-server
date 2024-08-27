@@ -683,6 +683,14 @@ ANSIBLE_BASE_ROLE_PRECREATE = {}
 
 ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
 
+ALLOW_LOCAL_ASSIGNING_JWT_ROLES = settings.get(
+    "ALLOW_LOCAL_ASSIGNING_JWT_ROLES", False
+)
+
+ALLOW_SHARED_RESOURCE_CUSTOM_ROLES = settings.get(
+    "ALLOW_SHARED_RESOURCE_CUSTOM_ROLES", False
+)
+
 # --------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCE API CLIENT
 # --------------------------------------------------------
