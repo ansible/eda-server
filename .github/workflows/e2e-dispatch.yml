@@ -96,6 +96,7 @@ jobs:
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Upload jUnit test results (APDE CI)
+        working-directory: ${{ env.EDA_QA_PATH }}
         run: >-
           http --check-status --ignore-stdin
           --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
@@ -177,6 +178,7 @@ jobs:
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Upload jUnit test results (APDE CI)
+        working-directory: ${{ env.EDA_QA_PATH }}
         run: >-
           http --check-status --ignore-stdin
           --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
