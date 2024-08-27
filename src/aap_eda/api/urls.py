@@ -25,7 +25,6 @@ from drf_spectacular.views import (
     SpectacularYAMLAPIView,
 )
 from rest_framework import routers
-from rest_framework_simplejwt import views as jwt_views
 
 from aap_eda.core import views as core_views
 
@@ -100,7 +99,7 @@ eda_v1_urls = [
     ),
     path(
         "auth/token/refresh/",
-        jwt_views.TokenRefreshView.as_view(),
+        views.TokenRefreshView.as_view(),
         name="token-refresh",
     ),
     path("users/me/", views.CurrentUserView.as_view(), name="current-user"),

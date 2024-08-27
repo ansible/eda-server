@@ -21,7 +21,7 @@ from .activation import (
     ActivationSerializer,
     PostActivationSerializer,
 )
-from .auth import LoginSerializer
+from .auth import JWTTokenSerializer, LoginSerializer, RefreshTokenSerializer
 from .config import ConfigSerializer
 from .credential_type import (
     CredentialTypeCreateSerializer,
@@ -80,6 +80,8 @@ from .user import (
 __all__ = (
     # auth
     "LoginSerializer",
+    "RefreshTokenSerializer",
+    "JWTTokenSerializer",
     # project
     "ProjectSerializer",
     "ProjectCreateRequestSerializer",
