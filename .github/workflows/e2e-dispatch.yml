@@ -85,9 +85,9 @@ jobs:
           EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
-            pytest -vv -k "${{ github.event.inputs.pytest_filter }}"
+            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=test-results.xml
           else
-            pytest -vv
+            pytest -vv --junit-xml=test-results.xml
           fi
 
       - name: Print EDA logs
@@ -153,4 +153,4 @@ jobs:
           # to allow for the time it takes to start the workers inside the tests
           EDAQA_DEFAULT_TIMEOUT: 120
         run: |
-          pytest -vv -s eda_qa/tests/whitebox/upstream
+          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=test-results.xml

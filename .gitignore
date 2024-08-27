@@ -25,3 +25,6 @@ Taskfile.yaml
 /tools/deploy/environment.properties
 
 venv/
+.coverage*
+coverage.xml
+test-results.xml
