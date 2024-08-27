@@ -27,6 +27,14 @@ If you have questions or need assistance, please reach out to our community team
 
 Refer to the [Contributing guide](docs/contributing.md) for further information.
 
+## Communication
+
+See the [Communication](https://github.com/ansible/eda-server/blob/main/docs/contributing.md#communication) section of the
+Contributing guide to find out how to get help and contact us.
+
+For more information about getting in touch, see the
+[Ansible communication guide](https://docs.ansible.com/ansible/devel/community/communication.html).
+
 ## Credits
 
 EDA-Controller is sponsored by [Red Hat, Inc](https://www.redhat.com).
