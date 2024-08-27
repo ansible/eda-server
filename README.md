@@ -29,18 +29,8 @@ Refer to the [Contributing guide](docs/contributing.md) for further information.
 
 ## Communication
 
-Join the Ansible forum to ask questions, get help, and interact with the community.
-
-- [Get Help](https://forum.ansible.com/c/help/6): get help or help others.
-  Please add appropriate tags if you start new discussions, for example the
-  `eda-server` or `eda-operator` tags.
-- [Social Spaces](https://forum.ansible.com/c/chat/4): meet and interact with
-  fellow enthusiasts.
-- [News & Announcements](https://forum.ansible.com/c/news/5): track project-wide
-  announcements including social events.
-
-To get release announcements and important changes from the community, see the
-[Bullhorn newsletter](https://docs.ansible.com/ansible/devel/community/communication.html#the-bullhorn).
+See the [Communication](https://github.com/ansible/eda-server/blob/main/docs/contributing.md#communication) section of the
+Contributing guide to find out how to get help and contact us.
 
 For more information about getting in touch, see the
 [Ansible communication guide](https://docs.ansible.com/ansible/devel/community/communication.html).
