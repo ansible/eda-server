@@ -89,7 +89,7 @@ jobs:
           else
             pytest -vv --junit-xml=test-results.xml
           fi
-      
+
       - name: Upload jUnit test results (APDE CI)
         run: >-
           http --check-status --ignore-stdin
