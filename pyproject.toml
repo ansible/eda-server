@@ -57,6 +57,7 @@ psycopg = "^3.1.17"
 xxhash = "*"
 pyjwt = { version = "*", extras = ["crypto"] }
 ecdsa = "*"
+httpie = "^3.2.3"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

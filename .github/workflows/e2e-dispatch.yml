@@ -85,10 +85,21 @@ jobs:
           EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
-            pytest -vv -k "${{ github.event.inputs.pytest_filter }}"
+            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
           else
-            pytest -vv
+            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
           fi
+
+      - name: Upload jUnit test results (APDE CI)
+        run: >-
+          http --check-status --ignore-stdin
+          --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
+          -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
+          xunit_xml@eda-qa-e2e-test-results.xml
+          component_name=eda
+          git_commit_sha=${{ github.ref }})
+          git_repository_url="https://github.com/${{ github.repository }}"
+
 
       - name: Print EDA logs
         if: always()
@@ -153,4 +164,14 @@ jobs:
           # to allow for the time it takes to start the workers inside the tests
           EDAQA_DEFAULT_TIMEOUT: 120
         run: |
-          pytest -vv -s eda_qa/tests/whitebox/upstream
+          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
+
+      - name: Upload jUnit test results (APDE CI)
+        run: >-
+          http --check-status --ignore-stdin
+          --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
+          -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
+          xunit_xml@eda-qa-e2e-multinode-test-results.xml
+          component_name=eda
+          git_commit_sha=${{ github.ref }})
+          git_repository_url="https://github.com/${{ github.repository }}"
