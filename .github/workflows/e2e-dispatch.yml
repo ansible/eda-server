@@ -93,8 +93,8 @@ jobs:
       - name: Upload jUnit test results (APDE CI)
         run: >-
           http --check-status --ignore-stdin
-          --auth "${TEST_RESULTS_AGGREGATOR_USERNAME}:${TEST_RESULTS_AGGREGATOR_PASSWORD}"
-          -f POST ${TEST_RESULTS_AGGREGATOR_URL}/api/results/upload/
+          --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
+          -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-test-results.xml
           component_name=eda
           git_commit_sha=$(git rev-parse HEAD)
@@ -169,8 +169,8 @@ jobs:
       - name: Upload jUnit test results (APDE CI)
         run: >-
           http --check-status --ignore-stdin
-          --auth "${TEST_RESULTS_AGGREGATOR_USERNAME}:${TEST_RESULTS_AGGREGATOR_PASSWORD}"
-          -f POST ${TEST_RESULTS_AGGREGATOR_URL}/api/results/upload/
+          --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
+          -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-multinode-test-results.xml
           component_name=eda
           git_commit_sha=$(git rev-parse HEAD)
