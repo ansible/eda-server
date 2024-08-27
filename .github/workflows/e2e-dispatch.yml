@@ -90,18 +90,20 @@ jobs:
       #       pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
       #     fi
 
-      - name: Temp
-        run: echo "hello" > eda-qa-e2e-test-results.xml
+      - name: Setup jUnit reporter
+        run: |
+          pip install httpie
+          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "hello" > eda-qa-e2e-test-results.xml
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
-          pip install httpie &&
           http --check-status --ignore-stdin
           --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-test-results.xml
           component_name=eda
-          git_commit_sha=${{ github.event.pull_request.head.sha }}
+          git_commit_sha=${{ env.GIT_SHA }}
           git_repository_url="https://github.com/${{ github.repository }}"
 
 
@@ -170,16 +172,18 @@ jobs:
       #   run: |
       #     pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
 
-      - name: Temp
-        run: echo "hello" > eda-qa-e2e-multinode-test-results.xml
+      - name: Setup jUnit reporter
+        run: |
+          pip install httpie
+          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "hello" > eda-qa-e2e-multinode-test-results.xml
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
-          pip install httpie &&
           http --check-status --ignore-stdin
           --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
           xunit_xml@eda-qa-e2e-multinode-test-results.xml
           component_name=eda
-          git_commit_sha=${{ github.event.pull_request.head.sha }}
+          git_commit_sha=${{ env.GIT_SHA }}
           git_repository_url="https://github.com/${{ github.repository }}"
