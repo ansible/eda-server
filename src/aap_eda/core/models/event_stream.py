@@ -16,18 +16,14 @@ import uuid
 
 from django.db import models
 
-from .base import BaseOrgModel
+from .base import BaseOrgModel, UniqueNamedModel
 
 __all__ = "EventStream"
 
 EDA_EVENT_STREAM_CHANNEL_PREFIX = "eda_event_stream_"
 
 
-class EventStream(BaseOrgModel):
-    name = models.TextField(
-        null=False, unique=True, help_text="The name of the webhook"
-    )
-
+class EventStream(BaseOrgModel, UniqueNamedModel):
     event_stream_type = models.TextField(
         null=False,
         help_text="The type of the event stream based on credential type",
