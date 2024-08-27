@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
-from .auth import SessionLoginView, SessionLogoutView
+from .auth import SessionLoginView, SessionLogoutView, TokenRefreshView
 from .config import ConfigView
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
@@ -31,6 +31,7 @@ __all__ = (
     # auth
     "SessionLoginView",
     "SessionLogoutView",
+    "TokenRefreshView",
     # project
     "ProjectViewSet",
     "AuditRuleViewSet",

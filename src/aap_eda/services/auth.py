@@ -12,11 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from datetime import datetime, timedelta
 from itertools import groupby
 
-from rest_framework_simplejwt.tokens import RefreshToken
+import jwt
+from django.conf import settings
 
 from aap_eda.core.models.user import User
+from aap_eda.services.exceptions import InvalidTokenError
 
 
 def group_permission_resource(permission_data):
@@ -35,6 +38,9 @@ def display_permissions(role_data: dict) -> dict:
     return role_data
 
 
+JWT_ALGORITHM = "HS256"
+
+
 def create_jwt_token() -> tuple[str, str]:
     """Create JWT access and refresh token pair.
 
@@ -47,5 +53,56 @@ def create_jwt_token() -> tuple[str, str]:
     if new:
         user.set_unusable_password()
         user.save(update_fields=["password"])
-    rf = RefreshToken.for_user(user)
-    return (str(rf.access_token), str(rf))
+
+    access_token = jwt_access_token(user.id)
+    refresh_token = jwt_refresh_token(user.id)
+    return (access_token, refresh_token)
+
+
+def jwt_access_token(user_id: int) -> str:
+    expiration = timedelta(
+        minutes=float(settings.JWT_ACCESS_TOKEN_LIFETIME_MINUTES)
+    )
+    return get_jwt_token(user_id, expiration, token_type="access")
+
+
+def jwt_refresh_token(user_id: int) -> str:
+    expiration = timedelta(
+        days=float(settings.JWT_REFRESH_TOKEN_LIFETIME_DAYS)
+    )
+    return get_jwt_token(user_id, expiration, token_type="refresh")
+
+
+def get_jwt_token(user_id, expiration, **kwargs):
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.now() + expiration,
+        **kwargs,
+    }
+
+    return jwt.encode(payload, settings.SECRET_KEY, JWT_ALGORITHM)
+
+
+def parse_jwt_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, settings.SECRET_KEY, JWT_ALGORITHM)
+    except jwt.DecodeError as e:
+        raise InvalidTokenError("Bad token") from e
+    except jwt.ExpiredSignatureError as e:
+        raise InvalidTokenError("Expired token") from e
+
+
+def validate_jwt_token(token: str, token_type: str) -> User:
+    token_dict = parse_jwt_token(token)
+
+    for key in ["user_id", "exp", "token_type"]:
+        if key not in token_dict:
+            raise InvalidTokenError("Missing key in token")
+
+    if token_dict["token_type"] != token_type:
+        raise InvalidTokenError("Invalid token type")
+
+    try:
+        return User.objects.get(id=token_dict["user_id"])
+    except User.DoesNotExist as e:
+        raise InvalidTokenError("Invalid user") from e
