@@ -116,8 +116,8 @@ jobs:
       - name: Upload jUnit test results (APDE CI)
         run: >-
           poetry run http --check-status --ignore-stdin
-          --auth "${{ env.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
-          -f POST "${{ env.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+          --auth "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
+          -f POST "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
           xunit_xml@eda-server-test-results.xml
           component_name=eda
           git_commit_sha=${{ env.GIT_SHA }}
