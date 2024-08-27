@@ -33,5 +33,8 @@ Before you submit a pull request, check that it meets these guidelines:
 
 ## Contact
 
-Also you can check the [Matrix chat](https://matrix.to/#/#eda:ansible.com), or via the
-<event-driven-automation@redhat.com> email.
+Join the Ansible forum to get in touch and ask questions.
+The [Get Help](https://forum.ansible.com/c/help/6) section is a good place to start.
+You can filter topics tagged as [`eda-server`](https://forum.ansible.com/tag/eda-server).
+
+You can also get in touch by sending an email to <event-driven-automation@redhat.com>.
