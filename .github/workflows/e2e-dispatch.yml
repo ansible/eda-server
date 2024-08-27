@@ -77,24 +77,23 @@ jobs:
         working-directory: ${{ env.EDA_QA_PATH }}
         run: pip install .
 
-      # - name: Run tests
-      #   working-directory: ${{ env.EDA_QA_PATH }}
-      #   env:
-      #     EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
-      #     EDAQA_ENV: authenticated
-      #     EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
-      #   run: |
-      #     if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
-      #       pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
-      #     else
-      #       pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
-      #     fi
+      - name: Run tests
+        working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
+          EDAQA_ENV: authenticated
+          EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
+        run: |
+          if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
+            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
+          else
+            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
+          fi
 
       - name: Setup jUnit reporter
         run: |
           pip install httpie
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
-          echo "hello" > eda-qa-e2e-test-results.xml
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
@@ -160,23 +159,22 @@ jobs:
         run: |
           docker compose -p eda-multinode -f tools/docker/docker-compose-dev.yaml build
 
-      # - name: Run multinode tests
-      #   working-directory: ${{ env.EDA_QA_PATH }}
-      #   env:
-      #     EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
-      #     EDAQA_ENV: default
-      #     EDAQA_MULTINODE_EDA_SERVER_PATH: "../"
-      #     # multinode-upstream tests require a longer timeout
-      #     # to allow for the time it takes to start the workers inside the tests
-      #     EDAQA_DEFAULT_TIMEOUT: 120
-      #   run: |
-      #     pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
+      - name: Run multinode tests
+        working-directory: ${{ env.EDA_QA_PATH }}
+        env:
+          EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
+          EDAQA_ENV: default
+          EDAQA_MULTINODE_EDA_SERVER_PATH: "../"
+          # multinode-upstream tests require a longer timeout
+          # to allow for the time it takes to start the workers inside the tests
+          EDAQA_DEFAULT_TIMEOUT: 120
+        run: |
+          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
 
       - name: Setup jUnit reporter
         run: |
           pip install httpie
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
-          echo "hello" > eda-qa-e2e-multinode-test-results.xml
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
