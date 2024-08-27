@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
-          pip install httpie
+          pip install httpie &&
           http --check-status --ignore-stdin
           --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload jUnit test results (APDE CI)
         run: >-
-          pip install httpie
+          pip install httpie &&
           http --check-status --ignore-stdin
           --auth "${{ vars.TEST_RESULTS_AGGREGATOR_USERNAME }}:${{ secrets.TEST_RESULTS_AGGREGATOR_PASSWORD }}"
           -f POST "${{ vars.TEST_RESULTS_AGGREGATOR_URL }}/api/results/upload/"
