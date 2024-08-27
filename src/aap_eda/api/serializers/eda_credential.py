@@ -103,7 +103,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
 class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     credential_type_id = serializers.IntegerField(
         required=True,
-        allow_null=True,
+        allow_null=False,
         validators=[validators.check_if_credential_type_exists],
     )
     organization_id = serializers.IntegerField(
