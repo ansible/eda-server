@@ -907,7 +907,7 @@ def test_create_activation_no_token_but_required(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        "The rulebook requires an Awx Token or RH AAP credential."
+        "The rulebook requires a RH AAP credential."
         in response.data["non_field_errors"]
     )
 
@@ -959,8 +959,7 @@ def test_restart_activation_with_required_token_deleted(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
-        "The rulebook requires an Awx Token or RH AAP credential."
-        in response.data["errors"]
+        "The rulebook requires a RH AAP credential." in response.data["errors"]
     )
 
 
