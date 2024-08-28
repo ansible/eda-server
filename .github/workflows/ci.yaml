@@ -99,7 +99,9 @@ jobs:
         run: poetry run /usr/bin/env aap-eda-manage makemigrations --dry-run --check
 
       - name: Run tests
-        run: poetry run python -m pytest -vv --cov=./ --cov-report=xml
+        run: |
+          poetry run python -m pytest -vv --cov=./ --cov-report=xml --junit-xml=eda-server-test-results.xml
+          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -110,3 +112,14 @@ jobs:
           flags: "unit-int-tests-${{ matrix.python-version }}"
           name: codecov-umbrella
           verbose: true
+      
+      - name: Upload jUnit test results (APDE CI)
+        if: github.repository == 'ansible/eda-server'
+        run: >-
+          poetry run http --check-status --ignore-stdin
+          --auth "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
+          -f POST "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+          xunit_xml@eda-server-test-results.xml
+          component_name=eda
+          git_commit_sha=${{ env.GIT_SHA }}
+          git_repository_url="https://github.com/${{ github.repository }}"
