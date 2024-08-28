@@ -845,7 +845,7 @@ def _validate_rulebook(data: dict, with_token: bool = False) -> None:
         rulesets_data,
     ):
         raise serializers.ValidationError(
-            "The rulebook requires an Awx Token or RH AAP credential.",
+            "The rulebook requires a RH AAP credential.",
         )
 
 
