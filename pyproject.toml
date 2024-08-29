@@ -56,7 +56,6 @@ psycopg = "^3.1.17"
 xxhash = "*"
 pyjwt = { version = "*", extras = ["crypto"] }
 ecdsa = "*"
-httpie = "^3.2.3"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
@@ -66,6 +65,7 @@ requests = { version = "*", python = "<4.0" }
 pytest-cov = "^4.1.0"
 pytest-lazy-fixture = "^0.6.3"
 requests-mock = "*"
+httpie = "^3.2.3"
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"
