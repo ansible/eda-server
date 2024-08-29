@@ -241,9 +241,7 @@ def test_start_no_awx_token(
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
     assert basic_activation.status == enums.ActivationStatus.ERROR
-    assert "The rulebook requires an Awx Token or RH AAP credential." in str(
-        exc.value
-    )
+    assert "The rulebook requires a RH AAP credential." in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
 
 

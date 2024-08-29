@@ -210,9 +210,7 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
     valid, message = is_activation_valid(activation)
 
     assert valid is False
-    assert (
-        "The rulebook requires an Awx Token or RH AAP credential."
-    ) in message
+    assert "The rulebook requires a RH AAP credential." in message
 
 
 @pytest.mark.django_db
