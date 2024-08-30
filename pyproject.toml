@@ -53,9 +53,9 @@ ansible-runner = ">=2.3"
 python-gnupg = "^0.5.2"
 autobahn = { git = "https://github.com/crossbario/autobahn-python.git", rev = "v24.4.2" }
 psycopg = "^3.1.17"
-xxhash = "*"
-pyjwt = { version = "*", extras = ["crypto"] }
-ecdsa = "*"
+xxhash = "3.4.*"
+pyjwt = { version = "2.7.*", extras = ["crypto"] }
+ecdsa = "0.18.*"
 insights-analytics-collector = "^0.3.2"
 distro = "^1.9.0"
 
