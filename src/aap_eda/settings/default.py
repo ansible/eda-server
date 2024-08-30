@@ -63,7 +63,7 @@ Redis queue settings:
 *   - Takes precedence over host and port
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
-* MQ_TLS - Force TLS on when True (default: False)
+* MQ_TLS - Force TLS on when True (default: None)
 * MQ_DB - Redis queue database (default: 0)
 * MQ_USER - Redis user (default: None)
 * MQ_USER_PASSWORD - Redis user passed (default: None)
@@ -366,7 +366,7 @@ REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
 REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
 REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
-REDIS_TLS = settings.get("MQ_TLS", False)
+REDIS_TLS = settings.get("MQ_TLS", None)
 DEFAULT_REDIS_DB = 0
 REDIS_DB = settings.get("MQ_DB", DEFAULT_REDIS_DB)
 RQ_REDIS_PREFIX = settings.get("RQ_REDIS_PREFIX", "eda-rq")
@@ -393,8 +393,15 @@ def _rq_common_parameters():
             "HOST": REDIS_HOST,
             "PORT": REDIS_PORT,
         }
-        if REDIS_CLIENT_CERT_PATH or REDIS_TLS:
+        if REDIS_TLS:
             params["SSL"] = True
+        else:
+            # This check should be deprecated in favor of just using
+            # MQ_TLS as the determining factor for if TLS is enabled.
+            if REDIS_CLIENT_CERT_PATH and REDIS_TLS is None:
+                params["SSL"] = True
+            else:
+                params["SSL"] = False
     return params
 
 
