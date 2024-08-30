@@ -396,7 +396,7 @@ def _rq_common_parameters():
         if REDIS_TLS:
             params["SSL"] = True
         else:
-            # TODO: Deprecate implicit setting based on cert path in favor of 
+            # TODO: Deprecate implicit setting based on cert path in favor of
             #       MQ_TLS as the determinant.
             if REDIS_CLIENT_CERT_PATH and REDIS_TLS is None:
                 params["SSL"] = True
