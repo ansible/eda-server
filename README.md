@@ -5,6 +5,7 @@
 [![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
 
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-blue)
 
 # Event Driven Ansible Controller
 
