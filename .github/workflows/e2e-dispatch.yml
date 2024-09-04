@@ -83,6 +83,7 @@ jobs:
           EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
           EDAQA_ENV: authenticated
           EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
+          EDAQA_UPSTREAM_ENABLED: true
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
             pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
