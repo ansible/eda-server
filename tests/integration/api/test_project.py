@@ -16,6 +16,7 @@ from typing import Any, Dict
 from unittest import mock
 
 import pytest
+import redis
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -422,9 +423,11 @@ def test_create_project_redis_unavailable(
     default_organization: models.Organization,
     preseed_credential_types,
 ):
-    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
-    job = mock.Mock(id=job_id)
-    import_project_task.delay.return_value = job
+    def raise_connection_error(*args, **kwargs):
+        raise redis.ConnectionError("redis unavailable")
+
+    import_project_task.delay.side_effect = raise_connection_error
+
     credential = create_custom_credential(
         credential_type=enums.DefaultCredentialType.GPG,
         organization=default_organization,
@@ -562,11 +565,18 @@ def test_sync_project_not_exist(admin_client: APIClient):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+@mock.patch("aap_eda.tasks.sync_project")
 def test_sync_project_redis_unavailable(
+    sync_project_task: mock.Mock,
     is_redis_failed: mock.Mock,
     admin_client: APIClient,
     default_project: models.Project,
 ):
+    def raise_connection_error(*args, **kwargs):
+        raise redis.ConnectionError("redis unavailable")
+
+    sync_project_task.delay.side_effect = raise_connection_error
+
     response = admin_client.post(
         f"{api_url_v1}/projects/{default_project.id}/sync/"
     )

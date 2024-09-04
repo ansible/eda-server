@@ -116,7 +116,9 @@ def get_redis_status() -> dict:
 def is_redis_failed() -> bool:
     """Return a boolean indicating if Redis is in a failed state."""
     response = get_redis_status()
-    return response["status"] == constants.STATUS_FAILED
+    status = response["status"]
+    logger.debug(f"Redis status: {status}")
+    return status == constants.STATUS_FAILED
 
 
 class Scheduler(_Scheduler):
