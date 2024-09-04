@@ -52,6 +52,7 @@ jobs:
       matrix:
         python-version:
           - "3.11"
+          - "3.12"
     env:
       EDA_SECRET_KEY: 'test'
       EDA_DB_PASSWORD: 'secret'
@@ -112,7 +113,7 @@ jobs:
           flags: "unit-int-tests-${{ matrix.python-version }}"
           name: codecov-umbrella
           verbose: true
-      
+
       - name: Upload jUnit test results (APDE CI)
         if: github.repository == 'ansible/eda-server' && github.ref == 'refs/heads/main'
         run: >-
