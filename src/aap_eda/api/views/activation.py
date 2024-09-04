@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -143,9 +144,6 @@ class ActivationViewSet(
                 "deleted.",
             )
 
-        # Redis must be available in order to perform the delete.
-        self.redis_is_available()
-
         audit_log = logging_utils.generate_simple_audit_log(
             "Delete",
             resource_name,
@@ -154,14 +152,23 @@ class ActivationViewSet(
             activation.organization,
         )
 
-        activation.status = ActivationStatus.DELETING
-        activation.save(update_fields=["status"])
-        logger.info(f"Now deleting {activation.name} ...")
+        try:
+            with transaction.atomic():
+                activation.status = ActivationStatus.DELETING
+                activation.save(update_fields=["status"])
+                name = activation.name
 
-        delete_rulebook_process(
-            process_parent_type=ProcessParentType.ACTIVATION,
-            process_parent_id=activation.id,
-        )
+                delete_rulebook_process(
+                    process_parent_type=ProcessParentType.ACTIVATION,
+                    process_parent_id=activation.id,
+                )
+                logger.info(f"Now deleting {name} ...")
+        except redis.ConnectionError:
+            # If Redis isn't available we'll generate a Conflict (409).
+            # Anything else we re-raise the exception.
+            self.redis_is_available()
+            raise
+
         logger.info(audit_log)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
