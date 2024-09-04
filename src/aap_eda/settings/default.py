@@ -665,6 +665,11 @@ ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
     "ALLOW_LOCAL_RESOURCE_MANAGEMENT", True
 )
 
+# If we have a resource server defined, apply local changes to that server
+RESOURCE_SERVER_SYNC_ENABLED = settings.get(
+    "RESOURCE_SERVER_SYNC_ENABLED", True
+)
+
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
 # ---------------------------------------------------------
