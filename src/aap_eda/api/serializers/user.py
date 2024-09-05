@@ -143,6 +143,21 @@ class CurrentUserUpdateSerializer(UserUpdateSerializerBase):
         ]
 
 
+class UserUpdateIsSuperuserSerializer(
+    serializers.ModelSerializer,
+    SharedResourceSerializerMixin,
+):
+    class Meta:
+        model = models.User
+        fields = [
+            "is_superuser",
+        ]
+
+    def validate(self, data):
+        data = self.validate_shared_resource(data)
+        return data
+
+
 class AwxTokenSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.AwxToken
