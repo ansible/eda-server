@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -117,22 +118,27 @@ class ProjectViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        # We cant do anything without redis.
-        self.redis_is_available()
+        # Catch Redis connection error and translate, as appropriate, to the
+        # Redis unavailable response.
+        try:
+            with transaction.atomic():
+                project = serializer.save()
+                check_related_permissions(
+                    request.user,
+                    serializer.Meta.model,
+                    {},
+                    model_to_dict(serializer.instance),
+                )
+                RoleDefinition.objects.give_creator_permissions(
+                    request.user, serializer.instance
+                )
 
-        with transaction.atomic():
-            project = serializer.save()
-            check_related_permissions(
-                request.user,
-                serializer.Meta.model,
-                {},
-                model_to_dict(serializer.instance),
-            )
-            RoleDefinition.objects.give_creator_permissions(
-                request.user, serializer.instance
-            )
-
-        job = tasks.import_project.delay(project_id=project.id)
+                job = tasks.import_project.delay(project_id=project.id)
+        except redis.ConnectionError:
+            # If Redis isn't available we'll generate a Conflict (409).
+            # Anything else we re-raise the exception.
+            self.redis_is_available()
+            raise
 
         # Atomically update `import_task_id` field only.
         models.Project.objects.filter(pk=project.id).update(
@@ -141,7 +147,6 @@ class ProjectViewSet(
         project.import_task_id = job.id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
-
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Create",
@@ -277,10 +282,6 @@ class ProjectViewSet(
         # user has sync permission for this project
         self.check_object_permissions(request, project)
 
-        # Now that we've verified the user has access to the project
-        # we need Redis for what comes next.
-        self.redis_is_available()
-
         if project.import_state in [
             models.Project.ImportState.PENDING,
             models.Project.ImportState.RUNNING,
@@ -289,7 +290,13 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
-        job = tasks.sync_project.delay(project_id=project.id)
+        try:
+            job = tasks.sync_project.delay(project_id=project.id)
+        except redis.ConnectionError:
+            # If Redis isn't available we'll generate a Conflict (409).
+            # Anything else we re-raise the exception.
+            self.redis_is_available()
+            raise
 
         project.import_state = models.Project.ImportState.PENDING
         project.import_task_id = job.id
