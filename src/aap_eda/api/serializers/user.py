@@ -144,7 +144,7 @@ class CurrentUserUpdateSerializer(UserUpdateSerializerBase):
 
 
 class UserUpdateIsSuperuserSerializer(
-    serializers.ModelSerializer,
+    UserUpdateSerializerBase,
     SharedResourceSerializerMixin,
 ):
     class Meta:

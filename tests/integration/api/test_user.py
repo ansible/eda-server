@@ -210,6 +210,23 @@ def test_update_is_superuser_field(
 
 
 @pytest.mark.django_db
+def test_update_superuser_field_as_non_superuser(
+    use_shared_resource_setting,
+    admin_client: APIClient,
+    new_user: models.User,
+):
+    data = {"is_superuser": True}
+
+    response = admin_client.patch(
+        f"{api_url_v1}/users/{new_user.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN, response.data
+
+    user_obj = models.User.objects.get(id=new_user.id)
+    assert user_obj.is_superuser is False
+
+
+@pytest.mark.django_db
 def test_create_superuser(
     superuser_client: APIClient,
     user_api_client: APIClient,
