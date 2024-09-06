@@ -1317,7 +1317,7 @@ class Command(BaseCommand):
                 use_permissions = [
                     perm
                     for perm in permissions
-                    if not perm.codename.startswith("delete_")
+                    if perm.codename.startswith("view_")
                 ]
                 use_role.permissions.set(use_permissions)
                 if use_role_created:
