@@ -1,0 +1,71 @@
+# This is a workflow file for GitHub Actions that automatically updates
+# the Poetry lock file and creates a pull request if changes are detected.
+
+name: Periodic autoupdate Poetry lock file
+
+on:
+  schedule:
+    - cron: "0 9 * * *"  # UTC time, runs every day at 9:00 AM
+
+jobs:
+  autoupdate-poetry-lock:
+    runs-on: ubuntu-latest
+    outputs:
+      lock-changed: ${{ steps.lock-changed.outputs.lock-changed }}
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v3
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Run poetry lock
+        run: poetry lock --no-update
+
+      - name: Check if lock file changed
+        id: lock-changed
+        run: |
+          if git diff --exit-code poetry.lock; then
+            echo "No changes detected"
+            echo "lock-changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected"
+            echo "lock-changed=true" >> $GITHUB_OUTPUT
+
+      - name: Push changes
+        if: steps.lock-changed.outputs.lock-changed == 'true'
+        run: |
+          git checkout -b autoupdate-poetry-lock
+          git add poetry.lock
+          git commit -m "ci(bot): update poetry lock file"
+          git push origin autoupdate-poetry-lock --force
+
+  create-pr:
+    needs:
+      - autoupdate-poetry-lock
+    if: needs.autoupdate-poetry-lock.outputs.lock-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout autoupdate-poetry-lock branch
+        uses: actions/checkout@v3
+        with:
+          ref: autoupdate-poetry-lock
+
+      - name: Create a Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: autoupdate-poetry-lock
+          base: main
+          title: "ci(bot): autopdate poetry lock file"
+          body: "This PR updates the poetry lock file with the latest changes."
+          labels: "run-e2e"
