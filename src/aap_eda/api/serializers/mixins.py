@@ -15,13 +15,22 @@
 from django.conf import settings
 
 from aap_eda.api import exceptions as api_exc
+from aap_eda.core import models
 
 
 class SharedResourceSerializerMixin:
-    def validate_shared_resource(self):
+    def validate_shared_resource(self, data=None):
         if not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
             view = self.context.get("view")
             action = view.action.capitalize() if view else "Action"
+
+            # exception where we should allow updating is_superuser field
+            if action == "Partial_update" and isinstance(
+                view.get_object(), models.User
+            ):
+                if data and "is_superuser" in data:
+                    return {"is_superuser": data["is_superuser"]}
+
             raise api_exc.Forbidden(
                 f"{action} should be done through the platform ingress"
             )
