@@ -693,6 +693,8 @@ ALLOW_SHARED_RESOURCE_CUSTOM_ROLES = settings.get(
     "ALLOW_SHARED_RESOURCE_CUSTOM_ROLES", False
 )
 
+ANSIBLE_BASE_CHECK_RELATED_PERMISSIONS = ["view"]
+
 # --------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCE API CLIENT
 # --------------------------------------------------------
