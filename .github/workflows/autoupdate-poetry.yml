@@ -66,6 +66,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: autoupdate-poetry-lock
           base: main
-          title: "ci(bot): autopdate poetry lock file"
+          title: "ci(bot): autoupdate poetry lock file"
           body: "This PR updates the poetry lock file with the latest changes."
           labels: "run-e2e"
