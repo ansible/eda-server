@@ -79,18 +79,9 @@ def test_project_credential_access(
     default_project.refresh_from_db()
     assert default_project.eda_credential_id != new_scm_credential.pk
 
-    # User can view related credential, but does not have permission to use
+    # view permission is enough to use related credential
+    # as defined by ANSIBLE_BASE_CHECK_RELATED_PERMISSIONS
     give_obj_perm(default_user, new_scm_credential, "view")
-    response = user_client.patch(
-        url, data={"eda_credential_id": new_scm_credential.pk}
-    )
-    assert response.status_code == 403, response.data
-    assert "eda_credential" in str(response.data), response.data
-    default_project.refresh_from_db()
-    assert default_project.eda_credential_id != new_scm_credential.pk
-
-    # User has permission to change the related credential
-    give_obj_perm(default_user, new_scm_credential, "change")
     response = user_client.patch(
         url, data={"eda_credential_id": new_scm_credential.pk}
     )

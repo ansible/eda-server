@@ -196,9 +196,10 @@ class CurrentUserAwxTokenViewSet(
         },
     ),
     partial_update=extend_schema(
-        exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
         description="Partial update of a user.",
-        request=serializers.UserCreateUpdateSerializer,
+        request=serializers.UserCreateUpdateSerializer
+        if settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT
+        else serializers.UserUpdateIsSuperuserSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.UserDetailSerializer,
@@ -251,8 +252,13 @@ class UserViewSet(
             return serializers.UserListSerializer
         elif self.action == "destroy":
             return serializers.UserSerializer
-        elif self.action in ["create", "partial_update"]:
+        elif self.action == "create":
             return serializers.UserCreateUpdateSerializer
+        elif self.action == "partial_update":
+            if settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT:
+                return serializers.UserCreateUpdateSerializer
+            else:
+                return serializers.UserUpdateIsSuperuserSerializer
 
         return serializers.UserDetailSerializer
 

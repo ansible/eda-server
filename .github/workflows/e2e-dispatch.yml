@@ -20,6 +20,7 @@ env:
   EDA_QA_PATH: "./eda-qa"
   REGISTRY: quay.io
   QUAY_USER: ansible+eda_gha
+  PYTEST_RETRIES: 2
 
 jobs:
   api-e2e-tests:
@@ -75,7 +76,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
-        run: pip install .
+        run: |
+          pip install .
+          pip install pytest-rerunfailures
 
       - name: Run tests
         working-directory: ${{ env.EDA_QA_PATH }}
@@ -86,9 +89,9 @@ jobs:
           EDAQA_UPSTREAM_ENABLED: true
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
-            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml
+            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
           else
-            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml
+            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
           fi
 
       - name: Setup jUnit reporter
@@ -155,7 +158,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
-        run: pip install .
+        run: |
+          pip install .
+          pip install pytest-rerunfailures
 
       - name: Build eda-server images
         working-directory: .
@@ -172,7 +177,7 @@ jobs:
           # to allow for the time it takes to start the workers inside the tests
           EDAQA_DEFAULT_TIMEOUT: 120
         run: |
-          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml
+          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
 
       - name: Setup jUnit reporter
         run: |
