@@ -149,29 +149,40 @@ class Scheduler(_Scheduler):
 def enable_redis_prefix():
     redis_prefix = settings.RQ_REDIS_PREFIX
 
-    rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
-    rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"
-    rq.queue.Queue.redis_queue_namespace_prefix = f"{redis_prefix}:queue:"
-    rq.queue.Queue.redis_queues_keys = f"{redis_prefix}:queues"
-    rq.worker.Worker.redis_worker_namespace_prefix = f"{redis_prefix}:worker:"
-    rq.worker.Worker.redis_workers_keys = f"{redis_prefix}:workers"
+    # Job.
     rq.job.Job.redis_job_namespace_prefix = f"{redis_prefix}:job:"
+
     rq.registry.BaseRegistry.key_template = f"{redis_prefix}:registry:{0}"
-    rq.registry.StartedJobRegistry.key_template = f"{redis_prefix}:wip:{0}"
-    rq.registry.FinishedJobRegistry.key_template = (
-        f"{redis_prefix}:finished:{0}"
-    )
-    rq.registry.FailedJobRegistry.key_template = f"{redis_prefix}:failed:{0}"
-    rq.registry.DeferredJobRegistry.key_template = (
-        f"{redis_prefix}:deferred:{0}"
-    )
-    rq.registry.ScheduledJobRegistry.key_template = (
-        f"{redis_prefix}:scheduled:{0}"
-    )
     rq.registry.CanceledJobRegistry.key_template = (
         f"{redis_prefix}:canceled:{0}"
     )
+    rq.registry.DeferredJobRegistry.key_template = (
+        f"{redis_prefix}:deferred:{0}"
+    )
+    rq.registry.FailedJobRegistry.key_template = f"{redis_prefix}:failed:{0}"
+    rq.registry.FinishedJobRegistry.key_template = (
+        f"{redis_prefix}:finished:{0}"
+    )
+    rq.registry.StartedJobRegistry.key_template = f"{redis_prefix}:wip:{0}"
+    rq.registry.ScheduledJobRegistry.key_template = (
+        f"{redis_prefix}:scheduled:{0}"
+    )
 
+    # PubSub.
+    rq.command.PUBSUB_CHANNEL_TEMPLATE = f"{redis_prefix}:pubsub:%s"
+
+    # Queue.
+    rq.queue.Queue.redis_queue_namespace_prefix = f"{redis_prefix}:queue:"
+    rq.queue.Queue.redis_queues_keys = f"{redis_prefix}:queues"
+
+    # Worker.
+    rq.worker.Worker.redis_worker_namespace_prefix = f"{redis_prefix}:worker:"
+    rq.worker.Worker.redis_workers_keys = f"{redis_prefix}:workers"
+    rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
+    rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"
+    rq.suspension.WORKERS_SUSPENDED = f"{redis_prefix}:suspended"
+
+    # Scheduler.
     Scheduler.redis_scheduler_namespace_prefix = (
         f"{redis_prefix}:scheduler_instance:"
     )
