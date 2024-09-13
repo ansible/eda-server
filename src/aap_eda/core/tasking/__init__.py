@@ -176,6 +176,10 @@ def enable_redis_prefix():
     rq.queue.Queue.redis_queues_keys = f"{redis_prefix}:queues"
 
     # Worker.
+    # Although PUBSUB_CHANNEL_TEMPLATE is defined in rq.command (and we've
+    # overridden it there for any new uses) rq.worker, which we've already
+    # imported, imports it so we need to override that value as well.
+    rq.worker.PUBSUB_CHANNEL_TEMPLATE = rq.command.PUBSUB_CHANNEL_TEMPLATE
     rq.worker.Worker.redis_worker_namespace_prefix = f"{redis_prefix}:worker:"
     rq.worker.Worker.redis_workers_keys = f"{redis_prefix}:workers"
     rq.worker_registration.REDIS_WORKER_KEYS = f"{redis_prefix}:workers"
