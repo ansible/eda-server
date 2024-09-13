@@ -327,6 +327,23 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
 
+
+def _config_authentication_backends():
+    from django.conf import settings as djsettings
+
+    backend = (
+        "ansible_base.lib.backends.prefixed_user_auth.PrefixedUserAuthBackend"
+    )
+    backends = djsettings.AUTHENTICATION_BACKENDS or []
+    if backend not in backends:
+        backends.append(backend)
+    return backends
+
+
+RENAMED_USERNAME_PREFIX = settings.get("RENAMED_USERNAME_PREFIX", "eda_")
+AUTHENTICATION_BACKENDS = _config_authentication_backends()
+
+
 # ---------------------------------------------------------
 # DEPLOYMENT SETTINGS
 # ---------------------------------------------------------
