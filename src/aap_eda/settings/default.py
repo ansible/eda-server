@@ -448,13 +448,13 @@ def rq_redis_client_instantiation_parameters():
     if REDIS_HA_CLUSTER_HOSTS:
         params["mode"] = "cluster"
         params["redis_hosts"] = REDIS_HA_CLUSTER_HOSTS
-        params["socket_keepalive"] = _get_boolean("SOCKET_KEEP_ALIVE", True)
+        params["socket_keepalive"] = _get_boolean("MQ_SOCKET_KEEP_ALIVE", True)
         params["socket_connect_timeout"] = settings.get(
-            "SOCKET_CONNECT_TIMEOUT", 10
+            "MQ_SOCKET_CONNECT_TIMEOUT", 10
         )
-        params["socket_timeout"] = settings.get("SOCKET_TIMEOUT", 10)
+        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 10)
         params["cluster_error_retry_attempts"] = settings.get(
-            "CLUSTER_ERROR_RETRY_ATTEMPTS", 3
+            "MQ_CLUSTER_ERROR_RETRY_ATTEMPTS", 3
         )
     return params
 
