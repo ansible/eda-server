@@ -136,16 +136,16 @@ def _get_secret_key() -> str:
 SECRET_KEY = _get_secret_key()
 
 
-def _get_debug() -> bool:
-    debug = settings.get("DEBUG", False)
-    if isinstance(debug, str):
-        debug = str_to_bool(debug)
-    if not isinstance(debug, bool):
-        raise ImproperlyConfigured("DEBUG setting must be a boolean value.")
-    return debug
+def _get_boolean(name: str, default=False) -> bool:
+    value = settings.get(name, default)
+    if isinstance(value, str):
+        value = str_to_bool(value)
+    if not isinstance(value, bool):
+        raise ImproperlyConfigured("{name} setting must be a boolean value.")
+    return value
 
 
-DEBUG = _get_debug()
+DEBUG = _get_boolean("DEBUG")
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 ALLOWED_HOSTS = (
@@ -448,7 +448,14 @@ def rq_redis_client_instantiation_parameters():
     if REDIS_HA_CLUSTER_HOSTS:
         params["mode"] = "cluster"
         params["redis_hosts"] = REDIS_HA_CLUSTER_HOSTS
-
+        params["socket_keepalive"] = _get_boolean("MQ_SOCKET_KEEP_ALIVE", True)
+        params["socket_connect_timeout"] = settings.get(
+            "MQ_SOCKET_CONNECT_TIMEOUT", 10
+        )
+        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 10)
+        params["cluster_error_retry_attempts"] = settings.get(
+            "MQ_CLUSTER_ERROR_RETRY_ATTEMPTS", 3
+        )
     return params
 
 
