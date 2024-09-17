@@ -75,6 +75,7 @@ from .user import (
     UserDetailSerializer,
     UserListSerializer,
     UserSerializer,
+    UserUpdateIsSuperuserSerializer,
 )
 
 __all__ = (
@@ -109,6 +110,7 @@ __all__ = (
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",
+    "UserUpdateIsSuperuserSerializer",
     "UserDetailSerializer",
     # config
     "ConfigSerializer",

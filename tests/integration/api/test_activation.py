@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 from unittest import mock
 
 import pytest
+import redis
 import yaml
 from django.conf import settings
 from rest_framework import status
@@ -510,12 +511,19 @@ def test_delete_activation(
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+@mock.patch("aap_eda.api.views.activation.delete_rulebook_process")
 def test_delete_activation_redis_unavailable(
+    delete_rule_book_process: mock.Mock,
     is_redis_failed: mock.Mock,
     default_activation: models.Activation,
     admin_client: APIClient,
     preseed_credential_types,
 ):
+    def raise_connection_error(*args, **kwargs):
+        raise redis.ConnectionError("redis unavailable")
+
+    delete_rule_book_process.side_effect = raise_connection_error
+
     response = admin_client.delete(
         f"{api_url_v1}/activations/{default_activation.id}/"
     )
