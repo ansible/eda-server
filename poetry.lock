@@ -621,7 +621,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.9.2.0.dev8+g5f718b4"
+version = "2024.9.12.0.dev4+ga44d6bf"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -653,7 +653,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "5f718b41107f942967155dea0434e4802e3b5380"
+resolved_reference = "a44d6bfab27ffb33a2bd04604b0cb88c7dd7762d"
 
 [[package]]
 name = "django-crum"
