@@ -43,6 +43,7 @@ from .rulebook_process import (
     RulebookProcessLog,
     RulebookProcessQueue,
 )
+from .setting import Setting
 from .team import Team
 from .user import AwxToken, User
 
@@ -73,6 +74,7 @@ __all__ = [
     "Organization",
     "Team",
     "EventStream",
+    "Setting",
 ]
 
 permission_registry.register(

@@ -2,6 +2,10 @@ FROM quay.io/centos/centos:stream9
 
 ARG USER_ID=${USER_ID:-1001}
 ARG STATIC_ROOT=/var/lib/eda/static
+
+# python3.11 and python3.12 supported
+ARG PYTHON_BIN="python3.11"
+
 RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && mkdir -p /app/.local /var/lib/eda/ \
     && chown -R "${USER_ID}:0" /app/.local /var/lib/eda \
@@ -13,10 +17,11 @@ RUN mkdir -p /var/lib/eda/redis-tls \
 COPY ./tools/docker/redis-tls /var/lib/eda/redis-tls
 
 RUN DNF=dnf \
-    INSTALL_PACKAGES="python3.11 \
-    python3.11-devel \
-    python3.11-pip \
+    INSTALL_PACKAGES="${PYTHON_BIN} \
+    ${PYTHON_BIN}-devel \
+    ${PYTHON_BIN}-pip \
     libpq-devel \
+    libffi-devel \
     gcc \
     gettext \
     git-core \
@@ -28,7 +33,7 @@ RUN DNF=dnf \
     && rm -rf /var/cache/dnf
 
 USER "$USER_ID"
-ENV POETRY_VERSION="1.7.1" \
+ENV POETRY_VERSION="1.8.3" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -37,7 +42,6 @@ ENV POETRY_VERSION="1.7.1" \
     VIRTUAL_ENV=/app/venv \
     SOURCES_DIR=/app/src \
     PATH="/app/.local/bin:$PATH" \
-    PYTHON_BIN="python3.11" \
     HOME="/app"
 
 # Install poetry, create virtual environment

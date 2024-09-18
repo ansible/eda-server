@@ -206,6 +206,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "ansible_base.lib.middleware.logging.log_request.LogTracebackMiddleware",
     "crum.CurrentRequestUserMiddleware",
 ]
 
@@ -789,3 +790,6 @@ if EVENT_STREAM_MTLS_BASE_URL:
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
+
+AUTOMATION_ANALYTICS_URL = settings.get("AUTOMATION_ANALYTICS_URL", "")
+INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
