@@ -733,7 +733,15 @@ RESOURCE_SERVER = {
     "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
-RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
+
+try:
+    service_path_default = RESOURCE_SERVICE_PATH  # noqa
+except NameError:
+    service_path_default = None
+
+RESOURCE_SERVICE_PATH = settings.get(
+    "RESOURCE_SERVICE_PATH", service_path_default
+)
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
     "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
 )
