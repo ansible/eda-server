@@ -65,6 +65,9 @@ def audit_actions_table(
 ):
     audit_actions = _get_audit_action_qs(since, until)
 
+    if not bool(audit_actions):
+        return
+
     audit_action_query = (
         f"COPY ({audit_actions.query}) TO STDOUT WITH CSV HEADER"
     )
@@ -82,7 +85,12 @@ def audit_events_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
     audit_actions = _get_audit_action_qs(since, until)
+    if not bool(audit_actions):
+        return
+
     audit_event_query = _get_audit_event_query(audit_actions)
+    if not bool(audit_event_query):
+        return
 
     return _copy_table("audit_events", audit_event_query, full_path)
 
@@ -97,6 +105,9 @@ def audit_rules_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
     audit_rules = _get_audit_rule_qs(since, until)
+    if not bool(audit_rules):
+        return
+
     audit_rule_query = f"COPY ({audit_rules.query}) TO STDOUT WITH CSV HEADER"
 
     return _copy_table("audit_rules", audit_rule_query, full_path)
@@ -221,9 +232,13 @@ def teams_table(since: datetime, full_path: str, until: datetime, **kwargs):
     return _copy_table("teams", query, full_path)
 
 
-def _datetime_format(timestamp: datetime) -> str:
+def _datetime_format(dt: datetime) -> str:
     """Convert datetime object to string."""
-    iso_format = timestamp.strftime("%Y-%m-%d %H:%M:%S.%f%z")
+    if dt.microsecond == 0:
+        iso_format = dt.strftime("%Y-%m-%d %H:%M:%S%z")
+    else:
+        iso_format = dt.strftime("%Y-%m-%d %H:%M:%S.%f%z")
+
     return iso_format[:-2] + ":" + iso_format[-2:]
 
 
@@ -246,6 +261,7 @@ def _get_query(
             Q(created_at__gt=since, created_at__lte=until)
             | Q(modified_at__gt=since, modified_at__lte=until)
         ).order_by("id")
+
     query = (
         str(qs.query)
         .replace(_datetime_format(since), f"'{since.isoformat()}'")
@@ -259,6 +275,9 @@ def _get_audit_event_query(actions: list[models.AuditAction]):
     events = models.AuditEvent.objects.none()
     for action in actions:
         events |= action.audit_events.all()
+
+    if not bool(events):
+        return
 
     query = str(events.distinct().query)
 
@@ -285,7 +304,7 @@ def _get_audit_rule_qs(since: datetime, until: datetime):
     )
 
     if len(activation_instance_ids) == 0:
-        return []
+        return models.RulebookProcess.objects.none()
 
     if len(activation_instance_ids) == 1:
         audit_rules = models.AuditRule.objects.filter(
@@ -304,7 +323,7 @@ def _get_audit_action_qs(since: datetime, until: datetime):
     audit_rule_ids = audit_rules.values_list("id").distinct()
 
     if len(audit_rule_ids) == 0:
-        return []
+        return models.AuditRule.objects.none()
 
     if len(audit_rule_ids) == 1:
         audit_actions = models.AuditAction.objects.filter(

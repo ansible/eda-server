@@ -25,7 +25,14 @@ from insights_analytics_collector import Collector
 
 from aap_eda.analytics import analytics_collectors as collectors
 from aap_eda.analytics.collector import AnalyticsCollector
+from aap_eda.conf import settings_registry
 from aap_eda.core import models
+
+
+@pytest.fixture(autouse=True)
+def register() -> None:
+    settings_registry.persist_registry_data()
+    return None
 
 
 @pytest.mark.django_db
@@ -140,6 +147,7 @@ def test_activations_table_collector(default_activation: models.Activation):
             assert lines[0][3] == default_activation.description
 
 
+@pytest.mark.django_db
 def assert_audit_rules(expected_audit_rules):
     time_start = now() - timedelta(hours=9)
 
@@ -209,6 +217,7 @@ def test_multiple_audit_action_table_collector(
     assert_audit_events([audit_event_1, audit_event_2])
 
 
+@pytest.mark.django_db
 def assert_audit_actions(expected_audit_actions):
     time_start = now() - timedelta(hours=9)
 
@@ -238,6 +247,7 @@ def assert_audit_actions(expected_audit_actions):
             )
 
 
+@pytest.mark.django_db
 def assert_audit_events(expected_audit_events):
     time_start = now() - timedelta(hours=9)
 

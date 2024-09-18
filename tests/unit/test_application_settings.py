@@ -15,7 +15,7 @@
 import pytest
 
 from aap_eda.conf import application_settings, settings_registry
-from aap_eda.conf.registry import InvalidKeyError, InvalidValueError
+from aap_eda.conf.registry import InvalidKeyError
 
 
 @pytest.fixture(autouse=True)
@@ -41,16 +41,6 @@ def test_read_only_application_setting():
     assert settings_registry.is_setting_read_only("INSIGHTS_CERT_PATH") is True
     with pytest.raises(InvalidKeyError):
         application_settings.INSIGHTS_CERT_PATH = "path"
-
-
-@pytest.mark.django_db
-def test_application_setting_bad_type():
-    assert (
-        settings_registry.get_setting_type("AUTOMATION_ANALYTICS_LAST_ENTRIES")
-        == dict
-    )
-    with pytest.raises(InvalidValueError):
-        application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = 1
 
 
 @pytest.mark.django_db

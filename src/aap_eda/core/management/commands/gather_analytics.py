@@ -60,6 +60,7 @@ class Command(BaseCommand):
         since = parser.parse(opt_since) if opt_since else None
         if since and since.tzinfo is None:
             since = since.replace(tzinfo=timezone.utc)
+
         until = parser.parse(opt_until) if opt_until else None
         if until and until.tzinfo is None:
             until = until.replace(tzinfo=timezone.utc)

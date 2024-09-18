@@ -1,12 +1,13 @@
 import json
+from datetime import datetime
 
-from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
 from insights_analytics_collector import Collector
 
 from aap_eda.analytics.package import Package
 from aap_eda.analytics.utils import datetime_hook
+from aap_eda.conf.settings import application_settings
 
 
 class AnalyticsCollector(Collector):
@@ -18,11 +19,8 @@ class AnalyticsCollector(Collector):
     def _package_class():
         return Package
 
-    def get_last_gathering(self):
-        return self._last_gathering()
-
     def _is_shipping_configured(self):
-        if not settings.INSIGHTS_TRACKING_STATE:
+        if not application_settings.INSIGHTS_TRACKING_STATE:
             self.logger.warning(
                 "Insights for Event Driven Ansible is not enabled."
             )
@@ -35,26 +33,38 @@ class AnalyticsCollector(Collector):
         return True
 
     def _last_gathering(self):
-        return settings.AUTOMATION_ANALYTICS_LAST_GATHER
-
-    def _load_last_gathered_entries(self):
-        last_entries = settings.AUTOMATION_ANALYTICS_LAST_ENTRIES
-
-        return json.loads(
-            last_entries.value
-            if last_entries and last_entries.value
-            else "{}",  # noqa: P103
-            object_hook=datetime_hook,
+        self.logger.info(
+            "Last gather: "
+            f"{application_settings.AUTOMATION_ANALYTICS_LAST_GATHER}"
         )
 
-    def _save_last_gathered_entries(self, last_gathered_entries):
-        self.logger.info(f"Save last_entries: {last_gathered_entries}")
+        return (
+            datetime.fromisoformat(
+                application_settings.AUTOMATION_ANALYTICS_LAST_GATHER
+            )
+            if bool(application_settings.AUTOMATION_ANALYTICS_LAST_GATHER)
+            else None
+        )
 
-        settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = json.dumps(
+    def _load_last_gathered_entries(self):
+        last_entries = application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES
+        last_entries = last_entries.replace("'", '"')
+        self.logger.info(f"Last collect entries: {last_entries}")
+
+        return json.loads(last_entries, object_hook=datetime_hook)
+
+    def _save_last_gathered_entries(self, last_gathered_entries):
+        application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = json.dumps(
             last_gathered_entries, cls=DjangoJSONEncoder
+        )
+        self.logger.info(
+            "Save last_entries: "
+            f"{application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES}"
         )
 
     def _save_last_gather(self):
         self.logger.info(f"Save last_gather: {self.gather_until}")
 
-        settings.AUTOMATION_ANALYTICS_LAST_GATHER = self.gather_until
+        application_settings.AUTOMATION_ANALYTICS_LAST_GATHER = (
+            self.gather_until.isoformat()
+        )
