@@ -89,8 +89,8 @@ services:
       - -c
       - >-
         aap-eda-manage migrate
-        && aap-eda-manage create_initial_data
-        && scripts/create_superuser.sh
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false aap-eda-manage create_initial_data
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - '${EDA_API_PORT:-8000}:8000'
