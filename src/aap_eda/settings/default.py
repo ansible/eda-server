@@ -206,6 +206,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "ansible_base.lib.middleware.logging.log_request.LogTracebackMiddleware",
     "crum.CurrentRequestUserMiddleware",
 ]
 
