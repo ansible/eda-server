@@ -730,13 +730,16 @@ RESOURCE_SERVER = {
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
 
-try:
-    service_path_default = RESOURCE_SERVICE_PATH  # noqa
-except NameError:
-    service_path_default = None
+
+def _get_dab_service_path_default():
+    try:
+        return dab_settings.RESOURCE_SERVICE_PATH  # noqa
+    except AttributeError:
+        return None
+
 
 RESOURCE_SERVICE_PATH = settings.get(
-    "RESOURCE_SERVICE_PATH", service_path_default
+    "RESOURCE_SERVICE_PATH", _get_dab_service_path_default()
 )
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
     "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
