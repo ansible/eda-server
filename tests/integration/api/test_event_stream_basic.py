@@ -82,3 +82,46 @@ def test_post_event_stream_with_basic_auth(
         content_type=content_type,
     )
     assert response.status_code == auth_status
+
+
+@pytest.mark.django_db
+def test_post_event_stream_with_basic_auth_bad_json(
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    secret = secrets.token_hex(32)
+    username = "fred"
+    inputs = {
+        "auth_type": "basic",
+        "username": username,
+        "password": secret,
+        "http_header_key": "Authorization",
+    }
+
+    obj = create_event_stream_credential(
+        admin_client, enums.EventStreamCredentialType.BASIC.value, inputs
+    )
+
+    data_in = {
+        "name": "test-es-1",
+        "eda_credential_id": obj["id"],
+        "organization_id": get_default_test_org().id,
+        "test_mode": True,
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+    user_pass = f"{username}:{secret}"
+
+    auth_value = f"Basic {base64.b64encode(user_pass.encode()).decode()}"
+    data_bytes = '{"a": 1,'.encode()
+    content_type = "application/json"
+    headers = {
+        "Authorization": auth_value,
+        "Content-Type": content_type,
+    }
+    response = admin_client.post(
+        event_stream_post_url(event_stream.uuid),
+        headers=headers,
+        data=data_bytes,
+        content_type=content_type,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
