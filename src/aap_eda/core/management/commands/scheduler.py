@@ -70,6 +70,7 @@ For a complete list of parameters refer to the
 https://github.com/rq/rq-scheduler/blob/master/README.rst
 """
 import logging
+import re
 from datetime import datetime
 from time import sleep
 
@@ -164,7 +165,7 @@ class Command(rqscheduler.Command):
             ) as e:
                 # If we got one of these exceptions but are not on a Cluster go
                 # ahead and raise it normally.
-                if type(self.connection) is not DABRedisCluster:
+                if not isinstance(scheduler.connection, DABRedisCluster):
                     raise
 
                 # There are a lot of different exceptions that inherit from
@@ -173,10 +174,12 @@ class Command(rqscheduler.Command):
                 # Note:  ClusterDownError and TimeoutError are not subclasses
                 #        of ConnectionError.
                 if (
-                    issubclass(redis.exceptions.ConnectionError, e)
+                    issubclass(type(e), redis.exceptions.ConnectionError)
                     and type(e) is not redis.exceptions.ConnectionError
                 ):
                     raise
+
+                downed_node_ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}:[0-9]+', str(e))
 
                 # If we got a cluster issue we will loop here until we can ping
                 # the server again.
@@ -191,8 +194,15 @@ class Command(rqscheduler.Command):
                     sleep(backoff)
                     current_backoff = 2 * current_backoff
                     try:
-                        scheduler.connection.ping()
+                        if downed_node_ip:
+                            cluster_nodes = scheduler.connection.cluster_nodes()
+                            for ip in downed_node_ip:
+                                if 'fail' not in cluster_nodes[ip]['flags']:
+                                    raise Exception("Failed node is not yet in a failed state")
+                        else:
+                            scheduler.connection.ping()
                         break
                     # We could tighten this exception up
                     except Exception:
                         pass
+
