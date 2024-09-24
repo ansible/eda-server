@@ -331,6 +331,7 @@ class Worker(_Worker):
             prepare_for_work=prepare_for_work,
             serializer=JSONSerializer,
         )
+        self.is_shutting_down = False
 
     def _set_connection(
         self,
@@ -412,6 +413,10 @@ class Worker(_Worker):
 
             pipeline.execute()
 
+    def handle_warm_shutdown_request(self):
+        self.is_shutting_down = True
+        super().handle_warm_shutdown_request()
+
     # We are going to override the work function to create our own loop.
     # This will allow us to catch exceptions that the default work method will
     # not handle and restart our worker process if we hit them.
@@ -444,7 +449,7 @@ class Worker(_Worker):
             ) as e:
                 # If we got one of these exceptions but are not on a Cluster go
                 # ahead and raise it normally.
-                if type(self.connection) is not DABRedisCluster:
+                if not isinstance(self.connection, DABRedisCluster):
                     raise
 
                 # There are a lot of different exceptions that inherit from
@@ -453,7 +458,7 @@ class Worker(_Worker):
                 # Note: ClusterDownError and TimeoutError are not subclasses
                 #       of ConnectionError.
                 if (
-                    issubclass(redis.exceptions.ConnectionError, e)
+                    issubclass(type(e), redis.exceptions.ConnectionError)
                     and type(e) is not redis.exceptions.ConnectionError
                 ):
                     raise
@@ -484,6 +489,9 @@ class Worker(_Worker):
             #   an exit that did not raise an exception
             if return_value:
                 logger.debug(f"Working exited normally with {return_value}")
+                return return_value
+            elif self.is_shutting_down:
+                # Get got a warm shutdown request, lets respect it
                 return return_value
             else:
                 logger.error(
