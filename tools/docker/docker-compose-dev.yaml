@@ -137,8 +137,8 @@ services:
       - -c
       - >-
         aap-eda-manage migrate
-        && aap-eda-manage create_initial_data
-        && scripts/create_superuser.sh
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false aap-eda-manage create_initial_data
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
     ports:
       - "${EDA_API_PORT:-8000}:8000"
@@ -252,7 +252,7 @@ services:
     restart: always
 
   eda-webhook-api:
-    image: "${EDA_IMAGE:-quay.io/ansible/eda-server:main}"
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     environment: *common-env
     command:
       - /bin/bash
@@ -269,6 +269,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 10
+    volumes:
+      - '../../:/app/src:z'
 
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
