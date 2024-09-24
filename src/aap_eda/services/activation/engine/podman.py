@@ -124,7 +124,6 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerStartError("Missing image url")
 
         try:
-            self._login(request)
             LOGGER.info(f"Image URL is {request.image_url}")
             if request.pull_policy == "Always" or not self._image_exists(
                 request.image_url,
