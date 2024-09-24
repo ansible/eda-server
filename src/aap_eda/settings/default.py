@@ -459,7 +459,8 @@ def rq_redis_client_instantiation_parameters():
         )
         from redis.backoff import ConstantBackoff
         from redis.retry import Retry
-        params['retry'] = Retry(backoff=ConstantBackoff(3), retries=20)
+
+        params["retry"] = Retry(backoff=ConstantBackoff(3), retries=20)
     return params
 
 
