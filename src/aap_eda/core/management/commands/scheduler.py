@@ -186,6 +186,17 @@ class Command(rqscheduler.Command):
                 max_backoff = 60
                 current_backoff = 1
                 while True:
+                    if current_backoff > max_backoff:
+                        # Maybe we just got a network glitch and are waiting for
+                        # a cluster member to fail when its not going to. At this
+                        # point we've waited for 60 secs so lets go ahead and let
+                        # the scheduler try and restart                          
+                        logger.error(
+                            "Connection to redis is still down "
+                            "going to attempt to restart scheduler"
+                        )
+                        break
+
                     backoff = min(current_backoff, max_backoff)
                     logger.error(
                         f"Connection to redis cluster failed. Attempting to "
@@ -205,4 +216,3 @@ class Command(rqscheduler.Command):
                     # We could tighten this exception up
                     except Exception:
                         pass
-
