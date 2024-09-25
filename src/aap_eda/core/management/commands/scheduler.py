@@ -174,12 +174,14 @@ class Command(rqscheduler.Command):
                 # Note:  ClusterDownError and TimeoutError are not subclasses
                 #        of ConnectionError.
                 if (
-                    issubclass(type(e), redis.exceptions.ConnectionError)
+                    isinstance(e, redis.exceptions.ConnectionError)
                     and type(e) is not redis.exceptions.ConnectionError
                 ):
                     raise
 
-                downed_node_ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}:[0-9]+', str(e))
+                downed_node_ip = re.findall(
+                    r"[0-9]+(?:\.[0-9]+){3}:[0-9]+", str(e)
+                )
 
                 # If we got a cluster issue we will loop here until we can ping
                 # the server again.
@@ -187,10 +189,10 @@ class Command(rqscheduler.Command):
                 current_backoff = 1
                 while True:
                     if current_backoff > max_backoff:
-                        # Maybe we just got a network glitch and are waiting for
-                        # a cluster member to fail when its not going to. At this
-                        # point we've waited for 60 secs so lets go ahead and let
-                        # the scheduler try and restart                          
+                        # Maybe we just got a network glitch and are waiting
+                        # for a cluster member to fail when its not going to.
+                        # At this point we've waited for 60 secs so lets go
+                        # ahead and let the scheduler try and restart.
                         logger.error(
                             "Connection to redis is still down "
                             "going to attempt to restart scheduler"
@@ -206,10 +208,15 @@ class Command(rqscheduler.Command):
                     current_backoff = 2 * current_backoff
                     try:
                         if downed_node_ip:
-                            cluster_nodes = scheduler.connection.cluster_nodes()
+                            cluster_nodes = (
+                                scheduler.connection.cluster_nodes()
+                            )
                             for ip in downed_node_ip:
-                                if 'fail' not in cluster_nodes[ip]['flags']:
-                                    raise Exception("Failed node is not yet in a failed state")
+                                if "fail" not in cluster_nodes[ip]["flags"]:
+                                    raise Exception(
+                                        "Failed node is not yet in a failed "
+                                        "state"
+                                    )
                         else:
                             scheduler.connection.ping()
                         break

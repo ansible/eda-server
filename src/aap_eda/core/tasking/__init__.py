@@ -458,7 +458,7 @@ class Worker(_Worker):
                 # Note: ClusterDownError and TimeoutError are not subclasses
                 #       of ConnectionError.
                 if (
-                    issubclass(type(e), redis.exceptions.ConnectionError)
+                    isinstance(e, redis.exceptions.ConnectionError)
                     and type(e) is not redis.exceptions.ConnectionError
                 ):
                     raise
