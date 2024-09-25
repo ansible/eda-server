@@ -621,7 +621,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "24.9.25.1.dev498+g1af0ee7"
+version = "24.9.25.1.dev498+g084fa7b"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -653,7 +653,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/john-westcott-iv/django-ansible-base.git"
 reference = "redis_flushdb"
-resolved_reference = "1af0ee70b53329d9fc14b748204b6ea5fe35932a"
+resolved_reference = "084fa7b07cf38e62276b6dd4e4fb7f28eaad61f2"
 
 [[package]]
 name = "django-crum"
