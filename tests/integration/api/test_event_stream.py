@@ -171,21 +171,6 @@ def test_fetching_event_stream_credential(
     [
         (
             {
-                "auth_type": "mtls",
-                "subject": "Subject",
-                "http_header_key": "Subject",
-            },
-            enums.EventStreamCredentialType.MTLS.value,
-            "EVENT_STREAM_MTLS_BASE_URL",
-            (
-                "EventStream of type mTLS Event Stream cannot be "
-                "used because EVENT_STREAM_MTLS_BASE_URL is "
-                "not configured. "
-                "Please check with your site administrator."
-            ),
-        ),
-        (
-            {
                 "auth_type": "basic",
                 "username": "fred",
                 "password": secrets.token_hex(32),

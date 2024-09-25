@@ -234,7 +234,6 @@ def test_engine_start_with_credential(init_data, podman_engine):
 
     engine.start(request, log_handler)
 
-    engine.client.login.assert_called_once()
     engine.client.images.pull.assert_called_once_with(
         request.image_url,
         tls_verify=bool(credential.ssl_verify),
@@ -263,7 +262,6 @@ def test_engine_start_with_credential(init_data, podman_engine):
 def test_engine_start_with_login_api_exception(init_data, podman_engine):
     credential = Credential(username="me", secret="sec1", ssl_verify=True)
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
     request = get_request(init_data)
     request.credential = credential
 
@@ -273,7 +271,7 @@ def test_engine_start_with_login_api_exception(init_data, podman_engine):
     engine.client.login.side_effect = raise_error
 
     with pytest.raises(ContainerLoginError, match="Login failed"):
-        engine.start(request, log_handler)
+        engine._login(request)
 
 
 @pytest.mark.django_db

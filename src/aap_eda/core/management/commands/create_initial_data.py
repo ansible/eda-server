@@ -34,6 +34,7 @@ AVAILABLE_ALGORITHMS = sorted(hashlib.algorithms_available)
 AUTH_TYPE_LABEL = "Event Stream Authentication Type"
 SIGNATURE_ENCODING_LABEL = "Signature Encoding"
 HTTP_HEADER_LABEL = "HTTP Header Key"
+DEPRECATED_CREDENTIAL_KINDS = ["mtls"]
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
 ORG_ROLES = [
@@ -640,39 +641,6 @@ EVENT_STREAM_ECDSA_INPUTS = {
     ],
 }
 
-EVENT_STREAM_MTLS_INPUTS = {
-    "fields": [
-        {
-            "id": "auth_type",
-            "label": AUTH_TYPE_LABEL,
-            "type": "string",
-            "default": "mtls",
-            "hidden": True,
-        },
-        {
-            "id": "subject",
-            "label": "Certificate Subject",
-            "type": "string",
-            "help_text": (
-                "The Subject from Certificate compliant with RFC 2253."
-                "This is optional and can be used to check the subject "
-                "defined in the certificate."
-            ),
-        },
-        {
-            "id": "http_header_key",
-            "label": HTTP_HEADER_LABEL,
-            "type": "string",
-            "default": "Subject",
-            "help_text": (
-                "The NGINX Server passes the certificate subject using "
-                "this HTTP header"
-            ),
-            "hidden": True,
-        },
-    ],
-    "required": ["auth_type", "http_header_key"],
-}
 
 EVENT_STREAM_GITLAB_INPUTS = {
     "fields": [
@@ -990,20 +958,6 @@ CREDENTIAL_TYPES = [
         ),
     },
     {
-        "name": enums.EventStreamCredentialType.MTLS,
-        "namespace": "event_stream",
-        "kind": "mtls",
-        "inputs": EVENT_STREAM_MTLS_INPUTS,
-        "injectors": {},
-        "managed": True,
-        "description": (
-            "Credential for Event Streams that use mutual TLS. "
-            "The Certificate is installed in the Web Server and "
-            "we can optionally validate the Subject defined in the "
-            "Certificate."
-        ),
-    },
-    {
         "name": enums.CustomEventStreamCredentialType.GITLAB,
         "namespace": "event_stream",
         "kind": "gitlab",
@@ -1088,7 +1042,15 @@ class Command(BaseCommand):
         self._copy_scm_credentials()
         self._create_org_roles()
         self._create_obj_roles()
+        self._remove_deprecated_credential_kinds()
         enable_redis_prefix()
+
+    def _remove_deprecated_credential_kinds(self):
+        """Remove old credential types which are deprecated."""
+        for credential_type in models.CredentialType.objects.filter(
+            kind__in=DEPRECATED_CREDENTIAL_KINDS
+        ).all():
+            credential_type.delete()
 
     def _preload_credential_types(self):
         for credential_type in populate_credential_types(CREDENTIAL_TYPES):
