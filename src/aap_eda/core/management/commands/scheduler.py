@@ -70,9 +70,13 @@ For a complete list of parameters refer to the
 https://github.com/rq/rq-scheduler/blob/master/README.rst
 """
 import logging
+import re
 from datetime import datetime
+from time import sleep
 
 import django_rq
+import redis
+from ansible_base.lib.redis.client import DABRedisCluster
 from django.conf import settings
 from django_rq.management.commands import rqscheduler
 from rq_scheduler import Scheduler
@@ -149,4 +153,73 @@ class Command(rqscheduler.Command):
         add_startup_jobs(scheduler)
         add_periodic_jobs(scheduler)
         add_cron_jobs(scheduler)
-        super().handle(*args, **options)
+        # We are going to start our own loop here to catch exceptions which
+        # might be coming from a redis cluster and retrying things.
+        while True:
+            try:
+                super().handle(*args, **options)
+            except (
+                redis.exceptions.TimeoutError,
+                redis.exceptions.ClusterDownError,
+                redis.exceptions.ConnectionError,
+            ) as e:
+                # If we got one of these exceptions but are not on a Cluster go
+                # ahead and raise it normally.
+                if not isinstance(scheduler.connection, DABRedisCluster):
+                    raise
+
+                # There are a lot of different exceptions that inherit from
+                # ConnectionError.  So we need to make sure if we got that its
+                # an actual ConnectionError. If not, go ahead and raise it.
+                # Note:  ClusterDownError and TimeoutError are not subclasses
+                #        of ConnectionError.
+                if (
+                    isinstance(e, redis.exceptions.ConnectionError)
+                    and type(e) is not redis.exceptions.ConnectionError
+                ):
+                    raise
+
+                downed_node_ip = re.findall(
+                    r"[0-9]+(?:\.[0-9]+){3}:[0-9]+", str(e)
+                )
+
+                # If we got a cluster issue we will loop here until we can ping
+                # the server again.
+                max_backoff = 60
+                current_backoff = 1
+                while True:
+                    if current_backoff > max_backoff:
+                        # Maybe we just got a network glitch and are waiting
+                        # for a cluster member to fail when its not going to.
+                        # At this point we've waited for 60 secs so lets go
+                        # ahead and let the scheduler try and restart.
+                        logger.error(
+                            "Connection to redis is still down "
+                            "going to attempt to restart scheduler"
+                        )
+                        break
+
+                    backoff = min(current_backoff, max_backoff)
+                    logger.error(
+                        f"Connection to redis cluster failed. Attempting to "
+                        f"reconnect in {backoff}"
+                    )
+                    sleep(backoff)
+                    current_backoff = 2 * current_backoff
+                    try:
+                        if downed_node_ip:
+                            cluster_nodes = (
+                                scheduler.connection.cluster_nodes()
+                            )
+                            for ip in downed_node_ip:
+                                if "fail" not in cluster_nodes[ip]["flags"]:
+                                    raise Exception(
+                                        "Failed node is not yet in a failed "
+                                        "state"
+                                    )
+                        else:
+                            scheduler.connection.ping()
+                        break
+                    # We could tighten this exception up
+                    except Exception:
+                        pass

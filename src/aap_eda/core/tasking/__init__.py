@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from time import sleep
 from types import MethodType
 from typing import (
     Any,
@@ -330,6 +331,7 @@ class Worker(_Worker):
             prepare_for_work=prepare_for_work,
             serializer=JSONSerializer,
         )
+        self.is_shutting_down = False
 
     def _set_connection(
         self,
@@ -410,6 +412,91 @@ class Worker(_Worker):
             started_job_registry.remove(job, pipeline=pipeline)
 
             pipeline.execute()
+
+    def handle_warm_shutdown_request(self):
+        self.is_shutting_down = True
+        super().handle_warm_shutdown_request()
+
+    # We are going to override the work function to create our own loop.
+    # This will allow us to catch exceptions that the default work method will
+    # not handle and restart our worker process if we hit them.
+    def work(
+        self,
+        burst: bool = False,
+        logging_level: str = "INFO",
+        date_format: str = rq.defaults.DEFAULT_LOGGING_DATE_FORMAT,
+        log_format: str = rq.defaults.DEFAULT_LOGGING_FORMAT,
+        max_jobs: Optional[int] = None,
+        with_scheduler: bool = False,
+    ) -> bool:
+        while True:
+            # super.work() returns a value that we want to return on a normal
+            # exit.
+            return_value = None
+            try:
+                return_value = super().work(
+                    burst,
+                    logging_level,
+                    date_format,
+                    log_format,
+                    max_jobs,
+                    with_scheduler,
+                )
+            except (
+                redis.exceptions.TimeoutError,
+                redis.exceptions.ClusterDownError,
+                redis.exceptions.ConnectionError,
+            ) as e:
+                # If we got one of these exceptions but are not on a Cluster go
+                # ahead and raise it normally.
+                if not isinstance(self.connection, DABRedisCluster):
+                    raise
+
+                # There are a lot of different exceptions that inherit from
+                # ConnectionError.  So we need to make sure if we got that its
+                # an actual ConnectionError.  If not, go ahead and raise it.
+                # Note: ClusterDownError and TimeoutError are not subclasses
+                #       of ConnectionError.
+                if (
+                    isinstance(e, redis.exceptions.ConnectionError)
+                    and type(e) is not redis.exceptions.ConnectionError
+                ):
+                    raise
+
+                # If we got a cluster issue we will loop here until we can ping
+                # the server again.
+                max_backoff = 60
+                current_backoff = 1
+                while True:
+                    backoff = min(current_backoff, max_backoff)
+                    logger.error(
+                        f"Connection to redis cluster failed. Attempting to "
+                        f"reconnect in {backoff}"
+                    )
+                    sleep(backoff)
+                    current_backoff = 2 * current_backoff
+                    try:
+                        self.connection.ping()
+                        break
+                    # We could tighten this exception up.
+                    except Exception:
+                        pass
+                # At this point return value is none so we are going to go
+                # ahead and fall through to the loop to restart.
+
+            # We are outside of the work function with either:
+            #   a "normal exist"
+            #   an exit that did not raise an exception
+            if return_value:
+                logger.debug(f"Working exited normally with {return_value}")
+                return return_value
+            elif self.is_shutting_down:
+                # Get got a warm shutdown request, lets respect it
+                return return_value
+            else:
+                logger.error(
+                    "Work exited no return value, going to restart the worker"
+                )
 
 
 class DefaultWorker(Worker):

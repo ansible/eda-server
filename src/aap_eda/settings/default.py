@@ -453,10 +453,14 @@ def rq_redis_client_instantiation_parameters():
         params["socket_connect_timeout"] = settings.get(
             "MQ_SOCKET_CONNECT_TIMEOUT", 10
         )
-        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 10)
+        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 150)
         params["cluster_error_retry_attempts"] = settings.get(
             "MQ_CLUSTER_ERROR_RETRY_ATTEMPTS", 3
         )
+        from redis.backoff import ConstantBackoff
+        from redis.retry import Retry
+
+        params["retry"] = Retry(backoff=ConstantBackoff(3), retries=20)
     return params
 
 
