@@ -1,3 +1,17 @@
+#  Copyright 2024 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import os
 import platform
 from datetime import datetime
@@ -206,6 +220,49 @@ def event_streams_table(
 ):
     query = _get_query(models.EventStream.objects, since, until)
     return _copy_table("event_streams", query, full_path)
+
+
+@register(
+    "event_streams_by_activation_table",
+    "1.0",
+    format="csv",
+    description="Data on event_streams used by each activation",
+)
+def event_streams_by_activation_table(
+    since: datetime, full_path: str, until: datetime, **kwargs
+):
+    activations = models.Activation.objects.filter(
+        Q(created_at__gt=since, created_at__lte=until)
+        | Q(modified_at__gt=since, modified_at__lte=until)
+    ).distinct()
+
+    event_streams = models.EventStream.objects.none()
+    for activation in activations:
+        event_streams |= activation.event_streams.all()
+
+    if not bool(event_streams):
+        return
+
+    event_streams = event_streams.extra(
+        select={
+            "activation_id": "core_activation_event_streams.activation_id",
+            "event_stream_id": "core_eventstream.id",
+        }
+    ).values(
+        "activation_id",
+        "event_stream_id",
+        "name",
+        "event_stream_type",
+        "eda_credential_id",
+        "owner",
+        "events_received",
+        "last_event_received_at",
+        "organization_id",
+    )
+
+    query = f"COPY ({event_streams.query}) TO STDOUT WITH CSV HEADER"
+
+    return _copy_table("event_streams_by_activation", query, full_path)
 
 
 @register(

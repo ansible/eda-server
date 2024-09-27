@@ -491,6 +491,53 @@ def test_event_streams_table_collector(
 
 
 @pytest.mark.django_db
+def test_event_streams_table_by_activation_collector(
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+    default_event_streams: list[models.EventStream],
+):
+    default_activation.event_streams.add(default_event_streams[0])
+    new_activation.event_streams.add(default_event_streams[1])
+
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        collectors.event_streams_by_activation_table(
+            time_start, tmpdir, until=now() + timedelta(seconds=1)
+        )
+        with open(
+            os.path.join(tmpdir, "event_streams_by_activation_table.csv")
+        ) as f:
+            reader = csv.reader(f)
+
+            header = next(reader)
+            lines = list(reader)
+
+            assert header == [
+                "activation_id",
+                "event_stream_id",
+                "name",
+                "event_stream_type",
+                "eda_credential_id",
+                "owner_id",
+                "events_received",
+                "last_event_received_at",
+                "organization_id",
+            ]
+            assert len(lines) == 2
+            assert lines[0][1] == str(default_event_streams[0].id)
+            assert lines[0][2] == default_event_streams[0].name
+            assert lines[0][3] == default_event_streams[0].event_stream_type
+            assert lines[1][1] == str(default_event_streams[1].id)
+            assert lines[1][2] == default_event_streams[1].name
+            assert lines[1][3] == default_event_streams[1].event_stream_type
+            assert sorted([lines[0][0], lines[1][0]]) == sorted(
+                [str(default_activation.id), str(new_activation.id)]
+            )
+
+
+@pytest.mark.django_db
 def test_projects_table_collector(
     default_project: models.Project,
 ):
