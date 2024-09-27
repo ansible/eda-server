@@ -46,11 +46,13 @@ def test_read_only_application_setting():
 @pytest.mark.django_db
 def test_application_setting_bad_type():
     assert (
-        settings_registry.get_setting_type("AUTOMATION_ANALYTICS_LAST_ENTRIES")
-        == dict
+        settings_registry.get_setting_type(
+            "AUTOMATION_ANALYTICS_GATHER_INTERVAL"
+        )
+        == int
     )
     with pytest.raises(InvalidValueError):
-        application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = 1
+        application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL = "bad_type"
 
 
 @pytest.mark.django_db

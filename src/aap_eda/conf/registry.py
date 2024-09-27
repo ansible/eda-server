@@ -84,8 +84,7 @@ _APPLICATION_SETTING_REGISTRIES = [
     ),
     RegistryData(
         name="AUTOMATION_ANALYTICS_LAST_ENTRIES",
-        type=dict,
-        default={},
+        default="{}",  # noqa P103
     ),
     RegistryData(
         name="AUTOMATION_ANALYTICS_GATHER_INTERVAL",
