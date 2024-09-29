@@ -15,7 +15,6 @@
 import logging
 from urllib.parse import urljoin
 
-import yaml
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.conf import settings
@@ -34,7 +33,9 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import EventStreamAuthType, ResourceType
+from aap_eda.core.exceptions import GatewayAPIError, MissingCredentials
 from aap_eda.core.utils import logging_utils
+from aap_eda.services.sync_certs import SyncCertificates
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,8 @@ class EventStreamViewSet(
                 f"Event stream '{event_stream.name}' is being referenced by "
                 f"{ref_count} activation(s) and cannot be deleted"
             )
+
+        self._sync_certificates(event_stream, "destroy")
         self.perform_destroy(event_stream)
 
         logger.info(
@@ -187,11 +190,11 @@ class EventStreamViewSet(
             RoleDefinition.objects.give_creator_permissions(
                 request.user, serializer.instance
             )
-            inputs = yaml.safe_load(
-                response.eda_credential.inputs.get_secret_value()
-            )
             sub_path = f"{EVENT_STREAM_EXTERNAL_PATH}/{response.uuid}/post/"
-            if inputs["auth_type"] == EventStreamAuthType.MTLS:
+            if (
+                response.eda_credential.credential_type.kind
+                == EventStreamAuthType.MTLS_V2.value
+            ):
                 response.url = urljoin(
                     settings.EVENT_STREAM_MTLS_BASE_URL, sub_path
                 )
@@ -200,6 +203,7 @@ class EventStreamViewSet(
                     settings.EVENT_STREAM_BASE_URL, sub_path
                 )
             response.save(update_fields=["url"])
+            self._sync_certificates(response, "create")
 
         logger.info(
             logging_utils.generate_simple_audit_log(
@@ -325,3 +329,19 @@ class EventStreamViewSet(
             )
         )
         return self.get_paginated_response(serializer.data)
+
+    def _sync_certificates(
+        self, event_stream: models.EventStream, action: str
+    ):
+        if (
+            event_stream.eda_credential.credential_type.kind
+            == EventStreamAuthType.MTLS_V2.value
+        ):
+            try:
+                obj = SyncCertificates(event_stream.eda_credential.id)
+                if action == "destroy":
+                    obj.delete(event_stream.id)
+                else:
+                    obj.update()
+            except (GatewayAPIError, MissingCredentials) as ex:
+                logger.error("Could not %s certificates %s", action, str(ex))

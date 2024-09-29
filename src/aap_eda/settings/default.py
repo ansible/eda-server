@@ -803,3 +803,11 @@ INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
 # Available methods:
 # https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
 AUTOMATION_AUTH_METHOD = settings.get("AUTOMATION_AUTH_METHOD", "user-pass")
+# --------------------------------------------------------
+# GATEWAY API ACCESS:
+# --------------------------------------------------------
+GATEWAY_URL = settings.get("GATEWAY_URL", None)
+GATEWAY_USER = settings.get("GATEWAY_USER", None)
+GATEWAY_PASSWORD = settings.get("GATEWAY_PASSWORD", None)
+GATEWAY_TOKEN = settings.get("GATEWAY_TOKEN", None)
+GATEWAY_SSL_VERIFY = settings.get("GATEWAY_SSL_VERIFY", True)

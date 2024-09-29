@@ -148,7 +148,7 @@ class EventStreamAuthType(DjangoStrEnum):
     OAUTH2 = "oauth2"
     OAUTH2JWT = "oauth2-jwt"
     ECDSA = "ecdsa"
-    MTLS = "mtls"
+    MTLS_V2 = "mtls_v2"
 
 
 class SignatureEncodingType(DjangoStrEnum):
@@ -165,7 +165,7 @@ class EventStreamCredentialType(DjangoStrEnum):
     OAUTH2 = "OAuth2 Event Stream"
     OAUTH2_JWT = "OAuth2 JWT Event Stream"
     ECDSA = "ECDSA Event Stream"
-    MTLS = "mTLS Event Stream"
+    MTLS_V2 = "mTLS Event Stream"
 
 
 class CustomEventStreamCredentialType(DjangoStrEnum):

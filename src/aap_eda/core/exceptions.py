@@ -31,3 +31,11 @@ class PGNotifyError(Exception):
 
 class ParseError(Exception):
     pass
+
+
+class MissingCredentials(Exception):
+    pass
+
+
+class GatewayAPIError(Exception):
+    pass
