@@ -110,7 +110,7 @@ def test_monitor_project_tasks_with_job(
         import_task_id=expected_job_id,
     )
     default_queue.enqueue(fake_job, job_id=expected_job_id)
-    default_queue.enqueue(monitor_project_tasks)
+    default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
     worker = DefaultWorker(
         [default_queue], connection=default_queue.connection
