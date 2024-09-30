@@ -278,7 +278,7 @@ def valid_hash_format(fmt: str):
 def _validate_event_stream_settings(auth_type: str):
     """Check event stream settings."""
     if (
-        auth_type == enums.EventStreamCredentialType.MTLS
+        auth_type == enums.EventStreamCredentialType.MTLS_V2
         and not settings.EVENT_STREAM_MTLS_BASE_URL
     ):
         raise serializers.ValidationError(
@@ -290,7 +290,7 @@ def _validate_event_stream_settings(auth_type: str):
         )
 
     if (
-        auth_type != enums.EventStreamCredentialType.MTLS
+        auth_type != enums.EventStreamCredentialType.MTLS_V2
         and not settings.EVENT_STREAM_BASE_URL
     ):
         raise serializers.ValidationError(

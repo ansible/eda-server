@@ -834,6 +834,48 @@ EVENT_STREAM_DYNATRACE_INPUTS = {
     "required": ["auth_type", "username", "password", "http_header_key"],
 }
 
+EVENT_STREAM_MTLS_V2_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "mtls_v2",
+            "hidden": True,
+        },
+        {
+            "id": "certificate",
+            "label": "Certificate",
+            "type": "string",
+            "multiline": True,
+            "help_text": (
+                "The Certificate collection in PEM format. You can have "
+                "multiple certificates in this field separated by "
+                "-----BEGIN CERTIFICATE----- "
+                "and ending in -----END CERTIFICATE-----"
+            ),
+        },
+        {
+            "id": "subject",
+            "label": "Certificate Subject",
+            "type": "string",
+            "help_text": (
+                "The Subject from Certificate compliant with RFC 2253."
+                "This is optional and can be used to check the subject "
+                "defined in the certificate."
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Subject",
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "certificate", "http_header_key"],
+}
+
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
@@ -955,6 +997,21 @@ CREDENTIAL_TYPES = [
             "Credential for Event Streams that use Elliptic Curve DSA. "
             "This requires a public key and the headers that carry "
             "the signature."
+        ),
+    },
+    {
+        "name": enums.EventStreamCredentialType.MTLS_V2,
+        "namespace": "event_stream",
+        "kind": "mtls_v2",
+        "inputs": EVENT_STREAM_MTLS_V2_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Event Streams that use mutual TLS. "
+            "The Certificates can be defined in the UI and it "
+            "be transferred to the Gateway proxy for validation "
+            "of incoming requests. We can optionally validate the "
+            "Subject defined in the inbound Certificate."
         ),
     },
     {

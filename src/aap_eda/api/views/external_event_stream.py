@@ -148,7 +148,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                     secret=inputs["secret"].encode("utf-8"),
                 )
                 obj.authenticate(request.body)
-            elif inputs["auth_type"] == EventStreamAuthType.MTLS:
+            elif inputs["auth_type"] == EventStreamAuthType.MTLS_V2:
                 obj = MTLSAuthentication(
                     subject=inputs.get("subject", ""),
                     value=request.headers[inputs["http_header_key"]],
@@ -199,7 +199,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 )
                 obj.authenticate(request.body)
             else:
-                message = "Unknown auth type"
+                message = f"Unknown auth type {inputs['auth_type']}"
                 logger.error(message)
                 raise ParseError(message)
         except AuthenticationFailed as err:
