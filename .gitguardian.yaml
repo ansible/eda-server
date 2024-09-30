@@ -1,0 +1,7 @@
+secret:
+  ignored_paths:
+    - 'docs/*'
+    - tools/docker/nginx/certs/*
+    - tools/docker/nginx/redis-tls/*
+    - tests/unit/data/*
+    - tests/integration/api/test_event_stream_ecdsa.py
