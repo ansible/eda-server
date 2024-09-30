@@ -44,9 +44,10 @@ x-environment:
   - EDA_EVENT_STREAM_MTLS_BASE_URL=${EDA_EVENT_STREAM_MTLS_BASE_URL:-https://localhost:8443/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
   - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
   - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
-  - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/cert.pem}
-  - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/cert.key}
-  - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/CA.pem}
+  - EDA_STATIC_URL=${EDA_STATIC_URL:-api/eda/static/}
+  - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/wildcard.crt}
+  - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/wildcard.key}
+  - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
 
 
 services:
@@ -88,7 +89,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage migrate
+        aap-eda-manage collectstatic --noinput
+        && aap-eda-manage migrate
         && ANSIBLE_REVERSE_RESOURCE_SYNC=false aap-eda-manage create_initial_data
         && ANSIBLE_REVERSE_RESOURCE_SYNC=false scripts/create_superuser.sh
         && aap-eda-manage runserver 0.0.0.0:8000
@@ -209,13 +211,16 @@ services:
     ports:
       - '${EDA_PROXY_PORT:-3128}:3128'
 
-  eda-ui:
-    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
+  eda-nginx:
+    image: ${EDA_NGINX_IMAGE:-docker.io/nginx:alpine}
     environment: *common-env
+    command: nginx -g "daemon off;"
     ports:
       - '${EDA_UI_PORT:-8443}:443'
     volumes:
-      - './tools/docker/my_certs:/tmp/my_certs:z'
+      - './my_certs:/tmp/my_certs:z'
+      - './nginx/certs:/certs:z'
+      - './nginx/default.conf.template:/etc/nginx/templates/default.conf.template:z'
     depends_on:
       eda-webhook-api:
         condition: service_healthy
