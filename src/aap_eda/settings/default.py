@@ -733,7 +733,15 @@ RESOURCE_SERVER = {
     "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
-RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
+
+try:
+    service_path_default = RESOURCE_SERVICE_PATH  # noqa
+except NameError:
+    service_path_default = None
+
+RESOURCE_SERVICE_PATH = settings.get(
+    "RESOURCE_SERVICE_PATH", service_path_default
+)
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
     "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
 )
@@ -795,5 +803,11 @@ MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
 
+# --------------------------------------------------------
+# METRICS COLLECTIONS:
+# --------------------------------------------------------
 AUTOMATION_ANALYTICS_URL = settings.get("AUTOMATION_ANALYTICS_URL", "")
 INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
+# Available methods:
+# https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
+AUTOMATION_AUTH_METHOD = settings.get("AUTOMATION_AUTH_METHOD", "user-pass")
