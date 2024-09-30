@@ -206,6 +206,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "ansible_base.lib.middleware.logging.log_request.LogTracebackMiddleware",
     "crum.CurrentRequestUserMiddleware",
 ]
 
@@ -452,10 +453,14 @@ def rq_redis_client_instantiation_parameters():
         params["socket_connect_timeout"] = settings.get(
             "MQ_SOCKET_CONNECT_TIMEOUT", 10
         )
-        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 10)
+        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 150)
         params["cluster_error_retry_attempts"] = settings.get(
             "MQ_CLUSTER_ERROR_RETRY_ATTEMPTS", 3
         )
+        from redis.backoff import ConstantBackoff
+        from redis.retry import Retry
+
+        params["retry"] = Retry(backoff=ConstantBackoff(3), retries=20)
     return params
 
 
@@ -728,7 +733,15 @@ RESOURCE_SERVER = {
     "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
-RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
+
+try:
+    service_path_default = RESOURCE_SERVICE_PATH  # noqa
+except NameError:
+    service_path_default = None
+
+RESOURCE_SERVICE_PATH = settings.get(
+    "RESOURCE_SERVICE_PATH", service_path_default
+)
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
     "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
 )
@@ -789,3 +802,12 @@ if EVENT_STREAM_MTLS_BASE_URL:
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
+
+# --------------------------------------------------------
+# METRICS COLLECTIONS:
+# --------------------------------------------------------
+AUTOMATION_ANALYTICS_URL = settings.get("AUTOMATION_ANALYTICS_URL", "")
+INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
+# Available methods:
+# https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
+AUTOMATION_AUTH_METHOD = settings.get("AUTOMATION_AUTH_METHOD", "user-pass")
