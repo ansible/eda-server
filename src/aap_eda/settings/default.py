@@ -690,9 +690,21 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
 
-ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
-    "ALLOW_LOCAL_RESOURCE_MANAGEMENT", True
-)
+# These settings have defaults in DAB
+# if the file or env var does not define them, leave as default
+if settings.exists("ALLOW_LOCAL_RESOURCE_MANAGEMENT"):
+    ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
+        "ALLOW_LOCAL_RESOURCE_MANAGEMENT"
+    )
+
+if settings.exists("RESOURCE_SERVICE_PATH"):
+    RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH")
+
+if settings.exists("RESOURCE_SERVER_SYNC_ENABLED"):
+    RESOURCE_SERVER_SYNC_ENABLED = settings.get("RESOURCE_SERVER_SYNC_ENABLED")
+
+if settings.exists("ENABLE_SERVICE_BACKED_SSO"):
+    ENABLE_SERVICE_BACKED_SSO = settings.get("ENABLE_SERVICE_BACKED_SSO")
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
@@ -734,14 +746,6 @@ RESOURCE_SERVER = {
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
 
-try:
-    service_path_default = RESOURCE_SERVICE_PATH  # noqa
-except NameError:
-    service_path_default = None
-
-RESOURCE_SERVICE_PATH = settings.get(
-    "RESOURCE_SERVICE_PATH", service_path_default
-)
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
     "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
 )
