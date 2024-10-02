@@ -23,14 +23,13 @@ from django.core.exceptions import ObjectDoesNotExist
 from django_rq import get_queue
 
 import aap_eda.tasks.activation_request_queue as requests_queue
-from aap_eda.core import models
+from aap_eda.core import models, tasking
 from aap_eda.core.enums import (
     ActivationRequest,
     ActivationStatus,
     ProcessParentType,
 )
 from aap_eda.core.models import Activation, ActivationRequestQueue
-from aap_eda.core.tasking import Worker, unique_enqueue
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.activation_manager import (
     ActivationManager,
@@ -300,7 +299,7 @@ def dispatch(
                 )
                 return
 
-    unique_enqueue(
+    tasking.unique_enqueue(
         queue_name,
         job_id,
         _manage,
@@ -365,6 +364,7 @@ def get_queue_name_by_parent_id(
     return process.rulebookprocessqueue.queue_name
 
 
+@tasking.redis_connect_retry()
 def check_rulebook_queue_health(queue_name: str) -> bool:
     """Check for the state of the queue.
 
@@ -374,7 +374,7 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
     queue = get_queue(queue_name)
 
     all_workers_dead = True
-    for worker in Worker.all(queue=queue):
+    for worker in tasking.Worker.all(queue=queue):
         last_heartbeat = worker.last_heartbeat
         if last_heartbeat is None:
             continue
@@ -482,7 +482,7 @@ def monitor_rulebook_processes() -> None:
 
 def enqueue_monitor_rulebook_processes() -> None:
     """Wrap monitor_rulebook_processes to ensure only one task is enqueued."""
-    unique_enqueue(
+    tasking.unique_enqueue(
         "default",
         "monitor_rulebook_processes",
         monitor_rulebook_processes,
