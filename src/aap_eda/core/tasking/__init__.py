@@ -619,6 +619,7 @@ class ActivationWorker(Worker):
         )
 
 
+@redis_connect_retry()
 def enqueue_delay(
     queue_name: str, job_id: str, delay: int, *args, **kwargs
 ) -> Job:
@@ -632,11 +633,13 @@ def enqueue_delay(
     )
 
 
+@redis_connect_retry()
 def queue_cancel_job(queue_name: str, job_id: str) -> None:
     scheduler = get_scheduler(name=queue_name)
     scheduler.cancel(job_id)
 
 
+@redis_connect_retry()
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     """Enqueue a new job if it is not already enqueued.
 
@@ -657,6 +660,7 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     return queue.enqueue(*args, **kwargs)
 
 
+@redis_connect_retry()
 def job_from_queue(
     queue: typing.Union[Queue, str], job_id: str
 ) -> typing.Optional[Job]:

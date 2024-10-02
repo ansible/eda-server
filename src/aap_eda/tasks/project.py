@@ -57,6 +57,9 @@ def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
     unique_enqueue(queue_name, job_id, _monitor_project_tasks, queue_name)
 
 
+# Although this directly uses interfaces that depend on a Redis connection
+# it is a periodically run task and we let that periodicity provide the
+# resilience to Redis connection issues.
 def _monitor_project_tasks(queue_name: str) -> None:
     """Handle project tasks that are stuck.
 

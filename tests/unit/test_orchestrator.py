@@ -79,7 +79,7 @@ def _mock_up_queues(monkeypatch, queues):
     def _worker_all(queue=None) -> list:
         return queue.workers
 
-    monkeypatch.setattr(orchestrator.Worker, "all", _worker_all)
+    monkeypatch.setattr(orchestrator.tasking.Worker, "all", _worker_all)
 
     def _process_count(queue: mock.Mock) -> None:
         return queue.process_count
@@ -434,7 +434,9 @@ def test_check_rulebook_queue_health_all_workers_dead(setup_queue_health):
     all_workers_mock = mock.Mock(return_value=[worker_mock])
     datetime_mock.now.return_value = datetime(2022, 1, 1, minute=5)
 
-    with mock.patch("aap_eda.tasks.orchestrator.Worker.all", all_workers_mock):
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
+    ):
         result = check_rulebook_queue_health(queue_name)
 
     get_queue_mock.assert_called_once_with(queue_name)
@@ -460,7 +462,9 @@ def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
     all_workers_mock = mock.Mock(return_value=[worker_mock1, worker_mock2])
     datetime_mock.now.return_value = datetime(2022, 1, 1, hour=6, second=30)
 
-    with mock.patch("aap_eda.tasks.orchestrator.Worker.all", all_workers_mock):
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
+    ):
         result = check_rulebook_queue_health(queue_name)
 
     get_queue_mock.assert_called_once_with(queue_name)
