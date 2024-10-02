@@ -14,17 +14,17 @@
 
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from aap_eda.api.permissions import IsSystemAdmin
 from aap_eda.api.serializers.setting import SettingSerializer
 from aap_eda.conf import settings_registry
 
 
 class SettingView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsSystemAdmin]
 
     def get_serializer(self, *args, **kwargs):
         return SettingSerializer(*args, **kwargs)
