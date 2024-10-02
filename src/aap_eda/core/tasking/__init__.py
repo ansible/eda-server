@@ -1,20 +1,12 @@
 """Tools for running background tasks."""
 from __future__ import annotations
 
+import functools
 import logging
+import time
+import typing
 from datetime import datetime, timedelta
-from time import sleep
 from types import MethodType
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Optional,
-    Protocol,
-    Type,
-    Union,
-)
 
 import redis
 import rq
@@ -55,14 +47,91 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-ErrorHandlerType = Callable[[_Job], None]
+ErrorHandlerType = typing.Callable[[_Job], None]
 
-_ErrorHandlersArgType = Union[
+_ErrorHandlersArgType = typing.Union[
     list[ErrorHandlerType],
     tuple[ErrorHandlerType],
     ErrorHandlerType,
     None,
 ]
+
+
+class RedisRetryException(Exception):
+    """Base exception for Redis retries."""
+
+    pass
+
+
+class RedisRetryDelayLimitExceeded(RedisRetryException):
+    """Raised if Redis retries exceeded a caller specified time limit."""
+
+    pass
+
+
+def redis_connect_retry(
+    delay_max: int = 60,
+    delay_limit: int = 0,
+    loop_exit: typing.Optional[typing.Callable[[Exception], bool]] = None,
+) -> typing.Callable:
+    delay_max = max(delay_max, 1)
+    delay_limit = max(delay_limit, 0)
+
+    def decorator(func: typing.Callable) -> typing.Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> typing.Optional[typing.Any]:
+            value = None
+            total_delay = 0
+            delay = 1
+            while True:
+                try:
+                    value = func(*args, **kwargs)
+                    if delay > 1:
+                        logger.info("Connection to redis re-established.")
+                    break
+                except (
+                    redis.exceptions.TimeoutError,
+                    redis.exceptions.ClusterDownError,
+                    redis.exceptions.ConnectionError,
+                ) as e:
+                    # There are a lot of different exceptions that inherit from
+                    # ConnectionError.  So we need to make sure if we got that
+                    # its an actual ConnectionError. If not, go ahead and raise
+                    # it.
+                    # Note:  ClusterDownError and TimeoutError are not
+                    #        subclasses of ConnectionError.
+                    if (
+                        isinstance(e, redis.exceptions.ConnectionError)
+                        and type(e) is not redis.exceptions.ConnectionError
+                    ):
+                        raise
+
+                    if (loop_exit is not None) and loop_exit(e):
+                        break
+
+                    delay = min(delay, delay_max)
+                    if delay_limit > 0:
+                        delay = min(delay, delay_limit - total_delay)
+                    logger.error(
+                        f"Connection to redis failed; retrying in {delay}s."
+                    )
+                    time.sleep(delay)
+
+                    total_delay += delay
+                    if (delay_limit > 0) and (total_delay >= delay_limit):
+                        msg = (
+                            f"Exceeded {delay_limit}s time limit for redis"
+                            " connection failure."
+                        )
+                        logger.error(msg)
+                        raise RedisRetryDelayLimitExceeded(msg)
+
+                    delay *= 2
+            return value
+
+        return wrapper
+
+    return decorator
 
 
 def _create_url_from_parameters(**kwargs) -> str:
@@ -80,7 +149,7 @@ def _create_url_from_parameters(**kwargs) -> str:
     return url
 
 
-def _prune_redis_kwargs(**kwargs) -> dict[str, Any]:
+def _prune_redis_kwargs(**kwargs) -> dict[str, typing.Any]:
     """Prunes the kwargs of unsupported parameters for RedisCluster."""
     # HA cluster does not support an alternate redis db and will generate an
     # exception if we pass a value (even the default). If we're in that
@@ -97,7 +166,7 @@ def _prune_redis_kwargs(**kwargs) -> dict[str, Any]:
     return kwargs
 
 
-def get_redis_client(**kwargs) -> Union[DABRedis, DABRedisCluster]:
+def get_redis_client(**kwargs) -> typing.Union[DABRedis, DABRedisCluster]:
     """Instantiate a Redis client via DAB.
 
     DAB will return an appropriate client for HA based on the passed
@@ -218,13 +287,13 @@ def enable_redis_prefix():
 enable_redis_prefix()
 
 
-class SerializerProtocol(Protocol):
+class SerializerProtocol(typing.Protocol):
     @staticmethod
-    def dumps(obj: Any) -> bytes:
+    def dumps(obj: typing.Any) -> bytes:
         ...
 
     @staticmethod
-    def loads(data: bytes) -> Any:
+    def loads(data: bytes) -> typing.Any:
         ...
 
 
@@ -238,11 +307,11 @@ class Queue(_Queue):
         self,
         name: str = "default",
         default_timeout: int = -1,
-        connection: Optional[Connection] = None,
+        connection: typing.Optional[Connection] = None,
         is_async: bool = True,
-        job_class: Optional[_Job] = None,
-        serializer: Optional[SerializerProtocol] = None,
-        **kwargs: Any,
+        job_class: typing.Optional[_Job] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
+        **kwargs: typing.Any,
     ):
         if serializer is None:
             serializer = JSONSerializer
@@ -266,9 +335,9 @@ class Job(_Job):
 
     def __init__(
         self,
-        id: Optional[str] = None,
-        connection: Optional[Connection] = None,
-        serializer: Optional[SerializerProtocol] = None,
+        id: typing.Optional[str] = None,
+        connection: typing.Optional[Connection] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
     ):
         if serializer is None:
             serializer = JSONSerializer
@@ -299,20 +368,20 @@ class Worker(_Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = None,
+        queues: typing.Iterable[typing.Union[Queue, str]],
+        name: typing.Optional[str] = None,
         default_result_ttl: int = DEFAULT_RESULT_TTL,
-        connection: Optional[Connection] = None,
-        exc_handler: Any = None,
+        connection: typing.Optional[Connection] = None,
+        exc_handler: typing.Any = None,
         exception_handlers: _ErrorHandlersArgType = None,
         default_worker_ttl: int = DEFAULT_WORKER_TTL,
-        job_class: Type[_Job] = None,
-        queue_class: Type[_Queue] = None,
+        job_class: typing.Type[_Job] = None,
+        queue_class: typing.Type[_Queue] = None,
         log_job_description: bool = True,
         job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
         disable_default_exception_handler: bool = False,
         prepare_for_work: bool = True,
-        serializer: Optional[SerializerProtocol] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
     ):
         connection = _get_necessary_client_connection(connection)
         super().__init__(
@@ -335,8 +404,8 @@ class Worker(_Worker):
 
     def _set_connection(
         self,
-        connection: Union[DABRedis, DABRedisCluster],
-    ) -> Union[DABRedis, DABRedisCluster]:
+        connection: typing.Union[DABRedis, DABRedisCluster],
+    ) -> typing.Union[DABRedis, DABRedisCluster]:
         # A DABRedis connection doesn't need intervention.
         if isinstance(connection, DABRedis):
             return super()._set_connection(connection)
@@ -366,12 +435,14 @@ class Worker(_Worker):
     @classmethod
     def all(
         cls,
-        connection: Optional[Union[DABRedis, DABRedisCluster]] = None,
-        job_class: Optional[Type[Job]] = None,
-        queue_class: Optional[Type[Queue]] = None,
-        queue: Optional[Queue] = None,
+        connection: typing.Optional[
+            typing.Union[DABRedis, DABRedisCluster]
+        ] = None,
+        job_class: typing.Optional[typing.Type[Job]] = None,
+        queue_class: typing.Optional[typing.Type[Queue]] = None,
+        queue: typing.Optional[Queue] = None,
         serializer=None,
-    ) -> List[Worker]:
+    ) -> typing.List[Worker]:
         # If we don't have a queue (whose connection would be used) make
         # certain that we have an appropriate connection and pass it
         # to the superclass.
@@ -417,86 +488,42 @@ class Worker(_Worker):
         self.is_shutting_down = True
         super().handle_warm_shutdown_request()
 
-    # We are going to override the work function to create our own loop.
-    # This will allow us to catch exceptions that the default work method will
-    # not handle and restart our worker process if we hit them.
+    # We are overriding the work function to utilize our own common
+    # Redis connection looping.
     def work(
         self,
         burst: bool = False,
         logging_level: str = "INFO",
         date_format: str = rq.defaults.DEFAULT_LOGGING_DATE_FORMAT,
         log_format: str = rq.defaults.DEFAULT_LOGGING_FORMAT,
-        max_jobs: Optional[int] = None,
+        max_jobs: typing.Optional[int] = None,
         with_scheduler: bool = False,
     ) -> bool:
+        value = None
         while True:
-            # super.work() returns a value that we want to return on a normal
-            # exit.
-            return_value = None
-            try:
-                return_value = super().work(
-                    burst,
-                    logging_level,
-                    date_format,
-                    log_format,
-                    max_jobs,
-                    with_scheduler,
-                )
-            except (
-                redis.exceptions.TimeoutError,
-                redis.exceptions.ClusterDownError,
-                redis.exceptions.ConnectionError,
-            ) as e:
-                # If we got one of these exceptions but are not on a Cluster go
-                # ahead and raise it normally.
-                if not isinstance(self.connection, DABRedisCluster):
-                    raise
+            value = redis_connect_retry(
+                loop_exit=lambda e: self.is_shutting_down
+            )(super().work)(
+                burst,
+                logging_level,
+                date_format,
+                log_format,
+                max_jobs,
+                with_scheduler,
+            )
 
-                # There are a lot of different exceptions that inherit from
-                # ConnectionError.  So we need to make sure if we got that its
-                # an actual ConnectionError.  If not, go ahead and raise it.
-                # Note: ClusterDownError and TimeoutError are not subclasses
-                #       of ConnectionError.
-                if (
-                    isinstance(e, redis.exceptions.ConnectionError)
-                    and type(e) is not redis.exceptions.ConnectionError
-                ):
-                    raise
+            # If there's a return value or the worker is shutting down
+            # break out of the loop.
+            if (value is not None) or self.is_shutting_down:
+                if value is not None:
+                    logger.debug(f"Working exited normally with {value}")
+                break
 
-                # If we got a cluster issue we will loop here until we can ping
-                # the server again.
-                max_backoff = 60
-                current_backoff = 1
-                while True:
-                    backoff = min(current_backoff, max_backoff)
-                    logger.error(
-                        f"Connection to redis cluster failed. Attempting to "
-                        f"reconnect in {backoff}"
-                    )
-                    sleep(backoff)
-                    current_backoff = 2 * current_backoff
-                    try:
-                        self.connection.ping()
-                        break
-                    # We could tighten this exception up.
-                    except Exception:
-                        pass
-                # At this point return value is none so we are going to go
-                # ahead and fall through to the loop to restart.
+            logger.error(
+                "Work exited no return value, going to restart the worker"
+            )
 
-            # We are outside of the work function with either:
-            #   a "normal exist"
-            #   an exit that did not raise an exception
-            if return_value:
-                logger.debug(f"Working exited normally with {return_value}")
-                return return_value
-            elif self.is_shutting_down:
-                # Get got a warm shutdown request, lets respect it
-                return return_value
-            else:
-                logger.error(
-                    "Work exited no return value, going to restart the worker"
-                )
+        return value
 
 
 class DefaultWorker(Worker):
@@ -507,20 +534,20 @@ class DefaultWorker(Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = "default",
+        queues: typing.Iterable[typing.Union[Queue, str]],
+        name: typing.Optional[str] = "default",
         default_result_ttl: int = DEFAULT_RESULT_TTL,
-        connection: Optional[Connection] = None,
-        exc_handler: Any = None,
+        connection: typing.Optional[Connection] = None,
+        exc_handler: typing.Any = None,
         exception_handlers: _ErrorHandlersArgType = None,
         default_worker_ttl: int = DEFAULT_WORKER_TTL,
-        job_class: Type[_Job] = None,
-        queue_class: Type[_Queue] = None,
+        job_class: typing.Type[_Job] = None,
+        queue_class: typing.Type[_Queue] = None,
         log_job_description: bool = True,
         job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
         disable_default_exception_handler: bool = False,
         prepare_for_work: bool = True,
-        serializer: Optional[SerializerProtocol] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
     ):
         if job_class is None:
             job_class = Job
@@ -553,20 +580,20 @@ class ActivationWorker(Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = "activation",
+        queues: typing.Iterable[typing.Union[Queue, str]],
+        name: typing.Optional[str] = "activation",
         default_result_ttl: int = DEFAULT_RESULT_TTL,
-        connection: Optional[Connection] = None,
-        exc_handler: Any = None,
+        connection: typing.Optional[Connection] = None,
+        exc_handler: typing.Any = None,
         exception_handlers: _ErrorHandlersArgType = None,
         default_worker_ttl: int = DEFAULT_WORKER_TTL,
-        job_class: Type[_Job] = None,
-        queue_class: Type[_Queue] = None,
+        job_class: typing.Type[_Job] = None,
+        queue_class: typing.Type[_Queue] = None,
         log_job_description: bool = True,
         job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
         disable_default_exception_handler: bool = False,
         prepare_for_work: bool = True,
-        serializer: Optional[SerializerProtocol] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
     ):
         if job_class is None:
             job_class = Job
@@ -630,7 +657,9 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     return queue.enqueue(*args, **kwargs)
 
 
-def job_from_queue(queue: Union[Queue, str], job_id: str) -> Optional[Job]:
+def job_from_queue(
+    queue: typing.Union[Queue, str], job_id: str
+) -> typing.Optional[Job]:
     """Return queue job if it not canceled or finished else None."""
     if type(queue) is str:
         queue = get_queue(name=queue)
