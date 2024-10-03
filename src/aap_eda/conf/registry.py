@@ -136,18 +136,20 @@ class SettingsRegistry(object):
         return self._registry[key].type
 
     def db_update_setting(self, key: str, value: Any) -> None:
-        self._validate_key(key, writable=True)
-        Setting.objects.filter(key=key).update(
-            value=self._setting_value(key, value)
-        )
+        self.db_update_settings({key: value})
 
     def db_update_settings(self, settings: dict[str, Any]) -> None:
+        interval = None
         with transaction.atomic():
             for key, value in settings.items():
                 self._validate_key(key, writable=True)
                 Setting.objects.filter(key=key).update(
                     value=self._setting_value(key, value)
                 )
+                if key == "AUTOMATION_ANALYTICS_GATHER_INTERVAL":
+                    interval = int(value)
+        if interval:
+            SettingsRegistry._reschedule_gather_analytics(interval)
 
     def db_get_settings_for_display(self) -> dict[str, Any]:
         keys = self.get_registered_settings()
@@ -187,6 +189,12 @@ class SettingsRegistry(object):
         if self.is_setting_secret(key) and value:
             return ENCRYPTED_STRING
         return value
+
+    @staticmethod
+    def _reschedule_gather_analytics(interval: int):
+        from aap_eda.tasks.analytics import reschedule_gather_analytics
+
+        reschedule_gather_analytics(interval)
 
 
 settings_registry = SettingsRegistry()

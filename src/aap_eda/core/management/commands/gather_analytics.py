@@ -13,13 +13,12 @@
 #  limitations under the License.
 
 import logging
+from datetime import timezone
 
 from dateutil import parser
 from django.core.management.base import BaseCommand, CommandParser
-from django.utils import timezone
 
-from aap_eda.analytics import analytics_collectors
-from aap_eda.analytics.collector import AnalyticsCollector
+from aap_eda.analytics import collector
 
 
 class Command(BaseCommand):
@@ -90,12 +89,13 @@ class Command(BaseCommand):
             self.logger.error("Either --ship or --dry-run needs to be set.")
             return
 
-        collector = AnalyticsCollector(
-            collector_module=analytics_collectors,
-            collection_type="manual" if opt_ship else "dry-run",
+        collection_type = "manual" if opt_ship else "dry-run"
+        tgzfiles = collector.gather(
+            collection_type=collection_type,
+            since=since,
+            until=until,
             logger=self.logger,
         )
-        tgzfiles = collector.gather(since=since, until=until)
 
         if not tgzfiles:
             self.logger.info("No analytics collected")
