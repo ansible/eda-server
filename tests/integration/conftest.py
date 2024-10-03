@@ -1185,14 +1185,16 @@ def default_event_streams(
                 organization=default_organization,
                 url=DUMMY_URL,
                 eda_credential=default_hmac_credential,
+                test_mode=False,
             ),
             models.EventStream(
                 uuid=uuid.uuid4(),
-                name="test-es-2",
+                name="another-test-es-2",
                 owner=default_user,
                 organization=default_organization,
                 url=DUMMY_URL,
                 eda_credential=default_hmac_credential,
+                test_mode=True,
             ),
         ]
     )

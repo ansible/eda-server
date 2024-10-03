@@ -23,6 +23,10 @@ class EventStreamFilter(django_filters.FilterSet):
         lookup_expr="istartswith",
         label="Filter by event stream name.",
     )
+    test_mode = django_filters.BooleanFilter(
+        field_name="test_mode",
+        label="Filter by the test_mode being true or false",
+    )
 
     class Meta:
         model = models.EventStream
