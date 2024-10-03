@@ -5,10 +5,10 @@ from datetime import datetime
 import distro
 from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
+from django.db import connection
 from django.db.models import Manager, Q
 from insights_analytics_collector import CsvFileSplitter, register
 
-from aap_eda.analytics.collector import AnalyticsCollector
 from aap_eda.core import models
 from aap_eda.utils import get_eda_version
 
@@ -352,7 +352,7 @@ def _get_audit_action_qs(since: datetime, until: datetime):
 def _copy_table(table, query, path):
     file_path = os.path.join(path, table + "_table.csv")
     file = CsvFileSplitter(filespec=file_path)
-    with AnalyticsCollector.db_connection().cursor() as cursor:
+    with connection.cursor() as cursor:
         with cursor.copy(query) as copy:
             while data := copy.read():
                 byte_data = bytes(data)
