@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import json
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -19,8 +20,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
 from insights_analytics_collector import Collector
 
-from aap_eda.analytics.package import Package
-from aap_eda.analytics.utils import datetime_hook
+from aap_eda.analytics import analytics_collectors, package, utils
 from aap_eda.conf.settings import application_settings
 
 
@@ -30,8 +30,8 @@ class AnalyticsCollector(Collector):
         return connection
 
     @staticmethod
-    def _package_class() -> Package:
-        return Package
+    def _package_class() -> package.Package:
+        return package.Package
 
     def _is_shipping_configured(self) -> bool:
         if not application_settings.INSIGHTS_TRACKING_STATE:
@@ -65,7 +65,7 @@ class AnalyticsCollector(Collector):
         last_entries = last_entries.replace("'", '"')
         self.logger.info(f"Last collect entries: {last_entries}")
 
-        return json.loads(last_entries, object_hook=datetime_hook)
+        return json.loads(last_entries, object_hook=utils.datetime_hook)
 
     def _save_last_gathered_entries(self, last_gathered_entries: dict) -> None:
         application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = json.dumps(
@@ -82,3 +82,14 @@ class AnalyticsCollector(Collector):
         application_settings.AUTOMATION_ANALYTICS_LAST_GATHER = (
             self.gather_until.isoformat()
         )
+
+
+def gather(collection_type="scheduled", since=None, until=None, logger=None):
+    if not logger:
+        logger = logging.getLogger("aap_eda.analytics")
+    collector = AnalyticsCollector(
+        collector_module=analytics_collectors,
+        collection_type=collection_type,
+        logger=logger,
+    )
+    return collector.gather(since=since, until=until)

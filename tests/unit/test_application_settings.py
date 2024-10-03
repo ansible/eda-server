@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from unittest import mock
+
 import pytest
 
 from aap_eda.conf import application_settings, settings_registry
@@ -71,3 +73,24 @@ def test_db_update_and_display():
     assert settings["REDHAT_USERNAME"] == "me"
     assert settings["REDHAT_PASSWORD"] == "$encrypted$"
     assert application_settings.REDHAT_PASSWORD == pwval
+
+
+@pytest.mark.django_db
+def test_update_gather_interval():
+    with mock.patch(
+        "aap_eda.tasks.analytics.reschedule_gather_analytics"
+    ) as reschedule:
+        application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL = 500
+        reschedule.assert_called_once_with(500)
+        assert application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL == 500
+
+    with mock.patch(
+        "aap_eda.tasks.analytics.reschedule_gather_analytics"
+    ) as reschedule:
+        settings_registry.db_update_settings(
+            {"AUTOMATION_ANALYTICS_GATHER_INTERVAL": 1000}
+        )
+        reschedule.assert_called_once_with(1000)
+        assert (
+            application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL == 1000
+        )
