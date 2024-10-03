@@ -122,6 +122,5 @@ Minikube is the recommended method for macOS users
 
 **Note**: For fedora, the binary may be `go-task`.
 
-You can now access the UI at <http://localhost:8080/eda/> using the above credentials.
-Also you can inspect the API documentation at <https://localhost:8443/api/eda/v1/docs>
+You can now inspect the API documentation at <https://localhost:8443/api/eda/v1/docs>
 or navigate through the resources with the DRF browsable API at <https://localhost:8443/api/eda/v1/>

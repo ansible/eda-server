@@ -68,7 +68,7 @@ You can build an image with your changes and use that image in docker-compose
 2. export EDA_IMAGE=localhost/myserver:latest
 3. docker-compose -f ./tools/docker/docker-compose-mac.yml up
 
-You can now access the UI at <https://localhost:8443/overview/> with default login username and password(admin/testpass).
+You can now access the api at <https://localhost:8443/api/eda/va/docs/> with default login username and password(admin/testpass).
 
 ## Layout
 ![Alt_PodmanDeployment](./podman_deployment.png?raw=true)
