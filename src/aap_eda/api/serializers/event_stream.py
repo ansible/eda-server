@@ -31,6 +31,23 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         ],
     )
 
+    def validate(self, data):
+        eda_credential_id = data.get("eda_credential_id")
+        if not eda_credential_id:
+            return data
+
+        credential = models.EdaCredential.objects.get(id=eda_credential_id)
+        kind = credential.credential_type.kind
+
+        event_stream_type = data.get("event_stream_type")
+        if kind != event_stream_type:
+            raise serializers.ValidationError(
+                f"The input event stream type {event_stream_type} does not "
+                f"match with the credential type {kind}"
+            )
+
+        return data
+
     class Meta:
         model = models.EventStream
         fields = [
