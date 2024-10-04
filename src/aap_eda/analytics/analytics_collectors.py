@@ -20,7 +20,7 @@ import distro
 from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
 from django.db import connection
-from django.db.models import Manager, Q
+from django.db.models import F, Manager, Q
 from insights_analytics_collector import CsvFileSplitter, register
 
 from aap_eda.analytics.utils import (
@@ -54,7 +54,6 @@ def config(**kwargs) -> dict:
         # skip license related info so far
         "eda_log_level": settings.APP_LOG_LEVEL,
         "eda_version": get_eda_version(),
-        "eda_deployment_type": settings.DEPLOYMENT_TYPE,
     }
 
 
@@ -218,8 +217,35 @@ def decision_environments_table(
 def event_streams_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.EventStream.objects, since, until)
-    return _copy_table("event_streams", query, full_path)
+    event_streams = (
+        models.EventStream.objects.filter(
+            Q(created_at__gt=since, created_at__lte=until)
+            | Q(modified_at__gt=since, modified_at__lte=until)
+        )
+        .order_by("id")
+        .distinct()
+    ).values(
+        "id",
+        "organization_id",
+        "name",
+        "event_stream_type",
+        "eda_credential_id",
+        "uuid",
+        "created_at",
+        "modified_at",
+        "events_received",
+        "last_event_received_at",
+    )
+
+    query = (
+        str(event_streams.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "event_streams", f"COPY ({query}) TO STDOUT WITH CSV HEADER", full_path
+    )
 
 
 @register(
@@ -243,21 +269,18 @@ def event_streams_by_activation_table(
     if not bool(event_streams):
         return
 
-    event_streams = event_streams.extra(
-        select={
-            "activation_id": "core_activation_event_streams.activation_id",
-            "event_stream_id": "core_eventstream.id",
-        }
+    event_streams = event_streams.annotate(
+        event_stream_id=F("id"),
+        activation_id=F("activations__id"),
     ).values(
-        "activation_id",
-        "event_stream_id",
         "name",
         "event_stream_type",
         "eda_credential_id",
-        "owner",
         "events_received",
         "last_event_received_at",
         "organization_id",
+        "event_stream_id",
+        "activation_id",
     )
 
     query = f"COPY ({event_streams.query}) TO STDOUT WITH CSV HEADER"

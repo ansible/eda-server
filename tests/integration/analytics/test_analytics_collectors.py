@@ -67,14 +67,13 @@ def test_internal_infra_files():
             data_collection_status_csv, encoding="utf-8"
         )
 
-        assert len(config_json.keys()) == 5
+        assert len(config_json.keys()) == 4
         for key in config_json.keys():
             assert key in [
                 "install_uuid",
                 "platform",
                 "eda_log_level",
                 "eda_version",
-                "eda_deployment_type",
             ]
         assert manifest_json["config.json"] == "1.0"
         assert manifest_json["data_collection_status.csv"] == "1.0"
@@ -470,15 +469,7 @@ def test_event_streams_table_collector(
                 "name",
                 "event_stream_type",
                 "eda_credential_id",
-                "additional_data_headers",
-                "test_mode",
-                "test_content_type",
-                "test_content",
-                "test_headers",
-                "test_error_message",
-                "owner_id",
                 "uuid",
-                "url",
                 "created_at",
                 "modified_at",
                 "events_received",
@@ -515,24 +506,23 @@ def test_event_streams_table_by_activation_collector(
             lines = list(reader)
 
             assert header == [
-                "activation_id",
-                "event_stream_id",
                 "name",
                 "event_stream_type",
                 "eda_credential_id",
-                "owner_id",
                 "events_received",
                 "last_event_received_at",
                 "organization_id",
+                "event_stream_id",
+                "activation_id",
             ]
             assert len(lines) == 2
-            assert lines[0][1] == str(default_event_streams[0].id)
-            assert lines[0][2] == default_event_streams[0].name
-            assert lines[0][3] == default_event_streams[0].event_stream_type
-            assert lines[1][1] == str(default_event_streams[1].id)
-            assert lines[1][2] == default_event_streams[1].name
-            assert lines[1][3] == default_event_streams[1].event_stream_type
-            assert sorted([lines[0][0], lines[1][0]]) == sorted(
+            assert lines[0][0] == default_event_streams[0].name
+            assert lines[0][1] == default_event_streams[0].event_stream_type
+            assert lines[0][6] == str(default_event_streams[0].id)
+            assert lines[1][0] == default_event_streams[1].name
+            assert lines[1][1] == default_event_streams[1].event_stream_type
+            assert lines[1][6] == str(default_event_streams[1].id)
+            assert sorted([lines[0][7], lines[1][7]]) == sorted(
                 [str(default_activation.id), str(new_activation.id)]
             )
 
