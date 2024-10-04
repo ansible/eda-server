@@ -40,6 +40,35 @@ def test_list_event_streams(
 
 
 @pytest.mark.django_db
+def test_list_event_streams_filter_test_mode(
+    admin_client: APIClient,
+    default_event_streams: List[models.EventStream],
+    default_vault_credential,
+):
+    response = admin_client.get(f"{api_url_v1}/event-streams/?test_mode=true")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["test_mode"] is True
+
+    response = admin_client.get(f"{api_url_v1}/event-streams/?test_mode=false")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["test_mode"] is False
+
+
+@pytest.mark.django_db
+def test_list_event_streams_filter_name(
+    admin_client: APIClient,
+    default_event_streams: List[models.EventStream],
+    default_vault_credential,
+):
+    response = admin_client.get(f"{api_url_v1}/event-streams/?name=another")
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["name"].startswith("another")
+
+
+@pytest.mark.django_db
 def test_retrieve_event_stream(
     admin_client: APIClient,
     default_event_streams: List[models.EventStream],
