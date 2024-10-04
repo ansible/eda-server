@@ -186,6 +186,60 @@ def test_activations_sources(
 
 
 @pytest.mark.django_db
+def test_activation_stats(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+):
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    default_activation.restart_count = 1
+    default_activation.failure_count = 2
+    default_activation.save(update_fields=["restart_count", "failure_count"])
+    with tempfile.TemporaryDirectory() as tmpdir:
+        collectors.activation_stats(
+            time_start, tmpdir, until=now() + timedelta(seconds=1)
+        )
+        with open(os.path.join(tmpdir, "activations_stats_table.csv")) as f:
+            reader = csv.reader(f)
+
+            header = next(reader)
+            lines = list(reader)
+
+            assert header == [
+                "id",
+                "name",
+                "status",
+                "restart_count",
+                "failure_count",
+                "log_level",
+                "organization_id",
+                "created_at",
+                "ended_at",
+                "activations_counts",
+                "max_restart_count",
+            ]
+            assert len(lines) == 2
+            assert lines[0][0] == f"{new_activation.id}"
+            assert lines[0][1] == new_activation.name
+            assert lines[0][2] == new_activation.status
+            assert int(lines[0][3]) == new_activation.restart_count
+            assert int(lines[0][4]) == new_activation.failure_count
+            assert lines[0][8] == new_activation.modified_at.isoformat(
+                sep=" "
+            ).replace("00:00", "00")
+            assert int(lines[0][9]) == 0
+            assert lines[1][0] == f"{default_activation.id}"
+            assert lines[1][1] == default_activation.name
+            assert lines[1][2] == default_activation.status
+            assert int(lines[1][3]) == default_activation.restart_count
+            assert int(lines[1][4]) == default_activation.failure_count
+            assert lines[1][8] == ""
+            assert int(lines[1][9]) == 2
+
+
+@pytest.mark.django_db
 def test_activations_table_collector(default_activation: models.Activation):
     until = now()
     time_start = until - timedelta(hours=9)
