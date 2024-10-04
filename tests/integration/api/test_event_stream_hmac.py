@@ -22,7 +22,7 @@ import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import enums
+from aap_eda.core import enums, models
 from tests.integration.api.test_event_stream import (
     create_event_stream,
     create_event_stream_credential,
@@ -60,6 +60,7 @@ def test_post_event_stream(
     obj = _create_hmac_credential(admin_client, secret, hash_algorithm)
     data_in = {
         "name": "test-es-1",
+        "event_stream_type": obj["credential_type"]["kind"],
         "eda_credential_id": obj["id"],
         "organization_id": get_default_test_org().id,
     }
@@ -82,14 +83,9 @@ def test_post_event_stream_bad_secret(
     preseed_credential_types,
 ):
     secret = secrets.token_hex(32)
-    obj = _create_hmac_credential(admin_client, secret)
-    data_in = {
-        "name": "test-es-1",
-        "eda_credential_id": obj["id"],
-        "organization_id": get_default_test_org().id,
-        "test_mode": True,
-    }
-    event_stream = create_event_stream(admin_client, data_in)
+    event_stream = _prepare_credential(
+        admin_client, secret, "", DEFAULT_TEST_HMAC_ENCODING
+    )
     bad_secret = secrets.token_hex(32)
     data = {"a": 1, "b": 2}
     headers = {
@@ -115,22 +111,9 @@ def test_post_event_stream_with_prefix(
 ):
     secret = secrets.token_hex(32)
     signature_prefix = "sha256="
-    obj = _create_hmac_credential(
-        admin_client,
-        secret,
-        DEFAULT_TEST_HMAC_ALGORITHM,
-        DEFAULT_TEST_HMAC_HEADER,
-        DEFAULT_TEST_HMAC_ENCODING,
-        signature_prefix,
+    event_stream = _prepare_credential(
+        admin_client, secret, signature_prefix, DEFAULT_TEST_HMAC_ENCODING
     )
-
-    data_in = {
-        "name": "test-es-1",
-        "eda_credential_id": obj["id"],
-        "organization_id": get_default_test_org().id,
-        "test_mode": True,
-    }
-    event_stream = create_event_stream(admin_client, data_in)
     data = {"a": 1, "b": 2}
     digest = hash_digest(data, secret, hashlib.sha256)
     headers = {DEFAULT_TEST_HMAC_HEADER: f"{signature_prefix}{digest}"}
@@ -149,21 +132,9 @@ def test_post_event_stream_with_test_mode(
 ):
     secret = secrets.token_hex(32)
     signature_prefix = "sha256="
-    obj = _create_hmac_credential(
-        admin_client,
-        secret,
-        DEFAULT_TEST_HMAC_ALGORITHM,
-        DEFAULT_TEST_HMAC_HEADER,
-        DEFAULT_TEST_HMAC_ENCODING,
-        signature_prefix,
+    event_stream = _prepare_credential(
+        admin_client, secret, signature_prefix, DEFAULT_TEST_HMAC_ENCODING
     )
-    data_in = {
-        "name": "test-es-1",
-        "eda_credential_id": obj["id"],
-        "organization_id": get_default_test_org().id,
-        "test_mode": True,
-    }
-    event_stream = create_event_stream(admin_client, data_in)
     data = {"a": 1, "b": 2}
     digest = hash_digest(data, secret, hashlib.sha256)
     headers = {DEFAULT_TEST_HMAC_HEADER: (f"{signature_prefix}{digest}")}
@@ -188,22 +159,9 @@ def test_post_event_stream_with_form_urlencoded(
 ):
     secret = secrets.token_hex(32)
     signature_prefix = "sha256="
-    obj = _create_hmac_credential(
-        admin_client,
-        secret,
-        DEFAULT_TEST_HMAC_ALGORITHM,
-        DEFAULT_TEST_HMAC_HEADER,
-        DEFAULT_TEST_HMAC_ENCODING,
-        signature_prefix,
+    event_stream = _prepare_credential(
+        admin_client, secret, signature_prefix, DEFAULT_TEST_HMAC_ENCODING
     )
-
-    data_in = {
-        "name": "test-es-1",
-        "eda_credential_id": obj["id"],
-        "organization_id": get_default_test_org().id,
-        "test_mode": True,
-    }
-    event_stream = create_event_stream(admin_client, data_in)
     data = {"a": 1, "b": 2}
     content_type = "application/x-www-form-urlencoded"
     data_bytes = urlencode(data).encode()
@@ -232,21 +190,9 @@ def test_post_event_stream_with_base64_format(
 ):
     secret = secrets.token_hex(32)
     signature_prefix = "sha256="
-    obj = _create_hmac_credential(
-        admin_client,
-        secret,
-        DEFAULT_TEST_HMAC_ALGORITHM,
-        DEFAULT_TEST_HMAC_HEADER,
-        "base64",
-        signature_prefix,
+    event_stream = _prepare_credential(
+        admin_client, secret, signature_prefix, "base64"
     )
-    data_in = {
-        "name": "test-es-1",
-        "eda_credential_id": obj["id"],
-        "organization_id": get_default_test_org().id,
-        "test_mode": True,
-    }
-    event_stream = create_event_stream(admin_client, data_in)
     data = {"a": 1, "b": 2}
     content_type = "application/x-www-form-urlencoded"
     data_bytes = urlencode(data).encode()
@@ -265,6 +211,30 @@ def test_post_event_stream_with_base64_format(
         content_type=content_type,
     )
     assert response.status_code == status.HTTP_200_OK
+
+
+def _prepare_credential(
+    admin_client: APIClient,
+    secret: str = "",
+    signature_prefix: str = "",
+    encoding: str = "",
+) -> models.EdaCredential:
+    obj = _create_hmac_credential(
+        admin_client,
+        secret,
+        DEFAULT_TEST_HMAC_ALGORITHM,
+        DEFAULT_TEST_HMAC_HEADER,
+        encoding,
+        signature_prefix,
+    )
+    data_in = {
+        "name": "test-es-1",
+        "eda_credential_id": obj["id"],
+        "event_stream_type": obj["credential_type"]["kind"],
+        "organization_id": get_default_test_org().id,
+        "test_mode": True,
+    }
+    return create_event_stream(admin_client, data_in)
 
 
 def _create_hmac_credential(

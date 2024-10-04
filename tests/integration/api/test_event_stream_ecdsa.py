@@ -90,6 +90,7 @@ def test_post_event_stream_with_ecdsa(
     data_in = {
         "name": "test-es-1",
         "eda_credential_id": obj["id"],
+        "event_stream_type": obj["credential_type"]["kind"],
         "organization_id": get_default_test_org().id,
         "test_mode": True,
     }
