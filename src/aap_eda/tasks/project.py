@@ -16,15 +16,14 @@ import logging
 
 from django.conf import settings
 
-from aap_eda.core import models
-from aap_eda.core.tasking import get_queue, job, unique_enqueue
+from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
 
 
-@job(PROJECT_TASKS_QUEUE)
+@tasking.job(PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
@@ -37,7 +36,7 @@ def import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@job(PROJECT_TASKS_QUEUE)
+@tasking.job(PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
 
@@ -54,12 +53,16 @@ def sync_project(project_id: int):
 # default is the default queue
 def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
     job_id = "monitor_project_tasks"
-    unique_enqueue(queue_name, job_id, _monitor_project_tasks, queue_name)
+    tasking.unique_enqueue(
+        queue_name, job_id, _monitor_project_tasks, queue_name
+    )
 
 
-# Although this directly uses interfaces that depend on a Redis connection
-# it is a periodically run task and we let that periodicity provide the
-# resilience to Redis connection issues.
+# Although this is a periodically run task and that could be viewed as
+# providing resilience to Redis connection issues we decorate it with the
+# redis_connect_retry to maintain the model that anything directly dependent on
+# a Redis connection is wrapped by retries.
+@tasking.redis_connect_retry()
 def _monitor_project_tasks(queue_name: str) -> None:
     """Handle project tasks that are stuck.
 
@@ -69,7 +72,7 @@ def _monitor_project_tasks(queue_name: str) -> None:
     """
     logger.info("Task started: Monitor project tasks")
 
-    queue = get_queue(queue_name)
+    queue = tasking.get_queue(queue_name)
 
     # Filter projects that doesn't have any related job
     pending_projects = models.Project.objects.filter(
