@@ -57,6 +57,9 @@ _ErrorHandlersArgType = typing.Union[
 ]
 
 
+class RetryError(Exception):
+    pass
+
 def redis_connect_retry(
     max_delay: int = 60,
     loop_exit: typing.Optional[typing.Callable[[Exception], bool]] = None,
@@ -65,32 +68,37 @@ def redis_connect_retry(
 
     def decorator(func: typing.Callable) -> typing.Callable:
         @functools.wraps(func)
+        def chuckles(*args, **kwargs) -> typing.Optional[typing.Any]:
+            try:
+                return func(*args, **kwargs)
+            except (
+                redis.exceptions.TimeoutError,
+                redis.exceptions.ClusterDownError,
+                redis.exceptions.ConnectionError,
+            ) as e:
+                # There are a lot of different exceptions that inherit from
+                # ConnectionError.  So we need to make sure if we got that
+                # its an actual ConnectionError. If not, go ahead and raise
+                # it.
+                # Note:  ClusterDownError and TimeoutError are not
+                #        subclasses of ConnectionError.
+                if (
+                    isinstance(e, redis.exceptions.ConnectionError)
+                    and type(e) is not redis.exceptions.ConnectionError
+                ):
+                    raise
+                raise RetryError
+
         def wrapper(*args, **kwargs) -> typing.Optional[typing.Any]:
             value = None
             delay = 1
             while True:
                 try:
-                    value = func(*args, **kwargs)
+                    value = chuckles(*args, **kwargs)
                     if delay > 1:
                         logger.info("Connection to redis re-established.")
                     break
-                except (
-                    redis.exceptions.TimeoutError,
-                    redis.exceptions.ClusterDownError,
-                    redis.exceptions.ConnectionError,
-                ) as e:
-                    # There are a lot of different exceptions that inherit from
-                    # ConnectionError.  So we need to make sure if we got that
-                    # its an actual ConnectionError. If not, go ahead and raise
-                    # it.
-                    # Note:  ClusterDownError and TimeoutError are not
-                    #        subclasses of ConnectionError.
-                    if (
-                        isinstance(e, redis.exceptions.ConnectionError)
-                        and type(e) is not redis.exceptions.ConnectionError
-                    ):
-                        raise
-
+                except RetryError:
                     if (loop_exit is not None) and loop_exit(e):
                         break
 
