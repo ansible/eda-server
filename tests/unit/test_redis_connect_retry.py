@@ -98,13 +98,16 @@ def test_loop_exit():
     loop_count = 0
     loop_limit = 2
 
+    class LoopLimitExceeded(Exception):
+        pass
+
     @tasking.redis_connect_retry(loop_exit=lambda e: loop_count >= loop_limit)
     def _test_function():
         nonlocal loop_count
 
         loop_count += 1
         if loop_count >= (loop_limit + 1):
-            raise Exception
+            raise LoopLimitExceeded
 
         time.sleep(1)
         raise redis.exceptions.ConnectionError
