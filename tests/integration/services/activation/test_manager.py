@@ -306,10 +306,10 @@ def test_start_first_run(
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert basic_activation.status == enums.ActivationStatus.RUNNING
+    assert basic_activation.status == enums.ActivationStatus.STARTING
     assert (
         basic_activation.latest_instance.status
-        == enums.ActivationStatus.RUNNING
+        == enums.ActivationStatus.STARTING
     )
     assert basic_activation.latest_instance.activation_pod_id == "test-pod-id"
     assert basic_activation.restart_count == 0
@@ -342,10 +342,10 @@ def test_start_restart(
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert running_activation.status == enums.ActivationStatus.RUNNING
+    assert running_activation.status == enums.ActivationStatus.STARTING
     assert (
         running_activation.latest_instance.status
-        == enums.ActivationStatus.RUNNING
+        == enums.ActivationStatus.STARTING
     )
     assert (
         running_activation.latest_instance.activation_pod_id == "test-pod-id"

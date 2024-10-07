@@ -251,11 +251,7 @@ class ActivationManager(StatusManager):
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-        # update status
-        self.set_status(ActivationStatus.RUNNING)
-        with transaction.atomic():
-            self.set_latest_instance_status(ActivationStatus.RUNNING)
-            self._set_activation_pod_id(pod_id=container_id)
+        self._set_activation_pod_id(pod_id=container_id)
         self._reset_failure_count()
 
         # update logs

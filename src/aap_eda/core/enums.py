@@ -119,6 +119,7 @@ ACTIVATION_STATUS_MESSAGE_MAP = {
 # TODO: rename to "RulebookProcessRequest"
 class ActivationRequest(DjangoStrEnum):
     START = "start"
+    RUNNING = "running"
     STOP = "stop"
     RESTART = "restart"
     DELETE = "delete"

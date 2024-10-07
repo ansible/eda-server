@@ -14,6 +14,8 @@ from django.db import DatabaseError
 
 from aap_eda.core import models
 from aap_eda.core.enums import DefaultCredentialType
+from aap_eda.core.models.activation import ActivationStatus, ProcessParentType
+from aap_eda.tasks import orchestrator
 
 from .messages import (
     ActionMessage,
@@ -153,14 +155,20 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         ).first()
 
         if instance:
-            instance.updated_at = message.reported_at
-            instance.save(update_fields=["updated_at"])
+            if instance.status != ActivationStatus.STARTING:
+                instance.updated_at = message.reported_at
+                instance.save(update_fields=["updated_at"])
 
             activation = instance.get_parent()
             activation.ruleset_stats[
                 message.stats["ruleSetName"]
             ] = message.stats
             activation.save(update_fields=["ruleset_stats"])
+            if activation.status == ActivationStatus.STARTING:
+                orchestrator.running_rulebook_process(
+                    process_parent_type=ProcessParentType.ACTIVATION,
+                    process_parent_id=activation.id,
+                )
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."
