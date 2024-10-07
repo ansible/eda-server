@@ -1,5 +1,6 @@
 import uuid
 from typing import Generator
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -9,6 +10,7 @@ from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import enums, models
+from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
 # TODO(doston): this test module needs a whole refactor to use already
@@ -452,6 +454,56 @@ async def test_handle_heartbeat(
 
 
 @pytest.mark.django_db(transaction=True)
+async def test_handle_heartbeat_running_status(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
+    rulebook_process_id = await _prepare_db_data(
+        default_organization,
+        ActivationStatus.STARTING,
+    )
+    rulebook_process = await get_rulebook_process(rulebook_process_id)
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+    assert activation.ruleset_stats == {}
+
+    stats = [
+        {
+            "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
+            "end": None,
+            "numberOfRules": 1,
+            "numberOfDisabledRules": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 2000,
+            "eventsMatched": 1,
+            "eventsSuppressed": 1999,
+            "permanentStorageSize": 0,
+            "asyncResponses": 0,
+            "bytesSentOnAsync": 0,
+            "sessionId": 1,
+            "ruleSetName": "ruleset1",
+        },
+    ]
+
+    payloads = [
+        {
+            "type": "SessionStats",
+            "activation_id": rulebook_process_id,
+            "stats": stat,
+            "reported_at": timezone.now().strftime(DATETIME_FORMAT),
+        }
+        for stat in stats
+    ]
+    with patch(
+        "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
+    ) as mock_orchestrator:
+        for payload in payloads:
+            await ws_communicator.send_json_to(payload)
+
+        await ws_communicator.wait()
+        mock_orchestrator.assert_called_once()
+
+
+@pytest.mark.django_db(transaction=True)
 async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
@@ -801,7 +853,9 @@ def _prepare_activation_with_controller_info(
 
 
 @database_sync_to_async
-def _prepare_db_data(default_organization: models.Organization):
+def _prepare_db_data(
+    default_organization: models.Organization, status=ActivationStatus.RUNNING
+):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
@@ -843,11 +897,13 @@ def _prepare_db_data(default_organization: models.Organization):
         user=user,
         decision_environment=decision_environment,
         awx_token=token[0],
+        status=status,
         organization=default_organization,
     )
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
+        status=status,
         organization=default_organization,
     )
 

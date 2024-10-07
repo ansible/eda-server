@@ -621,6 +621,9 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 # RULEBOOK LIVENESS SETTINGS
 # ---------------------------------------------------------
 
+RULEBOOK_READINESS_TIMEOUT_SECONDS = int(
+    settings.get("RULEBOOK_READINESS_TIMEOUT_SECONDS", 30)
+)
 RULEBOOK_LIVENESS_CHECK_SECONDS = int(
     settings.get("RULEBOOK_LIVENESS_CHECK_SECONDS", 300)
 )
