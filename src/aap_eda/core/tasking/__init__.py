@@ -57,31 +57,16 @@ _ErrorHandlersArgType = typing.Union[
 ]
 
 
-class RedisRetryException(Exception):
-    """Base exception for Redis retries."""
-
-    pass
-
-
-class RedisRetryDelayLimitExceeded(RedisRetryException):
-    """Raised if Redis retries exceeded a caller specified time limit."""
-
-    pass
-
-
 def redis_connect_retry(
-    delay_max: int = 60,
-    delay_limit: int = 0,
+    max_delay: int = 60,
     loop_exit: typing.Optional[typing.Callable[[Exception], bool]] = None,
 ) -> typing.Callable:
-    delay_max = max(delay_max, 1)
-    delay_limit = max(delay_limit, 0)
+    max_delay = max(max_delay, 1)
 
     def decorator(func: typing.Callable) -> typing.Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> typing.Optional[typing.Any]:
             value = None
-            total_delay = 0
             delay = 1
             while True:
                 try:
@@ -109,22 +94,11 @@ def redis_connect_retry(
                     if (loop_exit is not None) and loop_exit(e):
                         break
 
-                    delay = min(delay, delay_max)
-                    if delay_limit > 0:
-                        delay = min(delay, delay_limit - total_delay)
+                    delay = min(delay, max_delay)
                     logger.error(
                         f"Connection to redis failed; retrying in {delay}s."
                     )
                     time.sleep(delay)
-
-                    total_delay += delay
-                    if (delay_limit > 0) and (total_delay >= delay_limit):
-                        msg = (
-                            f"Exceeded {delay_limit}s time limit for redis"
-                            " connection failure."
-                        )
-                        logger.error(msg)
-                        raise RedisRetryDelayLimitExceeded(msg)
 
                     delay *= 2
             return value
