@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import copy
-import logging
 import uuid
 from typing import Any, Dict, List
 from unittest import mock
@@ -1126,16 +1125,6 @@ def test_queue_name(redis_parameters):
 @pytest.fixture
 def default_queue(test_queue_name, redis_external) -> Queue:
     return Queue(test_queue_name, connection=redis_external)
-
-
-@pytest.fixture
-def caplog_factory(caplog):
-    def _factory(logger):
-        logger.setLevel(logging.INFO)
-        logger.handlers += [caplog.handler]
-        return caplog
-
-    return _factory
 
 
 @pytest.fixture

@@ -12,9 +12,24 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+
 import pytest
 
 from aap_eda.settings import default
+
+
+#################################################################
+# Log capture factory
+#################################################################
+@pytest.fixture
+def caplog_factory(caplog):
+    def _factory(logger):
+        logger.setLevel(logging.INFO)
+        logger.handlers += [caplog.handler]
+        return caplog
+
+    return _factory
 
 
 #################################################################
