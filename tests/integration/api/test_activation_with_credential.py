@@ -640,3 +640,67 @@ def test_create_activation_with_extra_vars_mix_credential(
     assert extra_var["custom_password"] == "password"
     for key, value in original_extra_var.items():
         assert value == extra_var[key]
+
+
+@pytest.mark.django_db
+def test_create_activation_with_conflict_key_file_contents(
+    admin_client: APIClient,
+    activation_payload: Dict[str, Any],
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": activation_payload[
+            "decision_environment_id"
+        ],
+        "rulebook_id": activation_payload["rulebook_id"],
+        "organization_id": default_organization.id,
+    }
+
+    credential_type_inputs = {
+        "fields": [
+            {"id": "cert", "label": "Certificate", "type": "string"},
+            {"id": "key", "label": "Key", "type": "string"},
+        ]
+    }
+    credential_type_injectors = {
+        "file": {
+            "template.cert_file": "[mycert]\n{{ cert }}",
+        },
+    }
+    credential_type = models.CredentialType.objects.create(
+        name="sample_credential_type",
+        inputs=credential_type_inputs,
+        injectors=credential_type_injectors,
+    )
+
+    eda_credentials = models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="credential-1",
+                inputs={"cert": "my_pem_data", "key": "my_pem_key"},
+                credential_type_id=credential_type.id,
+                organization=default_organization,
+            ),
+            models.EdaCredential(
+                name="credential-2",
+                inputs={"cert": "my_pem_data", "key": "my_pem_key"},
+                credential_type_id=credential_type.id,
+                organization=default_organization,
+            ),
+        ]
+    )
+
+    eda_credential_ids = [credential.id for credential in eda_credentials]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Template Key: template.cert_file already exists in file injectors. "
+        "It conflicts with credential type: sample_credential_type. "
+        "Please check file injectors." in response.data["non_field_errors"]
+    )

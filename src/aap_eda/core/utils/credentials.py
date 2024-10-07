@@ -26,13 +26,21 @@ from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
-SUPPORTED_KEYS_IN_INJECTORS = ["extra_vars"]
+SUPPORTED_KEYS_IN_INJECTORS = {"extra_vars", "file"}
 PROTECTED_PASSPHRASE_ERROR = (
     "The key is passphrase protected, please provide passphrase."
 )
 
 
 class InjectorMissingKeyException(Exception):
+    pass
+
+
+class InjectorInvalidTemplateKey(Exception):
+    pass
+
+
+class InjectorDuplicateKey(Exception):
     pass
 
 
@@ -245,17 +253,15 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     if not isinstance(injectors, dict):
         errors.append("Injectors must be in Key-Value pairs format")
 
-    if not any(
-        support_key in injectors.keys()
-        for support_key in SUPPORTED_KEYS_IN_INJECTORS
-    ):
+    injector_keys = set(injectors.keys())
+    if not injector_keys or not SUPPORTED_KEYS_IN_INJECTORS >= injector_keys:
         errors.append(
             "Injectors must have keys defined in"
-            f" {SUPPORTED_KEYS_IN_INJECTORS}"
+            f" {sorted(SUPPORTED_KEYS_IN_INJECTORS)}"
         )
 
     context = _default_context(schema)
-
+    key_names = []
     for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
         if not input_data:
@@ -267,6 +273,24 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
 
         for k, v in input_data.items():
             try:
+                if k in key_names:
+                    raise InjectorDuplicateKey(
+                        f"Injector {field} key: {k} already exists"
+                    )
+
+                if field == "file":
+                    keys = k.split(".")
+                    if keys[0] != "template":
+                        raise InjectorInvalidTemplateKey(
+                            f"Injector {field} key: {k} "
+                            "should start with template"
+                        )
+                    if len(keys) > 2:
+                        raise InjectorInvalidTemplateKey(
+                            f"Injector {field} key: {k} cannot "
+                            "contain multiple dots"
+                        )
+
                 if isinstance(v, str):
                     _check_jinja_string(v, context)
             except InjectorMissingKeyException as e:
@@ -274,6 +298,8 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
                     f"Injector key: {k} has a value which refers to an"
                     f" undefined key error: {e}"
                 )
+            except (InjectorInvalidTemplateKey, InjectorDuplicateKey) as e:
+                errors.append(f"{e}")
 
     return {"injectors": errors} if bool(errors) else {}
 

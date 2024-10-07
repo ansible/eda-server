@@ -120,7 +120,7 @@ def _extend_extra_vars_from_credentials(
             updated_extra_vars[key] = credential_data["extra_vars"][key]
         return yaml.dump(updated_extra_vars)
     else:
-        return yaml.dump(credential_data["extra_vars"])
+        return yaml.dump(credential_data.get("extra_vars", {}))
 
 
 def _update_extra_vars_from_eda_credentials(
@@ -875,6 +875,7 @@ def _validate_eda_credentials(data: dict) -> None:
         return
 
     existing_keys = []
+    existing_template_keys = []
     extra_var = data.get("extra_var")
 
     try:
@@ -897,19 +898,8 @@ def _validate_eda_credentials(data: dict) -> None:
             if eda_credential.credential_type.id == vault.id:
                 continue
 
-            injectors = eda_credential.credential_type.injectors
-
-            for key in injectors.get("extra_vars", []):
-                if key in existing_keys:
-                    message = (
-                        f"Key: {key} already exists in extra var. "
-                        f"It conflicts with credential type: "
-                        f"{eda_credential.credential_type.name}. "
-                        f"Please check injectors."
-                    )
-                    raise serializers.ValidationError(message)
-
-                existing_keys.append(key)
+            _check_extra_var_injectors(eda_credential, existing_keys)
+            _check_file_injectors(eda_credential, existing_template_keys)
         except models.EdaCredential.DoesNotExist:
             raise serializers.ValidationError(
                 f"EdaCredential with id {eda_credential_id} does not exist"
@@ -1084,3 +1074,40 @@ def _check_duplicate_names(
             f"{', '.join(duplicate_names)} are being used multiple times"
         )
         raise serializers.ValidationError({SOURCE_MAPPING_ERROR_KEY: [msg]})
+
+
+def _check_extra_var_injectors(
+    eda_credential: models.EdaCredential,
+    existing_keys: list[str],
+) -> None:
+    injectors = eda_credential.credential_type.injectors
+    for key in injectors.get("extra_vars", []):
+        if key in existing_keys:
+            message = (
+                f"Key: {key} already exists in extra var. "
+                f"It conflicts with credential type: "
+                f"{eda_credential.credential_type.name}. "
+                f"Please check injectors."
+            )
+            raise serializers.ValidationError(message)
+
+        existing_keys.append(key)
+
+
+def _check_file_injectors(
+    eda_credential: models.EdaCredential,
+    existing_template_keys: list[str],
+) -> None:
+    injectors = eda_credential.credential_type.injectors
+    for key in injectors.get("file", []):
+        if key in existing_template_keys:
+            message = (
+                f"Template Key: {key} already exists "
+                "in file injectors. "
+                f"It conflicts with credential type: "
+                f"{eda_credential.credential_type.name}. "
+                f"Please check file injectors."
+            )
+            raise serializers.ValidationError(message)
+
+        existing_template_keys.append(key)
