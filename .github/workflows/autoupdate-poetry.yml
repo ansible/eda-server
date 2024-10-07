@@ -10,6 +10,7 @@ on:
 jobs:
   autoupdate-poetry-lock:
     runs-on: ubuntu-latest
+    if: github.repository == 'ansible/eda-server'
     outputs:
       lock-changed: ${{ steps.lock-changed.outputs.lock-changed }}
     steps:
@@ -40,6 +41,7 @@ jobs:
           else
             echo "Changes detected"
             echo "lock-changed=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Push changes
         if: steps.lock-changed.outputs.lock-changed == 'true'
@@ -52,7 +54,7 @@ jobs:
   create-pr:
     needs:
       - autoupdate-poetry-lock
-    if: needs.autoupdate-poetry-lock.outputs.lock-changed == 'true'
+    if: github.repository == 'ansible/eda-server' && needs.autoupdate-poetry-lock.outputs.lock-changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout autoupdate-poetry-lock branch
