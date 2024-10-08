@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import time
-
 import pytest
 import redis
 
@@ -44,8 +42,6 @@ def test_max_delay(tasking_caplog):
         loop_count += 1
         if loop_count >= (loop_limit + 1):
             return
-
-        time.sleep(1)
         raise redis.exceptions.ConnectionError
 
     _test_function()
@@ -57,24 +53,31 @@ def test_max_delay(tasking_caplog):
     )
 
 
+class SubclassConnectionError(redis.exceptions.ConnectionError):
+    pass
+
+
 @pytest.mark.parametrize(
-    ("exception"),
+    ("tolerate", "exception"),
     [
-        redis.exceptions.ClusterDownError,
-        redis.exceptions.ConnectionError,
-        redis.exceptions.TimeoutError,
+        [True, redis.exceptions.ClusterDownError("cluster down")],
+        [False, SubclassConnectionError("not tolerated")],
+        [True, redis.exceptions.ConnectionError("connection error")],
+        [
+            True,
+            redis.exceptions.RedisClusterException(
+                "Redis Cluster cannot be connected."
+            ),
+        ],
+        [False, redis.exceptions.RedisClusterException("not tolerated")],
+        [True, redis.exceptions.TimeoutError("timeout error")],
     ],
 )
-def test_retry_exceptions(exception):
-    """Tests that the exceptions to be tolerated for retry are tolerated and
-    that any subclass of redis.exceptions.ConnectionError is raised rather than
-    tolerated."""
-
+def test_retry_exceptions(tolerate, exception):
+    """Tests that that exceptions to be tolerated for retry are tolerated and
+    those particular instances that should not be are not."""
     loop_count = 0
     loop_limit = 2
-
-    class SubclassConnectionError(redis.exceptions.ConnectionError):
-        pass
 
     @tasking.redis_connect_retry()
     def _test_function():
@@ -82,13 +85,14 @@ def test_retry_exceptions(exception):
 
         loop_count += 1
         if loop_count >= (loop_limit + 1):
-            raise SubclassConnectionError
+            return
+        raise exception
 
-        time.sleep(1)
-        raise exception(type(exception))
-
-    with pytest.raises(SubclassConnectionError):
+    if tolerate:
         _test_function()
+    else:
+        with pytest.raises(type(exception)):
+            _test_function()
 
 
 def test_loop_exit():
@@ -108,8 +112,6 @@ def test_loop_exit():
         loop_count += 1
         if loop_count >= (loop_limit + 1):
             raise LoopLimitExceeded
-
-        time.sleep(1)
         raise redis.exceptions.ConnectionError
 
     _test_function()

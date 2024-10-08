@@ -75,9 +75,10 @@ def redis_connect_retry(
                         logger.info("Connection to redis re-established.")
                     break
                 except (
-                    redis.exceptions.TimeoutError,
                     redis.exceptions.ClusterDownError,
                     redis.exceptions.ConnectionError,
+                    redis.exceptions.RedisClusterException,
+                    redis.exceptions.TimeoutError,
                 ) as e:
                     # There are a lot of different exceptions that inherit from
                     # ConnectionError.  So we need to make sure if we got that
@@ -89,6 +90,16 @@ def redis_connect_retry(
                         isinstance(e, redis.exceptions.ConnectionError)
                         and type(e) is not redis.exceptions.ConnectionError
                     ):
+                        raise
+
+                    # RedisClusterException is used as a catch-all for various
+                    # faults.  The only one we should tolerate is that which
+                    # includes "Redis Cluster cannot be connected." which is
+                    # experienced when there are zero cluster hosts that can be
+                    # reached.
+                    if isinstance(
+                        e, redis.exceptions.RedisClusterException
+                    ) and ("Redis Cluster cannot be connected." not in str(e)):
                         raise
 
                     if (loop_exit is not None) and loop_exit(e):
