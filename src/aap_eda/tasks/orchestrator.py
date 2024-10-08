@@ -128,6 +128,9 @@ def _run_request(
             manager.start(
                 is_restart=request.request == ActivationRequest.AUTO_START,
             )
+        elif request.request == ActivationRequest.RUNNING:
+            manager.set_latest_instance_status(status=ActivationStatus.RUNNING)
+            manager.set_status(status=ActivationStatus.RUNNING)
         elif request.request == ActivationRequest.STOP:
             manager.stop()
         elif request.request == ActivationRequest.RESTART:
@@ -402,6 +405,18 @@ def start_rulebook_process(
         process_parent_type,
         process_parent_id,
         ActivationRequest.START,
+    )
+
+
+def running_rulebook_process(
+    process_parent_type: ProcessParentType,
+    process_parent_id: int,
+) -> None:
+    """Change the status of the activation with the given id to running."""
+    requests_queue.push(
+        process_parent_type,
+        process_parent_id,
+        ActivationRequest.RUNNING,
     )
 
 

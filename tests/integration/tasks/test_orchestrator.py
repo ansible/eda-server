@@ -120,6 +120,7 @@ def job_mock():
         ActivationRequest.STOP,
         ActivationRequest.DELETE,
         ActivationRequest.AUTO_START,
+        ActivationRequest.RUNNING,
     ],
 )
 @mock.patch("aap_eda.tasks.orchestrator.ActivationManager")
@@ -141,6 +142,13 @@ def test_manage_request(manager_mock, activation, verb):
         manager_instance_mock.delete.assert_called_once()
     elif verb == ActivationRequest.AUTO_START:
         manager_instance_mock.start.assert_called_once_with(is_restart=True)
+    elif verb == ActivationRequest.RUNNING:
+        manager_instance_mock.set_status.assert_called_once_with(
+            status=ActivationStatus.RUNNING
+        )
+        manager_instance_mock.set_latest_instance_status.assert_called_once_with(  # noqa: E501
+            status=ActivationStatus.RUNNING
+        )
     assert (
         len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id)) == 0
     )
@@ -184,6 +192,7 @@ def test_manage_not_start(
         (orchestrator.start_rulebook_process, ActivationRequest.START),
         (orchestrator.delete_rulebook_process, ActivationRequest.DELETE),
         (orchestrator.restart_rulebook_process, ActivationRequest.RESTART),
+        (orchestrator.running_rulebook_process, ActivationRequest.RUNNING),
     ],
 )
 @mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
