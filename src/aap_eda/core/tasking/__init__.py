@@ -49,16 +49,9 @@ def redis_connect_retry(
     max_delay: int = 60,
     loop_exit: typing.Optional[typing.Callable[[Exception], bool]] = None,
 ) -> typing.Callable:
-    max_delay = max(max_delay, 1)
-
     def decorator(func: typing.Callable) -> typing.Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> typing.Optional[typing.Any]:
-            return func(*args, **kwargs)
+        return func
 
-        return wrapper
-
-    return decorator
 
 
 def _create_url_from_parameters(**kwargs) -> str:
