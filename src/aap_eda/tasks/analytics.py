@@ -16,11 +16,11 @@ import logging
 from datetime import datetime, timezone
 
 import django_rq
-from rq.exceptions import NoSuchJobError
+import rq
 
 from aap_eda.analytics import collector
 from aap_eda.conf import application_settings
-from aap_eda.core.tasking import Job, unique_enqueue
+from aap_eda.core import tasking
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +49,10 @@ def schedule_gather_analytics() -> None:
 
 def reschedule_gather_analytics(new_interval: int, serializer=None) -> None:
     try:
-        job = Job.fetch(ANALYTICS_SCHEDULE_JOB_ID, serializer=serializer)
-    except NoSuchJobError:
+        job = tasking.Job.fetch(
+            ANALYTICS_SCHEDULE_JOB_ID, serializer=serializer
+        )
+    except rq.exceptions.NoSuchJobError:
         logger.warning(f"Job {ANALYTICS_SCHEDULE_JOB_ID} does not exist")
         return
     job.meta["interval"] = new_interval
@@ -63,7 +65,7 @@ def reschedule_gather_analytics(new_interval: int, serializer=None) -> None:
 
 def gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
     logger.info("Queue EDA analytics")
-    unique_enqueue(queue_name, ANALYTICS_JOB_ID, _gather_analytics)
+    tasking.unique_enqueue(queue_name, ANALYTICS_JOB_ID, _gather_analytics)
 
 
 def _gather_analytics() -> None:

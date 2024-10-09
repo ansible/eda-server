@@ -74,9 +74,9 @@ import typing
 from datetime import datetime
 
 import django_rq
+import rq_scheduler
 from django.conf import settings
 from django_rq.management.commands import rqscheduler
-from rq_scheduler import Scheduler
 
 from aap_eda.core import tasking
 
@@ -89,21 +89,21 @@ RQ_CRON_JOBS = getattr(settings, "RQ_CRON_JOBS", None)
 
 
 @tasking.redis_connect_retry()
-def delete_scheduled_jobs(scheduler: Scheduler) -> None:
+def delete_scheduled_jobs(scheduler: rq_scheduler.Scheduler) -> None:
     """Cancel any existing jobs in the scheduler when the app starts up."""
     for job in scheduler.get_jobs():
         logging.info("Deleting scheduled job: %s", job)
         job.delete()
 
 
-def add_startup_jobs(scheduler: Scheduler) -> None:
+def add_startup_jobs(scheduler: rq_scheduler.Scheduler) -> None:
     if not RQ_STARTUP_JOBS:
         logger.info("No scheduled jobs. Skipping.")
         return
 
     @tasking.redis_connect_retry()
     def _add_startup_job(
-        scheduler: Scheduler,
+        scheduler: rq_scheduler.Scheduler,
         entry: dict[str, typing.Any],
     ) -> None:
         logger.info('Adding startup job "%s"', entry["func"])
@@ -119,14 +119,14 @@ def add_startup_jobs(scheduler: Scheduler) -> None:
         _add_startup_job(scheduler, entry)
 
 
-def add_periodic_jobs(scheduler: Scheduler) -> None:
+def add_periodic_jobs(scheduler: rq_scheduler.Scheduler) -> None:
     if not RQ_PERIODIC_JOBS:
         logger.info("No periodic jobs. Skipping.")
         return
 
     @tasking.redis_connect_retry()
     def _add_periodic_job(
-        scheduler: Scheduler,
+        scheduler: rq_scheduler.Scheduler,
         entry: dict[str, typing.Any],
     ) -> None:
         logger.info('Adding periodic job "%s"', entry["func"])
@@ -142,7 +142,7 @@ def add_periodic_jobs(scheduler: Scheduler) -> None:
         _add_periodic_job(scheduler, entry)
 
 
-def add_cron_jobs(scheduler: Scheduler) -> None:
+def add_cron_jobs(scheduler: rq_scheduler.Scheduler) -> None:
     """Schedule cron jobs."""
     if not RQ_CRON_JOBS:
         logger.info("No cron jobs. Skipping.")
@@ -150,7 +150,7 @@ def add_cron_jobs(scheduler: Scheduler) -> None:
 
     @tasking.redis_connect_retry()
     def _add_cron_job(
-        scheduler: Scheduler,
+        scheduler: rq_scheduler.Scheduler,
         entry: dict[str, typing.Any],
     ) -> None:
         logger.info('Adding cron job "%s"', entry["func"])

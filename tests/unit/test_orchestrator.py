@@ -16,6 +16,7 @@ import functools
 from datetime import datetime, timedelta
 from unittest import mock
 
+import django_rq
 import pytest
 from django.conf import settings
 
@@ -74,7 +75,7 @@ def _mock_up_queues(monkeypatch, queues):
     def _get_queue(name: str) -> mock.Mock:
         return mock_queues[name]
 
-    monkeypatch.setattr(orchestrator, "get_queue", _get_queue)
+    monkeypatch.setattr(django_rq, "get_queue", _get_queue)
 
     def _worker_all(queue=None) -> list:
         return queue.workers
@@ -394,9 +395,7 @@ def setup_queue_health():
     timedelta_mock.return_value = timedelta(seconds=60)
 
     patches = {
-        "get_queue": mock.patch(
-            "aap_eda.tasks.orchestrator.get_queue", get_queue_mock
-        ),
+        "get_queue": mock.patch("django_rq.get_queue", get_queue_mock),
         "datetime": mock.patch(
             "aap_eda.tasks.orchestrator.datetime", datetime_mock
         ),

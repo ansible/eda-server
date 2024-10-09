@@ -164,7 +164,7 @@ def test_manage_not_start(
         return_value=container_engine_mock,
     ):
         with mock.patch(
-            "aap_eda.services.activation.activation_manager.get_current_job",
+            "rq.get_current_job",
             return_value=job_mock,
         ):
             orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
@@ -297,7 +297,7 @@ def test_max_running_activation_after_start_job(
         return_value=container_engine_mock,
     ):
         with mock.patch(
-            "aap_eda.services.activation.activation_manager.get_current_job",
+            "rq.get_current_job",
             return_value=job_mock,
         ):
             orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)

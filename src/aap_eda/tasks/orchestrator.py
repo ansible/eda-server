@@ -18,9 +18,9 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional
 
+import django_rq
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django_rq import get_queue
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models, tasking
@@ -371,7 +371,7 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
     Returns True if the queue is healthy, False otherwise.
     Clears the queue if all workers are dead to avoid stuck processes.
     """
-    queue = get_queue(queue_name)
+    queue = django_rq.get_queue(queue_name)
 
     all_workers_dead = True
     for worker in tasking.Worker.all(queue=queue):

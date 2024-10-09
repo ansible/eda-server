@@ -14,6 +14,7 @@
 
 import logging
 
+import django_rq
 from django.conf import settings
 
 from aap_eda.core import models, tasking
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
 
 
-@tasking.job(PROJECT_TASKS_QUEUE)
+@django_rq.job(PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
@@ -36,7 +37,7 @@ def import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@tasking.job(PROJECT_TASKS_QUEUE)
+@django_rq.job(PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
 
@@ -72,7 +73,7 @@ def _monitor_project_tasks(queue_name: str) -> None:
     """
     logger.info("Task started: Monitor project tasks")
 
-    queue = tasking.get_queue(queue_name)
+    queue = django_rq.get_queue(queue_name)
 
     # Filter projects that doesn't have any related job
     pending_projects = models.Project.objects.filter(
