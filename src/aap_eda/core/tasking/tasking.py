@@ -409,9 +409,9 @@ class Worker(rq.Worker):
     ) -> bool:
         value = None
         while True:
-#             value = redis_connect_retry(
-#                 loop_exit=lambda e: self.is_shutting_down
-#             )(super().work)(
+            #             value = redis_connect_retry(
+            #                 loop_exit=lambda e: self.is_shutting_down
+            #             )(super().work)(
             value = super().work(
                 burst,
                 logging_level,
@@ -441,46 +441,13 @@ class DefaultWorker(Worker):
     Uses JSONSerializer as a default one.
     """
 
-    def __init__(
-        self,
-        queues: typing.Iterable[typing.Union[Queue, str]],
-        name: typing.Optional[str] = "default",
-        default_result_ttl: int = rq.defaults.DEFAULT_RESULT_TTL,
-        connection: typing.Optional[rq.Connection] = None,
-        exc_handler: typing.Any = None,
-        exception_handlers: _ErrorHandlersArgType = None,
-        default_worker_ttl: int = rq.defaults.DEFAULT_WORKER_TTL,
-        job_class: typing.Type[rq.job.Job] = None,
-        queue_class: typing.Type[django_rq.queues.Queue] = None,
-        log_job_description: bool = True,
-        job_monitoring_interval: int = (
-            rq.defaults.DEFAULT_JOB_MONITORING_INTERVAL
-        ),
-        disable_default_exception_handler: bool = False,
-        prepare_for_work: bool = True,
-        serializer: typing.Optional[SerializerProtocol] = None,
-    ):
-        if job_class is None:
-            job_class = Job
-        if queue_class is None:
-            queue_class = Queue
+    def __init__(self, *args, **kwargs):
+        kwargs["name"] = kwargs.get("name", "activation")
+        kwargs["job_class"] = kwargs.get("job_class", Job)
+        kwargs["queue_class"] = kwargs.get("queue_class", Queue)
+        kwargs["serializer"] = rq.serializers.JSONSerializer
 
-        super().__init__(
-            queues=queues,
-            name=name,
-            default_result_ttl=default_result_ttl,
-            connection=connection,
-            exc_handler=exc_handler,
-            exception_handlers=exception_handlers,
-            default_worker_ttl=default_worker_ttl,
-            job_class=job_class,
-            queue_class=queue_class,
-            log_job_description=log_job_description,
-            job_monitoring_interval=job_monitoring_interval,
-            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
-            prepare_for_work=prepare_for_work,
-            serializer=rq.serializers.JSONSerializer,
-        )
+        super().__init__(*args, **kwargs)
 
 
 class ActivationWorker(Worker):
@@ -489,46 +456,22 @@ class ActivationWorker(Worker):
     Uses JSONSerializer as a default one.
     """
 
-    def __init__(
-        self,
-        queues: typing.Iterable[typing.Union[Queue, str]],
-        name: typing.Optional[str] = "activation",
-        default_result_ttl: int = rq.defaults.DEFAULT_RESULT_TTL,
-        connection: typing.Optional[rq.Connection] = None,
-        exc_handler: typing.Any = None,
-        exception_handlers: _ErrorHandlersArgType = None,
-        default_worker_ttl: int = rq.defaults.DEFAULT_WORKER_TTL,
-        job_class: typing.Type[rq.job.Job] = None,
-        queue_class: typing.Type[django_rq.queues.Queue] = None,
-        log_job_description: bool = True,
-        job_monitoring_interval: int = (
-            rq.defaults.DEFAULT_JOB_MONITORING_INTERVAL
-        ),
-        disable_default_exception_handler: bool = False,
-        prepare_for_work: bool = True,
-        serializer: typing.Optional[SerializerProtocol] = None,
-    ):
-        if job_class is None:
-            job_class = Job
-        if queue_class is None:
-            queue_class = Queue
+    def __init__(self, *args, **kwargs):
         queue_name = settings.RULEBOOK_QUEUE_NAME
 
+        kwargs["name"] = kwargs.get("name", "activation")
+        kwargs["job_class"] = kwargs.get("job_class", Job)
+        kwargs["queue_class"] = kwargs.get("queue_class", Queue)
+        kwargs["default_worker_ttl"] = settings.DEFAULT_WORKER_TTL
+        kwargs["serializer"] = rq.serializers.JSONSerializer
+
         super().__init__(
-            queues=[Queue(name=queue_name, connection=connection)],
-            name=name,
-            default_result_ttl=default_result_ttl,
-            connection=connection,
-            exc_handler=exc_handler,
-            exception_handlers=exception_handlers,
-            default_worker_ttl=settings.DEFAULT_WORKER_TTL,
-            job_class=job_class,
-            queue_class=queue_class,
-            log_job_description=log_job_description,
-            job_monitoring_interval=job_monitoring_interval,
-            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
-            prepare_for_work=prepare_for_work,
-            serializer=rq.serializers.JSONSerializer,
+            queues=[
+                Queue(
+                    name=queue_name, connection=kwargs.get("connection", None)
+                )
+            ],
+            **kwargs,
         )
 
 
