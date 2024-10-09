@@ -1,3 +1,4 @@
+from .dcecorators import redis_connect_retry
 from .tasking import (
     ActivationWorker,
     DefaultWorker,
@@ -12,6 +13,5 @@ from .tasking import (
     is_redis_failed,
     job_from_queue,
     queue_cancel_job,
-    redis_connect_retry,
     unique_enqueue,
 )
