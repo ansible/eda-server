@@ -30,6 +30,7 @@ ANALYTICS_JOB_ID = "job_gather_analytics"
 ANALYTICS_TASKS_QUEUE = "default"
 
 
+@tasking.redis_connect_retry()
 def schedule_gather_analytics() -> None:
     scheduler = django_rq.get_scheduler()
     func = "aap_eda.tasks.analytics.gather_analytics"
@@ -47,6 +48,7 @@ def schedule_gather_analytics() -> None:
     )
 
 
+@tasking.redis_connect_retry()
 def reschedule_gather_analytics(new_interval: int, serializer=None) -> None:
     try:
         job = tasking.Job.fetch(
