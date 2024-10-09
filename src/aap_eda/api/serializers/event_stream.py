@@ -63,7 +63,6 @@ class EventStreamInSerializer(serializers.ModelSerializer):
             "additional_data_headers",
             "eda_credential_id",
             "organization_id",
-            "event_stream_type",
         ]
 
 
