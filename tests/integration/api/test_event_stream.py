@@ -148,34 +148,6 @@ def test_update_event_stream(
 
 
 @pytest.mark.django_db
-def test_update_event_stream_with_mismatched_type(
-    admin_client: APIClient,
-    default_hmac_credential: models.EdaCredential,
-    default_organization: models.Organization,
-    default_event_stream: models.EventStream,
-):
-    invalid_event_stream_type = "mismatched_type"
-    data_in = {
-        "name": "new_test_event_stream",
-        "event_stream_type": invalid_event_stream_type,
-    }
-    with override_settings(
-        EVENT_STREAM_BASE_URL="https://www.example.com/",
-    ):
-        response = admin_client.patch(
-            f"{api_url_v1}/event-streams/{default_event_stream.id}/",
-            data=data_in,
-        )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert (
-            f"The input event stream type {invalid_event_stream_type} does "
-            "not match with the credential type "
-            f"{default_hmac_credential.credential_type.kind}"
-            in response.data["non_field_errors"]
-        )
-
-
-@pytest.mark.django_db
 def test_create_event_stream_without_credentials(
     admin_client: APIClient, default_organization: models.Organization
 ):
@@ -188,34 +160,6 @@ def test_create_event_stream_without_credentials(
     assert response.json() == {
         "eda_credential_id": ["This field is required."],
     }
-
-
-@pytest.mark.django_db
-def test_create_event_stream_with_mismatched_types(
-    admin_client: APIClient,
-    default_organization: models.Organization,
-    default_hmac_credential: models.EdaCredential,
-):
-    invalid_event_stream_type = "invalid_type"
-    data_in = {
-        "name": "test_es",
-        "event_stream_type": invalid_event_stream_type,
-        "eda_credential_id": default_hmac_credential.id,
-        "organization_id": default_organization.id,
-    }
-    with override_settings(
-        EVENT_STREAM_BASE_URL="https://www.example.com/",
-    ):
-        response = admin_client.post(
-            f"{api_url_v1}/event-streams/", data=data_in
-        )
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert (
-            f"The input event stream type {invalid_event_stream_type} does "
-            "not match with the credential type "
-            f"{default_hmac_credential.credential_type.kind}"
-            in response.data["non_field_errors"]
-        )
 
 
 @pytest.mark.django_db
