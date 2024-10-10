@@ -62,6 +62,8 @@ services:
     user: "1000"
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
+    security_opt:
+      - apparmor=unconfined
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
