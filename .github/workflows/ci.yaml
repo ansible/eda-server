@@ -43,12 +43,14 @@ jobs:
             sleep 1
           done
           sleep 10
-          for p in $(podman ps -a | grep podman | awk '{print $NF}'); do
+          for p in $(docker ps -a | grep podman | awk '{print $NF}'); do
             echo "Logs for $p"
-            podman logs $p;
+            docker logs $p;
           done
 
           docker ps -a
+          podman version
+          find /run -iname "*podman*"
 
 
   # lint:
