@@ -42,13 +42,13 @@ jobs:
           systemctl --user status podman.socket
           docker compose -p eda -f docker-compose-stage.yaml pull
           docker compose -p eda -f docker-compose-stage.yaml up -d
-          while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
-            echo "Waiting for API to be ready..."
-            sleep 1
-          done
+          # while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
+          #   echo "Waiting for API to be ready..."
+          #   sleep 1
+          # done
           sleep 10
           podman ps -a
-          for p in $(podman ps -a | grep podman | awk '{print $NF}'); do
+          for p in $(podman ps -a | awk '{print $NF}'); do
             echo "Logs for $p"
             podman logs $p;
           done
