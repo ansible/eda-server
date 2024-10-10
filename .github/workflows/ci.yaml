@@ -36,6 +36,7 @@ jobs:
       - name: Run api in background
         working-directory: tools/docker
         run: |
+          set +e
           # docker compose -p eda -f docker-compose-stage.yaml pull
           # docker compose -p eda -f docker-compose-stage.yaml up -d
           # while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
@@ -50,10 +51,11 @@ jobs:
 
           # docker ps -a
           # podman version
-          echo "user is $(id -u)"
-          systemctl --user list-units | grep -i podman
           file $XDG_RUNTIME_DIR/podman/podman.sock
           systemctl --user enable --now podman.socket
+          echo "user is $(id -u)"
+
+
 
 
   # lint:
