@@ -55,8 +55,6 @@ services:
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - '${EDA_PODMAN_PORT:-8888}:8888'
-    depends_on:
-     - podman-pre-setup
 
   postgres:
     image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
