@@ -40,6 +40,9 @@ jobs:
           export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
           systemctl --user enable --now podman.socket
           systemctl --user status podman.socket
+          docker compose version
+          docker version
+          podman version
           docker compose -p eda -f docker-compose-stage.yaml pull
           docker compose -p eda -f docker-compose-stage.yaml up -d
           echo "print hosts of api"
