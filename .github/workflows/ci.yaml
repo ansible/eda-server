@@ -74,6 +74,8 @@ jobs:
             echo "Logs for $p"
             docker logs $p;
           done
+          sleep 5
+          docker ps -a
 
   # lint:
   #   runs-on: ubuntu-latest
