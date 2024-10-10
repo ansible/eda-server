@@ -37,31 +37,41 @@ jobs:
         working-directory: tools/docker
         run: |
           set +e
-          export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
-          systemctl --user enable --now podman.socket
-          systemctl --user status podman.socket
-          docker compose version
-          docker version
-          podman version
+
+          # podman attempt
+          # export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+          # systemctl --user enable --now podman.socket
+          # systemctl --user status podman.socket
+          # docker compose version
+          # docker version
+          # podman version
+          # docker compose -p eda -f docker-compose-stage.yaml pull
+          # docker compose -p eda -f docker-compose-stage.yaml up -d
+          # echo "print hosts of api"
+          # podman exec eda-eda-api-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
+          # # while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
+          # #   echo "Waiting for API to be ready..."
+          # #   sleep 1
+          # # done
+          # sleep 10
+          # podman ps -a
+          # echo "print hosts of postgres"
+          # podman exec eda-postgres-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
+
+          # for p in $(podman ps -a | awk '{print $NF}'); do
+          #   echo "Logs for $p"
+          #   podman logs $p;
+          # done
+
+          # docker attempt
           docker compose -p eda -f docker-compose-stage.yaml pull
           docker compose -p eda -f docker-compose-stage.yaml up -d
-          echo "print hosts of api"
-          podman exec eda-eda-api-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
-          # while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
-          #   echo "Waiting for API to be ready..."
-          #   sleep 1
-          # done
           sleep 10
-          podman ps -a
-          echo "print hosts of postgres"
-          podman exec eda-postgres-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
 
-          for p in $(podman ps -a | awk '{print $NF}'); do
+          for p in $(docker ps -a | grep -i podman | awk '{print $NF}'); do
             echo "Logs for $p"
-            podman logs $p;
+            docker logs $p;
           done
-
-
 
   # lint:
   #   runs-on: ubuntu-latest
