@@ -53,6 +53,8 @@ jobs:
           # podman version
           file $XDG_RUNTIME_DIR/podman/podman.sock
           systemctl --user enable --now podman.socket
+          systemctl --user status podman.socket
+          file $XDG_RUNTIME_DIR/podman/podman.sock
           echo "user is $(id -u)"
 
 
