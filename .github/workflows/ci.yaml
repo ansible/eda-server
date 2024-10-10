@@ -77,10 +77,17 @@ jobs:
         with:
           ref: autoupdate-poetry-lock
 
+      - name: debug
+        run: |
+          git status
+          git log --oneline -n 5
+          git diff main
+
       - name: Create a Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          branch: autoupdate-poetry-lock
           base: main
           title: "ci(bot): autoupdate poetry lock file"
           body: "This PR updates the poetry lock file with the latest changes."
