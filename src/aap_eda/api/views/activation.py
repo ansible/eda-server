@@ -413,8 +413,15 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
+        # Redis must be available in order to perform the restart.
+        self.redis_is_available()
+
         valid, error = is_activation_valid(activation)
         if not valid:
+            stop_rulebook_process(
+                process_parent_type=ProcessParentType.ACTIVATION,
+                process_parent_id=activation.id,
+            )
             activation.status = ActivationStatus.ERROR
             activation.status_message = error
             activation.save(update_fields=["status", "status_message"])
@@ -423,9 +430,6 @@ class ActivationViewSet(
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
-
-        # Redis must be available in order to perform the restart.
-        self.redis_is_available()
 
         restart_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
