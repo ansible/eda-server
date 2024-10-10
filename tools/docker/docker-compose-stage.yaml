@@ -51,7 +51,10 @@ services:
     user: "0"
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
-    command: >-
+    security_opt:
+      - apparmor=unconfined
+    command: |
+      sestatus
       chown -R podman /home/podman/.local/share/containers/storage
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
