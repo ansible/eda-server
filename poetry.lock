@@ -632,7 +632,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.9.27.0.dev13+g5f1ca89"
+version = "2024.10.8.0.dev15+gb96e64f"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -640,20 +640,20 @@ files = []
 develop = false
 
 [package.dependencies]
-channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
+channels = {version = "*", optional = true, markers = "extra == \"channel_auth\""}
 cryptography = "*"
 Django = ">=4.2.5,<4.3.0"
 django-crum = "*"
-django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
+django-redis = {version = "*", optional = true, markers = "extra == \"redis_client\""}
 django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
+redis = {version = "*", optional = true, markers = "extra == \"redis_client\""}
 
 [package.extras]
-all = ["channels", "cryptography", "django-auth-ldap", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+all = ["channels", "cryptography", "django-auth-ldap", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs-plus", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular"]
-authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs-plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 jwt-consumer = ["pyjwt", "requests"]
 oauth2-provider = ["django-oauth-toolkit (<2.4.0)"]
@@ -664,7 +664,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "5f1ca896a4dc94a4ed7f1da0dc371ddc4217669f"
+resolved_reference = "b96e64fc293f975f03f411e86ed469c6bd9af509"
 
 [[package]]
 name = "django-crum"
