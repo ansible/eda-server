@@ -37,26 +37,21 @@ jobs:
         working-directory: tools/docker
         run: |
           set +e
-          # docker compose -p eda -f docker-compose-stage.yaml pull
-          # docker compose -p eda -f docker-compose-stage.yaml up -d
-          # while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
-          #   echo "Waiting for API to be ready..."
-          #   sleep 1
-          # done
-          # sleep 10
-          # for p in $(docker ps -a | grep podman | awk '{print $NF}'); do
-          #   echo "Logs for $p"
-          #   docker logs $p;
-          # done
-
-          # docker ps -a
-          # podman version
-          file $XDG_RUNTIME_DIR/podman/podman.sock
+          export $XDG_RUNTIME_DIR/podman/podman.sock
           systemctl --user enable --now podman.socket
           systemctl --user status podman.socket
-          file $XDG_RUNTIME_DIR/podman/podman.sock
-          echo "user is $(id -u)"
-
+          docker compose -p eda -f docker-compose-stage.yaml pull
+          docker compose -p eda -f docker-compose-stage.yaml up -d
+          while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
+            echo "Waiting for API to be ready..."
+            sleep 1
+          done
+          sleep 10
+          podman ps -a
+          for p in $(podman ps -a | grep podman | awk '{print $NF}'); do
+            echo "Logs for $p"
+            podman logs $p;
+          done
 
 
 
