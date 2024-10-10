@@ -11,6 +11,9 @@ jobs:
   autoupdate-poetry-lock:
     runs-on: ubuntu-latest
     if: github.repository == 'ansible/eda-server'
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       lock-changed: ${{ steps.lock-changed.outputs.lock-changed }}
     steps:
@@ -43,27 +46,9 @@ jobs:
             echo "lock-changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Push changes
-        if: steps.lock-changed.outputs.lock-changed == 'true'
-        run: |
-          git checkout -b autoupdate-poetry-lock
-          git add poetry.lock
-          git commit -m "ci(bot): update poetry lock file"
-          git push origin autoupdate-poetry-lock --force
-
-  create-pr:
-    needs:
-      - autoupdate-poetry-lock
-    if: github.repository == 'ansible/eda-server' && needs.autoupdate-poetry-lock.outputs.lock-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout autoupdate-poetry-lock branch
-        uses: actions/checkout@v3
-        with:
-          ref: autoupdate-poetry-lock
-
       - name: Create a Pull Request
         uses: peter-evans/create-pull-request@v5
+        if: steps.lock-changed.outputs.lock-changed == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: autoupdate-poetry-lock
