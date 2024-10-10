@@ -54,7 +54,6 @@ services:
     security_opt:
       - apparmor=unconfined
     command: |
-      sestatus
       chown -R podman /home/podman/.local/share/containers/storage
     volumes:
       - 'podman_data:/home/podman/.local/share/containers/storage'
