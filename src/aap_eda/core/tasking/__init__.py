@@ -1,23 +1,17 @@
 """Tools for running background tasks."""
 from __future__ import annotations
 
+import functools
 import logging
+import time
+import typing
 from datetime import datetime, timedelta
-from time import sleep
 from types import MethodType
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Optional,
-    Protocol,
-    Type,
-    Union,
-)
 
+import django_rq
 import redis
 import rq
+import rq_scheduler
 from ansible_base.lib import constants
 from ansible_base.lib.redis.client import (
     DABRedis,
@@ -26,18 +20,7 @@ from ansible_base.lib.redis.client import (
     get_redis_status as _get_redis_status,
 )
 from django.conf import settings
-from django_rq import enqueue, get_queue, get_scheduler, job
-from django_rq.queues import Queue as _Queue
-from rq import Connection, Worker as _Worker, results
-from rq.defaults import (
-    DEFAULT_JOB_MONITORING_INTERVAL,
-    DEFAULT_RESULT_TTL,
-    DEFAULT_WORKER_TTL,
-)
-from rq.job import Job as _Job, JobStatus
-from rq.registry import StartedJobRegistry
-from rq.serializers import JSONSerializer
-from rq_scheduler import Scheduler as _Scheduler
+from rq import results as rq_results
 
 from aap_eda.settings import default
 
@@ -46,23 +29,82 @@ __all__ = [
     "Queue",
     "ActivationWorker",
     "DefaultWorker",
-    "enqueue",
-    "job",
-    "get_queue",
     "unique_enqueue",
     "job_from_queue",
 ]
 
 logger = logging.getLogger(__name__)
 
-ErrorHandlerType = Callable[[_Job], None]
+ErrorHandlerType = typing.Callable[[rq.job.Job], None]
 
-_ErrorHandlersArgType = Union[
+_ErrorHandlersArgType = typing.Union[
     list[ErrorHandlerType],
     tuple[ErrorHandlerType],
     ErrorHandlerType,
     None,
 ]
+
+
+def redis_connect_retry(
+    max_delay: int = 60,
+    loop_exit: typing.Optional[typing.Callable[[Exception], bool]] = None,
+) -> typing.Callable:
+    max_delay = max(max_delay, 1)
+
+    def decorator(func: typing.Callable) -> typing.Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> typing.Optional[typing.Any]:
+            value = None
+            delay = 1
+            while True:
+                try:
+                    value = func(*args, **kwargs)
+                    if delay > 1:
+                        logger.info("Connection to redis re-established.")
+                    break
+                except (
+                    redis.exceptions.ClusterDownError,
+                    redis.exceptions.ConnectionError,
+                    redis.exceptions.RedisClusterException,
+                    redis.exceptions.TimeoutError,
+                ) as e:
+                    # There are a lot of different exceptions that inherit from
+                    # ConnectionError.  So we need to make sure if we got that
+                    # its an actual ConnectionError. If not, go ahead and raise
+                    # it.
+                    # Note:  ClusterDownError and TimeoutError are not
+                    #        subclasses of ConnectionError.
+                    if (
+                        isinstance(e, redis.exceptions.ConnectionError)
+                        and type(e) is not redis.exceptions.ConnectionError
+                    ):
+                        raise
+
+                    # RedisClusterException is used as a catch-all for various
+                    # faults.  The only one we should tolerate is that which
+                    # includes "Redis Cluster cannot be connected." which is
+                    # experienced when there are zero cluster hosts that can be
+                    # reached.
+                    if isinstance(
+                        e, redis.exceptions.RedisClusterException
+                    ) and ("Redis Cluster cannot be connected." not in str(e)):
+                        raise
+
+                    if (loop_exit is not None) and loop_exit(e):
+                        break
+
+                    delay = min(delay, max_delay)
+                    logger.error(
+                        f"Connection to redis failed; retrying in {delay}s."
+                    )
+                    time.sleep(delay)
+
+                    delay *= 2
+            return value
+
+        return wrapper
+
+    return decorator
 
 
 def _create_url_from_parameters(**kwargs) -> str:
@@ -80,7 +122,7 @@ def _create_url_from_parameters(**kwargs) -> str:
     return url
 
 
-def _prune_redis_kwargs(**kwargs) -> dict[str, Any]:
+def _prune_redis_kwargs(**kwargs) -> dict[str, typing.Any]:
     """Prunes the kwargs of unsupported parameters for RedisCluster."""
     # HA cluster does not support an alternate redis db and will generate an
     # exception if we pass a value (even the default). If we're in that
@@ -97,7 +139,7 @@ def _prune_redis_kwargs(**kwargs) -> dict[str, Any]:
     return kwargs
 
 
-def get_redis_client(**kwargs) -> Union[DABRedis, DABRedisCluster]:
+def get_redis_client(**kwargs) -> typing.Union[DABRedis, DABRedisCluster]:
     """Instantiate a Redis client via DAB.
 
     DAB will return an appropriate client for HA based on the passed
@@ -122,7 +164,7 @@ def is_redis_failed() -> bool:
     return status == constants.STATUS_FAILED
 
 
-class Scheduler(_Scheduler):
+class Scheduler(rq_scheduler.Scheduler):
     """Custom scheduler class."""
 
     def __init__(
@@ -198,12 +240,12 @@ def enable_redis_prefix():
     def eda_get_key(job_id):
         return f"{redis_prefix}:results:{job_id}"
 
-    results.get_key = eda_get_key
+    rq_results.get_key = eda_get_key
 
     def cls_get_key(cls, job_id):
         return f"{redis_prefix}:results:{job_id}"
 
-    results.Result.get_key = MethodType(cls_get_key, results.Result)
+    rq_results.Result.get_key = MethodType(cls_get_key, rq_results.Result)
 
     def property_registry_cleaning_key(self):
         return f"{redis_prefix}:clean_registries:{self.name}"
@@ -218,17 +260,17 @@ def enable_redis_prefix():
 enable_redis_prefix()
 
 
-class SerializerProtocol(Protocol):
+class SerializerProtocol(typing.Protocol):
     @staticmethod
-    def dumps(obj: Any) -> bytes:
+    def dumps(obj: typing.Any) -> bytes:
         ...
 
     @staticmethod
-    def loads(data: bytes) -> Any:
+    def loads(data: bytes) -> typing.Any:
         ...
 
 
-class Queue(_Queue):
+class Queue(django_rq.queues.Queue):
     """Custom queue class.
 
     Uses JSONSerializer as a default one.
@@ -238,14 +280,14 @@ class Queue(_Queue):
         self,
         name: str = "default",
         default_timeout: int = -1,
-        connection: Optional[Connection] = None,
+        connection: typing.Optional[rq.Connection] = None,
         is_async: bool = True,
-        job_class: Optional[_Job] = None,
-        serializer: Optional[SerializerProtocol] = None,
-        **kwargs: Any,
+        job_class: typing.Optional[rq.job.Job] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
+        **kwargs: typing.Any,
     ):
         if serializer is None:
-            serializer = JSONSerializer
+            serializer = rq.serializers.JSONSerializer
 
         super().__init__(
             name=name,
@@ -258,7 +300,7 @@ class Queue(_Queue):
         )
 
 
-class Job(_Job):
+class Job(rq.job.Job):
     """Custom job class.
 
     Uses JSONSerializer as a default one.
@@ -266,12 +308,12 @@ class Job(_Job):
 
     def __init__(
         self,
-        id: Optional[str] = None,
-        connection: Optional[Connection] = None,
-        serializer: Optional[SerializerProtocol] = None,
+        id: typing.Optional[str] = None,
+        connection: typing.Optional[rq.Connection] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
     ):
         if serializer is None:
-            serializer = JSONSerializer
+            serializer = rq.serializers.JSONSerializer
         connection = _get_necessary_client_connection(connection)
 
         super().__init__(id, connection, serializer)
@@ -282,7 +324,9 @@ class Job(_Job):
 # couldn't use it as DAB requires a url parameter that Redis does not.
 # If the connection a worker is given is not from DAB we replace it
 # with one that is.
-def _get_necessary_client_connection(connection: Connection) -> Connection:
+def _get_necessary_client_connection(
+    connection: rq.Connection,
+) -> rq.Connection:
     if not isinstance(connection, (DABRedis, DABRedisCluster)):
         connection = get_redis_client(
             **default.rq_redis_client_instantiation_parameters()
@@ -290,7 +334,7 @@ def _get_necessary_client_connection(connection: Connection) -> Connection:
     return connection
 
 
-class Worker(_Worker):
+class Worker(rq.Worker):
     """Custom worker class.
 
     Provides establishment of DAB Redis client and work arounds for various
@@ -299,20 +343,22 @@ class Worker(_Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = None,
-        default_result_ttl: int = DEFAULT_RESULT_TTL,
-        connection: Optional[Connection] = None,
-        exc_handler: Any = None,
+        queues: typing.Iterable[typing.Union[Queue, str]],
+        name: typing.Optional[str] = None,
+        default_result_ttl: int = rq.defaults.DEFAULT_RESULT_TTL,
+        connection: typing.Optional[rq.Connection] = None,
+        exc_handler: typing.Any = None,
         exception_handlers: _ErrorHandlersArgType = None,
-        default_worker_ttl: int = DEFAULT_WORKER_TTL,
-        job_class: Type[_Job] = None,
-        queue_class: Type[_Queue] = None,
+        default_worker_ttl: int = rq.defaults.DEFAULT_WORKER_TTL,
+        job_class: typing.Type[rq.job.Job] = None,
+        queue_class: typing.Type[django_rq.queues.Queue] = None,
         log_job_description: bool = True,
-        job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
+        job_monitoring_interval: int = (
+            rq.defaults.DEFAULT_JOB_MONITORING_INTERVAL
+        ),
         disable_default_exception_handler: bool = False,
         prepare_for_work: bool = True,
-        serializer: Optional[SerializerProtocol] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
     ):
         connection = _get_necessary_client_connection(connection)
         super().__init__(
@@ -329,14 +375,14 @@ class Worker(_Worker):
             job_monitoring_interval=job_monitoring_interval,
             disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
             prepare_for_work=prepare_for_work,
-            serializer=JSONSerializer,
+            serializer=rq.serializers.JSONSerializer,
         )
         self.is_shutting_down = False
 
     def _set_connection(
         self,
-        connection: Union[DABRedis, DABRedisCluster],
-    ) -> Union[DABRedis, DABRedisCluster]:
+        connection: typing.Union[DABRedis, DABRedisCluster],
+    ) -> typing.Union[DABRedis, DABRedisCluster]:
         # A DABRedis connection doesn't need intervention.
         if isinstance(connection, DABRedis):
             return super()._set_connection(connection)
@@ -366,12 +412,14 @@ class Worker(_Worker):
     @classmethod
     def all(
         cls,
-        connection: Optional[Union[DABRedis, DABRedisCluster]] = None,
-        job_class: Optional[Type[Job]] = None,
-        queue_class: Optional[Type[Queue]] = None,
-        queue: Optional[Queue] = None,
+        connection: typing.Optional[
+            typing.Union[DABRedis, DABRedisCluster]
+        ] = None,
+        job_class: typing.Optional[typing.Type[Job]] = None,
+        queue_class: typing.Optional[typing.Type[Queue]] = None,
+        queue: typing.Optional[Queue] = None,
         serializer=None,
-    ) -> List[Worker]:
+    ) -> typing.List[Worker]:
         # If we don't have a queue (whose connection would be used) make
         # certain that we have an appropriate connection and pass it
         # to the superclass.
@@ -386,7 +434,10 @@ class Worker(_Worker):
         )
 
     def handle_job_success(
-        self, job: Job, queue: Queue, started_job_registry: StartedJobRegistry
+        self,
+        job: Job,
+        queue: Queue,
+        started_job_registry: rq.registry.StartedJobRegistry,
     ):
         # A DABRedis connection doesn't need intervention.
         if isinstance(self.connection, DABRedis):
@@ -417,86 +468,42 @@ class Worker(_Worker):
         self.is_shutting_down = True
         super().handle_warm_shutdown_request()
 
-    # We are going to override the work function to create our own loop.
-    # This will allow us to catch exceptions that the default work method will
-    # not handle and restart our worker process if we hit them.
+    # We are overriding the work function to utilize our own common
+    # Redis connection looping.
     def work(
         self,
         burst: bool = False,
         logging_level: str = "INFO",
         date_format: str = rq.defaults.DEFAULT_LOGGING_DATE_FORMAT,
         log_format: str = rq.defaults.DEFAULT_LOGGING_FORMAT,
-        max_jobs: Optional[int] = None,
+        max_jobs: typing.Optional[int] = None,
         with_scheduler: bool = False,
     ) -> bool:
+        value = None
         while True:
-            # super.work() returns a value that we want to return on a normal
-            # exit.
-            return_value = None
-            try:
-                return_value = super().work(
-                    burst,
-                    logging_level,
-                    date_format,
-                    log_format,
-                    max_jobs,
-                    with_scheduler,
-                )
-            except (
-                redis.exceptions.TimeoutError,
-                redis.exceptions.ClusterDownError,
-                redis.exceptions.ConnectionError,
-            ) as e:
-                # If we got one of these exceptions but are not on a Cluster go
-                # ahead and raise it normally.
-                if not isinstance(self.connection, DABRedisCluster):
-                    raise
+            value = redis_connect_retry(
+                loop_exit=lambda e: self.is_shutting_down
+            )(super().work)(
+                burst,
+                logging_level,
+                date_format,
+                log_format,
+                max_jobs,
+                with_scheduler,
+            )
 
-                # There are a lot of different exceptions that inherit from
-                # ConnectionError.  So we need to make sure if we got that its
-                # an actual ConnectionError.  If not, go ahead and raise it.
-                # Note: ClusterDownError and TimeoutError are not subclasses
-                #       of ConnectionError.
-                if (
-                    isinstance(e, redis.exceptions.ConnectionError)
-                    and type(e) is not redis.exceptions.ConnectionError
-                ):
-                    raise
+            # If there's a return value or the worker is shutting down
+            # break out of the loop.
+            if (value is not None) or self.is_shutting_down:
+                if value is not None:
+                    logger.debug(f"Working exited normally with {value}")
+                break
 
-                # If we got a cluster issue we will loop here until we can ping
-                # the server again.
-                max_backoff = 60
-                current_backoff = 1
-                while True:
-                    backoff = min(current_backoff, max_backoff)
-                    logger.error(
-                        f"Connection to redis cluster failed. Attempting to "
-                        f"reconnect in {backoff}"
-                    )
-                    sleep(backoff)
-                    current_backoff = 2 * current_backoff
-                    try:
-                        self.connection.ping()
-                        break
-                    # We could tighten this exception up.
-                    except Exception:
-                        pass
-                # At this point return value is none so we are going to go
-                # ahead and fall through to the loop to restart.
+            logger.error(
+                "Work exited no return value, going to restart the worker"
+            )
 
-            # We are outside of the work function with either:
-            #   a "normal exist"
-            #   an exit that did not raise an exception
-            if return_value:
-                logger.debug(f"Working exited normally with {return_value}")
-                return return_value
-            elif self.is_shutting_down:
-                # Get got a warm shutdown request, lets respect it
-                return return_value
-            else:
-                logger.error(
-                    "Work exited no return value, going to restart the worker"
-                )
+        return value
 
 
 class DefaultWorker(Worker):
@@ -507,20 +514,12 @@ class DefaultWorker(Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = "default",
-        default_result_ttl: int = DEFAULT_RESULT_TTL,
-        connection: Optional[Connection] = None,
-        exc_handler: Any = None,
-        exception_handlers: _ErrorHandlersArgType = None,
-        default_worker_ttl: int = DEFAULT_WORKER_TTL,
-        job_class: Type[_Job] = None,
-        queue_class: Type[_Queue] = None,
-        log_job_description: bool = True,
-        job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
-        disable_default_exception_handler: bool = False,
-        prepare_for_work: bool = True,
-        serializer: Optional[SerializerProtocol] = None,
+        queues: typing.Iterable[typing.Union[Queue, str]],
+        name: typing.Optional[str] = "default",
+        job_class: typing.Type[rq.job.Job] = None,
+        queue_class: typing.Type[django_rq.queues.Queue] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
+        **kwargs,
     ):
         if job_class is None:
             job_class = Job
@@ -530,18 +529,10 @@ class DefaultWorker(Worker):
         super().__init__(
             queues=queues,
             name=name,
-            default_result_ttl=default_result_ttl,
-            connection=connection,
-            exc_handler=exc_handler,
-            exception_handlers=exception_handlers,
-            default_worker_ttl=default_worker_ttl,
             job_class=job_class,
             queue_class=queue_class,
-            log_job_description=log_job_description,
-            job_monitoring_interval=job_monitoring_interval,
-            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
-            prepare_for_work=prepare_for_work,
-            serializer=JSONSerializer,
+            serializer=rq.serializers.JSONSerializer,
+            **kwargs,
         )
 
 
@@ -553,20 +544,14 @@ class ActivationWorker(Worker):
 
     def __init__(
         self,
-        queues: Iterable[Union[Queue, str]],
-        name: Optional[str] = "activation",
-        default_result_ttl: int = DEFAULT_RESULT_TTL,
-        connection: Optional[Connection] = None,
-        exc_handler: Any = None,
-        exception_handlers: _ErrorHandlersArgType = None,
-        default_worker_ttl: int = DEFAULT_WORKER_TTL,
-        job_class: Type[_Job] = None,
-        queue_class: Type[_Queue] = None,
-        log_job_description: bool = True,
-        job_monitoring_interval: int = DEFAULT_JOB_MONITORING_INTERVAL,
-        disable_default_exception_handler: bool = False,
-        prepare_for_work: bool = True,
-        serializer: Optional[SerializerProtocol] = None,
+        queues: typing.Iterable[typing.Union[Queue, str]],
+        name: typing.Optional[str] = "activation",
+        connection: typing.Optional[rq.Connection] = None,
+        default_worker_ttl: int = rq.defaults.DEFAULT_WORKER_TTL,
+        job_class: typing.Type[rq.job.Job] = None,
+        queue_class: typing.Type[django_rq.queues.Queue] = None,
+        serializer: typing.Optional[SerializerProtocol] = None,
+        **kwargs,
     ):
         if job_class is None:
             job_class = Job
@@ -577,26 +562,21 @@ class ActivationWorker(Worker):
         super().__init__(
             queues=[Queue(name=queue_name, connection=connection)],
             name=name,
-            default_result_ttl=default_result_ttl,
             connection=connection,
-            exc_handler=exc_handler,
-            exception_handlers=exception_handlers,
             default_worker_ttl=settings.DEFAULT_WORKER_TTL,
             job_class=job_class,
             queue_class=queue_class,
-            log_job_description=log_job_description,
-            job_monitoring_interval=job_monitoring_interval,
-            disable_default_exception_handler=disable_default_exception_handler,  # noqa: E501
-            prepare_for_work=prepare_for_work,
-            serializer=JSONSerializer,
+            serializer=rq.serializers.JSONSerializer,
+            **kwargs,
         )
 
 
+@redis_connect_retry()
 def enqueue_delay(
     queue_name: str, job_id: str, delay: int, *args, **kwargs
 ) -> Job:
     """Enqueue a job to run after specific seconds."""
-    scheduler = get_scheduler(name=queue_name)
+    scheduler = django_rq.get_scheduler(name=queue_name)
     return scheduler.enqueue_at(
         datetime.utcnow() + timedelta(seconds=delay),
         job_id=job_id,
@@ -605,11 +585,13 @@ def enqueue_delay(
     )
 
 
+@redis_connect_retry()
 def queue_cancel_job(queue_name: str, job_id: str) -> None:
-    scheduler = get_scheduler(name=queue_name)
+    scheduler = django_rq.get_scheduler(name=queue_name)
     scheduler.cancel(job_id)
 
 
+@redis_connect_retry()
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     """Enqueue a new job if it is not already enqueued.
 
@@ -624,22 +606,25 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
             )
             return job
 
-    queue = get_queue(name=queue_name)
+    queue = django_rq.get_queue(name=queue_name)
     kwargs["job_id"] = job_id
     logger.info(f"Enqueing unique job: {job_id}")
     return queue.enqueue(*args, **kwargs)
 
 
-def job_from_queue(queue: Union[Queue, str], job_id: str) -> Optional[Job]:
+@redis_connect_retry()
+def job_from_queue(
+    queue: typing.Union[Queue, str], job_id: str
+) -> typing.Optional[Job]:
     """Return queue job if it not canceled or finished else None."""
     if type(queue) is str:
-        queue = get_queue(name=queue)
+        queue = django_rq.get_queue(name=queue)
     job = queue.fetch_job(job_id)
     if job and job.get_status(refresh=True) in [
-        JobStatus.QUEUED,
-        JobStatus.STARTED,
-        JobStatus.DEFERRED,
-        JobStatus.SCHEDULED,
+        rq.job.JobStatus.QUEUED,
+        rq.job.JobStatus.STARTED,
+        rq.job.JobStatus.DEFERRED,
+        rq.job.JobStatus.SCHEDULED,
     ]:
         return job
     return None
