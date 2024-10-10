@@ -60,7 +60,9 @@ jobs:
           git config --global user.email "edabot@github.com"
           git config --global user.name "edabot"
           git checkout -b autoupdate-poetry-lock
+          git status
           git add poetry.lock
+          git status
           git commit -m "ci(bot): update poetry lock file"
           git push origin autoupdate-poetry-lock --force
 
