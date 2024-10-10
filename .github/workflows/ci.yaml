@@ -22,6 +22,9 @@ jobs:
   autoupdate-poetry-lock:
     runs-on: ubuntu-latest
     if: github.repository == 'ansible/eda-server'
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       lock-changed: ${{ steps.lock-changed.outputs.lock-changed }}
     steps:
@@ -66,32 +69,42 @@ jobs:
           git commit -m "ci(bot): update poetry lock file"
           git push origin autoupdate-poetry-lock --force
 
-  create-pr:
-    needs:
-      - autoupdate-poetry-lock
-    if: github.repository == 'ansible/eda-server' && needs.autoupdate-poetry-lock.outputs.lock-changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout autoupdate-poetry-lock branch
-        uses: actions/checkout@v3
-        with:
-          ref: autoupdate-poetry-lock
-
-      - name: debug
-        run: |
-          git status
-          git log --oneline -n 5
-          git diff main
-
       - name: Create a Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: autoupdate-poetry-lock
+          # branch: autoupdate-poetry-lock
           base: main
           title: "ci(bot): autoupdate poetry lock file"
           body: "This PR updates the poetry lock file with the latest changes."
           labels: "run-e2e"
+
+
+  # create-pr:
+  #   needs:
+  #     - autoupdate-poetry-lock
+  #   if: github.repository == 'ansible/eda-server' && needs.autoupdate-poetry-lock.outputs.lock-changed == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout autoupdate-poetry-lock branch
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: autoupdate-poetry-lock
+
+  #     - name: debug
+  #       run: |
+  #         git status
+  #         git log --oneline -n 5
+
+  #     - name: Create a Pull Request
+  #       uses: peter-evans/create-pull-request@v5
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         # branch: autoupdate-poetry-lock
+  #         base: main
+  #         title: "ci(bot): autoupdate poetry lock file"
+  #         body: "This PR updates the poetry lock file with the latest changes."
+  #         labels: "run-e2e"
 
 
   # lint:
