@@ -37,7 +37,7 @@ jobs:
         working-directory: tools/docker
         run: |
           set +e
-          export $XDG_RUNTIME_DIR/podman/podman.sock
+          export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
           systemctl --user enable --now podman.socket
           systemctl --user status podman.socket
           docker compose -p eda -f docker-compose-stage.yaml pull
