@@ -42,6 +42,8 @@ jobs:
           systemctl --user status podman.socket
           docker compose -p eda -f docker-compose-stage.yaml pull
           docker compose -p eda -f docker-compose-stage.yaml up -d
+          echo "print hosts of api"
+          podman exec eda-eda-api-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
           # while ! curl -s http://localhost:8000/_healthz | grep -q "OK"; do
           #   echo "Waiting for API to be ready..."
           #   sleep 1
@@ -50,8 +52,7 @@ jobs:
           podman ps -a
           echo "print hosts of postgres"
           podman exec eda-postgres-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
-          echo "print hosts of api"
-          podman exec eda-eda-api-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
+
           for p in $(podman ps -a | awk '{print $NF}'); do
             echo "Logs for $p"
             podman logs $p;
