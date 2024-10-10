@@ -54,49 +54,21 @@ x-environment: &common-env
   SSL_CLIENT_CERTIFICATE: ${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
 
 services:
-  podman-pre-setup-node1:
-    user: "0"
-    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
-    privileged: true
-    command: >-
-      chown -R podman /home/podman/.local/share/containers/storage
-    volumes:
-      - 'podman_data_node1:/home/podman/.local/share/containers/storage'
-
-  podman-pre-setup-node2:
-    user: "0"
-    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
-    privileged: true
-    command: >-
-      chown -R podman /home/podman/.local/share/containers/storage
-    volumes:
-      - 'podman_data_node2:/home/podman/.local/share/containers/storage'
-
   podman-node1:
-    user: "1000"
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - "${EDA_PODMAN_NODE1_PORT:-8888}:8888"
-    volumes:
-      - 'podman_data_node1:/home/podman/.local/share/containers/storage'
-    depends_on:
-     - podman-pre-setup-node1
 
   podman-node2:
-    user: "1000"
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - "${EDA_PODMAN_NODE2_PORT:-8889}:8888"
-    volumes:
-      - 'podman_data_node2:/home/podman/.local/share/containers/storage'
-    depends_on:
-     - podman-pre-setup-node2
 
   postgres:
     image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
@@ -303,8 +275,6 @@ services:
 
 volumes:
   postgres_data: {}
-  podman_data_node1: {}
-  podman_data_node2: {}
 
 networks:
   service-mesh:
