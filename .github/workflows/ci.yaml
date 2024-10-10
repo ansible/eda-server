@@ -52,10 +52,10 @@ jobs:
           podman exec eda-postgres-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
           echo "print hosts of api"
           podman exec eda-eda-api-1 bash -c 'cat /etc/hosts && echo $(hostname -i)'
-          # for p in $(podman ps -a | awk '{print $NF}'); do
-          #   echo "Logs for $p"
-          #   podman logs $p;
-          # done
+          for p in $(podman ps -a | awk '{print $NF}'); do
+            echo "Logs for $p"
+            podman logs $p;
+          done
 
 
 

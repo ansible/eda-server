@@ -1,6 +1,7 @@
 x-environment:
   &common-env
   - EDA_DB_HOST=postgres
+  - EDA_DB_PORT=${EDA_DB_PORT:-5432}
   - EDA_MQ_HOST=${EDA_MQ_HOST:-redis}
   - EDA_MQ_PORT=${EDA_MQ_PORT:-6379}
   - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
@@ -70,6 +71,7 @@ services:
 
   postgres:
     image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
+    hostname: postgres
     environment:
       POSTGRESQL_USER: eda
       POSTGRESQL_PASSWORD: secret
