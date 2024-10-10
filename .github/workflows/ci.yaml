@@ -65,6 +65,7 @@ jobs:
 
           # docker attempt
           sudo systemctl stop apparmor
+          sudo systemctl disable apparmor
           docker compose -p eda -f docker-compose-stage.yaml pull
           docker compose -p eda -f docker-compose-stage.yaml up -d
           sleep 10
