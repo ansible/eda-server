@@ -52,6 +52,8 @@ jobs:
           # podman version
           echo "user is $(id -u)"
           systemctl --user list-units | grep -i podman
+          file $XDG_RUNTIME_DIR/podman/podman.sock
+          systemctl --user enable --now podman.socket
 
 
   # lint:
