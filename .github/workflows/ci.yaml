@@ -57,23 +57,24 @@ jobs:
             echo "lock-changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Push changes
-        if: steps.lock-changed.outputs.lock-changed == 'true'
-        run: |
-          git config --global user.email "edabot@github.com"
-          git config --global user.name "edabot"
-          git checkout -b autoupdate-poetry-lock
-          git status
-          git add poetry.lock
-          git status
-          git commit -m "ci(bot): update poetry lock file"
-          git push origin autoupdate-poetry-lock --force
+      # - name: Push changes
+      #   if: steps.lock-changed.outputs.lock-changed == 'true'
+      #   run: |
+      #     git config --global user.email "edabot@github.com"
+      #     git config --global user.name "edabot"
+      #     git checkout -b autoupdate-poetry-lock
+      #     git status
+      #     git add poetry.lock
+      #     git status
+      #     git commit -m "ci(bot): update poetry lock file"
+      #     git push origin autoupdate-poetry-lock --force
 
       - name: Create a Pull Request
         uses: peter-evans/create-pull-request@v5
+        if: steps.lock-changed.outputs.lock-changed == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # branch: autoupdate-poetry-lock
+          branch: autoupdate-poetry-lock
           base: main
           title: "ci(bot): autoupdate poetry lock file"
           body: "This PR updates the poetry lock file with the latest changes."
