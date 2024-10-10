@@ -47,29 +47,14 @@ x-environment:
   - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
 
 services:
-  podman-pre-setup:
-    user: "0"
-    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
-    privileged: true
-    security_opt:
-      - apparmor=unconfined
-    command: |
-      chown -R podman /home/podman/.local/share/containers/storage
-    volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
-
   podman:
     user: "1000"
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
-    security_opt:
-      - apparmor=unconfined
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - '${EDA_PODMAN_PORT:-8888}:8888'
-    volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
     depends_on:
      - podman-pre-setup
 
