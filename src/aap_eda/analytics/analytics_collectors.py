@@ -9,6 +9,10 @@ from django.db import connection
 from django.db.models import Manager, Q
 from insights_analytics_collector import CsvFileSplitter, register
 
+from aap_eda.analytics.utils import (
+    collect_controllers_info,
+    extract_job_details,
+)
 from aap_eda.core import models
 from aap_eda.utils import get_eda_version
 
@@ -38,6 +42,43 @@ def config(**kwargs) -> dict:
         "eda_version": get_eda_version(),
         "eda_deployment_type": settings.DEPLOYMENT_TYPE,
     }
+
+
+@register(
+    "jobs_stats",
+    "1.0",
+    description="Stats data for jobs",
+)
+def jobs_stats(since: datetime, full_path: str, until: datetime, **kwargs):
+    stats = {}
+    audit_actions = _get_audit_action_qs(since, until)
+
+    if not bool(audit_actions):
+        return stats
+
+    controllers = collect_controllers_info()
+    for action in audit_actions.all():
+        job_type, job_id, install_uuid = extract_job_details(
+            action.url, controllers
+        )
+        if not job_type:
+            continue
+
+        data = stats.get(job_id, [])
+        job_stat = {}
+        job_stat["job_id"] = job_id
+        job_stat["type"] = job_type
+        job_stat["created_at"] = action.fired_at.strftime(
+            "%Y-%m-%dT%H:%M:%S.%fZ"
+        )
+        job_stat["status"] = action.status
+        job_stat["url"] = action.url
+        job_stat["install_uuid"] = install_uuid
+        data.append(job_stat)
+
+        stats[job_id] = data
+
+    return stats
 
 
 @register(
@@ -344,7 +385,7 @@ def _get_audit_action_qs(since: datetime, until: datetime):
     else:
         audit_actions = models.AuditAction.objects.filter(
             audit_rule_id__in=tuple(audit_rule_ids)
-        ).order_by("id")
+        ).order_by("fired_at")
 
     return audit_actions
 
