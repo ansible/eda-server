@@ -961,14 +961,23 @@ def test_restart_activation_with_required_token_deleted(
     assert response.status_code == status.HTTP_201_CREATED
     token = models.AwxToken.objects.get(id=admin_awx_token.id)
     token.delete()
+    activation_id = response.data["id"]
 
-    response = admin_client.post(
-        f"{api_url_v1}/activations/{response.data['id']}/restart/",
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        "The rulebook requires a RH AAP credential." in response.data["errors"]
-    )
+    with mock.patch(
+        "aap_eda.api.views.activation.stop_rulebook_process"
+    ) as mock_stop:
+        response = admin_client.post(
+            f"{api_url_v1}/activations/{activation_id}/restart/",
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert (
+            "The rulebook requires a RH AAP credential."
+            in response.data["errors"]
+        )
+        mock_stop.assert_called_once_with(
+            process_parent_type=enums.ProcessParentType.ACTIVATION,
+            process_parent_id=activation_id,
+        )
 
 
 @pytest.mark.django_db
