@@ -403,13 +403,37 @@ def test_stop_already_stopped(
     assert not container_engine_mock.cleanup.called
 
 
+@pytest.mark.parametrize(
+    ("before_status", "after_status", "before_msg", "after_msg"),
+    [
+        (
+            enums.ActivationStatus.RUNNING,
+            enums.ActivationStatus.STOPPED,
+            "running",
+            "Stop requested by user.",
+        ),
+        (
+            enums.ActivationStatus.ERROR,
+            enums.ActivationStatus.ERROR,
+            "activation validation failed",
+            "activation validation failed",
+        ),
+    ],
+)
 @pytest.mark.django_db
 def test_stop_running(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
+    before_status,
+    after_status,
+    before_msg,
+    after_msg,
 ):
     """Test stop verb when activation is running."""
+    running_activation.status = before_status
+    running_activation.status_message = before_msg
+    running_activation.save(update_fields=["status", "status_message"])
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
         db_instance=running_activation,
@@ -419,13 +443,13 @@ def test_stop_running(
     assert "Stopping" in eda_caplog.text
     assert "Cleanup operation requested" in eda_caplog.text
     assert "Activation stopped." in eda_caplog.text
-    assert running_activation.status == enums.ActivationStatus.STOPPED
+    assert running_activation.status == after_status
     assert (
         running_activation.latest_instance.status
         == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
-    assert running_activation.status_message == "Stop requested by user."
+    assert running_activation.status_message == after_msg
     assert container_engine_mock.cleanup.called
 
 

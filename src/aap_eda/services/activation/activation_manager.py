@@ -718,7 +718,8 @@ class ActivationManager(StatusManager):
             return
 
         try:
-            self.set_status(ActivationStatus.STOPPING)
+            if self.db_instance.status != ActivationStatus.ERROR:
+                self.set_status(ActivationStatus.STOPPING)
             self._stop_instance()
 
         except engine_exceptions.ContainerEngineError as exc:
@@ -730,7 +731,10 @@ class ActivationManager(StatusManager):
             self._error_activation(msg)
             raise exceptions.ActivationStopError(msg) from exc
         user_msg = "Stop requested by user."
-        self.set_status(ActivationStatus.STOPPED, user_msg)
+        if self.db_instance.status != ActivationStatus.ERROR:
+            # do not overwrite the status and message if the activation
+            # is already in error status
+            self.set_status(ActivationStatus.STOPPED, user_msg)
         container_logger = self.container_logger_class(self.latest_instance.id)
         container_logger.write(user_msg, flush=True)
         LOGGER.info(
