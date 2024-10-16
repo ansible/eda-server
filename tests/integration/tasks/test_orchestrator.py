@@ -164,7 +164,7 @@ def test_manage_not_start(
         return_value=container_engine_mock,
     ):
         with mock.patch(
-            "aap_eda.services.activation.activation_manager.get_current_job",
+            "rq.get_current_job",
             return_value=job_mock,
         ):
             orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
@@ -186,7 +186,7 @@ def test_manage_not_start(
         (orchestrator.restart_rulebook_process, ActivationRequest.RESTART),
     ],
 )
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 @mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_activation_requests(
     get_queue_name_mock,
@@ -216,7 +216,7 @@ def test_activation_requests(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 @mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_monitor_rulebook_processes(
     get_queue_name_mock, enqueue_mock, activation, max_running_processes
@@ -297,7 +297,7 @@ def test_max_running_activation_after_start_job(
         return_value=container_engine_mock,
     ):
         with mock.patch(
-            "aap_eda.services.activation.activation_manager.get_current_job",
+            "rq.get_current_job",
             return_value=job_mock,
         ):
             orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
@@ -309,7 +309,7 @@ def test_max_running_activation_after_start_job(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 def test_monitor_rulebook_processes_unique(enqueue_mock):
     orchestrator.enqueue_monitor_rulebook_processes()
     enqueue_mock.assert_called_once_with(

@@ -88,15 +88,20 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         )
 
     def _parse_body(self, content_type: str, body: bytes) -> dict:
-        if content_type == "application/json":
-            data = yaml.safe_load(body.decode())
-        elif content_type == "application/x-www-form-urlencoded":
-            data = urllib.parse.parse_qs(body.decode())
+        if content_type == "application/x-www-form-urlencoded":
+            try:
+                data = urllib.parse.parse_qs(
+                    body.decode(), strict_parsing=True
+                )
+            except ValueError as exc:
+                message = f"Invalid content. Type: {content_type}"
+                logger.error(message)
+                raise ParseError(message) from exc
         else:
             try:
                 data = yaml.safe_load(body.decode())
             except yaml.YAMLError as exc:
-                message = f"Invalid content type passed {content_type}"
+                message = f"Invalid content. Type: {content_type}"
                 logger.error(message)
                 raise ParseError(message) from exc
         return data

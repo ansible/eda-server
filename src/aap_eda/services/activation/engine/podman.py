@@ -15,13 +15,13 @@
 import logging
 import os
 
+import rq
 from dateutil import parser
 from django.conf import settings
 from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
-from rq.timeouts import JobTimeoutException
 
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.utils import str_to_bool
@@ -373,7 +373,7 @@ class Engine(ContainerEngine):
         except APIError as e:
             LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
-        except JobTimeoutException as e:
+        except rq.timeouts.JobTimeoutException as e:
             msg = f"Timeout: {e}"
             LOGGER.error(msg)
             log_handler.write(msg, True)

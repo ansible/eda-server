@@ -299,7 +299,7 @@ def test_start_first_run(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
+        "rq.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
@@ -335,7 +335,7 @@ def test_start_restart(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
+        "rq.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start(is_restart=True)
@@ -690,7 +690,7 @@ def test_start_max_running_activations(
     )
 
     with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
+        "rq.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
