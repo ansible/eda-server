@@ -28,6 +28,16 @@ from aap_eda.core import enums, models
 from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
 
+NEW_HELP_TEXT = (
+    "Red Hat Ansible Automation Platform base URL to authenticate with.",
+    "For Event-Driven Ansible controller 2.5 with Ansible Automation Controller 2.4, use the following example: https://<<your_controller_host>>",  # noqa E501
+    "For Ansible Automation Controller 2.5, use the following example: https://<<your_gateway_host>>/api/controller/",  # noqa E501
+)
+
+ORIG_HELP_TEXT = (
+    "Red Hat Ansible Automation Platform base URL to authenticate with."
+)
+
 CRUD = ["add", "view", "change", "delete"]
 LOGGER = logging.getLogger(__name__)
 AVAILABLE_ALGORITHMS = sorted(hashlib.algorithms_available)
@@ -251,10 +261,7 @@ AAP_INPUTS = {
             "id": "host",
             "label": "Red Hat Ansible Automation Platform",
             "type": "string",
-            "help_text": (
-                "Red Hat Ansible Automation Platform base URL"
-                " to authenticate with."
-            ),
+            "help_text": NEW_HELP_TEXT,
         },
         {
             "id": "username",
@@ -1018,12 +1025,14 @@ def populate_credential_types(
     for credential_type_data in credential_types:
         new_type, created = models.CredentialType.objects.get_or_create(
             name=credential_type_data["name"],
-            description=credential_type_data.get("description", ""),
-            namespace=credential_type_data.get("namespace"),
-            kind=credential_type_data.get("kind", "cloud"),
-            inputs=credential_type_data.get("inputs", {}),
-            injectors=credential_type_data.get("injectors", {}),
-            managed=credential_type_data.get("managed", True),
+            defaults={
+                "description": credential_type_data.get("description", ""),
+                "namespace": credential_type_data.get("namespace"),
+                "kind": credential_type_data.get("kind", "cloud"),
+                "inputs": credential_type_data.get("inputs", {}),
+                "injectors": credential_type_data.get("injectors", {}),
+                "managed": credential_type_data.get("managed", True),
+            },
         )
         if created:
             created_credential_types.append(new_type)
