@@ -567,6 +567,10 @@ SPECTACULAR_SETTINGS = {
 
 APP_LOG_LEVEL = settings.get("APP_LOG_LEVEL", "INFO")
 
+# If DEBUG is set, keep consistent the log level
+if DEBUG:
+    APP_LOG_LEVEL = "DEBUG"
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -588,12 +592,12 @@ LOGGING = {
         },
         "django.request": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
         "django.channels.server": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
         "aap_eda": {
@@ -603,7 +607,7 @@ LOGGING = {
         },
         "ansible_base": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
     },
