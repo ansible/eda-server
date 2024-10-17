@@ -11,9 +11,12 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.db import DatabaseError
+from django.utils import timezone
 
 from aap_eda.core import models
 from aap_eda.core.enums import DefaultCredentialType
+from aap_eda.core.models.activation import ActivationStatus
+from aap_eda.tasks import orchestrator
 
 from .messages import (
     ActionMessage,
@@ -153,7 +156,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         ).first()
 
         if instance:
-            instance.updated_at = message.reported_at
+            instance.updated_at = message.reported_at or timezone.now()
             instance.save(update_fields=["updated_at"])
 
             activation = instance.get_parent()
@@ -161,6 +164,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 message.stats["ruleSetName"]
             ] = message.stats
             activation.save(update_fields=["ruleset_stats"])
+
+            if activation.status == ActivationStatus.STARTING:
+                orchestrator.enqueue_monitor_rulebook_processes()
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."
