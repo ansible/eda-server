@@ -14,6 +14,8 @@ from django.db import DatabaseError
 
 from aap_eda.core import models
 from aap_eda.core.enums import DefaultCredentialType
+from aap_eda.core.exceptions import DuplicateFileTemplateKeyError
+from aap_eda.core.utils.strings import substitute_variables
 
 from .messages import (
     ActionMessage,
@@ -21,6 +23,7 @@ from .messages import (
     ControllerInfo,
     EndOfResponse,
     ExtraVars,
+    FileContentMessage,
     HeartbeatMessage,
     JobMessage,
     Rulebook,
@@ -40,6 +43,7 @@ class MessageType(Enum):
     SHUTDOWN = "Shutdown"
     PROCESSED_EVENT = "ProcessedEvent"
     SESSION_STATS = "SessionStats"
+    FILE_CONTENTS = "FileContents"
 
 
 # Determine host status based on event type
@@ -127,6 +131,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         if eda_vault_data:
             vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
+
+        templates = await self.get_file_contents_from_credentials(message)
+        for template, contents in templates.items():
+            data = FileContentMessage(
+                template_key=template,
+                data=base64.b64encode(contents.encode()).decode(),
+                eof=True,
+            )
+            await self.send(text_data=data.json())
 
         await self.send(text_data=EndOfResponse().json())
 
@@ -473,3 +486,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         )
         logger.debug("Updated Job URL %s", result)
         return result
+
+    @database_sync_to_async
+    def get_file_contents_from_credentials(
+        self, message: WorkerMessage
+    ) -> tp.Optional[dict]:
+        rulebook_process_instance = models.RulebookProcess.objects.get(
+            id=message.activation_id,
+        )
+        activation = rulebook_process_instance.get_parent()
+        file_templates = {}
+        for eda_credential in activation.eda_credentials.all():
+            inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
+            injectors = eda_credential.credential_type.injectors
+            if "file" in injectors:
+                for template, value in injectors["file"].items():
+                    if template in file_templates:
+                        raise DuplicateFileTemplateKeyError(
+                            f"{template} already exists"
+                        )
+                    contents = substitute_variables(value, inputs)
+                    file_templates[template] = contents
+        return file_templates
