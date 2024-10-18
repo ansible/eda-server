@@ -52,6 +52,7 @@ x-environment:
 
 services:
   podman:
+    user: ${EDA_PODMAN_USER_ID:-0}
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
