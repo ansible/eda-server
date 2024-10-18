@@ -65,7 +65,11 @@ def storage_save_patch():
 
 
 @pytest.mark.django_db
-def test_project_import(storage_save_patch, service_tempdir_patch):
+def test_project_import(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-01"
         shutil.copytree(src, path, symlinks=False)
@@ -85,6 +89,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
                 url="https://git.example.com/repo01.git",
                 scm_branch="my_branch",
                 scm_refspec="the_ref",
+                organization=default_organization,
             ),
             models.Project(
                 name="test-project-02",
@@ -92,6 +97,7 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
                 verify_ssl=False,
                 scm_branch="tag2",
                 scm_refspec="",
+                organization=default_organization,
             ),
         ]
     )
@@ -128,7 +134,9 @@ def test_project_import(storage_save_patch, service_tempdir_patch):
 
 @pytest.mark.django_db
 def test_project_import_with_new_layout(
-    storage_save_patch, service_tempdir_patch
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
 ):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-02"
@@ -144,7 +152,9 @@ def test_project_import_with_new_layout(
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
+        name="test-project-01",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
     )
 
     service = ProjectImportService(scm_cls=git_mock)
@@ -157,7 +167,9 @@ def test_project_import_with_new_layout(
 
 @pytest.mark.django_db
 def test_project_import_rulebook_directory_missing(
-    storage_save_patch, service_tempdir_patch
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
 ):
     repo_mock = mock.Mock(name="ScmRepository()")
     repo_mock.rev_parse.return_value = (
@@ -167,7 +179,9 @@ def test_project_import_rulebook_directory_missing(
     git_mock.clone.return_value = repo_mock
 
     project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
+        name="test-project-01",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
     )
     message_expected = (
         "The 'extensions/eda/rulebooks' or 'rulebooks'"
@@ -188,7 +202,9 @@ def test_project_import_rulebook_directory_missing(
 
 @pytest.mark.django_db
 def test_project_import_with_vaulted_data(
-    storage_save_patch, service_tempdir_patch
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
 ):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-04"
@@ -204,7 +220,9 @@ def test_project_import_with_vaulted_data(
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
-        name="test-project-04", url="https://git.example.com/repo.git"
+        name="test-project-04",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
     )
 
     service = ProjectImportService(scm_cls=git_mock)
@@ -215,7 +233,7 @@ def test_project_import_with_vaulted_data(
     assert project.import_state == models.Project.ImportState.COMPLETED
 
 
-def _setup_project_sync():
+def _setup_project_sync(default_organization: models.Organization):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-02"
         shutil.copytree(src, path, symlinks=False)
@@ -228,7 +246,9 @@ def _setup_project_sync():
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
-        name="test-project-01", url="https://git.example.com/repo.git"
+        name="test-project-01",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
     )
 
     service = ProjectImportService(scm_cls=git_mock)
@@ -245,10 +265,14 @@ def _setup_project_sync():
 
 
 @pytest.mark.django_db
-def test_project_sync(storage_save_patch, service_tempdir_patch):
+def test_project_sync(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
     # TODO(cutwater): Create activations and verify that rulebook content
     #       is updated
-    project = _setup_project_sync()
+    project = _setup_project_sync(default_organization)
     storage_save_patch.reset_mock()
 
     def clone_project(_url, path, *_args, **_kwargs):
@@ -280,8 +304,12 @@ def test_project_sync(storage_save_patch, service_tempdir_patch):
 
 
 @pytest.mark.django_db
-def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
-    project = _setup_project_sync()
+def test_project_sync_same_hash(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    project = _setup_project_sync(default_organization)
     storage_save_patch.reset_mock()
 
     def clone_project(_url, path, *_args, **_kwargs):
@@ -314,7 +342,10 @@ def test_project_sync_same_hash(storage_save_patch, service_tempdir_patch):
 
 @pytest.mark.django_db
 def test_project_import_with_invalid_rulebooks(
-    storage_save_patch, service_tempdir_patch, caplog
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+    caplog,
 ):
     def clone_project(_url, path, *_args, **_kwargs):
         src = DATA_DIR / "project-05"
@@ -330,7 +361,9 @@ def test_project_import_with_invalid_rulebooks(
     git_mock.clone.side_effect = clone_project
 
     project = models.Project.objects.create(
-        name="test-project-04", url="https://git.example.com/repo.git"
+        name="test-project-04",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
     )
 
     logger = logging.getLogger("aap_eda")

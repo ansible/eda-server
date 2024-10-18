@@ -22,7 +22,7 @@ from aap_eda.tasks.exceptions import UnknownProcessParentType
 
 
 @pytest.fixture()
-def activations():
+def activations(default_organization: models.Organization):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -33,11 +33,13 @@ def activations():
     activation1 = models.Activation.objects.create(
         name="test1",
         user=user,
+        organization=default_organization,
     )
 
     activation2 = models.Activation.objects.create(
         name="test2",
         user=user,
+        organization=default_organization,
     )
 
     return [activation1, activation2]

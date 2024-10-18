@@ -54,7 +54,7 @@ class InitData:
 
 
 @pytest.fixture()
-def init_data():
+def init_data(default_organization: models.Organization):
     user = models.User.objects.create(
         username="tester",
         password="secret",
@@ -65,11 +65,13 @@ def init_data():
     activation = models.Activation.objects.create(
         name="activation",
         user=user,
+        organization=default_organization,
     )
     activation_instance = models.RulebookProcess.objects.create(
         name="test-instance",
         log_read_at=parser.parse("2023-10-30T19:18:48.362883381Z"),
         activation=activation,
+        organization=default_organization,
     )
 
     return InitData(
@@ -91,7 +93,10 @@ def get_ansible_rulebook_cmdline(data: InitData):
     )
 
 
-def get_request(data: InitData):
+def get_request(
+    data: InitData,
+    default_organization: models.Organization,
+):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
@@ -103,11 +108,19 @@ def get_request(data: InitData):
         mounts=[{"/dev": "/opt"}],
         env_vars={"a": 1},
         extra_args={"b": 2},
-        credential=Credential(username="me", secret="secret", ssl_verify=True),
+        credential=Credential(
+            username="me",
+            secret="secret",
+            ssl_verify=True,
+            organization=default_organization,
+        ),
     )
 
 
-def get_request_with_never_pull_policy(data: InitData):
+def get_request_with_never_pull_policy(
+    data: InitData,
+    default_organization: models.Organization,
+):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
@@ -115,18 +128,31 @@ def get_request_with_never_pull_policy(data: InitData):
         process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
         pull_policy="Never",
-        credential=Credential(username="me", secret="secret", ssl_verify=True),
+        credential=Credential(
+            username="me",
+            secret="secret",
+            ssl_verify=True,
+            organization=default_organization,
+        ),
     )
 
 
-def get_request_with_credential(data: InitData):
+def get_request_with_credential(
+    default_organization: models.Organization,
+    data: InitData,
+):
     return ContainerRequest(
         name="test-request",
         image_url="quay.io/ansible/ansible-rulebook:main",
         rulebook_process_id=data.activation_instance.id,
         process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
-        credential=Credential(username="me", secret="secret", ssl_verify=True),
+        credential=Credential(
+            username="me",
+            secret="secret",
+            ssl_verify=True,
+            organization=default_organization,
+        ),
     )
 
 
@@ -201,9 +227,13 @@ def test_engine_init_with_exception(init_data):
 
 
 @pytest.mark.django_db
-def test_engine_start(init_data, podman_engine):
+def test_engine_start(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
     log_handler = DBLogger(init_data.activation_instance.id)
 
     engine.start(request, log_handler)
@@ -214,10 +244,14 @@ def test_engine_start(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_none_image_url(init_data, podman_engine):
+def test_engine_start_with_none_image_url(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
     request.image_url = None
 
     with pytest.raises(ContainerStartError):
@@ -225,11 +259,20 @@ def test_engine_start_with_none_image_url(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_credential(init_data, podman_engine):
+def test_engine_start_with_credential(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
-    credential = Credential(username="me", secret="secret", ssl_verify=True)
+    request = get_request(init_data, default_organization)
+    credential = Credential(
+        username="me",
+        secret="secret",
+        ssl_verify=True,
+        organization=default_organization,
+    )
     request.credential = credential
 
     engine.start(request, log_handler)
@@ -259,10 +302,19 @@ def test_engine_start_with_credential(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_login_api_exception(init_data, podman_engine):
-    credential = Credential(username="me", secret="sec1", ssl_verify=True)
+def test_engine_start_with_login_api_exception(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    credential = Credential(
+        username="me",
+        secret="sec1",
+        ssl_verify=True,
+        organization=default_organization,
+    )
     engine = podman_engine
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
     request.credential = credential
 
     def raise_error(*args, **kwargs):
@@ -275,10 +327,14 @@ def test_engine_start_with_login_api_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
+def test_engine_start_with_image_not_found_exception(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
 
     def raise_not_found_error(*args, **kwargs):
         raise ImageNotFound("Image not found")
@@ -296,10 +352,14 @@ def test_engine_start_with_image_not_found_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_image_api_exception(init_data, podman_engine):
+def test_engine_start_with_image_api_exception(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
 
     def raise_api_error(*args, **kwargs):
         raise APIError("Image not found")
@@ -312,11 +372,13 @@ def test_engine_start_with_image_api_exception(init_data, podman_engine):
 
 @pytest.mark.django_db
 def test_engine_start_with_image_pull_timeout_exception(
-    init_data, podman_engine
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
 ):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
     error = "Task exceeded maximum timeout value 120 seconds"
 
     def raise_timeout_error(*args, **kwargs):
@@ -329,10 +391,14 @@ def test_engine_start_with_image_pull_timeout_exception(
 
 
 @pytest.mark.django_db
-def test_engine_start_with_image_pull_exception(init_data, podman_engine):
+def test_engine_start_with_image_pull_exception(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
 
     image_mock = mock.Mock()
     image_mock.pull.return_value.id = None
@@ -349,10 +415,14 @@ def test_engine_start_with_image_pull_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_containers_run_exception(init_data, podman_engine):
+def test_engine_start_with_containers_run_exception(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
     log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data)
+    request = get_request(init_data, default_organization)
 
     def raise_error(*args, **kwargs):
         raise ContainerError(
@@ -374,9 +444,15 @@ def test_engine_start_with_containers_run_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_start_with_never_pull_policy_request(init_data, podman_engine):
+def test_engine_start_with_never_pull_policy_request(
+    init_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
     engine = podman_engine
-    request = get_request_with_never_pull_policy(init_data)
+    request = get_request_with_never_pull_policy(
+        init_data, default_organization
+    )
     log_handler = DBLogger(init_data.activation_instance.id)
 
     engine.start(request, log_handler)

@@ -66,6 +66,7 @@ def test_create_decision_environment(
         name="eda-credential",
         description="Default Credential",
         credential_type=credential_type,
+        organization=default_organization,
         inputs=inputs_to_store(
             {
                 "username": "dummy-user",
@@ -144,6 +145,7 @@ def test_create_decision_environment_with_empty_credential(
         description="Default Credential",
         credential_type=credential_type,
         inputs=inputs_to_store(credential_inputs),
+        organization=default_organization,
     )
     data_in = {
         "name": "de1",
@@ -237,6 +239,7 @@ def test_retrieve_decision_environment_not_exist(admin_client: APIClient):
 def test_partial_update_decision_environment(
     default_decision_environment: models.DecisionEnvironment,
     admin_client: APIClient,
+    default_organization: models.Organization,
     preseed_credential_types,
     credential_type,
     status_code,
@@ -247,6 +250,7 @@ def test_partial_update_decision_environment(
         name="eda-credential",
         description="Default Credential",
         credential_type=credential_type,
+        organization=default_organization,
         inputs=inputs_to_store(
             {
                 "username": "dummy-user",
@@ -292,6 +296,7 @@ def test_partial_update_decision_environment(
 @pytest.mark.django_db
 def test_partial_update_decision_environment_with_image_url_and_host(
     default_decision_environment: models.DecisionEnvironment,
+    default_organization: models.Organization,
     admin_client: APIClient,
     preseed_credential_types,
     inputs,
@@ -306,6 +311,7 @@ def test_partial_update_decision_environment_with_image_url_and_host(
         description="Default Credential",
         credential_type=credential_type,
         inputs=inputs_to_store(inputs),
+        organization=default_organization,
     )
     data = {"eda_credential_id": credential.id, "image_url": "quay.io"}
     response = admin_client.patch(

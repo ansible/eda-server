@@ -17,5 +17,9 @@ from django.conf import settings
 from .organization import Organization
 
 
+def get_default_organization():
+    return Organization.objects.get(name=settings.DEFAULT_ORGANIZATION_NAME)
+
+
 def get_default_organization_id():
-    return Organization.objects.get(name=settings.DEFAULT_ORGANIZATION_NAME).id
+    return get_default_organization().id

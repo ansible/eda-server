@@ -297,7 +297,9 @@ def test_delete_credential_type(superuser_client: APIClient):
 
 @pytest.mark.django_db
 def test_delete_credential_type_with_credentials(
-    superuser_client: APIClient, preseed_credential_types
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
 ):
     credential_type = models.CredentialType.objects.create(
         name="user_type",
@@ -310,6 +312,7 @@ def test_delete_credential_type_with_credentials(
         name="credential-1",
         inputs={"username": "adam"},
         credential_type=credential_type,
+        organization=default_organization,
     )
 
     response = superuser_client.delete(
@@ -491,6 +494,7 @@ def test_update_managed_credential_type(
 )
 def test_update_credential_type_with_created_credentials(
     superuser_client: APIClient,
+    default_organization: models.Organization,
     preseed_credential_types,
     data,
     status_code,
@@ -507,6 +511,7 @@ def test_update_credential_type_with_created_credentials(
         name="test-eda-credential",
         inputs={"username": "adam"},
         credential_type_id=user_type.id,
+        organization=default_organization,
     )
 
     response = superuser_client.patch(
