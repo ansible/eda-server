@@ -21,25 +21,34 @@ class SettingSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         super(SettingSerializer, self).__init__(*args, **kwargs)
 
-        for key in settings_registry.get_registered_settings():
-            v_type = settings_registry.get_setting_type(key)
-            read_only = settings_registry.is_setting_read_only(key)
-            if v_type == str:
-                field = serializers.CharField(
-                    required=False, allow_blank=True, read_only=read_only
-                )
+        for setting in settings_registry.get_setting_schemas().values():
+            common_attrs = {
+                "required": False,
+                "read_only": setting.defined_in_file,
+                "label": setting.label,
+                "help_text": setting.help_text,
+                "default": setting.default,
+            }
+            v_type = setting.type
+            if setting.type == str:
+                common_attrs["min_length"] = setting.min_length
+                common_attrs["max_length"] = setting.max_length
+                field = serializers.CharField(allow_blank=True, **common_attrs)
             elif v_type == int:
-                field = serializers.IntegerField(
-                    required=False, read_only=read_only
-                )
+                common_attrs["min_value"] = setting.min_value
+                common_attrs["max_value"] = setting.max_value
+                field = serializers.IntegerField(**common_attrs)
             elif v_type == bool:
-                field = serializers.BooleanField(
-                    required=False, read_only=read_only
-                )
+                field = serializers.BooleanField(**common_attrs)
             elif v_type == dict:
-                field = serializers.JSONField(
-                    required=False, read_only=read_only
-                )
+                field = serializers.JSONField(**common_attrs)
             else:
                 raise TypeError(f"unsupported type {v_type}")
-            self.fields[key] = field
+            field.category = setting.category
+            field.category_slug = setting.category_slug
+            field.defined_in_file = setting.defined_in_file
+            field.hidden = setting.hidden
+            field.encrypted = setting.is_secret
+            if setting.unit:
+                field.unit = setting.unit
+            self.fields[setting.name] = field

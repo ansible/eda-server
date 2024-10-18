@@ -14,7 +14,7 @@
 
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 from django.conf import settings
@@ -39,9 +39,19 @@ class InvalidValueError(Exception):
 class RegistryData(object):
     name: str
     default: Any
+    label: str = ""
+    help_text: str = ""
     type: type = str
-    read_only: bool = False
     is_secret: bool = False
+    hidden: bool = False
+    defined_in_file: bool = False
+    category: str = "System"
+    category_slug = "system"
+    unit: str = ""
+    min_value: Optional[int] = None
+    max_value: Optional[int] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
 
 
 _APPLICATION_SETTING_REGISTRIES = [
@@ -49,47 +59,71 @@ _APPLICATION_SETTING_REGISTRIES = [
         name="INSIGHTS_TRACKING_STATE",
         type=bool,
         default=False,
+        label="Gather data for Automation Analytics",
+        help_text="Enables the service to gather data on automation and send it to Automation Analytics.",  # noqa: E501
     ),
     RegistryData(
         name="AUTOMATION_ANALYTICS_URL",
-        read_only=True,
         default=settings.AUTOMATION_ANALYTICS_URL,
+        defined_in_file=True,
+        label="Automation Analytics upload URL",
+        help_text="This value has been set manually in a settings file.\n\nThis setting is used to to configure the upload URL for data collection for Automation Analytics.",  # noqa: E501
     ),
     RegistryData(
         name="REDHAT_USERNAME",
         default="",
+        label="Red Hat customer username",
+        help_text="This username is used to send data to Automation Analytics",
     ),
     RegistryData(
         name="REDHAT_PASSWORD",
         is_secret=True,
         default="",
+        label="Red Hat customer password",
+        help_text="This password is used to send data to Automation Analytics",
     ),
     RegistryData(
         name="SUBSCRIPTIONS_USERNAME",
         default="",
+        label="Red Hat or Satellite username",
+        help_text="This username is used to retrieve subscription and content information",  # noqa: E501
     ),
     RegistryData(
         name="SUBSCRIPTIONS_PASSWORD",
         is_secret=True,
         default="",
+        label="Red Hat or Satellite password",
+        help_text="This password is used to retrieve subscription and content information",  # noqa: E501
     ),
     RegistryData(
         name="INSIGHTS_CERT_PATH",
-        read_only=True,
         default=settings.INSIGHTS_CERT_PATH,
+        hidden=True,
+        defined_in_file=True,
+        label="Insights certificate path",
+        help_text="File path to locate insights certificate",
     ),
     RegistryData(
         name="AUTOMATION_ANALYTICS_LAST_GATHER",
         default="",
+        hidden=True,
+        label="Last gather date for Automation Analytics",
+        help_text="",
     ),
     RegistryData(
         name="AUTOMATION_ANALYTICS_LAST_ENTRIES",
         default="{}",  # noqa P103
+        label="Last gathered entries from the data collection service of Automation Analytics",  # noqa: E501
+        help_text="",
     ),
     RegistryData(
         name="AUTOMATION_ANALYTICS_GATHER_INTERVAL",
         type=int,
         default=14400,
+        label="Automation Analytics Gather Interval",
+        help_text="Interval (in seconds) between data gathering.",
+        min_value=1800,
+        unit="seconds",
     ),
 ]
 
@@ -109,11 +143,14 @@ class SettingsRegistry(object):
 
     def persist_registry_data(self):
         for key, data in self._registry.items():
-            if data.read_only:
+            if data.defined_in_file:
                 update_method = Setting.objects.update_or_create
             else:
                 update_method = Setting.objects.get_or_create
             update_method(key=key, defaults={"value": data.default})
+
+    def get_setting_schemas(self) -> OrderedDict[str, RegistryData]:
+        return self._registry
 
     def get_registered_settings(
         self, skip_read_only: bool = False
@@ -121,7 +158,7 @@ class SettingsRegistry(object):
         setting_names = []
 
         for setting, data in self._registry.items():
-            if data.read_only and skip_read_only:
+            if data.defined_in_file and skip_read_only:
                 continue
             setting_names.append(setting)
         return setting_names
@@ -130,7 +167,7 @@ class SettingsRegistry(object):
         return self._registry[key].is_secret
 
     def is_setting_read_only(self, key: str) -> bool:
-        return self._registry[key].read_only
+        return self._registry[key].defined_in_file
 
     def get_setting_type(self, key: str) -> type:
         return self._registry[key].type
