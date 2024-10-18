@@ -81,3 +81,20 @@ class EncryptedTextField(BaseEncryptedField, models.TextField):
         if value is None:
             return None
         return SecretValue(decrypt_string(value))
+
+
+class EncryptedJsonField(BaseEncryptedField, models.JSONField):
+    def get_db_prep_save(self, value, connection):
+        if value is None:
+            return None
+        if isinstance(value, SecretValue):
+            value = value.get_secret_value()
+        value = super().get_db_prep_save(value, connection)
+        return encrypt_string(value)
+
+    def from_db_value(self, value, expression, connection):
+        if value is None:
+            return None
+        value = decrypt_string(value)
+        value = super().from_db_value(value, expression, connection)
+        return SecretValue(value)

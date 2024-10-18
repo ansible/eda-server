@@ -24,7 +24,6 @@ from .organization import OrganizationViewSet
 from .project import ProjectViewSet
 from .root import ApiRootView, ApiV1RootView
 from .rulebook import AuditRuleViewSet, RulebookViewSet
-from .setting import SettingView
 from .team import TeamViewSet
 from .user import CurrentUserAwxTokenViewSet, CurrentUserView, UserViewSet
 
@@ -62,5 +61,4 @@ __all__ = (
     "EventStreamViewSet",
     # External event stream
     "ExternalEventStreamViewSet",
-    "SettingView",
 )
