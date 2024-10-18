@@ -86,7 +86,7 @@ INJECTORS = {
 
 @pytest.fixture
 def rollback_migration():
-    call_command("migrate", "core", "0050")
+    call_command("migrate", "core", "0049")
     yield
     call_command("migrate")
 
@@ -95,7 +95,7 @@ def rollback_migration():
 def test_migration(rollback_migration):
     credential_type = _prepare_aap_credetial_type()
 
-    call_command("migrate", "core", "0051")
+    call_command("migrate", "core", "0050")
     credential_type.refresh_from_db()
     assert _get_help_text(credential_type) == list(NEW_HELP_TEXT)
 

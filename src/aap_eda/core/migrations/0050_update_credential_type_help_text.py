@@ -32,7 +32,7 @@ def _update_credential_type_help_text(apps, help_text):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0050_setting"),
+        ("core", "0049_alter_eventstream_name"),
     ]
 
     operations = [
