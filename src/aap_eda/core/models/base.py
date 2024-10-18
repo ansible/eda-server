@@ -14,8 +14,6 @@
 
 from django.db import models
 
-from .utils import get_default_organization_id
-
 __all__ = ("BaseOrgModel", "UniqueNamedModel")
 
 
@@ -28,7 +26,6 @@ class BaseOrgModel(models.Model):
         on_delete=models.CASCADE,
         blank=False,
         null=False,
-        default=get_default_organization_id,
     )
 
 

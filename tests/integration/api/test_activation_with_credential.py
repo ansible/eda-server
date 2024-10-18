@@ -403,11 +403,13 @@ def test_create_activation_with_conflict_credentials(
                 name="credential-1",
                 inputs={"sasl_username": "adam", "sasl_password": "secret"},
                 credential_type_id=user_credential_type.id,
+                organization_id=default_organization.id,
             ),
             models.EdaCredential(
                 name="credential-2",
                 inputs={"sasl_username": "bearny", "sasl_password": "demo"},
                 credential_type_id=user_credential_type.id,
+                organization_id=default_organization.id,
             ),
         ]
     )

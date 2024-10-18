@@ -52,8 +52,11 @@ AAP_INPUTS = {
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_without_credentials(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
-    rulebook_process_with_extra_var = await _prepare_db_data()
+    rulebook_process_with_extra_var = await _prepare_db_data(
+        default_organization
+    )
     rulebook_process_without_extra_var = (
         await _prepare_activation_instance_without_extra_var()
     )
@@ -110,9 +113,12 @@ async def test_handle_workers_without_credentials(
 async def test_handle_workers_with_eda_system_vault_credential(
     ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
     rulebook_process_id = (
-        await _prepare_activation_instance_with_eda_system_vault_credential()
+        await _prepare_activation_instance_with_eda_system_vault_credential(
+            default_organization,
+        )
     )
 
     payload = {
@@ -138,9 +144,13 @@ async def test_handle_workers_with_eda_system_vault_credential(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_controller_info(
-    ws_communicator: WebsocketCommunicator, preseed_credential_types
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_activation_with_controller_info()
+    rulebook_process_id = await _prepare_activation_with_controller_info(
+        default_organization,
+    )
 
     payload = {
         "type": "Worker",
@@ -173,7 +183,7 @@ async def test_handle_workers_with_validation_errors(
     connected, _ = await communicator.connect(timeout=3)
     assert connected
 
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
 
     payload = {
         "type": "Worker",
@@ -190,7 +200,7 @@ async def test_handle_jobs(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
 
     assert (await get_job_instance_count()) == 0
     assert (await get_activation_instance_job_instance_count()) == 0
@@ -238,7 +248,7 @@ async def test_handle_actions_multiple_firing(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     assert (await get_audit_rule_count()) == 0
@@ -272,7 +282,7 @@ async def test_handle_actions_with_empty_job_uuid(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     assert (await get_audit_rule_count()) == 0
 
     # job uuid is empty string
@@ -297,7 +307,7 @@ async def test_handle_actions(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     assert (await get_audit_rule_count()) == 0
@@ -340,7 +350,7 @@ async def test_rule_status_with_multiple_failed_actions(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     action1 = create_action_payload(
@@ -376,7 +386,7 @@ async def test_handle_heartbeat(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     rulebook_process = await get_rulebook_process(rulebook_process_id)
     activation = await get_activation_by_rulebook_process(rulebook_process_id)
     assert activation.ruleset_stats == {}
@@ -446,7 +456,7 @@ async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     matching_events = _matching_events()
@@ -560,6 +570,7 @@ async def test_controller_job_url(
     api_url,
     old_url,
     new_url,
+    default_organization: models.Organization,
 ):
     my_aap_inputs = {
         "host": api_url,
@@ -569,7 +580,7 @@ async def test_controller_job_url(
         "oauth_token": "",
     }
     rulebook_process_id = await _prepare_activation_with_controller_info(
-        my_aap_inputs
+        default_organization, my_aap_inputs
     )
     job_instance = await _prepare_job_instance()
 
@@ -663,23 +674,28 @@ def get_job_instance_event_count():
 
 
 @database_sync_to_async
-def _prepare_activation_instance_with_eda_system_vault_credential():
+def _prepare_activation_instance_with_eda_system_vault_credential(
+    default_organization: models.Organization,
+):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de_test_name_1",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -698,6 +714,7 @@ def _prepare_activation_instance_with_eda_system_vault_credential():
         inputs={"vault_id": "adam", "vault_password": "secret"},
         managed=False,
         credential_type=vault_credential_type,
+        organization=default_organization,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
@@ -707,34 +724,42 @@ def _prepare_activation_instance_with_eda_system_vault_credential():
         project=project,
         user=user,
         decision_environment=decision_environment,
+        organization=default_organization,
     )
     activation.eda_credentials.add(credential)
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
+def _prepare_activation_with_controller_info(
+    default_organization: models.Organization,
+    inputs=AAP_INPUTS,
+):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de_test_name_1",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -753,6 +778,7 @@ def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
         inputs=inputs,
         managed=False,
         credential_type=aap_credential_type,
+        organization=default_organization,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
@@ -762,28 +788,32 @@ def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
         project=project,
         user=user,
         decision_environment=decision_environment,
+        organization=default_organization,
     )
     activation.eda_credentials.add(credential)
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_db_data():
+def _prepare_db_data(default_organization: models.Organization):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -801,6 +831,7 @@ def _prepare_db_data():
         name="de_test_name_1",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
@@ -812,10 +843,12 @@ def _prepare_db_data():
         user=user,
         decision_environment=decision_environment,
         awx_token=token[0],
+        organization=default_organization,
     )
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
+        organization=default_organization,
     )
 
     ruleset, _ = models.Ruleset.objects.get_or_create(
@@ -841,17 +874,21 @@ def _prepare_db_data():
 
 
 @database_sync_to_async
-def _prepare_activation_instance_without_extra_var():
+def _prepare_activation_instance_without_extra_var(
+    default_organization: models.Organization,
+):
     project = models.Project.objects.create(
         name="test-project-no-extra_var",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -869,6 +906,7 @@ def _prepare_activation_instance_without_extra_var():
         name="de_test_name_2",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     activation = models.Activation.objects.create(
@@ -879,27 +917,33 @@ def _prepare_activation_instance_without_extra_var():
         user=user,
         decision_environment=decision_environment,
         awx_token=token[0],
+        organization=default_organization,
     )
 
     rulebook_process = models.RulebookProcess.objects.create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_activation_instance_no_token():
+def _prepare_activation_instance_no_token(
+    default_organization: models.Organization,
+):
     project = models.Project.objects.create(
         name="test-project-no-token",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -914,6 +958,7 @@ def _prepare_activation_instance_no_token():
         name="de_no_token",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     activation = models.Activation.objects.create(
@@ -923,10 +968,12 @@ def _prepare_activation_instance_no_token():
         project=project,
         user=user,
         decision_environment=decision_environment,
+        organization=default_organization,
     )
 
     rulebook_process = models.RulebookProcess.objects.create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id

@@ -19,16 +19,21 @@ from aap_eda.core import models
 
 
 @pytest.fixture
-def default_decision_environment() -> models.DecisionEnvironment:
+def default_decision_environment(
+    default_organization,
+) -> models.DecisionEnvironment:
     """Return a default decision environment."""
     return models.DecisionEnvironment.objects.create(
         name="test-decision-environment",
         image_url="localhost:14000/test-image-url",
+        organization=default_organization,
     )
 
 
 @pytest.fixture
-def default_rulebook() -> models.Rulebook:
+def default_rulebook(
+    default_organization: models.Organization,
+) -> models.Rulebook:
     """Return a default rulebook."""
     rulesets = """
 ---
@@ -48,6 +53,7 @@ def default_rulebook() -> models.Rulebook:
     return models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=rulesets,
+        organization=default_organization,
     )
 
 

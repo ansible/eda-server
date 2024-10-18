@@ -29,7 +29,7 @@ from aap_eda.services.activation.restart_helper import (
 
 
 @pytest.fixture()
-def activation():
+def activation(default_organization: models.Organization):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -40,6 +40,7 @@ def activation():
     return models.Activation.objects.create(
         name="test1",
         user=user,
+        organization=default_organization,
     )
 
 

@@ -92,7 +92,7 @@ def test_remove_extra_permission():
 #################################################################
 # Credentials
 #################################################################
-def create_old_registry_credential():
+def create_old_registry_credential(default_organization: models.Organization):
     credential = models.Credential.objects.create(
         name="registry cred",
         credential_type=enums.CredentialType.REGISTRY,
@@ -103,11 +103,12 @@ def create_old_registry_credential():
         name="my DE",
         image_url="private-reg.com/fred/de",
         credential=credential,
+        organization=default_organization,
     )
     return credential, de
 
 
-def create_old_git_credential():
+def create_old_git_credential(default_organization: models.Organization):
     credential = models.Credential.objects.create(
         name="git cred",
         credential_type=enums.CredentialType.GITHUB,
@@ -118,13 +119,16 @@ def create_old_git_credential():
         name="my project",
         url="github.com/fred/projects",
         credential=credential,
+        organization=default_organization,
     )
     return credential, project
 
 
 @pytest.mark.django_db
-def test_copy_registry_credentials(caplog):
-    credential, de = create_old_registry_credential()
+def test_copy_registry_credentials(
+    default_organization: models.Organization, caplog
+):
+    credential, de = create_old_registry_credential(default_organization)
     Command().handle()
 
     assert not models.Credential.objects.filter(id=credential.id).exists()
@@ -143,8 +147,10 @@ def test_copy_registry_credentials(caplog):
 
 
 @pytest.mark.django_db
-def test_copy_project_credentials(caplog):
-    credential, project = create_old_git_credential()
+def test_copy_project_credentials(
+    default_organization: models.Organization, caplog
+):
+    credential, project = create_old_git_credential(default_organization)
     Command().handle()
 
     assert not models.Credential.objects.filter(id=credential.id).exists()

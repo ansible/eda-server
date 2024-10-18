@@ -1074,6 +1074,8 @@ class Command(BaseCommand):
         if not credentials:
             return
 
+        default_organization = models.utils.get_default_organization()
+
         cred_type = models.CredentialType.objects.filter(
             name=enums.DefaultCredentialType.REGISTRY
         ).first()
@@ -1101,6 +1103,7 @@ class Command(BaseCommand):
                     "managed": False,
                     "credential_type": cred_type,
                     "inputs": inputs_to_store(inputs),
+                    "organization": default_organization,
                 },
             )
             if created:
@@ -1128,6 +1131,8 @@ class Command(BaseCommand):
         if not credentials:
             return
 
+        default_organization = models.utils.get_default_organization()
+
         cred_type = models.CredentialType.objects.filter(
             name=enums.DefaultCredentialType.SOURCE_CONTROL
         ).first()
@@ -1143,6 +1148,7 @@ class Command(BaseCommand):
                     "managed": False,
                     "credential_type": cred_type,
                     "inputs": inputs_to_store(inputs),
+                    "organization": default_organization,
                 },
             )
             if created:

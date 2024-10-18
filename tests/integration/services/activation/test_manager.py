@@ -43,7 +43,9 @@ def apply_settings(settings: SettingsWrapper, **kwargs):
 
 
 @pytest.fixture
-def rulebook_with_job_template() -> models.Rulebook:
+def rulebook_with_job_template(
+    default_organization: models.Organization,
+) -> models.Rulebook:
     """Return a default rulebook."""
     rulesets = """
 ---
@@ -63,6 +65,7 @@ def rulebook_with_job_template() -> models.Rulebook:
     return models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=rulesets,
+        organization=default_organization,
     )
 
 
@@ -74,10 +77,14 @@ def eda_caplog(caplog_factory) -> LogCaptureFixture:
 
 @pytest.fixture
 def activation_with_instance(
+    default_organization: models.Organization,
     basic_activation: models.Activation,
 ) -> models.Activation:
     """Return an activation with an instance."""
-    models.RulebookProcess.objects.create(activation=basic_activation)
+    models.RulebookProcess.objects.create(
+        activation=basic_activation,
+        organization=default_organization,
+    )
     return basic_activation
 
 
@@ -100,6 +107,7 @@ def basic_activation(
     default_user: models.User,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
 ) -> models.Activation:
     """Return the minimal activation."""
     return models.Activation.objects.create(
@@ -110,6 +118,7 @@ def basic_activation(
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
         log_level=enums.RulebookProcessLogLevel.INFO,
+        organization=default_organization,
     )
 
 
@@ -118,6 +127,7 @@ def new_activation_with_instance(
     default_user: models.User,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
 ) -> models.Activation:
     """Return an activation with an instance."""
     activation = models.Activation.objects.create(
@@ -127,10 +137,12 @@ def new_activation_with_instance(
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
     )
     models.RulebookProcess.objects.create(
         activation=activation,
         status=enums.ActivationStatus.RUNNING,
+        organization=default_organization,
     )
     models.RulebookProcessQueue.objects.create(
         process=activation.latest_instance,

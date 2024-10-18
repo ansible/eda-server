@@ -17,16 +17,18 @@ from aap_eda.core import models
 
 
 @pytest.fixture()
-def new_activation(new_user):
+def new_activation(new_user, default_organization):
     return models.Activation.objects.create(
         name="activation",
         user=new_user,
+        organization=default_organization,
     )
 
 
 @pytest.fixture()
-def new_rulebook_process_with_activation(new_activation):
+def new_rulebook_process_with_activation(new_activation, default_organization):
     return models.RulebookProcess.objects.create(
         name="test-instance",
         activation=new_activation,
+        organization=default_organization,
     )

@@ -30,6 +30,7 @@ def activation_no_instance(
     default_user: models.User,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
 ) -> models.Activation:
     """Return an activation with outassociated RulebookProcess."""
     return models.Activation.objects.create(
@@ -39,16 +40,21 @@ def activation_no_instance(
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
     )
 
 
 @pytest.fixture
-def activation(activation_no_instance) -> models.Activation:
+def activation(
+    default_organization: models.Organization,
+    activation_no_instance,
+) -> models.Activation:
     """Return an activation with associated RulebookProcess."""
     models.RulebookProcess.objects.create(
         name="activation-instance-1",
         activation=activation_no_instance,
         git_hash=PROJECT_GIT_HASH,
+        organization=default_organization,
     )
     return activation_no_instance
 

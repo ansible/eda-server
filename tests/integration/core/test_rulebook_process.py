@@ -25,7 +25,7 @@ from aap_eda.core.exceptions import (
 
 
 @pytest.fixture()
-def init_data():
+def init_data(default_organization: models.Organization):
     user = models.User.objects.create(
         username="tester",
         password="secret",
@@ -36,10 +36,12 @@ def init_data():
     activation = models.Activation.objects.create(
         name="activation",
         user=user,
+        organization=default_organization,
     )
     return models.RulebookProcess.objects.create(
         name="test-instance",
         activation=activation,
+        organization=default_organization,
     )
 
 
