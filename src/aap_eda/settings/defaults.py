@@ -251,3 +251,12 @@ PG_NOTIFY_DSN_SERVER: Optional[str] = None
 EVENT_STREAM_BASE_URL: UrlSlash = None
 EVENT_STREAM_MTLS_BASE_URL: UrlSlash = None
 MAX_PG_NOTIFY_MESSAGE_SIZE: int = 6144
+
+# --------------------------------------------------------
+# METRICS COLLECTIONS:
+# --------------------------------------------------------
+AUTOMATION_ANALYTICS_URL: str = ""
+INSIGHTS_CERT_PATH: str = ""
+# Available methods:
+# https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
+AUTOMATION_AUTH_METHOD: str = "user-pass"

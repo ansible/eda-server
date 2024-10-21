@@ -183,3 +183,7 @@ ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
 ANSIBLE_BASE_CHECK_RELATED_PERMISSIONS = ["view"]
 
 DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
+
+# Defines feature flags, and their conditions.
+# See https://cfpb.github.io/django-flags/
+FLAGS = {}
