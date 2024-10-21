@@ -12,11 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from dataclasses import dataclass
 from unittest import mock
 
 import pytest
-from dateutil import parser
 from kubernetes import client as k8sclient
 from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
@@ -24,11 +22,6 @@ from kubernetes.config.config_exception import ConfigException
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.services.activation.db_log_handler import DBLogger
-from aap_eda.services.activation.engine.common import (
-    AnsibleRulebookCmdLine,
-    ContainerRequest,
-    Credential,
-)
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineError,
@@ -46,76 +39,7 @@ from aap_eda.services.activation.engine.kubernetes import (
     get_k8s_client,
 )
 
-
-@dataclass
-class InitData:
-    activation: models.Activation
-    activation_instance: models.RulebookProcess
-
-
-@pytest.fixture()
-def init_data(default_organization: models.Organization):
-    user = models.User.objects.create(
-        username="tester",
-        password="secret",
-        first_name="Adam",
-        last_name="Tester",
-        email="adam@example.com",
-    )
-    activation = models.Activation.objects.create(
-        name="activation",
-        k8s_service_name="test_k8s_service",
-        user=user,
-        organization=default_organization,
-    )
-    activation_instance = models.RulebookProcess.objects.create(
-        name="test-instance",
-        log_read_at=parser.parse("2023-10-30T19:18:48.362883381Z"),
-        activation=activation,
-        organization=default_organization,
-    )
-
-    return InitData(
-        activation=activation,
-        activation_instance=activation_instance,
-    )
-
-
-def get_ansible_rulebook_cmdline(data: InitData):
-    return AnsibleRulebookCmdLine(
-        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-        ws_ssl_verify="no",
-        ws_token_url="http://localhost:8000/api/eda/v1/auth/token/refresh",
-        ws_access_token="access",
-        ws_refresh_token="refresh",
-        id=data.activation.id,
-        log_level="-v",
-        heartbeat=5,
-    )
-
-
-def get_request(
-    data: InitData,
-    default_organization: models.Organization,
-):
-    return ContainerRequest(
-        name="test-request",
-        image_url="quay.io/ansible/ansible-rulebook:main",
-        rulebook_process_id=data.activation_instance.id,
-        process_parent_id=data.activation.id,
-        cmdline=get_ansible_rulebook_cmdline(data),
-        credential=Credential(
-            username="admin",
-            secret="secret",
-            ssl_verify=True,
-            organization=default_organization,
-        ),
-        ports=[("localhost", 8080)],
-        mem_limit="8G",
-        env_vars={"a": 1},
-        extra_args={"b": 2},
-        k8s_service_name=data.activation.k8s_service_name,
-    )
+from .utils import get_request
 
 
 def get_container_state(phase: str):
@@ -274,8 +198,8 @@ def get_pod_statuses_with_exit_code(exit_code: int):
 
 
 @pytest.fixture
-def kubernetes_engine(init_data):
-    activation_id = init_data.activation.id
+def kubernetes_engine(init_kubernetes_data):
+    activation_id = init_kubernetes_data.activation.id
     with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
         engine = Engine(
             activation_id=str(activation_id),
@@ -293,8 +217,8 @@ def kubernetes_engine(init_data):
     ],
 )
 @pytest.mark.django_db
-def test_engine_init(init_data, resource_prefixes):
-    activation_id = init_data.activation.id
+def test_engine_init(init_kubernetes_data, resource_prefixes):
+    activation_id = init_kubernetes_data.activation.id
     with mock.patch("builtins.open", mock.mock_open(read_data="aap-eda")):
         for prefix in resource_prefixes:
             engine = Engine(
@@ -311,8 +235,8 @@ def test_engine_init(init_data, resource_prefixes):
 
 
 @pytest.mark.django_db
-def test_engine_init_with_exception(init_data):
-    activation_id = init_data.activation.id
+def test_engine_init_with_exception(init_kubernetes_data):
+    activation_id = init_kubernetes_data.activation.id
     with pytest.raises(
         ContainerEngineInitError,
         match=(
@@ -351,13 +275,18 @@ def test_get_k8s_client_exception():
 
 @pytest.mark.django_db
 def test_engine_start(
-    init_data,
+    init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
 ):
     engine = kubernetes_engine
-    request = get_request(init_data, default_organization)
-    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
@@ -365,12 +294,12 @@ def test_engine_start(
             engine.start(request, log_handler)
 
     assert engine.job_name == (
-        f"activation-job-{init_data.activation.id}-"
-        f"{init_data.activation_instance.id}"
+        f"activation-job-{init_kubernetes_data.activation.id}-"
+        f"{init_kubernetes_data.activation_instance.id}"
     )
     assert engine.pod_name == (
-        f"activation-pod-{init_data.activation.id}-"
-        f"{init_data.activation_instance.id}"
+        f"activation-pod-{init_kubernetes_data.activation.id}-"
+        f"{init_kubernetes_data.activation_instance.id}"
     )
 
     assert models.RulebookProcessLog.objects.count() == 5
@@ -381,13 +310,18 @@ def test_engine_start(
 
 @pytest.mark.django_db
 def test_engine_start_with_create_job_exception(
-    init_data,
+    init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
 ):
     engine = kubernetes_engine
-    request = get_request(init_data, default_organization)
-    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     def raise_api_error(*args, **kwargs):
         raise ApiException("Job create error")
@@ -402,13 +336,18 @@ def test_engine_start_with_create_job_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_pod_status(
-    init_data,
+    init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
 ):
     engine = kubernetes_engine
-    request = get_request(init_data, default_organization)
-    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     with mock.patch.object(engine.client, "core_api") as core_api_mock:
         core_api_mock.list_namespaced_service.return_value.items = None
@@ -442,14 +381,19 @@ def test_engine_start_with_pod_status(
 )
 @pytest.mark.django_db
 def test_engine_start_with_invalid_image_exception(
-    init_data,
+    init_kubernetes_data,
     kubernetes_engine,
     image_reasons,
     default_organization: models.Organization,
 ):
     engine = kubernetes_engine
-    request = get_request(init_data, default_organization)
-    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     with mock.patch(
         "aap_eda.services.activation.engine.kubernetes.watch"
@@ -515,9 +459,9 @@ def test_get_status_with_exit_codes(kubernetes_engine, exit_codes):
 
 
 @pytest.mark.django_db
-def test_delete_secret(init_data, kubernetes_engine):
+def test_delete_secret(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     status_mock = mock.Mock()
 
     with mock.patch.object(engine.client, "core_api") as core_api_mock:
@@ -550,10 +494,10 @@ def test_delete_secret(init_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_delete_service(init_data, kubernetes_engine):
+def test_delete_service(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
     engine.job_name = "activation-job"
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     service_name = "eda-service"
     service_mock = mock.Mock()
     service_mock.metadata.name = service_name
@@ -585,11 +529,11 @@ def test_delete_service(init_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_delete_job(init_data, kubernetes_engine):
+def test_delete_job(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
     job_name = "eda-job"
     engine.job_name = job_name
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     job_mock = mock.Mock()
     job_mock.metadata.name = job_name
@@ -610,11 +554,11 @@ def test_delete_job(init_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_delete_job_with_exception(init_data, kubernetes_engine):
+def test_delete_job_with_exception(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
     job_name = "eda-job"
     engine.job_name = job_name
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     job_mock = mock.Mock()
     job_mock.metadata.name = job_name
@@ -637,9 +581,9 @@ def test_delete_job_with_exception(init_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_cleanup(init_data, kubernetes_engine):
+def test_cleanup(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     job_name = "eda-job"
 
     with mock.patch.object(engine, "_delete_secret") as secret_mock:
@@ -656,10 +600,10 @@ def test_cleanup(init_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_update_logs(init_data, kubernetes_engine):
+def test_update_logs(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    init_log_read_at = init_data.activation_instance.log_read_at
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    init_log_read_at = init_kubernetes_data.activation_instance.log_read_at
     job_name = "eda-job"
     pod_mock = mock.Mock()
 
@@ -689,8 +633,11 @@ def test_update_logs(init_data, kubernetes_engine):
             engine.update_logs(job_name, log_handler)
 
             assert models.RulebookProcessLog.objects.last().log == f"{message}"
-            init_data.activation_instance.refresh_from_db()
-            assert init_data.activation_instance.log_read_at > init_log_read_at
+            init_kubernetes_data.activation_instance.refresh_from_db()
+            assert (
+                init_kubernetes_data.activation_instance.log_read_at
+                > init_log_read_at
+            )
 
         def raise_api_error(*args, **kwargs):
             raise ApiException("Container not found")
@@ -713,7 +660,7 @@ def test_update_logs(init_data, kubernetes_engine):
 
 
 @pytest.mark.django_db
-def test_get_job_pod(init_data, kubernetes_engine):
+def test_get_job_pod(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
     pods_mock = mock.Mock()
     pod = get_pod("running")
@@ -746,13 +693,18 @@ def test_get_job_pod(init_data, kubernetes_engine):
 
 @pytest.mark.django_db
 def test_create_service(
-    init_data,
+    init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
 ):
     engine = kubernetes_engine
     engine.job_name = "eda-job"
-    request = get_request(init_data, default_organization)
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+    )
 
     with mock.patch.object(engine.client, "core_api") as core_api_mock:
         core_api_mock.list_namespaced_service.return_value.items = None
@@ -772,14 +724,19 @@ def test_create_service(
 
 @pytest.mark.django_db
 def test_create_secret(
-    init_data,
+    init_kubernetes_data,
     kubernetes_engine,
     default_organization: models.Organization,
 ):
     engine = kubernetes_engine
     engine.job_name = "eda-job"
-    request = get_request(init_data, default_organization)
-    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
 
     def raise_api_error(*args, **kwargs):
         raise ApiException("Secret create error")

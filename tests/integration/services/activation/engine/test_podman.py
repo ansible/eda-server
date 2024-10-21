@@ -13,12 +13,10 @@
 #  limitations under the License.
 
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from unittest import mock
 
 import pytest
-from dateutil import parser
 from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
@@ -29,7 +27,6 @@ from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine import messages
 from aap_eda.services.activation.engine.common import (
-    AnsibleRulebookCmdLine,
     ContainerRequest,
     Credential,
 )
@@ -44,77 +41,9 @@ from aap_eda.services.activation.engine.exceptions import (
 )
 from aap_eda.services.activation.engine.podman import Engine, get_podman_client
 
+from .utils import InitData, get_ansible_rulebook_cmdline, get_request
+
 DATA_DIR = Path(__file__).parent / "data"
-
-
-@dataclass
-class InitData:
-    activation: models.Activation
-    activation_instance: models.RulebookProcess
-
-
-@pytest.fixture()
-def init_data(default_organization: models.Organization):
-    user = models.User.objects.create(
-        username="tester",
-        password="secret",
-        first_name="Adam",
-        last_name="Tester",
-        email="adam@example.com",
-    )
-    activation = models.Activation.objects.create(
-        name="activation",
-        user=user,
-        organization=default_organization,
-    )
-    activation_instance = models.RulebookProcess.objects.create(
-        name="test-instance",
-        log_read_at=parser.parse("2023-10-30T19:18:48.362883381Z"),
-        activation=activation,
-        organization=default_organization,
-    )
-
-    return InitData(
-        activation=activation,
-        activation_instance=activation_instance,
-    )
-
-
-def get_ansible_rulebook_cmdline(data: InitData):
-    return AnsibleRulebookCmdLine(
-        ws_url="ws://localhost:8000/api/eda/ws/ansible-rulebook",
-        ws_ssl_verify="no",
-        ws_token_url="http://localhost:8000/api/eda/v1/auth/token/refresh",
-        ws_access_token="access",
-        ws_refresh_token="refresh",
-        id=data.activation.id,
-        log_level="-v",
-        heartbeat=5,
-    )
-
-
-def get_request(
-    data: InitData,
-    default_organization: models.Organization,
-):
-    return ContainerRequest(
-        name="test-request",
-        image_url="quay.io/ansible/ansible-rulebook:main",
-        rulebook_process_id=data.activation_instance.id,
-        process_parent_id=data.activation.id,
-        cmdline=get_ansible_rulebook_cmdline(data),
-        ports=[("localhost", 8080)],
-        mem_limit="8G",
-        mounts=[{"/dev": "/opt"}],
-        env_vars={"a": 1},
-        extra_args={"b": 2},
-        credential=Credential(
-            username="me",
-            secret="secret",
-            ssl_verify=True,
-            organization=default_organization,
-        ),
-    )
 
 
 def get_request_with_never_pull_policy(
@@ -162,8 +91,8 @@ def use_dummy_socket_url(settings):
 
 
 @pytest.fixture
-def podman_engine(init_data):
-    activation_id = init_data.activation.id
+def podman_engine(init_podman_data):
+    activation_id = init_podman_data.activation.id
     with mock.patch(
         "aap_eda.services.activation.engine.podman.PodmanClient"
     ) as client_mock:
@@ -209,16 +138,16 @@ def test_get_podman_client_with_exception(settings):
 
 
 @pytest.mark.django_db
-def test_engine_init(init_data):
-    activation_id = init_data.activation.id
+def test_engine_init(init_podman_data):
+    activation_id = init_podman_data.activation.id
     with mock.patch("aap_eda.services.activation.engine.podman.PodmanClient"):
         engine = Engine(_activation_id=str(activation_id))
         engine.client.version.assert_called_once()
 
 
 @pytest.mark.django_db
-def test_engine_init_with_exception(init_data):
-    activation_id = init_data.activation.id
+def test_engine_init_with_exception(init_podman_data):
+    activation_id = init_podman_data.activation.id
     with pytest.raises(
         ContainerEngineInitError,
         match=r"http://socket_url/",
@@ -228,13 +157,18 @@ def test_engine_init_with_exception(init_data):
 
 @pytest.mark.django_db
 def test_engine_start(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    request = get_request(init_data, default_organization)
-    log_handler = DBLogger(init_data.activation_instance.id)
+    request = get_request(
+        init_podman_data,
+        "me",
+        default_organization,
+        mounts=[{"/dev": "/opt"}],
+    )
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     engine.start(request, log_handler)
 
@@ -245,13 +179,15 @@ def test_engine_start(
 
 @pytest.mark.django_db
 def test_engine_start_with_none_image_url(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
     request.image_url = None
 
     with pytest.raises(ContainerStartError):
@@ -260,13 +196,15 @@ def test_engine_start_with_none_image_url(
 
 @pytest.mark.django_db
 def test_engine_start_with_credential(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
     credential = Credential(
         username="me",
         secret="secret",
@@ -303,7 +241,7 @@ def test_engine_start_with_credential(
 
 @pytest.mark.django_db
 def test_engine_start_with_login_api_exception(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
@@ -314,7 +252,9 @@ def test_engine_start_with_login_api_exception(
         organization=default_organization,
     )
     engine = podman_engine
-    request = get_request(init_data, default_organization)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
     request.credential = credential
 
     def raise_error(*args, **kwargs):
@@ -328,13 +268,15 @@ def test_engine_start_with_login_api_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_image_not_found_exception(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
 
     def raise_not_found_error(*args, **kwargs):
         raise ImageNotFound("Image not found")
@@ -353,13 +295,15 @@ def test_engine_start_with_image_not_found_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_image_api_exception(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
 
     def raise_api_error(*args, **kwargs):
         raise APIError("Image not found")
@@ -372,13 +316,15 @@ def test_engine_start_with_image_api_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_image_pull_timeout_exception(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
     error = "Task exceeded maximum timeout value 120 seconds"
 
     def raise_timeout_error(*args, **kwargs):
@@ -392,13 +338,15 @@ def test_engine_start_with_image_pull_timeout_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_image_pull_exception(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
 
     image_mock = mock.Mock()
     image_mock.pull.return_value.id = None
@@ -416,13 +364,15 @@ def test_engine_start_with_image_pull_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_containers_run_exception(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    request = get_request(init_data, default_organization)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    request = get_request(
+        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+    )
 
     def raise_error(*args, **kwargs):
         raise ContainerError(
@@ -445,15 +395,15 @@ def test_engine_start_with_containers_run_exception(
 
 @pytest.mark.django_db
 def test_engine_start_with_never_pull_policy_request(
-    init_data,
+    init_podman_data,
     podman_engine,
     default_organization: models.Organization,
 ):
     engine = podman_engine
     request = get_request_with_never_pull_policy(
-        init_data, default_organization
+        init_podman_data, default_organization
     )
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     engine.start(request, log_handler)
 
@@ -531,9 +481,9 @@ def test_engine_get_status_with_exception(podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_cleanup(init_data, podman_engine):
+def test_engine_cleanup(init_podman_data, podman_engine):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     engine.cleanup("100", log_handler)
 
@@ -543,9 +493,11 @@ def test_engine_cleanup(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_cleanup_with_not_found_exception(init_data, podman_engine):
+def test_engine_cleanup_with_not_found_exception(
+    init_podman_data, podman_engine
+):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     def raise_error(*args, **kwargs):
         raise NotFound("Not found")
@@ -562,9 +514,9 @@ def test_engine_cleanup_with_not_found_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_cleanup_with_remove_exception(init_data, podman_engine):
+def test_engine_cleanup_with_remove_exception(init_podman_data, podman_engine):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     err_msg = "Not found"
 
@@ -581,9 +533,9 @@ def test_engine_cleanup_with_remove_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_cleanup_with_get_exception(init_data, podman_engine):
+def test_engine_cleanup_with_get_exception(init_podman_data, podman_engine):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     err_msg = "Not found"
 
@@ -597,10 +549,10 @@ def test_engine_cleanup_with_get_exception(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_update_logs(init_data, podman_engine):
+def test_engine_update_logs(init_podman_data, podman_engine):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
-    init_log_read_at = init_data.activation_instance.log_read_at
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+    init_log_read_at = init_podman_data.activation_instance.log_read_at
     message = (
         "2023-10-31 15:28:01,318 - ansible_rulebook.engine - INFO - "
         "Calling main in ansible.eda.range"
@@ -635,14 +587,16 @@ def test_engine_update_logs(init_data, podman_engine):
     )
     assert models.RulebookProcessLog.objects.last().log == f"{message}"
 
-    init_data.activation_instance.refresh_from_db()
-    assert init_data.activation_instance.log_read_at > init_log_read_at
+    init_podman_data.activation_instance.refresh_from_db()
+    assert init_podman_data.activation_instance.log_read_at > init_log_read_at
 
 
 @pytest.mark.django_db
-def test_engine_update_logs_with_container_not_found(init_data, podman_engine):
+def test_engine_update_logs_with_container_not_found(
+    init_podman_data, podman_engine
+):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     engine.client.containers.exists.return_value = None
     engine.update_logs("100", log_handler)
@@ -653,9 +607,9 @@ def test_engine_update_logs_with_container_not_found(init_data, podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_update_logs_with_exception(init_data, podman_engine):
+def test_engine_update_logs_with_exception(init_podman_data, podman_engine):
     engine = podman_engine
-    log_handler = DBLogger(init_data.activation_instance.id)
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
 
     def raise_error(*args, **kwargs):
         raise APIError("Not found")
