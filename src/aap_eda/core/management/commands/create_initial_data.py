@@ -23,7 +23,6 @@ from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
 
-from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
 from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
@@ -1045,7 +1044,6 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        settings_registry.persist_registry_data()
         self._preload_credential_types()
         self._copy_registry_credentials()
         self._copy_scm_credentials()
