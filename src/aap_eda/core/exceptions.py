@@ -31,3 +31,7 @@ class PGNotifyError(Exception):
 
 class ParseError(Exception):
     pass
+
+
+class DuplicateFileTemplateKeyError(Exception):
+    pass

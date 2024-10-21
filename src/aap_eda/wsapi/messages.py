@@ -104,3 +104,10 @@ class HeartbeatMessage(BaseModel):
     activation_id: int
     stats: dict = {}
     reported_at: str
+
+
+class FileContentMessage(BaseModel):
+    type: str = "FileContents"
+    template_key: str
+    data: str
+    eof: bool = False
