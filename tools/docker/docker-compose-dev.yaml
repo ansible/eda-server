@@ -55,7 +55,6 @@ x-environment: &common-env
 
 services:
   podman-node1:
-    user: ${EDA_PODMAN_USER_ID:-0}
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
@@ -64,7 +63,6 @@ services:
       - "${EDA_PODMAN_NODE1_PORT:-8888}:8888"
 
   podman-node2:
-    user: ${EDA_PODMAN_USER_ID:-0}
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
