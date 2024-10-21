@@ -7,7 +7,7 @@ import aap_eda.core.utils.crypto.fields
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0049_alter_eventstream_name"),
+        ("core", "0050_update_credential_type_help_text"),
     ]
 
     operations = [
