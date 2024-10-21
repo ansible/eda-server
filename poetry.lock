@@ -627,6 +627,18 @@ files = [
 ]
 
 [[package]]
+name = "distro"
+version = "1.9.0"
+description = "Distro - an OS platform information API"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2"},
+    {file = "distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed"},
+]
+
+[[package]]
 name = "django"
 version = "4.2.16"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
@@ -649,7 +661,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.1.31"
+version = "2.5.20250207"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -658,24 +670,21 @@ files = []
 develop = false
 
 [package.dependencies]
-asgiref = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
-Django = ">=4.2.16,<4.3.0"
+Django = ">=4.2.5,<4.3.0"
 django-crum = "*"
 django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
 django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
-pyjwt = {version = "*", optional = true, markers = "extra == \"jwt-consumer\" or extra == \"resource-registry\""}
+pyjwt = {version = "*", optional = true, markers = "extra == \"jwt-consumer\""}
 redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
-requests = {version = "*", optional = true, markers = "extra == \"jwt-consumer\" or extra == \"resource-registry\""}
-sqlparse = ">=0.5.2"
-urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
+requests = {version = "*", optional = true, markers = "extra == \"jwt-consumer\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular"]
 authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
@@ -683,7 +692,6 @@ feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
 oauth2-provider = ["django-oauth-toolkit (<2.4.0)"]
 redis-client = ["django-redis", "redis"]
-resource-registry = ["asgiref", "pyjwt", "requests", "urllib3"]
 testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
@@ -1179,6 +1187,22 @@ files = [
     {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
     {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
 ]
+
+[[package]]
+name = "insights-analytics-collector"
+version = "0.3.2"
+description = "Collector Package for Insights for AAP"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "insights-analytics-collector-0.3.2.tar.gz", hash = "sha256:c8464e2f602b01e42574bdad85ed4c8afca9d613c8c886fcbe72f592899f520b"},
+    {file = "insights_analytics_collector-0.3.2-py3-none-any.whl", hash = "sha256:0e88b938d05df83ced969fd0ee29e8452745240ae622fde75aded97a56ee1cf8"},
+]
+
+[package.dependencies]
+django = "*"
+requests = "*"
 
 [[package]]
 name = "ipython"
@@ -2943,4 +2967,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "af92edac99cd98dd22a6900a9e34f57dc4ee061730f49471aef763936b6dafef"
+content-hash = "71e8f64607d46a37c9da833261776fad3e0df9bceaa77e566877f24aa2b76625"

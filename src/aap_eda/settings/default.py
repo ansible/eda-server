@@ -221,6 +221,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "ansible_base.lib.middleware.logging.log_request.LogTracebackMiddleware",
     "crum.CurrentRequestUserMiddleware",
 ]
 
@@ -535,7 +536,12 @@ RQ_QUEUES = get_rq_queues()
 # Otherwise, the default name is used
 RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
-RQ_STARTUP_JOBS = []
+RQ_STARTUP_JOBS = [
+    {
+        "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
+        "job_id": "start_analytics_scheduler",
+    },
+]
 
 # Id of the scheduler job it's required when we have multiple instances of
 # the scheduler running to avoid duplicate jobs
@@ -831,3 +837,12 @@ MAX_PG_NOTIFY_MESSAGE_SIZE = int(
 )
 
 DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
+
+# --------------------------------------------------------
+# METRICS COLLECTIONS:
+# --------------------------------------------------------
+AUTOMATION_ANALYTICS_URL = settings.get("AUTOMATION_ANALYTICS_URL", "")
+INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
+# Available methods:
+# https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
+AUTOMATION_AUTH_METHOD = settings.get("AUTOMATION_AUTH_METHOD", "user-pass")
