@@ -516,6 +516,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     ruleset_stats = YAMLSerializerField(
+        required=True,
         sort_keys=False,
         help_text="The stat information about the activation",
     )
@@ -629,7 +630,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
                 activation.ruleset_stats
             )
             if activation.ruleset_stats
-            else None
+            else ""
         )
 
         return {
