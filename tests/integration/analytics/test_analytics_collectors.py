@@ -19,6 +19,7 @@ import tarfile
 import tempfile
 import uuid
 from datetime import timedelta
+from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -90,7 +91,7 @@ def test_internal_infra_files():
             "status",
             "elapsed",
         ]
-        assert len(lines) == 2
+        assert len(lines) == 3
 
     collector._gather_cleanup()
 
@@ -157,6 +158,31 @@ def test_jobs_stats_collector(
             assert second_jobs[0]["status"] == audit_action_3.status
             assert second_jobs[0]["url"] == audit_action_3.url
             assert second_jobs[0]["install_uuid"] == intall_uuids[0]
+
+
+@pytest.mark.django_db
+def test_activations_sources(
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+    default_event_streams: List[models.EventStream],
+):
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    for stream in default_event_streams:
+        default_activation.event_streams.add(stream.id)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        data = collectors.activation_sources(time_start, tmpdir, until)
+
+        assert data["ansible.eda.range"]["occurrence"] == 3
+        assert sorted(data["ansible.eda.range"]["activation_ids"]) == sorted(
+            [default_activation.id, new_activation.id]
+        )
+        assert sorted(data["ansible.eda.range"]["event_stream_ids"]) == sorted(
+            [default_event_streams[0].id, default_event_streams[1].id]
+        )
+        assert data["ansible.eda.range"]["event_streams"]["hmac"] == 2
 
 
 @pytest.mark.django_db
