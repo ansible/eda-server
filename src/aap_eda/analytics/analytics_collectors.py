@@ -14,9 +14,12 @@
 
 import os
 import platform
+from collections import Counter
 from datetime import datetime
+from typing import Any, Generator, Tuple
 
 import distro
+import yaml
 from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
 from django.db import connection
@@ -28,7 +31,10 @@ from aap_eda.analytics.utils import (
     extract_job_details,
 )
 from aap_eda.core import models
+from aap_eda.core.exceptions import ParseError
 from aap_eda.utils import get_eda_version
+
+SOURCE_RESERVED_KEYS = ["name", "filters"]
 
 
 @register(
@@ -351,6 +357,84 @@ def teams_table(since: datetime, full_path: str, until: datetime, **kwargs):
     query = _get_query(models.Team.objects, since, until, **args)
 
     return _copy_table("teams", query, full_path)
+
+
+@register(
+    "activation_sources",
+    "1.0",
+    description="Event Sources used by activations",
+)
+def activation_sources(
+    since: datetime, full_path: str, until: datetime, **kwargs
+) -> dict:
+    sources = {}
+    activations = models.Activation.objects.filter(
+        Q(created_at__gt=since, created_at__lte=until)
+        | Q(modified_at__gt=since, modified_at__lte=until)
+    ).distinct()
+
+    for activation in activations:
+        source_data = _gen_source_data(activation)
+        stream_data = _gen_stream_data(activation)
+        event_stream_ids = [
+            stream.id for stream in activation.event_streams.all()
+        ]
+        for src, occurrence in source_data:
+            data = sources.get(src, {})
+
+            data["occurrence"] = data.get("occurrence", 0) + occurrence
+
+            activation_ids_set = set(data.get("activation_ids", []))
+            activation_ids_set.add(activation.id)
+            data["activation_ids"] = list(activation_ids_set)
+
+            event_stream_ids_set = set(data.get("event_stream_ids", []))
+            event_stream_ids_set.update(event_stream_ids)
+            if event_stream_ids_set:
+                data["event_stream_ids"] = list(event_stream_ids_set)
+
+            event_streams = data.get("event_streams", {})
+            for stream, counter in stream_data:
+                event_streams[stream] = event_streams.get(stream, 0) + counter
+
+            if event_streams:
+                data["event_streams"] = event_streams
+
+            sources[src] = data
+
+    return sources
+
+
+def _gen_source_data(
+    activation: models.Activation,
+) -> Generator[Tuple[Any, int], None, None]:
+    try:
+        rulesets = yaml.safe_load(activation.rulebook_rulesets)
+    except yaml.MarkedYAMLError as ex:
+        raise ParseError("Failed to parse rulebook data") from ex
+
+    source_types = []
+    for ruleset in rulesets:
+        for source in ruleset.get("sources", []):
+            keys = source.keys()
+            types = [item for item in keys if item not in SOURCE_RESERVED_KEYS]
+            source_types.extend(types)
+
+    sources_dict = Counter(source_types)
+
+    yield from sources_dict.items()
+
+
+def _gen_stream_data(
+    activation: models.Activation,
+) -> Generator[Tuple[Any, int], None, None]:
+    stream_types = [
+        stream.event_stream_type for stream in activation.event_streams.all()
+    ]
+
+    stream_dict = Counter(stream_types)
+
+    yield from stream_dict.items()
 
 
 def _datetime_format(dt: datetime) -> str:
