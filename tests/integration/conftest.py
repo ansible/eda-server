@@ -670,6 +670,7 @@ def new_activation(
         organization=default_organization,
         user=default_user,
         log_level="debug",
+        status="completed",
     )
 
 
