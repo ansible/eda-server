@@ -30,13 +30,16 @@ from aap_eda.core.enums import ActivationRequest, ActivationStatus
     ],
 )
 @pytest.mark.django_db
-def test_latest_instance_field(instance):
+def test_latest_instance_field(
+    default_organization: models.Organization, instance
+):
     """Test latest_instance field is updated when a new instance is created."""
     assert instance.latest_instance is None
 
     kwargs = {
         "name": "test-instance",
         "status": ActivationStatus.PENDING,
+        "organization": default_organization,
     }
 
     if isinstance(instance, models.Activation):

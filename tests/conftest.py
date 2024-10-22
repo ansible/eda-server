@@ -15,7 +15,9 @@
 import logging
 
 import pytest
+from django.conf import settings
 
+from aap_eda.core import models
 from aap_eda.settings import default
 
 
@@ -30,6 +32,18 @@ def caplog_factory(caplog):
         return caplog
 
     return _factory
+
+
+#################################################################
+# Organization
+#################################################################
+@pytest.fixture
+def default_organization() -> models.Organization:
+    "Corresponds to migration add_default_organization"
+    return models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )[0]
 
 
 #################################################################

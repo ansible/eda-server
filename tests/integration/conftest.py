@@ -316,7 +316,9 @@ def default_rulebook(
 
 @pytest.fixture
 def bad_rulebook(
-    default_project: models.Project, bad_rulesets: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    bad_rulesets: str,
 ) -> models.Rulebook:
     """Return a bad Rulebook."""
     return models.Rulebook.objects.create(
@@ -324,12 +326,15 @@ def bad_rulebook(
         rulesets=bad_rulesets,
         description="test bad rulebook",
         project=default_project,
+        organization=default_organization,
     )
 
 
 @pytest.fixture
 def default_rulebook_with_run_job_template(
-    default_project: models.Project, default_run_job_template_rulesets: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    default_run_job_template_rulesets: str,
 ) -> models.Rulebook:
     """Return a default Rulebook with run_job_template action"""
     return models.Rulebook.objects.create(
@@ -337,6 +342,7 @@ def default_rulebook_with_run_job_template(
         rulesets=default_run_job_template_rulesets,
         description="test rulebook",
         project=default_project,
+        organization=default_organization,
     )
 
 
@@ -360,13 +366,16 @@ def ruleset_with_job_template() -> str:
 
 @pytest.fixture
 def rulebook_with_job_template(
-    default_project: models.Project, ruleset_with_job_template: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    ruleset_with_job_template: str,
 ) -> models.Rulebook:
     rulebook = models.Rulebook.objects.create(
         name="job-template.yml",
         description="rulebook with job template",
         rulesets=ruleset_with_job_template,
         project=default_project,
+        organization=default_organization,
     )
     return rulebook
 
@@ -430,7 +439,9 @@ def default_rule(ruleset_1: models.Ruleset) -> models.Rule:
 #################################################################
 @pytest.fixture
 def default_activation_instance(
-    default_activation: models.Activation, default_project: models.Project
+    default_activation: models.Activation,
+    default_project: models.Project,
+    default_organization: models.Organization,
 ) -> models.RulebookProcess:
     """Return a list of Activation Instances"""
     instance = models.RulebookProcess.objects.create(
@@ -441,6 +452,7 @@ def default_activation_instance(
         status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
             enums.ActivationStatus.COMPLETED
         ],
+        organization=default_organization,
     )
 
     models.RulebookProcessQueue.objects.create(
@@ -454,6 +466,7 @@ def default_activation_instance(
 @pytest.fixture
 def default_audit_rule(
     default_activation_instance: models.RulebookProcess,
+    default_organization: models.Organization,
 ) -> models.AuditRule:
     return models.AuditRule.objects.create(
         name="default audit rule",
@@ -462,12 +475,14 @@ def default_audit_rule(
         ruleset_uuid=DUMMY_UUID,
         ruleset_name="test-audit-ruleset-name-1",
         activation_instance=default_activation_instance,
+        organization=default_organization,
     )
 
 
 @pytest.fixture
 def audit_rule_1(
     default_activation_instances: List[models.RulebookProcess],
+    default_organization: models.Organization,
 ) -> models.AuditRule:
     return models.AuditRule.objects.create(
         name="rule with 1 action",
@@ -476,12 +491,14 @@ def audit_rule_1(
         ruleset_uuid=DUMMY_UUID,
         ruleset_name="test-audit-ruleset-name-1",
         activation_instance=default_activation_instances[0],
+        organization=default_organization,
     )
 
 
 @pytest.fixture
 def audit_rule_2(
     new_activation_instance: models.RulebookProcess,
+    default_organization: models.Organization,
 ) -> models.AuditRule:
     return models.AuditRule.objects.create(
         name="rule with 2 actions/events",
@@ -490,6 +507,7 @@ def audit_rule_2(
         ruleset_uuid=DUMMY_UUID,
         ruleset_name="test-audit-ruleset-name-2",
         activation_instance=new_activation_instance,
+        organization=default_organization,
     )
 
 
@@ -684,7 +702,9 @@ def new_activation(
 
 @pytest.fixture
 def default_activation_instances(
-    default_activation: models.Activation, default_project: models.Project
+    default_activation: models.Activation,
+    default_project: models.Project,
+    default_organization: models.Organization,
 ) -> models.RulebookProcess:
     """Return a list of Activation Instances"""
     instances = models.RulebookProcess.objects.bulk_create(
@@ -697,6 +717,7 @@ def default_activation_instances(
                 status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
                     enums.ActivationStatus.COMPLETED
                 ],
+                organization=default_organization,
             ),
             models.RulebookProcess(
                 name="default-activation-instance-2",
@@ -706,6 +727,7 @@ def default_activation_instances(
                 status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
                     enums.ActivationStatus.FAILED
                 ],
+                organization=default_organization,
             ),
         ]
     )
@@ -721,7 +743,9 @@ def default_activation_instances(
 
 @pytest.fixture
 def new_activation_instance(
-    new_activation: models.Activation, default_project: models.Project
+    new_activation: models.Activation,
+    default_project: models.Project,
+    default_organization: models.Organization,
 ) -> models.RulebookProcess:
     """Return an Activation Instance for new_activation fixture"""
     return models.RulebookProcess.objects.create(
@@ -732,6 +756,7 @@ def new_activation_instance(
         status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
             enums.ActivationStatus.COMPLETED
         ],
+        organization=default_organization,
     )
 
 
@@ -1040,15 +1065,6 @@ def default_gpg_credential(
 #################################################################
 # Organizations and Teams
 #################################################################
-@pytest.fixture
-def default_organization() -> models.Organization:
-    "Corresponds to migration add_default_organization"
-    return models.Organization.objects.get_or_create(
-        name=settings.DEFAULT_ORGANIZATION_NAME,
-        description="The default organization",
-    )[0]
-
-
 @pytest.fixture
 def new_organization() -> models.Organization:
     "Return a new organization"

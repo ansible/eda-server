@@ -16,22 +16,25 @@ from unittest import mock
 
 import pytest
 
-from aap_eda.core.models import EdaCredential
+from aap_eda.core import models
 from aap_eda.services.project.scm import ScmError, ScmRepository
 
 
 @pytest.fixture
-def credential() -> EdaCredential:
-    credential = EdaCredential.objects.create(
+def credential(
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential = models.EdaCredential.objects.create(
         name="test-eda-credential",
         inputs={"username": "adam", "password": "secret"},
+        organization=default_organization,
     )
     credential.refresh_from_db()
     return credential
 
 
 @pytest.mark.django_db
-def test_git_clone(credential: EdaCredential):
+def test_git_clone(credential: models.EdaCredential):
     executor = mock.MagicMock()
     with tempfile.TemporaryDirectory() as dest_path:
         repository = ScmRepository.clone(
@@ -65,7 +68,7 @@ def test_git_clone(credential: EdaCredential):
 
 @pytest.mark.django_db
 def test_git_clone_leak_password(
-    credential: EdaCredential,
+    credential: models.EdaCredential,
 ):
     executor = mock.MagicMock()
 
@@ -110,7 +113,7 @@ def test_git_clone_without_ssl_verification():
 
 @pytest.mark.django_db
 def test_git_clone_empty_project(
-    credential: EdaCredential,
+    credential: models.EdaCredential,
 ):
     executor = mock.MagicMock()
 

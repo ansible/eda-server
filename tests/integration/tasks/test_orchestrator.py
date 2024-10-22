@@ -28,7 +28,9 @@ from aap_eda.tasks import orchestrator
 
 
 @pytest.fixture
-def default_rulebook() -> models.Rulebook:
+def default_rulebook(
+    default_organization: models.Organization,
+) -> models.Rulebook:
     """Return a default rulebook."""
     rulesets = """
 ---
@@ -48,11 +50,12 @@ def default_rulebook() -> models.Rulebook:
     return models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=rulesets,
+        organization=default_organization,
     )
 
 
 @pytest.fixture()
-def activation(default_rulebook):
+def activation(default_rulebook, default_organization):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -63,6 +66,7 @@ def activation(default_rulebook):
     decision_environment = models.DecisionEnvironment.objects.create(
         name="test-decision-environment",
         image_url="localhost:14000/test-image-url",
+        organization=default_organization,
     )
     return models.Activation.objects.create(
         name="test1",
@@ -70,11 +74,12 @@ def activation(default_rulebook):
         decision_environment=decision_environment,
         rulebook=default_rulebook,
         rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
     )
 
 
 @pytest.fixture()
-def max_running_processes():
+def max_running_processes(default_organization: models.Organization):
     user = models.User.objects.create_user(
         username="luke.skywalker2",
         first_name="Luke",
@@ -87,6 +92,7 @@ def max_running_processes():
         activation = models.Activation.objects.create(
             name=f"test_max_running{i}",
             user=user,
+            organization=default_organization,
         )
         status = (
             ActivationStatus.STARTING if i == 0 else ActivationStatus.RUNNING
@@ -95,6 +101,7 @@ def max_running_processes():
             name=f"running{i}",
             activation=activation,
             status=status,
+            organization=default_organization,
         )
         processes.append(process)
         models.RulebookProcessQueue.objects.create(
@@ -271,6 +278,7 @@ def test_max_running_activation_after_start_job(
     activation,
     max_running_processes,
     container_engine_mock,
+    default_organization: models.Organization,
 ):
     """Check if the max running processes error is handled correctly
     when the limit is reached after the request is started."""
@@ -282,6 +290,7 @@ def test_max_running_activation_after_start_job(
             name="running",
             activation=max_running_processes[0].activation,
             status=ActivationStatus.RUNNING,
+            organization=default_organization,
         )
         original_start_method(instance, *args[1:], **kwargs)
 
