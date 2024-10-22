@@ -1185,6 +1185,7 @@ def default_event_streams(
             models.EventStream(
                 uuid=uuid.uuid4(),
                 name="test-es-1",
+                event_stream_type=default_hmac_credential.credential_type.kind,
                 owner=default_user,
                 organization=default_organization,
                 eda_credential=default_hmac_credential,
@@ -1193,6 +1194,7 @@ def default_event_streams(
             models.EventStream(
                 uuid=uuid.uuid4(),
                 name="another-test-es-2",
+                event_stream_type=default_hmac_credential.credential_type.kind,
                 owner=default_user,
                 organization=default_organization,
                 eda_credential=default_hmac_credential,
