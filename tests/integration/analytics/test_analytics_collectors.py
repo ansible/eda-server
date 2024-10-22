@@ -17,7 +17,9 @@ import json
 import os
 import tarfile
 import tempfile
+import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from django.utils.timezone import now
@@ -89,9 +91,73 @@ def test_internal_infra_files():
             "status",
             "elapsed",
         ]
-        assert len(lines) == 1
+        assert len(lines) == 2
 
     collector._gather_cleanup()
+
+
+@pytest.mark.django_db
+def test_jobs_stats_collector(
+    default_activation: models.Activation,
+    audit_action_1: models.AuditAction,
+    audit_action_2: models.AuditAction,
+    audit_action_3: models.AuditAction,
+):
+    until = now()
+    time_start = until - timedelta(hours=9)
+    job_ids = ["8018", "8020"]
+    intall_uuids = [str(uuid.uuid4()), str(uuid.uuid4())]
+    audit_action_1.url = (
+        f"https://controller_1/#/jobs/playbook/{job_ids[0]}/details/"
+    )
+    audit_action_2.url = (
+        f"https://controller_2/#/jobs/workflow/{job_ids[0]}/details/"
+    )
+    audit_action_3.url = (
+        f"https://controller_1/#/jobs/workflow/{job_ids[1]}/details/"
+    )
+    audit_action_1.save(update_fields=["url"])
+    audit_action_2.save(update_fields=["url"])
+    audit_action_3.save(update_fields=["url"])
+
+    with patch(
+        "aap_eda.analytics.analytics_collectors.collect_controllers_info"
+    ) as collect_controllers_info:
+        collect_controllers_info.return_value = {
+            "https://controller_1/": {"install_uuid": intall_uuids[0]},
+            "https://controller_2/": {"install_uuid": intall_uuids[1]},
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data = collectors.jobs_stats(
+                time_start, tmpdir, until=now() + timedelta(seconds=1)
+            )
+            assert list(data.keys()) == job_ids
+
+            first_jobs = data[job_ids[0]]
+            assert len(first_jobs) == 2
+            assert first_jobs[0]["job_id"] == job_ids[0]
+            assert first_jobs[0]["type"] == "run_job_template"
+            assert first_jobs[0]["created_at"] == audit_action_1.fired_at
+            assert first_jobs[0]["status"] == audit_action_1.status
+            assert first_jobs[0]["url"] == audit_action_1.url
+            assert first_jobs[0]["install_uuid"] == intall_uuids[0]
+
+            assert first_jobs[1]["job_id"] == job_ids[0]
+            assert first_jobs[1]["type"] == "run_workflow_template"
+            assert first_jobs[1]["created_at"] == audit_action_2.fired_at
+            assert first_jobs[1]["status"] == audit_action_2.status
+            assert first_jobs[1]["url"] == audit_action_2.url
+            assert first_jobs[1]["install_uuid"] == intall_uuids[1]
+
+            second_jobs = data[job_ids[1]]
+            assert len(second_jobs) == 1
+            assert second_jobs[0]["job_id"] == job_ids[1]
+            assert second_jobs[0]["type"] == "run_workflow_template"
+            assert second_jobs[0]["created_at"] == audit_action_3.fired_at
+            assert second_jobs[0]["status"] == audit_action_3.status
+            assert second_jobs[0]["url"] == audit_action_3.url
+            assert second_jobs[0]["install_uuid"] == intall_uuids[0]
 
 
 @pytest.mark.django_db

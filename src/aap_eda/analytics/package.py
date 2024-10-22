@@ -39,7 +39,7 @@ class Package(InsightsAnalyticsPackage):
         self._check_users()
         user_name = (
             application_settings.REDHAT_USERNAME
-            | application_settings.SUBSCRIPTIONS_USERNAME
+            or application_settings.SUBSCRIPTIONS_USERNAME
         )
 
         return user_name
@@ -48,7 +48,7 @@ class Package(InsightsAnalyticsPackage):
         self._check_users()
         user_password = (
             application_settings.REDHAT_PASSWORD
-            | application_settings.SUBSCRIPTIONS_PASSWORD
+            or application_settings.SUBSCRIPTIONS_PASSWORD
         )
 
         return user_password

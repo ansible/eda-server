@@ -83,32 +83,32 @@ def test_gather_analytics_invalid_settings(
         (
             ("--dry-run", "--since", "2024-08-20"),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
         (
             ("--dry-run", "--since", "'2024-08-20 19:44:43.622759+00'"),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
         (
             ("--dry-run", "--since", "'2024-08-20 19:44:43'"),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
         (
             ("--dry-run", "--since", "'2024-08-20 19:44:43.622759'"),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
         (
             ("--dry-run", "--until", "2024-09-20"),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
         (
             ("--dry-run", "--until", "'2024-09-20 19:44:43.622759+00'"),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
         (
             (
@@ -119,7 +119,7 @@ def test_gather_analytics_invalid_settings(
                 "'2024-09-20 19:44:43'",
             ),
             "INFO",
-            "No analytics collected",
+            "Analytics collection is done",
         ),
     ],
 )
