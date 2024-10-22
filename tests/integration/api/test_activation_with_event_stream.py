@@ -222,6 +222,26 @@ def create_activation_related_data(
         else None
     )
 
+    hmac_credential_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.HMAC
+    )
+    hmac_credential_id = models.EdaCredential.objects.create(
+        name="default-hmac-credential",
+        description="Default HMAC Credential",
+        credential_type=hmac_credential_type,
+        inputs=inputs_to_store(
+            {
+                "auth_type": "hmac",
+                "hmac_algorithm": "sha256",
+                "secret": "secret",
+                "header_key": "X-Hub-Signature-256",
+                "hmac_format": "hex",
+                "hmac_signature_prefix": "sha256=",
+            }
+        ),
+        organization=organization,
+    ).id
+
     event_streams = []
     for name in event_stream_names:
         event_stream = models.EventStream.objects.create(
@@ -229,6 +249,7 @@ def create_activation_related_data(
             name=name,
             owner=user,
             organization=organization,
+            eda_credential_id=hmac_credential_id,
         )
         event_streams.append(event_stream)
 

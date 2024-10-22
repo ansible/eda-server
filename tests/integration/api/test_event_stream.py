@@ -75,13 +75,32 @@ def test_retrieve_event_stream(
     default_vault_credential,
 ):
     event_stream = default_event_streams[0]
-    response = admin_client.get(
-        f"{api_url_v1}/event-streams/{event_stream.id}/"
-    )
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/ohlala/",
+    ):
+        response = admin_client.get(
+            f"{api_url_v1}/event-streams/{event_stream.id}/"
+        )
+
     assert response.status_code == status.HTTP_200_OK
     assert response.data["name"] == default_event_streams[0].name
-    assert response.data["url"] == default_event_streams[0].url
     assert response.data["owner"] == "luke.skywalker"
+
+    uuid = default_event_streams[0].uuid
+    base_url = f"https://www.example.com/ohlala{api_url_v1}"
+    expected_url = f"{base_url}/external_event_stream/{uuid}/post/"
+    assert response.data["url"] == expected_url
+
+    # Verify the url is dynamic
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example2.com/ohlala2/",
+    ):
+        response = admin_client.get(
+            f"{api_url_v1}/event-streams/{event_stream.id}/"
+        )
+        assert response.data["url"].startswith(
+            "https://www.example2.com/ohlala2/"
+        )
 
 
 @pytest.mark.django_db
