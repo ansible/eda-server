@@ -23,7 +23,20 @@ import yaml
 from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
 from django.db import connection
-from django.db.models import F, Manager, Q
+from django.db.models import (
+    Case,
+    Count,
+    DateTimeField,
+    F,
+    IntegerField,
+    Manager,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 from insights_analytics_collector import CsvFileSplitter, register
 
 from aap_eda.analytics.utils import (
@@ -31,6 +44,7 @@ from aap_eda.analytics.utils import (
     extract_job_details,
 )
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.exceptions import ParseError
 from aap_eda.utils import get_eda_version
 
@@ -98,6 +112,76 @@ def jobs_stats(since: datetime, full_path: str, until: datetime, **kwargs):
         stats[job_id] = data
 
     return stats
+
+
+@register(
+    "activations_stats",
+    "1.0",
+    format="csv",
+    description="Stats for activations",
+)
+def activation_stats(
+    since: datetime, full_path: str, until: datetime, **kwargs
+):
+    has_ended_at_states = [
+        ActivationStatus.FAILED.value,
+        ActivationStatus.STOPPED.value,
+        ActivationStatus.COMPLETED.value,
+        ActivationStatus.UNRESPONSIVE.value,
+        ActivationStatus.ERROR.value,
+        ActivationStatus.WORKERS_OFFLINE.value,
+    ]
+    counts_query = (
+        models.RulebookProcess.objects.filter(activation_id=OuterRef("pk"))
+        .values("activation_id")
+        .annotate(counts=Count("id"))
+        .values("counts")
+    )
+
+    activations = (
+        models.Activation.objects.annotate(
+            ended_at=Case(
+                When(status__in=has_ended_at_states, then=F("modified_at")),
+                output_field=DateTimeField(),
+            ),
+            activations_counts=Coalesce(Subquery(counts_query), Value(0)),
+            max_restart_count=Value(
+                int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+                output_field=IntegerField(),
+            ),
+        )
+        .filter(
+            Q(created_at__gt=since, created_at__lte=until)
+            | Q(modified_at__gt=since, modified_at__lte=until)
+        )
+        .distinct()
+    ).values(
+        "id",
+        "name",
+        "status",
+        "restart_count",
+        "failure_count",
+        "log_level",
+        "organization_id",
+        "created_at",
+        "ended_at",
+        "activations_counts",
+        "max_restart_count",
+    )
+
+    query = (
+        str(activations.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+    for status in has_ended_at_states:
+        query = query.replace(status, f"'{status}'")
+
+    return _copy_table(
+        "activations_stats",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
