@@ -36,7 +36,6 @@ from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
 
 DUMMY_UUID = "8472ff2c-6045-4418-8d4e-46f6cffc8557"
-DUMMY_URL = "https://www.example.com"
 
 
 #################################################################
@@ -1187,7 +1186,6 @@ def default_event_streams(
                 name="test-es-1",
                 owner=default_user,
                 organization=default_organization,
-                url=DUMMY_URL,
                 eda_credential=default_hmac_credential,
                 test_mode=False,
             ),
@@ -1196,7 +1194,6 @@ def default_event_streams(
                 name="another-test-es-2",
                 owner=default_user,
                 organization=default_organization,
-                url=DUMMY_URL,
                 eda_credential=default_hmac_credential,
                 test_mode=True,
             ),
@@ -1215,7 +1212,6 @@ def default_event_stream(
         name="test-es-1",
         owner=default_user,
         organization=default_organization,
-        url=DUMMY_URL,
         eda_credential=default_hmac_credential,
     )
 

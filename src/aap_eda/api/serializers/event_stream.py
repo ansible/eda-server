@@ -12,12 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from typing import Optional
+from urllib.parse import urljoin
 
+import yaml
+from django.conf import settings
+from django.urls import reverse
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models, validators
+from aap_eda.core import enums, models, validators
 
 
 class EventStreamInSerializer(serializers.ModelSerializer):
@@ -72,6 +76,7 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
     eda_credential = EdaCredentialRefSerializer(
         required=True, allow_null=False
     )
+    url = serializers.SerializerMethodField()
 
     class Meta:
         model = models.EventStream
@@ -97,6 +102,16 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             "event_stream_type",
             *read_only_fields,
         ]
+
+    def get_url(self, obj) -> str:
+        path = reverse(
+            "external_event_stream-post",
+            kwargs={"pk": obj.uuid},
+        ).lstrip("/")
+        inputs = yaml.safe_load(obj.eda_credential.inputs.get_secret_value())
+        if inputs.get("auth_type", None) == enums.EventStreamAuthType.MTLS:
+            return urljoin(settings.EVENT_STREAM_MTLS_BASE_URL, path)
+        return urljoin(settings.EVENT_STREAM_BASE_URL, path)
 
     def get_owner(self, obj) -> str:
         return f"{obj.owner.username}"

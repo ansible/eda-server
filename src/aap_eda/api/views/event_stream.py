@@ -13,12 +13,9 @@
 #  limitations under the License.
 """EventStream configuration API Set."""
 import logging
-from urllib.parse import urljoin
 
-import yaml
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
-from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
@@ -33,12 +30,10 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import EventStreamAuthType, ResourceType
+from aap_eda.core.enums import ResourceType
 from aap_eda.core.utils import logging_utils
 
 logger = logging.getLogger(__name__)
-
-EVENT_STREAM_EXTERNAL_PATH = "api/eda/v1/external_event_stream"
 
 resource_name = "EventStream"
 
@@ -187,19 +182,6 @@ class EventStreamViewSet(
             RoleDefinition.objects.give_creator_permissions(
                 request.user, serializer.instance
             )
-            inputs = yaml.safe_load(
-                response.eda_credential.inputs.get_secret_value()
-            )
-            sub_path = f"{EVENT_STREAM_EXTERNAL_PATH}/{response.uuid}/post/"
-            if inputs["auth_type"] == EventStreamAuthType.MTLS:
-                response.url = urljoin(
-                    settings.EVENT_STREAM_MTLS_BASE_URL, sub_path
-                )
-            else:
-                response.url = urljoin(
-                    settings.EVENT_STREAM_BASE_URL, sub_path
-                )
-            response.save(update_fields=["url"])
 
         logger.info(
             logging_utils.generate_simple_audit_log(
