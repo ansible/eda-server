@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from itertools import groupby
 
 import jwt
+from ansible_base.resource_registry.signals.handlers import no_reverse_sync
 from django.conf import settings
 
 from aap_eda.core.models.user import User
@@ -46,10 +47,11 @@ def create_jwt_token() -> tuple[str, str]:
 
     They can be sent to rulebook clients through command line arguments.
     """
-    user, new = User.objects.get_or_create(
-        username="_token_service_user",
-        is_service_account=True,
-    )
+    with no_reverse_sync():
+        user, new = User.objects.get_or_create(
+            username="_token_service_user",
+            is_service_account=True,
+        )
     if new:
         user.set_unusable_password()
         user.save(update_fields=["password"])
