@@ -68,3 +68,29 @@ def test_update_settings_wrong_type(superuser_client: APIClient):
         f"{api_url_v1}/settings/system/", data=data
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_options(superuser_client: APIClient):
+    response = superuser_client.options(f"{api_url_v1}/settings/system/")
+    assert response.status_code == status.HTTP_200_OK
+    get_interval = response.data["actions"]["GET"][
+        "AUTOMATION_ANALYTICS_GATHER_INTERVAL"
+    ]
+    patch_interval = response.data["actions"]["PATCH"][
+        "AUTOMATION_ANALYTICS_GATHER_INTERVAL"
+    ]
+    for field in [get_interval, patch_interval]:
+        assert field["type"] == "integer"
+        assert field["hidden"] is False
+        assert field["label"] == "Automation Analytics Gather Interval"
+        assert (
+            field["help_text"]
+            == "Interval (in seconds) between data gathering."
+        )
+        assert field["min_value"] == 1800
+        assert field["category"] == "System"
+        assert field["category_slug"] == "system"
+        assert field["unit"] == "seconds"
+    assert get_interval["defined_in_file"] is False
+    assert patch_interval["default"] == 14400
