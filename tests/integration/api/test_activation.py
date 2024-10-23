@@ -413,7 +413,7 @@ def test_retrieve_activation(
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert_activation_base_data(data, default_activation)
-    assert data["ruleset_stats"] is None
+    assert data["ruleset_stats"] == ""
     if default_activation.project:
         assert data["project"]["id"] == default_activation.project.id
     else:
