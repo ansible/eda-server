@@ -17,7 +17,10 @@ import json
 import os
 import tarfile
 import tempfile
+import uuid
 from datetime import timedelta
+from typing import List
+from unittest.mock import patch
 
 import pytest
 from django.utils.timezone import now
@@ -65,14 +68,13 @@ def test_internal_infra_files():
             data_collection_status_csv, encoding="utf-8"
         )
 
-        assert len(config_json.keys()) == 5
+        assert len(config_json.keys()) == 4
         for key in config_json.keys():
             assert key in [
                 "install_uuid",
                 "platform",
                 "eda_log_level",
                 "eda_version",
-                "eda_deployment_type",
             ]
         assert manifest_json["config.json"] == "1.0"
         assert manifest_json["data_collection_status.csv"] == "1.0"
@@ -89,9 +91,152 @@ def test_internal_infra_files():
             "status",
             "elapsed",
         ]
-        assert len(lines) == 1
+        assert len(lines) == 3
 
     collector._gather_cleanup()
+
+
+@pytest.mark.django_db
+def test_jobs_stats_collector(
+    default_activation: models.Activation,
+    audit_action_1: models.AuditAction,
+    audit_action_2: models.AuditAction,
+    audit_action_3: models.AuditAction,
+):
+    until = now()
+    time_start = until - timedelta(hours=9)
+    job_ids = ["8018", "8020"]
+    intall_uuids = [str(uuid.uuid4()), str(uuid.uuid4())]
+    audit_action_1.url = (
+        f"https://controller_1/#/jobs/playbook/{job_ids[0]}/details/"
+    )
+    audit_action_2.url = (
+        f"https://controller_2/#/jobs/workflow/{job_ids[0]}/details/"
+    )
+    audit_action_3.url = (
+        f"https://controller_1/#/jobs/workflow/{job_ids[1]}/details/"
+    )
+    audit_action_1.save(update_fields=["url"])
+    audit_action_2.save(update_fields=["url"])
+    audit_action_3.save(update_fields=["url"])
+
+    with patch(
+        "aap_eda.analytics.analytics_collectors.collect_controllers_info"
+    ) as collect_controllers_info:
+        collect_controllers_info.return_value = {
+            "https://controller_1/": {"install_uuid": intall_uuids[0]},
+            "https://controller_2/": {"install_uuid": intall_uuids[1]},
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data = collectors.jobs_stats(
+                time_start, tmpdir, until=now() + timedelta(seconds=1)
+            )
+            assert list(data.keys()) == job_ids
+
+            first_jobs = data[job_ids[0]]
+            assert len(first_jobs) == 2
+            assert first_jobs[0]["job_id"] == job_ids[0]
+            assert first_jobs[0]["type"] == "run_job_template"
+            assert first_jobs[0]["created_at"] == audit_action_1.fired_at
+            assert first_jobs[0]["status"] == audit_action_1.status
+            assert first_jobs[0]["url"] == audit_action_1.url
+            assert first_jobs[0]["install_uuid"] == intall_uuids[0]
+
+            assert first_jobs[1]["job_id"] == job_ids[0]
+            assert first_jobs[1]["type"] == "run_workflow_template"
+            assert first_jobs[1]["created_at"] == audit_action_2.fired_at
+            assert first_jobs[1]["status"] == audit_action_2.status
+            assert first_jobs[1]["url"] == audit_action_2.url
+            assert first_jobs[1]["install_uuid"] == intall_uuids[1]
+
+            second_jobs = data[job_ids[1]]
+            assert len(second_jobs) == 1
+            assert second_jobs[0]["job_id"] == job_ids[1]
+            assert second_jobs[0]["type"] == "run_workflow_template"
+            assert second_jobs[0]["created_at"] == audit_action_3.fired_at
+            assert second_jobs[0]["status"] == audit_action_3.status
+            assert second_jobs[0]["url"] == audit_action_3.url
+            assert second_jobs[0]["install_uuid"] == intall_uuids[0]
+
+
+@pytest.mark.django_db
+def test_activations_sources(
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+    default_event_streams: List[models.EventStream],
+):
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    for stream in default_event_streams:
+        default_activation.event_streams.add(stream.id)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        data = collectors.activation_sources(time_start, tmpdir, until)
+
+        assert data["ansible.eda.range"]["occurrence"] == 3
+        assert sorted(data["ansible.eda.range"]["activation_ids"]) == sorted(
+            [default_activation.id, new_activation.id]
+        )
+        assert sorted(data["ansible.eda.range"]["event_stream_ids"]) == sorted(
+            [default_event_streams[0].id, default_event_streams[1].id]
+        )
+        assert data["ansible.eda.range"]["event_streams"]["hmac"] == 2
+
+
+@pytest.mark.django_db
+def test_activation_stats(
+    default_activation_instances: List[models.RulebookProcess],
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+):
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    default_activation.restart_count = 1
+    default_activation.failure_count = 2
+    default_activation.save(update_fields=["restart_count", "failure_count"])
+    with tempfile.TemporaryDirectory() as tmpdir:
+        collectors.activation_stats(
+            time_start, tmpdir, until=now() + timedelta(seconds=1)
+        )
+        with open(os.path.join(tmpdir, "activations_stats_table.csv")) as f:
+            reader = csv.reader(f)
+
+            header = next(reader)
+            lines = list(reader)
+
+            assert header == [
+                "id",
+                "name",
+                "status",
+                "restart_count",
+                "failure_count",
+                "log_level",
+                "organization_id",
+                "created_at",
+                "ended_at",
+                "activations_counts",
+                "max_restart_count",
+            ]
+            assert len(lines) == 2
+            assert lines[0][0] == f"{new_activation.id}"
+            assert lines[0][1] == new_activation.name
+            assert lines[0][2] == new_activation.status
+            assert int(lines[0][3]) == new_activation.restart_count
+            assert int(lines[0][4]) == new_activation.failure_count
+            assert lines[0][8] == new_activation.modified_at.isoformat(
+                sep=" "
+            ).replace("00:00", "00")
+            assert int(lines[0][9]) == 0
+            assert lines[1][0] == f"{default_activation.id}"
+            assert lines[1][1] == default_activation.name
+            assert lines[1][2] == default_activation.status
+            assert int(lines[1][3]) == default_activation.restart_count
+            assert int(lines[1][4]) == default_activation.failure_count
+            assert lines[1][8] == ""
+            assert int(lines[1][9]) == 2
 
 
 @pytest.mark.django_db
@@ -404,15 +549,7 @@ def test_event_streams_table_collector(
                 "name",
                 "event_stream_type",
                 "eda_credential_id",
-                "additional_data_headers",
-                "test_mode",
-                "test_content_type",
-                "test_content",
-                "test_headers",
-                "test_error_message",
-                "owner_id",
                 "uuid",
-                "url",
                 "created_at",
                 "modified_at",
                 "events_received",
@@ -422,6 +559,52 @@ def test_event_streams_table_collector(
             assert lines[0][0] == str(default_event_stream.id)
             assert lines[0][2] == default_event_stream.name
             assert lines[0][3] == default_event_stream.event_stream_type
+
+
+@pytest.mark.django_db
+def test_event_streams_table_by_activation_collector(
+    default_activation: models.Activation,
+    new_activation: models.Activation,
+    default_event_streams: list[models.EventStream],
+):
+    default_activation.event_streams.add(default_event_streams[0])
+    new_activation.event_streams.add(default_event_streams[1])
+
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        collectors.event_streams_by_activation_table(
+            time_start, tmpdir, until=now() + timedelta(seconds=1)
+        )
+        with open(
+            os.path.join(tmpdir, "event_streams_by_activation_table.csv")
+        ) as f:
+            reader = csv.reader(f)
+
+            header = next(reader)
+            lines = list(reader)
+
+            assert header == [
+                "name",
+                "event_stream_type",
+                "eda_credential_id",
+                "events_received",
+                "last_event_received_at",
+                "organization_id",
+                "event_stream_id",
+                "activation_id",
+            ]
+            assert len(lines) == 2
+            assert lines[0][0] == default_event_streams[0].name
+            assert lines[0][1] == default_event_streams[0].event_stream_type
+            assert lines[0][6] == str(default_event_streams[0].id)
+            assert lines[1][0] == default_event_streams[1].name
+            assert lines[1][1] == default_event_streams[1].event_stream_type
+            assert lines[1][6] == str(default_event_streams[1].id)
+            assert sorted([lines[0][7], lines[1][7]]) == sorted(
+                [str(default_activation.id), str(new_activation.id)]
+            )
 
 
 @pytest.mark.django_db

@@ -639,6 +639,7 @@ def default_activation(
     default_decision_environment: models.DecisionEnvironment,
     default_project: models.Project,
     default_rulebook: models.Rulebook,
+    default_rulesets: str,
     default_extra_var_data: str,
     default_organization: models.Organization,
     default_user: models.User,
@@ -651,6 +652,7 @@ def default_activation(
         decision_environment=default_decision_environment,
         project=default_project,
         rulebook=default_rulebook,
+        rulebook_rulesets=default_rulesets,
         extra_var=default_extra_var_data,
         organization=default_organization,
         user=default_user,
@@ -666,6 +668,7 @@ def new_activation(
     default_project: models.Project,
     default_rulebook: models.Rulebook,
     default_extra_var_data: str,
+    default_run_job_template_rulesets: str,
     default_organization: models.Organization,
     default_user: models.User,
 ) -> models.Activation:
@@ -676,10 +679,12 @@ def new_activation(
         decision_environment=default_decision_environment,
         project=default_project,
         rulebook=default_rulebook,
+        rulebook_rulesets=default_run_job_template_rulesets,
         extra_var=default_extra_var_data,
         organization=default_organization,
         user=default_user,
         log_level="debug",
+        status="completed",
     )
 
 
@@ -1170,6 +1175,7 @@ def default_event_streams(
             models.EventStream(
                 uuid=uuid.uuid4(),
                 name="test-es-1",
+                event_stream_type=default_hmac_credential.credential_type.kind,
                 owner=default_user,
                 organization=default_organization,
                 url=DUMMY_URL,
@@ -1179,6 +1185,7 @@ def default_event_streams(
             models.EventStream(
                 uuid=uuid.uuid4(),
                 name="another-test-es-2",
+                event_stream_type=default_hmac_credential.credential_type.kind,
                 owner=default_user,
                 organization=default_organization,
                 url=DUMMY_URL,

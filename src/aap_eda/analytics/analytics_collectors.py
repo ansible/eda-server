@@ -1,16 +1,54 @@
+#  Copyright 2024 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import os
 import platform
+from collections import Counter
 from datetime import datetime
+from typing import Any, Generator, Tuple
 
 import distro
+import yaml
 from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
 from django.db import connection
-from django.db.models import Manager, Q
+from django.db.models import (
+    Case,
+    Count,
+    DateTimeField,
+    F,
+    IntegerField,
+    Manager,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 from insights_analytics_collector import CsvFileSplitter, register
 
+from aap_eda.analytics.utils import (
+    collect_controllers_info,
+    extract_job_details,
+)
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.exceptions import ParseError
 from aap_eda.utils import get_eda_version
+
+SOURCE_RESERVED_KEYS = ["name", "filters"]
 
 
 @register(
@@ -36,8 +74,114 @@ def config(**kwargs) -> dict:
         # skip license related info so far
         "eda_log_level": settings.APP_LOG_LEVEL,
         "eda_version": get_eda_version(),
-        "eda_deployment_type": settings.DEPLOYMENT_TYPE,
     }
+
+
+@register(
+    "jobs_stats",
+    "1.0",
+    description="Stats data for jobs",
+)
+def jobs_stats(since: datetime, full_path: str, until: datetime, **kwargs):
+    stats = {}
+    audit_actions = _get_audit_action_qs(since, until)
+
+    if not bool(audit_actions):
+        return stats
+
+    controllers = collect_controllers_info()
+    for action in audit_actions.all():
+        job_type, job_id, install_uuid = extract_job_details(
+            action.url, controllers
+        )
+        if not job_type:
+            continue
+
+        data = stats.get(job_id, [])
+        job_stat = {}
+        job_stat["job_id"] = job_id
+        job_stat["type"] = job_type
+        job_stat["created_at"] = action.fired_at.strftime(
+            "%Y-%m-%dT%H:%M:%S.%fZ"
+        )
+        job_stat["status"] = action.status
+        job_stat["url"] = action.url
+        job_stat["install_uuid"] = install_uuid
+        data.append(job_stat)
+
+        stats[job_id] = data
+
+    return stats
+
+
+@register(
+    "activations_stats",
+    "1.0",
+    format="csv",
+    description="Stats for activations",
+)
+def activation_stats(
+    since: datetime, full_path: str, until: datetime, **kwargs
+):
+    has_ended_at_states = [
+        ActivationStatus.FAILED.value,
+        ActivationStatus.STOPPED.value,
+        ActivationStatus.COMPLETED.value,
+        ActivationStatus.UNRESPONSIVE.value,
+        ActivationStatus.ERROR.value,
+        ActivationStatus.WORKERS_OFFLINE.value,
+    ]
+    counts_query = (
+        models.RulebookProcess.objects.filter(activation_id=OuterRef("pk"))
+        .values("activation_id")
+        .annotate(counts=Count("id"))
+        .values("counts")
+    )
+
+    activations = (
+        models.Activation.objects.annotate(
+            ended_at=Case(
+                When(status__in=has_ended_at_states, then=F("modified_at")),
+                output_field=DateTimeField(),
+            ),
+            activations_counts=Coalesce(Subquery(counts_query), Value(0)),
+            max_restart_count=Value(
+                int(settings.ACTIVATION_MAX_RESTARTS_ON_FAILURE),
+                output_field=IntegerField(),
+            ),
+        )
+        .filter(
+            Q(created_at__gt=since, created_at__lte=until)
+            | Q(modified_at__gt=since, modified_at__lte=until)
+        )
+        .distinct()
+    ).values(
+        "id",
+        "name",
+        "status",
+        "restart_count",
+        "failure_count",
+        "log_level",
+        "organization_id",
+        "created_at",
+        "ended_at",
+        "activations_counts",
+        "max_restart_count",
+    )
+
+    query = (
+        str(activations.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+    for status in has_ended_at_states:
+        query = query.replace(status, f"'{status}'")
+
+    return _copy_table(
+        "activations_stats",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -163,8 +307,75 @@ def decision_environments_table(
 def event_streams_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.EventStream.objects, since, until)
-    return _copy_table("event_streams", query, full_path)
+    event_streams = (
+        models.EventStream.objects.filter(
+            Q(created_at__gt=since, created_at__lte=until)
+            | Q(modified_at__gt=since, modified_at__lte=until)
+        )
+        .order_by("id")
+        .distinct()
+    ).values(
+        "id",
+        "organization_id",
+        "name",
+        "event_stream_type",
+        "eda_credential_id",
+        "uuid",
+        "created_at",
+        "modified_at",
+        "events_received",
+        "last_event_received_at",
+    )
+
+    query = (
+        str(event_streams.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "event_streams", f"COPY ({query}) TO STDOUT WITH CSV HEADER", full_path
+    )
+
+
+@register(
+    "event_streams_by_activation_table",
+    "1.0",
+    format="csv",
+    description="Data on event_streams used by each activation",
+)
+def event_streams_by_activation_table(
+    since: datetime, full_path: str, until: datetime, **kwargs
+):
+    activations = models.Activation.objects.filter(
+        Q(created_at__gt=since, created_at__lte=until)
+        | Q(modified_at__gt=since, modified_at__lte=until)
+    ).distinct()
+
+    event_streams = models.EventStream.objects.none()
+    for activation in activations:
+        event_streams |= activation.event_streams.all()
+
+    if not bool(event_streams):
+        return
+
+    event_streams = event_streams.annotate(
+        event_stream_id=F("id"),
+        activation_id=F("activations__id"),
+    ).values(
+        "name",
+        "event_stream_type",
+        "eda_credential_id",
+        "events_received",
+        "last_event_received_at",
+        "organization_id",
+        "event_stream_id",
+        "activation_id",
+    )
+
+    query = f"COPY ({event_streams.query}) TO STDOUT WITH CSV HEADER"
+
+    return _copy_table("event_streams_by_activation", query, full_path)
 
 
 @register(
@@ -230,6 +441,84 @@ def teams_table(since: datetime, full_path: str, until: datetime, **kwargs):
     query = _get_query(models.Team.objects, since, until, **args)
 
     return _copy_table("teams", query, full_path)
+
+
+@register(
+    "activation_sources",
+    "1.0",
+    description="Event Sources used by activations",
+)
+def activation_sources(
+    since: datetime, full_path: str, until: datetime, **kwargs
+) -> dict:
+    sources = {}
+    activations = models.Activation.objects.filter(
+        Q(created_at__gt=since, created_at__lte=until)
+        | Q(modified_at__gt=since, modified_at__lte=until)
+    ).distinct()
+
+    for activation in activations:
+        source_data = _gen_source_data(activation)
+        stream_data = _gen_stream_data(activation)
+        event_stream_ids = [
+            stream.id for stream in activation.event_streams.all()
+        ]
+        for src, occurrence in source_data:
+            data = sources.get(src, {})
+
+            data["occurrence"] = data.get("occurrence", 0) + occurrence
+
+            activation_ids_set = set(data.get("activation_ids", []))
+            activation_ids_set.add(activation.id)
+            data["activation_ids"] = list(activation_ids_set)
+
+            event_stream_ids_set = set(data.get("event_stream_ids", []))
+            event_stream_ids_set.update(event_stream_ids)
+            if event_stream_ids_set:
+                data["event_stream_ids"] = list(event_stream_ids_set)
+
+            event_streams = data.get("event_streams", {})
+            for stream, counter in stream_data:
+                event_streams[stream] = event_streams.get(stream, 0) + counter
+
+            if event_streams:
+                data["event_streams"] = event_streams
+
+            sources[src] = data
+
+    return sources
+
+
+def _gen_source_data(
+    activation: models.Activation,
+) -> Generator[Tuple[Any, int], None, None]:
+    try:
+        rulesets = yaml.safe_load(activation.rulebook_rulesets)
+    except yaml.MarkedYAMLError as ex:
+        raise ParseError("Failed to parse rulebook data") from ex
+
+    source_types = []
+    for ruleset in rulesets:
+        for source in ruleset.get("sources", []):
+            keys = source.keys()
+            types = [item for item in keys if item not in SOURCE_RESERVED_KEYS]
+            source_types.extend(types)
+
+    sources_dict = Counter(source_types)
+
+    yield from sources_dict.items()
+
+
+def _gen_stream_data(
+    activation: models.Activation,
+) -> Generator[Tuple[Any, int], None, None]:
+    stream_types = [
+        stream.event_stream_type for stream in activation.event_streams.all()
+    ]
+
+    stream_dict = Counter(stream_types)
+
+    yield from stream_dict.items()
 
 
 def _datetime_format(dt: datetime) -> str:
@@ -344,7 +633,7 @@ def _get_audit_action_qs(since: datetime, until: datetime):
     else:
         audit_actions = models.AuditAction.objects.filter(
             audit_rule_id__in=tuple(audit_rule_ids)
-        ).order_by("id")
+        ).order_by("fired_at")
 
     return audit_actions
 
