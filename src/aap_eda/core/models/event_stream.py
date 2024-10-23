@@ -29,7 +29,6 @@ class EventStream(BaseOrgModel, UniqueNamedModel):
         help_text="The type of the event stream based on credential type",
         default="hmac",
     )
-
     eda_credential = models.ForeignKey(
         "EdaCredential",
         blank=True,
@@ -45,11 +44,9 @@ class EventStream(BaseOrgModel, UniqueNamedModel):
             "are comma delimited"
         ),
     )
-
     test_mode = models.BooleanField(
         default=False, help_text="Enable test mode"
     )
-
     test_content_type = models.TextField(
         blank=True,
         default="",
@@ -76,7 +73,6 @@ class EventStream(BaseOrgModel, UniqueNamedModel):
         default="",
         help_text="The error message,  when in test mode",
     )
-
     owner = models.ForeignKey(
         "User",
         on_delete=models.CASCADE,
@@ -84,10 +80,6 @@ class EventStream(BaseOrgModel, UniqueNamedModel):
         help_text="The user who created the webhook",
     )
     uuid = models.UUIDField(default=uuid.uuid4)
-    url = models.TextField(
-        null=False,
-        help_text="The URL which will be used to post to the event stream",
-    )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     events_received = models.BigIntegerField(
