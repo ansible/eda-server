@@ -13,21 +13,25 @@
 #  limitations under the License.
 
 import logging
+from django.conf import settings
 
 from ansible_base.lib.utils.db import advisory_lock
 from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
+from dispatcherd.publish import task
+from ansible_base.lib.utils.db import advisory_lock
 
 logger = logging.getLogger(__name__)
 
 
 ANALYTICS_SCHEDULE_JOB_ID = "gather_analytics"
 ANALYTICS_JOB_ID = "job_gather_analytics"
-ANALYTICS_TASKS_QUEUE = "default"
+ANALYTICS_TASKS_QUEUE = settings.DISPATCHERD_DEFAULT_CHANNEL
 
 
+@task()
 def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
     if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
         return
@@ -49,6 +53,7 @@ def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
         )
 
 
+@task()
 def auto_gather_analytics() -> None:
     schedule_gather_analytics()
     gather_analytics()
@@ -65,6 +70,7 @@ def gather_analytics() -> None:
         _gather_analytics()
 
 
+@task()
 def _gather_analytics() -> None:
     if not utils.get_insights_tracking_state():
         logger.info("INSIGHTS_TRACKING_STATE is not enabled")

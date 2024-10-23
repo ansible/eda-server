@@ -16,16 +16,14 @@ import logging
 import random
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta
 from typing import Optional
 
-import django_rq
 from ansible_base.lib.utils.db import advisory_lock
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 import aap_eda.tasks.activation_request_queue as requests_queue
-from aap_eda.core import models, tasking
+from aap_eda.core import models
 from aap_eda.core.enums import (
     ActivationRequest,
     ActivationStatus,
@@ -41,6 +39,9 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
+from ansible_base.lib.utils.db import advisory_lock
+from dispatcherd.publish import task
+from dispatcherd.factories import get_control_from_settings
 
 from .exceptions import UnknownProcessParentType
 
@@ -77,26 +78,10 @@ def get_process_parent(
     return klass.objects.get(id=parent_id)
 
 
-def _manage(process_parent_type: str, id: int, request_id: str = "") -> None:
-    """Wrap the _manage_no_lock function.
-
-    It ensures that only one task is executed at a time.
-    """
-    with advisory_lock(
-        _manage_process_job_id(process_parent_type, id), wait=False
-    ) as acquired:
-        if not acquired:
-            LOGGER.debug(
-                f"Method _manage({process_parent_type}, {id}) "
-                "already being ran, exiting",
-            )
-            return
-
-        _manage_no_lock(process_parent_type, id, request_id)
-
-
 def _manage_no_lock(
-    process_parent_type: str, id: int, request_id: str = ""
+    process_parent_type: str,
+    id: int,
+    request_id: str = "",
 ) -> None:
     """Manage the activation with the given id.
 
@@ -136,6 +121,20 @@ def _manage_no_lock(
             f"Processing monitor request for {process_parent_type} {id}",
         )
         ActivationManager(process_parent).monitor()
+
+
+@task()
+def _manage(process_parent_type: str, id: int, request_id: str = "") -> None:
+    with advisory_lock(
+        _manage_process_job_id(process_parent_type, id), wait=False
+    ) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"Method _manage({process_parent_type}, {id}) already being ran, exiting"
+            )
+            return
+
+        _manage_no_lock(process_parent_type, id, request_id)
 
 
 def _run_request(
@@ -200,6 +199,18 @@ def dispatch(
     if request_type is None:
         request_type = "Monitor"
 
+    with advisory_lock(job_id, wait=False) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"_manage({job_id}) already being ran, not dispatching request {request_type}"
+            )
+            return
+
+    LOGGER.info(
+        f"Dispatching request {request_type} for {process_parent_type} "
+        f"{process_parent_id}",
+    )
+
     try:
         process_parent = get_process_parent(
             process_parent_type, process_parent_id
@@ -228,15 +239,6 @@ def dispatch(
     )
 
     status_manager = StatusManager(process_parent)
-
-    job = tasking.get_pending_job(job_id)
-    if job:
-        LOGGER.info(
-            f"Request {request_type} for {process_parent_type} "
-            f"{process_parent_id} can not be processed "
-            f"because there is already a job {job_id} ",
-        )
-        return
 
     # new processes
     if request_type in [
@@ -368,13 +370,14 @@ def dispatch(
         f"request {request_type} to queue {queue_name}"
     )
 
-    tasking.unique_enqueue(
-        queue_name,
-        job_id,
-        _manage,
-        process_parent_type,
-        process_parent_id,
-        request_id,
+    # TODO: sanitize or escape channel names on dispatcherd side
+    _manage.apply_async(
+        args=[process_parent_type, process_parent_id, request_id],
+        queue=queue_name.replace("-", "_"),
+        uuid=job_id,
+    )
+    LOGGER.debug(
+        f"_manage({job_id}) submitted to queue {queue_name} request={request_type}"
     )
 
 
@@ -434,32 +437,21 @@ def get_queue_name_by_parent_id(
     return process.rulebookprocessqueue.queue_name
 
 
-@tasking.redis_connect_retry()
 def check_rulebook_queue_health(queue_name: str) -> bool:
     """Check for the state of the queue.
 
     Returns True if the queue is healthy, False otherwise.
     Clears the queue if all workers are dead to avoid stuck processes.
     """
-    queue = django_rq.get_queue(queue_name)
-
-    all_workers_dead = True
-    for worker in tasking.Worker.all(queue=queue):
-        last_heartbeat = worker.last_heartbeat
-        if last_heartbeat is None:
-            continue
-        threshold = datetime.now() - timedelta(
-            seconds=settings.DEFAULT_WORKER_HEARTBEAT_TIMEOUT,
+    ctl = get_control_from_settings(
+        default_publish_channel=queue_name.replace("-", "_")
+    )
+    alive = ctl.control_with_reply("alive")
+    if not alive:
+        LOGGER.warning(
+            f"Worker queue {queue_name} was found to not be healthy"
         )
-        if last_heartbeat >= threshold:
-            all_workers_dead = False
-            break
-
-    if all_workers_dead:
-        queue.empty()
-        return False
-
-    return True
+    return bool(alive)
 
 
 # Internal start/restart requests are sent by the manager in restart_helper.py
@@ -475,6 +467,7 @@ def start_rulebook_process(
         ActivationRequest.START,
         request_id,
     )
+    # Schedule would pick this up, but this makes things move faster
     monitor_rulebook_processes.delay()
 
 
@@ -505,6 +498,7 @@ def delete_rulebook_process(
         ActivationRequest.DELETE,
         request_id,
     )
+    # Schedule would pick this up, but this makes things move faster
     monitor_rulebook_processes.delay()
 
 
@@ -560,17 +554,12 @@ def monitor_rulebook_processes_no_lock() -> None:
         )
 
 
-@job("default")
+@task(queue="eda_workers")
 def monitor_rulebook_processes() -> None:
-    """Wrap monitor_rulebook_processes_no_lock.
-
-    Ensures only one task is executed.
-    """
     with advisory_lock("monitor_rulebook_processes", wait=False) as acquired:
         if not acquired:
             LOGGER.debug(
-                "monitor_rulebook_process being ran by "
-                "another process, exiting",
+                "monitor_rulebook_process being ran by another process, exiting"
             )
             return
 

@@ -22,9 +22,14 @@ spec:
               value: eda-api:8000
             - name: EDA_SERVER
               value: http://eda-api:8000
+            - name: EDA_WEBHOOK_SERVER
+              value: http://eda-api:8000
           name: eda-ui
           imagePullPolicy: Never
-          image: eda-ui
+          image: quay.io/ansible/eda-ui:main
           ports:
             - containerPort: 8080
+          envFrom:
+          - configMapRef:
+              name: eda-env-properties
 status: {}
