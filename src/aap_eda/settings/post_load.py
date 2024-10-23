@@ -170,9 +170,9 @@ def get_rq_queues(settings: Dynaconf) -> dict:
     # Configure the default queue
     queues["default"] = _rq_common_parameters(settings)
     queues["default"]["DEFAULT_TIMEOUT"] = settings.DEFAULT_QUEUE_TIMEOUT
-    queues["default"][
-        "REDIS_CLIENT_KWARGS"
-    ] = _rq_redis_client_additional_parameters(settings)
+    queues["default"]["REDIS_CLIENT_KWARGS"] = (
+        _rq_redis_client_additional_parameters(settings)
+    )
 
     # Configure the worker queues
     for queue in settings.RULEBOOK_WORKER_QUEUES:
@@ -180,9 +180,9 @@ def get_rq_queues(settings: Dynaconf) -> dict:
         queues[queue][
             "DEFAULT_TIMEOUT"
         ] = settings.DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue][
-            "REDIS_CLIENT_KWARGS"
-        ] = _rq_redis_client_additional_parameters(settings)
+        queues[queue]["REDIS_CLIENT_KWARGS"] = (
+            _rq_redis_client_additional_parameters(settings)
+        )
 
     return queues
 
@@ -324,6 +324,12 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 "level": settings.APP_LOG_LEVEL,
                 "propagate": False,
             },
+            "dispatcherd": {
+                "handlers": ["console"],
+                # "level": settings.APP_LOG_LEVEL,
+                "level": "DEBUG",  # TODO: this is for demo!!
+                "propagate": False,
+            },
         },
     }
 
@@ -348,15 +354,11 @@ def _set_resource_server(settings: Dynaconf) -> None:
         settings.RESOURCE_SERVER["URL"]
         and settings.RESOURCE_SERVER["SECRET_KEY"]
     ):
-        jobs = settings.RQ_PERIODIC_JOBS
-        jobs.append(
-            {
-                "func": "aap_eda.tasks.shared_resources.resync_shared_resources",  # noqa: E501
-                "interval": 900,
-                "id": "resync_shared_resources",
-            }
-        )
-        settings.RQ_PERIODIC_JOBS = jobs
+        jobs = settings.DISPATCHERD_SCHEDULE_TASKS
+        jobs["aap_eda.tasks.shared_resources.resync_shared_resources"] = {
+            "schedule": 900,
+        }
+        settings.DISPATCHERD_SCHEDULE_TASKS = jobs
 
 
 def _enforce_types(settings: Dynaconf) -> None:

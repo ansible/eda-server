@@ -17,7 +17,6 @@ import logging
 import typing as tp
 from datetime import timedelta
 
-import rq
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -26,7 +25,7 @@ from django.utils import timezone
 from pydantic import ValidationError
 
 from aap_eda.api.serializers.activation import is_activation_valid
-from aap_eda.core import models, tasking
+from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
@@ -1065,10 +1064,8 @@ class ActivationManager(StatusManager):
             queue_name=queue_name,
         )
 
-    @tasking.redis_connect_retry()
     def _get_queue_name(self) -> str:
-        this_job = rq.get_current_job()
-        return this_job.origin
+        return settings.RULEBOOK_QUEUE_NAME
 
     def _get_container_request(self) -> ContainerRequest:
         try:

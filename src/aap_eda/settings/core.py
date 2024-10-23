@@ -152,30 +152,21 @@ RQ = {
 DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
 DEFAULT_WORKER_TTL = 5
 
-RQ_STARTUP_JOBS = [
-    {
-        "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
-        "job_id": "start_analytics_scheduler",
-    },
-]
+# DISPATCHERD SETTINGS
+DISPATCHERD_DEFAULT_CHANNEL = "eda_workers"
+DISPATCHERD_STARTUP_TASKS = {
+    "aap_eda.tasks.analytics.schedule_gather_analytics": {},
+}
 
-# Id of the scheduler job it's required when we have multiple instances of
-# the scheduler running to avoid duplicate jobs
-RQ_PERIODIC_JOBS = [
-    {
-        "func": (
-            "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
-        ),
-        "interval": 5,
-        "id": "enqueue_monitor_rulebook_processes",
-    },
-    {
-        "func": "aap_eda.tasks.project.monitor_project_tasks",
-        "interval": 30,
-        "id": "monitor_project_tasks",
-    },
-]
-RQ_CRON_JOBS = []
+# Dispatcherd schedule tasks, using old celery beat syntax
+DISPATCHERD_SCHEDULE_TASKS = {
+    "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 5},
+    "aap_eda.tasks.project._monitor_project_tasks": {"schedule": 30},
+}
+
+# Related to new dispatcherd, TODO: handle via DAB
+DISPATCHERD_MIN_WORKERS = 4
+DISPATCHERD_MAX_WORKERS = 4
 
 ANSIBLE_BASE_CUSTOM_VIEW_PARENT = "aap_eda.api.views.dab_base.BaseAPIView"
 

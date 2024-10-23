@@ -13,33 +13,46 @@
 #  limitations under the License.
 
 import logging
+from django.conf import settings
 
 from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
+from dispatcherd.publish import task
+from ansible_base.lib.utils.db import advisory_lock
 
 logger = logging.getLogger(__name__)
 
 
 ANALYTICS_SCHEDULE_JOB_ID = "gather_analytics"
 ANALYTICS_JOB_ID = "job_gather_analytics"
-ANALYTICS_TASKS_QUEUE = "default"
+ANALYTICS_TASKS_QUEUE = settings.DISPATCHERD_DEFAULT_CHANNEL
 
 
+@task()
 def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
     if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
         return
     interval = utils.get_analytics_interval()
     logger.info(f"Schedule analytics to run in {interval} seconds")
-    tasking.enqueue_delay(
-        queue_name,
-        ANALYTICS_SCHEDULE_JOB_ID,
-        interval,
-        auto_gather_analytics,
-    )
+    with advisory_lock(ANALYTICS_SCHEDULE_JOB_ID, wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                "Another instance of schedule_gather_analytics"
+                " is already running",
+            )
+            return
+
+        tasking.enqueue_delay(
+            queue_name,
+            ANALYTICS_SCHEDULE_JOB_ID,
+            interval,
+            auto_gather_analytics,
+        )
 
 
+@task()
 def auto_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
     gather_analytics(queue_name)
     schedule_gather_analytics()
@@ -47,9 +60,23 @@ def auto_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
 
 def gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
     logger.info("Queue EDA analytics")
-    tasking.unique_enqueue(queue_name, ANALYTICS_JOB_ID, _gather_analytics)
+
+    with advisory_lock(ANALYTICS_JOB_ID, wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                "Another instance of gather analytics is already running"
+            )
+            return
+
+        # TODO: sanitize or escape channel names on dispatcherd side
+        _gather_analytics.apply_async(
+            args=[],
+            queue=queue_name.replace("-", "_"),
+            uuid=ANALYTICS_JOB_ID,
+        )
 
 
+@task()
 def _gather_analytics() -> None:
     if not utils.get_insights_tracking_state():
         logger.info("INSIGHTS_TRACKING_STATE is not enabled")

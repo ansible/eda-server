@@ -58,6 +58,10 @@ RUN poetry install -E all --no-root --no-cache \
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 RUN pip install ansible-core
+
+USER 0
+USER "$USER_ID"
+
 RUN EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear
 
 USER 0
@@ -66,6 +70,7 @@ RUN for dir in \
     /app/venv \
     /app/venv/bin ; \
     do mkdir -m 0775 -p $dir ; chmod g+rwx $dir ; chgrp root $dir ; done
+
 
 USER "$USER_ID"
 

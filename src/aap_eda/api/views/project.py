@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 
-import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -34,7 +33,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
 
-from .mixins import RedisDependencyMixin, ResponseSerializerMixin
+from .mixins import ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +85,6 @@ class ProjectViewSet(
     DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
-    RedisDependencyMixin,
 ):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
@@ -109,7 +107,6 @@ class ProjectViewSet(
                 description="Return a created project.",
             )
         }
-        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
         serializer = serializers.ProjectCreateRequestSerializer(
@@ -117,33 +114,26 @@ class ProjectViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        # Catch Redis connection error and translate, as appropriate, to the
-        # Redis unavailable response.
-        try:
-            with transaction.atomic():
-                project = serializer.save()
-                check_related_permissions(
-                    request.user,
-                    serializer.Meta.model,
-                    {},
-                    model_to_dict(serializer.instance),
-                )
-                RoleDefinition.objects.give_creator_permissions(
-                    request.user, serializer.instance
-                )
+        with transaction.atomic():
+            project = serializer.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(serializer.instance),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, serializer.instance
+            )
 
-                job = tasks.import_project.delay(project_id=project.id)
-        except redis.ConnectionError:
-            # If Redis isn't available we'll generate a Conflict (409).
-            # Anything else we re-raise the exception.
-            self.redis_is_available()
-            raise
+            job_data, _ = tasks.import_project.delay(project_id=project.id)
+            job_id = job_data["uuid"]
 
         # Atomically update `import_task_id` field only.
         models.Project.objects.filter(pk=project.id).update(
-            import_task_id=job.id
+            import_task_id=job_id
         )
-        project.import_task_id = job.id
+        project.import_task_id = job_id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
         logger.info(
@@ -237,8 +227,7 @@ class ProjectViewSet(
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
-        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer}
-        | RedisDependencyMixin.redis_unavailable_response(),
+        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer},
         request=None,
         description="Sync a project",
     )
@@ -270,16 +259,10 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
-        try:
-            job = tasks.sync_project.delay(project_id=project.id)
-        except redis.ConnectionError:
-            # If Redis isn't available we'll generate a Conflict (409).
-            # Anything else we re-raise the exception.
-            self.redis_is_available()
-            raise
+        job_data, _ = tasks.sync_project.delay(project_id=project.id)
 
         project.import_state = models.Project.ImportState.PENDING
-        project.import_task_id = job.id
+        project.import_task_id = job_data["uuid"]
         project.import_error = None
         project.save()
 
