@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from _pytest.logging import LogCaptureFixture
+from django.utils import timezone
 from pytest_django.fixtures import SettingsWrapper
 from pytest_lazyfixture import lazy_fixture
 
@@ -86,6 +87,21 @@ def activation_with_instance(
         organization=default_organization,
     )
     return basic_activation
+
+
+@pytest.fixture
+def starting_activation(activation_with_instance: models.Activation):
+    """Return a running activation."""
+    activation = activation_with_instance
+    activation.status = enums.ActivationStatus.STARTING
+    activation.save(update_fields=["status"])
+    activation.latest_instance.status = enums.ActivationStatus.STARTING
+    activation.latest_instance.activation_pod_id = "test-pod-id"
+    activation.latest_instance.updated_at = timezone.now()
+    activation.latest_instance.save(
+        update_fields=["status", "activation_pod_id", "updated_at"],
+    )
+    return activation
 
 
 @pytest.fixture
@@ -161,6 +177,13 @@ def job_mock():
     mock_job = MagicMock()
     mock_job.origin = "queue_name_test"
     return mock_job
+
+
+@pytest.fixture
+def running_container_status_mock():
+    status_mock = MagicMock()
+    status_mock.status = enums.ActivationStatus.RUNNING
+    return status_mock
 
 
 @pytest.mark.django_db
@@ -318,10 +341,10 @@ def test_start_first_run(
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert basic_activation.status == enums.ActivationStatus.RUNNING
+    assert basic_activation.status == enums.ActivationStatus.STARTING
     assert (
         basic_activation.latest_instance.status
-        == enums.ActivationStatus.RUNNING
+        == enums.ActivationStatus.STARTING
     )
     assert basic_activation.latest_instance.activation_pod_id == "test-pod-id"
     assert basic_activation.restart_count == 0
@@ -330,6 +353,29 @@ def test_start_first_run(
         process=basic_activation.latest_instance,
     )
     assert rulebook_process_queue.queue_name == job_mock.origin
+
+
+@pytest.mark.django_db
+def test_monitor_to_running_status(
+    starting_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    running_container_status_mock: MagicMock,
+):
+    """Teset monitor task brings activation to running status"""
+    activation_manager = ActivationManager(
+        db_instance=starting_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.return_value = (
+        running_container_status_mock
+    )
+    activation_manager.monitor()
+    assert starting_activation.status == enums.ActivationStatus.RUNNING
+    assert (
+        starting_activation.latest_instance.status
+        == enums.ActivationStatus.RUNNING
+    )
+    assert starting_activation.restart_count == 0
 
 
 @pytest.mark.django_db
@@ -354,10 +400,10 @@ def test_start_restart(
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert running_activation.status == enums.ActivationStatus.RUNNING
+    assert running_activation.status == enums.ActivationStatus.STARTING
     assert (
         running_activation.latest_instance.status
-        == enums.ActivationStatus.RUNNING
+        == enums.ActivationStatus.STARTING
     )
     assert (
         running_activation.latest_instance.activation_pod_id == "test-pod-id"

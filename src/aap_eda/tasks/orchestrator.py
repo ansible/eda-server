@@ -95,6 +95,7 @@ def _manage(process_parent_type: str, id: int) -> None:
                 break
 
     if not has_request_processed and process_parent.status in [
+        ActivationStatus.STARTING,
         ActivationStatus.RUNNING,
         ActivationStatus.WORKERS_OFFLINE,
     ]:
@@ -466,6 +467,7 @@ def monitor_rulebook_processes() -> None:
     # monitor running instances
     for process in models.RulebookProcess.objects.filter(
         status__in=[
+            ActivationStatus.STARTING,
             ActivationStatus.RUNNING,
             ActivationStatus.WORKERS_OFFLINE,
         ]

@@ -251,12 +251,7 @@ class ActivationManager(StatusManager):
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-        # update status
-        self.set_status(ActivationStatus.RUNNING)
-        with transaction.atomic():
-            self.set_latest_instance_status(ActivationStatus.RUNNING)
-            self._set_activation_pod_id(pod_id=container_id)
-        self._reset_failure_count()
+        self._set_activation_pod_id(pod_id=container_id)
 
         # update logs
         LOGGER.info(
@@ -356,18 +351,24 @@ class ActivationManager(StatusManager):
             or self._is_in_status(ActivationStatus.ERROR)
         )
 
-    def _is_unresponsive(self) -> bool:
-        if self.db_instance.status in [
+    def _is_unresponsive(self, check_readiness: bool) -> bool:
+        previous_time = None
+        if check_readiness:
+            previous_time = self.latest_instance.started_at
+            timeout = settings.RULEBOOK_READINESS_TIMEOUT_SECONDS
+        elif self.db_instance.status in [
             ActivationStatus.RUNNING,
             ActivationStatus.STARTING,
         ]:
-            cutoff_time = timezone.now() - timedelta(
-                seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS,
-            )
-            return self.latest_instance.updated_at < cutoff_time
+            previous_time = self.latest_instance.updated_at
+            timeout = settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS
+
+        if previous_time:
+            cutoff_time = timezone.now() - timedelta(seconds=timeout)
+            return previous_time < cutoff_time
         return False
 
-    def _unresponsive_policy(self):
+    def _unresponsive_policy(self, check_type: str):
         """Apply the unresponsive restart policy."""
         LOGGER.info(
             "Unresponsive policy called for "
@@ -382,7 +383,7 @@ class ActivationManager(StatusManager):
             )
             user_msg = (
                 "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
+                f"{check_type} check for ansible rulebook timed out. "
                 "Restart policy is not applicable."
             )
             container_logger.write(user_msg, flush=True)
@@ -400,7 +401,7 @@ class ActivationManager(StatusManager):
             )
             user_msg = (
                 "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
+                f"{check_type} check for ansible rulebook timed out. "
                 "Activation is going to be restarted."
             )
             container_logger.write(user_msg, flush=True)
@@ -861,6 +862,7 @@ class ActivationManager(StatusManager):
             return
 
         if self.db_instance.status not in [
+            ActivationStatus.STARTING,
             ActivationStatus.RUNNING,
             ActivationStatus.WORKERS_OFFLINE,
         ]:
@@ -871,6 +873,8 @@ class ActivationManager(StatusManager):
             )
             LOGGER.info(msg)
             return
+
+        self._detect_running_status()
 
         # get the status of the container
         container_status = None
@@ -905,17 +909,21 @@ class ActivationManager(StatusManager):
         # Detect unresponsive activation instance
         # TODO: we should decrease the default timeout/livecheck
         # in the future might be configurable per activation
-        if self._is_unresponsive():
+        check_readiness = (
+            self.latest_instance.status == ActivationStatus.STARTING
+        )
+        check_type = "Readiness" if check_readiness else "Liveness"
+        if self._is_unresponsive(check_readiness=check_readiness):
             msg = (
                 "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
+                f"{check_type} check for ansible rulebook timed out. "
                 "Applicable restart policy will be applied."
             )
             LOGGER.info(
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 f"{msg}",
             )
-            self._unresponsive_policy()
+            self._unresponsive_policy(check_type=check_type)
             return
 
         # last case is the success case
@@ -955,6 +963,18 @@ class ActivationManager(StatusManager):
                 f"Container {self.latest_instance.activation_pod_id} "
                 "is in an stopped state.",
             )
+
+    def _detect_running_status(self):
+        if (
+            self.latest_instance.status == ActivationStatus.STARTING
+            and self.latest_instance.updated_at
+        ):
+            # safely turn the status to running after updated_at was set
+            # upon receiving at least one heartbeat
+            with transaction.atomic():
+                self.set_status(ActivationStatus.RUNNING)
+                self.set_latest_instance_status(ActivationStatus.RUNNING)
+                self._reset_failure_count()
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
