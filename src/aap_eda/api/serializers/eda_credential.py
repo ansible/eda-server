@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from django.db.models import Q
+from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -192,13 +193,16 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
         Q(eda_credential=eda_credential)
         | Q(signature_validation_credential=eda_credential)
     )
+    used_event_streams = models.EventStream.objects.filter(
+        eda_credential=eda_credential
+    )
 
     for activation in used_activations:
         resource = {
             "type": "Activation",
             "id": activation.id,
             "name": activation.name,
-            "url": f"api/eda/v1/activations/{activation.id}/",
+            "uri": reverse("activation-detail", kwargs={"pk": activation.id}),
         }
         resources.append(resource)
 
@@ -207,8 +211,9 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
             "type": "DecisionEnvironment",
             "id": decision_environment.id,
             "name": decision_environment.name,
-            "url": (
-                f"api/eda/v1/decision-environments/{decision_environment.id}/"
+            "uri": reverse(
+                "decisionenvironment-detail",
+                kwargs={"pk": decision_environment.id},
             ),
         }
         resources.append(resource)
@@ -218,7 +223,18 @@ def get_references(eda_credential: models.EdaCredential) -> list[dict]:
             "type": "Project",
             "id": project.id,
             "name": project.name,
-            "url": f"api/eda/v1/projects/{project.id}/",
+            "uri": reverse("project-detail", kwargs={"pk": project.id}),
+        }
+        resources.append(resource)
+
+    for event_stream in used_event_streams:
+        resource = {
+            "type": "EventStream",
+            "id": event_stream.id,
+            "name": event_stream.name,
+            "uri": reverse(
+                "eventstream-detail", kwargs={"pk": event_stream.id}
+            ),
         }
         resources.append(resource)
 
