@@ -411,7 +411,10 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
         child=serializers.IntegerField(),
-        validators=[validators.check_multiple_credentials],
+        validators=[
+            validators.check_multiple_credentials,
+            validators.check_single_aap_credential,
+        ],
     )
     k8s_service_name = serializers.CharField(
         required=False,
