@@ -899,14 +899,27 @@ def test_delete_credential_used_by_project_with_gpg_credential(
 @pytest.mark.django_db
 def test_retrieve_eda_credential_with_refs(
     default_activation: models.Activation,
+    default_event_stream: models.EventStream,
+    default_decision_environment: models.DecisionEnvironment,
+    default_project: models.Project,
+    default_eda_credential: models.EdaCredential,
     admin_client: APIClient,
     refs,
     preseed_credential_types,
 ):
-    eda_credential = default_activation.eda_credentials.all()[0]
+    default_activation.eda_credentials.add(default_eda_credential)
+
+    default_event_stream.eda_credential = default_eda_credential
+    default_event_stream.save(update_fields=["eda_credential"])
+
+    default_decision_environment.eda_credential = default_eda_credential
+    default_decision_environment.save(update_fields=["eda_credential"])
+
+    default_project.eda_credential = default_eda_credential
+    default_project.save(update_fields=["eda_credential"])
 
     response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/{eda_credential.id}/?refs={refs}",
+        f"{api_url_v1}/eda-credentials/{default_eda_credential.id}/?refs={refs}",  # noqa 501
     )
     assert response.status_code == status.HTTP_200_OK
 
@@ -914,12 +927,30 @@ def test_retrieve_eda_credential_with_refs(
         assert response.data["references"] is not None
         references = response.data["references"]
 
-        assert len(references) == 1
+        assert len(references) == 4
         references[0] = {
             "type": "Activation",
             "id": default_activation.id,
             "name": default_activation.name,
-            "url": f"api/eda/v1/activations/{default_activation.id}/",
+            "uri": f"api/eda/v1/activations/{default_activation.id}/",
+        }
+        references[1] = {
+            "type": "DecisionEnvironment",
+            "id": default_decision_environment.id,
+            "name": default_decision_environment.name,
+            "uri": f"api/eda/v1/decision-environments/{default_decision_environment.id}/",  # noqa 501
+        }
+        references[2] = {
+            "type": "Project",
+            "id": default_project.id,
+            "name": default_project.name,
+            "uri": f"api/eda/v1/projects/{default_project.id}/",
+        }
+        references[3] = {
+            "type": "EventStream",
+            "id": default_event_stream.id,
+            "name": default_event_stream.name,
+            "uri": f"api/eda/v1/event-streams/{default_event_stream.id}/",
         }
     else:
         assert response.data["references"] is None
