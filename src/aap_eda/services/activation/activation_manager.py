@@ -77,6 +77,11 @@ class ActivationManager(StatusManager):
 
         self.container_logger_class = container_logger_class
 
+    def _update_started_time(self) -> None:
+        """Update latest instance's started_at to now."""
+        self.latest_instance.started_at = timezone.now()
+        self.latest_instance.save(update_fields=["started_at"])
+
     def _set_activation_pod_id(self, pod_id: tp.Optional[str]) -> None:
         """Set the pod id of the activation instance."""
         # TODO: implement db locking?
@@ -252,6 +257,7 @@ class ActivationManager(StatusManager):
             raise exceptions.ActivationStartError(msg) from exc
 
         self._set_activation_pod_id(pod_id=container_id)
+        self._update_started_time()
 
         # update logs
         LOGGER.info(
