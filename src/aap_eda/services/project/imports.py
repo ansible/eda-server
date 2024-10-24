@@ -26,7 +26,7 @@ from django.core import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
-from aap_eda.services.project.scm import ScmRepository
+from aap_eda.services.project.scm import ScmEmptyError, ScmRepository
 from aap_eda.services.rulebook import insert_rulebook_related_data
 
 logger = logging.getLogger(__name__)
@@ -61,13 +61,12 @@ def _project_import_wrapper(
         try:
             func(self, project)
             project.import_state = models.Project.ImportState.COMPLETED
-        except Exception as e:
+        except ScmEmptyError as e:
             # if a project is empty, sync status should show completed
-            project.import_state = (
-                models.Project.ImportState.COMPLETED
-                if "Project folder is empty" in e.args[0]
-                else models.Project.ImportState.FAILED
-            )
+            project.import_state = models.Project.ImportState.COMPLETED
+            project.import_error = str(e)
+        except Exception as e:
+            project.import_state = models.Project.ImportState.FAILED
             project.import_error = str(e)
             error = e
         finally:
