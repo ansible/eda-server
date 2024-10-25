@@ -33,8 +33,8 @@ class EdaCredentialReferenceSerializer(serializers.Serializer):
     name = serializers.CharField(
         required=True, help_text="Name of the related resource"
     )
-    url = serializers.URLField(
-        required=True, help_text="URL of the related resource"
+    uri = serializers.URLField(
+        required=True, help_text="URI of the related resource"
     )
 
 
