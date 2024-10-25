@@ -642,3 +642,67 @@ def test_create_activation_with_extra_vars_mix_credential(
     assert extra_var["custom_password"] == "password"
     for key, value in original_extra_var.items():
         assert value == extra_var[key]
+
+
+@pytest.mark.django_db
+def test_create_activation_with_multip_aap_credentials(
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    data = "secret"
+    aap_credentials = models.EdaCredential.objects.bulk_create(
+        [
+            models.EdaCredential(
+                name="aap-credential-1",
+                inputs=inputs_to_store(
+                    {
+                        "host": "https://eda_controller_url",
+                        "username": "adam",
+                        "password": data,
+                        "ssl_verify": "no",
+                        "oauth_token": "",
+                    }
+                ),
+                credential_type=aap_credential_type,
+                organization=default_organization,
+            ),
+            models.EdaCredential(
+                name="aap-credential-2",
+                inputs=inputs_to_store(
+                    {
+                        "host": "https://eda_controller_url",
+                        "username": "",
+                        "password": "",
+                        "ssl_verify": "no",
+                        "oauth_token": "xzy_token",
+                    }
+                ),
+                credential_type=aap_credential_type,
+                organization=default_organization,
+            ),
+        ]
+    )
+
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": default_decision_environment.id,
+        "rulebook_id": default_rulebook.id,
+        "extra_var": EXTRA_VAR,
+        "organization_id": default_organization.id,
+        "eda_credentials": [credential.id for credential in aap_credentials],
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        f"{len(aap_credentials)} RH AAP credentials"
+        " are provided instead of 1" in response.data["eda_credentials"]
+    )

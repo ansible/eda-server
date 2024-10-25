@@ -17,6 +17,7 @@ import typing as tp
 
 import yaml
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from aap_eda.core import enums, models
@@ -109,9 +110,33 @@ def check_credential_types_for_scm(eda_credential_id: int) -> int:
     return eda_credential_id
 
 
-def check_multiple_credentials(eda_credential_ids: list[int]) -> int:
+def check_multiple_credentials(
+    eda_credential_ids: list[int],
+) -> list[int]:
     for eda_credential_id in eda_credential_ids:
         check_credential_types_for_activation(eda_credential_id)
+
+    return eda_credential_ids
+
+
+def check_single_aap_credential(
+    eda_credential_ids: list[int],
+) -> list[int]:
+    credentials = [
+        get_credential_if_exists(eda_credential_id)
+        for eda_credential_id in eda_credential_ids
+    ]
+    aap_credential_ids = [
+        credential.id
+        for credential in credentials
+        if credential.credential_type.name == enums.DefaultCredentialType.AAP
+    ]
+
+    if len(aap_credential_ids) > 1:
+        raise serializers.ValidationError(
+            _("%(number)d RH AAP credentials are provided instead of 1")
+            % {"number": len(aap_credential_ids)}
+        )
 
     return eda_credential_ids
 
