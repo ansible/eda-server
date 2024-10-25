@@ -94,6 +94,7 @@ To configure a Resource Server for syncing of managed resources:
 
 """
 import os
+from datetime import timedelta
 
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
@@ -528,22 +529,11 @@ RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
 RQ_STARTUP_JOBS = []
 
-# Id of the scheduler job it's required when we have multiple instances of
-# the scheduler running to avoid duplicate jobs
-RQ_PERIODIC_JOBS = [
-    {
-        "func": (
-            "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
-        ),
-        "interval": 5,
-        "id": "enqueue_monitor_rulebook_processes",
-    },
-    {
-        "func": "aap_eda.tasks.project.monitor_project_tasks",
-        "interval": 30,
-        "id": "monitor_project_tasks",
-    },
-]
+CELERYBEAT_SCHEDULE = {
+    'aap_eda.tasks.orchestrator.monitor_rulebook_processes': {'schedule': timedelta(seconds=5)},
+    'aap_eda.tasks.project._monitor_project_tasks': {'schedule': timedelta(seconds=30)},
+}
+
 RQ_CRON_JOBS = []
 RQ_SCHEDULER_JOB_INTERVAL = settings.get("SCHEDULER_JOB_INTERVAL", 5)
 
@@ -615,6 +605,11 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        "dispatcher": {
+            "handlers": ["console"],
+            "level": "DEBUG",  # TODO: this is for demo!!
+            "propagate": False,
+        }
     },
 }
 
