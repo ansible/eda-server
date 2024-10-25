@@ -98,6 +98,56 @@ def test_create_decision_environment(
 
 
 @pytest.mark.parametrize(
+    ("image_url", "unallowed"),
+    [
+        ("http://registry.com/img1:tag1", "scheme not allowed"),
+        ("//registry.com/img1:tag1", "network location not allowed"),
+        ("registry.com/img1:tag;parameter", "parameters not allowed"),
+        ("registry.com/img1:tag1?query", "query not allowed"),
+        ("registry.com/img1:tag#fragment", "fragment not allowed"),
+        ("/registry.com/img1:tag1", 'must not start with "/"'),
+    ],
+)
+@pytest.mark.django_db
+def test_create_decision_environment_with_malformed_url(
+    image_url,
+    unallowed,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        organization=default_organization,
+        inputs=inputs_to_store(
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": "registry.com",
+            }
+        ),
+    )
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": image_url,
+        "organization_id": default_organization.id,
+        "eda_credential_id": credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    errors = response.data.get("non_field_errors")
+    assert f"Image url {image_url} is malformed; {unallowed}" in str(errors)
+
+
+@pytest.mark.parametrize(
     ("credential_inputs", "status_code", "status_message"),
     [
         (

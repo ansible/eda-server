@@ -14,6 +14,7 @@
 import hashlib
 import logging
 import typing as tp
+import urllib
 
 import yaml
 from django.conf import settings
@@ -57,6 +58,32 @@ def check_if_de_exists(decision_environment_id: int) -> int:
 
 
 def check_if_de_valid(image_url: str, eda_credential_id: int):
+    parsed_url = urllib.parse.urlparse(image_url)
+    base_message = f"Image url {image_url} is malformed; "
+    if parsed_url.scheme:
+        raise serializers.ValidationError(base_message + "scheme not allowed")
+    if parsed_url.netloc:
+        raise serializers.ValidationError(
+            base_message + "network location not allowed"
+        )
+    if parsed_url.params:
+        raise serializers.ValidationError(
+            base_message + "parameters not allowed"
+        )
+    if parsed_url.query:
+        raise serializers.ValidationError(base_message + "query not allowed")
+    if parsed_url.fragment:
+        raise serializers.ValidationError(
+            base_message + "fragment not allowed"
+        )
+
+    # Now that we've passed the above and know there's no netloc check if the
+    # path starts with a "/"; it should not.
+    if parsed_url.path.startswith("/"):
+        raise serializers.ValidationError(
+            base_message + 'must not start with "/"'
+        )
+
     credential = get_credential_if_exists(eda_credential_id)
     inputs = yaml.safe_load(credential.inputs.get_secret_value())
     host = inputs.get("host")
