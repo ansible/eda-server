@@ -7,6 +7,7 @@ import time
 import typing
 from datetime import datetime, timedelta
 from types import MethodType
+import json
 
 import django_rq
 import redis
@@ -23,6 +24,9 @@ from django.conf import settings
 from rq import results as rq_results
 
 from aap_eda.settings import default
+
+from dispatcher.brokers.pg_notify import publish_message
+
 
 __all__ = [
     "Job",
@@ -593,23 +597,26 @@ def queue_cancel_job(queue_name: str, job_id: str) -> None:
 
 @redis_connect_retry()
 def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
-    """Enqueue a new job if it is not already enqueued.
+    """Send message into pg_notify, named incorrectly for now, for demo
 
-    Detects if a job with the same id is already enqueued and if it is
-    it will return it instead of enqueuing a new one.
+    Note that queues will not behave the same as before.
+    pg_notify is essentially always broadcast.
     """
-    for name in settings.RQ_QUEUES:
-        job = job_from_queue(name, job_id)
-        if job:
-            logger.info(
-                f"Skip enqueing job: {job_id} because it is already enqueued"
-            )
-            return job
-
-    queue = django_rq.get_queue(name=queue_name)
-    kwargs["job_id"] = job_id
-    logger.info(f"Enqueing unique job: {job_id}")
-    return queue.enqueue(*args, **kwargs)
+    task_name = args[0]
+    if isinstance(task_name, str):
+        pass  # this is how we want it
+    elif callable(task_name):
+        task_name = f'{task_name.__module__}.{task_name.__name__}'
+    # task_name is RQ worker, task by itself is AWX dispatcher
+    payload = {
+        'task_name': task_name,
+        'task': task_name,
+        'uuid': job_id,
+        'args': args[1:]  # little sketchy about how reliable this is
+    }
+    message = json.dumps(payload)
+    # TODO: sanitize or escape channel names on dispatcher side
+    publish_message(queue_name.replace('-', '_'), message)
 
 
 @redis_connect_retry()

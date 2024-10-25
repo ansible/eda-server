@@ -84,14 +84,6 @@ class ActivationViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        # If we're expected to run this activation we need redis
-        # to be available.
-        if serializer.validated_data.get(
-            "is_enabled",
-            models.activation.DEFAULT_ENABLED,
-        ):
-            self.redis_is_available()
-
         with transaction.atomic():
             response = serializer.create(serializer.validated_data)
             check_related_permissions(
@@ -164,9 +156,7 @@ class ActivationViewSet(
                 )
                 logger.info(f"Now deleting {name} ...")
         except redis.ConnectionError:
-            # If Redis isn't available we'll generate a Conflict (409).
-            # Anything else we re-raise the exception.
-            self.redis_is_available()
+            # TODO: get rid of try-except, not needed
             raise
 
         logger.info(audit_log)
@@ -312,9 +302,6 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Redis must be available in order to perform the enable.
-        self.redis_is_available()
-
         logger.info(f"Now enabling {activation.name} ...")
 
         activation.is_enabled = True
@@ -363,9 +350,6 @@ class ActivationViewSet(
         self._check_deleting(activation)
 
         if activation.is_enabled:
-            # Redis must be available in order to perform the delete.
-            self.redis_is_available()
-
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
             activation.save(
@@ -412,9 +396,6 @@ class ActivationViewSet(
             raise api_exc.Forbidden(
                 detail="Activation is disabled and cannot be run."
             )
-
-        # Redis must be available in order to perform the restart.
-        self.redis_is_available()
 
         valid, error = is_activation_valid(activation)
         if not valid:

@@ -149,23 +149,6 @@ services:
     volumes:
       - '../../:/app/src:z'
 
-  eda-scheduler:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_SCHEDULER_WORKERS:-2}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage scheduler
-    depends_on:
-      eda-api:
-        condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-    restart: always
-
   eda-default-worker:
     image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
@@ -174,9 +157,7 @@ services:
     command:
       - /bin/bash
       - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.DefaultWorker
+      - aap-eda-manage run_worker_dispatcher
     depends_on:
       eda-api:
         condition: service_healthy
@@ -195,9 +176,7 @@ services:
     command:
       - /bin/bash
       - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
+      - aap-eda-manage run_activation_dispatcher
     depends_on:
       eda-api:
         condition: service_healthy
@@ -216,9 +195,7 @@ services:
     command:
       - /bin/bash
       - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
+      - aap-eda-manage run_activation_dispatcher
     depends_on:
       eda-api:
         condition: service_healthy

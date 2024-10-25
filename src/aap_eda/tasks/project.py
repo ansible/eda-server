@@ -14,21 +14,19 @@
 
 import logging
 
-import django_rq
+from dispatcher.publish import task
+from dispatcher.control import Control
+
 from django.conf import settings
 
-from aap_eda.core import models, tasking
+from aap_eda.core import models
 from aap_eda.services.project import ProjectImportError, ProjectImportService
 
 logger = logging.getLogger(__name__)
-PROJECT_TASKS_QUEUE = "default"
-
-# Wrap the django_rq job decorator so its processing is within our retry
-# code.
-job = tasking.redis_connect_retry()(django_rq.job)
+PROJECT_TASKS_QUEUE = "eda_workers"
 
 
-@job(PROJECT_TASKS_QUEUE)
+@task(queue=PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
     logger.info(f"Task started: Import project ( {project_id=} )")
 
@@ -41,7 +39,7 @@ def import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@job(PROJECT_TASKS_QUEUE)
+@task(queue=PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
     logger.info(f"Task started: Sync project ( {project_id=} )")
 
@@ -54,20 +52,7 @@ def sync_project(project_id: int):
     logger.info(f"Task complete: Sync project ( project_id={project.id} )")
 
 
-# Started by the scheduler, unique concurrent execution on specified queue;
-# default is the default queue
-def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
-    job_id = "monitor_project_tasks"
-    tasking.unique_enqueue(
-        queue_name, job_id, _monitor_project_tasks, queue_name
-    )
-
-
-# Although this is a periodically run task and that could be viewed as
-# providing resilience to Redis connection issues we decorate it with the
-# redis_connect_retry to maintain the model that anything directly dependent on
-# a Redis connection is wrapped by retries.
-@tasking.redis_connect_retry()
+@task(queue=PROJECT_TASKS_QUEUE)
 def _monitor_project_tasks(queue_name: str) -> None:
     """Handle project tasks that are stuck.
 
@@ -77,7 +62,7 @@ def _monitor_project_tasks(queue_name: str) -> None:
     """
     logger.info("Task started: Monitor project tasks")
 
-    queue = django_rq.get_queue(queue_name)
+    ctl = Control(PROJECT_TASKS_QUEUE, config={'conninfo': settings.PG_NOTIFY_DSN_SERVER})
 
     # Filter projects that doesn't have any related job
     pending_projects = models.Project.objects.filter(
@@ -85,8 +70,8 @@ def _monitor_project_tasks(queue_name: str) -> None:
     )
     missing_projects = []
     for project in pending_projects:
-        job = queue.fetch_job(str(project.import_task_id))
-        if job is None:
+        running_data = ctl.control_with_reply('running', data={'uuid': project.import_task_id})
+        if not running_data:
             missing_projects.append(project)
 
     # Sync or import missing projects
@@ -98,11 +83,11 @@ def _monitor_project_tasks(queue_name: str) -> None:
             " in the queue. Adding it back."
         )
         if project.git_hash:
-            job = sync_project.delay(project.id)
+            job_data, _ = sync_project.delay(project.id)
         else:
-            job = import_project.delay(project.id)
+            job_data, _ = import_project.delay(project.id)
 
-        project.import_task_id = job.id
+        project.import_task_id = job_data['uuid']
         project.save(update_fields=["import_task_id", "modified_at"])
 
     logger.info("Task complete: Monitor project tasks")

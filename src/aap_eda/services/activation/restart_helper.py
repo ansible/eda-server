@@ -22,6 +22,8 @@ from aap_eda.core.tasking import enqueue_delay, queue_cancel_job
 
 LOGGER = logging.getLogger(__name__)
 
+DEFAULT_QUEUE = "eda_workers"
+
 
 def auto_start_job_id(process_parent_type: str, id: int) -> str:
     """Generate the auto-start job id for use in enqueuing and cancelling."""
@@ -36,7 +38,7 @@ def system_cancel_restart_activation(
     The restart may not exist.
     """
     LOGGER.debug(f"Cancelling auto-start for {process_parent_type} {id}")
-    queue_cancel_job("default", auto_start_job_id(process_parent_type, id))
+    queue_cancel_job(DEFAULT_QUEUE, auto_start_job_id(process_parent_type, id))
 
 
 def system_restart_activation(
@@ -52,7 +54,7 @@ def system_restart_activation(
         f"in {delay_seconds} seconds",
     )
     enqueue_delay(
-        "default",
+        DEFAULT_QUEUE,
         auto_start_job_id(process_parent_type, id),
         delay_seconds,
         _queue_auto_start,
