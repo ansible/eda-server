@@ -132,18 +132,17 @@ class ProjectViewSet(
                     request.user, serializer.instance
                 )
 
-                job = tasks.import_project.delay(project_id=project.id)
+                job_data, _ = tasks.import_project.delay(project_id=project.id)
+                job_id = job_data['uuid']
         except redis.ConnectionError:
-            # If Redis isn't available we'll generate a Conflict (409).
-            # Anything else we re-raise the exception.
-            self.redis_is_available()
+            # TODO: remove try-except block
             raise
 
         # Atomically update `import_task_id` field only.
         models.Project.objects.filter(pk=project.id).update(
-            import_task_id=job.id
+            import_task_id=job_id
         )
-        project.import_task_id = job.id
+        project.import_task_id = job_id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
         logger.info(
@@ -273,9 +272,7 @@ class ProjectViewSet(
         try:
             job = tasks.sync_project.delay(project_id=project.id)
         except redis.ConnectionError:
-            # If Redis isn't available we'll generate a Conflict (409).
-            # Anything else we re-raise the exception.
-            self.redis_is_available()
+            # TODO: remove try-except block
             raise
 
         project.import_state = models.Project.ImportState.PENDING
