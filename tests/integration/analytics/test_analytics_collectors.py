@@ -274,13 +274,11 @@ def test_activations_table_collector(default_activation: models.Activation):
                 "rulebook_name",
                 "rulebook_rulesets",
                 "ruleset_stats",
-                "user_id",
                 "created_at",
                 "modified_at",
                 "status_updated_at",
                 "status_message",
                 "latest_instance_id",
-                "awx_token_id",
                 "log_level",
                 "eda_system_vault_credential_id",
                 "k8s_service_name",
@@ -318,7 +316,6 @@ def assert_audit_rules(expected_audit_rules):
                 "ruleset_uuid",
                 "ruleset_name",
                 "activation_instance_id",
-                "job_instance_id",
             ]
             assert len(lines) == len(expected_audit_rules)
             for i, rule in enumerate(expected_audit_rules):
@@ -443,7 +440,6 @@ def test_eda_credentials_table_collector(
                 "organization_id",
                 "name",
                 "description",
-                "inputs",
                 "managed",
                 "created_at",
                 "modified_at",
@@ -515,7 +511,6 @@ def test_decision_environments_table_collector(
                 "name",
                 "description",
                 "image_url",
-                "credential_id",
                 "eda_credential_id",
                 "created_at",
                 "modified_at",
@@ -633,7 +628,6 @@ def test_projects_table_collector(
                 "proxy",
                 "git_hash",
                 "verify_ssl",
-                "credential_id",
                 "eda_credential_id",
                 "archive_file",
                 "import_state",
@@ -743,16 +737,14 @@ def test_organizations_table_collector(
             assert header == [
                 "id",
                 "modified",
-                "modified_by_id",
                 "created",
-                "created_by_id",
                 "name",
                 "description",
             ]
             assert len(lines) == 1
             assert lines[0][0] == str(default_organization.id)
-            assert lines[0][5] == default_organization.name
-            assert lines[0][6] == default_organization.description
+            assert lines[0][3] == default_organization.name
+            assert lines[0][4] == default_organization.description
 
 
 @pytest.mark.django_db
