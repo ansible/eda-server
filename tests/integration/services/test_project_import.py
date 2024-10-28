@@ -64,25 +64,18 @@ def storage_save_patch():
         yield save_mock
 
 
-@pytest.mark.django_db
-def test_project_import(
-    default_organization: models.Organization,
-    storage_save_patch,
-    service_tempdir_patch,
-):
-    def clone_project(_url, path, *_args, **_kwargs):
-        src = DATA_DIR / "project-01"
-        shutil.copytree(src, path, symlinks=False)
-        return repo_mock
-
-    repo_mock = mock.Mock(name="ScmRepository()")
-    repo_mock.rev_parse.return_value = (
-        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+@pytest.fixture
+def project(default_organization: models.Organization):
+    return models.Project.objects.create(
+        name="test-project-01",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
     )
-    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
-    git_mock.clone.side_effect = clone_project
 
-    projects = models.Project.objects.bulk_create(
+
+@pytest.fixture
+def projects(default_organization: models.Organization):
+    return models.Project.objects.bulk_create(
         [
             models.Project(
                 name="test-project-01",
@@ -101,6 +94,25 @@ def test_project_import(
             ),
         ]
     )
+
+
+@pytest.mark.django_db
+def test_project_import(
+    projects: list[models.Project],
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-01"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="ScmRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
+    git_mock.clone.side_effect = clone_project
 
     for project in projects:
         service = ProjectImportService(scm_cls=git_mock)
@@ -134,7 +146,7 @@ def test_project_import(
 
 @pytest.mark.django_db
 def test_project_import_with_new_layout(
-    default_organization: models.Organization,
+    project: models.Project,
     storage_save_patch,
     service_tempdir_patch,
 ):
@@ -151,12 +163,6 @@ def test_project_import_with_new_layout(
     git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
 
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/repo.git",
-        organization=default_organization,
-    )
-
     service = ProjectImportService(scm_cls=git_mock)
     service.import_project(project)
     project.refresh_from_db()
@@ -167,7 +173,7 @@ def test_project_import_with_new_layout(
 
 @pytest.mark.django_db
 def test_project_import_rulebook_directory_missing(
-    default_organization: models.Organization,
+    project: models.Project,
     storage_save_patch,
     service_tempdir_patch,
 ):
@@ -178,11 +184,6 @@ def test_project_import_rulebook_directory_missing(
     git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.return_value = repo_mock
 
-    project = models.Project.objects.create(
-        name="test-project-01",
-        url="https://git.example.com/repo.git",
-        organization=default_organization,
-    )
     message_expected = (
         "The 'extensions/eda/rulebooks' or 'rulebooks'"
         + " directory doesn't exist within the project root."
@@ -201,8 +202,36 @@ def test_project_import_rulebook_directory_missing(
 
 
 @pytest.mark.django_db
+def test_project_import_with_no_rulebooks(
+    project: models.Project,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    def clone_project(_url, path, *_args, **_kwargs):
+        src = DATA_DIR / "project-06"
+        shutil.copytree(src, path, symlinks=False)
+        return repo_mock
+
+    repo_mock = mock.Mock(name="ScmRepository()")
+    repo_mock.rev_parse.return_value = (
+        "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    )
+
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
+    git_mock.clone.side_effect = clone_project
+
+    service = ProjectImportService(scm_cls=git_mock)
+    service.import_project(project)
+    project.refresh_from_db()
+
+    assert project.git_hash == "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+    assert project.import_error == "This project contains no rulebooks."
+
+
+@pytest.mark.django_db
 def test_project_import_with_vaulted_data(
-    default_organization: models.Organization,
+    project: models.Project,
     storage_save_patch,
     service_tempdir_patch,
 ):
@@ -218,12 +247,6 @@ def test_project_import_with_vaulted_data(
 
     git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
-
-    project = models.Project.objects.create(
-        name="test-project-04",
-        url="https://git.example.com/repo.git",
-        organization=default_organization,
-    )
 
     service = ProjectImportService(scm_cls=git_mock)
     service.import_project(project)
@@ -342,7 +365,7 @@ def test_project_sync_same_hash(
 
 @pytest.mark.django_db
 def test_project_import_with_invalid_rulebooks(
-    default_organization: models.Organization,
+    project: models.Project,
     storage_save_patch,
     service_tempdir_patch,
     caplog,
@@ -359,12 +382,6 @@ def test_project_import_with_invalid_rulebooks(
 
     git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
     git_mock.clone.side_effect = clone_project
-
-    project = models.Project.objects.create(
-        name="test-project-04",
-        url="https://git.example.com/repo.git",
-        organization=default_organization,
-    )
 
     logger = logging.getLogger("aap_eda")
     propagate = logger.propagate
