@@ -40,6 +40,12 @@ class ScmError(Exception):
     pass
 
 
+class ScmEmptyError(ScmError):
+    """The checkout repository is empty which is treated as an error."""
+
+    pass
+
+
 class ScmAuthenticationError(Exception):
     """SCM Authentication error."""
 
@@ -208,7 +214,7 @@ class ScmRepository:
                 msg = msg.replace(secret, "****", 1)
                 msg = msg.replace(quote(secret, safe=""), "****", 1)
             logger.warning("SCM clone failed: %s", msg)
-            raise ScmError(msg) from None
+            raise e.__class__(msg) from None
         finally:
             if key_file:
                 key_file.close()
@@ -324,7 +330,9 @@ class GitAnsibleRunnerExecutor:
                 ):
                     err_msg = "Credentials not provided or incorrect"
                     raise ScmAuthenticationError(err_msg)
-                if "did not match any file" in err_msg:
-                    raise ScmError(self.PROJECT_EMPTY_ERROR_MSG)
+                if "did not match any file" in err_msg and err_msg.startswith(
+                    '"Failed to checkout branch'
+                ):
+                    raise ScmEmptyError(self.PROJECT_EMPTY_ERROR_MSG)
                 raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
             raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")
