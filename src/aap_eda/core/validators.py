@@ -13,6 +13,7 @@
 #  limitations under the License.
 import hashlib
 import logging
+import re
 import typing as tp
 import urllib
 
@@ -78,10 +79,27 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
         )
 
     # Now that we've passed the above and know there's no netloc check if the
-    # path starts with a "/"; it should not.
-    if parsed_url.path.startswith("/"):
+    # path, rsplit into the <name> and <tag> (if any), matches their respective
+    # regexes as defined here:
+    # https://github.com/opencontainers/distribution-spec/blob/8376368dd8aadc33bf6c88a8b765df90287bb5c8/spec.md?plain=1#L155 # noqa: E501
+
+    split = parsed_url.path.rstrip().rsplit(":", 1)
+    name = split[0]
+    tag = split[1] if (len(split) > 1) else None
+
+    if not re.fullmatch(
+        r"[[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*",  # noqa: E501
+        name,
+    ):
         raise serializers.ValidationError(
-            base_message + 'must not start with "/"'
+            base_message + "name does not match OCI standard"
+        )
+
+    if (tag is not None) and (
+        not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
+    ):
+        raise serializers.ValidationError(
+            base_message + "tag does not match OCI standard"
         )
 
     credential = get_credential_if_exists(eda_credential_id)
@@ -93,7 +111,16 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             f"Credential {credential.name} needs to have host information"
         )
 
-    if not image_url.startswith(host):
+    # Check that the first part of the image path matches the host.
+    # For backward compatibility when creating a new DE with an old credential
+    # we need to separate any schema from the host before doing the compare.
+    parsed_host = urllib.parse.urlparse(host)
+    # If there's a netloc that's the host to use; if not, the path is the host.
+    parsed_host = (
+        parsed_host.netloc if parsed_host.netloc else parsed_host.path
+    )
+
+    if name.split("/", 1)[0] != parsed_host:
         msg = (
             f"DecisionEnvironment image url: {image_url} does "
             f"not match with the credential host: {host}"

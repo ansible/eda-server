@@ -98,18 +98,60 @@ def test_create_decision_environment(
 
 
 @pytest.mark.parametrize(
-    ("image_url", "unallowed"),
+    ("return_code", "image_url", "unallowed"),
     [
-        ("http://registry.com/img1:tag1", "scheme not allowed"),
-        ("//registry.com/img1:tag1", "network location not allowed"),
-        ("registry.com/img1:tag;parameter", "parameters not allowed"),
-        ("registry.com/img1:tag1?query", "query not allowed"),
-        ("registry.com/img1:tag#fragment", "fragment not allowed"),
-        ("/registry.com/img1:tag1", 'must not start with "/"'),
+        (status.HTTP_201_CREATED, "registry.com/group/img1:tag", ""),
+        (status.HTTP_201_CREATED, "registry.com/group/img1", ""),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "http://registry.com/img1:tag1",
+            "scheme not allowed",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "//registry.com/img1:tag1",
+            "network location not allowed",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/img1:tag;parameter",
+            "parameters not allowed",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/img1:tag1?query",
+            "query not allowed",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/img1:tag#fragment",
+            "fragment not allowed",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/:tag",
+            "name does not match OCI standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/img1:",
+            "tag does not match OCI standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/bad^img1",
+            "name does not match OCI standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/img1:bad^tag",
+            "tag does not match OCI standard",
+        ),
     ],
 )
 @pytest.mark.django_db
-def test_create_decision_environment_with_malformed_url(
+def test_create_decision_environment_url(
+    return_code,
     image_url,
     unallowed,
     default_organization: models.Organization,
@@ -142,9 +184,12 @@ def test_create_decision_environment_with_malformed_url(
     response = admin_client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
     )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    errors = response.data.get("non_field_errors")
-    assert f"Image url {image_url} is malformed; {unallowed}" in str(errors)
+    assert response.status_code == return_code
+    if return_code == status.HTTP_400_BAD_REQUEST:
+        errors = response.data.get("non_field_errors")
+        assert f"Image url {image_url} is malformed; {unallowed}" in str(
+            errors
+        )
 
 
 @pytest.mark.parametrize(
