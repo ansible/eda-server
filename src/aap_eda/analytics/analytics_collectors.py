@@ -193,9 +193,47 @@ def activation_stats(
 def activations_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.Activation.objects, since, until)
+    queryset = _get_query(models.Activation.objects, since, until).values(
+        "id",
+        "organization_id",
+        "name",
+        "description",
+        "is_enabled",
+        "git_hash",
+        "decision_environment_id",
+        "project_id",
+        "rulebook_id",
+        "extra_var",
+        "restart_policy",
+        "status",
+        "current_job_id",
+        "restart_count",
+        "failure_count",
+        "is_valid",
+        "rulebook_name",
+        "rulebook_rulesets",
+        "ruleset_stats",
+        "created_at",
+        "modified_at",
+        "status_updated_at",
+        "status_message",
+        "latest_instance_id",
+        "log_level",
+        "eda_system_vault_credential_id",
+        "k8s_service_name",
+        "source_mappings",
+        "skip_audit_events",
+    )
 
-    return _copy_table("activations", query, full_path)
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "activations", f"COPY ({query}) TO STDOUT WITH CSV HEADER", full_path
+    )
 
 
 @register(
@@ -248,7 +286,18 @@ def audit_events_table(
 def audit_rules_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    audit_rules = _get_audit_rule_qs(since, until)
+    audit_rules = _get_audit_rule_qs(since, until).values(
+        "id",
+        "organization_id",
+        "name",
+        "status",
+        "created_at",
+        "fired_at",
+        "rule_uuid",
+        "ruleset_uuid",
+        "ruleset_name",
+        "activation_instance_id",
+    )
     if not bool(audit_rules):
         return
 
@@ -266,9 +315,28 @@ def audit_rules_table(
 def eda_credentials_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.EdaCredential.objects, since, until)
+    queryset = _get_query(models.EdaCredential.objects, since, until).values(
+        "id",
+        "organization_id",
+        "name",
+        "description",
+        "managed",
+        "created_at",
+        "modified_at",
+        "credential_type_id",
+    )
 
-    return _copy_table("eda_credentials", query, full_path)
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "eda_credentials",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -280,9 +348,19 @@ def eda_credentials_table(
 def credential_types_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.CredentialType.objects, since, until)
+    queryset = _get_query(models.CredentialType.objects, since, until)
 
-    return _copy_table("credential_types", query, full_path)
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "credential_types",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -294,8 +372,30 @@ def credential_types_table(
 def decision_environments_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.DecisionEnvironment.objects, since, until)
-    return _copy_table("decision_environments", query, full_path)
+    queryset = _get_query(
+        models.DecisionEnvironment.objects, since, until
+    ).values(
+        "id",
+        "organization_id",
+        "name",
+        "description",
+        "image_url",
+        "eda_credential_id",
+        "created_at",
+        "modified_at",
+    )
+
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "decision_environments",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -385,8 +485,39 @@ def event_streams_by_activation_table(
     description="Data on projects",
 )
 def projects_table(since: datetime, full_path: str, until: datetime, **kwargs):
-    query = _get_query(models.Project.objects, since, until)
-    return _copy_table("projects", query, full_path)
+    queryset = _get_query(models.Project.objects, since, until).values(
+        "id",
+        "organization_id",
+        "name",
+        "description",
+        "url",
+        "proxy",
+        "git_hash",
+        "verify_ssl",
+        "eda_credential_id",
+        "archive_file",
+        "import_state",
+        "import_task_id",
+        "import_error",
+        "created_at",
+        "modified_at",
+        "scm_type",
+        "scm_branch",
+        "scm_refspec",
+        "signature_validation_credential_id",
+    )
+
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "projects",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -398,8 +529,19 @@ def projects_table(since: datetime, full_path: str, until: datetime, **kwargs):
 def rulebooks_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
-    query = _get_query(models.Rulebook.objects, since, until)
-    return _copy_table("rulebooks", query, full_path)
+    queryset = _get_query(models.Rulebook.objects, since, until)
+
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "rulebooks",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -412,8 +554,19 @@ def rulebook_processes_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
     args = {"started_at": True}
-    query = _get_query(models.RulebookProcess.objects, since, until, **args)
-    return _copy_table("rulebook_processes", query, full_path)
+    queryset = _get_query(models.RulebookProcess.objects, since, until, **args)
+
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "rulebook_processes",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -426,8 +579,27 @@ def organizations_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ):
     args = {"created": True}
-    query = _get_query(models.Organization.objects, since, until, **args)
-    return _copy_table("organizations", query, full_path)
+    queryset = _get_query(
+        models.Organization.objects, since, until, **args
+    ).values(
+        "id",
+        "modified",
+        "created",
+        "name",
+        "description",
+    )
+
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "organizations",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -438,9 +610,19 @@ def organizations_table(
 )
 def teams_table(since: datetime, full_path: str, until: datetime, **kwargs):
     args = {"created": True}
-    query = _get_query(models.Team.objects, since, until, **args)
+    queryset = _get_query(models.Team.objects, since, until, **args)
 
-    return _copy_table("teams", query, full_path)
+    query = (
+        str(queryset.query)
+        .replace(_datetime_format(since), f"'{since.isoformat()}'")
+        .replace(_datetime_format(until), f"'{until.isoformat()}'")
+    )
+
+    return _copy_table(
+        "teams",
+        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
+        full_path,
+    )
 
 
 @register(
@@ -563,13 +745,7 @@ def _get_query(
             .distinct()
         )
 
-    query = (
-        str(qs.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return f"COPY ({query}) TO STDOUT WITH CSV HEADER"
+    return qs
 
 
 def _get_audit_event_query(actions: list[models.AuditAction]):
