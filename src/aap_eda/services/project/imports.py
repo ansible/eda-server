@@ -105,7 +105,14 @@ class ProjectImportService:
     @_project_import_wrapper
     def sync_project(self, project: models.Project) -> None:
         with self._clone_and_process(project) as (repo_dir, git_hash):
-            if project.git_hash == git_hash:
+            # At this point project.import_state and
+            # project.import_error have been cleared. We are relying on
+            # project.rulebook_set to determine whether previous sync
+            # succeeded or not
+            if (
+                project.git_hash == git_hash
+                and project.rulebook_set.count() > 0
+            ):
                 logger.info(
                     "Project (id=%s, name=%s) is up to date. Nothing to sync.",
                     project.id,
