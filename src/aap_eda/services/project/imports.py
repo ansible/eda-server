@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable, Final, Iterator, Optional, Type
@@ -26,7 +27,7 @@ from django.core import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
-from aap_eda.services.project.scm import ScmRepository
+from aap_eda.services.project.scm import ScmEmptyError, ScmRepository
 from aap_eda.services.rulebook import insert_rulebook_related_data
 
 logger = logging.getLogger(__name__)
@@ -61,13 +62,12 @@ def _project_import_wrapper(
         try:
             func(self, project)
             project.import_state = models.Project.ImportState.COMPLETED
-        except Exception as e:
+        except ScmEmptyError as e:
             # if a project is empty, sync status should show completed
-            project.import_state = (
-                models.Project.ImportState.COMPLETED
-                if "Project folder is empty" in e.args[0]
-                else models.Project.ImportState.FAILED
-            )
+            project.import_state = models.Project.ImportState.COMPLETED
+            project.import_error = str(e)
+        except Exception as e:
+            project.import_state = models.Project.ImportState.FAILED
             project.import_error = str(e)
             error = e
         finally:
@@ -90,9 +90,6 @@ def _project_import_wrapper(
     return wrapper
 
 
-# TODO(cutwater): The project import and project sync are mostly
-#   similar operations. Current implementation has some code duplication.
-#   This needs to be refactored in the future.
 class ProjectImportService:
     def __init__(self, scm_cls: Optional[Type[ScmRepository]] = None):
         if scm_cls is None:
@@ -101,44 +98,13 @@ class ProjectImportService:
 
     @_project_import_wrapper
     def import_project(self, project: models.Project) -> None:
-        with self._temporary_directory() as tempdir:
-            repo_dir = os.path.join(tempdir, "src")
-
-            proxy = project.proxy.get_secret_value() if project.proxy else None
-            repo = self._scm_cls.clone(
-                project.url,
-                repo_dir,
-                credential=project.eda_credential,
-                gpg_credential=project.signature_validation_credential,
-                depth=1,
-                verify_ssl=project.verify_ssl,
-                branch=project.scm_branch,
-                refspec=project.scm_refspec,
-                proxy=proxy,
-            )
-            project.git_hash = repo.rev_parse("HEAD")
-
+        with self._clone_and_process(project) as (repo_dir, git_hash):
+            project.git_hash = git_hash
             self._import_rulebooks(project, repo_dir)
 
     @_project_import_wrapper
     def sync_project(self, project: models.Project) -> None:
-        with self._temporary_directory() as tempdir:
-            repo_dir = os.path.join(tempdir, "src")
-
-            proxy = project.proxy.get_secret_value() if project.proxy else None
-            repo = self._scm_cls.clone(
-                project.url,
-                repo_dir,
-                credential=project.eda_credential,
-                gpg_credential=project.signature_validation_credential,
-                depth=1,
-                verify_ssl=project.verify_ssl,
-                branch=project.scm_branch,
-                refspec=project.scm_refspec,
-                proxy=proxy,
-            )
-            git_hash = repo.rev_parse("HEAD")
-
+        with self._clone_and_process(project) as (repo_dir, git_hash):
             if project.git_hash == git_hash:
                 logger.info(
                     "Project (id=%s, name=%s) is up to date. Nothing to sync.",
@@ -150,6 +116,27 @@ class ProjectImportService:
             project.git_hash = git_hash
 
             self._sync_rulebooks(project, repo_dir, git_hash)
+
+    @contextmanager
+    def _clone_and_process(self, project: models.Project):
+        with self._temporary_directory() as tempdir:
+            repo_dir = os.path.join(tempdir, "src")
+
+            proxy = project.proxy.get_secret_value() if project.proxy else None
+            repo = self._scm_cls.clone(
+                project.url,
+                repo_dir,
+                credential=project.eda_credential,
+                gpg_credential=project.signature_validation_credential,
+                depth=1,
+                verify_ssl=project.verify_ssl,
+                branch=project.scm_branch,
+                refspec=project.scm_refspec,
+                proxy=proxy,
+            )
+            yield repo_dir, repo.rev_parse("HEAD")
+            if project.rulebook_set.count() == 0:
+                raise ScmEmptyError("This project contains no rulebooks.")
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
