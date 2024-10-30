@@ -19,6 +19,7 @@ from django.db.utils import IntegrityError
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.tasking import enqueue_delay, queue_cancel_job
+from dispatcher.publish import task
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def system_restart_activation(
     )
 
 
+@task(queue="eda_workers")
 def _queue_auto_start(process_parent_type: str, id: int) -> None:
     LOGGER.info(f"Requesting auto-start for {process_parent_type} {id}")
     try:

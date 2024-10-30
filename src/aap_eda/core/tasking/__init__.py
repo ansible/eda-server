@@ -5,9 +5,7 @@ import functools
 import logging
 import time
 import typing
-from datetime import datetime, timedelta
 from types import MethodType
-import json
 
 import django_rq
 import redis
@@ -24,17 +22,13 @@ from django.conf import settings
 from rq import results as rq_results
 
 from aap_eda.settings import default
-
-from dispatcher.brokers.pg_notify import publish_message
-
+from dispatcher.control import Control
 
 __all__ = [
     "Job",
     "Queue",
     "ActivationWorker",
     "DefaultWorker",
-    "unique_enqueue",
-    "job_from_queue",
 ]
 
 logger = logging.getLogger(__name__)
@@ -575,63 +569,21 @@ class ActivationWorker(Worker):
         )
 
 
-@redis_connect_retry()
 def enqueue_delay(
-    queue_name: str, job_id: str, delay: int, *args, **kwargs
+    queue_name: str, job_id: str, delay: int, method, *args, **kwargs
 ) -> Job:
     """Enqueue a job to run after specific seconds."""
-    scheduler = django_rq.get_scheduler(name=queue_name)
-    return scheduler.enqueue_at(
-        datetime.utcnow() + timedelta(seconds=delay),
-        job_id=job_id,
-        *args,
-        **kwargs,
+    method.apply_async(
+        args=args, kwargs=kwargs, queue=queue_name, delay=delay, uuid=job_id
     )
 
 
-@redis_connect_retry()
 def queue_cancel_job(queue_name: str, job_id: str) -> None:
-    scheduler = django_rq.get_scheduler(name=queue_name)
-    scheduler.cancel(job_id)
-
-
-@redis_connect_retry()
-def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
-    """Send message into pg_notify, named incorrectly for now, for demo
-
-    Note that queues will not behave the same as before.
-    pg_notify is essentially always broadcast.
-    """
-    task_name = args[0]
-    if isinstance(task_name, str):
-        pass  # this is how we want it
-    elif callable(task_name):
-        task_name = f'{task_name.__module__}.{task_name.__name__}'
-    # task_name is RQ worker, task by itself is AWX dispatcher
-    payload = {
-        'task_name': task_name,
-        'task': task_name,
-        'uuid': job_id,
-        'args': args[1:]  # little sketchy about how reliable this is
-    }
-    message = json.dumps(payload)
-    # TODO: sanitize or escape channel names on dispatcher side
-    publish_message(queue_name.replace('-', '_'), message)
-
-
-@redis_connect_retry()
-def job_from_queue(
-    queue: typing.Union[Queue, str], job_id: str
-) -> typing.Optional[Job]:
-    """Return queue job if it not canceled or finished else None."""
-    if type(queue) is str:
-        queue = django_rq.get_queue(name=queue)
-    job = queue.fetch_job(job_id)
-    if job and job.get_status(refresh=True) in [
-        rq.job.JobStatus.QUEUED,
-        rq.job.JobStatus.STARTED,
-        rq.job.JobStatus.DEFERRED,
-        rq.job.JobStatus.SCHEDULED,
-    ]:
-        return job
-    return None
+    ctl = Control(
+        queue_name, config={"conninfo": settings.PG_NOTIFY_DSN_SERVER}
+    )
+    canceled_data = ctl.control_with_reply("cancel", data={"uuid": job_id})
+    if canceled_data:
+        logger.warning(f"Canceled jobs in flight: {canceled_data}")
+    else:
+        logger.debug(f"No jobs running with id {job_id} to cancel")

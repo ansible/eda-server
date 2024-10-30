@@ -17,8 +17,6 @@ import random
 from collections import Counter
 from typing import Optional
 
-from dispatcher.publish import task
-
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -35,6 +33,9 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
+from aap_eda.utils.advisory_lock import advisory_lock
+from dispatcher.control import Control
+from dispatcher.publish import task
 
 from .exceptions import UnknownProcessParentType
 
@@ -66,8 +67,7 @@ def get_process_parent(
     return klass.objects.get(id=parent_id)
 
 
-@task(queue="eda_workers")
-def _manage(process_parent_type: str, id: int) -> None:
+def _manage_no_lock(process_parent_type: str, id: int) -> None:
     """Manage the activation with the given id.
 
     It will run pending user requests or monitor the activation
@@ -104,6 +104,20 @@ def _manage(process_parent_type: str, id: int) -> None:
             f"Processing monitor request for {process_parent_type} {id}",
         )
         ActivationManager(process_parent).monitor()
+
+
+@task()
+def _manage(process_parent_type: str, id: int) -> None:
+    with advisory_lock(
+        _manage_process_job_id(process_parent_type, id), wait=False
+    ) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"Method _manage({process_parent_type}, {id}) already being ran, exiting"
+            )
+            return
+
+        _manage_no_lock(process_parent_type, id)
 
 
 def _run_request(
@@ -155,6 +169,13 @@ def dispatch(
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
+
+    with advisory_lock(job_id, wait=False) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"_manage({job_id}) already being ran, not dispatching request {request_type}"
+            )
+            return
 
     LOGGER.info(
         f"Dispatching request {request_type} for {process_parent_type} "
@@ -241,72 +262,74 @@ def dispatch(
                     msg,
                 )
                 return
-        # TODO: commenting out for demo, need to discuss heartbeat solution
-        # elif not check_rulebook_queue_health(queue_name):
-        #     # The queue is unhealthy.  If we're not restarting it there's
-        #     # nothing we can do except update its status to WORKERS_OFFLINE.
-        #     if request_type != ActivationRequest.RESTART:
-        #         # A process in PENDING status don't need to update its status.
-        #         # A monitor can be scheduled for an activation in PENDING
-        #         # status if its latest process is in workers-offline status
-        #         # and it is scheduled for restart.
-        #         if process_parent.status == ActivationStatus.PENDING:
-        #             return
+        elif not check_rulebook_queue_health(queue_name):
+            # The queue is unhealthy.  If we're not restarting it there's
+            # nothing we can do except update its status to WORKERS_OFFLINE.
+            if request_type != ActivationRequest.RESTART:
+                # A process in PENDING status don't need to update its status.
+                # A monitor can be scheduled for an activation in PENDING
+                # status if its latest process is in workers-offline status
+                # and it is scheduled for restart.
+                if process_parent.status == ActivationStatus.PENDING:
+                    return
 
-        #         # If the process is in WORKERS_OFFLINE status, it is already
-        #         # in a bad state.  We don't need to update its status.
-        #         if process_parent.status == ActivationStatus.WORKERS_OFFLINE:
-        #             return
+                # If the process is in WORKERS_OFFLINE status, it is already
+                # in a bad state.  We don't need to update its status.
+                if process_parent.status == ActivationStatus.WORKERS_OFFLINE:
+                    return
 
-        #         msg = (
-        #             f"{process_parent_type} {process_parent_id} is in an "
-        #             "unknown state. The workers of its associated queue "
-        #             f"'{queue_name}' are failing liveness checks. "
-        #             "There may be an issue with the worker node; "
-        #             "please contact the administrator."
-        #         )
-        #         status_manager.set_status(
-        #             ActivationStatus.WORKERS_OFFLINE,
-        #             msg,
-        #         )
-        #         status_manager.set_latest_instance_status(
-        #             ActivationStatus.WORKERS_OFFLINE,
-        #             msg,
-        #         )
-        #         LOGGER.warning(msg)
-        #         return
+                msg = (
+                    f"{process_parent_type} {process_parent_id} is in an "
+                    "unknown state. The workers of its associated queue "
+                    f"'{queue_name}' are failing liveness checks. "
+                    "There may be an issue with the worker node; "
+                    "please contact the administrator."
+                )
+                status_manager.set_status(
+                    ActivationStatus.WORKERS_OFFLINE,
+                    msg,
+                )
+                status_manager.set_latest_instance_status(
+                    ActivationStatus.WORKERS_OFFLINE,
+                    msg,
+                )
+                LOGGER.warning(msg)
+                return
 
-        #     # The queue is unhealthy, but this is a restart.
-        #     # The priority is to adhere to the restart policy and
-        #     # execute the task.
-        #     LOGGER.warning(
-        #         f"Restarting {process_parent_type} {process_parent_id} "
-        #         "on the least busy queue; The workers of its associated queue "
-        #         f"'{queue_name}' are failing liveness checks. "
-        #         "There may be an issue with the worker node; please contact "
-        #         "the administrator.",
-        #     )
-        #     try:
-        #         queue_name = get_least_busy_queue_name()
-        #     except HealthyQueueNotFoundError:
-        #         msg = (
-        #             f"There are no healthy queues to process the "
-        #             f"restart request for {process_parent_type} "
-        #             f"{process_parent_id}. There may be an issue "
-        #             "with the system; please contact the administrator."
-        #         )
-        #         LOGGER.warning(msg)
-        #         status_manager.set_status(
-        #             ActivationStatus.PENDING,
-        #             msg,
-        #         )
-        #         return
+            # The queue is unhealthy, but this is a restart.
+            # The priority is to adhere to the restart policy and
+            # execute the task.
+            LOGGER.warning(
+                f"Restarting {process_parent_type} {process_parent_id} "
+                "on the least busy queue; The workers of its associated queue "
+                f"'{queue_name}' are failing liveness checks. "
+                "There may be an issue with the worker node; please contact "
+                "the administrator.",
+            )
+            try:
+                queue_name = get_least_busy_queue_name()
+            except HealthyQueueNotFoundError:
+                msg = (
+                    f"There are no healthy queues to process the "
+                    f"restart request for {process_parent_type} "
+                    f"{process_parent_id}. There may be an issue "
+                    "with the system; please contact the administrator."
+                )
+                LOGGER.warning(msg)
+                status_manager.set_status(
+                    ActivationStatus.PENDING,
+                    msg,
+                )
+                return
 
     # TODO: sanitize or escape channel names on dispatcher side
     _manage.apply_async(
         args=[process_parent_type, process_parent_id],
-        queue=queue_name.replace('-', '_'),
-        uuid=job_id
+        queue=queue_name.replace("-", "_"),
+        uuid=job_id,
+    )
+    LOGGER.debug(
+        f"_manage({job_id}) submitted to queue {queue_name} request={request_type}"
     )
 
 
@@ -315,9 +338,8 @@ def get_least_busy_queue_name() -> str:
     queue_counter = Counter()
 
     for queue_name in settings.RULEBOOK_WORKER_QUEUES:
-        # TODO: commenting out for demo, need to discuss heartbeat solution
-        # if not check_rulebook_queue_health(queue_name):
-        #     continue
+        if not check_rulebook_queue_health(queue_name):
+            continue
         running_processes_count = models.RulebookProcess.objects.filter(
             status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
             rulebookprocessqueue__queue_name=queue_name,
@@ -367,33 +389,20 @@ def get_queue_name_by_parent_id(
     return process.rulebookprocessqueue.queue_name
 
 
-# TODO: heartbeat solution
-# @tasking.redis_connect_retry()
-# def check_rulebook_queue_health(queue_name: str) -> bool:
-#     """Check for the state of the queue.
+def check_rulebook_queue_health(queue_name: str) -> bool:
+    """Check for the state of the queue.
 
-#     Returns True if the queue is healthy, False otherwise.
-#     Clears the queue if all workers are dead to avoid stuck processes.
-#     """
-#     queue = django_rq.get_queue(queue_name)
-
-#     all_workers_dead = True
-#     for worker in tasking.Worker.all(queue=queue):
-#         last_heartbeat = worker.last_heartbeat
-#         if last_heartbeat is None:
-#             continue
-#         threshold = datetime.now() - timedelta(
-#             seconds=settings.DEFAULT_WORKER_HEARTBEAT_TIMEOUT,
-#         )
-#         if last_heartbeat >= threshold:
-#             all_workers_dead = False
-#             break
-
-#     if all_workers_dead:
-#         queue.empty()
-#         return False
-
-#     return True
+    Returns True if the queue is healthy, False otherwise.
+    Clears the queue if all workers are dead to avoid stuck processes.
+    """
+    ctl = Control(
+        queue_name.replace("-", "_"),
+        config={"conninfo": settings.PG_NOTIFY_DSN_SERVER},
+    )
+    alive = ctl.control_with_reply("alive")
+    if not alive:
+        LOGGER.warning(f'Worker queue {queue_name} was found to not be healthy')
+    return bool(alive)
 
 
 # Internal start/restart requests are sent by the manager in restart_helper.py
@@ -434,11 +443,8 @@ def delete_rulebook_process(
         process_parent_id,
         ActivationRequest.DELETE,
     )
-    dispatch(
-        process_parent_type,
-        process_parent_id,
-        ActivationRequest.DELETE,
-    )
+    # Schedule would pick this up, but this makes things move faster
+    monitor_rulebook_processes.delay()
 
 
 def restart_rulebook_process(
@@ -454,8 +460,7 @@ def restart_rulebook_process(
     monitor_rulebook_processes.delay()
 
 
-@task(queue='eda_workers')
-def monitor_rulebook_processes() -> None:
+def monitor_rulebook_processes_no_lock() -> None:
     """Monitor activations scheduled task.
 
     Started by the scheduler, executed by the default worker.
@@ -488,3 +493,15 @@ def monitor_rulebook_processes() -> None:
             process_parent_id,
             None,
         )
+
+
+@task(queue="eda_workers")
+def monitor_rulebook_processes() -> None:
+    with advisory_lock("monitor_rulebook_processes", wait=False) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                "monitor_rulebook_process being ran by another process, exiting"
+            )
+            return
+
+        monitor_rulebook_processes_no_lock()
