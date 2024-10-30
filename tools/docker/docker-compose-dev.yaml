@@ -26,7 +26,7 @@ x-environment: &common-env
   EDA_SECRET_KEY: ${EDA_SECRET_KEY:-'insecure'}
   EDA_DEBUG: ${EDA_DEBUG:-True}
   EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:-'secret'}
-  EDA_RULEBOOK_WORKER_QUEUES: "activation-node1,activation-node2"
+  EDA_RULEBOOK_WORKER_QUEUES: "activation-node1"
   EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT: ${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
   EDA_ANSIBLE_BASE_JWT_KEY: ${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
   EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT: ${EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT:-True}
@@ -63,14 +63,14 @@ services:
     ports:
       - "${EDA_PODMAN_NODE1_PORT:-8888}:8888"
 
-  podman-node2:
-    user: ${EDA_PODMAN_USER_ID:-0}
-    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
-    privileged: true
-    command: >-
-      podman system service --time=0 tcp://0.0.0.0:8888
-    ports:
-      - "${EDA_PODMAN_NODE2_PORT:-8889}:8888"
+  # podman-node2:
+  #   user: ${EDA_PODMAN_USER_ID:-0}
+  #   image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
+  #   privileged: true
+  #   command: >-
+  #     podman system service --time=0 tcp://0.0.0.0:8888
+  #   ports:
+  #     - "${EDA_PODMAN_NODE2_PORT:-8889}:8888"
 
   postgres:
     image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
@@ -149,10 +149,27 @@ services:
     volumes:
       - '../../:/app/src:z'
 
+  # eda-scheduler:
+  #   image: ${EDA_IMAGE:-localhost/aap-eda}
+  #   deploy:
+  #     replicas: ${EDA_SCHEDULER_WORKERS:-2}
+  #   environment: *common-env
+  #   command:
+  #     - /bin/bash
+  #     - -c
+  #     - >-
+  #       aap-eda-manage scheduler
+  #   depends_on:
+  #     eda-api:
+  #       condition: service_healthy
+  #   volumes:
+  #     - '../../:/app/src:z'
+  #   restart: always
+
   eda-default-worker:
     image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
-      replicas: ${EDA_DEFAULT_WORKERS:-2}
+      replicas: ${EDA_DEFAULT_WORKERS:-1}
     environment: *common-env
     command:
       - /bin/bash
@@ -168,7 +185,7 @@ services:
   eda-activation-worker-node1:
     image: ${EDA_IMAGE:-localhost/aap-eda}
     deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+      replicas: ${EDA_ACTIVATION_WORKERS:-1}
     environment:
       <<: *common-env
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node1'
@@ -184,24 +201,26 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  eda-activation-worker-node2:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    environment:
-      <<: *common-env
-      EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
-      EDA_PODMAN_SOCKET_URL: tcp://podman-node2:8888
-    command:
-      - /bin/bash
-      - -c
-      - aap-eda-manage run_activation_dispatcher
-    depends_on:
-      eda-api:
-        condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-    restart: always
+  # eda-activation-worker-node2:
+  #   image: ${EDA_IMAGE:-localhost/aap-eda}
+  #   deploy:
+  #     replicas: ${EDA_ACTIVATION_WORKERS:-2}
+  #   environment:
+  #     <<: *common-env
+  #     EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
+  #     EDA_PODMAN_SOCKET_URL: tcp://podman-node2:8888
+  #   command:
+  #     - /bin/bash
+  #     - -c
+  #     - >-
+  #       aap-eda-manage rqworker
+  #       --worker-class aap_eda.core.tasking.ActivationWorker
+  #   depends_on:
+  #     eda-api:
+  #       condition: service_healthy
+  #   volumes:
+  #     - '../../:/app/src:z'
+  #   restart: always
 
   eda-webhook-api:
     image: ${EDA_IMAGE:-localhost/aap-eda}
@@ -241,9 +260,7 @@ services:
     ports:
       - '${EDA_UI_PORT:-8443}:443'
     volumes:
-      - './my_certs:/tmp/my_certs:z'
-      - './nginx/certs:/certs:z'
-      - './nginx/default.conf.template:/etc/nginx/templates/default.conf.template:z'
+      - './tools/docker/my_certs:/tmp/my_certs:z'
     depends_on:
       eda-webhook-api:
         condition: service_healthy
