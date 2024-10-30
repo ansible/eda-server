@@ -98,60 +98,110 @@ def test_create_decision_environment(
 
 
 @pytest.mark.parametrize(
-    ("return_code", "image_url", "unallowed"),
+    ("return_code", "host", "image_url", "unallowed"),
     [
-        (status.HTTP_201_CREATED, "registry.com/group/img1:tag", ""),
-        (status.HTTP_201_CREATED, "registry.com/group/img1", ""),
         (
-            status.HTTP_400_BAD_REQUEST,
-            "http://registry.com/img1:tag1",
-            "scheme not allowed",
+            status.HTTP_201_CREATED,
+            "1.2.3.4",
+            "1.2.3.4/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "1.2.3.4:5000",
+            "1.2.3.4:5000/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com",
+            "registry.com/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com:5000",
+            "registry.com:5000/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com:5000",
+            "registry.com:5000/group/img1:tag",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "https://registry.com",
+            "registry.com/group/img1:tag",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "https://registry.com:5000",
+            "registry.com:5000/group/img1:tag",
+            "",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
-            "//registry.com/img1:tag1",
-            "network location not allowed",
+            "registry.com",
+            "/registry.com",
+            "no host name found",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
-            "registry.com/img1:tag;parameter",
-            "parameters not allowed",
+            "registry.com",
+            "https://registry.com/group/img1:tag1",
+            "invalid host name: 'https:'",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
-            "registry.com/img1:tag1?query",
-            "query not allowed",
+            "registry.com",
+            "registry?com/group/img1",
+            "invalid host name: 'registry?com'",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
-            "registry.com/img1:tag#fragment",
-            "fragment not allowed",
+            "registry.com",
+            "registry.com",
+            "no image path found",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com/",
+            "no image path found",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
             "registry.com/group/:tag",
-            "name does not match OCI standard",
+            "'group/' does not match OCI name standard",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
+            "registry.com",
             "registry.com/group/img1:",
-            "tag does not match OCI standard",
+            "'' does not match OCI tag standard",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
+            "registry.com",
             "registry.com/group/bad^img1",
-            "name does not match OCI standard",
+            "'group/bad^img1' does not match OCI name standard",
         ),
         (
             status.HTTP_400_BAD_REQUEST,
+            "registry.com",
             "registry.com/group/img1:bad^tag",
-            "tag does not match OCI standard",
+            "'bad^tag' does not match OCI tag standard",
         ),
     ],
 )
 @pytest.mark.django_db
 def test_create_decision_environment_url(
     return_code,
+    host,
     image_url,
     unallowed,
     default_organization: models.Organization,
@@ -170,7 +220,7 @@ def test_create_decision_environment_url(
             {
                 "username": "dummy-user",
                 "password": "dummy-password",
-                "host": "registry.com",
+                "host": host,
             }
         ),
     )
@@ -408,7 +458,10 @@ def test_partial_update_decision_environment_with_image_url_and_host(
         inputs=inputs_to_store(inputs),
         organization=default_organization,
     )
-    data = {"eda_credential_id": credential.id, "image_url": "quay.io"}
+    data = {
+        "eda_credential_id": credential.id,
+        "image_url": "quay.io/path/to/image",
+    }
     response = admin_client.patch(
         f"{api_url_v1}/decision-environments/"
         f"{default_decision_environment.id}/",
