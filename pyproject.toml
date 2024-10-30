@@ -42,6 +42,7 @@ psycopg-binary = { version = "*", optional = true }
 django-rq = "^2.8.0"
 rq = "^1.13.0"
 django-filter = ">23.2,<24"
+django-pglocks = ">=1.0.4"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
@@ -67,6 +68,7 @@ pyjwt = { version = "2.7.*", extras = ["crypto"] }
 ecdsa = "0.18.*"
 validators = "^0.34.0"
 django-flags = "^5.0.13"
+# dispatcher = { git = "git@github.com:ansible/dispatcher.git", branch = "main" }
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
