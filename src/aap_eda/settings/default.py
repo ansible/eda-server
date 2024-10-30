@@ -530,8 +530,12 @@ RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 RQ_STARTUP_JOBS = []
 
 CELERYBEAT_SCHEDULE = {
-    'aap_eda.tasks.orchestrator.monitor_rulebook_processes': {'schedule': timedelta(seconds=5)},
-    'aap_eda.tasks.project._monitor_project_tasks': {'schedule': timedelta(seconds=30)},
+    "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {
+        "schedule": timedelta(seconds=5)
+    },
+    "aap_eda.tasks.project._monitor_project_tasks": {
+        "schedule": timedelta(seconds=30)
+    },
 }
 
 RQ_CRON_JOBS = []
@@ -609,7 +613,7 @@ LOGGING = {
             "handlers": ["console"],
             "level": "DEBUG",  # TODO: this is for demo!!
             "propagate": False,
-        }
+        },
     },
 }
 
