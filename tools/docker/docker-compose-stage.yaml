@@ -41,6 +41,7 @@ x-environment:
   - EDA_EVENT_STREAM_MTLS_BASE_URL=${EDA_EVENT_STREAM_MTLS_BASE_URL:-https://localhost:8443/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
   - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
   - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - EDA_STATIC_URL=${EDA_STATIC_URL:-api/eda/static/}
   - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/wildcard.crt}
   - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/wildcard.key}
   - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
@@ -207,8 +208,8 @@ services:
     ports:
       - '${EDA_PROXY_PORT:-3128}:3128'
 
-  eda-nginx:
-    image: ${EDA_NGINX_IMAGE:-docker.io/nginx:alpine}
+  eda-ui:
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}
     environment: *common-env
     command: nginx -g "daemon off;"
     ports:
