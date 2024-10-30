@@ -200,6 +200,17 @@ def test_project_import_rulebook_directory_missing(
     assert project.import_state == models.Project.ImportState.FAILED
     assert project.import_error == message_expected
 
+    # resync the project does not clear the import_state and import_error
+    with pytest.raises(
+        ProjectImportError,
+        match=re.escape(message_expected),
+    ):
+        service.sync_project(project)
+
+    project.refresh_from_db()
+    assert project.import_state == models.Project.ImportState.FAILED
+    assert project.import_error == message_expected
+
 
 @pytest.mark.django_db
 def test_project_import_with_no_rulebooks(
