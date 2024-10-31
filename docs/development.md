@@ -247,8 +247,10 @@ environment variables:
 * `EDA_DB_NAME` – Database name (default: `eda`)
 
 ### TLS-enabled redis
+
 If you wish to run a development environment requiring TLS connections to redis it is a simple
 process...
+
 1. build your container images as described above
 2. start them using `docker-compose -f ./tools/docker/docker-compose-dev-redis-tls.yaml up`
 
@@ -388,4 +390,5 @@ task format:isort
 task format:black
 ```
 
-You can now access the api at <https://localhost:8443/api/eda/v1/docs> with default login username and password(admin/testpass).
+You can now access the api at <https://localhost:8443/api/eda/v1/docs> with the default credentials `admin`/`testpass`.
+You can also access the standalone UI at <http://localhost:8443/>.
