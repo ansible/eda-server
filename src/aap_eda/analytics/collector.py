@@ -18,6 +18,7 @@ from typing import Optional
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
+from flags.state import flag_enabled
 from insights_analytics_collector import Collector
 
 from aap_eda.analytics import analytics_collectors, package, utils
@@ -87,9 +88,12 @@ class AnalyticsCollector(Collector):
 def gather(collection_type="scheduled", since=None, until=None, logger=None):
     if not logger:
         logger = logging.getLogger("aap_eda.analytics")
-    collector = AnalyticsCollector(
-        collector_module=analytics_collectors,
-        collection_type=collection_type,
-        logger=logger,
-    )
-    return collector.gather(since=since, until=until)
+    if not flag_enabled("EDA_ANALYTICS"):
+        return
+    else:
+        collector = AnalyticsCollector(
+            collector_module=analytics_collectors,
+            collection_type=collection_type,
+            logger=logger,
+        )
+        return collector.gather(since=since, until=until)

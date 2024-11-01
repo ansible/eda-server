@@ -17,6 +17,7 @@ from io import StringIO
 
 import pytest
 from django.core.management import call_command
+from django.test import override_settings
 
 from aap_eda.conf import settings_registry
 from aap_eda.conf.settings import application_settings
@@ -51,6 +52,7 @@ def use_analytic_url(settings):
     ],
 )
 @pytest.mark.django_db
+@override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
 def test_gather_analytics_invalid_settings(
     settings, caplog_factory, analytics_url, tracking_state, expected
 ):
@@ -124,6 +126,7 @@ def test_gather_analytics_invalid_settings(
     ],
 )
 @pytest.mark.django_db
+@override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
 def test_gather_analytics_command(caplog_factory, args, log_level, expected):
     application_settings.INSIGHTS_TRACKING_STATE = True
     out = StringIO()
@@ -138,5 +141,32 @@ def test_gather_analytics_command(caplog_factory, args, log_level, expected):
 
     assert any(
         record.levelname == log_level and record.message == expected
+        for record in eda_log.records
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "feature_flag_state, expected",
+    [
+        (True, "Either --ship or --dry-run needs to be set."),
+        (False, "EDA_ANALYTICS is not enabled."),
+    ],
+)
+def test_gather_analytics_command_by_ff_state(
+    caplog_factory, feature_flag_state, expected
+):
+    application_settings.INSIGHTS_TRACKING_STATE = True
+    out = StringIO()
+    logger = logging.getLogger("aap_eda.analytics")
+    eda_log = caplog_factory(logger)
+    if feature_flag_state:
+        call_command("enable_flag", "EDA_ANALYTICS", stdout=out)
+
+    command = "gather_analytics"
+    call_command(command, stdout=out)
+
+    assert any(
+        record.levelname == "ERROR" and record.message == expected
         for record in eda_log.records
     )
