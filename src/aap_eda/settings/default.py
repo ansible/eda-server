@@ -203,7 +203,7 @@ FLAGS = {
     "EDA_ANALYTICS": [
         {
             "condition": "boolean",
-            "value": settings.get("EDA_FEATURE_FLAG_EDA_ANALYTICS", False),
+            "value": settings.get("FEATURE_FLAG_EDA_ANALYTICS", False),
         }
     ]
 }

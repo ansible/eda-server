@@ -91,10 +91,9 @@ def gather(collection_type="scheduled", since=None, until=None, logger=None):
     if not flag_enabled("EDA_ANALYTICS"):
         logger.info("EDA_ANALYTICS is disabled.")
         return
-    else:
-        collector = AnalyticsCollector(
-            collector_module=analytics_collectors,
-            collection_type=collection_type,
-            logger=logger,
-        )
-        return collector.gather(since=since, until=until)
+    collector = AnalyticsCollector(
+        collector_module=analytics_collectors,
+        collection_type=collection_type,
+        logger=logger,
+    )
+    return collector.gather(since=since, until=until)

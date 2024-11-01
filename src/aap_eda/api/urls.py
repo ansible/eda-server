@@ -117,7 +117,7 @@ flagged_urls = [
     ),
 ]
 
-eda_v1_urls = eda_v1_urls + flagged_urls
+eda_v1_urls.extend(flagged_urls)
 
 dab_urls = [
     path("", include(dab_urls)),
