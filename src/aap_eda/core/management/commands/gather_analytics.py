@@ -20,9 +20,6 @@ from django.core.management.base import BaseCommand, CommandParser
 from flags.state import flag_enabled
 
 from aap_eda.analytics import collector
-from aap_eda.core.utils.logging_utils import (
-    feature_flag_analytics_disabled_logger,
-)
 
 
 class Command(BaseCommand):
@@ -75,7 +72,7 @@ class Command(BaseCommand):
         opt_until = options.get("until")
 
         if not flag_enabled("EDA_ANALYTICS"):
-            feature_flag_analytics_disabled_logger()
+            self.logger.error("EDA_ANALYTICS is disabled.")
             return
 
         since = parser.parse(opt_since) if opt_since else None

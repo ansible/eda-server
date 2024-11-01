@@ -199,7 +199,14 @@ INSTALLED_APPS = [
     "aap_eda.core",
 ]
 
-FLAGS = {"EDA_ANALYTICS": [{"condition": "boolean", "value": False}]}
+FLAGS = {
+    "EDA_ANALYTICS": [
+        {
+            "condition": "boolean",
+            "value": settings.get("EDA_FEATURE_FLAG_EDA_ANALYTICS", False),
+        }
+    ]
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

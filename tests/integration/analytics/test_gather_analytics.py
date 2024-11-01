@@ -150,7 +150,7 @@ def test_gather_analytics_command(caplog_factory, args, log_level, expected):
     "feature_flag_state, expected",
     [
         (True, "Either --ship or --dry-run needs to be set."),
-        (False, "EDA_ANALYTICS is not enabled."),
+        (False, "EDA_ANALYTICS is disabled."),
     ],
 )
 def test_gather_analytics_command_by_ff_state(

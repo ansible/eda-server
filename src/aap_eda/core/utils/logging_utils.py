@@ -1,5 +1,3 @@
-import logging
-
 from aap_eda.core import models
 
 
@@ -27,9 +25,3 @@ def get_organization_name_from_data(data):
             else None
         )
     return org_name
-
-
-def feature_flag_analytics_disabled_logger():
-    logger = logging.getLogger("aap_eda.analytics")
-    logger.error("EDA_ANALYTICS is not enabled.")
-    return
