@@ -23,6 +23,9 @@ from insights_analytics_collector import Collector
 
 from aap_eda.analytics import analytics_collectors, package, utils
 from aap_eda.conf.settings import application_settings
+from aap_eda.core.utils.logging_utils import (
+    feature_flag_analytics_disabled_logger,
+)
 
 
 class AnalyticsCollector(Collector):
@@ -89,6 +92,7 @@ def gather(collection_type="scheduled", since=None, until=None, logger=None):
     if not logger:
         logger = logging.getLogger("aap_eda.analytics")
     if not flag_enabled("EDA_ANALYTICS"):
+        feature_flag_analytics_disabled_logger()
         return
     else:
         collector = AnalyticsCollector(
