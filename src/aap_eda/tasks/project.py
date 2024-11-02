@@ -116,7 +116,7 @@ def _monitor_project_tasks_no_lock() -> None:
 def _monitor_project_tasks() -> None:
     with advisory_lock("monitor_project_tasks", wait=False) as acquired:
         if not acquired:
-            logger.debug(f"Another task already running monitor_project_tasks")
+            logger.debug("Another task already running monitor_project_tasks, exiting")
             return
 
         _monitor_project_tasks_no_lock

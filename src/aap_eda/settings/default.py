@@ -767,13 +767,9 @@ ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
 )
 
 if RESOURCE_SERVER["URL"] and RESOURCE_SERVER["SECRET_KEY"]:
-    RQ_PERIODIC_JOBS.append(
-        {
-            "func": "aap_eda.tasks.shared_resources.resync_shared_resources",
-            "interval": 900,
-            "id": "resync_shared_resources",
-        }
-    )
+    CELERYBEAT_SCHEDULE["aap_eda.tasks.shared_resources.resync_shared_resources"] = {
+        "schedule": timedelta(seconds=900)
+    }
 
 
 ACTIVATION_DB_HOST = settings.get(

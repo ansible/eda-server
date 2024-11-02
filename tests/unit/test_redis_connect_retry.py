@@ -35,7 +35,6 @@ def test_max_delay(tasking_caplog):
     loop_count = 0
     loop_limit = 8
 
-    @tasking.redis_connect_retry(max_delay=5)
     def _test_function():
         nonlocal loop_count
 
@@ -79,7 +78,6 @@ def test_retry_exceptions(tolerate, exception):
     loop_count = 0
     loop_limit = 2
 
-    @tasking.redis_connect_retry()
     def _test_function():
         nonlocal loop_count
 
@@ -105,7 +103,6 @@ def test_loop_exit():
     class LoopLimitExceeded(Exception):
         pass
 
-    @tasking.redis_connect_retry(loop_exit=lambda e: loop_count >= loop_limit)
     def _test_function():
         nonlocal loop_count
 

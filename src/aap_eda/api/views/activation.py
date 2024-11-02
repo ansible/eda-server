@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 
-import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -41,8 +40,6 @@ from aap_eda.tasks.orchestrator import (
     stop_rulebook_process,
 )
 
-from .mixins import RedisDependencyMixin
-
 logger = logging.getLogger(__name__)
 
 resource_name = "RulebookActivation"
@@ -51,7 +48,6 @@ resource_name = "RulebookActivation"
 class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
-    RedisDependencyMixin,
 ):
     queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
@@ -75,7 +71,6 @@ class ActivationViewSet(
                 description="Invalid data to create activation."
             ),
         }
-        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
         context = {"request": request}
@@ -125,7 +120,6 @@ class ActivationViewSet(
                 description="The Activation has been deleted.",
             ),
         }
-        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def destroy(self, request, *args, **kwargs):
         activation = self.get_object()
@@ -144,20 +138,16 @@ class ActivationViewSet(
             activation.organization,
         )
 
-        try:
-            with transaction.atomic():
-                activation.status = ActivationStatus.DELETING
-                activation.save(update_fields=["status"])
-                name = activation.name
+        with transaction.atomic():
+            activation.status = ActivationStatus.DELETING
+            activation.save(update_fields=["status"])
+            name = activation.name
 
-                delete_rulebook_process(
-                    process_parent_type=ProcessParentType.ACTIVATION,
-                    process_parent_id=activation.id,
-                )
-                logger.info(f"Now deleting {name} ...")
-        except redis.ConnectionError:
-            # TODO: get rid of try-except, not needed
-            raise
+            delete_rulebook_process(
+                process_parent_type=ProcessParentType.ACTIVATION,
+                process_parent_id=activation.id,
+            )
+            logger.info(f"Now deleting {name} ...")
 
         logger.info(audit_log)
 
@@ -341,7 +331,6 @@ class ActivationViewSet(
                 description="Activation has been disabled.",
             ),
         }
-        | RedisDependencyMixin.redis_unavailable_response(),
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
@@ -384,7 +373,6 @@ class ActivationViewSet(
                 description="Activation not enabled.",
             ),
         }
-        | RedisDependencyMixin.redis_unavailable_response(),
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):

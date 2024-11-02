@@ -28,10 +28,12 @@ class Command(BaseCommand):
 
     # # TODO: stuff to support this isn't in yet
     # def add_arguments(self, parser):
-    #     parser.add_argument('--status', dest='status', action='store_true', help='print the internal state of any running dispatchers')
+    #     parser.add_argument(
+    #       '--status', dest='status', action='store_true',
+    # help='print the internal state of any running dispatchers')
 
     def handle(self, *args, **options):
-        # NOTE: using a channel named literally "default" will give a postgres SynaxError.
+        # NOTE: using a channel named "default" will give a postgres SynaxError
         # It seems to be some kind of reserved variable name in postgres.
         dispatcher_config = {
             "producers": {
