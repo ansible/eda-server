@@ -1051,7 +1051,6 @@ class Command(BaseCommand):
         self._create_org_roles()
         self._create_obj_roles()
         self._remove_deprecated_credential_kinds()
-        enable_redis_prefix()
 
     def _remove_deprecated_credential_kinds(self):
         """Remove old credential types which are deprecated."""
