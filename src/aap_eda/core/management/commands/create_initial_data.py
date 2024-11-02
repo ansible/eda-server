@@ -24,7 +24,6 @@ from django.db import transaction
 from django.db.models import Q
 
 from aap_eda.core import enums, models
-from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
 
 NEW_HELP_TEXT = (
@@ -1050,7 +1049,6 @@ class Command(BaseCommand):
         self._create_org_roles()
         self._create_obj_roles()
         self._remove_deprecated_credential_kinds()
-        enable_redis_prefix()
 
     def _remove_deprecated_credential_kinds(self):
         """Remove old credential types which are deprecated."""
