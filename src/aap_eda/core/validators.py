@@ -99,9 +99,12 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             _(base_message + "no image path found")
         )
 
-    split = path.rsplit(":", 1)
+    split = path.split(":", 1)
     name = split[0]
+    # Get the tag sans any additional content.  Any additional content
+    # is passed without validation.
     tag = split[1] if (len(split) > 1) else None
+    tag = tag if tag is None else tag.split("@", 1)[0]
 
     if not re.fullmatch(
         r"[[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*",  # noqa: E501

@@ -143,6 +143,12 @@ def test_create_decision_environment(
             "",
         ),
         (
+            status.HTTP_201_CREATED,
+            "https://registry.com:5000",
+            "registry.com:5000/group/img1:tag@additional-content",
+            "",
+        ),
+        (
             status.HTTP_400_BAD_REQUEST,
             "registry.com",
             "/registry.com",
@@ -194,6 +200,12 @@ def test_create_decision_environment(
             status.HTTP_400_BAD_REQUEST,
             "registry.com",
             "registry.com/group/img1:bad^tag",
+            "'bad^tag' does not match OCI tag standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "https://registry.com:5000",
+            "registry.com:5000/group/img1:bad^tag@additional-content",
             "'bad^tag' does not match OCI tag standard",
         ),
     ],
