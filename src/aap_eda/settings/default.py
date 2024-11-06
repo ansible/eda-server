@@ -201,7 +201,11 @@ INSTALLED_APPS = [
 
 FLAGS = {
     "EDA_ANALYTICS": [
-        {"condition": "boolean", "value": True, "required": True}
+        {
+            "condition": "boolean",
+            "value": settings.get("FEATURE_FLAG_EDA_ANALYTICS", True),
+            "required": True,
+        }
     ]
 }
 
