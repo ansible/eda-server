@@ -201,11 +201,7 @@ INSTALLED_APPS = [
 
 FLAGS = {
     "EDA_ANALYTICS": [
-        {
-            "condition": "boolean",
-            "value": True,
-            "required": True
-        }
+        {"condition": "boolean", "value": True, "required": True}
     ]
 }
 
