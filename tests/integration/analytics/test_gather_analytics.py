@@ -160,8 +160,8 @@ def test_gather_analytics_command_by_ff_state(
     out = StringIO()
     logger = logging.getLogger("aap_eda.analytics")
     eda_log = caplog_factory(logger)
-    if feature_flag_state:
-        call_command("enable_flag", "EDA_ANALYTICS", stdout=out)
+    if not feature_flag_state:
+        call_command("disable_flag", "EDA_ANALYTICS", stdout=out)
 
     command = "gather_analytics"
     call_command(command, stdout=out)
