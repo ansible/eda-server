@@ -232,6 +232,14 @@ If you use docker or podman, you can start just the postgres instance with:
 task docker:up:postgres
 ```
 
+### Initializing the deployment
+
+You can initialize the deployment with some basic resources useful for development:
+
+```shell
+ansible-playbook  tools/ansible/eda_init.yml
+```
+
 ### Customizing database settings
 
 If you need to run a local or standalone external instance of PostgreSQL service, you will need
