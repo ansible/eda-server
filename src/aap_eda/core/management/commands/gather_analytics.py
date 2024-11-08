@@ -17,6 +17,7 @@ from datetime import timezone
 
 from dateutil import parser
 from django.core.management.base import BaseCommand, CommandParser
+from flags.state import flag_enabled
 
 from aap_eda.analytics import collector
 
@@ -69,6 +70,10 @@ class Command(BaseCommand):
         opt_dry_run = options.get("dry-run")
         opt_since = options.get("since")
         opt_until = options.get("until")
+
+        if not flag_enabled("EDA_ANALYTICS"):
+            self.logger.error("EDA_ANALYTICS is disabled.")
+            return
 
         since = parser.parse(opt_since) if opt_since else None
         if since and since.tzinfo is None:

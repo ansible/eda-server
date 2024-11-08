@@ -24,6 +24,7 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularYAMLAPIView,
 )
+from flags.urls import flagged_path
 from rest_framework import routers
 
 from aap_eda.core import views as core_views
@@ -85,9 +86,6 @@ openapi_urls = [
 
 eda_v1_urls = [
     path("config/", views.ConfigView.as_view(), name="config"),
-    path(
-        "settings/system/", views.SettingView.as_view(), name="setting-system"
-    ),
     path("status/", core_views.StatusView.as_view(), name="status"),
     path("", include(openapi_urls)),
     path(
@@ -108,6 +106,18 @@ eda_v1_urls = [
     path("users/me/", views.CurrentUserView.as_view(), name="current-user"),
     *router.urls,
 ]
+
+flagged_urls = [
+    flagged_path(
+        "EDA_ANALYTICS",
+        "settings/system/",
+        views.SettingView.as_view(),
+        name="setting-system",
+        state=True,
+    ),
+]
+
+eda_v1_urls.extend(flagged_urls)
 
 dab_urls = [
     path("", include(dab_urls)),

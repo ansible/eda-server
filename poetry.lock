@@ -675,7 +675,7 @@ channels = {version = "*", optional = true, markers = "extra == \"channel-auth\"
 cryptography = "*"
 Django = ">=4.2.16,<4.3.0"
 django-crum = "*"
-django-redis = {version = "*", optional = true, markers = "extra == \"redis_client\""}
+django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
 django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
