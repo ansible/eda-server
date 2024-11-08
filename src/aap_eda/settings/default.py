@@ -211,6 +211,15 @@ def toggle_feature_flags(flags, settings):
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
+FLAGS = {
+    "EDA_ANALYTICS": [
+        {
+            "condition": "boolean",
+            "value": settings.get("FEATURE_EDA_ANALYTICS", True),
+            "required": settings.get("FEATURE_EDA_ANALYTICS", True),
+        }
+    ]
+}
 toggle_feature_flags(FLAGS, settings)
 
 MIDDLEWARE = [
@@ -536,12 +545,14 @@ RQ_QUEUES = get_rq_queues()
 # Otherwise, the default name is used
 RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
-RQ_STARTUP_JOBS = [
-    {
-        "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
-        "job_id": "start_analytics_scheduler",
-    },
-]
+RQ_STARTUP_JOBS = []
+if settings.get("FEATURE_EDA_ANALYTICS", True):
+    RQ_STARTUP_JOBS = [
+        {
+            "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
+            "job_id": "start_analytics_scheduler",
+        },
+    ]
 
 # Id of the scheduler job it's required when we have multiple instances of
 # the scheduler running to avoid duplicate jobs
