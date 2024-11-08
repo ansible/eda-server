@@ -186,4 +186,12 @@ DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
 
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
-FLAGS = {}
+FLAGS = {
+    "EDA_ANALYTICS": [
+        {
+            "condition": "boolean",
+            "value": True,
+            "required": True,
+        }
+    ]
+}
