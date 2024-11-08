@@ -180,6 +180,7 @@ JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
 # Application definition
 INSTALLED_APPS = [
     "daphne",
+    "flags",
     # Django apps
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -197,6 +198,16 @@ INSTALLED_APPS = [
     "aap_eda.api",
     "aap_eda.core",
 ]
+
+FLAGS = {
+    "EDA_ANALYTICS": [
+        {
+            "condition": "boolean",
+            "value": settings.get("FEATURE_EDA_ANALYTICS", True),
+            "required": settings.get("FEATURE_EDA_ANALYTICS", True),
+        }
+    ]
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -517,12 +528,14 @@ RQ_QUEUES = get_rq_queues()
 # Otherwise, the default name is used
 RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
-RQ_STARTUP_JOBS = [
-    {
-        "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
-        "job_id": "start_analytics_scheduler",
-    },
-]
+RQ_STARTUP_JOBS = []
+if settings.get("FEATURE_EDA_ANALYTICS", True):
+    RQ_STARTUP_JOBS = [
+        {
+            "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
+            "job_id": "start_analytics_scheduler",
+        },
+    ]
 
 # Id of the scheduler job it's required when we have multiple instances of
 # the scheduler running to avoid duplicate jobs
