@@ -71,15 +71,14 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
     #
     # THe host portion is validated using the validators package and the path
     # and tag are validated using the OCI regexes for each.
-    base_message = f"Image url {image_url} is malformed; "
-
     split = image_url.split("/", 1)
     host = split[0]
     path = split[1] if len(split) > 1 else None
 
     if host == "":
         raise serializers.ValidationError(
-            _(base_message + "no host name found")
+            _("Image url %(image_url)s is malformed; no host name found")
+            % {"image_url": image_url}
         )
 
     # Yes, validators returns (not throws) an exception if the argument doesn't
@@ -91,12 +90,17 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
         if not isinstance(validity, validators.ValidationError):
             raise
         raise serializers.ValidationError(
-            _(base_message + f"invalid host name: '{host}'")
+            _(
+                "Image url %(image_url)s is malformed; "
+                "invalid host name: '%(host)s'"
+            )
+            % {"image_url": image_url, "host": host}
         )
 
     if (path is None) or (path == ""):
         raise serializers.ValidationError(
-            _(base_message + "no image path found")
+            _("Image url %(image_url)s is malformed; no image path found")
+            % {"image_url": image_url}
         )
 
     split = path.split(":", 1)
@@ -111,14 +115,22 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
         name,
     ):
         raise serializers.ValidationError(
-            _(base_message + f"'{name}' does not match OCI name standard")
+            _(
+                "Image url %(image_url)s is malformed; "
+                "'%(name)s' does not match OCI name standard"
+            )
+            % {"image_url": image_url, "name": name}
         )
 
     if (tag is not None) and (
         not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
     ):
         raise serializers.ValidationError(
-            _(base_message + f"'{tag}' does not match OCI tag standard")
+            _(
+                "Image url %(image_url)s is malformed; "
+                "'%(tag)s' does not match OCI tag standard"
+            )
+            % {"image_url": image_url, "tag": tag}
         )
 
     credential = get_credential_if_exists(eda_credential_id)
@@ -127,7 +139,8 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
 
     if not credential_host:
         raise serializers.ValidationError(
-            _(f"Credential {credential.name} needs to have host information")
+            _("Credential %(name)s needs to have host information")
+            % {"name": credential.name}
         )
 
     # Check that the host matches the credential host.
@@ -147,9 +160,10 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
 
     if host != parsed_host:
         msg = _(
-            f"DecisionEnvironment image url: {image_url} does "
-            f"not match with the credential host: {credential_host}"
-        )
+            "DecisionEnvironment image url: %(image_url)s does "
+            "not match with the credential host: %(host)s"
+        ) % {"image_url": image_url, "host": credential_host}
+
         raise serializers.ValidationError(msg)
 
 
