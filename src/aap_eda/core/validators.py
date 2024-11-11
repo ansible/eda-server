@@ -13,8 +13,11 @@
 #  limitations under the License.
 import hashlib
 import logging
+import re
 import typing as tp
+import urllib
 
+import validators
 import yaml
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -57,20 +60,110 @@ def check_if_de_exists(decision_environment_id: int) -> int:
 
 
 def check_if_de_valid(image_url: str, eda_credential_id: int):
+    # The OCI standard format for the image url is a combination of a host
+    # (with optional port) separated from the image path (with optional tag) by
+    # a slash: <host>[:port]/<path>[:tag].
+    #
+    # https://github.com/opencontainers/distribution-spec/blob/8376368dd8aadc33bf6c88a8b765df90287bb5c8/spec.md?plain=1#L155 # noqa: E501
+    #
+    # We split the image url on the first slash into the host and path.  The
+    # path is further split into a name and tag on the rightmost colon.
+    #
+    # THe host portion is validated using the validators package and the path
+    # and tag are validated using the OCI regexes for each.
+    split = image_url.split("/", 1)
+    host = split[0]
+    path = split[1] if len(split) > 1 else None
+
+    if host == "":
+        raise serializers.ValidationError(
+            _("Image url %(image_url)s is malformed; no host name found")
+            % {"image_url": image_url}
+        )
+
+    # Yes, validators returns (not throws) an exception if the argument doesn't
+    # pass muster (it returns True otherwise).  Consequently we have to check
+    # the class of the return to know what happened and if it's not validators'
+    # validation exception raise whatever the heck it is.
+    validity = validators.hostname(host)
+    if isinstance(validity, Exception):
+        if not isinstance(validity, validators.ValidationError):
+            raise
+        raise serializers.ValidationError(
+            _(
+                "Image url %(image_url)s is malformed; "
+                "invalid host name: '%(host)s'"
+            )
+            % {"image_url": image_url, "host": host}
+        )
+
+    if (path is None) or (path == ""):
+        raise serializers.ValidationError(
+            _("Image url %(image_url)s is malformed; no image path found")
+            % {"image_url": image_url}
+        )
+
+    split = path.split(":", 1)
+    name = split[0]
+    # Get the tag sans any additional content.  Any additional content
+    # is passed without validation.
+    tag = split[1] if (len(split) > 1) else None
+    tag = tag if tag is None else tag.split("@", 1)[0]
+
+    if not re.fullmatch(
+        r"[[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*",  # noqa: E501
+        name,
+    ):
+        raise serializers.ValidationError(
+            _(
+                "Image url %(image_url)s is malformed; "
+                "'%(name)s' does not match OCI name standard"
+            )
+            % {"image_url": image_url, "name": name}
+        )
+
+    if (tag is not None) and (
+        not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
+    ):
+        raise serializers.ValidationError(
+            _(
+                "Image url %(image_url)s is malformed; "
+                "'%(tag)s' does not match OCI tag standard"
+            )
+            % {"image_url": image_url, "tag": tag}
+        )
+
     credential = get_credential_if_exists(eda_credential_id)
     inputs = yaml.safe_load(credential.inputs.get_secret_value())
-    host = inputs.get("host")
+    credential_host = inputs.get("host")
 
-    if not host:
+    if not credential_host:
         raise serializers.ValidationError(
-            f"Credential {credential.name} needs to have host information"
+            _("Credential %(name)s needs to have host information")
+            % {"name": credential.name}
         )
 
-    if not image_url.startswith(host):
-        msg = (
-            f"DecisionEnvironment image url: {image_url} does "
-            f"not match with the credential host: {host}"
-        )
+    # Check that the host matches the credential host.
+    # For backward compatibility when creating a new DE with an old credential
+    # we need to separate any scheme from the host before doing the compare.
+    parsed_credential_host = urllib.parse.urlparse(credential_host)
+    # If there's a netloc that's the host to use; if not, it's the path if
+    # there is no scheme else it's the scheme and path joined by a colon.
+    if parsed_credential_host.netloc:
+        parsed_host = parsed_credential_host.netloc
+    else:
+        parsed_host = parsed_credential_host.path
+        if parsed_credential_host.scheme:
+            parsed_host = ":".join(
+                [parsed_credential_host.scheme, parsed_host]
+            )
+
+    if host != parsed_host:
+        msg = _(
+            "DecisionEnvironment image url: %(image_url)s does "
+            "not match with the credential host: %(host)s"
+        ) % {"image_url": image_url, "host": credential_host}
+
         raise serializers.ValidationError(msg)
 
 
