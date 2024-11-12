@@ -180,6 +180,7 @@ JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
 # Application definition
 INSTALLED_APPS = [
     "daphne",
+    "flags",
     # Django apps
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -197,6 +198,9 @@ INSTALLED_APPS = [
     "aap_eda.api",
     "aap_eda.core",
 ]
+
+# Defines feature flags, and their conditions. See https://cfpb.github.io/django-flags/
+FLAGS = {}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
