@@ -199,7 +199,8 @@ INSTALLED_APPS = [
     "aap_eda.core",
 ]
 
-# Defines feature flags, and their conditions. See https://cfpb.github.io/django-flags/
+# Defines feature flags, and their conditions.
+# See https://cfpb.github.io/django-flags/
 FLAGS = {}
 
 MIDDLEWARE = [
