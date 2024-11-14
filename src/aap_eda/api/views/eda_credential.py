@@ -184,7 +184,7 @@ class EdaCredentialViewSet(
 
     @extend_schema(
         description="Partial update of an EDA credential",
-        request=serializers.EdaCredentialCreateSerializer,
+        request=serializers.EdaCredentialUpdateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EdaCredentialSerializer,
@@ -202,7 +202,7 @@ class EdaCredentialViewSet(
             data.get("inputs", {}), eda_credential.inputs
         )
 
-        serializer = serializers.EdaCredentialCreateSerializer(
+        serializer = serializers.EdaCredentialUpdateSerializer(
             eda_credential, data=data, partial=True
         )
         serializer.is_valid(raise_exception=True)

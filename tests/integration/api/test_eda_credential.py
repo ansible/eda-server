@@ -500,6 +500,32 @@ def test_partial_update_eda_credential_with_invalid_inputs(
     )
 
 
+@pytest.mark.django_db
+def test_partial_update_eda_credential_type_not_changed(
+    admin_client: APIClient,
+    default_registry_credential: models.EdaCredential,
+    preseed_credential_types,
+):
+    aap_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    data = {"credential_type_id": aap_cred_type.id}
+    response = admin_client.patch(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    result = response.data
+    assert (
+        result["credential_type"]["id"]
+        == default_registry_credential.credential_type.id
+    )
+    assert (
+        result["credential_type"]["name"]
+        == default_registry_credential.credential_type.name
+    )
+
+
 @pytest.mark.parametrize(
     ("credential_type", "old_inputs", "inputs", "expected_inputs"),
     [
