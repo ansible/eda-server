@@ -241,40 +241,41 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
     def to_representation(self, project):
         eda_credential = (
-            EdaCredentialRefSerializer(project["eda_credential"]).data
-            if project["eda_credential"]
+            EdaCredentialRefSerializer(project.eda_credential).data
+            if project.eda_credential
             else None
         )
         signature_validation_credential = (
             EdaCredentialRefSerializer(
-                project["signature_validation_credential"]
+                project.signature_validation_credential
             ).data
-            if project["signature_validation_credential"]
+            if project.signature_validation_credential
             else None
         )
         organization = (
-            OrganizationRefSerializer(project["organization"]).data
-            if project["organization"]
+            OrganizationRefSerializer(project.organization).data
+            if project.organization
             else None
         )
+
         return {
-            "id": project["id"],
-            "name": project["name"],
-            "description": project["description"],
-            "url": project["url"],
-            "proxy": project["proxy"],
-            "scm_type": project["scm_type"],
-            "scm_branch": project["scm_branch"],
-            "scm_refspec": project["scm_refspec"],
-            "git_hash": project["git_hash"],
-            "verify_ssl": project["verify_ssl"],
+            "id": project.id,
+            "name": project.name,
+            "description": project.description,
+            "url": project.url,
+            "proxy": self.get_proxy(project),
+            "scm_type": project.scm_type,
+            "scm_branch": project.scm_branch,
+            "scm_refspec": project.scm_refspec,
+            "git_hash": project.git_hash,
+            "verify_ssl": project.verify_ssl,
             "organization": organization,
             "eda_credential": eda_credential,
             "signature_validation_credential": signature_validation_credential,
-            "import_state": project["import_state"],
-            "import_error": project["import_error"],
-            "created_at": project["created_at"],
-            "modified_at": project["modified_at"],
+            "import_state": project.import_state,
+            "import_error": project.import_error,
+            "created_at": project.created_at,
+            "modified_at": project.modified_at,
         }
 
 

@@ -83,7 +83,6 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
 class ProjectViewSet(
     ResponseSerializerMixin,
     mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
     DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
@@ -171,38 +170,19 @@ class ProjectViewSet(
         },
     )
     def retrieve(self, request, pk):
-        project = super().retrieve(request, pk)
-        project.data["eda_credential"] = (
-            models.EdaCredential.objects.get(
-                pk=project.data["eda_credential_id"]
-            )
-            if project.data["eda_credential_id"]
-            else None
-        )
-        project.data["signature_validation_credential"] = (
-            models.EdaCredential.objects.get(
-                pk=project.data["signature_validation_credential_id"]
-            )
-            if project.data["signature_validation_credential_id"]
-            else None
-        )
-        project.data["organization"] = (
-            models.Organization.objects.get(pk=project.data["organization_id"])
-            if project.data["organization_id"]
-            else None
-        )
+        project = self.get_object()
 
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
                 resource_name,
-                project.data["name"],
-                project.data["id"],
-                project.data["organization"].name,
+                project.name,
+                project.id,
+                project.organization.name,
             )
         )
 
-        return Response(serializers.ProjectReadSerializer(project.data).data)
+        return Response(serializers.ProjectReadSerializer(project).data)
 
     @extend_schema(
         description="Partial update of a project",
