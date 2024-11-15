@@ -83,7 +83,6 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
 class ProjectViewSet(
     ResponseSerializerMixin,
     mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
     DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
