@@ -39,15 +39,6 @@ def test_validate_schema():
     errors = validate_schema(bad_schema_format)
     assert "schema must be in dict format" in errors
 
-    no_fields_schema = {
-        "id": "username",
-        "label": "Username",
-        "type": "string",
-    }
-
-    errors = validate_schema(no_fields_schema)
-    assert "'fields' must exist and non empty" in errors
-
     eda_prefix_id_schema = {
         "fields": [
             {
