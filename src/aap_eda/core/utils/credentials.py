@@ -172,10 +172,10 @@ def validate_schema(schema: dict) -> list[str]:
         return errors
 
     fields = schema.get("fields")
-
     if not fields:
-        errors.append("'fields' must exist and non empty")
-    elif not isinstance(fields, list):
+        return errors
+
+    if not isinstance(fields, list):
         errors.append("'fields' must be a list")
     else:
         id_fields = _get_id_fields(schema)
@@ -245,7 +245,8 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     if not isinstance(injectors, dict):
         errors.append("Injectors must be in Key-Value pairs format")
 
-    if not any(
+    injector_keys = injectors.keys()
+    if bool(injector_keys) and not any(
         support_key in injectors.keys()
         for support_key in SUPPORTED_KEYS_IN_INJECTORS
     ):
