@@ -63,7 +63,7 @@ def inputs_to_display(schema: dict, inputs: str) -> dict:
 def get_secret_fields(schema: dict) -> list[str]:
     return [
         field["id"]
-        for field in schema["fields"]
+        for field in schema.get("fields", [])
         if "secret" in field and bool(field["secret"])
     ]
 
