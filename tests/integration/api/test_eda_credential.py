@@ -207,6 +207,67 @@ def test_create_eda_credential_with_gpg_key_data(
 
 
 @pytest.mark.parametrize(
+    ("status_code", "hostname"),
+    [
+        (
+            status.HTTP_201_CREATED,
+            "validname",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "valid-name",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "valid.name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "invalid name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "invalid/name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "invalid@name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "https://invalid.name",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_registry_eda_credential_with_various_host_names(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    status_code,
+    hostname,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+
+    data_in = {
+        "name": f"eda-credential-{credential_type}",
+        "inputs": {
+            "host": hostname,
+        },
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+    assert response.status_code == status_code
+    if status_code == status.HTTP_400_BAD_REQUEST:
+        assert "Host format invalid" in response.data["inputs.host"]
+
+
+@pytest.mark.parametrize(
     ("credential_type", "status_code", "key", "error_message"),
     [
         (
