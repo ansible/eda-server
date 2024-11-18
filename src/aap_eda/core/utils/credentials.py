@@ -17,9 +17,11 @@ import tempfile
 
 import gnupg
 import jinja2
+import validators
 import yaml
 from django.core.exceptions import ValidationError
 from jinja2.nativetypes import NativeTemplate
+from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core.utils.awx import validate_ssh_private_key
@@ -136,6 +138,11 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                     errors["inputs.ssh_key_unlock"] = result
                 else:
                     errors[display_field] = result
+
+        if (field == "host") and user_input:
+            result = _validate_host_name(user_input)
+            if bool(result):
+                errors[display_field] = result
 
         if field == "gpg_public_key":
             result = _validate_gpg_public_key(user_input)
@@ -276,6 +283,27 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
                 )
 
     return {"injectors": errors} if bool(errors) else {}
+
+
+def validate_host_name(host: str) -> None:
+    errors = _validate_host_name(host)
+    if bool(errors):
+        raise serializers.ValidationError(f"invalid host name: {host}")
+
+
+def _validate_host_name(host: str) -> list[str]:
+    errors = []
+
+    # Yes, validators returns (not throws) an exception if the argument doesn't
+    # pass muster (it returns True otherwise).  Consequently we have to check
+    # the class of the return to know what happened and if it's not validators'
+    # validation exception raise whatever the heck it is.
+    validity = validators.hostname(host)
+    if isinstance(validity, Exception):
+        if not isinstance(validity, validators.ValidationError):
+            raise
+        errors.append("Host format invalid")
+    return errors
 
 
 def _get_id_fields(schema: dict) -> list[str]:

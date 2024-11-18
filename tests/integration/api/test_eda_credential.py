@@ -551,11 +551,11 @@ def test_partial_update_eda_credential_type_not_changed(
                 "verify_ssl": True,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "verify_ssl": False,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "user name",
                 "password": ENCRYPTED_STRING,
                 "oauth_token": ENCRYPTED_STRING,
@@ -605,12 +605,12 @@ def test_partial_update_eda_credential_type_not_changed(
                 "verify_ssl": True,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "verify_ssl": False,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "password": ENCRYPTED_STRING,
                 "verify_ssl": False,
@@ -625,12 +625,12 @@ def test_partial_update_eda_credential_type_not_changed(
                 "verify_ssl": True,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "password": "password",
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "password": ENCRYPTED_STRING,
                 "verify_ssl": True,
