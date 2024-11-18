@@ -23,7 +23,10 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from aap_eda.core import enums, models
-from aap_eda.core.utils.credentials import validate_host_name, validate_schema
+from aap_eda.core.utils.credentials import (
+    validate_registry_host_name,
+    validate_schema,
+)
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
 
 logger = logging.getLogger(__name__)
@@ -80,7 +83,7 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
         )
 
     try:
-        validate_host_name(host)
+        validate_registry_host_name(host)
     except serializers.ValidationError:
         # We raise our own instance of this exception in order to assert
         # control over the format of the message.

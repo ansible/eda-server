@@ -24,6 +24,7 @@ from jinja2.nativetypes import NativeTemplate
 from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
+from aap_eda.core import enums
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
@@ -82,7 +83,11 @@ def inputs_from_store(inputs: str) -> dict:
     return yaml.safe_load(inputs)
 
 
-def validate_inputs(schema: dict, inputs: dict) -> dict:
+def validate_inputs(
+    schema: dict,
+    inputs: dict,
+    credential_type: enums.CredentialType = None,
+) -> dict:
     """Validate user inputs against credential schema.
 
     Sample output:
@@ -139,8 +144,15 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                 else:
                     errors[display_field] = result
 
-        if (field == "host") and user_input:
-            result = _validate_host_name(user_input)
+        # We apply particular requirements on "host" when it is
+        # associated with a container registry.
+        if (
+            (credential_type is not None)
+            and (credential_type.name == enums.CredentialType.REGISTRY)
+            and (field == "host")
+            and user_input
+        ):
+            result = _validate_registry_host_name(user_input)
             if bool(result):
                 errors[display_field] = result
 
@@ -285,13 +297,13 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     return {"injectors": errors} if bool(errors) else {}
 
 
-def validate_host_name(host: str) -> None:
-    errors = _validate_host_name(host)
+def validate_registry_host_name(host: str) -> None:
+    errors = _validate_registry_host_name(host)
     if bool(errors):
         raise serializers.ValidationError(f"invalid host name: {host}")
 
 
-def _validate_host_name(host: str) -> list[str]:
+def _validate_registry_host_name(host: str) -> list[str]:
     errors = []
 
     # Yes, validators returns (not throws) an exception if the argument doesn't
