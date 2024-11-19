@@ -121,9 +121,9 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
 
         inputs = data.get("inputs", {})
         errors = validate_inputs(
+            credential_type,
             credential_type.inputs,
             inputs,
-            credential_type,
         )
         if bool(errors):
             raise serializers.ValidationError(errors)
@@ -158,9 +158,9 @@ class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
             return data
 
         errors = validate_inputs(
+            credential_type,
             credential_type.inputs,
             inputs,
-            credential_type,
         )
         if bool(errors):
             raise serializers.ValidationError(errors)

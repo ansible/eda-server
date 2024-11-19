@@ -84,9 +84,9 @@ def inputs_from_store(inputs: str) -> dict:
 
 
 def validate_inputs(
+    credential_type,  # CredentialType; not typed to avoid circular import
     schema: dict,
     inputs: dict,
-    credential_type: enums.CredentialType = None,
 ) -> dict:
     """Validate user inputs against credential schema.
 
@@ -147,8 +147,7 @@ def validate_inputs(
         # We apply particular requirements on "host" when it is
         # associated with a container registry.
         if (
-            (credential_type is not None)
-            and (credential_type.name == enums.DefaultCredentialType.REGISTRY)
+            (credential_type.name == enums.DefaultCredentialType.REGISTRY)
             and (field == "host")
             and user_input
         ):
