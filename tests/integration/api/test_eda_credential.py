@@ -1068,3 +1068,24 @@ def test_retrieve_eda_credential_with_empty_encrypted_fields(
     assert "ssh_key_unlock" not in keys
     assert "username" in keys
     assert "password" in keys
+
+
+@pytest.mark.django_db
+def test_custom_credential_type_empty_inputs(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    injectors = {"extra_vars": {"abc": "123"}}
+    credential_type = models.CredentialType.objects.create(
+        name="demo_type", inputs={}, injectors=injectors
+    )
+    data = {
+        "name": "demo-credential",
+        "inputs": {},
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(f"{api_url_v1}/eda-credentials/", data=data)
+    assert response.status_code == status.HTTP_201_CREATED
+    result = response.data
+    assert result["name"] == "demo-credential"
