@@ -148,7 +148,7 @@ def validate_inputs(
         # associated with a container registry.
         if (
             (credential_type is not None)
-            and (credential_type.name == enums.CredentialType.REGISTRY)
+            and (credential_type.name == enums.DefaultCredentialType.REGISTRY)
             and (field == "host")
             and user_input
         ):
