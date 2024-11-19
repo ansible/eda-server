@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Optional
+
 import pytest
 from pytest_lazyfixture import lazy_fixture
 from rest_framework import status
@@ -194,7 +196,7 @@ def test_create_credential_type_sans_type(superuser_client: APIClient):
             {"a": "b"},
             "injectors",
             "Injectors must have keys defined in "
-            f"{SUPPORTED_KEYS_IN_INJECTORS}",
+            f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}",
         ),
         (
             {"fields": {"id": "username"}},
@@ -386,7 +388,10 @@ def test_partial_update_inputs_credential_type(
         (
             {"c": "d"},
             status.HTTP_400_BAD_REQUEST,
-            "Injectors must have keys defined in ['extra_vars']",
+            (
+                "Injectors must have keys defined in "
+                f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}"
+            ),
         ),
         (
             {"extra_vars": {"username": "{{ name }}"}},
@@ -523,3 +528,166 @@ def test_credential_types_based_on_namespace(
     data = response.json()
     for credential_type in data["results"]:
         assert credential_type["namespace"] == "event_stream"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("inputs", "injectors", "status_code", "key", "message"),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.key_file": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            None,
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "xyz.cert_file": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            ("Injector file key: xyz.cert_file should start with template"),
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template": "[mycert]\n{{ cert }}",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            None,
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.cert_file.abc": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Injector file key: template.cert_file.abc "
+                "cannot contain multiple dots"
+            ),
+        ),
+    ],
+)
+def test_create_credential_type_with_file(
+    superuser_client: APIClient,
+    inputs: dict,
+    injectors: dict,
+    status_code: int,
+    key: str,
+    message: Optional[str],
+):
+    data_in = {
+        "name": "credential_type_1",
+        "description": "desc here",
+        "inputs": inputs,
+        "injectors": injectors,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+    assert response.status_code == status_code
+    if message and key:
+        assert message in response.data[key]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("inputs", "injectors", "status_code", "key", "message"),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "name", "label": "Name", "type": "string"},
+                    {"id": "age", "label": "Age", "type": "string"},
+                ]
+            },
+            {
+                "extra_vars": {
+                    "template.filename": "{{ name }}",
+                    "age": "{{ age }}",
+                },
+                "file": {"template.filename": "Name = {{ name }}"},
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            "template.filename already exists",
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "name", "label": "Name", "type": "string"},
+                    {"id": "age", "label": "Age", "type": "string"},
+                ]
+            },
+            {
+                "extra_vars": {
+                    "name": "{{ name }}",
+                    "age": "{{ age }}",
+                },
+                "file": {"template.filename": "Name = {{ name }}"},
+            },
+            status.HTTP_201_CREATED,
+            "",
+            "",
+        ),
+    ],
+)
+def test_create_credential_type_with_duplicates(
+    superuser_client: APIClient,
+    inputs: dict,
+    injectors: dict,
+    status_code: int,
+    key: str,
+    message: str,
+):
+    data_in = {
+        "name": "credential_type_1",
+        "inputs": inputs,
+        "injectors": injectors,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+    assert response.status_code == status_code
+    if message and key:
+        assert message in response.data[key][0]

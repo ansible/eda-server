@@ -19,6 +19,7 @@ import gnupg
 import jinja2
 import yaml
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 from jinja2.nativetypes import NativeTemplate
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
@@ -26,13 +27,21 @@ from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
-SUPPORTED_KEYS_IN_INJECTORS = ["extra_vars"]
+SUPPORTED_KEYS_IN_INJECTORS = {"extra_vars", "file"}
 PROTECTED_PASSPHRASE_ERROR = (
     "The key is passphrase protected, please provide passphrase."
 )
 
 
 class InjectorMissingKeyException(Exception):
+    pass
+
+
+class InjectorInvalidTemplateKey(Exception):
+    pass
+
+
+class InjectorDuplicateKey(Exception):
     pass
 
 
@@ -245,18 +254,15 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     if not isinstance(injectors, dict):
         errors.append("Injectors must be in Key-Value pairs format")
 
-    injector_keys = injectors.keys()
-    if bool(injector_keys) and not any(
-        support_key in injectors.keys()
-        for support_key in SUPPORTED_KEYS_IN_INJECTORS
-    ):
+    injector_keys = set(injectors.keys())
+    if not injector_keys.issubset(SUPPORTED_KEYS_IN_INJECTORS):
         errors.append(
             "Injectors must have keys defined in"
-            f" {SUPPORTED_KEYS_IN_INJECTORS}"
+            f" {sorted(SUPPORTED_KEYS_IN_INJECTORS)}"
         )
 
     context = _default_context(schema)
-
+    key_names = []
     for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
         if not input_data:
@@ -268,13 +274,23 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
 
         for k, v in input_data.items():
             try:
+                if k in key_names:
+                    raise InjectorDuplicateKey(
+                        f"Injector {field} key: {k} already exists"
+                    )
+
+                if field == "file":
+                    _validate_file_template_key(k)
                 if isinstance(v, str):
                     _check_jinja_string(v, context)
+                key_names.append(k)
             except InjectorMissingKeyException as e:
                 errors.append(
                     f"Injector key: {k} has a value which refers to an"
                     f" undefined key error: {e}"
                 )
+            except (InjectorInvalidTemplateKey, InjectorDuplicateKey) as e:
+                errors.append(f"{e}")
 
     return {"injectors": errors} if bool(errors) else {}
 
@@ -389,3 +405,23 @@ def _validate_gpg_public_key(key_data: str) -> list[str]:
             errors.append(msg)
 
     return errors
+
+
+def _validate_file_template_key(key: str) -> None:
+    keys = key.split(".")
+    if keys[0] != "template":
+        raise InjectorInvalidTemplateKey(
+            _(
+                "Injector %(injector_type)s key: %(key)s "
+                "should start with template"
+            )
+            % {"injector_type": "file", "key": key}
+        )
+    if len(keys) > 2:
+        raise InjectorInvalidTemplateKey(
+            _(
+                "Injector %(injector_type)s key: %(key)s "
+                "cannot contain multiple dots"
+            )
+            % {"injector_type": "file", "key": key}
+        )
