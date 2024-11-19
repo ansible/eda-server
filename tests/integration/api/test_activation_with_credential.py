@@ -788,3 +788,73 @@ def _create_credential(
     response = api_client.post(f"{api_url_v1}/eda-credentials/", data=data)
     assert response.status_code == status.HTTP_201_CREATED
     return response.data
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("extra_vars", "inputs", "injectors", "status_code"),
+    [
+        (
+            yaml.dump({"a": 1}),
+            {},
+            {},
+            status.HTTP_201_CREATED,
+        ),
+        (
+            None,
+            {},
+            {},
+            status.HTTP_201_CREATED,
+        ),
+        (
+            yaml.dump({"a": 1}),
+            {},
+            {"extra_vars": {"abc": "xyz"}},
+            status.HTTP_201_CREATED,
+        ),
+        (
+            None,
+            {},
+            {"extra_vars": {"abc": "xyz"}},
+            status.HTTP_201_CREATED,
+        ),
+    ],
+)
+def test_create_activation_with_empty_credential(
+    admin_client: APIClient,
+    default_decision_environment: models.DecisionEnvironment,
+    default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    extra_vars,
+    inputs,
+    injectors,
+    status_code,
+):
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": default_decision_environment.id,
+        "rulebook_id": default_rulebook.id,
+        "extra_vars": extra_vars,
+        "organization_id": default_organization.id,
+    }
+    credential_type = models.CredentialType.objects.create(
+        name="empty_user_type",
+        inputs=inputs,
+        injectors=injectors,
+    )
+
+    eda_credential = models.EdaCredential.objects.create(
+        name="credential-1",
+        inputs={},
+        credential_type_id=credential_type.id,
+        organization=default_organization,
+    )
+
+    eda_credential_ids = [eda_credential.id]
+    test_activation["eda_credentials"] = eda_credential_ids
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status_code
