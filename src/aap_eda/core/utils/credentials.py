@@ -14,6 +14,7 @@
 
 import re
 import tempfile
+import typing
 
 import gnupg
 import jinja2
@@ -25,6 +26,9 @@ from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
+
+if typing.TYPE_CHECKING:
+    from aap_eda.core import models
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
@@ -84,7 +88,7 @@ def inputs_from_store(inputs: str) -> dict:
 
 
 def validate_inputs(
-    credential_type,  # CredentialType; not typed to avoid circular import
+    credential_type: "models.CredentialType",
     schema: dict,
     inputs: dict,
 ) -> dict:
