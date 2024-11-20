@@ -604,6 +604,46 @@ def test_credential_types_based_on_namespace(
                 "cannot contain multiple dots"
             ),
         ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Injector file key: template cannot be mixed "
+                "with fully qualified keys"
+            ),
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template": "[mykey]\n{{ key }}",
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Injector file key: template.cert_file "
+                "cannot be mixed with template key"
+            ),
+        ),
     ],
 )
 def test_create_credential_type_with_file(
