@@ -131,6 +131,12 @@ def _update_extra_vars_from_eda_credentials(
 ) -> None:
     for eda_credential_id in validated_data["eda_credentials"]:
         eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
+        if (
+            creating
+            and eda_credential.credential_type.name
+            == DefaultCredentialType.AAP
+        ):
+            vault_data.password_used = True
         if eda_credential.credential_type.name in [
             DefaultCredentialType.VAULT,
             DefaultCredentialType.AAP,
@@ -143,9 +149,8 @@ def _update_extra_vars_from_eda_credentials(
 
         user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
 
-        if any(key in user_inputs for key in secret_fields):
-            if creating:
-                vault_data.password_used = True
+        if creating and any(key in user_inputs for key in secret_fields):
+            vault_data.password_used = True
 
         for key, value in user_inputs.items():
             if key in secret_fields:
@@ -879,6 +884,7 @@ def _validate_eda_credentials(data: dict) -> None:
         return
 
     existing_extra_var_keys = []
+    existing_env_var_keys = []
     existing_file_keys = []
     extra_var = data.get("extra_var")
 
@@ -906,6 +912,7 @@ def _validate_eda_credentials(data: dict) -> None:
                 eda_credential, existing_extra_var_keys, "extra_vars"
             )
             _check_injectors(eda_credential, existing_file_keys, "file")
+            _check_injectors(eda_credential, existing_env_var_keys, "env")
         except models.EdaCredential.DoesNotExist:
             raise serializers.ValidationError(
                 f"EdaCredential with id {eda_credential_id} does not exist"
