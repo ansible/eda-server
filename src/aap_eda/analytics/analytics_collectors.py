@@ -479,6 +479,57 @@ def event_streams_by_activation_table(
 
 
 @register(
+    "event_streams_by_running_activations_table",
+    "1.0",
+    format="csv",
+    description="Data on event_streams used by each running activation",
+)
+def event_streams_by_running_activations_table(
+    since: datetime, full_path: str, until: datetime, **kwargs
+):
+    running_states = [
+        ActivationStatus.RUNNING,
+        ActivationStatus.STARTING,
+        ActivationStatus.PENDING,
+    ]
+    activations = (
+        models.Activation.objects.filter(
+            Q(created_at__gt=since, created_at__lte=until)
+            | Q(modified_at__gt=since, modified_at__lte=until)
+        )
+        .filter(status__in=running_states)
+        .distinct()
+    )
+
+    event_streams = models.EventStream.objects.none()
+    for activation in activations:
+        event_streams |= activation.event_streams.all()
+
+    if not bool(event_streams):
+        return
+
+    event_streams = event_streams.annotate(
+        event_stream_id=F("id"),
+        activation_id=F("activations__id"),
+    ).values(
+        "name",
+        "event_stream_type",
+        "eda_credential_id",
+        "events_received",
+        "last_event_received_at",
+        "organization_id",
+        "event_stream_id",
+        "activation_id",
+    )
+
+    query = f"COPY ({event_streams.query}) TO STDOUT WITH CSV HEADER"
+
+    return _copy_table(
+        "event_streams_by_running_activations", query, full_path
+    )
+
+
+@register(
     "project_table",
     "1.0",
     format="csv",
