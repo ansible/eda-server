@@ -280,7 +280,7 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
                     )
 
                 if field == "file":
-                    _validate_file_template_key(k)
+                    _validate_file_template_key(k, key_names)
                 if isinstance(v, str):
                     _check_jinja_string(v, context)
                 key_names.append(k)
@@ -407,7 +407,7 @@ def _validate_gpg_public_key(key_data: str) -> list[str]:
     return errors
 
 
-def _validate_file_template_key(key: str) -> None:
+def _validate_file_template_key(key: str, key_names: list[str]) -> None:
     keys = key.split(".")
     if keys[0] != "template":
         raise InjectorInvalidTemplateKey(
@@ -425,3 +425,24 @@ def _validate_file_template_key(key: str) -> None:
             )
             % {"injector_type": "file", "key": key}
         )
+
+    if len(keys) == 1:
+        for known_key in key_names:
+            if known_key.startswith("template"):
+                raise InjectorInvalidTemplateKey(
+                    _(
+                        "Injector %(injector_type)s key: %(key)s "
+                        "cannot be mixed with fully qualified keys"
+                    )
+                    % {"injector_type": "file", "key": key}
+                )
+    if len(keys) == 2:
+        for known_key in key_names:
+            if known_key == "template":
+                raise InjectorInvalidTemplateKey(
+                    _(
+                        "Injector %(injector_type)s key: %(key)s "
+                        "cannot be mixed with template key"
+                    )
+                    % {"injector_type": "file", "key": key}
+                )
