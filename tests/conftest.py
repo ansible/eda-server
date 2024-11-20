@@ -17,7 +17,11 @@ import logging
 import pytest
 from django.conf import settings
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
+from aap_eda.core.management.commands.create_initial_data import (
+    CREDENTIAL_TYPES,
+    populate_credential_types,
+)
 from aap_eda.settings import default
 
 
@@ -44,6 +48,24 @@ def default_organization() -> models.Organization:
         name=settings.DEFAULT_ORGANIZATION_NAME,
         description="The default organization",
     )[0]
+
+
+#################################################################
+# DB
+#################################################################
+@pytest.fixture
+def preseed_credential_types(
+    default_organization: models.Organization,
+) -> list[models.CredentialType]:
+    """Preseed Credential Types."""
+    return populate_credential_types(CREDENTIAL_TYPES)
+
+
+@pytest.fixture
+def aap_credential_type(preseed_credential_types):
+    return models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
 
 
 #################################################################
