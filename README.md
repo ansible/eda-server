@@ -38,4 +38,4 @@ For more information about getting in touch, see the
 
 ## Credits
 
-EDA-Controller is sponsored by [Red Hat, Inc](https://www.redhat.com).
+EDA-Controller is sponsored by [Red Hat, Inc](https://www.redhat.com)..
