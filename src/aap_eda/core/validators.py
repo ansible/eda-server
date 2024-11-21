@@ -24,6 +24,7 @@ from rest_framework import serializers
 
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
+    check_reserved_keys_in_extra_vars,
     validate_registry_host_name,
     validate_schema,
 )
@@ -308,6 +309,7 @@ def is_extra_var_dict(extra_var: str):
             raise serializers.ValidationError(
                 "Extra var is not in object format"
             )
+        check_reserved_keys_in_extra_vars(data)
     except yaml.YAMLError:
         raise serializers.ValidationError(
             "Extra var must be in JSON or YAML format"

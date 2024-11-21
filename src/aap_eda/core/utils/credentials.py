@@ -39,6 +39,8 @@ PROTECTED_PASSPHRASE_ERROR = (
     "The key is passphrase protected, please provide passphrase."
 )
 
+RESERVED_EXTRA_VAR_KEYS = {"ansible", "eda"}
+
 
 class InjectorMissingKeyException(Exception):
     pass
@@ -294,6 +296,13 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
             errors.append(f"{field} must be a dict type")
             continue
 
+        try:
+            if field == "extra_vars":
+                check_reserved_keys_in_extra_vars(input_data)
+        except ValidationError as e:
+            errors.append(e.message)
+            continue
+
         for k, v in input_data.items():
             try:
                 if k in key_names:
@@ -489,3 +498,18 @@ def _validate_file_template_key(key: str, key_names: list[str]) -> None:
                     )
                     % {"injector_type": "file", "key": key}
                 )
+
+
+def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
+    for key in data.keys():
+        if key in RESERVED_EXTRA_VAR_KEYS:
+            raise ValidationError(
+                _(
+                    "Extra vars key '%(key)s' cannot be one of these "
+                    "reserved keys '%(reserved)s'"
+                )
+                % {
+                    "key": key,
+                    "reserved": ", ".join(sorted((RESERVED_EXTRA_VAR_KEYS))),
+                }
+            )
