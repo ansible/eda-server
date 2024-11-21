@@ -236,6 +236,20 @@ NOT_YAML_JSON_ERROR_MSG = "Extra var must be in JSON or YAML format"
         ("John, ", NOT_OBJECT_ERROR_MSG),
         ("[John, 3,]", NOT_OBJECT_ERROR_MSG),
         ('{"name": "John" - 2 }', NOT_YAML_JSON_ERROR_MSG),
+        (
+            '{"eda": "Fred"}',
+            (
+                "Extra vars key 'eda' cannot be one of these reserved keys "
+                "'ansible, eda'"
+            ),
+        ),
+        (
+            '{"ansible": "Fred"}',
+            (
+                "Extra vars key 'ansible' cannot be one of these reserved "
+                "keys 'ansible, eda'"
+            ),
+        ),
     ],
 )
 @pytest.mark.django_db

@@ -230,6 +230,32 @@ def test_create_credential_type_sans_type(superuser_client: APIClient):
             "Injector key: keyfile has a value which refers to an undefined "
             "key error",
         ),
+        (
+            {},
+            {
+                "extra_vars": {
+                    "eda": "123",
+                },
+            },
+            "injectors",
+            (
+                "Extra vars key 'eda' cannot be one of these "
+                "reserved keys 'ansible, eda'"
+            ),
+        ),
+        (
+            {},
+            {
+                "extra_vars": {
+                    "ansible": "123",
+                },
+            },
+            "injectors",
+            (
+                "Extra vars key 'ansible' cannot be one of "
+                "these reserved keys 'ansible, eda'"
+            ),
+        ),
     ],
 )
 def test_create_credential_type_with_schema_validate_errors(
