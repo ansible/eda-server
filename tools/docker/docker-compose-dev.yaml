@@ -237,7 +237,9 @@ services:
     ports:
       - '${EDA_UI_PORT:-8443}:443'
     volumes:
-      - './tools/docker/my_certs:/tmp/my_certs:z'
+      - './my_certs:/tmp/my_certs:z'
+      - './nginx/certs:/certs:z'
+      - './nginx/default.conf.template:/etc/nginx/templates/default.conf.template:z'
     depends_on:
       eda-webhook-api:
         condition: service_healthy
