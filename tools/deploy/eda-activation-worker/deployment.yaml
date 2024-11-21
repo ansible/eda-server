@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: eda-activation-worker
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: eda
@@ -20,7 +20,7 @@ spec:
         - args:
             - /bin/bash
             - -c
-            - aap-eda-manage rqworker --worker-class aap_eda.core.tasking.ActivationWorker
+            - aap-eda-manage run_worker_dispatcher
           env:
             - name: EDA_DATABASE_URL
               value: postgresql+asyncpg://postgres:secret@postgres/eda

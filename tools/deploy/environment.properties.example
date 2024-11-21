@@ -5,3 +5,11 @@ EDA_CONTROLLER_SSL_VERIFY=no
 # EDA Server
 EDA_WEBSOCKET_BASE_URL=ws://eda-api:8000
 EDA_WEBSOCKET_SSL_VERIFY=no
+EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
+EDA_EVENT_STREAM_BASE_URL=https://localhost:8443/edgecafe-beef-feed-fade-decadeedgecafe/
+EDA_EVENT_STREAM_MTLS_BASE_URL=https://localhost:8443/mtls/edgecafe-beef-feed-fade-decadeedgecafe/
+EDA_PG_NOTIFY_DSN="host=eda-postgres port=5432 dbname=eda user=postgres password=secret"
+EDA_PG_NOTIFY_DSN_SERVER="host=eda-postgres port=5432 dbname=eda user=postgres password=secret"
+SSL_CERTIFICATE=/certs/wildcard.crt
+SSL_CERTIFICATE_KEY=/certs/wildcard.key
+SSL_CLIENT_CERTIFICATE=/certs/client.crt
