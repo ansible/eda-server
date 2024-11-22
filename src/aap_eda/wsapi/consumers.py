@@ -510,7 +510,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                             f"{template} already exists"
                         )
                     contents = substitute_variables(value, inputs)
-                    file_templates[template] = contents
+                    file_templates[template] = str(contents)
         return file_templates
 
     @database_sync_to_async
