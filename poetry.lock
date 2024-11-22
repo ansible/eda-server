@@ -621,7 +621,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.11.8.0.dev7+gfe4ee752"
+version = "2024.4.25"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -631,31 +631,28 @@ develop = false
 [package.dependencies]
 channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
-Django = ">=4.2.16,<4.3.0"
+Django = ">=4.2.5,<4.3.0"
 django-crum = "*"
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
 django-split-settings = "*"
 djangorestframework = "*"
 inflection = "*"
 redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
-sqlparse = ">=0.5.0"
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["channels", "cryptography", "django-auth-ldap", "django-redis", "drf-spectacular", "pyjwt", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "social-auth-app-django", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular"]
-authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+authentication = ["django-auth-ldap", "python-ldap", "python3-saml", "social-auth-app-django", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 jwt-consumer = ["pyjwt", "requests"]
-oauth2-provider = ["django-oauth-toolkit (<2.4.0)"]
 redis-client = ["django-redis", "redis"]
-resource-registry = ["asgiref", "pyjwt", "requests", "urllib3"]
 testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "3dc1dca437ee594211ec33bfb4c3fa1c6d39d11a"
+resolved_reference = "7c71771fbd2ca54dcb400ab12fe0f7a4ee655eed"
 
 [[package]]
 name = "django-crum"
