@@ -718,6 +718,16 @@ def test_create_credential_type_with_file(
             "template.filename already exists",
         ),
         (
+            {"fields": [{"id": "name", "label": "Name", "type": "string"}]},
+            {
+                "extra_vars": {"myname": "{{ name }}"},
+                "env": {"myname": "{{ name }}"},
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            "myname already exists",
+        ),
+        (
             {
                 "fields": [
                     {"id": "name", "label": "Name", "type": "string"},
@@ -730,6 +740,7 @@ def test_create_credential_type_with_file(
                     "age": "{{ age }}",
                 },
                 "file": {"template.filename": "Name = {{ name }}"},
+                "env": {"NAME": "{{ name }}", "AGE": "{{ age }}"},
             },
             status.HTTP_201_CREATED,
             "",

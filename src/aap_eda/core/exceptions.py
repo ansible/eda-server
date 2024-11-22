@@ -35,3 +35,7 @@ class ParseError(Exception):
 
 class DuplicateFileTemplateKeyError(Exception):
     pass
+
+
+class DuplicateEnvKeyError(Exception):
+    pass
