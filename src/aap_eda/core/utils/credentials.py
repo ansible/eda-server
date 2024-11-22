@@ -27,7 +27,7 @@ from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
-SUPPORTED_KEYS_IN_INJECTORS = {"extra_vars", "file"}
+SUPPORTED_KEYS_IN_INJECTORS = {"env", "extra_vars", "file"}
 PROTECTED_PASSPHRASE_ERROR = (
     "The key is passphrase protected, please provide passphrase."
 )
@@ -275,7 +275,7 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
             continue
 
         try:
-            if field == "extra_vars":
+            if field in ["extra_vars", "env"]:
                 check_reserved_keys_in_extra_vars(input_data)
         except ValidationError as e:
             errors.append(e.message)
