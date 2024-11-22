@@ -46,8 +46,8 @@ AAP_INPUTS = {
     "host": "https://eda_controller_url",
     "username": "adam",
     "password": "secret",
-    "ssl_verify": "no",
     "oauth_token": "",
+    "verify_ssl": False,
 }
 
 
@@ -118,7 +118,9 @@ async def test_handle_workers_with_eda_system_vault_credential(
     preseed_credential_types,
     default_organization: models.Organization,
 ):
-    credential = await _prepare_system_vault_credential(default_organization)
+    credential = await _prepare_system_vault_credential_async(
+        default_organization
+    )
     rulebook_process_id = await _prepare_activation_instance_with_credentials(
         default_organization,
         [credential],
@@ -164,6 +166,8 @@ async def test_handle_workers_with_controller_info(
     for type in [
         "Rulebook",
         "ControllerInfo",
+        "VaultCollection",
+        "EnvVars",
         "EndOfResponse",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
@@ -172,8 +176,12 @@ async def test_handle_workers_with_controller_info(
             assert response["url"] == AAP_INPUTS["host"]
             assert response["username"] == AAP_INPUTS["username"]
             assert response["password"] == AAP_INPUTS["password"]
-            assert response["ssl_verify"] == AAP_INPUTS["ssl_verify"]
+            assert (response["ssl_verify"] == "yes") is AAP_INPUTS[
+                "verify_ssl"
+            ]
             assert response["token"] == AAP_INPUTS["oauth_token"]
+        elif type == "EnvVars":
+            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -823,6 +831,8 @@ def _prepare_activation_with_controller_info(
         organization=default_organization,
     )
 
+    system_credential = _prepare_system_vault_credential(default_organization)
+
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy=enums.RestartPolicy.ALWAYS,
@@ -831,6 +841,7 @@ def _prepare_activation_with_controller_info(
         user=user,
         decision_environment=decision_environment,
         organization=default_organization,
+        eda_system_vault_credential=system_credential,
     )
     activation.eda_credentials.add(credential)
 
@@ -1175,8 +1186,14 @@ def _prepare_credential(
 
 
 @database_sync_to_async
+def _prepare_system_vault_credential_async(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    return _prepare_system_vault_credential(organization)
+
+
 def _prepare_system_vault_credential(
-    default_organization: models.Organization,
+    organization: models.Organization,
 ) -> models.EdaCredential:
     vault_credential_type = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.VAULT
@@ -1187,5 +1204,5 @@ def _prepare_system_vault_credential(
         inputs={"vault_id": "adam", "vault_password": "secret"},
         managed=False,
         credential_type=vault_credential_type,
-        organization=default_organization,
+        organization=organization,
     )
