@@ -78,6 +78,11 @@ class ExtraVars(BaseModel):
     type: str = "ExtraVars"
 
 
+class EnvVars(BaseModel):
+    data: str
+    type: str = "EnvVars"
+
+
 # ssl_verify is either yes|no, future may have cert
 class ControllerInfo(BaseModel):
     type: str = "ControllerInfo"
