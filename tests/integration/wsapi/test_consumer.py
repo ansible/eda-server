@@ -1095,35 +1095,87 @@ def _create_event(data, uuid):
     }
 
 
+@pytest.mark.parametrize(
+    (
+        "credential_type_inputs",
+        "credential_type_injectors",
+        "credential_inputs",
+        "file_contents",
+    ),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                },
+            },
+            {
+                "cert": "This is a certificate",
+                "key": "This is a key",
+            },
+            [
+                {
+                    "data": base64.b64encode(
+                        "[mycert]\nThis is a certificate".encode()
+                    ).decode(),
+                    "template_key": "template.cert_file",
+                },
+            ],
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "fdata", "label": "File Data", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.myfile": "{{ fdata }}",
+                },
+            },
+            {"fdata": "{'x':[{'name': 'Fred'}]}"},
+            [
+                {
+                    "data": base64.b64encode(
+                        "{'x': [{'name': 'Fred'}]}".encode()
+                    ).decode(),
+                    "template_key": "template.myfile",
+                },
+            ],
+        ),
+        (
+            {},
+            {
+                "file": {
+                    "template.other_file": "abc",
+                },
+            },
+            {},
+            [
+                {
+                    "data": base64.b64encode("abc".encode()).decode(),
+                    "template_key": "template.other_file",
+                },
+            ],
+        ),
+    ],
+)
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_file_contents(
     ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
     default_organization: models.Organization,
+    credential_type_inputs: dict[str, any],
+    credential_type_injectors: dict[str, any],
+    credential_inputs: dict[str, any],
+    file_contents: list[dict[str, any]],
 ):
-    credential_type_inputs = {
-        "fields": [
-            {"id": "cert", "label": "Certificate", "type": "string"},
-            {"id": "key", "label": "Key", "type": "string"},
-        ]
-    }
-    credential_type_injectors = {
-        "file": {
-            "template.cert_file": "[mycert]\n{{ cert }}",
-            "template.key_file": "[mykey]\n{{ key }}",
-        },
-    }
-
-    credential_inputs = {
-        "cert": "This is a certificate",
-        "key": "This is a key",
-    }
-
-    cert_template = "[mycert]\nThis is a certificate"
-    key_template = "[mykey]\nThis is a key"
-    cert_template_encoded = base64.b64encode(cert_template.encode()).decode()
-    key_template_encoded = base64.b64encode(key_template.encode()).decode()
-
     eda_credential = await _prepare_credential(
         credential_type_inputs,
         credential_type_injectors,
@@ -1141,21 +1193,12 @@ async def test_handle_workers_with_file_contents(
         "activation_id": rulebook_process_id,
     }
     await ws_communicator.send_json_to(payload)
-    cert_data = {
-        "data": cert_template_encoded,
-        "template_key": "template.cert_file",
-    }
-    key_data = {
-        "data": key_template_encoded,
-        "template_key": "template.key_file",
-    }
+    check_data = [("Rulebook", None)]
+    for fc in file_contents:
+        check_data.append(("FileContents", fc))
+    check_data.append(("EndOfResponse", None))
 
-    for type, data in [
-        ("Rulebook", None),
-        ("FileContents", key_data),
-        ("FileContents", cert_data),
-        ("EndOfResponse", None),
-    ]:
+    for type, data in check_data:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
         if data:
