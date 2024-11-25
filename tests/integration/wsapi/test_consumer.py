@@ -1164,6 +1164,33 @@ def _create_event(data, uuid):
                 },
             ],
         ),
+        (
+            {
+                "fields": [
+                    {
+                        "id": "keytab",
+                        "label": "KeyTab",
+                        "format": "binary_base64",
+                        "secret": True,
+                    },
+                ]
+            },
+            {
+                "file": {
+                    "template.keytab_file": "{{ keytab }}",
+                },
+            },
+            {
+                "keytab": base64.b64encode(bytes([1, 2, 3, 4, 5])).decode(),
+            },
+            [
+                {
+                    "data": base64.b64encode(bytes([1, 2, 3, 4, 5])).decode(),
+                    "template_key": "template.keytab_file",
+                    "data_format": "binary",
+                },
+            ],
+        ),
     ],
 )
 @pytest.mark.django_db(transaction=True)
