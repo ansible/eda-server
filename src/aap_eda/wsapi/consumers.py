@@ -22,7 +22,7 @@ from aap_eda.core.exceptions import (
 )
 from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.core.utils.credentials import get_secret_fields
-from aap_eda.core.utils.strings import substitute_variables
+from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.tasks import orchestrator
 
 from .messages import (
@@ -42,6 +42,8 @@ from .messages import (
 )
 
 logger = logging.getLogger(__name__)
+
+BINARY_FORMATS = {"binary_base64"}
 
 
 class MessageType(Enum):
@@ -143,14 +145,11 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
 
-        templates = await self.get_file_contents_from_credentials(activation)
-        for template, contents in templates.items():
-            data = FileContentMessage(
-                template_key=template,
-                data=base64.b64encode(contents.encode()).decode(),
-                eof=True,
-            )
-            await self.send(text_data=data.json())
+        file_contents = await self.get_file_contents_from_credentials(
+            activation
+        )
+        for file_content in file_contents:
+            await self.send(text_data=file_content.json())
 
         env_var = await self.get_env_vars_from_credentials(activation)
         if env_var:
@@ -498,20 +497,32 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_file_contents_from_credentials(
         self, activation: models.Activation
-    ) -> tp.Optional[dict]:
-        file_templates = {}
+    ) -> tp.Optional[list[FileContentMessage]]:
+        file_template_names = []
+        file_messages = []
         for eda_credential in activation.eda_credentials.all():
             inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
             injectors = eda_credential.credential_type.injectors
+            binary_fields = []
+            for field in eda_credential.credential_type.inputs.get(
+                "fields", []
+            ):
+                if field.get("format") in BINARY_FORMATS:
+                    binary_fields.append(field["id"])
+
             if "file" in injectors:
                 for template, value in injectors["file"].items():
-                    if template in file_templates:
+                    if template in file_template_names:
                         raise DuplicateFileTemplateKeyError(
                             f"{template} already exists"
                         )
-                    contents = substitute_variables(value, inputs)
-                    file_templates[template] = str(contents)
-        return file_templates
+                    file_template_names.append(template)
+                    file_messages.append(
+                        self.get_file_content_message(
+                            template, binary_fields, value, inputs
+                        )
+                    )
+        return file_messages
 
     @database_sync_to_async
     def get_env_vars_from_credentials(
@@ -575,3 +586,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             vault_inputs = yaml.safe_load(vault_inputs.get_secret_value())
             return vault_inputs["vault_password"], vault_inputs["vault_id"]
         return None, None
+
+    @staticmethod
+    def get_file_content_message(
+        template: str, binary_fields: list[str], value: str, inputs: dict
+    ) -> FileContentMessage:
+        binary_file = any(
+            attr in binary_fields for attr in extract_variables(value)
+        )
+
+        contents = str(substitute_variables(value, inputs))
+        if binary_file:
+            return FileContentMessage(
+                template_key=template,
+                data=contents,
+                data_format="binary",
+                eof=True,
+            )
+        return FileContentMessage(
+            template_key=template,
+            data=base64.b64encode(contents.encode()).decode(),
+            eof=True,
+        )
