@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
+from aap_eda.core.utils.strings import extract_variables
 from aap_eda.utils import get_eda_version, str_to_bool
 
 
@@ -45,3 +46,26 @@ def test_get_eda_version():
     # assert outcome when aap-eda package is not found
     with patch("importlib.metadata.version", side_effect=PackageNotFoundError):
         assert get_eda_version() == "unknown"
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("simple", set()),
+        (
+            "And this is a {{demo}}",
+            {
+                "demo",
+            },
+        ),
+        (
+            "{{var1}} and {{var2}}",
+            {
+                "var1",
+                "var2",
+            },
+        ),
+    ],
+)
+def test_extract_variables(value, expected):
+    assert extract_variables(value) == expected
