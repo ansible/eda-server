@@ -19,7 +19,7 @@ import tarfile
 import tempfile
 import uuid
 from datetime import timedelta
-from typing import List
+from typing import IO, List
 from unittest.mock import patch
 
 import pytest
@@ -29,13 +29,62 @@ from insights_analytics_collector import Collector
 from aap_eda.analytics import analytics_collectors as collectors
 from aap_eda.analytics.collector import AnalyticsCollector
 from aap_eda.conf import settings_registry
-from aap_eda.core import models
+from aap_eda.core import enums, models
 
 
 @pytest.fixture(autouse=True)
 def register() -> None:
     settings_registry.persist_registry_data()
     return None
+
+
+@pytest.fixture
+def activations_with_different_status(
+    default_decision_environment: models.DecisionEnvironment,
+    default_project: models.Project,
+    default_rulebook: models.Rulebook,
+    default_extra_var_data: str,
+    default_organization: models.Organization,
+    default_user: models.User,
+) -> List[models.Activation]:
+    """Return Activations"""
+    activation_data = [
+        {
+            "name": "pending-activation",
+            "description": "Activation in pending state",
+            "status": enums.ActivationStatus.PENDING,
+            "log_level": "info",
+        },
+        {
+            "name": "running-activation",
+            "description": "Activation in running state",
+            "status": enums.ActivationStatus.RUNNING,
+            "log_level": "error",
+        },
+        {
+            "name": "completed-activation",
+            "description": "Activation in completed state",
+            "status": enums.ActivationStatus.COMPLETED,
+            "log_level": "debug",
+        },
+    ]
+
+    activations = [
+        models.Activation(
+            name=data["name"],
+            description=data["description"],
+            status=data["status"],
+            decision_environment=default_decision_environment,
+            project=default_project,
+            rulebook=default_rulebook,
+            extra_var=default_extra_var_data,
+            organization=default_organization,
+            user=default_user,
+            log_level=data["log_level"],
+        )
+        for data in activation_data
+    ]
+    return models.Activation.objects.bulk_create(activations)
 
 
 @pytest.mark.django_db
@@ -227,7 +276,7 @@ def test_activation_stats(
             assert int(lines[0][3]) == new_activation.restart_count
             assert int(lines[0][4]) == new_activation.failure_count
             assert lines[0][8] == new_activation.modified_at.isoformat(
-                sep=" "
+                sep=" ", timespec="microseconds"
             ).replace("00:00", "00")
             assert int(lines[0][9]) == 0
             assert lines[1][0] == f"{default_activation.id}"
@@ -575,31 +624,73 @@ def test_event_streams_table_by_activation_collector(
         with open(
             os.path.join(tmpdir, "event_streams_by_activation_table.csv")
         ) as f:
-            reader = csv.reader(f)
-
-            header = next(reader)
-            lines = list(reader)
-
-            assert header == [
-                "name",
-                "event_stream_type",
-                "eda_credential_id",
-                "events_received",
-                "last_event_received_at",
-                "organization_id",
-                "event_stream_id",
-                "activation_id",
-            ]
-            assert len(lines) == 2
-            assert lines[0][0] == default_event_streams[0].name
-            assert lines[0][1] == default_event_streams[0].event_stream_type
-            assert lines[0][6] == str(default_event_streams[0].id)
-            assert lines[1][0] == default_event_streams[1].name
-            assert lines[1][1] == default_event_streams[1].event_stream_type
-            assert lines[1][6] == str(default_event_streams[1].id)
-            assert sorted([lines[0][7], lines[1][7]]) == sorted(
-                [str(default_activation.id), str(new_activation.id)]
+            assert_event_streams_data(
+                default_event_streams, [default_activation, new_activation], f
             )
+
+
+@pytest.mark.django_db
+def test_event_streams_table_by_running_activations_collector(
+    activations_with_different_status: list[models.Activation],
+    default_event_streams: list[models.EventStream],
+):
+    activations_with_different_status[0].event_streams.add(
+        default_event_streams[0]
+    )
+    activations_with_different_status[1].event_streams.add(
+        default_event_streams[1]
+    )
+
+    until = now()
+    time_start = until - timedelta(hours=9)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        collectors.event_streams_by_running_activations_table(
+            time_start, tmpdir, until=now() + timedelta(seconds=1)
+        )
+        with open(
+            os.path.join(
+                tmpdir, "event_streams_by_running_activations_table.csv"
+            )
+        ) as f:
+            assert_event_streams_data(
+                default_event_streams, activations_with_different_status, f
+            )
+
+
+def assert_event_streams_data(
+    default_event_streams: list[models.EventStream],
+    activations: list[models.Activation],
+    data: IO[str],
+):
+    reader = csv.reader(data)
+
+    header = next(reader)
+    lines = list(reader)
+
+    assert header == [
+        "name",
+        "event_stream_type",
+        "eda_credential_id",
+        "events_received",
+        "last_event_received_at",
+        "organization_id",
+        "event_stream_id",
+        "activation_id",
+    ]
+    assert len(lines) == 2
+    assert lines[0][0] == default_event_streams[0].name
+    assert lines[0][1] == default_event_streams[0].event_stream_type
+    assert lines[0][6] == str(default_event_streams[0].id)
+    assert lines[1][0] == default_event_streams[1].name
+    assert lines[1][1] == default_event_streams[1].event_stream_type
+    assert lines[1][6] == str(default_event_streams[1].id)
+    assert sorted([lines[0][7], lines[1][7]]) == sorted(
+        [
+            str(activations[0].id),
+            str(activations[1].id),
+        ]
+    )
 
 
 @pytest.mark.django_db
