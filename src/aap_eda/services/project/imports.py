@@ -28,7 +28,6 @@ from django.core import exceptions
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
 from aap_eda.services.project.scm import ScmEmptyError, ScmRepository
-from aap_eda.services.rulebook import insert_rulebook_related_data
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +179,6 @@ class ProjectImportService:
             rulesets=rulebook_info.raw_content,
             organization=project.organization,
         )
-        insert_rulebook_related_data(rulebook, rulebook_info.content)
         return rulebook
 
     def _sync_rulebook(
@@ -196,8 +194,6 @@ class ProjectImportService:
             return
         rulebook.rulesets = rulebook_info.raw_content
         rulebook.save()
-        rulebook.ruleset_set.clear()
-        insert_rulebook_related_data(rulebook, rulebook_info.content)
         models.Activation.objects.filter(rulebook=rulebook).update(
             rulebook_rulesets=rulebook.rulesets,
             git_hash=git_hash,
