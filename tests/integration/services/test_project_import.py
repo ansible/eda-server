@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 import os
-import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -23,7 +22,6 @@ import pytest
 
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportService
-from aap_eda.services.project.imports import ProjectImportError
 from aap_eda.services.project.scm import ScmRepository
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -175,25 +173,15 @@ def test_project_import_rulebook_directory_missing(
     )
 
     service = ProjectImportService(scm_cls=git_mock)
-    with pytest.raises(
-        ProjectImportError,
-        match=re.escape(message_expected),
-    ):
-        service.import_project(project)
+    service.import_project(project)
 
     project = models.Project.objects.get(id=project.id)
-    assert project.import_state == models.Project.ImportState.FAILED
+    assert project.import_state == models.Project.ImportState.COMPLETED
     assert project.import_error == message_expected
 
-    # resync the project does not clear the import_state and import_error
-    with pytest.raises(
-        ProjectImportError,
-        match=re.escape(message_expected),
-    ):
-        service.sync_project(project)
-
+    service.sync_project(project)
     project.refresh_from_db()
-    assert project.import_state == models.Project.ImportState.FAILED
+    assert project.import_state == models.Project.ImportState.COMPLETED
     assert project.import_error == message_expected
 
 

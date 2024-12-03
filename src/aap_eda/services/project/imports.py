@@ -27,7 +27,7 @@ from django.core import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
-from aap_eda.services.project.scm import ScmEmptyError, ScmRepository
+from aap_eda.services.project.scm import ScmRepository
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,10 @@ class ProjectImportError(Exception):
     pass
 
 
+class ProjectImportWarning(Exception):
+    pass
+
+
 class MalformedError(Exception):
     pass
 
@@ -61,8 +65,8 @@ def _project_import_wrapper(
         try:
             func(self, project)
             project.import_state = models.Project.ImportState.COMPLETED
-        except ScmEmptyError as e:
-            # if a project is empty, sync status should show completed
+        except ProjectImportWarning as e:
+            # import status should show completed but with an error message
             project.import_state = models.Project.ImportState.COMPLETED
             project.import_error = str(e)
         except Exception as e:
@@ -142,7 +146,9 @@ class ProjectImportService:
             )
             yield repo_dir, repo.rev_parse("HEAD")
             if project.rulebook_set.count() == 0:
-                raise ScmEmptyError("This project contains no rulebooks.")
+                raise ProjectImportWarning(
+                    "This project contains no rulebooks."
+                )
 
     def _temporary_directory(self) -> tempfile.TemporaryDirectory:
         return tempfile.TemporaryDirectory(prefix=TMP_PREFIX)
@@ -207,7 +213,7 @@ class ProjectImportService:
                 break
 
         if not rulebooks_dir:
-            raise ProjectImportError(
+            raise ProjectImportWarning(
                 "The 'extensions/eda/rulebooks' or 'rulebooks' directory"
                 " doesn't exist within the project root."
             )
