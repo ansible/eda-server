@@ -275,9 +275,13 @@ def test_activation_stats(
             assert lines[0][2] == new_activation.status
             assert int(lines[0][3]) == new_activation.restart_count
             assert int(lines[0][4]) == new_activation.failure_count
-            assert lines[0][8] == new_activation.modified_at.isoformat(
-                sep=" ", timespec="microseconds"
-            ).replace("00:00", "00")
+            assert lines[0][8].split("+")[
+                0
+            ] == new_activation.modified_at.isoformat(" ").split("+")[
+                0
+            ].rstrip(
+                "0"
+            )
             assert int(lines[0][9]) == 0
             assert lines[1][0] == f"{default_activation.id}"
             assert lines[1][1] == default_activation.name

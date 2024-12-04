@@ -50,7 +50,10 @@ def collect_controllers_info() -> dict:
         inputs = yaml.safe_load(credential.inputs.get_secret_value())
         host = inputs["host"]
         url = f"{host}/api/v2/ping/"
-        verify = str_to_bool(inputs.get("verify_ssl", ""))
+        verify = inputs.get("verify_ssl", False)
+        if isinstance(verify, str):
+            verify = str_to_bool(verify)
+
         token = inputs.get("oauth_token")
 
         controller_info["credential_id"] = credential.id

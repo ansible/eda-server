@@ -22,7 +22,9 @@ class MissingUserPasswordError(Exception):
 
 
 class Package(InsightsAnalyticsPackage):
-    PAYLOAD_CONTENT_TYPE = "application/vnd.redhat.aap-eda.filename+tgz"
+    PAYLOAD_CONTENT_TYPE = (
+        "application/vnd.redhat.aap-event-driven-ansible.filename+tgz"
+    )
     CERT_PATH = settings.INSIGHTS_CERT_PATH
 
     def _tarname_base(self) -> str:
