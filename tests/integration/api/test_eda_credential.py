@@ -1068,3 +1068,29 @@ def test_retrieve_eda_credential_with_empty_encrypted_fields(
     assert "ssh_key_unlock" not in keys
     assert "username" in keys
     assert "password" in keys
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_success(
+    admin_client: APIClient,
+    default_registry_credential,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/"
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    new_credential = response.data
+    assert new_credential["id"] != default_registry_credential.id
+    assert (
+        new_credential["credential_type"]["id"]
+        == default_registry_credential.credential_type.id
+    )
+    assert default_registry_credential.name in new_credential["name"]
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_not_found(
+    admin_client: APIClient,
+):
+    response = admin_client.post(f"{api_url_v1}/eda-credentials/0/copy/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
