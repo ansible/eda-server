@@ -1108,16 +1108,20 @@ def _create_event(data, uuid):
                 "fields": [
                     {"id": "cert", "label": "Certificate", "type": "string"},
                     {"id": "key", "label": "Key", "type": "string"},
+                    {"id": "optional", "label": "Optional", "type": "string"},
                 ]
             },
             {
                 "file": {
                     "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.empty": "",
+                    "template.optional": "{{ optional }}",
                 },
             },
             {
                 "cert": "This is a certificate",
                 "key": "This is a key",
+                "optional": "",
             },
             [
                 {

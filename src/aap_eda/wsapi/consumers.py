@@ -510,18 +510,21 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 if field.get("format") in BINARY_FORMATS:
                     binary_fields.append(field["id"])
 
-            if "file" in injectors:
-                for template, value in injectors["file"].items():
-                    if template in file_template_names:
-                        raise DuplicateFileTemplateKeyError(
-                            f"{template} already exists"
-                        )
-                    file_template_names.append(template)
-                    file_messages.append(
-                        self.get_file_content_message(
-                            template, binary_fields, value, inputs
-                        )
+            for template, value in injectors.get("file", {}).items():
+                if template in file_template_names:
+                    raise DuplicateFileTemplateKeyError(
+                        f"{template} already exists"
                     )
+                message = self.get_file_content_message(
+                    template, binary_fields, value, inputs
+                )
+                if not message:
+                    logger.info(
+                        f"{template} is skipped because its content is empty"
+                    )
+                    continue
+                file_template_names.append(template)
+                file_messages.append(message)
         return file_messages
 
     @database_sync_to_async
@@ -590,12 +593,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     @staticmethod
     def get_file_content_message(
         template: str, binary_fields: list[str], value: str, inputs: dict
-    ) -> FileContentMessage:
+    ) -> tp.Optional[FileContentMessage]:
         binary_file = any(
             attr in binary_fields for attr in extract_variables(value)
         )
 
         contents = str(substitute_variables(value, inputs))
+        if not contents:
+            return None
         if binary_file:
             return FileContentMessage(
                 template_key=template,
