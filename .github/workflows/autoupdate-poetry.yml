@@ -50,7 +50,8 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         if: steps.lock-changed.outputs.lock-changed == 'true'
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # TODO: uses eda-ci pat token, replace with a bot.
+          token: ${{ secrets.EDA_CI_GH_TOKEN }}
           branch: autoupdate-poetry-lock
           base: main
           title: "ci(bot): autoupdate poetry lock file"
