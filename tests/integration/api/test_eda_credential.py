@@ -6,7 +6,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
-from aap_eda.core.utils.credentials import ENCRYPTED_STRING, inputs_to_store
+from aap_eda.core.utils.credentials import (
+    ENCRYPTED_STRING,
+    inputs_to_display,
+    inputs_to_store,
+)
 from tests.integration.conftest import DUMMY_GPG_KEY
 from tests.integration.constants import api_url_v1
 
@@ -1107,6 +1111,10 @@ def test_copy_eda_credential_success(
         == default_registry_credential.credential_type.id
     )
     assert default_registry_credential.name in new_credential["name"]
+    assert new_credential["inputs"] == inputs_to_display(
+        default_registry_credential.credential_type.inputs,
+        default_registry_credential.inputs,
+    )
 
 
 @pytest.mark.django_db
