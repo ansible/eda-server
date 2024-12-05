@@ -32,6 +32,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
+from aap_eda.core.enums import Action
 from aap_eda.core.utils.credentials import (
     build_copy_post_data,
     inputs_to_store,
@@ -79,6 +80,7 @@ class EdaCredentialViewSet(
     )
     filterset_class = filters.EdaCredentialFilter
     ordering_fields = ["name"]
+    rbac_action = None
 
     def filter_queryset(self, queryset):
         if queryset.model is models.EdaCredential:
@@ -293,7 +295,7 @@ class EdaCredentialViewSet(
             ),
         },
     )
-    @action(methods=["post"], detail=True)
+    @action(methods=["post"], detail=True, rbac_action=Action.READ)
     def copy(self, request, pk):
         eda_credential = self.get_object()
         post_data = build_copy_post_data(eda_credential)
