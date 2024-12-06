@@ -42,9 +42,11 @@ kubernetes = "26.1.*"
 podman = "4.9.*"
 rq-scheduler = "^0.10"
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
-    "channel_auth",
+    "channel-auth",
     "rbac",
-    "redis_client",
+    "redis-client",
+    "resource-registry",
+    "jwt-consumer",
 ] }
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
@@ -56,8 +58,8 @@ psycopg = "^3.1.17"
 xxhash = "3.4.*"
 pyjwt = { version = "2.7.*", extras = ["crypto"] }
 ecdsa = "0.18.*"
-distro = "^1.9.0"
 validators = "^0.34.0"
+django-flags = "^5.0.13"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

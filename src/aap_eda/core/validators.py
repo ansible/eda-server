@@ -17,7 +17,6 @@ import re
 import typing as tp
 import urllib
 
-import validators
 import yaml
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -26,6 +25,7 @@ from rest_framework import serializers
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
     check_reserved_keys_in_extra_vars,
+    validate_registry_host_name,
     validate_schema,
 )
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
@@ -72,8 +72,7 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
     # We split the image url on the first slash into the host and path.  The
     # path is further split into a name and tag on the rightmost colon.
     #
-    # THe host portion is validated using the validators package and the path
-    # and tag are validated using the OCI regexes for each.
+    # The path and tag are validated using the OCI regexes for each.
     split = image_url.split("/", 1)
     host = split[0]
     path = split[1] if len(split) > 1 else None
@@ -84,14 +83,11 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url}
         )
 
-    # Yes, validators returns (not throws) an exception if the argument doesn't
-    # pass muster (it returns True otherwise).  Consequently we have to check
-    # the class of the return to know what happened and if it's not validators'
-    # validation exception raise whatever the heck it is.
-    validity = validators.hostname(host)
-    if isinstance(validity, Exception):
-        if not isinstance(validity, validators.ValidationError):
-            raise
+    try:
+        validate_registry_host_name(host)
+    except serializers.ValidationError:
+        # We raise our own instance of this exception in order to assert
+        # control over the format of the message.
         raise serializers.ValidationError(
             _(
                 "Image url %(image_url)s is malformed; "

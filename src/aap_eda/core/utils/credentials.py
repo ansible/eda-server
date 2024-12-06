@@ -14,15 +14,22 @@
 
 import re
 import tempfile
+import typing
 
 import gnupg
 import jinja2
+import validators
 import yaml
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from jinja2.nativetypes import NativeTemplate
+from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
+from aap_eda.core import enums
+
+if typing.TYPE_CHECKING:
+    from aap_eda.core import models
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
@@ -91,7 +98,11 @@ def inputs_from_store(inputs: str) -> dict:
     return yaml.safe_load(inputs)
 
 
-def validate_inputs(schema: dict, inputs: dict) -> dict:
+def validate_inputs(
+    credential_type: "models.CredentialType",
+    schema: dict,
+    inputs: dict,
+) -> dict:
     """Validate user inputs against credential schema.
 
     Sample output:
@@ -147,6 +158,17 @@ def validate_inputs(schema: dict, inputs: dict) -> dict:
                     errors["inputs.ssh_key_unlock"] = result
                 else:
                     errors[display_field] = result
+
+        # We apply particular requirements on "host" when it is
+        # associated with a container registry.
+        if (
+            (credential_type.name == enums.DefaultCredentialType.REGISTRY)
+            and (field == "host")
+            and user_input
+        ):
+            result = _validate_registry_host_name(user_input)
+            if bool(result):
+                errors[display_field] = result
 
         if field == "gpg_public_key":
             result = _validate_gpg_public_key(user_input)
@@ -302,6 +324,27 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
                 errors.append(f"{e}")
 
     return {"injectors": errors} if bool(errors) else {}
+
+
+def validate_registry_host_name(host: str) -> None:
+    errors = _validate_registry_host_name(host)
+    if bool(errors):
+        raise serializers.ValidationError(f"invalid host name: {host}")
+
+
+def _validate_registry_host_name(host: str) -> list[str]:
+    errors = []
+
+    # Yes, validators returns (not throws) an exception if the argument doesn't
+    # pass muster (it returns True otherwise).  Consequently we have to check
+    # the class of the return to know what happened and if it's not validators'
+    # validation exception raise whatever the heck it is.
+    validity = validators.hostname(host)
+    if isinstance(validity, Exception):
+        if not isinstance(validity, validators.ValidationError):
+            raise
+        errors.append("Host format invalid")
+    return errors
 
 
 def _get_id_fields(schema: dict) -> list[str]:

@@ -58,8 +58,8 @@ def test_add_permissions(
 
     url = reverse(f"{get_basename(model)}-list")
     with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
-        response = user_client.post(url, data=post_data)
         prior_ct = model.objects.count()
+        response = user_client.post(url, data=post_data)
         assert response.status_code == 403, response.data
         assert model.objects.count() == prior_ct  # assure nothing was created
 
