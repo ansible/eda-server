@@ -15,18 +15,21 @@
 import re
 import tempfile
 import typing
+from datetime import datetime
 
 import gnupg
 import jinja2
 import validators
 import yaml
 from django.core.exceptions import ValidationError
+from django.forms import model_to_dict
 from django.utils.translation import gettext_lazy as _
 from jinja2.nativetypes import NativeTemplate
 from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
+from aap_eda.core.utils.crypto.base import SecretValue
 
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
@@ -513,3 +516,30 @@ def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
                     "reserved": ", ".join(sorted((RESERVED_EXTRA_VAR_KEYS))),
                 }
             )
+
+
+def build_copy_post_data(eda_credential: "models.EdaCredential") -> dict:
+    """Build a POST payload data from an existing EDA Credential object."""
+    post_data = model_to_dict(eda_credential)
+    # Remove 'id' field from post data
+    post_data.pop("id")
+    # Form a new name for the new credential
+    current_time = datetime.now().strftime("%H:%M:%S")
+    post_data["name"] = " @ ".join([post_data["name"], current_time])
+    # Update foreign key fields
+    post_data["organization_id"] = post_data.pop("organization")
+    post_data["credential_type_id"] = post_data.pop("credential_type")
+    # Decrypt 'inputs' field value for post data
+    if (
+        eda_credential.credential_type
+        and eda_credential.credential_type.inputs
+    ):
+        inputs = (
+            eda_credential.inputs.get_secret_value()
+            if isinstance(eda_credential.inputs, SecretValue)
+            else eda_credential.inputs
+        )
+        decoded_inputs = inputs_from_store(inputs)
+        post_data["inputs"] = decoded_inputs
+
+    return post_data
