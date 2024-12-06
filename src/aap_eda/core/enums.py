@@ -56,9 +56,9 @@ class ResourceType(DjangoStrEnum):
 
 
 class Action(DjangoStrEnum):
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
+    CREATE = "add"
+    READ = "view"
+    UPDATE = "change"
     DELETE = "delete"
     ENABLE = "enable"
     DISABLE = "disable"

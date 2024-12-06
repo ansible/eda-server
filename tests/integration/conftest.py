@@ -856,6 +856,7 @@ def default_registry_credential(
                 "username": "dummy-user",
                 "password": "dummy-password",
                 "host": "quay.io",
+                "verify_ssl": False,
             }
         ),
         organization=default_organization,
