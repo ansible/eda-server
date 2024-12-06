@@ -134,30 +134,7 @@ class EdaCredentialViewSet(
         },
     )
     def create(self, request):
-        serializer = serializers.EdaCredentialCreateSerializer(
-            data=request.data
-        )
-
-        serializer.is_valid(raise_exception=True)
-        serializer.validated_data["inputs"] = inputs_to_store(
-            serializer.validated_data["inputs"]
-        )
-        with transaction.atomic():
-            response = serializer.create(serializer.validated_data)
-            check_related_permissions(
-                request.user,
-                serializer.Meta.model,
-                {},
-                model_to_dict(response),
-            )
-            RoleDefinition.objects.give_creator_permissions(
-                request.user, response
-            )
-
-        return Response(
-            serializers.EdaCredentialSerializer(response).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return self._create_eda_credential(request, request.data)
 
     @extend_schema(
         description="List all EDA credentials",
@@ -299,8 +276,11 @@ class EdaCredentialViewSet(
     def copy(self, request, pk):
         eda_credential = self.get_object()
         post_data = build_copy_post_data(eda_credential)
+        return self._create_eda_credential(request, post_data)
 
-        serializer = serializers.EdaCredentialCreateSerializer(data=post_data)
+    def _create_eda_credential(self, request, data):
+        """Create a new credential object given payload data."""
+        serializer = serializers.EdaCredentialCreateSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.validated_data["inputs"] = inputs_to_store(
             serializer.validated_data["inputs"]
