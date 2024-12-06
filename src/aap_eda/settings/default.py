@@ -362,6 +362,7 @@ if WEBSOCKET_TOKEN_BASE_URL is None:
         "ws://", "http://"
     ).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_SOCKET_TIMEOUT = settings.get("PODMAN_SOCKET_TIMEOUT", None)
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
 PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
