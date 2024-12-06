@@ -174,6 +174,8 @@ def test_engine_start(
 
     engine.client.containers.run.assert_called_once()
     assert models.RulebookProcessLog.objects.count() == 4
+    for log in models.RulebookProcessLog.objects.all():
+        assert log.log_timestamp > 0
     assert models.RulebookProcessLog.objects.last().log.endswith("is running.")
 
 
