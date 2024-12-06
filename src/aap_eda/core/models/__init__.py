@@ -30,14 +30,7 @@ from .job import (
 from .organization import Organization
 from .project import Project
 from .queue import ActivationRequestQueue
-from .rulebook import (
-    AuditAction,
-    AuditEvent,
-    AuditRule,
-    Rule,
-    Rulebook,
-    Ruleset,
-)
+from .rulebook import AuditAction, AuditEvent, AuditRule, Rulebook
 from .rulebook_process import (
     RulebookProcess,
     RulebookProcessLog,
@@ -60,9 +53,7 @@ __all__ = [
     "JobInstance",
     "Job",
     "Project",
-    "Rule",
     "Rulebook",
-    "Ruleset",
     "User",
     "AwxToken",
     "Credential",

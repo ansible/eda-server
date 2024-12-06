@@ -27,10 +27,6 @@ from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
 from aap_eda.core.management.commands import create_initial_data
-from aap_eda.core.management.commands.create_initial_data import (
-    CREDENTIAL_TYPES,
-    populate_credential_types,
-)
 from aap_eda.core.tasking import Queue, get_redis_client
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
@@ -389,48 +385,6 @@ def source_list() -> List[dict]:
             "source": "ansible.eda.range",
         }
     ]
-
-
-@pytest.fixture
-def ruleset_1(
-    default_rulebook: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-1",
-        sources=source_list,
-        rulebook=default_rulebook,
-    )
-
-
-@pytest.fixture
-def ruleset_2(
-    default_rulebook: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-2",
-        sources=source_list,
-        rulebook=default_rulebook,
-    )
-
-
-@pytest.fixture
-def ruleset_3(
-    rulebook_with_job_template: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-3",
-        sources=source_list,
-        rulebook=rulebook_with_job_template,
-    )
-
-
-@pytest.fixture
-def default_rule(ruleset_1: models.Ruleset) -> models.Rule:
-    return models.Rule.objects.create(
-        name="say hello",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset_1,
-    )
 
 
 #################################################################
@@ -1033,14 +987,6 @@ def credential_payload(
         "inputs": {"username": "dummy-user", "password": "dummy-password"},
         "organization_id": default_organization.id,
     }
-
-
-@pytest.fixture
-def preseed_credential_types(
-    default_organization: models.Organization,
-) -> list[models.CredentialType]:
-    """Preseed Credential Types."""
-    return populate_credential_types(CREDENTIAL_TYPES)
 
 
 @pytest.fixture

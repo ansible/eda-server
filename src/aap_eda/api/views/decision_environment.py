@@ -108,7 +108,6 @@ class DecisionEnvironmentViewSet(
     ResponseSerializerMixin,
     CreateDecisionEnvironmentMixin,
     PartialUpdateOnlyDecisionEnvironmentMixin,
-    mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
@@ -140,35 +139,21 @@ class DecisionEnvironmentViewSet(
         },
     )
     def retrieve(self, request, pk):
-        decision_environment = super().retrieve(request, pk)
-        decision_environment.data["eda_credential"] = (
-            models.EdaCredential.objects.get(
-                pk=decision_environment.data["eda_credential_id"]
-            )
-            if decision_environment.data["eda_credential_id"]
-            else None
-        )
-        decision_environment.data["organization"] = (
-            models.Organization.objects.get(
-                pk=decision_environment.data["organization_id"]
-            )
-            if decision_environment.data["organization_id"]
-            else None
-        )
+        decision_environment = self.get_object()
 
         logger.info(
             logging_utils.generate_simple_audit_log(
                 "Read",
                 resource_name,
-                decision_environment.data["name"],
-                decision_environment.data["id"],
-                decision_environment.data["organization"],
+                decision_environment.name,
+                decision_environment.id,
+                decision_environment.organization.name,
             )
         )
 
         return Response(
             serializers.DecisionEnvironmentReadSerializer(
-                decision_environment.data
+                decision_environment
             ).data
         )
 
