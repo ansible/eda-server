@@ -51,6 +51,10 @@ class DBLogger(LogHandler):
         ):
             self.flush()
 
+        # set default value of log_timestamp
+        if log_timestamp == 0:
+            log_timestamp = int(datetime.now().timestamp())
+
         if not isinstance(lines, list):
             lines = [lines]
 
