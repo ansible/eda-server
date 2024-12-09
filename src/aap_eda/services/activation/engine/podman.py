@@ -37,25 +37,28 @@ from .common import (
 LOGGER = logging.getLogger(__name__)
 
 
+def _get_podman_socket_url() -> str:
+    if settings.PODMAN_SOCKET_URL:
+        return settings.PODMAN_SOCKET_URL
+    if os.getuid() == 0:
+        return "unix:///run/podman/podman.sock"
+    xdg_runtime_dir = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    return f"unix://{xdg_runtime_dir}/podman/podman.sock"
+
+
 def get_podman_client() -> PodmanClient:
     """Podman client factory."""
+    params = {}
+    if settings.PODMAN_SOCKET_TIMEOUT:
+        params["timeout"] = settings.PODMAN_SOCKET_TIMEOUT
+    podman_url = _get_podman_socket_url()
+    params["base_url"] = podman_url
+    LOGGER.info(f"Using podman socket: {podman_url}")
     try:
-        podman_url = settings.PODMAN_SOCKET_URL
-        if podman_url:
-            return PodmanClient(base_url=podman_url)
-
-        if os.getuid() == 0:
-            podman_url = "unix:///run/podman/podman.sock"
-        else:
-            xdg_runtime_dir = os.getenv(
-                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-            )
-            podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
-        LOGGER.info(f"Using podman socket: {podman_url}")
-        return PodmanClient(base_url=podman_url)
+        return PodmanClient(**params)
     except ValueError as e:
         LOGGER.error(f"Failed to initialize podman client: f{e}")
-        raise exceptions.ContainerEngineInitError(str(e))
+        raise exceptions.ContainerEngineInitError(str(e)) from e
 
 
 class Engine(ContainerEngine):
