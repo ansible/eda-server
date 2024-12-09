@@ -16,7 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional, Union
+from typing import Optional
 
 import yaml
 from django.conf import settings
@@ -112,15 +112,15 @@ def _update_k8s_service_name(validated_data: dict) -> str:
 
 
 def _extend_extra_vars_from_credentials(
-    validated_data: dict, credential_data: Union[str, Dict]
+    validated_data: dict, extra_vars: dict
 ) -> str:
     if validated_data.get("extra_var"):
         updated_extra_vars = yaml.safe_load(validated_data.get("extra_var"))
-        for key in credential_data.get("extra_vars", []):
-            updated_extra_vars[key] = credential_data["extra_vars"][key]
+        for key, value in extra_vars.items():
+            updated_extra_vars[key] = value
         return yaml.dump(updated_extra_vars)
     else:
-        return yaml.dump(credential_data.get("extra_vars", {}))
+        return yaml.dump(extra_vars)
 
 
 def _update_extra_vars_from_eda_credentials(
@@ -152,6 +152,9 @@ def _update_extra_vars_from_eda_credentials(
         if creating and any(key in user_inputs for key in secret_fields):
             vault_data.password_used = True
 
+        if not injectors or "extra_vars" not in injectors:
+            continue
+
         for key, value in user_inputs.items():
             if key in secret_fields:
                 user_inputs[key] = encrypt_string(
@@ -160,10 +163,12 @@ def _update_extra_vars_from_eda_credentials(
                     vault_id=EDA_SERVER_VAULT_LABEL,
                 )
 
-        data = substitute_variables(injectors, user_inputs)
+        injected_extra_vars = substitute_variables(
+            injectors["extra_vars"], user_inputs
+        )
 
         updated_extra_vars = _extend_extra_vars_from_credentials(
-            validated_data, data
+            validated_data, injected_extra_vars
         )
         # when creating an activation we need to return the updated extra vars
         if creating:
