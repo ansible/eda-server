@@ -288,7 +288,7 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
             f" {sorted(SUPPORTED_KEYS_IN_INJECTORS)}"
         )
 
-    context = _default_context(schema)
+    context = _default_context(schema, injectors)
     key_names = []
     for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
@@ -356,28 +356,29 @@ def _get_id_fields(schema: dict) -> list[str]:
     return [field.get("id") for field in fields if field.get("id")]
 
 
-def _default_context(schema: dict) -> dict:
-    results = {}
+def _default_context(schema: dict, injectors: dict) -> dict:
+    context = {}
 
     fields = schema.get("fields", [])
 
     for field in fields:
         field_type = field.get("type")
         if field_type == "boolean":
-            results[field["id"]] = True
+            context[field["id"]] = True
         else:
-            results[field["id"]] = ""
+            context[field["id"]] = ""
 
         default = field.get("default")
         if default:
-            results[field["id"]] = default
+            context[field["id"]] = default
 
         choices = field.get("choices")
         if choices:
             if isinstance(choices, list):
-                results[field["id"]] = choices[0]
+                context[field["id"]] = choices[0]
 
-    return results
+    _add_file_template_keys(context, injectors.get("file", {}))
+    return context
 
 
 def _check_jinja_string(value: str, context: dict) -> str:
@@ -543,3 +544,22 @@ def build_copy_post_data(eda_credential: "models.EdaCredential") -> dict:
         post_data["inputs"] = decoded_inputs
 
     return post_data
+
+
+def _add_file_template_keys(context: dict, files: dict):
+    for key in files.keys():
+        parts = key.split(".")
+        # case key == "template"
+        if len(parts) == 1:
+            if "eda" in context and "filename" in context["eda"]:
+                continue
+            context["eda"] = {"filename": ""}
+            continue
+
+        # else case key == "template.file1"
+        if "eda" in context and "filename" in context["eda"]:
+            if isinstance(context["eda"]["filename"], str):
+                continue
+            context["eda"]["filename"][parts[1]] = ""
+        else:
+            context["eda"] = {"filename": {parts[1]: ""}}

@@ -739,8 +739,38 @@ def test_create_credential_type_with_file(
                     "name": "{{ name }}",
                     "age": "{{ age }}",
                 },
-                "file": {"template.filename": "Name = {{ name }}"},
-                "env": {"NAME": "{{ name }}", "AGE": "{{ age }}"},
+                "file": {"template": "Name = {{ name }}"},
+                "env": {
+                    "NAME": "{{ name }}",
+                    "AGE": "{{ age }}",
+                    "FNAME": "{{ eda.filename }}",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            "",
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "name", "label": "Name", "type": "string"},
+                    {"id": "age", "label": "Age", "type": "string"},
+                ]
+            },
+            {
+                "extra_vars": {
+                    "name": "{{ name }}",
+                    "age": "{{ age }}",
+                },
+                "file": {
+                    "template.file1": "Name = {{ name }}",
+                    "template.file2": "Age = {{ age }}",
+                },
+                "env": {
+                    "NAME": "{{ eda.filename.file1 }}",
+                    "AGE": "{{ eda.filename.file2 }}",
+                    "FNAME": "X",
+                },
             },
             status.HTTP_201_CREATED,
             "",
