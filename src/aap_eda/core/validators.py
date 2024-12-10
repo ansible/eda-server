@@ -24,8 +24,8 @@ from rest_framework import serializers
 
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
-    validate_registry_host_name,
     check_reserved_keys_in_extra_vars,
+    validate_registry_host_name,
     validate_schema,
 )
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
