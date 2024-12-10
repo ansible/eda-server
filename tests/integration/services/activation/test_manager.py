@@ -747,9 +747,12 @@ def test_start_max_running_activations(
         basic_activation, container_engine_mock
     )
 
-    with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
-        "rq.get_current_job",
-        return_value=job_mock,
+    with (
+        pytest.raises(exceptions.MaxRunningProcessesError),
+        mock.patch(
+            "rq.get_current_job",
+            return_value=job_mock,
+        ),
     ):
         activation_manager.start()
     assert "No capacity to start a new rulebook process" in eda_caplog.text

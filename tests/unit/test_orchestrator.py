@@ -406,9 +406,12 @@ def setup_queue_health():
             "aap_eda.tasks.orchestrator.settings", settings_mock
         ),
     }
-    with patches["get_queue"], patches["datetime"], patches[
-        "timedelta"
-    ], patches["settings"]:
+    with (
+        patches["get_queue"],
+        patches["datetime"],
+        patches["timedelta"],
+        patches["settings"],
+    ):
         yield (
             queue_name,
             queue_mock,

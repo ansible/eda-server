@@ -94,7 +94,7 @@ class EventStream(BaseOrgModel, UniqueNamedModel):
         """Generate the channel name based on the UUID and prefix."""
         return (
             f"{EDA_EVENT_STREAM_CHANNEL_PREFIX}"
-            f"{str(self.uuid).replace('-','_')}"
+            f"{str(self.uuid).replace('-', '_')}"
         )
 
     channel_name = property(_get_channel_name)

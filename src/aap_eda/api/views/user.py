@@ -197,9 +197,11 @@ class CurrentUserAwxTokenViewSet(
     ),
     partial_update=extend_schema(
         description="Partial update of a user.",
-        request=serializers.UserCreateUpdateSerializer
-        if settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT
-        else serializers.UserUpdateIsSuperuserSerializer,
+        request=(
+            serializers.UserCreateUpdateSerializer
+            if settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT
+            else serializers.UserUpdateIsSuperuserSerializer
+        ),
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.UserDetailSerializer,
