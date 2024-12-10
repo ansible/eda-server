@@ -19,8 +19,6 @@ from .base import BaseOrgModel
 
 __all__ = (
     "Rulebook",
-    "Ruleset",
-    "Rule",
     "AuditRule",
 )
 
@@ -60,30 +58,6 @@ class Rulebook(BaseOrgModel):
                     f" {self.id} - {self.name}: Error: {e}"
                 )
             )
-
-
-class Ruleset(models.Model):
-    class Meta:
-        db_table = "core_ruleset"
-        unique_together = ["rulebook_id", "name"]
-
-    name = models.TextField(null=False)
-    sources = models.JSONField(default=dict)
-    rulebook = models.ForeignKey(
-        "Rulebook", on_delete=models.CASCADE, null=True
-    )
-    created_at = models.DateTimeField(auto_now_add=True, null=False)
-    modified_at = models.DateTimeField(auto_now=True, null=False)
-
-
-class Rule(models.Model):
-    class Meta:
-        db_table = "core_rule"
-        unique_together = ["ruleset", "name"]
-
-    ruleset = models.ForeignKey("Ruleset", on_delete=models.CASCADE, null=True)
-    name = models.TextField(null=False)
-    action = models.JSONField(default=dict, null=False)
 
 
 class AuditRule(BaseOrgModel):

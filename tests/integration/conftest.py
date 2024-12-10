@@ -387,48 +387,6 @@ def source_list() -> List[dict]:
     ]
 
 
-@pytest.fixture
-def ruleset_1(
-    default_rulebook: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-1",
-        sources=source_list,
-        rulebook=default_rulebook,
-    )
-
-
-@pytest.fixture
-def ruleset_2(
-    default_rulebook: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-2",
-        sources=source_list,
-        rulebook=default_rulebook,
-    )
-
-
-@pytest.fixture
-def ruleset_3(
-    rulebook_with_job_template: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-3",
-        sources=source_list,
-        rulebook=rulebook_with_job_template,
-    )
-
-
-@pytest.fixture
-def default_rule(ruleset_1: models.Ruleset) -> models.Rule:
-    return models.Rule.objects.create(
-        name="say hello",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset_1,
-    )
-
-
 #################################################################
 # Activations and Activation Instances
 #################################################################

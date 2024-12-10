@@ -907,25 +907,6 @@ def _prepare_db_data(
         organization=default_organization,
     )
 
-    ruleset, _ = models.Ruleset.objects.get_or_create(
-        name="ruleset",
-        sources=[
-            {
-                "name": "<unnamed>",
-                "type": "range",
-                "config": {"limit": 5},
-                "source": "ansible.eda.range",
-            }
-        ],
-        rulebook=rulebook,
-    )
-
-    rule, _ = models.Rule.objects.get_or_create(
-        name="rule",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset,
-    )
-
     return rulebook_process.id
 
 

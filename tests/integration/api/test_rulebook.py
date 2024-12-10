@@ -518,8 +518,6 @@ def test_delete_project_and_rulebooks(
     default_project: models.Project,
     default_activation: models.Activation,
     default_rulebook: models.Rulebook,
-    ruleset_1: models.Ruleset,
-    default_rule: models.Rule,
     admin_client: APIClient,
 ):
     response = admin_client.delete(
@@ -531,5 +529,3 @@ def test_delete_project_and_rulebooks(
     assert activation.rulebook is None
     assert not models.Project.objects.filter(id=default_project.id).exists()
     assert not models.Rulebook.objects.filter(id=default_rulebook.id).exists()
-    assert not models.Ruleset.objects.filter(id=ruleset_1.id).exists()
-    assert not models.Rule.objects.filter(id=default_rule.id).exists()
