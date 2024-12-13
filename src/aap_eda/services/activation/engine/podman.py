@@ -48,9 +48,7 @@ def _get_podman_socket_url() -> str:
 
 def get_podman_client() -> PodmanClient:
     """Podman client factory."""
-    params = {}
-    if settings.PODMAN_SOCKET_TIMEOUT:
-        params["timeout"] = settings.PODMAN_SOCKET_TIMEOUT
+    params = {"timeout": settings.PODMAN_SOCKET_TIMEOUT}
     podman_url = _get_podman_socket_url()
     params["base_url"] = podman_url
     LOGGER.info(f"Using podman socket: {podman_url}")
