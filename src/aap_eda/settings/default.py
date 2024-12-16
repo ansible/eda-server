@@ -194,6 +194,7 @@ INSTALLED_APPS = [
     "ansible_base.rbac",
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
+    "ansible_base.rest_filters",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
