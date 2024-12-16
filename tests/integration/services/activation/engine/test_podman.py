@@ -39,7 +39,12 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerStartError,
     ContainerUpdateLogsError,
 )
-from aap_eda.services.activation.engine.podman import Engine, get_podman_client
+from aap_eda.services.activation.engine.podman import (
+    Engine,
+    _get_podman_socket_url,
+    get_podman_client,
+)
+from aap_eda.settings.default import settings as orig_dynaconf_settings
 
 from .utils import InitData, get_ansible_rulebook_cmdline, get_request
 
@@ -102,6 +107,62 @@ def podman_engine(init_podman_data):
         )
 
         yield engine
+
+
+def test_podman_socket_url_from_settings(settings):
+    """Test when PODMAN_SOCKET_URL is set in settings."""
+    settings.PODMAN_SOCKET_URL = "custom_socket_url"
+    result = _get_podman_socket_url()
+    assert result == "custom_socket_url"
+
+
+def test_podman_socket_url_as_root(settings):
+    """Test when the user is root (uid=0)."""
+    settings.PODMAN_SOCKET_URL = None
+    with mock.patch("os.getuid", return_value=0):
+        result = _get_podman_socket_url()
+        assert result == "unix:///run/podman/podman.sock"
+
+
+def test_podman_socket_url_non_root_with_xdg_runtime_dir(settings):
+    """Test for a non-root user with XDG_RUNTIME_DIR set."""
+    settings.PODMAN_SOCKET_URL = None
+    with mock.patch("os.getuid", return_value=1000), mock.patch(
+        "os.getenv",
+        return_value="/custom/runtime/dir",
+    ):
+        result = _get_podman_socket_url()
+        assert result == "unix:///custom/runtime/dir/podman/podman.sock"
+
+
+@mock.patch.dict(os.environ, clear=True)
+def test_podman_socket_url_non_root_without_xdg_runtime_dir(settings):
+    """Test for a non-root user without XDG_RUNTIME_DIR set."""
+    settings.PODMAN_SOCKET_URL = None
+    with mock.patch("os.getuid", return_value=1000):
+        result = _get_podman_socket_url()
+        assert result == "unix:///run/user/1000/podman/podman.sock"
+
+
+def test_get_podman_client_with_timeout(settings):
+    """Test setting the timeout for the Podman client."""
+    settings.PODMAN_SOCKET_TIMEOUT = 10
+    client = get_podman_client()
+    assert client.api.timeout == 10
+
+
+def test_get_podman_client_with_zero_timeout():
+    """Test setting the timeout for the Podman client to zero."""
+    with mock.patch("aap_eda.settings.default.settings.get") as get_mock:
+
+        def get_side_effect(*args, **kwargs):
+            if args[0] == "PODMAN_SOCKET_TIMEOUT":
+                return 0
+            return orig_dynaconf_settings.get(*args, **kwargs)
+
+        get_mock.side_effect = get_side_effect
+        client = get_podman_client()
+        assert client.api.timeout is None
 
 
 def test_get_podman_client(settings):
