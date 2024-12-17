@@ -97,28 +97,22 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
     def to_representation(self, decision_environment):
         eda_credential = (
             EdaCredentialRefSerializer(
-                decision_environment["eda_credential"]
+                decision_environment.eda_credential
             ).data
-            if decision_environment["eda_credential"]
+            if decision_environment.eda_credential
             else None
         )
         organization = (
-            OrganizationRefSerializer(
-                decision_environment["organization"]
-            ).data
-            if decision_environment["organization"]
+            OrganizationRefSerializer(decision_environment.organization).data
+            if decision_environment.organization
             else None
         )
-        return {
-            "id": decision_environment["id"],
-            "name": decision_environment["name"],
-            "description": decision_environment["description"],
-            "image_url": decision_environment["image_url"],
+        result = super().to_representation(decision_environment)
+        result |= {
             "organization": organization,
             "eda_credential": eda_credential,
-            "created_at": decision_environment["created_at"],
-            "modified_at": decision_environment["modified_at"],
         }
+        return result
 
 
 class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):

@@ -1,3 +1,4 @@
+import base64
 import uuid
 from typing import Generator
 from unittest.mock import patch
@@ -45,8 +46,8 @@ AAP_INPUTS = {
     "host": "https://eda_controller_url",
     "username": "adam",
     "password": "secret",
-    "ssl_verify": "no",
     "oauth_token": "",
+    "verify_ssl": False,
 }
 
 
@@ -117,10 +118,12 @@ async def test_handle_workers_with_eda_system_vault_credential(
     preseed_credential_types,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = (
-        await _prepare_activation_instance_with_eda_system_vault_credential(
-            default_organization,
-        )
+    credential = await _prepare_system_vault_credential_async(
+        default_organization
+    )
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [credential],
     )
 
     payload = {
@@ -163,6 +166,8 @@ async def test_handle_workers_with_controller_info(
     for type in [
         "Rulebook",
         "ControllerInfo",
+        "VaultCollection",
+        "EnvVars",
         "EndOfResponse",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
@@ -171,8 +176,12 @@ async def test_handle_workers_with_controller_info(
             assert response["url"] == AAP_INPUTS["host"]
             assert response["username"] == AAP_INPUTS["username"]
             assert response["password"] == AAP_INPUTS["password"]
-            assert response["ssl_verify"] == AAP_INPUTS["ssl_verify"]
+            assert (response["ssl_verify"] == "yes") is AAP_INPUTS[
+                "verify_ssl"
+            ]
             assert response["token"] == AAP_INPUTS["oauth_token"]
+        elif type == "EnvVars":
+            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -726,8 +735,9 @@ def get_job_instance_event_count():
 
 
 @database_sync_to_async
-def _prepare_activation_instance_with_eda_system_vault_credential(
+def _prepare_activation_instance_with_credentials(
     default_organization: models.Organization,
+    credentials: list[models.EdaCredential],
 ):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
@@ -757,18 +767,6 @@ def _prepare_activation_instance_with_eda_system_vault_credential(
         email="luke.skywalker@example.com",
         password="secret",
     )
-    vault_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.VAULT
-    )
-
-    credential = models.EdaCredential.objects.create(
-        name="eda_credential",
-        inputs={"vault_id": "adam", "vault_password": "secret"},
-        managed=False,
-        credential_type=vault_credential_type,
-        organization=default_organization,
-    )
-
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy=enums.RestartPolicy.ALWAYS,
@@ -778,7 +776,7 @@ def _prepare_activation_instance_with_eda_system_vault_credential(
         decision_environment=decision_environment,
         organization=default_organization,
     )
-    activation.eda_credentials.add(credential)
+    activation.eda_credentials.add(*credentials)
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
@@ -833,6 +831,8 @@ def _prepare_activation_with_controller_info(
         organization=default_organization,
     )
 
+    system_credential = _prepare_system_vault_credential(default_organization)
+
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy=enums.RestartPolicy.ALWAYS,
@@ -841,6 +841,7 @@ def _prepare_activation_with_controller_info(
         user=user,
         decision_environment=decision_environment,
         organization=default_organization,
+        eda_system_vault_credential=system_credential,
     )
     activation.eda_credentials.add(credential)
 
@@ -905,25 +906,6 @@ def _prepare_db_data(
         activation=activation,
         status=status,
         organization=default_organization,
-    )
-
-    ruleset, _ = models.Ruleset.objects.get_or_create(
-        name="ruleset",
-        sources=[
-            {
-                "name": "<unnamed>",
-                "type": "range",
-                "config": {"limit": 5},
-                "source": "ansible.eda.range",
-            }
-        ],
-        rulebook=rulebook,
-    )
-
-    rule, _ = models.Rule.objects.get_or_create(
-        name="rule",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset,
     )
 
     return rulebook_process.id
@@ -1111,3 +1093,190 @@ def _create_event(data, uuid):
         },
         "i": data,
     }
+
+
+@pytest.mark.parametrize(
+    (
+        "credential_type_inputs",
+        "credential_type_injectors",
+        "credential_inputs",
+        "file_contents",
+    ),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                    {"id": "optional", "label": "Optional", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.empty": "",
+                    "template.optional": "{{ optional }}",
+                },
+            },
+            {
+                "cert": "This is a certificate",
+                "key": "This is a key",
+                "optional": "",
+            },
+            [
+                {
+                    "data": base64.b64encode(
+                        "[mycert]\nThis is a certificate".encode()
+                    ).decode(),
+                    "template_key": "template.cert_file",
+                },
+            ],
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "fdata", "label": "File Data", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.myfile": "{{ fdata }}",
+                },
+            },
+            {"fdata": "{'x':[{'name': 'Fred'}]}"},
+            [
+                {
+                    "data": base64.b64encode(
+                        "{'x': [{'name': 'Fred'}]}".encode()
+                    ).decode(),
+                    "template_key": "template.myfile",
+                },
+            ],
+        ),
+        (
+            {},
+            {
+                "file": {
+                    "template.other_file": "abc",
+                },
+            },
+            {},
+            [
+                {
+                    "data": base64.b64encode("abc".encode()).decode(),
+                    "template_key": "template.other_file",
+                },
+            ],
+        ),
+        (
+            {
+                "fields": [
+                    {
+                        "id": "keytab",
+                        "label": "KeyTab",
+                        "format": "binary_base64",
+                        "secret": True,
+                    },
+                ]
+            },
+            {
+                "file": {
+                    "template.keytab_file": "{{ keytab }}",
+                },
+            },
+            {
+                "keytab": base64.b64encode(bytes([1, 2, 3, 4, 5])).decode(),
+            },
+            [
+                {
+                    "data": base64.b64encode(bytes([1, 2, 3, 4, 5])).decode(),
+                    "template_key": "template.keytab_file",
+                    "data_format": "binary",
+                },
+            ],
+        ),
+    ],
+)
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_file_contents(
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    default_organization: models.Organization,
+    credential_type_inputs: dict[str, any],
+    credential_type_injectors: dict[str, any],
+    credential_inputs: dict[str, any],
+    file_contents: list[dict[str, any]],
+):
+    eda_credential = await _prepare_credential(
+        credential_type_inputs,
+        credential_type_injectors,
+        credential_inputs,
+        default_organization,
+    )
+
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [eda_credential],
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+    check_data = [("Rulebook", None)]
+    for fc in file_contents:
+        check_data.append(("FileContents", fc))
+    check_data.append(("EndOfResponse", None))
+
+    for type, data in check_data:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if data:
+            for key, value in data.items():
+                assert response[key] == value
+
+
+@database_sync_to_async
+def _prepare_credential(
+    credential_type_inputs: dict,
+    credential_type_injectors: dict,
+    credential_inputs: dict,
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential_type = models.CredentialType.objects.create(
+        name="sample_credential_type",
+        inputs=credential_type_inputs,
+        injectors=credential_type_injectors,
+    )
+
+    return models.EdaCredential.objects.create(
+        name="sample_eda_credential",
+        inputs=credential_inputs,
+        managed=False,
+        credential_type=credential_type,
+        organization=default_organization,
+    )
+
+
+@database_sync_to_async
+def _prepare_system_vault_credential_async(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    return _prepare_system_vault_credential(organization)
+
+
+def _prepare_system_vault_credential(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    vault_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.VAULT
+    )
+
+    return models.EdaCredential.objects.create(
+        name="eda_system_credential",
+        inputs={"vault_id": "adam", "vault_password": "secret"},
+        managed=False,
+        credential_type=vault_credential_type,
+        organization=organization,
+    )

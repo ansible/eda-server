@@ -115,23 +115,16 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     inputs = serializers.JSONField()
 
     def validate(self, data):
-        credential_type_id = data.get("credential_type_id")
-        if credential_type_id:
-            credential_type = models.CredentialType.objects.get(
-                id=credential_type_id
-            )
-        else:
-            # for update
-            credential_type = self.instance.credential_type
+        credential_type = models.CredentialType.objects.get(
+            id=data.get("credential_type_id")
+        )
 
         inputs = data.get("inputs", {})
-
-        # allow emtpy inputs during updating
-        if self.partial and not bool(inputs):
-            return data
-
-        errors = validate_inputs(credential_type.inputs, inputs)
-
+        errors = validate_inputs(
+            credential_type,
+            credential_type.inputs,
+            inputs,
+        )
         if bool(errors):
             raise serializers.ValidationError(errors)
 
@@ -144,6 +137,42 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
             "description",
             "inputs",
             "credential_type_id",
+            "organization_id",
+        ]
+
+
+class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
+    organization_id = serializers.IntegerField(
+        required=True,
+        allow_null=False,
+        validators=[validators.check_if_organization_exists],
+    )
+    inputs = serializers.JSONField()
+
+    def validate(self, data):
+        credential_type = self.instance.credential_type
+
+        inputs = data.get("inputs", {})
+        # allow empty inputs during updating
+        if self.partial and not bool(inputs):
+            return data
+
+        errors = validate_inputs(
+            credential_type,
+            credential_type.inputs,
+            inputs,
+        )
+        if bool(errors):
+            raise serializers.ValidationError(errors)
+
+        return data
+
+    class Meta:
+        model = models.EdaCredential
+        fields = [
+            "name",
+            "description",
+            "inputs",
             "organization_id",
         ]
 

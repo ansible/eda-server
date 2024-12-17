@@ -16,7 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional, Union
+from typing import Optional
 
 import yaml
 from django.conf import settings
@@ -112,15 +112,15 @@ def _update_k8s_service_name(validated_data: dict) -> str:
 
 
 def _extend_extra_vars_from_credentials(
-    validated_data: dict, credential_data: Union[str, Dict]
+    validated_data: dict, extra_vars: dict
 ) -> str:
     if validated_data.get("extra_var"):
         updated_extra_vars = yaml.safe_load(validated_data.get("extra_var"))
-        for key in credential_data.get("extra_vars", []):
-            updated_extra_vars[key] = credential_data["extra_vars"][key]
+        for key, value in extra_vars.items():
+            updated_extra_vars[key] = value
         return yaml.dump(updated_extra_vars)
     else:
-        return yaml.dump(credential_data["extra_vars"])
+        return yaml.dump(extra_vars)
 
 
 def _update_extra_vars_from_eda_credentials(
@@ -131,6 +131,12 @@ def _update_extra_vars_from_eda_credentials(
 ) -> None:
     for eda_credential_id in validated_data["eda_credentials"]:
         eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
+        if (
+            creating
+            and eda_credential.credential_type.name
+            == DefaultCredentialType.AAP
+        ):
+            vault_data.password_used = True
         if eda_credential.credential_type.name in [
             DefaultCredentialType.VAULT,
             DefaultCredentialType.AAP,
@@ -143,9 +149,11 @@ def _update_extra_vars_from_eda_credentials(
 
         user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
 
-        if any(key in user_inputs for key in secret_fields):
-            if creating:
-                vault_data.password_used = True
+        if creating and any(key in user_inputs for key in secret_fields):
+            vault_data.password_used = True
+
+        if not injectors or "extra_vars" not in injectors:
+            continue
 
         for key, value in user_inputs.items():
             if key in secret_fields:
@@ -155,10 +163,12 @@ def _update_extra_vars_from_eda_credentials(
                     vault_id=EDA_SERVER_VAULT_LABEL,
                 )
 
-        data = substitute_variables(injectors, user_inputs)
+        injected_extra_vars = substitute_variables(
+            injectors["extra_vars"], user_inputs
+        )
 
         updated_extra_vars = _extend_extra_vars_from_credentials(
-            validated_data, data
+            validated_data, injected_extra_vars
         )
         # when creating an activation we need to return the updated extra vars
         if creating:
@@ -878,14 +888,16 @@ def _validate_eda_credentials(data: dict) -> None:
     if eda_credential_ids is None:
         return
 
-    existing_keys = []
+    existing_extra_var_keys = []
+    existing_env_var_keys = []
+    existing_file_keys = []
     extra_var = data.get("extra_var")
 
     try:
         vault = _get_vault_credential_type()
         if extra_var:
             existing_data = yaml.safe_load(extra_var)
-            existing_keys = [*existing_data.keys()]
+            existing_extra_var_keys = [*existing_data.keys()]
     except models.CredentialType.DoesNotExist:
         raise serializers.ValidationError(
             f"CredentialType with name '{DefaultCredentialType.VAULT}'"
@@ -901,19 +913,11 @@ def _validate_eda_credentials(data: dict) -> None:
             if eda_credential.credential_type.id == vault.id:
                 continue
 
-            injectors = eda_credential.credential_type.injectors
-
-            for key in injectors.get("extra_vars", []):
-                if key in existing_keys:
-                    message = (
-                        f"Key: {key} already exists in extra var. "
-                        f"It conflicts with credential type: "
-                        f"{eda_credential.credential_type.name}. "
-                        f"Please check injectors."
-                    )
-                    raise serializers.ValidationError(message)
-
-                existing_keys.append(key)
+            _check_injectors(
+                eda_credential, existing_extra_var_keys, "extra_vars"
+            )
+            _check_injectors(eda_credential, existing_file_keys, "file")
+            _check_injectors(eda_credential, existing_env_var_keys, "env")
         except models.EdaCredential.DoesNotExist:
             raise serializers.ValidationError(
                 f"EdaCredential with id {eda_credential_id} does not exist"
@@ -1088,3 +1092,22 @@ def _check_duplicate_names(
             f"{', '.join(duplicate_names)} are being used multiple times"
         )
         raise serializers.ValidationError({SOURCE_MAPPING_ERROR_KEY: [msg]})
+
+
+def _check_injectors(
+    eda_credential: models.EdaCredential,
+    existing_keys: list[str],
+    injector_type: str,
+) -> None:
+    injectors = eda_credential.credential_type.injectors
+    for key in injectors.get(injector_type, []):
+        if key in existing_keys:
+            message = (
+                f"Key: {key} already exists in {injector_type}. "
+                f"It conflicts with credential type: "
+                f"{eda_credential.credential_type.name}. "
+                f"Please check injectors."
+            )
+            raise serializers.ValidationError(message)
+
+        existing_keys.append(key)

@@ -6,7 +6,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
-from aap_eda.core.utils.credentials import ENCRYPTED_STRING, inputs_to_store
+from aap_eda.core.utils.credentials import (
+    ENCRYPTED_STRING,
+    inputs_to_display,
+    inputs_to_store,
+)
 from tests.integration.conftest import DUMMY_GPG_KEY
 from tests.integration.constants import api_url_v1
 
@@ -204,6 +208,67 @@ def test_create_eda_credential_with_gpg_key_data(
     if response.data.get("inputs.gpg_public_key"):
         message = response.data.get("inputs.gpg_public_key")[0]
         assert message.startswith(status_message)
+
+
+@pytest.mark.parametrize(
+    ("status_code", "hostname"),
+    [
+        (
+            status.HTTP_201_CREATED,
+            "validname",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "valid-name",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "valid.name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "invalid name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "invalid/name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "invalid@name",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "https://invalid.name",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_registry_eda_credential_with_various_host_names(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    status_code,
+    hostname,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+
+    data_in = {
+        "name": f"eda-credential-{credential_type}",
+        "inputs": {
+            "host": hostname,
+        },
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+    assert response.status_code == status_code
+    if status_code == status.HTTP_400_BAD_REQUEST:
+        assert "Host format invalid" in response.data["inputs.host"]
 
 
 @pytest.mark.parametrize(
@@ -500,6 +565,32 @@ def test_partial_update_eda_credential_with_invalid_inputs(
     )
 
 
+@pytest.mark.django_db
+def test_partial_update_eda_credential_type_not_changed(
+    admin_client: APIClient,
+    default_registry_credential: models.EdaCredential,
+    preseed_credential_types,
+):
+    aap_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    data = {"credential_type_id": aap_cred_type.id}
+    response = admin_client.patch(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    result = response.data
+    assert (
+        result["credential_type"]["id"]
+        == default_registry_credential.credential_type.id
+    )
+    assert (
+        result["credential_type"]["name"]
+        == default_registry_credential.credential_type.name
+    )
+
+
 @pytest.mark.parametrize(
     ("credential_type", "old_inputs", "inputs", "expected_inputs"),
     [
@@ -525,11 +616,11 @@ def test_partial_update_eda_credential_with_invalid_inputs(
                 "verify_ssl": True,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "verify_ssl": False,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "user name",
                 "password": ENCRYPTED_STRING,
                 "oauth_token": ENCRYPTED_STRING,
@@ -579,12 +670,12 @@ def test_partial_update_eda_credential_with_invalid_inputs(
                 "verify_ssl": True,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "verify_ssl": False,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "password": ENCRYPTED_STRING,
                 "verify_ssl": False,
@@ -599,12 +690,12 @@ def test_partial_update_eda_credential_with_invalid_inputs(
                 "verify_ssl": True,
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "password": "password",
             },
             {
-                "host": "new host",
+                "host": "new-host",
                 "username": "new user name",
                 "password": ENCRYPTED_STRING,
                 "verify_ssl": True,
@@ -981,3 +1072,54 @@ def test_retrieve_eda_credential_with_empty_encrypted_fields(
     assert "ssh_key_unlock" not in keys
     assert "username" in keys
     assert "password" in keys
+
+
+@pytest.mark.django_db
+def test_custom_credential_type_empty_inputs(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    injectors = {"extra_vars": {"abc": "123"}}
+    credential_type = models.CredentialType.objects.create(
+        name="demo_type", inputs={}, injectors=injectors
+    )
+    data = {
+        "name": "demo-credential",
+        "inputs": {},
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(f"{api_url_v1}/eda-credentials/", data=data)
+    assert response.status_code == status.HTTP_201_CREATED
+    result = response.data
+    assert result["name"] == "demo-credential"
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_success(
+    admin_client: APIClient,
+    default_registry_credential,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/"
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    new_credential = response.data
+    assert new_credential["id"] != default_registry_credential.id
+    assert (
+        new_credential["credential_type"]["id"]
+        == default_registry_credential.credential_type.id
+    )
+    assert default_registry_credential.name in new_credential["name"]
+    assert new_credential["inputs"] == inputs_to_display(
+        default_registry_credential.credential_type.inputs,
+        default_registry_credential.inputs,
+    )
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_not_found(
+    admin_client: APIClient,
+):
+    response = admin_client.post(f"{api_url_v1}/eda-credentials/0/copy/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND

@@ -40,12 +40,6 @@ class ScmError(Exception):
     pass
 
 
-class ScmEmptyError(ScmError):
-    """The checkout repository is empty which is treated as an error."""
-
-    pass
-
-
 class ScmAuthenticationError(Exception):
     """SCM Authentication error."""
 
@@ -289,10 +283,6 @@ class ScmRepository:
 
 class GitAnsibleRunnerExecutor:
     ERROR_PREFIX = "Project Import Error:"
-    PROJECT_EMPTY_ERROR_MSG = (
-        "Project folder is empty. Please add "
-        "content to your project and try syncing it again."
-    )
 
     def __call__(
         self,
@@ -330,9 +320,5 @@ class GitAnsibleRunnerExecutor:
                 ):
                     err_msg = "Credentials not provided or incorrect"
                     raise ScmAuthenticationError(err_msg)
-                if "did not match any file" in err_msg and err_msg.startswith(
-                    '"Failed to checkout branch'
-                ):
-                    raise ScmEmptyError(self.PROJECT_EMPTY_ERROR_MSG)
                 raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
             raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")

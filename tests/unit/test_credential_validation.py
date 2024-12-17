@@ -16,6 +16,7 @@ from unittest import mock
 
 import pytest
 
+from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
     PROTECTED_PASSPHRASE_ERROR,
     SUPPORTED_KEYS_IN_INJECTORS,
@@ -38,15 +39,6 @@ def test_validate_schema():
 
     errors = validate_schema(bad_schema_format)
     assert "schema must be in dict format" in errors
-
-    no_fields_schema = {
-        "id": "username",
-        "label": "Username",
-        "type": "string",
-    }
-
-    errors = validate_schema(no_fields_schema)
-    assert "'fields' must exist and non empty" in errors
 
     eda_prefix_id_schema = {
         "fields": [
@@ -285,7 +277,8 @@ def test_validate_schema():
     assert "Duplicate fields: {'host'} found" in errors
 
 
-def test_validate_inputs():
+@pytest.mark.django_db
+def test_validate_inputs(aap_credential_type):
     schema = {
         "fields": [
             {
@@ -346,7 +339,9 @@ def test_validate_inputs():
         "password": "secret",
     }
 
-    errors = validate_inputs(schema, missing_required_inputs)
+    errors = validate_inputs(
+        aap_credential_type, schema, missing_required_inputs
+    )
     assert "Cannot be blank" in [*errors.values()][0]
 
     use_default_inputs = {
@@ -354,35 +349,35 @@ def test_validate_inputs():
         "username": "adam",
         "password": "secret",
     }
-    errors = validate_inputs(schema, use_default_inputs)
+    errors = validate_inputs(aap_credential_type, schema, use_default_inputs)
     assert use_default_inputs["verify_ssl"] is True
 
     good_boolean_inputs = {
         "host": "localhost",
         "verify_ssl": True,
     }
-    errors = validate_inputs(schema, good_boolean_inputs)
+    errors = validate_inputs(aap_credential_type, schema, good_boolean_inputs)
     assert errors == {}
 
     bad_boolean_inputs = {
         "host": "localhost",
         "verify_ssl": "secret",
     }
-    errors = validate_inputs(schema, bad_boolean_inputs)
+    errors = validate_inputs(aap_credential_type, schema, bad_boolean_inputs)
     assert "Must be a boolean" in [*errors.values()][0]
 
     good_choices_inputs = {
         "host": "localhost",
         "security_protocol": "PLAINTEXT",
     }
-    errors = validate_inputs(schema, good_choices_inputs)
+    errors = validate_inputs(aap_credential_type, schema, good_choices_inputs)
     assert errors == {}
 
     bad_choices_inputs = {
         "host": "localhost",
         "security_protocol": "TEST",
     }
-    errors = validate_inputs(schema, bad_choices_inputs)
+    errors = validate_inputs(aap_credential_type, schema, bad_choices_inputs)
     assert [*errors.values()][0][0].startswith("Must be one of the choices")
 
 
@@ -433,14 +428,13 @@ def test_validate_injectors():
     bad_injectors = {"name": "fred"}
     errors = validate_injectors(inputs, bad_injectors)
     assert (
-        f"Injectors must have keys defined in {SUPPORTED_KEYS_IN_INJECTORS}"
-        in errors["injectors"]
+        "Injectors must have keys defined in "
+        f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}" in errors["injectors"]
     )
 
-    for key in SUPPORTED_KEYS_IN_INJECTORS:
-        valid_injectors = {key: {"name": "fred"}}
-        errors = validate_injectors(inputs, valid_injectors)
-        assert errors == {}
+    valid_injectors = {"extra_vars": {"username": "fred"}}
+    errors = validate_injectors(inputs, valid_injectors)
+    assert errors == {}
 
 
 @pytest.mark.parametrize(
@@ -452,7 +446,8 @@ def test_validate_injectors():
         (None, DATA_DIR / "demo2", True),
     ],
 )
-def test_validate_ssh_keys(phrase, key_file, decision):
+@pytest.mark.django_db
+def test_validate_ssh_keys(phrase, key_file, decision, aap_credential_type):
     if key_file:
         with open(key_file) as f:
             data = f.read()
@@ -483,7 +478,7 @@ def test_validate_ssh_keys(phrase, key_file, decision):
     if phrase:
         inputs["ssh_key_unlock"] = phrase
 
-    errors = validate_inputs(schema, inputs)
+    errors = validate_inputs(aap_credential_type, schema, inputs)
 
     if decision:
         assert errors == {}
@@ -496,7 +491,8 @@ def test_validate_ssh_keys(phrase, key_file, decision):
                 assert key == "inputs.ssh_key_data"
 
 
-def test_validate_ssh_keys_without_phrase():
+@pytest.mark.django_db
+def test_validate_ssh_keys_without_phrase(aap_credential_type):
     schema = {
         "fields": [
             {
@@ -516,7 +512,7 @@ def test_validate_ssh_keys_without_phrase():
         data = f.read()
 
     inputs = {"ssh_key_data": data}
-    errors = validate_inputs(schema, inputs)
+    errors = validate_inputs(aap_credential_type, schema, inputs)
     assert errors == {}
 
 
@@ -528,7 +524,8 @@ def test_validate_ssh_keys_without_phrase():
         (DATA_DIR / "invalid_key.asc", "No valid GPG data found"),
     ],
 )
-def test_validate_gpg_keys(key_file, status_message):
+@pytest.mark.django_db
+def test_validate_gpg_keys(key_file, status_message, aap_credential_type):
     with open(key_file) as f:
         data = f.read()
 
@@ -548,7 +545,7 @@ def test_validate_gpg_keys(key_file, status_message):
     }
     inputs = {"gpg_public_key": data}
 
-    errors = validate_inputs(schema, inputs)
+    errors = validate_inputs(aap_credential_type, schema, inputs)
 
     if errors.get("inputs.gpg_public_key"):
         message = errors.get("inputs.gpg_public_key")[0]
@@ -556,7 +553,10 @@ def test_validate_gpg_keys(key_file, status_message):
 
 
 @mock.patch("gnupg.GPG")
-def test_validate_gpg_keys_with_exceptions(mock_gpg: mock.Mock):
+@pytest.mark.django_db
+def test_validate_gpg_keys_with_exceptions(
+    mock_gpg: mock.Mock, aap_credential_type
+):
     def raise_exception(*args, **kwargs):
         raise OSError("Unable to run gpg")
 
@@ -578,8 +578,57 @@ def test_validate_gpg_keys_with_exceptions(mock_gpg: mock.Mock):
     }
     inputs = {"gpg_public_key": "corrupted_data"}
 
-    errors = validate_inputs(schema, inputs)
+    errors = validate_inputs(aap_credential_type, schema, inputs)
 
     assert errors.get("inputs.gpg_public_key")[0].startswith(
         "Failed to validate GPG key: Unable to run gpg"
     )
+
+
+@pytest.mark.django_db
+def test_validate_registry_host_name(aap_credential_type):
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+
+    schema = {
+        "fields": [
+            {
+                "id": "host",
+                "type": "string",
+                "label": "Authentication URL",
+                "default": "quay.io",
+                "help_text": (
+                    "Authentication endpoint for the container registry."
+                ),
+            },
+        ]
+    }
+
+    # Valid host name but not a registry credential type.
+    errors = validate_inputs(
+        aap_credential_type, schema, {"host": "valid.name"}
+    )
+    assert not errors
+
+    # Valid host name passing registry credential type.
+    errors = validate_inputs(
+        registry_credential_type,
+        schema,
+        {"host": "valid.name"},
+    )
+    assert not errors
+
+    # Invalid host name but not passing a registry credential type.
+    errors = validate_inputs(
+        aap_credential_type, schema, {"host": "invalid@name"}
+    )
+    assert not errors
+
+    # Invalid host name passing registry credential type.
+    errors = validate_inputs(
+        registry_credential_type,
+        schema,
+        {"host": "invalid@name"},
+    )
+    assert "Host format invalid" in errors["inputs.host"]
