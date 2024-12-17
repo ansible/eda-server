@@ -362,7 +362,7 @@ if WEBSOCKET_TOKEN_BASE_URL is None:
         "ws://", "http://"
     ).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
-PODMAN_SOCKET_TIMEOUT = settings.get("PODMAN_SOCKET_TIMEOUT", default=0)
+PODMAN_SOCKET_TIMEOUT = settings.get("PODMAN_SOCKET_TIMEOUT", default=300)
 # zero raises an exception, None takes the socket default
 if PODMAN_SOCKET_TIMEOUT == 0:
     PODMAN_SOCKET_TIMEOUT = None
