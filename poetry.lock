@@ -621,7 +621,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.12.3.0.dev41+gb309891d"
+version = "2024.12.13"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -641,7 +641,7 @@ inflection = "*"
 pyjwt = {version = "*", optional = true, markers = "extra == \"jwt-consumer\" or extra == \"resource-registry\""}
 redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
 requests = {version = "*", optional = true, markers = "extra == \"jwt-consumer\" or extra == \"resource-registry\""}
-sqlparse = ">=0.5.0"
+sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
@@ -659,7 +659,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "b309891d4722fd4064c2b85657c119bdcc1b315a"
+resolved_reference = "b37fdd2ce8baa21cd2a40c96ff3a871e97363b14"
 
 [[package]]
 name = "django-crum"
@@ -2451,13 +2451,13 @@ files = [
 
 [[package]]
 name = "sqlparse"
-version = "0.5.1"
+version = "0.5.3"
 description = "A non-validating SQL parser."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "sqlparse-0.5.1-py3-none-any.whl", hash = "sha256:773dcbf9a5ab44a090f3441e2180efe2560220203dc2f8c0b0fa141e18b505e4"},
-    {file = "sqlparse-0.5.1.tar.gz", hash = "sha256:bb6b4df465655ef332548e24f08e205afc81b9ab86cb1c45657a7ff173a3a00e"},
+    {file = "sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca"},
+    {file = "sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272"},
 ]
 
 [package.extras]
@@ -2813,4 +2813,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "ca04e75950fd717a864ab650a4ca440f13a2c1535999d5364afb590c6df46159"
+content-hash = "b131a46faf49e555ababdbf206306625dc7473a70948a1fc042df350a50c6a21"
