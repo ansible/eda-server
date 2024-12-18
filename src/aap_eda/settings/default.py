@@ -563,6 +563,7 @@ SPECTACULAR_SETTINGS = {
     "PREPROCESSING_HOOKS": [
         "aap_eda.api.openapi.preprocess_filter_api_routes"
     ],
+    "GENERIC_ADDITIONAL_PROPERTIES": "bool",
 }
 
 # ---------------------------------------------------------

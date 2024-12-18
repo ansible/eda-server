@@ -16,6 +16,7 @@ import yaml
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -145,6 +146,16 @@ class RulebookViewSet(
                 description="Return a list of fired rules.",
             ),
         },
+        parameters=[
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                style="form",
+                explode=True,
+                description="A free formatted query string with Django semantics for filtering and ordering",  # noqa: E501
+            ),
+        ],
     ),
 )
 class AuditRuleViewSet(
@@ -184,7 +195,15 @@ class AuditRuleViewSet(
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this rule audit.",  # noqa: E501
-            )
+            ),
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                style="form",
+                explode=True,
+                description="A free formatted query string with Django semantics for filtering and ordering",  # noqa: E501
+            ),
         ],
     )
     @action(
@@ -220,7 +239,15 @@ class AuditRuleViewSet(
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this Audit Rule.",  # noqa: E501
-            )
+            ),
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                style="form",
+                explode=True,
+                description="A free formatted query string with Django semantics for filtering and ordering",  # noqa: E501
+            ),
         ],
     )
     @action(
