@@ -32,6 +32,7 @@ from aap_eda.services.activation.engine.common import (
 )
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
+    ContainerEngineError,
     ContainerEngineInitError,
     ContainerImagePullError,
     ContainerLoginError,
@@ -532,10 +533,37 @@ def test_engine_get_status(podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_get_status_with_exception(podman_engine):
+def test_engine_get_status_with_not_found_exception(podman_engine):
     engine = podman_engine
 
-    engine.client.containers.exists.return_value = None
+    engine.client.containers.get.side_effect = NotFound("Not found")
+
+    with pytest.raises(
+        ContainerNotFoundError, match="Container id 100 not found"
+    ):
+        engine.get_status("100")
+
+
+@pytest.mark.django_db
+def test_engine_get_status_with_api_error_exception(podman_engine):
+    engine = podman_engine
+
+    engine.client.containers.get.side_effect = APIError("unexpected error")
+
+    with pytest.raises(ContainerEngineError):
+        engine.get_status("100")
+
+
+@pytest.mark.django_db
+def test_engine_get_status_with_500_not_found(podman_engine):
+    engine = podman_engine
+    error_msg = (
+        "no container with ID "
+        "fe244749060b9b546af41eb4256f8e527a031748a64ea3ec93bd821daffc8d89 "
+        "found in database: no such container"
+    )
+
+    engine.client.containers.get.side_effect = APIError(error_msg)
 
     with pytest.raises(
         ContainerNotFoundError, match="Container id 100 not found"

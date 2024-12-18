@@ -884,10 +884,21 @@ class ActivationManager(StatusManager):
 
         # get the status of the container
         container_status = None
-        with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
+        try:
             container_status = self.container_engine.get_status(
                 container_id=self.latest_instance.activation_pod_id,
             )
+        except engine_exceptions.ContainerNotFoundError:
+            pass
+        except engine_exceptions.ContainerEngineError as exc:
+            msg = (
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                f"Failed to get status of the container. Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            self._error_instance(msg)
+            self._error_activation(msg)
+            raise exceptions.ActivationMonitorError(msg) from exc
 
         # Activations in running status must have a container
         # This case prevents cases when the container is externally deleted

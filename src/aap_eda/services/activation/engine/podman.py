@@ -174,12 +174,19 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerStartError(error_message) from e
 
     def get_status(self, container_id: str) -> ContainerStatus:
-        if not self.client.containers.exists(container_id):
+        try:
+            container = self.client.containers.get(container_id)
+        except NotFound:
             raise exceptions.ContainerNotFoundError(
                 f"Container id {container_id} not found"
             )
-
-        container = self.client.containers.get(container_id)
+        except APIError as exc:
+            # podman might return a 500 error when the container is not found.
+            if "no such container" in str(exc):
+                raise exceptions.ContainerNotFoundError(
+                    f"Container id {container_id} not found"
+                )
+            raise exceptions.ContainerEngineError(str(exc)) from exc
         error_msg = container.attrs.get("State").get("Error", "")
 
         # Check container status
