@@ -16,6 +16,7 @@ import yaml
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as defaultfilters
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -24,7 +25,6 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
@@ -146,21 +146,22 @@ class RulebookViewSet(
                 description="Return a list of fired rules.",
             ),
         },
+        parameters=[
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                style="form",
+                explode=True,
+                description="A free formatted query string with Django semantics for filtering and ordering",  # noqa: E501
+            ),
+        ],
     ),
 )
 class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.AuditRule.objects.all()
-    filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
-    filterset_class = filters.AuditRuleFilter
-    ordering_fields = [
-        "id",
-        "name",
-        "status",
-        "activation_instance__name",
-        "fired_at",
-    ]
 
     def filter_queryset(self, queryset):
         if queryset.model is models.AuditRule:
@@ -194,19 +195,20 @@ class AuditRuleViewSet(
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this rule audit.",  # noqa: E501
-            )
+            ),
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                style="form",
+                explode=True,
+                description="A free formatted query string with Django semantics for filtering and ordering",  # noqa: E501
+            ),
         ],
     )
     @action(
         detail=False,
         queryset=models.AuditAction.objects.order_by("id"),
-        filterset_class=filters.AuditRuleActionFilter,
-        ordering_fields=[
-            "name",
-            "status",
-            "url",
-            "fired_at",
-        ],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/actions",
     )
@@ -237,18 +239,20 @@ class AuditRuleViewSet(
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this Audit Rule.",  # noqa: E501
-            )
+            ),
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                style="form",
+                explode=True,
+                description="A free formatted query string with Django semantics for filtering and ordering",  # noqa: E501
+            ),
         ],
     )
     @action(
         detail=False,
         queryset=models.AuditEvent.objects.order_by("-received_at"),
-        filterset_class=filters.AuditRuleEventFilter,
-        ordering_fields=[
-            "source_name",
-            "source_type",
-            "received_at",
-        ],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/events",
     )
