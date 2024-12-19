@@ -379,6 +379,42 @@ def test_monitor_to_running_status(
 
 
 @pytest.mark.django_db
+def test_monitor_to_unexpected_error_status(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test monitor when get_status returns an unexpected error."""
+    activation_manager = ActivationManager(
+        db_instance=running_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.side_effect = (
+        engine_exceptions.ContainerEngineError("unexpected error")
+    )
+    with pytest.raises(exceptions.ActivationMonitorError):
+        activation_manager.monitor()
+    assert running_activation.status == enums.ActivationStatus.ERROR
+    assert "unexpected error" in running_activation.status_message
+
+
+@pytest.mark.django_db
+def test_monitor_container_not_found(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test monitor when get_status returns a container not found error."""
+    activation_manager = ActivationManager(
+        db_instance=running_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.side_effect = (
+        engine_exceptions.ContainerNotFoundError("Not found")
+    )
+    activation_manager.monitor()
+    assert running_activation.status == enums.ActivationStatus.FAILED
+
+
+@pytest.mark.django_db
 def test_start_restart(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
