@@ -99,8 +99,8 @@ import dynaconf
 from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
+from aap_eda import utils
 from aap_eda.core.enums import RulebookProcessLogLevel
-from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -139,7 +139,7 @@ SECRET_KEY = _get_secret_key()
 def _get_boolean(name: str, default=False) -> bool:
     value = settings.get(name, default)
     if isinstance(value, str):
-        value = str_to_bool(value)
+        value = utils.str_to_bool(value)
     if not isinstance(value, bool):
         raise ImproperlyConfigured("{name} setting must be a boolean value.")
     return value
@@ -555,7 +555,7 @@ API_PREFIX = settings.get("API_PREFIX", "api/eda").strip("/")
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Event Driven Ansible API",
-    "VERSION": "1.0.0",
+    "VERSION": utils.get_eda_version(),
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/v[0-9]",
     "SCHEMA_PATH_PREFIX_TRIM": True,
