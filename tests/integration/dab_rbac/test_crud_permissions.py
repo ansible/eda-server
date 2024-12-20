@@ -171,6 +171,10 @@ def test_change_permissions(
 
     url = get_detail_url(obj, skip_if_not_found=True)
 
+    if model_name == "activation":
+        obj.is_enabled = False
+        obj.save(update_fields=["is_enabled"])
+
     # Attempted PATCH without permission should give a 403
     give_obj_perm(default_user, obj, "view")
     response = user_client.patch(url, data={})

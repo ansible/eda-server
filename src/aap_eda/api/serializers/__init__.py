@@ -19,6 +19,7 @@ from .activation import (
     ActivationListSerializer,
     ActivationReadSerializer,
     ActivationSerializer,
+    ActivationUpdateSerializer,
     PostActivationSerializer,
 )
 from .auth import JWTTokenSerializer, LoginSerializer, RefreshTokenSerializer
@@ -100,6 +101,7 @@ __all__ = (
     "ActivationSerializer",
     "ActivationListSerializer",
     "ActivationCreateSerializer",
+    "ActivationUpdateSerializer",
     "ActivationReadSerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
