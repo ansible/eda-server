@@ -54,11 +54,21 @@ class ActivationViewSet(
     RedisDependencyMixin,
 ):
     queryset = models.Activation.objects.all()
-    serializer_class = serializers.ActivationSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
 
     rbac_action = None
+
+    def get_serializer_class(self):
+        if self.request.method == "PATCH":
+            return serializers.ActivationUpdateSerializer
+        elif (
+            self.request.method == "POST"
+            and self.request.path == "/api/eda/v1/activations/"
+        ):
+            return serializers.ActivationCreateSerializer
+        else:
+            return serializers.ActivationReadSerializer
 
     def filter_queryset(self, queryset):
         if queryset.model is models.Activation:
@@ -78,10 +88,7 @@ class ActivationViewSet(
         | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
-        context = {"request": request}
-        serializer = serializers.ActivationCreateSerializer(
-            data=request.data, context=context
-        )
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         # If we're expected to run this activation we need redis
@@ -124,6 +131,53 @@ class ActivationViewSet(
             serializers.ActivationReadSerializer(response).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @extend_schema(
+        request=serializers.ActivationUpdateSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.ActivationReadSerializer,
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                description="Invalid data to update activation."
+            ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                description="The activation is not allowed to be updated."
+            ),
+        },
+    )
+    def partial_update(self, request, pk):
+        activation = self.get_object()
+        if activation.is_enabled:
+            return Response(
+                data="Activation is not in disabled mode",
+                status=status.HTTP_409_CONFLICT,
+            )
+        serializer = self.get_serializer(
+            instance=activation, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.prepare_update(activation)
+
+        old_data = model_to_dict(activation)
+        with transaction.atomic():
+            serializer.update(activation, serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                old_data,
+                model_to_dict(activation),
+            )
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
+
+        return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
         description="Delete an existing Activation",
