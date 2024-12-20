@@ -459,8 +459,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
                 validated_data, vault_data
             )
 
-        vault = _get_vault_credential_type()
-
         if validated_data.get("eda_credentials"):
             _update_extra_vars_from_eda_credentials(
                 validated_data=validated_data,
@@ -473,11 +471,169 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
                 "eda_system_vault_credential"
             ] = _create_system_eda_credential(
                 vault_data.password,
-                vault,
+                _get_vault_credential_type(),
                 validated_data.get("organization_id"),
             )
 
         return super().create(validated_data)
+
+
+class ActivationUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating the Activation."""
+
+    class Meta:
+        model = models.Activation
+        fields = [
+            "name",
+            "description",
+            "decision_environment_id",
+            "rulebook_id",
+            "extra_var",
+            "organization_id",
+            "user",
+            "restart_policy",
+            "awx_token_id",
+            "log_level",
+            "eda_credentials",
+            "k8s_service_name",
+            "source_mappings",
+            "skip_audit_events",
+        ]
+
+    organization_id = serializers.IntegerField(
+        required=False,
+        allow_null=False,
+        validators=[validators.check_if_organization_exists],
+        error_messages={"null": "Organization is needed"},
+    )
+    rulebook_id = serializers.IntegerField(
+        validators=[validators.check_if_rulebook_exists],
+        error_messages={"null": "Rulebook is needed"},
+    )
+    extra_var = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[validators.is_extra_var_dict],
+    )
+    decision_environment_id = serializers.IntegerField(
+        validators=[validators.check_if_de_exists],
+        error_messages={"null": "Decision Environment is needed"},
+    )
+    awx_token_id = serializers.IntegerField(
+        allow_null=True,
+        validators=[validators.check_if_awx_token_exists],
+        required=False,
+    )
+    eda_credentials = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=serializers.IntegerField(),
+        validators=[
+            validators.check_multiple_credentials,
+            validators.check_single_aap_credential,
+        ],
+    )
+    k8s_service_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[validators.check_if_rfc_1035_compliant],
+    )
+
+    def validate(self, data):
+        _validate_credentials_and_token_and_rulebook(data=data, creating=True)
+        _validate_sources_with_event_streams(data=data)
+        return data
+
+    def prepare_update(self, activation: models.Activation):
+        rulebook_id = self.validated_data.get("rulebook_id")
+        self.validated_data["user_id"] = self.context["request"].user.id
+        if rulebook_id:
+            rulebook = models.Rulebook.objects.get(id=rulebook_id)
+            self.validated_data["rulebook_name"] = rulebook.name
+            self.validated_data["rulebook_rulesets"] = rulebook.rulesets
+            self.validated_data["git_hash"] = rulebook.project.git_hash
+            self.validated_data["project_id"] = rulebook.project.id
+
+        system_vault_credential = activation.eda_system_vault_credential
+        if system_vault_credential:
+            inputs = yaml.safe_load(
+                system_vault_credential.inputs.get_secret_value()
+            )
+            vault_data = VaultData(inputs["vault_password"], True)
+        else:
+            vault_data = VaultData()
+        if self.validated_data.get("source_mappings", []):
+            self.validated_data[
+                "rulebook_rulesets"
+            ] = _update_event_stream_source(self.validated_data, vault_data)
+
+        if self.validated_data.get("eda_credentials"):
+            _update_extra_vars_from_eda_credentials(
+                validated_data=self.validated_data,
+                vault_data=vault_data,
+                creating=True,
+            )
+
+        if vault_data.password_used and not system_vault_credential:
+            self.validated_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(
+                vault_data.password,
+                _get_vault_credential_type(),
+                self.validated_data.get(
+                    "organization_id", activation.organization.id
+                ),
+            )
+
+    def update(
+        self, instance: models.Activation, validated_data: dict
+    ) -> None:
+        update_fields = []
+        eda_credentials = []
+        event_streams = []
+        for key, value in validated_data.items():
+            if key == "eda_credentials":
+                eda_credentials = value
+                continue
+            elif key == "event_streams":
+                event_streams = value
+                continue
+            setattr(instance, key, value)
+            update_fields.append(key)
+
+        instance.save(update_fields=update_fields)
+        if eda_credentials:
+            instance.eda_credentials.set(eda_credentials)
+        if event_streams:
+            instance.event_streams.set(event_streams)
+
+    def to_representation(self, activation):
+        extra_var = (
+            replace_vault_data(activation.extra_var)
+            if activation.extra_var
+            else None
+        )
+        eda_credentials = [
+            credential.id for credential in activation.eda_credentials.all()
+        ]
+
+        return {
+            "name": activation.name,
+            "description": activation.description,
+            "decision_environment_id": activation.decision_environment_id,
+            "rulebook_id": activation.rulebook_id,
+            "extra_var": extra_var,
+            "organization_id": activation.organization_id,
+            "restart_policy": activation.restart_policy,
+            "awx_token_id": activation.awx_token_id,
+            "log_level": activation.log_level,
+            "eda_credentials": eda_credentials,
+            "k8s_service_name": activation.k8s_service_name,
+            "source_mappings": activation.source_mappings,
+            "skip_audit_events": activation.skip_audit_events,
+        }
 
 
 class ActivationInstanceSerializer(serializers.ModelSerializer):

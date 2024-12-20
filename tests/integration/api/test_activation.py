@@ -47,7 +47,7 @@ def test_create_activation(
     response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
-    assert response.status_code == status.HTTP_201_CREATED, response.data
+    assert response.status_code == status.HTTP_201_CREATED
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert_activation_base_data(
@@ -1028,3 +1028,67 @@ def test_create_activation_with_skip_audit_events(
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.skip_audit_events
+
+
+@pytest.mark.django_db
+def test_update_activation(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["is_enabled"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    id = response.data["id"]
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{id}/", data={"name": "another_name"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.name == "another_name"
+
+
+@pytest.mark.django_db
+def test_update_activation_invalid_body(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["is_enabled"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    id = response.data["id"]
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{id}/", data={"rulebook_id": None}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_update_enabled_activation(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["is_enabled"] = True
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    id = response.data["id"]
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{id}/", data={"name": "another_name"}
+    )
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        response.data
+        == "Activation is not in disabled mode or in stopped status"
+    )
