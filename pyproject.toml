@@ -67,7 +67,6 @@ pyjwt = { version = "2.7.*", extras = ["crypto"] }
 ecdsa = "0.18.*"
 validators = "^0.34.0"
 django-flags = "^5.0.13"
-# dispatcher = { git = "git@github.com:ansible/dispatcher.git", branch = "main" }
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

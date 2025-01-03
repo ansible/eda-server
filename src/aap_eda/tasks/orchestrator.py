@@ -17,6 +17,7 @@ import random
 from collections import Counter
 from typing import Optional
 
+from ansible_base.lib.utils.db import advisory_lock
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -33,7 +34,6 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
-from ansible_base.lib.utils.db import advisory_lock
 from dispatcher.control import Control
 from dispatcher.publish import task
 
