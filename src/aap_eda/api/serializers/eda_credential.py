@@ -106,11 +106,19 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_credential_type_exists],
+        error_messages={
+            "null": "Credential Type is needed",
+            "required": "Credential Type is required",
+        },
     )
     organization_id = serializers.IntegerField(
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
     )
     inputs = serializers.JSONField()
 
@@ -146,6 +154,7 @@ class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={"null": "Organization is needed"},
     )
     inputs = serializers.JSONField()
 

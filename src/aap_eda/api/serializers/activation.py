@@ -397,9 +397,17 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
     )
     rulebook_id = serializers.IntegerField(
-        validators=[validators.check_if_rulebook_exists]
+        validators=[validators.check_if_rulebook_exists],
+        error_messages={
+            "null": "Rulebook is needed",
+            "required": "Rulebook is required",
+        },
     )
     extra_var = serializers.CharField(
         required=False,
@@ -408,7 +416,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validators=[validators.is_extra_var_dict],
     )
     decision_environment_id = serializers.IntegerField(
-        validators=[validators.check_if_de_exists]
+        validators=[validators.check_if_de_exists],
+        error_messages={
+            "null": "Decision Environment is needed",
+            "required": "Decision Environment is required",
+        },
     )
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
@@ -691,7 +703,8 @@ class PostActivationSerializer(serializers.ModelSerializer):
     )
     name = serializers.CharField(required=True)
     decision_environment_id = serializers.IntegerField(
-        validators=[validators.check_if_de_exists]
+        validators=[validators.check_if_de_exists],
+        error_messages={"null": "Decision Environment is needed"},
     )
     # TODO: is_activation_valid needs to tell event stream/activation
     awx_token_id = serializers.IntegerField(

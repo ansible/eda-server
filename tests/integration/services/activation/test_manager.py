@@ -293,7 +293,7 @@ def test_start_no_decision_environment(
         activation_manager.start()
     assert basic_activation.status == enums.ActivationStatus.ERROR
     assert "decision_environment" in str(exc.value)
-    assert "This field may not be null" in str(exc.value)
+    assert "Decision Environment is needed" in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
 
 

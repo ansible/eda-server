@@ -46,6 +46,7 @@ class TeamCreateSerializer(
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={"null": "Organization is needed"},
     )
 
     class Meta:

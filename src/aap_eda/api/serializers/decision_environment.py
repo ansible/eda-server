@@ -44,6 +44,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={"null": "Organization is needed"},
     )
     eda_credential_id = serializers.IntegerField(
         required=False,
