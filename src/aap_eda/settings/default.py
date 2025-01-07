@@ -781,15 +781,6 @@ ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
 )
 
-_DEFAULT_PG_NOTIFY_DSN = (
-    f"host={ACTIVATION_DB_HOST} "
-    f"port={DATABASES['default']['PORT']} "
-    f"dbname={DATABASES['default']['NAME']} "
-    f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
-)
-
-PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
 PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
 
 SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
@@ -806,7 +797,11 @@ _DEFAULT_PG_NOTIFY_DSN_SERVER = (
     f"port={DATABASES['default']['PORT']} "
     f"dbname={DATABASES['default']['NAME']} "
     f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
+    f"password={DATABASES['default']['PASSWORD']} "
+    f"sslmode={settings.get('PGSSLMODE', default='prefer')} "
+    f"sslcert={settings.get('PGSSLCERT', default='None')} "
+    f"sslkey={settings.get('PGSSLKEY', default='None')} "
+    f"sslrootcert={settings.get('PGSSLROOTCERT', default='None')}"
 )
 PG_NOTIFY_DSN_SERVER = settings.get(
     "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
@@ -823,3 +818,9 @@ if EVENT_STREAM_MTLS_BASE_URL:
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
+
+DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
+PGSSLMODE = settings.get("PGSSLMODE", default="prefer")
+PGSSLCERT = settings.get("PGSSLCERT", default="")
+PGSSLKEY = settings.get("PGSSLKEY", default="")
+PGSSLROOTCERT = settings.get("PGSSLROOTCERT", default="")
