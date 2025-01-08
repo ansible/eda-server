@@ -74,6 +74,10 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
     )
     eda_credential_id = serializers.IntegerField(
         required=False,
@@ -110,6 +114,10 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
     )
     name = serializers.CharField(
         required=False,

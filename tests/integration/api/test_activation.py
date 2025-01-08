@@ -559,6 +559,40 @@ def test_restart_activation(
 
 
 @pytest.mark.parametrize(
+    ("missing_field", "error_message"),
+    [
+        (
+            "decision_environment_id",
+            "Decision Environment is required",
+        ),
+        (
+            "organization_id",
+            "Organization is required",
+        ),
+        (
+            "rulebook_id",
+            "Rulebook is required",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_activation_with_missing_required_fields(
+    activation_payload: Dict[str, Any],
+    admin_client: APIClient,
+    missing_field,
+    error_message,
+    preseed_credential_types,
+):
+    activation_payload.pop(missing_field)
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert error_message in response.data[missing_field]
+
+
+@pytest.mark.parametrize(
     "enabled",
     [True, False],
 )
@@ -613,13 +647,13 @@ def test_restart_activation_without_de(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert (
         response.data["errors"]
-        == "{'decision_environment_id': 'This field may not be null.'}"
+        == "{'decision_environment_id': 'Decision Environment is needed'}"
     )
     default_activation.refresh_from_db()
     assert default_activation.status == enums.ActivationStatus.ERROR
     assert (
         default_activation.status_message
-        == "{'decision_environment_id': 'This field may not be null.'}"
+        == "{'decision_environment_id': 'Decision Environment is needed'}"
     )
 
 

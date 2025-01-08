@@ -394,6 +394,19 @@ def test_create_or_update_project_with_right_eda_credential(
 
 
 @pytest.mark.django_db
+def test_create_project_with_none_organization(admin_client: APIClient):
+    body = {
+        "name": "none-organization",
+        "url": "https://git.example.com/acme/project-01",
+        "organization_id": None,
+    }
+
+    response = admin_client.post(f"{api_url_v1}/projects/", data=body)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Organization is needed" in str(response.data)
+
+
+@pytest.mark.django_db
 def test_create_project_name_conflict(
     default_project: models.Project, admin_client: APIClient
 ):
@@ -689,7 +702,7 @@ def test_partial_update_project_null_organization_id(
         data,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "This field may not be null." in str(response.data)
+    assert "Organization is needed" in str(response.data)
 
 
 @pytest.mark.django_db

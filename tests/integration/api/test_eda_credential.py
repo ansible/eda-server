@@ -161,7 +161,25 @@ def test_create_eda_credential_with_none_credential_type(
         f"{api_url_v1}/eda-credentials/", data=data_in
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "This field may not be null." in response.data["credential_type_id"]
+    assert "Credential Type is needed" in response.data["credential_type_id"]
+
+
+@pytest.mark.django_db
+def test_create_eda_credential_with_none_organization(
+    admin_client: APIClient,
+):
+    data = "secret"
+    data_in = {
+        "name": "eda-credential",
+        "inputs": {"username": "adam", "password": data},
+        "credential_type_id": None,
+        "organization_id": None,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Organization is needed" in response.data["organization_id"]
 
 
 @pytest.mark.parametrize(

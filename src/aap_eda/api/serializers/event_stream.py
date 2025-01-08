@@ -25,7 +25,11 @@ from aap_eda.core import enums, models, validators
 
 
 class EventStreamInSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(required=True, allow_null=False)
+    organization_id = serializers.IntegerField(
+        required=True,
+        allow_null=False,
+        error_messages={"null": "Organization is needed"},
+    )
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     eda_credential_id = serializers.IntegerField(
         required=True,
@@ -33,6 +37,7 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         validators=[
             validators.check_credential_types_for_event_stream,
         ],
+        error_messages={"null": "EdaCredential is needed"},
     )
 
     def validate(self, data):
