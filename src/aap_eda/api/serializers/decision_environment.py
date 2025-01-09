@@ -16,6 +16,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 
 
@@ -26,6 +27,8 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
         ]
         fields = [
             "name",
@@ -35,6 +38,16 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "eda_credential_id",
             *read_only_fields,
         ]
+
+    def to_representation(self, decision_environment):
+        result = super().to_representation(decision_environment)
+        result["created_by"] = BasicUserSerializer(
+            decision_environment.created_by
+        ).data
+        result["modified_by"] = BasicUserSerializer(
+            decision_environment.modified_by
+        ).data
+        return result
 
 
 class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
@@ -92,8 +105,16 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "eda_credential",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+            "created_by",
+            "modified_by",
+        ]
 
     def to_representation(self, decision_environment):
         eda_credential = (
@@ -109,6 +130,12 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             else None
         )
         result = super().to_representation(decision_environment)
+        result["created_by"] = BasicUserSerializer(
+            decision_environment.created_by
+        ).data
+        result["modified_by"] = BasicUserSerializer(
+            decision_environment.modified_by
+        ).data
         result |= {
             "organization": organization,
             "eda_credential": eda_credential,

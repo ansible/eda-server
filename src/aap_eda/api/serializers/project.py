@@ -19,6 +19,7 @@ from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 from aap_eda.core.utils.crypto.base import SecretValue
 
@@ -54,6 +55,8 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "import_error",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
         ]
         fields = [
             "name",
@@ -67,6 +70,12 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "proxy",
             *read_only_fields,
         ]
+
+    def to_representation(self, instance):
+        result = super().to_representation(instance)
+        result["created_by"] = BasicUserSerializer(instance.created_by).data
+        result["modified_by"] = BasicUserSerializer(instance.modified_by).data
+        return result
 
 
 class ProjectCreateRequestSerializer(serializers.ModelSerializer):
@@ -191,6 +200,8 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "scm_refspec",
             "verify_ssl",
             "proxy",
+            "created_by",
+            "modified_by",
         ]
 
     def validate(self, data):
@@ -208,6 +219,12 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
                     "The password in the proxy field should be unencrypted"
                 )
         return data
+
+    def to_representation(self, instance):
+        result = super().to_representation(instance)
+        result["created_by"] = BasicUserSerializer(instance.created_by).data
+        result["modified_by"] = BasicUserSerializer(instance.modified_by).data
+        return result
 
 
 class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
@@ -233,6 +250,8 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "import_error",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
         ]
         fields = [
             "name",
@@ -284,6 +303,8 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "import_error": project.import_error,
             "created_at": project.created_at,
             "modified_at": project.modified_at,
+            "created_by": BasicUserSerializer(project.created_by).data,
+            "modified_by": BasicUserSerializer(project.modified_by).data,
         }
 
 

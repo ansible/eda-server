@@ -1141,3 +1141,58 @@ def test_copy_eda_credential_not_found(
 ):
     response = admin_client.post(f"{api_url_v1}/eda-credentials/0/copy/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_eda_credential_by_fields(
+    credential_type: models.CredentialType,
+    default_organization: models.Organization,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    inputs = {"username": "adam"}
+    data_in = {
+        "name": "eda-credential-by-fields",
+        "inputs": inputs,
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+
+    base_client.force_authenticate(user=admin_user)
+    response = base_client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    credential = models.EdaCredential.objects.get(id=response.data["id"])
+    assert credential.created_by == admin_user
+    assert credential.modified_by == admin_user
+
+    response = base_client.get(
+        f"{api_url_v1}/eda-credentials/{credential.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    response = base_client.get(f"{api_url_v1}/eda-credentials/")
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.data["results"][0]
+    assert data["created_by"]["username"] == admin_user.username
+    assert data["modified_by"]["username"] == admin_user.username
+
+    base_client.force_authenticate(user=super_user)
+    update_data = {"name": "update eda-credentials fields"}
+    response = base_client.patch(
+        f"{api_url_v1}/eda-credentials/{credential.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == super_user.username
+
+    credential.refresh_from_db()
+
+    assert credential.created_by == admin_user
+    assert credential.modified_by == super_user

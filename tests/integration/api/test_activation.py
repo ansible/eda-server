@@ -42,6 +42,7 @@ def test_create_activation(
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
+    admin_info: dict,
     admin_client: APIClient,
 ):
     response = admin_client.post(
@@ -71,6 +72,8 @@ def test_create_activation(
     assert activation.status_message == (
         "Wait for a worker to be available to start activation"
     )
+    assert activation.created_by.username == admin_info["username"]
+    assert activation.modified_by.username == admin_info["username"]
     assert not activation.skip_audit_events
 
 
@@ -1062,3 +1065,33 @@ def test_create_activation_with_skip_audit_events(
     data = response.data
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.skip_audit_events
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+def test_activation_by_fields(
+    activation_payload: Dict[str, Any],
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    base_client.force_authenticate(user=admin_user)
+    response = base_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+
+    assert data["created_by"]["username"] == admin_user.username
+    assert data["modified_by"]["username"] == admin_user.username
+
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.created_by == admin_user
+    assert activation.modified_by == admin_user
+
+    response = base_client.get(f"{api_url_v1}/activations/{activation.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.data
+
+    assert data["created_by"]["username"] == admin_user.username
+    assert data["modified_by"]["username"] == admin_user.username

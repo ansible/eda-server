@@ -21,6 +21,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
 
 
@@ -97,6 +98,8 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             "test_headers",
             "events_received",
             "last_event_received_at",
+            "created_by",
+            "modified_by",
         ]
         fields = [
             "name",
@@ -127,3 +130,9 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             if obj.organization
             else None
         )
+
+    def to_representation(self, instance):
+        result = super().to_representation(instance)
+        result["created_by"] = BasicUserSerializer(instance.created_by).data
+        result["modified_by"] = BasicUserSerializer(instance.modified_by).data
+        return result
