@@ -34,6 +34,11 @@ def test_related_organization_edit_access_control(
         pytest.skip("Model has no change permission")
     if "organization" not in [f.name for f in obj._meta.concrete_fields]:
         pytest.skip("Model has no organization field")
+
+    if model_name == "activation":
+        obj.is_enabled = False
+        obj.save(update_fields=["is_enabled"])
+
     # user has permission to the object but not to its organization
     give_obj_perm(default_user, obj, "change")
     url = reverse(f"{model._meta.model_name}-detail", kwargs={"pk": obj.pk})

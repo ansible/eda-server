@@ -55,14 +55,7 @@ ORG_ROLES = [
             "inside of it"
         ),
         "permissions": {
-            "activation": [
-                "add",
-                "view",
-                "delete",
-                "enable",
-                "disable",
-                "restart",
-            ],
+            "activation": CRUD + ["enable", "disable", "restart"],
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
             "organization": ["view", "change", "delete"],
@@ -88,7 +81,7 @@ ORG_ROLES = [
             "a single organization"
         ),
         "permissions": {
-            "activation": ["add", "view"],
+            "activation": ["add", "view", "change"],
             "rulebook_process": ["view"],
             "audit_rule": ["view"],
             "organization": ["view"],
@@ -111,6 +104,7 @@ ORG_ROLES = [
             "activation": [
                 "add",
                 "view",
+                "change",
                 "enable",
                 "disable",
                 "restart",

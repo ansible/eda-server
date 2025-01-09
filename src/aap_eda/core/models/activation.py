@@ -50,7 +50,7 @@ class Activation(
             ("disable_activation", "Can disable an activation"),
             ("restart_activation", "Can restart an activation"),
         ]
-        default_permissions = ["add", "view", "delete"]
+        default_permissions = ["add", "view", "change", "delete"]
 
     description = models.TextField(
         default="",
