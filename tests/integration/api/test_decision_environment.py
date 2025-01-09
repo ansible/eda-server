@@ -57,6 +57,7 @@ def test_create_decision_environment(
     default_organization: models.Organization,
     admin_client: APIClient,
     preseed_credential_types,
+    admin_info,
     credential_type,
     status_code,
     status_message,
@@ -91,8 +92,12 @@ def test_create_decision_environment(
         result = response.data
         result.pop("created_at")
         result.pop("modified_at")
+        created_by = result.pop("created_by")
+        modified_by = result.pop("modified_by")
         assert result == {"id": id_, **data_in}
         assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
+        assert created_by["username"] == admin_info["username"]
+        assert modified_by["username"] == admin_info["username"]
     else:
         assert status_message in response.data["eda_credential_id"]
 
@@ -572,6 +577,56 @@ def test_delete_decision_environment_force(
     )
     default_activation.refresh_from_db()
     assert default_activation.decision_environment is None
+
+
+@pytest.mark.django_db
+def test_decision_environment_by_fields(
+    default_organization: models.Organization,
+    default_activation: models.Activation,
+    default_eda_credential: models.EdaCredential,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    base_client.force_authenticate(user=admin_user)
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "quay.io/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": default_eda_credential.id,
+    }
+    response = base_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    de = models.DecisionEnvironment.objects.get(id=response.data["id"])
+    assert de.created_by == admin_user
+    assert de.modified_by == admin_user
+
+    base_client.force_authenticate(user=super_user)
+    update_data = {"name": "de_changed"}
+    response = base_client.patch(
+        f"{api_url_v1}/decision-environments/{de.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    de.refresh_from_db()
+    assert de.created_by == admin_user
+    assert de.modified_by == super_user
+
+    response = base_client.get(f"{api_url_v1}/decision-environments/{de.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == super_user.username
+
+    response = base_client.get(f"{api_url_v1}/decision-environments/")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.data["results"]
+    # skip the first default_decision_enviroment
+    assert results[1]["created_by"]["username"] == admin_user.username
+    assert results[1]["modified_by"]["username"] == super_user.username
 
 
 # UTILS

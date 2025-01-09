@@ -18,6 +18,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import inputs_to_display, validate_inputs
 from aap_eda.core.utils.crypto.base import SecretValue
@@ -57,6 +58,8 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
             "managed",
             "organization",
         ]
@@ -98,6 +101,10 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "references": self.references,
             "created_at": eda_credential.created_at,
             "modified_at": eda_credential.modified_at,
+            "created_by": BasicUserSerializer(eda_credential.created_by).data,
+            "modified_by": BasicUserSerializer(
+                eda_credential.modified_by
+            ).data,
         }
 
 

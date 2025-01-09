@@ -28,12 +28,12 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 PROJECT_ARCHIVE_DIR = "projects/"
 
 
-class Project(BaseOrgModel, UniqueNamedModel):
+class Project(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     class Meta:
         db_table = "core_project"
         constraints = [

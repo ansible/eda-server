@@ -16,12 +16,12 @@ from django.db import models
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 __all__ = ("EdaCredential",)
 
 
-class EdaCredential(BaseOrgModel, UniqueNamedModel):
+class EdaCredential(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     router_basename = "edacredential"
 
     class Meta:

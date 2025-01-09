@@ -20,6 +20,7 @@ import redis
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
 from tests.integration.constants import api_url_v1
@@ -311,6 +312,7 @@ def test_create_or_update_project_with_right_eda_credential(
     preseed_credential_types,
     default_scm_credential,
     default_organization: models.Organization,
+    admin_user: models.User,
     action,
     credential_type,
     status_code,
@@ -381,6 +383,8 @@ def test_create_or_update_project_with_right_eda_credential(
         assert project.import_state == "pending"
         assert str(project.import_task_id) == job_id
 
+        assert project.created_by == admin_user
+        assert project.modified_by == admin_user
         # Check that response returned the valid representation of the project
         assert_project_data(response.data, project)
 
@@ -741,6 +745,66 @@ def test_delete_project_not_found(admin_client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.import_project")
+def test_project_by_fields(
+    import_project_task: mock.Mock,
+    default_scm_credential: models.EdaCredential,
+    default_organization: models.Organization,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
+    job = mock.Mock(id=job_id)
+    import_project_task.delay.return_value = job
+
+    body = {
+        "name": "test-project-01",
+        "url": "https://git.example.com/acme/project-01",
+        "eda_credential_id": default_scm_credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
+        "organization_id": default_organization.id,
+    }
+
+    base_client.force_authenticate(user=admin_user)
+    response = base_client.post(
+        f"{api_url_v1}/projects/",
+        data=body,
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    project = models.Project.objects.get(id=response.data["id"])
+
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    response = base_client.get(f"{api_url_v1}/projects/{response.data['id']}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    response = base_client.get(f"{api_url_v1}/projects/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()["results"]
+    assert data[0]["created_by"]["username"] == admin_user.username
+    assert data[0]["modified_by"]["username"] == admin_user.username
+
+    base_client.force_authenticate(user=super_user)
+    update_data = {"name": "test_project_by_fields"}
+    response = base_client.patch(
+        f"{api_url_v1}/projects/{project.id}/",
+        update_data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == super_user.username
+
+    project.refresh_from_db()
+    assert project.created_by == admin_user
+    assert project.modified_by == super_user
+
+
 # Utils
 # -------------------------------------
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -761,6 +825,10 @@ def assert_project_data(data: Dict[str, Any], project: models.Project):
                 project_value = project_value.get_secret_value().replace(
                     "secret", "$encrypted$"
                 )
+
+            if key == "created_by" or key == "modified_by":
+                project_value = BasicUserSerializer(project_value).data
+
             assert value == project_value
 
 

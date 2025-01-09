@@ -40,6 +40,7 @@ from aap_eda.api.serializers.project import (
     ProjectRefSerializer,
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
@@ -367,6 +368,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "created_by": BasicUserSerializer(activation.created_by).data,
+            "modified_by": BasicUserSerializer(activation.modified_by).data,
         }
 
 
@@ -657,6 +660,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.ruleset_stats
             else ""
         )
+        created_by = BasicUserSerializer(activation.created_by).data
+        modified_by = BasicUserSerializer(activation.modified_by).data
 
         return {
             "id": activation.id,
@@ -691,6 +696,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "created_by": created_by,
+            "modified_by": modified_by,
         }
 
 

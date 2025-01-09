@@ -306,6 +306,53 @@ def test_post_event_stream_with_missing_settings(
         assert response.json() == {"eda_credential_id": [error_msg]}
 
 
+@pytest.mark.django_db
+def test_event_stream_by_fields(
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    base_client.force_authenticate(user=admin_user)
+    data_in = {
+        "name": "test_event_stream",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+    }
+    event_stream = create_event_stream(base_client, data_in)
+    assert event_stream.created_by == admin_user
+    assert event_stream.modified_by == admin_user
+
+    with override_settings(settings_key=None):
+        response = base_client.get(
+            f"{api_url_v1}/event-streams/{event_stream.id}/"
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["created_by"]["username"] == admin_user.username
+        assert response.data["modified_by"]["username"] == admin_user.username
+
+        response = base_client.get(f"{api_url_v1}/event-streams/")
+        assert response.status_code == status.HTTP_200_OK
+        data = response.data["results"][0]
+        assert data["created_by"]["username"] == admin_user.username
+        assert data["modified_by"]["username"] == admin_user.username
+
+        base_client.force_authenticate(user=super_user)
+        update_data = {"name": "update event-streams fields"}
+        response = base_client.patch(
+            f"{api_url_v1}/event-streams/{event_stream.id}/", data=update_data
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["created_by"]["username"] == admin_user.username
+        assert response.data["modified_by"]["username"] == super_user.username
+
+        event_stream.refresh_from_db()
+        assert event_stream.created_by == admin_user
+        assert event_stream.modified_by == super_user
+
+
 def create_event_stream_credential(
     client: APIClient,
     credential_type_name: str,
