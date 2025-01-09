@@ -256,8 +256,8 @@ def test_create_eda_credential_with_gpg_key_data(
             "invalid@name",
         ),
         (
-            status.HTTP_400_BAD_REQUEST,
-            "https://invalid.name",
+            status.HTTP_201_CREATED,
+            "https://valid.name",
         ),
     ],
 )

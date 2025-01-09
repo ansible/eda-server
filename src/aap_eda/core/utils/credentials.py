@@ -342,6 +342,11 @@ def _validate_registry_host_name(host: str) -> list[str]:
     # pass muster (it returns True otherwise).  Consequently we have to check
     # the class of the return to know what happened and if it's not validators'
     # validation exception raise whatever the heck it is.
+
+    # Remove http:// or https:// scheme prefix if present,
+    # before conducting hostname validation
+    host = host.removeprefix("http://")
+    host = host.removeprefix("https://")
     validity = validators.hostname(host)
     if isinstance(validity, Exception):
         if not isinstance(validity, validators.ValidationError):
