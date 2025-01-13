@@ -33,7 +33,7 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
-from aap_eda.utils.advisory_lock import advisory_lock
+from ansible_base.lib.utils.db import advisory_lock
 from dispatcher.control import Control
 from dispatcher.publish import task
 
@@ -401,7 +401,9 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
     )
     alive = ctl.control_with_reply("alive")
     if not alive:
-        LOGGER.warning(f'Worker queue {queue_name} was found to not be healthy')
+        LOGGER.warning(
+            f"Worker queue {queue_name} was found to not be healthy"
+        )
     return bool(alive)
 
 

@@ -740,20 +740,6 @@ docs = ["mkdocs (>=0.17)", "mkdocs-rtd-dropdown (>=0.0.11)", "pymdown-extensions
 testing = ["coverage (>=3.7.0)", "django-debug-toolbar (>=3.2,<4)", "jinja2"]
 
 [[package]]
-name = "django-pglocks"
-version = "1.0.4"
-description = "django_pglocks provides useful context managers for advisory locks for PostgreSQL."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "django-pglocks-1.0.4.tar.gz", hash = "sha256:3c47c66fbfbd268ef46269673a0516a039539b0972b8ed2ec9cfee44c4b65523"},
-]
-
-[package.dependencies]
-six = ">=1.0.0"
-
-[[package]]
 name = "django-redis"
 version = "5.4.0"
 description = "Full featured redis cache backend for Django."

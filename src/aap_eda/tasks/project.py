@@ -18,7 +18,7 @@ from django.conf import settings
 
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportError, ProjectImportService
-from aap_eda.utils.advisory_lock import advisory_lock
+from ansible_base.lib.utils.db import advisory_lock
 from dispatcher.control import Control
 from dispatcher.publish import task
 
@@ -116,7 +116,9 @@ def _monitor_project_tasks_no_lock() -> None:
 def _monitor_project_tasks() -> None:
     with advisory_lock("monitor_project_tasks", wait=False) as acquired:
         if not acquired:
-            logger.debug("Another task already running monitor_project_tasks, exiting")
+            logger.debug(
+                "Another task already running monitor_project_tasks, exiting"
+            )
             return
 
         _monitor_project_tasks_no_lock

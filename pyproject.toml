@@ -43,7 +43,6 @@ psycopg-binary = { version = "*", optional = true }
 django-rq = "^2.8.0"
 rq = "^1.13.0"
 django-filter = ">23.2,<24"
-django-pglocks = ">=1.0.4"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
