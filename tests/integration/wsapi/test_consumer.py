@@ -738,6 +738,7 @@ def get_job_instance_event_count():
 def _prepare_activation_instance_with_credentials(
     default_organization: models.Organization,
     credentials: list[models.EdaCredential],
+    system_vault_credential: models.EdaCredential = None,
 ):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
@@ -774,6 +775,7 @@ def _prepare_activation_instance_with_credentials(
         project=project,
         user=user,
         decision_environment=decision_environment,
+        eda_system_vault_credential=system_vault_credential,
         organization=default_organization,
     )
     activation.eda_credentials.add(*credentials)
@@ -1237,6 +1239,41 @@ async def test_handle_workers_with_file_contents(
                 assert response[key] == value
 
 
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_env_vars(
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    eda_credential = await _prepare_aap_credential_async(default_organization)
+    system_credential = await _prepare_system_vault_credential_async(
+        default_organization
+    )
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [eda_credential],
+        system_credential,
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
+        "ControllerInfo",
+        "VaultCollection",
+        "EnvVars",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "EnvVars":
+            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
+
+
 @database_sync_to_async
 def _prepare_credential(
     credential_type_inputs: dict,
@@ -1256,6 +1293,33 @@ def _prepare_credential(
         managed=False,
         credential_type=credential_type,
         organization=default_organization,
+    )
+
+
+@database_sync_to_async
+def _prepare_aap_credential_async(
+    organization: models.Organization,
+):
+    return _prepare_aap_credential(organization)
+
+
+def _prepare_aap_credential(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+
+    data = "secret"
+    return models.EdaCredential.objects.create(
+        name="eda_aap_credential",
+        inputs={
+            "host": "https://controller_url/",
+            "username": "adam",
+            "password": data,
+        },
+        credential_type=aap_credential_type,
+        organization=organization,
     )
 
 

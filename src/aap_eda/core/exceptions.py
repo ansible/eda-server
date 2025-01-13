@@ -39,3 +39,7 @@ class DuplicateFileTemplateKeyError(Exception):
 
 class DuplicateEnvKeyError(Exception):
     pass
+
+
+class InvalidEnvKeyError(Exception):
+    pass
