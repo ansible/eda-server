@@ -33,7 +33,7 @@ jobs:
           pip install poetry
 
       - name: Run poetry lock
-        run: poetry lock --no-update
+        run: poetry lock
 
       - name: Check if lock file changed
         id: lock-changed
