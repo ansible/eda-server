@@ -558,7 +558,7 @@ def test_create_activation_with_bad_rulebook_hash(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert str(response.data[SOURCE_MAPPING_ERROR_KEY][0]) == (
         "Rulebook has changed since the sources were mapped."
-        " Please reattach Event streams again"
+        " Please reattach event streams"
     )
 
 
@@ -811,25 +811,20 @@ def test_update_activation_with_everything(
                 "source_name": f"{DEFAULT_SOURCE_NAME_PREFIX}1",
             }
         )
-    # to be enabled in another PR
-    """
     test_activation2["source_mappings"] = yaml.dump(source_mappings2)
-    """
+
     response = admin_client.patch(
         f"{api_url_v1}/activations/{activation_id}/", data=test_activation2
     )
-    assert response.status_code == status.HTTP_200_OK
-    data = response.data
-    activation = models.Activation.objects.filter(id=data["id"]).first()
-    assert activation.rulebook_name == f"{TEST_RULEBOOK['name']}2"
-    """
-    swapped_ruleset = yaml.safe_load(activation.rulebook_rulesets)
-    assert sorted(swapped_ruleset[0]["sources"][0].keys()) == [
-       "ansible.eda.pg_listener",
-       "name",
-    ]
-    assert data["event_streams"][0]["name"] == "demo-2"
-    """
+    assert_updated_event_stream_mapping(
+        response,
+        ["ansible.eda.pg_listener", "name"],
+        test_activation2["source_mappings"],
+        "demo-2",
+    )
+    activation = models.Activation.objects.filter(
+        id=response.data["id"]
+    ).first()
     for key, val in test_activation2.items():
         if key == "extra_var":
             assert activation.extra_var == (
@@ -842,6 +837,63 @@ def test_update_activation_with_everything(
             assert activation.eda_credentials.all()[0].id == val[0]
             continue
         if key == "source_mappings":
-            assert activation.source_mappings.strip() == val.strip()
             continue
         assert getattr(activation, key) == val
+
+    # test unchanged event stream mapping
+    test_activation3 = {"name": "name3"}
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation3
+    )
+    assert_updated_event_stream_mapping(
+        response,
+        ["ansible.eda.pg_listener", "name"],
+        test_activation2["source_mappings"],
+        "demo-2",
+    )
+
+    # test only changing event stream mapping
+    source_mappings = []
+    for event_stream in fks["event_streams"]:
+        source_mappings.append(
+            {
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
+                "rulebook_hash": get_rulebook_hash(LEGACY_TEST_RULESETS),
+                "source_name": f"{DEFAULT_SOURCE_NAME_PREFIX}1",
+            }
+        )
+    test_activation4 = {"source_mappings": yaml.dump(source_mappings)}
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation4
+    )
+    assert_updated_event_stream_mapping(
+        response,
+        ["ansible.eda.pg_listener", "name"],
+        test_activation4["source_mappings"],
+        "demo",
+    )
+
+    # test clearing event stream mapping
+    test_activation5 = {"rulebook_id": fks2["rulebook_id"]}
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation5
+    )
+    assert_updated_event_stream_mapping(
+        response, ["ansible.eda.range"], "", ""
+    )
+
+
+def assert_updated_event_stream_mapping(
+    response, sources: list, source_mappings: str, event_stream_name: str
+):
+    assert response.status_code == status.HTTP_200_OK
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    swapped_ruleset = yaml.safe_load(activation.rulebook_rulesets)
+    assert sorted(swapped_ruleset[0]["sources"][0].keys()) == sources
+    assert data["source_mappings"].strip() == source_mappings.strip()
+    if event_stream_name:
+        assert data["event_streams"][0]["name"] == "demo-2"
+    else:
+        assert data["event_streams"] == []
