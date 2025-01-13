@@ -530,12 +530,8 @@ RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 RQ_STARTUP_JOBS = []
 
 CELERYBEAT_SCHEDULE = {
-    "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {
-        "schedule": timedelta(seconds=5)
-    },
-    "aap_eda.tasks.project._monitor_project_tasks": {
-        "schedule": timedelta(seconds=30)
-    },
+    "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 30},
+    "aap_eda.tasks.project._monitor_project_tasks": {"schedule": 30},
 }
 
 RQ_CRON_JOBS = []
@@ -767,9 +763,9 @@ ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
 )
 
 if RESOURCE_SERVER["URL"] and RESOURCE_SERVER["SECRET_KEY"]:
-    CELERYBEAT_SCHEDULE["aap_eda.tasks.shared_resources.resync_shared_resources"] = {
-        "schedule": timedelta(seconds=900)
-    }
+    CELERYBEAT_SCHEDULE[
+        "aap_eda.tasks.shared_resources.resync_shared_resources"
+    ] = {"schedule": 900}
 
 
 ACTIVATION_DB_HOST = settings.get(
