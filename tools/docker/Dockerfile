@@ -33,7 +33,7 @@ RUN DNF=dnf \
     && rm -rf /var/cache/dnf
 
 USER "$USER_ID"
-ENV POETRY_VERSION="2.0.*" \
+ENV POETRY_VERSION="2.*" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
