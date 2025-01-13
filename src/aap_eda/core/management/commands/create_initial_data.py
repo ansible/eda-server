@@ -25,7 +25,6 @@ from django.db.models import Q
 
 from aap_eda.core import enums, models
 from aap_eda.core.models.utils import get_default_organization
-from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
 
 NEW_HELP_TEXT = (
