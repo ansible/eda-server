@@ -745,6 +745,7 @@ version = "1.0.4"
 description = "django_pglocks provides useful context managers for advisory locks for PostgreSQL."
 optional = false
 python-versions = "*"
+groups = ["main"]
 files = [
     {file = "django-pglocks-1.0.4.tar.gz", hash = "sha256:3c47c66fbfbd268ef46269673a0516a039539b0972b8ed2ec9cfee44c4b65523"},
 ]
@@ -2967,4 +2968,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "aa95339492e022686f01fa21e5cff1cf4508dcead5b8fcf5a301856d68a357b3"
+content-hash = "a13b66e13a292cb4937a61c3acaacd8a6cf1f9d11e709d43d9d38ea3b143b6b7"
