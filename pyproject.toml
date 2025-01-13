@@ -2,21 +2,27 @@
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-# -------------------------------------
-# Poetry: Metadata
-# -------------------------------------
-
-[tool.poetry]
+[project]
 name = "aap-eda"
 version = "0.2.0"
 description = ""
-authors = ["Red Hat, Inc. <info@ansible.com>"]
 readme = "README.md"
+authors = [
+    { name = "Ansible, Inc.", email = "Red Hat, Inc. <info@ansible.com>" },
+]
+requires-python = ">=3.11,<3.13"
+
+[project.scripts]
+aap-eda-manage = 'aap_eda.manage:main'
+
+
+# -------------------------------------
+# Poetry: Metadata
+# -------------------------------------
+[tool.poetry]
 packages = [{ include = "aap_eda", from = "src" }]
 include = ["aap_eda/data/playbooks/*.yml"]
 
-[tool.poetry.scripts]
-aap-eda-manage = 'aap_eda.manage:main'
 
 # -------------------------------------
 # Poetry: Dependencies
