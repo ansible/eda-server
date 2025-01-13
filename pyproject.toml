@@ -42,13 +42,12 @@ psycopg-binary = { version = "*", optional = true }
 django-rq = "^2.8.0"
 rq = "^1.13.0"
 django-filter = ">23.2,<24"
-django-pglocks = ">=1.0.4"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "4.9.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2024.12.13", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.1.3", extras = [
     "channel-auth",
     "rbac",
     "redis-client",

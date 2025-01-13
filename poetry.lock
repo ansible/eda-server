@@ -649,7 +649,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.12.13"
+version = "2025.1.3"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -687,8 +687,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "b37fdd2ce8baa21cd2a40c96ff3a871e97363b14"
+reference = "2025.1.3"
+resolved_reference = "1cf551b7834453dcfd09de1a18b44f9538f93852"
 
 [[package]]
 name = "django-crum"
@@ -738,20 +738,6 @@ Django = ">=2.2"
 [package.extras]
 docs = ["mkdocs (>=0.17)", "mkdocs-rtd-dropdown (>=0.0.11)", "pymdown-extensions (>=4.11)"]
 testing = ["coverage (>=3.7.0)", "django-debug-toolbar (>=3.2,<4)", "jinja2"]
-
-[[package]]
-name = "django-pglocks"
-version = "1.0.4"
-description = "django_pglocks provides useful context managers for advisory locks for PostgreSQL."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "django-pglocks-1.0.4.tar.gz", hash = "sha256:3c47c66fbfbd268ef46269673a0516a039539b0972b8ed2ec9cfee44c4b65523"},
-]
-
-[package.dependencies]
-six = ">=1.0.0"
 
 [[package]]
 name = "django-redis"
@@ -2968,4 +2954,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "a13b66e13a292cb4937a61c3acaacd8a6cf1f9d11e709d43d9d38ea3b143b6b7"
+content-hash = "902ea6b1c05edfe9e701560a92e6d049060c56bf65a835cfc6b10e72310b1181"
