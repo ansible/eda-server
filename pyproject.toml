@@ -1,5 +1,5 @@
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
@@ -20,6 +20,7 @@ aap-eda-manage = 'aap_eda.manage:main'
 # Poetry: Metadata
 # -------------------------------------
 [tool.poetry]
+requires-poetry = ">=2.0,<3.0"
 packages = [{ include = "aap_eda", from = "src" }]
 include = ["aap_eda/data/playbooks/*.yml"]
 
