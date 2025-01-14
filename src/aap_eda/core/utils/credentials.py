@@ -33,6 +33,7 @@ from aap_eda.core.utils.crypto.base import SecretValue
 
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
+
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
@@ -563,3 +564,18 @@ def _add_file_template_keys(context: dict, files: dict):
             context["eda"]["filename"][parts[1]] = ""
         else:
             context["eda"] = {"filename": {parts[1]: ""}}
+
+
+def add_default_values_to_user_inputs(schema: dict, inputs: dict) -> dict:
+    for field in schema.get("fields", []):
+        key = field.get("id")
+        field_type = field.get("type", "string")
+        default_value = field.get("default")
+
+        if key not in inputs:
+            if field_type == "string":
+                inputs[key] = default_value or ""
+            if field_type == "boolean":
+                inputs[key] = default_value or False
+
+    return inputs

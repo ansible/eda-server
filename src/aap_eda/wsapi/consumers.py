@@ -19,9 +19,13 @@ from aap_eda.core.enums import DefaultCredentialType
 from aap_eda.core.exceptions import (
     DuplicateEnvKeyError,
     DuplicateFileTemplateKeyError,
+    InvalidEnvKeyError,
 )
 from aap_eda.core.models.activation import ActivationStatus
-from aap_eda.core.utils.credentials import get_secret_fields
+from aap_eda.core.utils.credentials import (
+    add_default_values_to_user_inputs,
+    get_secret_fields,
+)
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.tasks import orchestrator
 
@@ -118,6 +122,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 logger.warning(f"Unsupported message received: {data}")
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
+        except InvalidEnvKeyError as err:
+            logger.error(f"Failed to parse {data} due to Env error: {err}")
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
@@ -531,39 +537,41 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     def get_env_vars_from_credentials(
         self, activation: models.Activation
     ) -> tp.Optional[str]:
-        vault_password, vault_id = self.get_vault_password_and_id(activation)
-        env_vars = {}
-
-        for eda_credential in activation.eda_credentials.all():
-            schema_inputs = eda_credential.credential_type.inputs
-            secret_fields = get_secret_fields(schema_inputs)
-            injectors = eda_credential.credential_type.injectors
-            user_inputs = yaml.safe_load(
-                eda_credential.inputs.get_secret_value()
+        try:
+            vault_password, vault_id = self.get_vault_password_and_id(
+                activation
             )
-            if "env" not in injectors:
-                continue
+            env_vars = {}
 
-            if secret_fields:
-                self.encrypt_user_inputs(
-                    secret_fields=secret_fields,
-                    user_inputs=user_inputs,
-                    password=vault_password,
-                    vault_id=vault_id,
+            for eda_credential in activation.eda_credentials.all():
+                injectors = eda_credential.credential_type.injectors
+                if "env" not in injectors:
+                    continue
+
+                schema_inputs = eda_credential.credential_type.inputs
+                secret_fields = get_secret_fields(schema_inputs)
+                user_inputs = yaml.safe_load(
+                    eda_credential.inputs.get_secret_value()
                 )
 
-            for key, value in injectors["env"].items():
-                if key in env_vars:
-                    raise DuplicateEnvKeyError(f"env {key} already exists")
-                env_vars[key] = (
-                    value
-                    if not isinstance(value, str) or "eda.filename" in value
-                    else substitute_variables(value, user_inputs)
-                )
+                add_default_values_to_user_inputs(schema_inputs, user_inputs)
 
-        if not env_vars:
-            return None
-        return yaml.dump(env_vars)
+                if secret_fields:
+                    self.encrypt_user_inputs(
+                        secret_fields=secret_fields,
+                        user_inputs=user_inputs,
+                        password=vault_password,
+                        vault_id=vault_id,
+                    )
+
+                self.substitute_envs(env_vars, injectors, user_inputs)
+
+            if not env_vars:
+                return None
+
+            return yaml.dump(env_vars)
+        except TypeError as err:
+            raise InvalidEnvKeyError(str(err)) from err
 
     @staticmethod
     def encrypt_user_inputs(
@@ -579,6 +587,20 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                     plaintext=value,
                     vault_id=vault_id,
                 )
+
+    @staticmethod
+    def substitute_envs(
+        envs: dict, injectors: dict, user_inputs: dict
+    ) -> None:
+        for key, value in injectors["env"].items():
+            if key in envs:
+                raise DuplicateEnvKeyError(f"env {key} already exists")
+
+            envs[key] = (
+                value
+                if not isinstance(value, str) or "eda.filename" in value
+                else substitute_variables(value, user_inputs)
+            )
 
     @staticmethod
     def get_vault_password_and_id(
