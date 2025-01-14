@@ -14,6 +14,7 @@
 
 from crum import get_current_user
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.db import models
 
 __all__ = ("BaseOrgModel", "UniqueNamedModel", "PrimordialModel")
@@ -72,13 +73,18 @@ class PrimordialModel(models.Model):
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields", [])
         current_user = get_current_user()
-        if (
-            not self.pk and current_user and not self.created_by
-        ):  # Set `created_by` only for new objects
-            self.created_by = current_user
-            if "created_by" not in update_fields:
-                update_fields.append("created_by")
-        if current_user:  # Always update `modified_by`
+        if current_user:
+            if isinstance(current_user, AnonymousUser):
+                super().save(*args, **kwargs)
+                return
+
+            # Set `created_by` only for new objects
+            if not self.pk and not self.created_by:
+                self.created_by = current_user
+                if "created_by" not in update_fields:
+                    update_fields.append("created_by")
+
+            # Always update `modified_by`
             self.modified_by = current_user
             if "modified_by" not in update_fields:
                 update_fields.append("modified_by")

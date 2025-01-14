@@ -19,7 +19,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.core import enums
+from aap_eda.core import enums, models
 from tests.integration.api.test_event_stream import (
     create_event_stream,
     create_event_stream_credential,
@@ -37,7 +37,9 @@ from tests.integration.api.test_event_stream import (
 )
 @pytest.mark.django_db
 def test_post_event_stream_with_basic_auth(
-    admin_client: APIClient,
+    base_client: APIClient,
+    admin_user: models.User,
+    anonymous_user: models.User,
     preseed_credential_types,
     auth_status,
     bogus_password,
@@ -51,8 +53,9 @@ def test_post_event_stream_with_basic_auth(
         "http_header_key": "Authorization",
     }
 
+    base_client.force_authenticate(user=admin_user)
     obj = create_event_stream_credential(
-        admin_client, enums.EventStreamCredentialType.BASIC.value, inputs
+        base_client, enums.EventStreamCredentialType.BASIC.value, inputs
     )
 
     data_in = {
@@ -62,7 +65,7 @@ def test_post_event_stream_with_basic_auth(
         "organization_id": get_default_test_org().id,
         "test_mode": True,
     }
-    event_stream = create_event_stream(admin_client, data_in)
+    event_stream = create_event_stream(base_client, data_in)
     if bogus_password:
         user_pass = f"{username}:{bogus_password}"
     else:
@@ -76,7 +79,16 @@ def test_post_event_stream_with_basic_auth(
         "Authorization": auth_value,
         "Content-Type": content_type,
     }
-    response = admin_client.post(
+    response = base_client.post(
+        event_stream_post_url(event_stream.uuid),
+        headers=headers,
+        data=data_bytes,
+        content_type=content_type,
+    )
+    assert response.status_code == auth_status
+
+    base_client.force_authenticate(user=anonymous_user)
+    response = base_client.post(
         event_stream_post_url(event_stream.uuid),
         headers=headers,
         data=data_bytes,

@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.test import override_settings
 from rest_framework.test import APIClient
@@ -98,6 +99,11 @@ def admin_user(default_organization, admin_info):
 
 
 @pytest.fixture
+def anonymous_user():
+    return AnonymousUser()
+
+
+@pytest.fixture
 def default_user_awx_token(default_user: models.User):
     return models.AwxToken.objects.create(
         name="admin-awx-token",
@@ -135,6 +141,15 @@ def user_client(
 def admin_client(base_client: APIClient, admin_user: models.User) -> APIClient:
     """Return a pre-configured instance of an APIClient with admin user."""
     base_client.force_authenticate(user=admin_user)
+    return base_client
+
+
+@pytest.fixture
+def anonymous_client(
+    base_client: APIClient, anonymous_user: models.User
+) -> APIClient:
+    """Return a pre-configured instance of an APIClient with anonymous_user."""
+    base_client.force_authenticate(user=anonymous_user)
     return base_client
 
 
