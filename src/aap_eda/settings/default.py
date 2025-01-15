@@ -192,6 +192,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
+    "pgactivity",
+    "pglock",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
@@ -530,7 +532,7 @@ RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 RQ_STARTUP_JOBS = []
 
 CELERYBEAT_SCHEDULE = {
-    "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 30},
+    "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 5},
     "aap_eda.tasks.project._monitor_project_tasks": {"schedule": 30},
 }
 
