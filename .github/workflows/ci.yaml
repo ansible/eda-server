@@ -105,7 +105,7 @@ jobs:
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           env_vars: OS,PYTHON
           fail_ci_if_error: false
