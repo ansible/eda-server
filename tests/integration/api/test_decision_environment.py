@@ -327,6 +327,87 @@ def test_create_decision_environment_with_empty_credential(
         assert status_message in str(errors)
 
 
+@pytest.mark.parametrize(
+    ("return_code", "image_url", "unallowed"),
+    [
+        (
+            status.HTTP_201_CREATED,
+            "1.2.3.4/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com/group/img1:latest",
+            "",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "https://registry.com/group/img1:latest",
+            "",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/",
+            "no image path found",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/:tag",
+            "'group/' does not match OCI name standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/img1:",
+            "'' does not match OCI tag standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/bad^img1",
+            "'group/bad^img1' does not match OCI name standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com/group/img1:bad^tag",
+            "'bad^tag' does not match OCI tag standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com:5000/group/img1:bad^tag@additional-content",
+            "'bad^tag' does not match OCI tag standard",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_decision_environment_with_no_credential(
+    return_code,
+    image_url,
+    unallowed,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": image_url,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == return_code
+    if return_code == status.HTTP_400_BAD_REQUEST:
+        errors = response.data.get("non_field_errors")
+        assert f"Image url {image_url} is malformed; {unallowed}" in str(
+            errors
+        )
+
+
 @pytest.mark.django_db
 def test_create_decision_environment_with_none_organization(
     admin_client: APIClient,

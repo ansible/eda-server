@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from urllib.parse import urlparse
+
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
@@ -73,9 +75,11 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         eda_credential_id = data.get("eda_credential_id")
+        image_url = data.get("image_url") or self.instance.image_url
         if eda_credential_id:
-            image_url = data.get("image_url") or self.instance.image_url
             validators.check_if_de_valid(image_url, eda_credential_id)
+        else:
+            validators.check_if_de_valid(image_url, -1)
 
         return data
 
