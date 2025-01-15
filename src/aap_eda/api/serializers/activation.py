@@ -32,6 +32,7 @@ from aap_eda.api.serializers.decision_environment import (
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
@@ -290,6 +291,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -312,6 +315,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
             "status_message",
             "awx_token_id",
             "log_level",
@@ -565,6 +570,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -590,6 +597,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
             "restarted_at",
             "status_message",
             "awx_token_id",
@@ -660,8 +669,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.ruleset_stats
             else ""
         )
-        created_by = BasicUserSerializer(activation.created_by).data
-        modified_by = BasicUserSerializer(activation.modified_by).data
 
         return {
             "id": activation.id,
@@ -696,8 +703,8 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
-            "created_by": created_by,
-            "modified_by": modified_by,
+            "created_by": BasicUserSerializer(activation.created_by).data,
+            "modified_by": BasicUserSerializer(activation.modified_by).data,
         }
 
 

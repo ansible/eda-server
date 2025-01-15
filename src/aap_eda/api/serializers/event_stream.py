@@ -20,6 +20,7 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
@@ -83,6 +84,8 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
         required=True, allow_null=False
     )
     url = serializers.SerializerMethodField()
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.EventStream
@@ -98,8 +101,6 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             "test_headers",
             "events_received",
             "last_event_received_at",
-            "created_by",
-            "modified_by",
         ]
         fields = [
             "name",
@@ -108,6 +109,8 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             "organization",
             "eda_credential",
             "event_stream_type",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 

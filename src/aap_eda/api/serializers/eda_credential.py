@@ -17,6 +17,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
@@ -51,6 +52,8 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
     )
     organization = OrganizationRefSerializer()
     references = EdaCredentialReferenceField(required=False, allow_null=True)
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.EdaCredential
@@ -58,8 +61,6 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
-            "created_by",
-            "modified_by",
             "managed",
             "organization",
         ]
@@ -69,6 +70,8 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "inputs",
             "credential_type",
             "references",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 
