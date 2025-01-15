@@ -77,7 +77,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
         if eda_credential_id:
             validators.check_if_de_valid(image_url, eda_credential_id)
         else:
-            validators.check_if_de_valid(image_url, -1)
+            validators.check_if_de_valid(image_url)
 
         return data
 
