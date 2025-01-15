@@ -15,20 +15,22 @@
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 
 
 class DecisionEnvironmentSerializer(serializers.ModelSerializer):
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
+
     class Meta:
         model = models.DecisionEnvironment
         read_only_fields = [
             "id",
             "created_at",
             "modified_at",
-            "created_by",
-            "modified_by",
         ]
         fields = [
             "name",
@@ -36,6 +38,8 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 
@@ -93,6 +97,8 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
         required=False, allow_null=True
     )
     organization = OrganizationRefSerializer()
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.DecisionEnvironment
@@ -112,8 +118,6 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
-            "created_by",
-            "modified_by",
         ]
 
     def to_representation(self, decision_environment):
