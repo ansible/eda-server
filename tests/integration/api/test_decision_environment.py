@@ -346,6 +346,11 @@ def test_create_decision_environment_with_empty_credential(
             "",
         ),
         (
+            status.HTTP_201_CREATED,
+            "registry.com/group/img1@sha256:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
+            "",
+        ),
+        (
             status.HTTP_400_BAD_REQUEST,
             "https://registry.com/group/img1:latest",
             "",

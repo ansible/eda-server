@@ -102,8 +102,14 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url}
         )
 
-    split = path.split(":", 1)
-    name = split[0]
+    digest = False
+    if "@sha256" in path:
+        split = path.split("@", 1)
+        name = split[0]
+        digest = True
+    else:
+        split = path.split(":", 1)
+        name = split[0]
     # Get the tag sans any additional content.  Any additional content
     # is passed without validation.
     tag = split[1] if (len(split) > 1) else None
@@ -121,7 +127,7 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url, "name": name}
         )
 
-    if (tag is not None) and (
+    if (not digest and tag is not None) and (
         not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
     ):
         raise serializers.ValidationError(
