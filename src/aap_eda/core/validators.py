@@ -133,7 +133,6 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
         )
 
     if eda_credential_id != -1:
-
         credential = get_credential_if_exists(eda_credential_id)
         inputs = yaml.safe_load(credential.inputs.get_secret_value())
         credential_host = inputs.get("host")
@@ -145,8 +144,9 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             )
 
         # Check that the host matches the credential host.
-        # For backward compatibility when creating a new DE with an old credential
-        # we need to separate any scheme from the host before doing the compare.
+        # For backward compatibility when creating a new DE with
+        # an old credential we need to separate any
+        # scheme from the host before doing the compare.
         parsed_credential_host = urllib.parse.urlparse(credential_host)
         # If there's a netloc that's the host to use; if not, it's the path if
         # there is no scheme else it's the scheme and path joined by a colon.
