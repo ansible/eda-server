@@ -349,6 +349,11 @@ de_requests = [
         "",
     ),
     (
+        True,
+        "registry.com/group/img1@sha512:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
+        "",
+    ),
+    (
         False,
         "https://registry.com/group/img1:latest",
         "",

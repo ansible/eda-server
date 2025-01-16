@@ -105,7 +105,7 @@ def check_if_de_valid(
         )
 
     digest = False
-    if "@sha256" in path:
+    if "@sha256" in path or "@sha512" in path:
         split = path.split("@", 1)
         name = split[0]
         digest = True
