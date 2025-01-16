@@ -447,3 +447,11 @@ def check_credential_types_for_event_stream(eda_credential_id: int) -> int:
 
     _validate_event_stream_settings(name)
     return eda_credential_id
+
+
+def check_if_activation_name_used(name: str) -> str:
+    if models.Activation.objects.filter(name=name).first():
+        raise serializers.ValidationError(
+            f"Activation with name {name} already exists"
+        )
+    return name

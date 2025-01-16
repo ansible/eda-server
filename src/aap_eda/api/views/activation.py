@@ -508,6 +508,53 @@ class ActivationViewSet(
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        description="Copy an activation.",
+        request=serializers.ActivationCopySerializer,
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                serializers.ActivationReadSerializer,
+                description="Return the copied activation.",
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                None, description="Activation not found."
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True, rbac_action=Action.READ)
+    def copy(self, request, pk):
+        activation = self.get_object()
+        serializer = serializers.ActivationCopySerializer(
+            instance=activation, data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            response = serializer.copy()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(activation),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Copy",
+                resource_name,
+                response.name,
+                response.id,
+                response.organization,
+            )
+        )
+
+        return Response(
+            serializers.ActivationReadSerializer(response).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     def _check_deleting(self, activation):
         if activation.status == ActivationStatus.DELETING:
             raise exceptions.APIException(

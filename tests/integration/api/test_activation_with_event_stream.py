@@ -745,45 +745,13 @@ def test_bad_src_activation_with_event_stream(
 def test_update_activation_with_everything(
     admin_client: APIClient, preseed_credential_types
 ):
-    fks = create_activation_related_data(["demo"], rulesets=TEST_RULESETS)
-    organization = models.Organization.objects.get(pk=fks["organization_id"])
-    credential = custom_credential("test", organization)
-
-    test_activation = {
-        "name": "test-activation",
-        "description": "test activation",
-        "is_enabled": False,
-        "extra_var": TEST_EXTRA_VAR,
-        "eda_credentials": [credential.id],
-        "decision_environment_id": fks["decision_environment_id"],
-        "rulebook_id": fks["rulebook_id"],
-        "organization_id": fks["organization_id"],
-        "skip_audit_events": False,
-        "restart_policy": enums.RestartPolicy.ALWAYS,
-        "log_level": enums.RulebookProcessLogLevel.ERROR,
-        "k8s_service_name": "demo-service",
-    }
-    source_mappings = []
-    for event_stream in fks["event_streams"]:
-        source_mappings.append(
-            {
-                "event_stream_name": event_stream.name,
-                "event_stream_id": event_stream.id,
-                "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
-                "source_name": "demo",
-            }
-        )
-    test_activation["source_mappings"] = yaml.dump(source_mappings)
-
-    response = admin_client.post(
-        f"{api_url_v1}/activations/", data=test_activation
-    )
-    assert response.status_code == status.HTTP_201_CREATED
+    response = _create_activation_with_everything(admin_client)
     activation_id = response.data["id"]
 
     fks2 = create_activation_related_data(
         ["demo-2"], rulesets=LEGACY_TEST_RULESETS, suffix="2"
     )
+    organization = models.Organization.objects.get(pk=fks2["organization_id"])
     credential2 = custom_credential("test-2", organization)
     extra_var2 = TEST_EXTRA_VAR.replace(
         "community.general", "community.shared"
@@ -854,7 +822,7 @@ def test_update_activation_with_everything(
 
     # test only changing event stream mapping
     source_mappings = []
-    for event_stream in fks["event_streams"]:
+    for event_stream in fks2["event_streams"]:
         source_mappings.append(
             {
                 "event_stream_name": event_stream.name,
@@ -882,6 +850,93 @@ def test_update_activation_with_everything(
     assert_updated_event_stream_mapping(
         response, ["ansible.eda.range"], "", ""
     )
+
+
+@pytest.mark.django_db
+def test_copy_activation_with_everything(
+    admin_client: APIClient, preseed_credential_types
+):
+    response = _create_activation_with_everything(admin_client)
+    data1 = response.data
+
+    response2 = admin_client.post(
+        f"{api_url_v1}/activations/{data1['id']}/copy/", {"name": "new name"}
+    )
+    assert response2.status_code == status.HTTP_201_CREATED
+    data2 = response2.data
+
+    assert data1["id"] != data2["id"]
+    assert data2["name"] == "new name"
+    assert data2["is_enabled"] is False
+
+    keys = {
+        "description",
+        "decision_environment",
+        "git_hash",
+        "project",
+        "rulebook",
+        "extra_var",
+        "organization",
+        "restart_policy",
+        "rulebook_name",
+        "log_level",
+        "eda_credentials",
+        "k8s_service_name",
+        "event_streams",
+        "source_mappings",
+    }
+    for key in keys:
+        assert data1[key] == data2[key]
+
+    activation1 = models.Activation.objects.get(id=data1["id"])
+    activation2 = models.Activation.objects.get(id=data2["id"])
+    assert activation1.rulebook_rulesets == activation2.rulebook_rulesets
+    assert (
+        activation1.eda_system_vault_credential
+        != activation2.eda_system_vault_credential
+    )
+    assert (
+        activation1.eda_system_vault_credential.inputs
+        == activation2.eda_system_vault_credential.inputs
+    )
+
+
+def _create_activation_with_everything(admin_client):
+    fks = create_activation_related_data(["demo"], rulesets=TEST_RULESETS)
+    organization = models.Organization.objects.get(pk=fks["organization_id"])
+    credential = custom_credential("test", organization)
+
+    test_activation = {
+        "name": "test-activation",
+        "description": "test activation",
+        "is_enabled": False,
+        "extra_var": TEST_EXTRA_VAR,
+        "eda_credentials": [credential.id],
+        "decision_environment_id": fks["decision_environment_id"],
+        "rulebook_id": fks["rulebook_id"],
+        "organization_id": fks["organization_id"],
+        "skip_audit_events": False,
+        "restart_policy": enums.RestartPolicy.ALWAYS,
+        "log_level": enums.RulebookProcessLogLevel.ERROR,
+        "k8s_service_name": "demo-service",
+    }
+    source_mappings = []
+    for event_stream in fks["event_streams"]:
+        source_mappings.append(
+            {
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
+                "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
+                "source_name": "demo",
+            }
+        )
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    return response
 
 
 def assert_updated_event_stream_mapping(
