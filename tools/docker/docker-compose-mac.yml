@@ -70,7 +70,7 @@ services:
       start_period: 5s
 
   redis:
-    image: ${EDA_REDIS_IMAGE:-docker.io/library/redis}:${EDA_REDIS_VERSION:-6.2.14}
+    image: ${EDA_REDIS_IMAGE:-mirror.gcr.io/library/redis}:${EDA_REDIS_VERSION:-6.2.14}
     ports:
       - '${EDA_REDIS_PORT:-6379}:6379'
     healthcheck:
