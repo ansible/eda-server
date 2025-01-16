@@ -62,7 +62,9 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     return decision_environment_id
 
 
-def check_if_de_valid(image_url: str, eda_credential_id: int = None):
+def check_if_de_valid(
+    image_url: str, eda_credential_id: tp.Optional[int] = None
+):
     # The OCI standard format for the image url is a combination of a host
     # (with optional port) separated from the image path (with optional tag) by
     # a slash: <host>[:port]/<path>[:tag].

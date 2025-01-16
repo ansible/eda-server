@@ -327,69 +327,72 @@ def test_create_decision_environment_with_empty_credential(
         assert status_message in str(errors)
 
 
+de_requests = [
+    (
+        True,
+        "1.2.3.4/group/img1",
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1",
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1:latest",
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1@sha256:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
+        "",
+    ),
+    (
+        False,
+        "https://registry.com/group/img1:latest",
+        "",
+    ),
+    (
+        False,
+        "registry.com/",
+        "no image path found",
+    ),
+    (
+        False,
+        "registry.com/group/:tag",
+        "'group/' does not match OCI name standard",
+    ),
+    (
+        False,
+        "registry.com/group/img1:",
+        "'' does not match OCI tag standard",
+    ),
+    (
+        False,
+        "registry.com/group/bad^img1",
+        "'group/bad^img1' does not match OCI name standard",
+    ),
+    (
+        False,
+        "registry.com/group/img1:bad^tag",
+        "'bad^tag' does not match OCI tag standard",
+    ),
+    (
+        False,
+        "registry.com:5000/group/img1:bad^tag@additional-content",
+        "'bad^tag' does not match OCI tag standard",
+    ),
+]
+
+
 @pytest.mark.parametrize(
-    ("return_code", "image_url", "unallowed"),
-    [
-        (
-            status.HTTP_201_CREATED,
-            "1.2.3.4/group/img1",
-            "",
-        ),
-        (
-            status.HTTP_201_CREATED,
-            "registry.com/group/img1",
-            "",
-        ),
-        (
-            status.HTTP_201_CREATED,
-            "registry.com/group/img1:latest",
-            "",
-        ),
-        (
-            status.HTTP_201_CREATED,
-            "registry.com/group/img1@sha256:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
-            "",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "https://registry.com/group/img1:latest",
-            "",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/",
-            "no image path found",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/:tag",
-            "'group/' does not match OCI name standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/img1:",
-            "'' does not match OCI tag standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/bad^img1",
-            "'group/bad^img1' does not match OCI name standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/img1:bad^tag",
-            "'bad^tag' does not match OCI tag standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com:5000/group/img1:bad^tag@additional-content",
-            "'bad^tag' does not match OCI tag standard",
-        ),
-    ],
+    ("expected_success", "image_url", "unallowed"),
+    de_requests,
 )
 @pytest.mark.django_db
 def test_create_decision_environment_with_no_credential(
-    return_code,
+    expected_success,
     image_url,
     unallowed,
     default_organization: models.Organization,
@@ -405,6 +408,10 @@ def test_create_decision_environment_with_no_credential(
     response = admin_client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
     )
+    return_code = status.HTTP_400_BAD_REQUEST
+    if expected_success:
+        return_code = status.HTTP_201_CREATED
+
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
         errors = response.data.get("non_field_errors")
@@ -414,68 +421,12 @@ def test_create_decision_environment_with_no_credential(
 
 
 @pytest.mark.parametrize(
-    ("return_code", "image_url", "unallowed"),
-    [
-        (
-            status.HTTP_200_OK,
-            "1.2.3.4/group/img1",
-            "",
-        ),
-        (
-            status.HTTP_200_OK,
-            "registry.com/group/img1",
-            "",
-        ),
-        (
-            status.HTTP_200_OK,
-            "registry.com/group/img1:latest",
-            "",
-        ),
-        (
-            status.HTTP_200_OK,
-            "registry.com/group/img1@sha256:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
-            "",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "https://registry.com/group/img1:latest",
-            "",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/",
-            "no image path found",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/:tag",
-            "'group/' does not match OCI name standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/img1:",
-            "'' does not match OCI tag standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/bad^img1",
-            "'group/bad^img1' does not match OCI name standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com/group/img1:bad^tag",
-            "'bad^tag' does not match OCI tag standard",
-        ),
-        (
-            status.HTTP_400_BAD_REQUEST,
-            "registry.com:5000/group/img1:bad^tag@additional-content",
-            "'bad^tag' does not match OCI tag standard",
-        ),
-    ],
+    ("expected_success", "image_url", "unallowed"),
+    de_requests,
 )
 @pytest.mark.django_db
 def test_patch_decision_environment_with_no_credential(
-    return_code,
+    expected_success,
     image_url,
     unallowed,
     default_organization: models.Organization,
@@ -502,6 +453,9 @@ def test_patch_decision_environment_with_no_credential(
         f"{api_url_v1}/decision-environments/" f"{response.data['id']}/",
         data=data_in,
     )
+    return_code = status.HTTP_400_BAD_REQUEST
+    if expected_success:
+        return_code = status.HTTP_200_OK
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
         errors = response.data.get("non_field_errors")
