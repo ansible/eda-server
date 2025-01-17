@@ -261,8 +261,7 @@ class EdaCredentialViewSet(
 
     @extend_schema(
         description="Copy an EDA credential.",
-        request= serializers.EdaCredentialCopySerializer,
-
+        request=serializers.EdaCredentialCopySerializer,
         responses={
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.EdaCredentialSerializer,
@@ -276,7 +275,9 @@ class EdaCredentialViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.READ)
     def copy(self, request, pk):
         eda_credential = self.get_object()
-        post_data = build_copy_post_data(eda_credential, request.data.get("name"))
+        post_data = build_copy_post_data(
+            eda_credential, request.data.get("name")
+        )
 
         return self._create_eda_credential(request, post_data)
 

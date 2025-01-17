@@ -15,7 +15,6 @@
 import re
 import tempfile
 import typing
-from datetime import datetime
 
 import gnupg
 import jinja2
@@ -30,6 +29,10 @@ from rest_framework import serializers
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
 from aap_eda.core.utils.crypto.base import SecretValue
+
+# from datetime import datetime
+
+
 
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
@@ -520,13 +523,15 @@ def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
             )
 
 
-def build_copy_post_data(eda_credential: "models.EdaCredential", newCredName: str) -> dict:
+def build_copy_post_data(
+    eda_credential: "models.EdaCredential", newCredName: str
+) -> dict:
     """Build a POST payload data from an existing EDA Credential object."""
     post_data = model_to_dict(eda_credential)
     # Remove 'id' field from post data
     post_data.pop("id")
-    post_data["name"] =  newCredName
-    
+    post_data["name"] = newCredName
+
     # Update foreign key fields
     post_data["organization_id"] = post_data.pop("organization")
     post_data["credential_type_id"] = post_data.pop("credential_type")

@@ -252,14 +252,16 @@ def check_if_credential_type_exists(credential_type_id: int) -> int:
         )
     return credential_type_id
 
+
 def check_if_credential_name_exists(name: str) -> str:
     if models.EdaCredential.objects.filter(
-            name=request.data.get("name")
-        ).exists():
+        name=name
+    ).exists():
         raise serializers.ValidationError(
             f"Credential name already exists: {name}"
         )
     return name
+
 
 def check_if_organization_exists(organization_id: int) -> int:
     try:

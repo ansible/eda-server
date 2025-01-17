@@ -1113,7 +1113,6 @@ def test_custom_credential_type_empty_inputs(
     assert result["name"] == "demo-credential"
 
 
-
 @pytest.mark.django_db
 def test_copy_eda_credential_success(
     admin_client: APIClient,
@@ -1122,11 +1121,12 @@ def test_copy_eda_credential_success(
     name_of_copied_cretential = "name_of_copied_cretential"
     data = {"name": name_of_copied_cretential}
     response = admin_client.post(
-        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/", data=data
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
+        data=data,
     )
     assert response.status_code == status.HTTP_201_CREATED
     new_credential = response.data
-    assert new_credential["id"] != default_registry_credential.id   
+    assert new_credential["id"] != default_registry_credential.id
     assert (
         new_credential["credential_type"]["id"]
         == default_registry_credential.credential_type.id
@@ -1147,9 +1147,9 @@ def test_copy_eda_credential_duplicate_name(
     name_of_copied_cretential = default_registry_credential.name
     data = {"name": name_of_copied_cretential}
     response = admin_client.post(
-        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/", data=data
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
+        data=data,
     )
-    new_credential = response.data
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 

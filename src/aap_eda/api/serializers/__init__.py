@@ -35,10 +35,10 @@ from .decision_environment import (
     DecisionEnvironmentSerializer,
 )
 from .eda_credential import (
+    EdaCredentialCopySerializer,
     EdaCredentialCreateSerializer,
     EdaCredentialSerializer,
     EdaCredentialUpdateSerializer,
-    EdaCredentialCopySerializer,
 )
 from .event_stream import EventStreamInSerializer, EventStreamOutSerializer
 from .organization import (
