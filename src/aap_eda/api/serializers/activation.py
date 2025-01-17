@@ -585,9 +585,20 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         else:
             vault_data = VaultData()
         if self.validated_data.get("source_mappings", []):
+            if not rulebook_id:
+                # load the original ruleset
+                self.validated_data[
+                    "rulebook_rulesets"
+                ] = activation.rulebook.rulesets
+
+            # update with new event streams
             self.validated_data[
                 "rulebook_rulesets"
             ] = _update_event_stream_source(self.validated_data, vault_data)
+        elif rulebook_id:
+            # user selects a rulebook but no mapping, clear existing mappings
+            self.validated_data["source_mappings"] = ""
+            self.validated_data["event_streams"] = []
 
         if self.validated_data.get("eda_credentials"):
             _update_extra_vars_from_eda_credentials(
@@ -611,8 +622,8 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         self, instance: models.Activation, validated_data: dict
     ) -> None:
         update_fields = []
-        eda_credentials = []
-        event_streams = []
+        eda_credentials = None
+        event_streams = None
         for key, value in validated_data.items():
             if key == "eda_credentials":
                 eda_credentials = value
@@ -624,10 +635,16 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
             update_fields.append(key)
 
         instance.save(update_fields=update_fields)
-        if eda_credentials:
-            instance.eda_credentials.set(eda_credentials)
-        if event_streams:
-            instance.event_streams.set(event_streams)
+        if eda_credentials is not None:
+            if eda_credentials:
+                instance.eda_credentials.set(eda_credentials)
+            else:
+                instance.eda_credentials.clear()
+        if event_streams is not None:
+            if event_streams:
+                instance.event_streams.set(event_streams)
+            else:
+                instance.event_streams.clear()
 
     def to_representation(self, activation):
         extra_var = (
@@ -1193,7 +1210,7 @@ def _validate_sources_with_event_streams(data: dict) -> None:
         if source_map["rulebook_hash"] != rulebook_hash:
             msg = (
                 "Rulebook has changed since the sources were mapped. "
-                "Please reattach Event streams again"
+                "Please reattach event streams"
             )
 
             raise serializers.ValidationError(
