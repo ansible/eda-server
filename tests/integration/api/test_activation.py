@@ -1159,3 +1159,51 @@ def test_update_enabled_activation(
         response.data
         == "Activation is not in disabled mode or in stopped status"
     )
+
+
+@pytest.mark.django_db
+def test_copy_activation(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["is_enabled"] = True
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    a_id = response.data["id"]
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{a_id}/copy/", data={"name": "another_name"}
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.name == "another_name"
+    assert activation.is_enabled is False
+
+
+@pytest.mark.django_db
+def test_copy_activation_invalid_body(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["is_enabled"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    a_id = response.data["id"]
+    name = response.data["name"]
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{a_id}/copy/", data={}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{a_id}/copy/", data={"name": name}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST

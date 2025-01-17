@@ -498,6 +498,54 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class ActivationCopySerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        required=True, validators=[validators.check_if_activation_name_used]
+    )
+
+    class Meta:
+        model = models.Activation
+        fields = ["name"]
+
+    def copy(self) -> dict:
+        activation: models.Activation = self.instance
+        copied_data = {
+            "name": self.validated_data["name"],
+            "description": activation.description,
+            "is_enabled": False,
+            "decision_environment": activation.decision_environment,
+            "rulebook": activation.rulebook,
+            "extra_var": activation.extra_var,
+            "organization": activation.organization,
+            "user": activation.user,
+            "restart_policy": activation.restart_policy,
+            "awx_token_id": activation.awx_token,
+            "log_level": activation.log_level,
+            "eda_credentials": activation.eda_credentials.all(),
+            "k8s_service_name": activation.k8s_service_name,
+            "source_mappings": activation.source_mappings,
+            "event_streams": activation.event_streams.all(),
+            "skip_audit_events": activation.skip_audit_events,
+            "rulebook_name": activation.rulebook.name,
+            "rulebook_rulesets": activation.rulebook_rulesets,
+            "git_hash": activation.rulebook.project.git_hash,
+            "project": activation.rulebook.project,
+        }
+        if activation.eda_system_vault_credential:
+            inputs = yaml.safe_load(
+                activation.eda_system_vault_credential.inputs.get_secret_value()  # noqa E501
+            )
+            copied_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(
+                inputs["vault_password"],
+                _get_vault_credential_type(),
+                activation.organization.id,
+            )
+
+        return super().create(copied_data)
+
+
 class ActivationUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating the Activation."""
 
