@@ -122,6 +122,24 @@ def test_create_team_forbidden(
 
 
 @pytest.mark.django_db
+def test_create_team_unique_name_constraint(
+    use_shared_resource_setting,
+    default_organization: models.Organization,
+    default_team: models.Team,
+    admin_client: APIClient,
+):
+    data_in = {
+        "name": default_team.name,
+        "description": "Test Team",
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(f"{api_url_v1}/teams/", data=data_in)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    errors = response.json()["non_field_errors"]
+    assert "Team with this name already exists in the organization." in errors
+
+
+@pytest.mark.django_db
 def test_retrieve_team(default_team: models.Team, admin_client: APIClient):
     response = admin_client.get(f"{api_url_v1}/teams/{default_team.id}/")
     assert response.status_code == status.HTTP_200_OK
