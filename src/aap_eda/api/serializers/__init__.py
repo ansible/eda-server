@@ -38,6 +38,7 @@ from .eda_credential import (
     EdaCredentialCreateSerializer,
     EdaCredentialSerializer,
     EdaCredentialUpdateSerializer,
+    EdaCredentialCopySerializer,
 )
 from .event_stream import EventStreamInSerializer, EventStreamOutSerializer
 from .organization import (
@@ -124,6 +125,7 @@ __all__ = (
     "EdaCredentialSerializer",
     "EdaCredentialCreateSerializer",
     "EdaCredentialUpdateSerializer",
+    "EdaCredentialCopySerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # organizations
