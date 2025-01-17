@@ -73,9 +73,8 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         eda_credential_id = data.get("eda_credential_id")
-        if eda_credential_id:
-            image_url = data.get("image_url") or self.instance.image_url
-            validators.check_if_de_valid(image_url, eda_credential_id)
+        image_url = data.get("image_url") or self.instance.image_url
+        validators.check_if_de_valid(image_url, eda_credential_id)
 
         return data
 

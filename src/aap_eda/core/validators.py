@@ -62,7 +62,9 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     return decision_environment_id
 
 
-def check_if_de_valid(image_url: str, eda_credential_id: int):
+def check_if_de_valid(
+    image_url: str, eda_credential_id: tp.Optional[int] = None
+):
     # The OCI standard format for the image url is a combination of a host
     # (with optional port) separated from the image path (with optional tag) by
     # a slash: <host>[:port]/<path>[:tag].
@@ -102,8 +104,14 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url}
         )
 
-    split = path.split(":", 1)
-    name = split[0]
+    digest = False
+    if "@sha256" in path or "@sha512" in path:
+        split = path.split("@", 1)
+        name = split[0]
+        digest = True
+    else:
+        split = path.split(":", 1)
+        name = split[0]
     # Get the tag sans any additional content.  Any additional content
     # is passed without validation.
     tag = split[1] if (len(split) > 1) else None
@@ -121,7 +129,7 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url, "name": name}
         )
 
-    if (tag is not None) and (
+    if (not digest and tag is not None) and (
         not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
     ):
         raise serializers.ValidationError(
@@ -132,38 +140,40 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url, "tag": tag}
         )
 
-    credential = get_credential_if_exists(eda_credential_id)
-    inputs = yaml.safe_load(credential.inputs.get_secret_value())
-    credential_host = inputs.get("host")
+    if eda_credential_id:
+        credential = get_credential_if_exists(eda_credential_id)
+        inputs = yaml.safe_load(credential.inputs.get_secret_value())
+        credential_host = inputs.get("host")
 
-    if not credential_host:
-        raise serializers.ValidationError(
-            _("Credential %(name)s needs to have host information")
-            % {"name": credential.name}
-        )
-
-    # Check that the host matches the credential host.
-    # For backward compatibility when creating a new DE with an old credential
-    # we need to separate any scheme from the host before doing the compare.
-    parsed_credential_host = urllib.parse.urlparse(credential_host)
-    # If there's a netloc that's the host to use; if not, it's the path if
-    # there is no scheme else it's the scheme and path joined by a colon.
-    if parsed_credential_host.netloc:
-        parsed_host = parsed_credential_host.netloc
-    else:
-        parsed_host = parsed_credential_host.path
-        if parsed_credential_host.scheme:
-            parsed_host = ":".join(
-                [parsed_credential_host.scheme, parsed_host]
+        if not credential_host:
+            raise serializers.ValidationError(
+                _("Credential %(name)s needs to have host information")
+                % {"name": credential.name}
             )
 
-    if host != parsed_host:
-        msg = _(
-            "DecisionEnvironment image url: %(image_url)s does "
-            "not match with the credential host: %(host)s"
-        ) % {"image_url": image_url, "host": credential_host}
+        # Check that the host matches the credential host.
+        # For backward compatibility when creating a new DE with
+        # an old credential we need to separate any
+        # scheme from the host before doing the compare.
+        parsed_credential_host = urllib.parse.urlparse(credential_host)
+        # If there's a netloc that's the host to use; if not, it's the path if
+        # there is no scheme else it's the scheme and path joined by a colon.
+        if parsed_credential_host.netloc:
+            parsed_host = parsed_credential_host.netloc
+        else:
+            parsed_host = parsed_credential_host.path
+            if parsed_credential_host.scheme:
+                parsed_host = ":".join(
+                    [parsed_credential_host.scheme, parsed_host]
+                )
 
-        raise serializers.ValidationError(msg)
+        if host != parsed_host:
+            msg = _(
+                "DecisionEnvironment image url: %(image_url)s does "
+                "not match with the credential host: %(host)s"
+            ) % {"image_url": image_url, "host": credential_host}
+
+            raise serializers.ValidationError(msg)
 
 
 def get_credential_if_exists(eda_credential_id: int) -> models.EdaCredential:
