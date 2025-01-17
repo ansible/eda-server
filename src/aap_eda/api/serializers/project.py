@@ -18,6 +18,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
@@ -43,6 +44,8 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
     )
 
     proxy = serializers.SerializerMethodField()
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Project
@@ -55,8 +58,6 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "import_error",
             "created_at",
             "modified_at",
-            "created_by",
-            "modified_by",
         ]
         fields = [
             "name",
@@ -68,6 +69,8 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "scm_refspec",
             "verify_ssl",
             "proxy",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 
@@ -187,6 +190,8 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Proxy server for http or https connection",
     )
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Project
@@ -238,6 +243,8 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
         required=False, allow_null=True
     )
     proxy = serializers.SerializerMethodField()
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Project
@@ -250,8 +257,6 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "import_error",
             "created_at",
             "modified_at",
-            "created_by",
-            "modified_by",
         ]
         fields = [
             "name",
@@ -263,6 +268,8 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "scm_branch",
             "scm_refspec",
             "proxy",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 

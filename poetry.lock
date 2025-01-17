@@ -649,7 +649,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2024.12.13"
+version = "2025.1.3"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -687,8 +687,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "b37fdd2ce8baa21cd2a40c96ff3a871e97363b14"
+reference = "2025.1.3"
+resolved_reference = "1cf551b7834453dcfd09de1a18b44f9538f93852"
 
 [[package]]
 name = "django-crum"
@@ -2954,4 +2954,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "aa95339492e022686f01fa21e5cff1cf4508dcead5b8fcf5a301856d68a357b3"
+content-hash = "902ea6b1c05edfe9e701560a92e6d049060c56bf65a835cfc6b10e72310b1181"

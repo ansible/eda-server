@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - env: []
-          image: docker.io/library/redis:6
+          image: mirror.gcr.io/library/redis:6
           name: redis
           ports:
             - containerPort: 6379
