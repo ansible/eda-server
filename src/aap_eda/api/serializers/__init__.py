@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from .activation import (
+    ActivationCopySerializer,
     ActivationCreateSerializer,
     ActivationInstanceLogSerializer,
     ActivationInstanceSerializer,
@@ -104,6 +105,7 @@ __all__ = (
     "ActivationCreateSerializer",
     "ActivationUpdateSerializer",
     "ActivationReadSerializer",
+    "ActivationCopySerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
     "PostActivationSerializer",
