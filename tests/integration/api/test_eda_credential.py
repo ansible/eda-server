@@ -1118,8 +1118,7 @@ def test_copy_eda_credential_success(
     admin_client: APIClient,
     default_registry_credential,
 ):
-    name_of_copied_cretential = "name_of_copied_cretential"
-    data = {"name": name_of_copied_cretential}
+    data = {"name": "name_of_copied_cretential"}
     response = admin_client.post(
         f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
         data=data,
@@ -1146,6 +1145,19 @@ def test_copy_eda_credential_duplicate_name(
 ):
     name_of_copied_cretential = default_registry_credential.name
     data = {"name": name_of_copied_cretential}
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_name_param_missing(
+    admin_client: APIClient,
+    default_registry_credential,
+):
+    data = {"name": ""}
     response = admin_client.post(
         f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
         data=data,

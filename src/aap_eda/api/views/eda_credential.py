@@ -278,9 +278,8 @@ class EdaCredentialViewSet(
         post_data = build_copy_post_data(
             eda_credential, request.data.get("name")
         )
-
         return self._create_eda_credential(request, post_data)
-
+        
     def _create_eda_credential(self, request, data):
         """Create a new credential object given payload data."""
         serializer = serializers.EdaCredentialCreateSerializer(data=data)
