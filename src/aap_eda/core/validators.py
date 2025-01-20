@@ -255,9 +255,7 @@ def check_if_credential_type_exists(credential_type_id: int) -> int:
 
 def check_if_credential_name_used(name: str) -> str:
     if not name:
-        raise serializers.ValidationError(
-            "Name parameter is missing."
-        )
+        raise serializers.ValidationError("Name parameter is missing.")
     if models.EdaCredential.objects.filter(name=name).exists():
         raise serializers.ValidationError(
             f"Credential name already exists: {name}"
