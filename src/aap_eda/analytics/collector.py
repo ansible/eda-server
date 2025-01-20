@@ -47,26 +47,26 @@ class AnalyticsCollector(Collector):
         # ignore license information checking for now
         return True
 
-    def _last_gathering(self) -> Optional[str]:
-        self.logger.info(
-            "Last gather: "
-            f"{application_settings.AUTOMATION_ANALYTICS_LAST_GATHER}"
-        )
+    def _last_gathering(self) -> Optional[datetime]:
+        last_gather = application_settings.AUTOMATION_ANALYTICS_LAST_GATHER
+        if not last_gather:
+            return None
 
-        return (
-            datetime.fromisoformat(
-                application_settings.AUTOMATION_ANALYTICS_LAST_GATHER
+        self.logger.info(f"Last gather: {last_gather}")
+        return datetime.fromisoformat(last_gather)
+
+    def _load_last_gathered_entries(self) -> dict:
+        try:
+            last_entries = (
+                application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES
             )
-            if bool(application_settings.AUTOMATION_ANALYTICS_LAST_GATHER)
-            else None
-        )
+            last_entries = last_entries.replace("'", '"')
+            self.logger.info(f"Last collect entries: {last_entries}")
 
-    def _load_last_gathered_entries(self) -> str:
-        last_entries = application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES
-        last_entries = last_entries.replace("'", '"')
-        self.logger.info(f"Last collect entries: {last_entries}")
-
-        return json.loads(last_entries, object_hook=utils.datetime_hook)
+            return json.loads(last_entries, object_hook=utils.datetime_hook)
+        except (json.JSONDecodeError, TypeError) as e:
+            self.logger.error(f"Failed to load last entries: {str(e)}")
+            return {}
 
     def _save_last_gathered_entries(self, last_gathered_entries: dict) -> None:
         application_settings.AUTOMATION_ANALYTICS_LAST_ENTRIES = json.dumps(
