@@ -31,9 +31,6 @@ from aap_eda.core import enums
 from aap_eda.core.utils.crypto.base import SecretValue
 
 # from datetime import datetime
-
-
-
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
 
@@ -524,13 +521,13 @@ def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
 
 
 def build_copy_post_data(
-    eda_credential: "models.EdaCredential", newCredName: str
+    eda_credential: "models.EdaCredential", new_cred_name: str
 ) -> dict:
     """Build a POST payload data from an existing EDA Credential object."""
     post_data = model_to_dict(eda_credential)
     # Remove 'id' field from post data
     post_data.pop("id")
-    post_data["name"] = newCredName
+    post_data["name"] = new_cred_name
 
     # Update foreign key fields
     post_data["organization_id"] = post_data.pop("organization")

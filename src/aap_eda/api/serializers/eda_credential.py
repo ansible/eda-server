@@ -114,7 +114,7 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
 class EdaCredentialCopySerializer(serializers.ModelSerializer):
     name = serializers.CharField(
         required=True,
-        validators=[validators.check_if_credential_name_exists],
+        validators=[validators.check_if_credential_name_used],
         help_text="Name of the new credintial",
     )
 
