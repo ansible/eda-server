@@ -30,7 +30,6 @@ from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
 from aap_eda.core.utils.crypto.base import SecretValue
 
-# from datetime import datetime
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
 
