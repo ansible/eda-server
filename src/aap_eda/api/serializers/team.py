@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.core import models, validators
@@ -55,6 +56,14 @@ class TeamCreateSerializer(
             "name",
             "description",
             "organization_id",
+        ]
+        validators = [
+            UniqueTogetherValidator(
+                queryset=models.Team.objects.all(),
+                fields=["organization_id", "name"],
+                message="Team with this name already exists in "
+                "the organization.",
+            )
         ]
 
     def validate(self, data):
