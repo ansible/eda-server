@@ -15,20 +15,30 @@
 from django.db import models
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
+from rest_framework.serializers import Serializer
 
 
-def generate_query_params(serializer):
+def generate_query_params(serializer: Serializer) -> list[OpenApiParameter]:
     """Generate OpenAPI query parameters dynamically based on the view's serializer fields and model."""  # noqa: E501
     query_params = []
     model = serializer.Meta.model
     fields = serializer.get_fields()
     field_names = fields.keys()
     for field in model._meta.get_fields():
-        if not field.is_relation and field.name in field_names:
+        # check if model field name is defined in the serializer
+        if (
+            field.name in field_names
+            or "_".join([field.name, "id"]) in field_names
+        ):
+            param_name = (
+                field.name
+                if field.name in field_names
+                else "_".join([field.name, "id"])
+            )
             query_params.append(
                 OpenApiParameter(
-                    name=field.name,
-                    description=f"Filter by {field.name}",
+                    name=param_name,
+                    description=f"Filter by {param_name}",
                     required=False,
                     type=(
                         OpenApiTypes.STR
