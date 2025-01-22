@@ -192,8 +192,6 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_rq",
     "django_filters",
-    "pgactivity",
-    "pglock",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
