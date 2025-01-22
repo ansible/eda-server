@@ -166,4 +166,4 @@ def test_generate_query_params(serializer, expected_params):
     assert len(query_params) == len(expected_params)
 
     for param, expected in zip(query_params, expected_params):
-        param.__dict__ == expected.__dict__
+        assert param.__dict__ == expected.__dict__
