@@ -17,8 +17,10 @@ from unittest.mock import patch
 
 import pytest
 
+from aap_eda.api import serializers
 from aap_eda.core.utils.strings import extract_variables
 from aap_eda.utils import get_eda_version, str_to_bool
+from aap_eda.utils.openapi import generate_query_params
 
 
 @pytest.mark.parametrize(
@@ -69,3 +71,18 @@ def test_get_eda_version():
 )
 def test_extract_variables(value, expected):
     assert extract_variables(value) == expected
+
+
+@pytest.mark.parametrize(
+    "serializer",
+    [
+        serializers.AuditRuleSerializer(),
+        serializers.AuditActionSerializer(),
+        serializers.AuditEventSerializer(),
+    ],
+)
+def test_generate_query_params(serializer):
+    query_params = generate_query_params(serializer)
+    assert isinstance(query_params, list)
+    param_names = [param.name for param in query_params]
+    assert set(param_names).issubset(serializer.get_fields().keys())
