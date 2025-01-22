@@ -94,6 +94,7 @@ class SampleModel(models.Model):
     another_model = models.ForeignKey(
         AnotherSampleModel, on_delete=models.CASCADE, null=True
     )
+    secret = models.CharField(max_length=100)
 
     class Meta:
         app_label = "tests"
