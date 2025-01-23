@@ -9,7 +9,9 @@ from tests.integration.constants import api_url_v1
 def test_feature_flags_list_endpoint(admin_client):
     response = admin_client.get(f"{api_url_v1}/feature-flags/definition")
     assert response.status_code == status.HTTP_200_OK, response.data
-    assert len(response.data) == 0  # Test number of feature flags. Modify each time a flag is added to default settings
+    # Test number of feature flags.
+    # Modify each time a flag is added to default settings
+    assert len(response.data) == 0
 
 
 @override_settings(
