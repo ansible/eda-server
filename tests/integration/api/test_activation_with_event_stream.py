@@ -282,8 +282,11 @@ def create_activation(fks: dict):
 
 @pytest.mark.django_db
 def test_create_activation_with_event_stream(
-    admin_client: APIClient, preseed_credential_types
+    admin_client: APIClient,
+    preseed_credential_types,
+    create_initial_data_command,
 ):
+    create_initial_data_command.handle()
     fks = create_activation_related_data(["demo"])
     test_activation = TEST_ACTIVATION.copy()
     test_activation["decision_environment_id"] = fks["decision_environment_id"]
@@ -674,12 +677,14 @@ event_stream_src_test_data = [
 def test_bad_src_activation_with_event_stream(
     admin_client: APIClient,
     preseed_credential_types,
+    create_initial_data_command,
     source_tuples,
     rulesets,
     status_code,
     message,
     error_key,
 ):
+    create_initial_data_command.handle()
     names = [event_stream_name for _, event_stream_name in source_tuples]
     fks = create_activation_related_data(names, True, rulesets)
     test_activation = TEST_ACTIVATION.copy()
