@@ -48,13 +48,14 @@ cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.2.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.1.3", extras = [
+django-ansible-base = { git = "https://github.com/zkayyali812/django-ansible-base.git", branch = "zk/feature-flag/api", extras = [
     "channel-auth",
     "rbac",
     "redis-client",
     "resource-registry",
     "jwt-consumer",
     "rest-filters",
+    "feature-flags",
 ] }
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
