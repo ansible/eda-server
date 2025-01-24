@@ -627,6 +627,28 @@ files = [
 ]
 
 [[package]]
+name = "dispatcher"
+version = "0.1.0"
+description = "An asyncio-based dispatcher for tasks in a worker pool."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = []
+develop = false
+
+[package.dependencies]
+pyyaml = "*"
+
+[package.extras]
+pg-notify = ["psycopg[binary]"]
+
+[package.source]
+type = "git"
+url = "https://github.com/ansible/dispatcher.git"
+reference = "main"
+resolved_reference = "a32e2451f0d4e2055be5d84ea5f7a985ce5c1696"
+
+[[package]]
 name = "django"
 version = "4.2.16"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
@@ -2954,4 +2976,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "902ea6b1c05edfe9e701560a92e6d049060c56bf65a835cfc6b10e72310b1181"
+content-hash = "0eef25d2d227ff0df60a52c68eca8d880c92afac0a7b5c8e9aa3f2fdb970f0c6"

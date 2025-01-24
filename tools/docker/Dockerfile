@@ -60,8 +60,6 @@ RUN poetry install -E all --only-root
 RUN pip install ansible-core
 
 USER 0
-# This repo is not yet fully published, so you need a local checkout for the demo phase
-RUN pip install -e $SOURCES_DIR/dispatcher
 USER "$USER_ID"
 
 RUN EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear

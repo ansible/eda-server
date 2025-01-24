@@ -1,45 +1,26 @@
-### Task Dispatcher
+# Task Dispatcher
 
 At demo phase currently, this removes use of Redis pub/sub queues in favor of pg_notify.
 RQ worker is removed and replaced with in-house dispatcher library,
 coming from the AWX dispatcher.
 
-#### Initial Phase, Task Trigger Demo
+## Demo Deployment
 
-Have 2 terminal tabs open. It is suggested that you run in the worker container.
+Currently only tested with Docker Compose development environment `tools/docker/docker-compose-dev.yaml`.
+No aditional steps required, just follow the normal deployment steps. We expect the system works as before.
 
-```
-docker exec -it docker-eda-default-worker-1 /bin/bash
-```
+You may want to deploy the development environment to test the dispatcher in parallel with the regular deployment,
+in this case you need to define EDA_IMAGE environment variable with a different value, for example `localhost/aap-eda-dispatcher`
+and run manually the docker compose command with a different project name, for example `docker-compose -p eda-dispatcher -f ./tools/docker/docker-compose-dev.yaml up`.
 
-Now run the task runner in 1 of the 2 tabs.
+## Development of the Dispatcher alongside the EDA
 
-```
-aap-eda-manage run_worker_dispatcher
-```
+Clone the project in `./dispatcher` directory and run `pip install -e ./dispatcher` to install the dispatcher library in development mode in the current virtual environment.
+You may need to configure the environment variable PYTHONPATH in your session and IDE to include the dispatcher directory.
+`export PYTHONPATH=./dispatcher:${PYTHONPATH}`
+The docker compose already sets the PYTHONPATH in the environment
 
-In the other tab, you need to do manual testing with `aap-eda-manage shell`:
-
-```python
-from dispatcher.brokers.pg_notify import publish_message
-publish_message("eda_workers", "aap_eda.tasks.orchestrator._manage")
-```
-
-As an outcome of running this, you should see DEBUG level logs showing what happened in the 1st tab.
-
-```
-2024-11-04 14:19:43,613 dispatcher.worker.task ERROR    Worker failed to run task aap_eda.tasks.orchestrator._manage(*[], **{}
-Traceback (most recent call last):
-  File "/app/src/dispatcher/dispatcher/worker/task.py", line 113, in perform_work
-    result = self.run_callable(message)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/app/src/dispatcher/dispatcher/worker/task.py", line 87, in run_callable
-    return _call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^
-TypeError: _manage() missing 2 required positional arguments: 'process_parent_type' and 'id'
-```
-
-These logs are telling you your call was incorrect.
+## Main Changes
 
 #### Plugging in Schedules
 

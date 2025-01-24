@@ -52,6 +52,7 @@ x-environment: &common-env
   SSL_CERTIFICATE: ${SSL_CERTIFICATE:-/certs/wildcard.crt}
   SSL_CERTIFICATE_KEY: ${SSL_CERTIFICATE_KEY:-/certs/wildcard.key}
   SSL_CLIENT_CERTIFICATE: ${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
+  PYTHONPATH: ./dispatcher:${PYTHONPATH}
 
 services:
   podman-node1:
