@@ -16,7 +16,9 @@ import asyncio
 import logging
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import BaseCommand
+from django.db import connection
 
 from dispatcher.main import DispatcherMain
 
@@ -48,6 +50,11 @@ class Command(BaseCommand):
 
         loop = asyncio.get_event_loop()
         dispatcher = DispatcherMain(dispatcher_config)
+
+        # Ensure that the database conn is restarted.
+        # This is necessary to prevent SQL errors.
+        connection.close()
+        cache.close()
         try:
             loop.run_until_complete(dispatcher.main())
         except KeyboardInterrupt:
