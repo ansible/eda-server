@@ -83,7 +83,7 @@ from tests.integration.constants import api_url_v1
                 "/organizations/",
                 "/teams/",
                 "/event-streams/",
-                "feature-flags/",
+                "/feature_flags_definition/",
             ],
             False,
             id="no_shared_resource",

@@ -7,7 +7,7 @@ from tests.integration.constants import api_url_v1
 
 @pytest.mark.django_db
 def test_feature_flags_list_endpoint(admin_client):
-    response = admin_client.get(f"{api_url_v1}/feature-flags/definition")
+    response = admin_client.get(f"{api_url_v1}/feature_flags_definition/")
     assert response.status_code == status.HTTP_200_OK, response.data
     # Test number of feature flags.
     # Modify each time a flag is added to default settings
@@ -24,7 +24,7 @@ def test_feature_flags_list_endpoint(admin_client):
 )
 @pytest.mark.django_db
 def test_feature_flags_override_flags(admin_client):
-    response = admin_client.get(f"{api_url_v1}/feature-flags/definition")
+    response = admin_client.get(f"{api_url_v1}/feature_flags_definition/")
     assert response.status_code == status.HTTP_200_OK, response.data
     assert len(response.data) == 1  # Validates number of feature flags
     assert (
