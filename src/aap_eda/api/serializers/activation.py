@@ -20,6 +20,7 @@ from typing import Optional
 
 import yaml
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import serializers
 
 from aap_eda.api.constants import (
@@ -254,6 +255,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "current_job_id",
             "created_at",
             "modified_at",
+            "edited_at",
             "status_message",
             "awx_token_id",
             "eda_credentials",
@@ -265,6 +267,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "edited_at",
             "rulebook_name",
         ]
 
@@ -315,6 +318,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "edited_at",
             "created_by",
             "modified_by",
             "status_message",
@@ -365,6 +369,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "rules_fired_count": rules_fired_count,
             "created_at": activation.created_at,
             "modified_at": activation.modified_at,
+            "edited_at": activation.edited_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
             "log_level": activation.log_level,
@@ -617,6 +622,7 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
     def prepare_update(self, activation: models.Activation):
         rulebook_id = self.validated_data.get("rulebook_id")
         self.validated_data["user_id"] = self.context["request"].user.id
+        self.validated_data["edited_at"] = timezone.now()
         if rulebook_id:
             rulebook = models.Rulebook.objects.get(id=rulebook_id)
             self.validated_data["rulebook_name"] = rulebook.name
@@ -818,6 +824,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "edited_at",
             "created_by",
             "modified_by",
             "restarted_at",
@@ -830,7 +837,13 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "source_mappings",
             "skip_audit_events",
         ]
-        read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+            "edited_at",
+            "restarted_at",
+        ]
 
     def to_representation(self, activation):
         decision_environment = (
@@ -915,6 +928,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "rules_fired_count": rules_fired_count,
             "created_at": activation.created_at,
             "modified_at": activation.modified_at,
+            "edited_at": activation.edited_at,
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
@@ -977,6 +991,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "user_id",
             "created_at",
             "modified_at",
+            "edited_at",
             "awx_token_id",
             "rulebook_id",
             "eda_credentials",
@@ -988,6 +1003,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
+            "edited_at",
         ]
 
 
