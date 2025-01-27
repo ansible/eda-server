@@ -63,3 +63,18 @@ def aap_credentials(
             ),
         ]
     )
+
+
+@pytest.fixture
+def analytics_settings():
+    """Mock application settings with proper attribute access."""
+
+    class Settings:
+        INSIGHTS_TRACKING_STATE = True
+        AUTOMATION_ANALYTICS_LAST_GATHER = None
+        AUTOMATION_ANALYTICS_LAST_ENTRIES = '{"key": "value"}'
+        AUTOMATION_ANALYTICS_URL = "https://url"
+        REDHAT_USERNAME = "dummy"
+        REDHAT_PASSWORD = "dummy"
+
+    return Settings()
