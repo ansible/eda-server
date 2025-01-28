@@ -179,7 +179,6 @@ class ActivationManager(StatusManager):
                 LOGGER.warning(msg)
                 self._cleanup()
                 self.set_latest_instance_status(ActivationStatus.STOPPED)
-                self._set_activation_pod_id(pod_id=None)
 
     def _start_activation_instance(self):
         """Start a new activation instance.
@@ -187,8 +186,6 @@ class ActivationManager(StatusManager):
         Update the status of the activation, latest instance, logs,
         counters and pod id.
         """
-        self.set_status(ActivationStatus.STARTING)
-
         # Ensure status of previous instances
         # For consistency, we should not have previous instances in
         # wrong status. If we create a new instance, it means that
@@ -1033,6 +1030,7 @@ class ActivationManager(StatusManager):
 
     @transaction.atomic
     def _create_activation_instance(self):
+        self.set_status(ActivationStatus.STARTING)
         git_hash = (
             self.db_instance.git_hash
             if hasattr(self.db_instance, "git_hash")
