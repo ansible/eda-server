@@ -46,7 +46,7 @@ django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
-podman = "4.9.*"
+podman = "5.2.*"
 rq-scheduler = "^0.10"
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.1.3", extras = [
     "channel-auth",
