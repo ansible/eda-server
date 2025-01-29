@@ -172,6 +172,15 @@ def dispatch(
         return
     status_manager = StatusManager(process_parent)
 
+    job = tasking.get_pending_job(job_id)
+    if job:
+        LOGGER.info(
+            f"Request {request_type} for {process_parent_type} "
+            f"{process_parent_id} can not be processed "
+            f"because there is already a job {job_id} ",
+        )
+        return
+
     # new processes
     if request_type in [
         ActivationRequest.START,
@@ -299,6 +308,10 @@ def dispatch(
                     msg,
                 )
                 return
+    LOGGER.info(
+        f"Trying to enqueue {process_parent_type} {process_parent_id} "
+        f"request {request_type} to queue {queue_name}"
+    )
 
     tasking.unique_enqueue(
         queue_name,

@@ -406,7 +406,7 @@ class Engine(ContainerEngine):
                 pod_args[key] = value
 
         for key, value in pod_args.items():
-            LOGGER.debug("Key %s Value %s", key, value)
+            LOGGER.debug("Pod arg %s: %s", key, value)
 
         LOGGER.info(pod_args)
         return pod_args

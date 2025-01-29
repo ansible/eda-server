@@ -598,18 +598,26 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
     Detects if a job with the same id is already enqueued and if it is
     it will return it instead of enqueuing a new one.
     """
-    for name in settings.RQ_QUEUES:
-        job = job_from_queue(name, job_id)
-        if job:
-            logger.info(
-                f"Skip enqueing job: {job_id} because it is already enqueued"
-            )
-            return job
+    job = get_pending_job(job_id)
+    if job:
+        logger.info(
+            f"Skip enqueing job: {job_id} because it is already enqueued"
+        )
+        return job
 
     queue = django_rq.get_queue(name=queue_name)
     kwargs["job_id"] = job_id
     logger.info(f"Enqueing unique job: {job_id}")
     return queue.enqueue(*args, **kwargs)
+
+
+@redis_connect_retry()
+def get_pending_job(job_id: str) -> typing.Optional[Job]:
+    for name in settings.RQ_QUEUES:
+        job = job_from_queue(name, job_id)
+        if job:
+            return job
+    return None
 
 
 @redis_connect_retry()
