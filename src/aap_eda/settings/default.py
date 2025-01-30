@@ -205,6 +205,10 @@ INSTALLED_APPS = [
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
 
+for feature in list(FLAGS.keys()):
+    if feature in settings:
+        FLAGS[feature][0]["value"] = settings.get(feature)
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
