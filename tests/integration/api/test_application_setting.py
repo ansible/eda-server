@@ -35,7 +35,9 @@ def test_list_system_settings(
     superuser_client: APIClient, feature_flag_state, status_code
 ):
     with override_settings(
-        FLAGS={"EDA_ANALYTICS": [("boolean", feature_flag_state)]}
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", feature_flag_state)]
+        }
     ):
         response = superuser_client.get(f"{api_url_v1}/settings/system/")
         assert response.status_code == status_code
@@ -55,7 +57,9 @@ def test_partial_update_system_settings(
     superuser_client: APIClient, feature_flag_state, status_code
 ):
     with override_settings(
-        FLAGS={"EDA_ANALYTICS": [("boolean", feature_flag_state)]}
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", feature_flag_state)]
+        }
     ):
         pword = "secret"
         body = {"REDHAT_USERNAME": "auser", "REDHAT_PASSWORD": pword}
@@ -79,7 +83,9 @@ def test_list_settings_forbidden(
     user_client: APIClient, feature_flag_state, status_code
 ):
     with override_settings(
-        FLAGS={"EDA_ANALYTICS": [("boolean", feature_flag_state)]}
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", feature_flag_state)]
+        }
     ):
         response = user_client.get(f"{api_url_v1}/settings/system/")
         assert response.status_code == status_code
@@ -94,7 +100,9 @@ def test_update_settings_forbidden(
     user_client: APIClient, feature_flag_state, status_code
 ):
     with override_settings(
-        FLAGS={"EDA_ANALYTICS": [("boolean", feature_flag_state)]}
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", feature_flag_state)]
+        }
     ):
         response = user_client.patch(f"{api_url_v1}/settings/system/", data={})
         assert response.status_code == status_code
@@ -109,7 +117,9 @@ def test_update_settings_wrong_type(
     superuser_client: APIClient, feature_flag_state, status_code
 ):
     with override_settings(
-        FLAGS={"EDA_ANALYTICS": [("boolean", feature_flag_state)]}
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", feature_flag_state)]
+        }
     ):
         data = {"AUTOMATION_ANALYTICS_GATHER_INTERVAL": "not number"}
         response = superuser_client.patch(
@@ -125,7 +135,9 @@ def test_update_settings_wrong_type(
 )
 def test_options(superuser_client: APIClient, feature_flag_state, status_code):
     with override_settings(
-        FLAGS={"EDA_ANALYTICS": [("boolean", feature_flag_state)]}
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", feature_flag_state)]
+        }
     ):
         response = superuser_client.options(f"{api_url_v1}/settings/system/")
         assert response.status_code == status_code

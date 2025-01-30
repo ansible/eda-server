@@ -52,7 +52,9 @@ def use_analytic_url(settings):
     ],
 )
 @pytest.mark.django_db
-@override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
+@override_settings(
+    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]}
+)
 def test_gather_analytics_invalid_settings(
     settings, caplog_factory, analytics_url, tracking_state, expected
 ):
@@ -64,7 +66,6 @@ def test_gather_analytics_invalid_settings(
     eda_log = caplog_factory(logger)
 
     call_command("gather_analytics", "--ship", stdout=out)
-
     assert expected in eda_log.text
 
 
@@ -126,7 +127,9 @@ def test_gather_analytics_invalid_settings(
     ],
 )
 @pytest.mark.django_db
-@override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
+@override_settings(
+    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]}
+)
 def test_gather_analytics_command(caplog_factory, args, log_level, expected):
     application_settings.INSIGHTS_TRACKING_STATE = True
     out = StringIO()
@@ -150,7 +153,7 @@ def test_gather_analytics_command(caplog_factory, args, log_level, expected):
     "feature_flag_state, expected",
     [
         (True, "Either --ship or --dry-run needs to be set."),
-        (False, "EDA_ANALYTICS is disabled."),
+        (False, "FEATURE_EDA_ANALYTICS_ENABLED is disabled."),
     ],
 )
 def test_gather_analytics_command_by_ff_state(
@@ -160,15 +163,20 @@ def test_gather_analytics_command_by_ff_state(
     out = StringIO()
     logger = logging.getLogger("aap_eda.analytics")
     eda_log = caplog_factory(logger)
-    if feature_flag_state:
-        call_command("enable_flag", "EDA_ANALYTICS", stdout=out)
-    else:
-        call_command("disable_flag", "EDA_ANALYTICS", stdout=out)
+    with override_settings(
+        FLAGS={
+            "FEATURE_EDA_ANALYTICS_ENABLED": [
+                {
+                    "condition": "boolean",
+                    "value": feature_flag_state,
+                }
+            ]
+        }
+    ):
+        command = "gather_analytics"
+        call_command(command, stdout=out)
 
-    command = "gather_analytics"
-    call_command(command, stdout=out)
-
-    assert any(
-        record.levelname == "ERROR" and record.message == expected
-        for record in eda_log.records
-    )
+        assert any(
+            record.levelname == "ERROR" and record.message == expected
+            for record in eda_log.records
+        )

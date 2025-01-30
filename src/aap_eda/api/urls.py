@@ -109,7 +109,7 @@ eda_v1_urls = [
 
 flagged_urls = [
     flagged_path(
-        "EDA_ANALYTICS",
+        "FEATURE_EDA_ANALYTICS_ENABLED",
         "settings/system/",
         views.SettingView.as_view(),
         name="setting-system",
