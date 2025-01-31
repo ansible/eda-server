@@ -202,10 +202,10 @@ INSTALLED_APPS = [
 ]
 
 
-def toggle_feature_flags(_flags, _settings):
-    for feature in _flags.keys():
-        if feature in _settings:
-            _flags[feature][0]["value"] = _settings.get(feature)
+def toggle_feature_flags(flags, settings):
+    for feature in flags.keys():
+        if feature in settings:
+            flags[feature][0]["value"] = settings.get(feature)
 
 
 # Defines feature flags, and their conditions.
