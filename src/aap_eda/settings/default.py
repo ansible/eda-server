@@ -204,8 +204,7 @@ INSTALLED_APPS = [
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
-
-for feature in list(FLAGS.keys()):
+for feature in FLAGS.keys():
     if feature in settings:
         FLAGS[feature][0]["value"] = settings.get(feature)
 
