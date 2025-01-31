@@ -16,9 +16,11 @@ from typing import Any, Dict
 from unittest import mock
 
 import pytest
+import redis
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
 from tests.integration.constants import api_url_v1
@@ -163,6 +165,7 @@ def test_create_or_update_project_with_right_signature_credential(
     new_project: models.Project,
     preseed_credential_types,
     default_gpg_credential,
+    default_organization: models.Organization,
     action,
     credential_type,
     status_code,
@@ -170,14 +173,8 @@ def test_create_or_update_project_with_right_signature_credential(
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
-
-    cred_inputs = inputs_to_store({"user": "me"})
-    credential_type = models.CredentialType.objects.get(name=credential_type)
-    credential = models.EdaCredential.objects.create(
-        name="credential",
-        description="Default Credential",
-        credential_type=credential_type,
-        inputs=cred_inputs,
+    credential = create_custom_credential(
+        credential_type=credential_type, organization=default_organization
     )
 
     if action == "create":
@@ -188,6 +185,7 @@ def test_create_or_update_project_with_right_signature_credential(
             "signature_validation_credential_id": default_gpg_credential.id,
             "scm_branch": "main",
             "scm_refspec": "ref1",
+            "organization_id": default_organization.id,
         }
 
         response = admin_client.post(
@@ -313,6 +311,8 @@ def test_create_or_update_project_with_right_eda_credential(
     new_project: models.Project,
     preseed_credential_types,
     default_scm_credential,
+    default_organization: models.Organization,
+    admin_user: models.User,
     action,
     credential_type,
     status_code,
@@ -320,14 +320,8 @@ def test_create_or_update_project_with_right_eda_credential(
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     job = mock.Mock(id=job_id)
     import_project_task.delay.return_value = job
-
-    cred_inputs = inputs_to_store({"user": "me"})
-    credential_type = models.CredentialType.objects.get(name=credential_type)
-    credential = models.EdaCredential.objects.create(
-        name="credential",
-        description="Default Credential",
-        credential_type=credential_type,
-        inputs=cred_inputs,
+    credential = create_custom_credential(
+        credential_type=credential_type, organization=default_organization
     )
 
     if action == "create":
@@ -338,6 +332,7 @@ def test_create_or_update_project_with_right_eda_credential(
             "signature_validation_credential_id": credential.id,
             "scm_branch": "main",
             "scm_refspec": "ref1",
+            "organization_id": default_organization.id,
         }
 
         response = admin_client.post(
@@ -388,6 +383,8 @@ def test_create_or_update_project_with_right_eda_credential(
         assert project.import_state == "pending"
         assert str(project.import_task_id) == job_id
 
+        assert project.created_by == admin_user
+        assert project.modified_by == admin_user
         # Check that response returned the valid representation of the project
         assert_project_data(response.data, project)
 
@@ -398,6 +395,19 @@ def test_create_or_update_project_with_right_eda_credential(
             "The type of credential can only be one of ['GPG Public Key']"
             in response.data["signature_validation_credential_id"]
         )
+
+
+@pytest.mark.django_db
+def test_create_project_with_none_organization(admin_client: APIClient):
+    body = {
+        "name": "none-organization",
+        "url": "https://git.example.com/acme/project-01",
+        "organization_id": None,
+    }
+
+    response = admin_client.post(f"{api_url_v1}/projects/", data=body)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Organization is needed" in str(response.data)
 
 
 @pytest.mark.django_db
@@ -417,6 +427,46 @@ def test_create_project_name_conflict(
     #   error handler level.
     #   See https://github.com/encode/django-rest-framework/issues/1848
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+@mock.patch("aap_eda.tasks.import_project")
+def test_create_project_redis_unavailable(
+    import_project_task: mock.Mock,
+    is_redis_failed: mock.Mock,
+    admin_client: APIClient,
+    default_scm_credential,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    def raise_connection_error(*args, **kwargs):
+        raise redis.ConnectionError("redis unavailable")
+
+    import_project_task.delay.side_effect = raise_connection_error
+
+    credential = create_custom_credential(
+        credential_type=enums.DefaultCredentialType.GPG,
+        organization=default_organization,
+    )
+
+    body = {
+        "name": "ain't-no-redis",
+        "url": "https://git.example.com/acme/project-01",
+        "eda_credential_id": default_scm_credential.id,
+        "signature_validation_credential_id": credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/projects/",
+        data=body,
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Redis is required but unavailable."}
 
 
 @pytest.mark.django_db
@@ -530,6 +580,28 @@ def test_sync_project_not_exist(admin_client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.django_db
+@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
+@mock.patch("aap_eda.tasks.sync_project")
+def test_sync_project_redis_unavailable(
+    sync_project_task: mock.Mock,
+    is_redis_failed: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+):
+    def raise_connection_error(*args, **kwargs):
+        raise redis.ConnectionError("redis unavailable")
+
+    sync_project_task.delay.side_effect = raise_connection_error
+
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "Redis is required but unavailable."}
+
+
 # Test: Partial update project
 # -------------------------------------
 @pytest.mark.django_db
@@ -634,7 +706,7 @@ def test_partial_update_project_null_organization_id(
         data,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "This field may not be null." in str(response.data)
+    assert "Organization is needed" in str(response.data)
 
 
 @pytest.mark.django_db
@@ -673,6 +745,66 @@ def test_delete_project_not_found(admin_client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.import_project")
+def test_project_by_fields(
+    import_project_task: mock.Mock,
+    default_scm_credential: models.EdaCredential,
+    default_organization: models.Organization,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
+    job = mock.Mock(id=job_id)
+    import_project_task.delay.return_value = job
+
+    body = {
+        "name": "test-project-01",
+        "url": "https://git.example.com/acme/project-01",
+        "eda_credential_id": default_scm_credential.id,
+        "scm_branch": "main",
+        "scm_refspec": "ref1",
+        "organization_id": default_organization.id,
+    }
+
+    base_client.force_authenticate(user=admin_user)
+    response = base_client.post(
+        f"{api_url_v1}/projects/",
+        data=body,
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    project = models.Project.objects.get(id=response.data["id"])
+
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    response = base_client.get(f"{api_url_v1}/projects/{response.data['id']}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    response = base_client.get(f"{api_url_v1}/projects/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()["results"]
+    assert data[0]["created_by"]["username"] == admin_user.username
+    assert data[0]["modified_by"]["username"] == admin_user.username
+
+    base_client.force_authenticate(user=super_user)
+    update_data = {"name": "test_project_by_fields"}
+    response = base_client.patch(
+        f"{api_url_v1}/projects/{project.id}/",
+        update_data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == super_user.username
+
+    project.refresh_from_db()
+    assert project.created_by == admin_user
+    assert project.modified_by == super_user
+
+
 # Utils
 # -------------------------------------
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -693,6 +825,10 @@ def assert_project_data(data: Dict[str, Any], project: models.Project):
                 project_value = project_value.get_secret_value().replace(
                     "secret", "$encrypted$"
                 )
+
+            if key == "created_by" or key == "modified_by":
+                project_value = BasicUserSerializer(project_value).data
+
             assert value == project_value
 
 
@@ -719,3 +855,17 @@ def get_organization_details(organization: models.Organization) -> dict:
         "name": organization.name,
         "description": organization.description,
     }
+
+
+def create_custom_credential(
+    credential_type: enums.CredentialType, organization: models.Organization
+) -> models.EdaCredential:
+    cred_inputs = inputs_to_store({"user": "me"})
+    credential_type = models.CredentialType.objects.get(name=credential_type)
+    return models.EdaCredential.objects.create(
+        name="custom-credential",
+        description="Custom Credential",
+        credential_type=credential_type,
+        inputs=cred_inputs,
+        organization=organization,
+    )

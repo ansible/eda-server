@@ -11,16 +11,32 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.db import DatabaseError
+from django.utils import timezone
 
+from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models
 from aap_eda.core.enums import DefaultCredentialType
+from aap_eda.core.exceptions import (
+    DuplicateEnvKeyError,
+    DuplicateFileTemplateKeyError,
+    InvalidEnvKeyError,
+)
+from aap_eda.core.models.activation import ActivationStatus
+from aap_eda.core.utils.credentials import (
+    add_default_values_to_user_inputs,
+    get_secret_fields,
+)
+from aap_eda.core.utils.strings import extract_variables, substitute_variables
+from aap_eda.tasks import orchestrator
 
 from .messages import (
     ActionMessage,
     AnsibleEventMessage,
     ControllerInfo,
     EndOfResponse,
+    EnvVars,
     ExtraVars,
+    FileContentMessage,
     HeartbeatMessage,
     JobMessage,
     Rulebook,
@@ -31,6 +47,8 @@ from .messages import (
 
 logger = logging.getLogger(__name__)
 
+BINARY_FORMATS = {"binary_base64"}
+
 
 class MessageType(Enum):
     ACTION = "Action"
@@ -40,6 +58,7 @@ class MessageType(Enum):
     SHUTDOWN = "Shutdown"
     PROCESSED_EVENT = "ProcessedEvent"
     SESSION_STATS = "SessionStats"
+    FILE_CONTENTS = "FileContents"
 
 
 # Determine host status based on event type
@@ -103,10 +122,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 logger.warning(f"Unsupported message received: {data}")
         except DatabaseError as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
+        except InvalidEnvKeyError as err:
+            logger.error(f"Failed to parse {data} due to Env error: {err}")
 
     async def handle_workers(self, message: WorkerMessage):
         logger.info(f"Start to handle workers: {message}")
-        rulesets, extra_var = await self.get_resources(message.activation_id)
+        activation = await self.get_activation(message.activation_id)
+        rulesets = activation.rulebook_rulesets
+        extra_var = activation.extra_var
 
         rulebook_message = Rulebook(
             data=base64.b64encode(rulesets.encode()).decode()
@@ -119,17 +142,29 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         await self.send(text_data=rulebook_message.json())
 
-        controller_info = await self.get_controller_info(message)
+        controller_info = await self.get_controller_info(activation)
         if controller_info:
             await self.send(text_data=controller_info.json())
 
-        eda_vault_data = await self.get_eda_system_vault_passwords(message)
+        eda_vault_data = await self.get_eda_system_vault_passwords(activation)
         if eda_vault_data:
             vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
 
-        await self.send(text_data=EndOfResponse().json())
+        file_contents = await self.get_file_contents_from_credentials(
+            activation
+        )
+        for file_content in file_contents:
+            await self.send(text_data=file_content.json())
 
+        env_var = await self.get_env_vars_from_credentials(activation)
+        if env_var:
+            env_var_message = EnvVars(
+                data=base64.b64encode(env_var.encode()).decode()
+            )
+            await self.send(text_data=env_var_message.json())
+
+        await self.send(text_data=EndOfResponse().json())
         # TODO: add broadcasting later by channel groups
 
     async def handle_jobs(self, message: JobMessage):
@@ -153,7 +188,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         ).first()
 
         if instance:
-            instance.updated_at = message.reported_at
+            instance.updated_at = message.reported_at or timezone.now()
             instance.save(update_fields=["updated_at"])
 
             activation = instance.get_parent()
@@ -161,6 +196,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 message.stats["ruleSetName"]
             ] = message.stats
             activation.save(update_fields=["ruleset_stats"])
+
+            if activation.status == ActivationStatus.STARTING:
+                orchestrator.enqueue_monitor_rulebook_processes()
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."
@@ -336,36 +374,32 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         return job_instance
 
     @database_sync_to_async
-    def get_resources(self, rulebook_process_id: str) -> tuple[str, str]:
+    def get_activation(self, rulebook_process_id: str) -> models.Activation:
         rulebook_process_instance = models.RulebookProcess.objects.get(
             id=rulebook_process_id
         )
-        activation = rulebook_process_instance.get_parent()
-
-        return activation.rulebook_rulesets, activation.extra_var
+        return rulebook_process_instance.get_parent()
 
     @database_sync_to_async
-    def get_awx_token(self, message: WorkerMessage) -> tp.Optional[str]:
+    def get_awx_token(self, activation: models.Activation) -> tp.Optional[str]:
         """Get AWX token from the worker message."""
-        rulebook_process_instance = models.RulebookProcess.objects.get(
-            id=message.activation_id,
-        )
-        parent = rulebook_process_instance.get_parent()
-        if not hasattr(parent, "awx_token"):
+        if not hasattr(activation, "awx_token"):
             return None
 
-        awx_token = parent.awx_token
+        awx_token = activation.awx_token
         return awx_token.token.get_secret_value() if awx_token else None
 
     async def get_controller_info(
-        self, message: WorkerMessage
+        self, activation: models.Activation
     ) -> tp.Optional[ControllerInfo]:
         """Get Controller Info."""
-        controller_info = await self.get_controller_info_from_aap_cred(message)
+        controller_info = await self.get_controller_info_from_aap_cred(
+            activation
+        )
         if controller_info:
             return controller_info
 
-        awx_token = await self.get_awx_token(message)
+        awx_token = await self.get_awx_token(activation)
         if awx_token:
             return ControllerInfo(
                 url=settings.EDA_CONTROLLER_URL,
@@ -376,17 +410,13 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_controller_info_from_aap_cred(
-        self, message: WorkerMessage
+        self, activation: models.Activation
     ) -> tp.Optional[ControllerInfo]:
         """Get AAP Credential from Activation."""
-        rulebook_process_instance = models.RulebookProcess.objects.get(
-            id=message.activation_id,
-        )
-        parent = rulebook_process_instance.get_parent()
         aap_credential_type = models.CredentialType.objects.get(
             name=DefaultCredentialType.AAP
         )
-        for eda_credential in parent.eda_credentials.all():
+        for eda_credential in activation.eda_credentials.all():
             if eda_credential.credential_type.id == aap_credential_type.id:
                 inputs = yaml.safe_load(
                     eda_credential.inputs.get_secret_value()
@@ -403,13 +433,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_eda_system_vault_passwords(
-        self, message: WorkerMessage
+        self, activation: models.Activation
     ) -> tp.List[VaultPassword]:
         """Get vault info from activation."""
-        rulebook_process_instance = models.RulebookProcess.objects.get(
-            id=message.activation_id,
-        )
-        activation = rulebook_process_instance.get_parent()
         vault_passwords = []
 
         if activation.eda_system_vault_credential:
@@ -473,3 +499,139 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         )
         logger.debug("Updated Job URL %s", result)
         return result
+
+    @database_sync_to_async
+    def get_file_contents_from_credentials(
+        self, activation: models.Activation
+    ) -> tp.Optional[list[FileContentMessage]]:
+        file_template_names = []
+        file_messages = []
+        for eda_credential in activation.eda_credentials.all():
+            inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
+            injectors = eda_credential.credential_type.injectors
+            binary_fields = []
+            for field in eda_credential.credential_type.inputs.get(
+                "fields", []
+            ):
+                if field.get("format") in BINARY_FORMATS:
+                    binary_fields.append(field["id"])
+
+            for template, value in injectors.get("file", {}).items():
+                if template in file_template_names:
+                    raise DuplicateFileTemplateKeyError(
+                        f"{template} already exists"
+                    )
+                message = self.get_file_content_message(
+                    template, binary_fields, value, inputs
+                )
+                if not message:
+                    logger.info(
+                        f"{template} is skipped because its content is empty"
+                    )
+                    continue
+                file_template_names.append(template)
+                file_messages.append(message)
+        return file_messages
+
+    @database_sync_to_async
+    def get_env_vars_from_credentials(
+        self, activation: models.Activation
+    ) -> tp.Optional[str]:
+        try:
+            vault_password, vault_id = self.get_vault_password_and_id(
+                activation
+            )
+            env_vars = {}
+
+            for eda_credential in activation.eda_credentials.all():
+                injectors = eda_credential.credential_type.injectors
+                if "env" not in injectors:
+                    continue
+
+                schema_inputs = eda_credential.credential_type.inputs
+                secret_fields = get_secret_fields(schema_inputs)
+                user_inputs = yaml.safe_load(
+                    eda_credential.inputs.get_secret_value()
+                )
+
+                add_default_values_to_user_inputs(schema_inputs, user_inputs)
+
+                if secret_fields:
+                    self.encrypt_user_inputs(
+                        secret_fields=secret_fields,
+                        user_inputs=user_inputs,
+                        password=vault_password,
+                        vault_id=vault_id,
+                    )
+
+                self.substitute_envs(env_vars, injectors, user_inputs)
+
+            if not env_vars:
+                return None
+
+            return yaml.dump(env_vars)
+        except TypeError as err:
+            raise InvalidEnvKeyError(str(err)) from err
+
+    @staticmethod
+    def encrypt_user_inputs(
+        secret_fields: list[str],
+        user_inputs: dict,
+        password: str,
+        vault_id: str,
+    ) -> None:
+        for key, value in user_inputs.items():
+            if key in secret_fields:
+                user_inputs[key] = encrypt_string(
+                    password=password,
+                    plaintext=value,
+                    vault_id=vault_id,
+                )
+
+    @staticmethod
+    def substitute_envs(
+        envs: dict, injectors: dict, user_inputs: dict
+    ) -> None:
+        for key, value in injectors["env"].items():
+            if key in envs:
+                raise DuplicateEnvKeyError(f"env {key} already exists")
+
+            envs[key] = (
+                value
+                if not isinstance(value, str) or "eda.filename" in value
+                else substitute_variables(value, user_inputs)
+            )
+
+    @staticmethod
+    def get_vault_password_and_id(
+        activation: models.Activation,
+    ) -> [tp.Optional[str], tp.Optional[str]]:
+        if activation.eda_system_vault_credential:
+            vault_inputs = activation.eda_system_vault_credential.inputs
+            vault_inputs = yaml.safe_load(vault_inputs.get_secret_value())
+            return vault_inputs["vault_password"], vault_inputs["vault_id"]
+        return None, None
+
+    @staticmethod
+    def get_file_content_message(
+        template: str, binary_fields: list[str], value: str, inputs: dict
+    ) -> tp.Optional[FileContentMessage]:
+        binary_file = any(
+            attr in binary_fields for attr in extract_variables(value)
+        )
+
+        contents = str(substitute_variables(value, inputs))
+        if not contents:
+            return None
+        if binary_file:
+            return FileContentMessage(
+                template_key=template,
+                data=contents,
+                data_format="binary",
+                eof=True,
+            )
+        return FileContentMessage(
+            template_key=template,
+            data=base64.b64encode(contents.encode()).decode(),
+            eof=True,
+        )

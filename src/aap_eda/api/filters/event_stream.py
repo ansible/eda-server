@@ -21,7 +21,11 @@ class EventStreamFilter(django_filters.FilterSet):
     name = django_filters.CharFilter(
         field_name="name",
         lookup_expr="istartswith",
-        label="Filter by event source name.",
+        label="Filter by event stream name.",
+    )
+    test_mode = django_filters.BooleanFilter(
+        field_name="test_mode",
+        label="Filter by the test_mode being true or false",
     )
 
     class Meta:

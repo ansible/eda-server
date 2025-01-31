@@ -31,7 +31,20 @@ Before you submit a pull request, check that it meets these guidelines:
 3. The pull request should pass all tests, linters and CI checks. You can run
    each of these locally in your [development environment](docs/development.md)
 
-## Contact
+## Communication
 
-Also you can check the [Matrix chat](https://matrix.to/#/#eda:ansible.com), or via the
-<event-driven-automation@redhat.com> email.
+Join the Ansible forum to ask questions, get help, and interact with the community.
+
+* [Get Help](https://forum.ansible.com/c/help/6): get help or help others.
+  Please add appropriate tags if you start new discussions, for example the
+  `eda-server` or `eda-operator` tags.
+  For example, you can filter topics tagged as [`eda-server`](https://forum.ansible.com/tag/eda-server)
+* [Social Spaces](https://forum.ansible.com/c/chat/4): meet and interact with
+  fellow enthusiasts.
+* [News & Announcements](https://forum.ansible.com/c/news/5): track project-wide
+  announcements including social events.
+
+To get release announcements and important changes from the community, see the
+[Bullhorn newsletter](https://docs.ansible.com/ansible/devel/community/communication.html#the-bullhorn).
+
+You can also get in touch by sending an email to <event-driven-automation@redhat.com>.

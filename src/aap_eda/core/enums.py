@@ -50,15 +50,15 @@ class ResourceType(DjangoStrEnum):
     CREDENTIAL = "credential"
     CREDENTIAL_TYPE = "credential_type"
     EDA_CREDENTIAL = "eda_credential"
-    EVENT_STREAM = "event_stream"
     ORGANIZATION = "organization"
     TEAM = "team"
+    EVENT_STREAM = "event_stream"
 
 
 class Action(DjangoStrEnum):
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
+    CREATE = "add"
+    READ = "view"
+    UPDATE = "change"
     DELETE = "delete"
     ENABLE = "enable"
     DISABLE = "disable"
@@ -98,6 +98,7 @@ class DefaultCredentialType(DjangoStrEnum):
     SOURCE_CONTROL = "Source Control"
     AAP = "Red Hat Ansible Automation Platform"
     GPG = "GPG Public Key"
+    POSTGRES = "Postgres"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
@@ -129,7 +130,6 @@ class ProcessParentType(DjangoStrEnum):
     """Types of parent objects for a rulebook process."""
 
     ACTIVATION = "activation"
-    EVENT_STREAM = "event_stream"
 
 
 class RulebookProcessLogLevel(DjangoStrEnum):
@@ -138,3 +138,39 @@ class RulebookProcessLogLevel(DjangoStrEnum):
     DEBUG = "debug"
     INFO = "info"
     ERROR = "error"
+
+
+class EventStreamAuthType(DjangoStrEnum):
+    """Types of authentication for EventStream."""
+
+    HMAC = "hmac"
+    TOKEN = "token"
+    BASIC = "basic"
+    OAUTH2 = "oauth2"
+    OAUTH2JWT = "oauth2-jwt"
+    ECDSA = "ecdsa"
+    MTLS = "mtls"
+
+
+class SignatureEncodingType(DjangoStrEnum):
+    """Types of format for HMAC."""
+
+    BASE64 = "base64"
+    HEX = "hex"
+
+
+class EventStreamCredentialType(DjangoStrEnum):
+    HMAC = "HMAC Event Stream"
+    BASIC = "Basic Event Stream"
+    TOKEN = "Token Event Stream"
+    OAUTH2 = "OAuth2 Event Stream"
+    OAUTH2_JWT = "OAuth2 JWT Event Stream"
+    ECDSA = "ECDSA Event Stream"
+    MTLS = "mTLS Event Stream"
+
+
+class CustomEventStreamCredentialType(DjangoStrEnum):
+    GITLAB = "GitLab Event Stream"
+    GITHUB = "GitHub Event Stream"
+    SNOW = "ServiceNow Event Stream"
+    DYNATRACE = "Dynatrace Event Stream"

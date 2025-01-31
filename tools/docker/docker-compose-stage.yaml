@@ -1,8 +1,10 @@
 x-environment:
   &common-env
   - EDA_DB_HOST=postgres
-  - EDA_MQ_HOST=redis
-  - DJANGO_SETTINGS_MODULE=aap_eda.settings.default
+  - EDA_MQ_HOST=${EDA_MQ_HOST:-redis}
+  - EDA_MQ_PORT=${EDA_MQ_PORT:-6379}
+  - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
+  - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-aap_eda.settings.default}
   - EDA_DB_PASSWORD=secret
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
@@ -14,8 +16,8 @@ x-environment:
   - EDA_CONTROLLER_TOKEN=${EDA_CONTROLLER_TOKEN:-some-secret-token}
   - EDA_CONTROLLER_SSL_VERIFY=${EDA_CONTROLLER_SSL_VERIFY:-no}
   - EDA_PROTOCOL=http
-  - EDA_HOST=eda-api:8000
-  - EDA_SERVER=http://eda-api:8000
+  - EDA_HOST=${EDA_HOST:-eda-api:8000}
+  - EDA_SERVER=http://${EDA_HOST:-eda-api:8000}
   - EDA_ANSIBLE_RULEBOOK_LOG_LEVEL=${EDA_ANSIBLE_RULEBOOK_LOG_LEVEL:-'-v'}
   - EDA_CONTAINER_NAME_PREFIX=${EDA_CONTAINER_NAME_PREFIX:-eda}
   - EDA_PODMAN_ENV_VARS=${EDA_PODMAN_ENV_VARS:-'@none None'}
@@ -25,141 +27,34 @@ x-environment:
   - EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT=${EDA_ANSIBLE_BASE_JWT_VALIDATE_CERT:-False}
   - EDA_ANSIBLE_BASE_JWT_KEY=${EDA_ANSIBLE_BASE_JWT_KEY:-'https://localhost'}
   - EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=${EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT:-True}
+  - EDA_ALLOW_LOCAL_ASSIGNING_JWT_ROLES=${EDA_ALLOW_LOCAL_ASSIGNING_JWT_ROLES:-True}
+  - EDA_ALLOW_SHARED_RESOURCE_CUSTOM_ROLES=${EDA_ALLOW_SHARED_RESOURCE_CUSTOM_ROLES:-True}
   - EDA_RESOURCE_SERVER__URL=${EDA_RESOURCE_SERVER__URL:-'@none None'}
   - EDA_RESOURCE_SERVER__SECRET_KEY=${EDA_RESOURCE_SERVER__SECRET_KEY:-'@none None'}
   - EDA_RESOURCE_SERVER__VALIDATE_HTTPS=${EDA_RESOURCE_SERVER__VALIDATE_HTTPS:-False}
   - EDA_RESOURCE_JWT_USER_ID=${EDA_RESOURCE_JWT_USER_ID:-'@none None'}
   - EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY=${EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY:-@json {}}
+  - EDA_SERVER_UUID=edgecafe-beef-feed-fade-decadeedgecafe
+  - EDA_PG_NOTIFY_DSN="host=host.containers.internal port=5432 dbname=eda user=postgres password=secret"
+  - EDA_PG_NOTIFY_DSN_SERVER="host=postgres port=5432 dbname=eda user=postgres password=secret"
+  - EDA_EVENT_STREAM_BASE_URL=${EDA_EVENT_STREAM_BASE_URL:-https://localhost:8443/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_EVENT_STREAM_MTLS_BASE_URL=${EDA_EVENT_STREAM_MTLS_BASE_URL:-https://localhost:8443/mtls/edgecafe-beef-feed-fade-decadeedgecafe/}
+  - EDA_WEBHOOK_HOST=${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - EDA_WEBHOOK_SERVER=http://${EDA_WEBHOOK_HOST:-eda-webhook-api:8000}
+  - EDA_STATIC_URL=${EDA_STATIC_URL:-api/eda/static/}
+  - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/wildcard.crt}
+  - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/wildcard.key}
+  - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
 
 services:
-  podman-pre-setup:
-    user: "0"
-    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
-    privileged: true
-    command: >-
-      chown -R podman /home/podman/.local/share/containers/storage
-    volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
-
   podman:
-    user: "1000"
+    user: ${EDA_PODMAN_USER_ID:-0}
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - '${EDA_PODMAN_PORT:-8888}:8888'
-    volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
-    depends_on:
-     - podman-pre-setup
-
-  eda-ui:
-    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
-    environment: *common-env
-    ports:
-      - '${EDA_UI_PORT:-8443}:443'
-    depends_on:
-      eda-api:
-        condition: service_healthy
-
-  eda-api:
-    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage migrate
-        && aap-eda-manage create_initial_data
-        && scripts/create_superuser.sh
-        && gunicorn -b 0.0.0.0:8000
-        -w ${EDA_API_WORKERS:-4} aap_eda.wsgi
-        --access-logfile -
-    ports:
-      - '${EDA_API_PORT:-8000}:8000'
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-
-  eda-ws:
-    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
-    ports:
-      - '${EDA_WS_PORT:-8001}:8000'
-    depends_on:
-      eda-api:
-        condition: service_healthy
-
-  eda-scheduler:
-    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage scheduler
-    depends_on:
-      eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-
-  eda-default-worker:
-    user: "${EDA_POD_USER_ID:-0}"
-    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
-    deploy:
-      replicas: ${EDA_DEFAULT_WORKERS:-1}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.DefaultWorker
-    depends_on:
-      eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: always
-
-  eda-activation-worker:
-    user: "${EDA_POD_USER_ID:-0}"
-    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
-    deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
-    depends_on:
-      eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: always
 
   postgres:
     image: ${EDA_POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}:${EDA_POSTGRES_VERSION:-latest}
@@ -190,6 +85,118 @@ services:
       retries: 3
       start_period: 5s
 
+  eda-api:
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage collectstatic --noinput
+        && aap-eda-manage migrate
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false aap-eda-manage create_initial_data
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false scripts/create_superuser.sh
+        && gunicorn -b 0.0.0.0:8000
+        -w ${EDA_API_WORKERS:-4} aap_eda.wsgi
+        --access-logfile -
+    ports:
+      - '${EDA_API_PORT:-8000}:8000'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    networks:
+      - service-mesh
+      - default
+    volumes:
+      - 'eda-api-staticfiles:/var/lib/eda/static:z'
+
+  eda-ws:
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
+    ports:
+      - '${EDA_WS_PORT:-8001}:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+
+  eda-scheduler:
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    restart: always
+
+  eda-default-worker:
+    user: "${EDA_POD_USER_ID:-0}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    deploy:
+      replicas: ${EDA_DEFAULT_WORKERS:-1}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.DefaultWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    restart: always
+
+  eda-activation-worker:
+    user: "${EDA_POD_USER_ID:-0}"
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    deploy:
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.ActivationWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    restart: always
+
+  eda-webhook-api:
+    image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        gunicorn -b 0.0.0.0:8000 -w ${EDA_WEBHOOK_WORKERS:-2} aap_eda.wsgi --access-logfile -
+    ports:
+      - '8555:8000'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
     profiles:
@@ -201,6 +208,26 @@ services:
     ports:
       - '${EDA_PROXY_PORT:-3128}:3128'
 
+  eda-ui:
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}
+    environment: *common-env
+    command: nginx -g "daemon off;"
+    ports:
+      - '${EDA_UI_PORT:-8443}:443'
+    volumes:
+      - './my_certs:/tmp/my_certs:z'
+      - './nginx/certs:/certs:z'
+      - './nginx/default.conf.template:/etc/nginx/templates/default.conf.template:z'
+      - 'eda-api-staticfiles:/staticfiles:z'
+    depends_on:
+      eda-webhook-api:
+        condition: service_healthy
+
 volumes:
   postgres_data: {}
-  podman_data: {}
+  eda-api-staticfiles: {}
+
+networks:
+  service-mesh:
+    name: service-mesh
+  default:

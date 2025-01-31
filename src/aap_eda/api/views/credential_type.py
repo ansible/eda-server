@@ -14,6 +14,7 @@
 
 import logging
 
+from ansible_base.rbac.api.permissions import AuthenticatedReadAdminChange
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -69,19 +70,12 @@ class CredentialTypeViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
+    permission_classes = (AuthenticatedReadAdminChange,)
     queryset = models.CredentialType.objects.all()
     serializer_class = serializers.CredentialTypeSerializer
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.CredentialTypeFilter
     ordering_fields = ["name"]
-
-    def filter_queryset(self, queryset):
-        if queryset.model is models.CredentialType:
-            return super().filter_queryset(
-                queryset.model.access_qs(self.request.user, queryset=queryset)
-            )
-        return super().filter_queryset(queryset)
-
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
 
@@ -102,7 +96,7 @@ class CredentialTypeViewSet(
 
         serializer.is_valid(raise_exception=True)
         serializer.validated_data["kind"] = "cloud"
-        for field in serializer.validated_data["inputs"]["fields"]:
+        for field in serializer.validated_data["inputs"].get("fields", []):
             if "type" not in field:
                 field["type"] = "string"
 

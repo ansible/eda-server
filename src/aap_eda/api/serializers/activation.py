@@ -16,7 +16,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional, Union
+from typing import Optional
 
 import yaml
 from django.conf import settings
@@ -24,14 +24,16 @@ from rest_framework import serializers
 
 from aap_eda.api.constants import (
     EDA_SERVER_VAULT_LABEL,
-    PG_NOTIFY_TEMPLATE_RULEBOOK_DATA,
+    SOURCE_MAPPING_ERROR_KEY,
 )
-from aap_eda.api.exceptions import InvalidEventStreamRulebook
+from aap_eda.api.exceptions import InvalidEventStreamSource
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
 from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
+from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ANSIBLE_VAULT_STRING,
@@ -39,22 +41,40 @@ from aap_eda.api.serializers.project import (
     ProjectRefSerializer,
 )
 from aap_eda.api.serializers.rulebook import RulebookRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
+from aap_eda.core.exceptions import ParseError
 from aap_eda.core.utils.credentials import get_secret_fields
 from aap_eda.core.utils.k8s_service_name import (
     InvalidRFC1035LabelError,
     create_k8s_service_name,
 )
-from aap_eda.core.utils.strings import (
-    substitute_extra_vars,
-    substitute_source_args,
-    substitute_variables,
-    swap_sources,
+from aap_eda.core.utils.rulebook import (
+    build_source_list,
+    get_rulebook_hash,
+    swap_event_stream_sources,
 )
+from aap_eda.core.utils.strings import substitute_variables
 
 logger = logging.getLogger(__name__)
+REQUIRED_KEYS = [
+    "event_stream_id",
+    "event_stream_name",
+    "source_name",
+    "rulebook_hash",
+]
+
+PG_NOTIFY_DSN = (
+    "host={{postgres_db_host}} port={{postgres_db_port}} "
+    "dbname={{postgres_db_name}} user={{postgres_db_user}} "
+    "password={{postgres_db_password}} sslmode={{postgres_sslmode}} "
+    "sslcert={{eda.filename.postgres_sslcert|default(None)}} "
+    "sslkey={{eda.filename.postgres_sslkey|default(None)}} "
+    "sslpassword={{postgres_sslpassword|default(None)}} "
+    "sslrootcert={{eda.filename.postgres_sslrootcert|default(None)}}"
+)
 
 
 @dataclass
@@ -63,41 +83,30 @@ class VaultData:
     password_used: bool = False
 
 
-def _updated_ruleset(validated_data: dict, vault_data: VaultData):
+def _update_event_stream_source(validated_data: dict) -> str:
     try:
-        sources_info = []
+        source_mappings = yaml.safe_load(validated_data["source_mappings"])
+        sources_info = {}
+        for source_map in source_mappings:
+            event_stream_id = source_map.get("event_stream_id")
+            obj = models.EventStream.objects.get(id=event_stream_id)
 
-        for event_stream_id in validated_data["event_streams"]:
-            event_stream = models.EventStream.objects.get(id=event_stream_id)
+            sources_info[obj.name] = {
+                "ansible.eda.pg_listener": {
+                    "dsn": PG_NOTIFY_DSN,
+                    "channels": [obj.channel_name],
+                },
+            }
 
-            if event_stream.rulebook:
-                rulesets = yaml.safe_load(event_stream.rulebook.rulesets)
-            else:
-                rulesets = yaml.safe_load(PG_NOTIFY_TEMPLATE_RULEBOOK_DATA)
-
-            extra_vars = rulesets[0]["sources"][0].get("extra_vars", {})
-            encrypt_vars = rulesets[0]["sources"][0].get("encrypt_vars", [])
-
-            if bool(encrypt_vars):
-                vault_data.password_used = True
-
-            extra_vars = substitute_extra_vars(
-                event_stream.__dict__,
-                extra_vars,
-                encrypt_vars,
-                vault_data.password,
-            )
-
-            source = rulesets[0]["sources"][0]["complementary_source"]
-            source = substitute_source_args(
-                event_stream.__dict__, source, extra_vars
-            )
-            sources_info.append(source)
-
-        return swap_sources(validated_data["rulebook_rulesets"], sources_info)
+        return swap_event_stream_sources(
+            validated_data["rulebook_rulesets"], sources_info, source_mappings
+        )
+        # TODO: Can we catch a better exception
     except Exception as e:
-        logger.error(f"Failed to update rulesets: {e}")
-        raise InvalidEventStreamRulebook(e)
+        logger.error(
+            "Failed to update event stream source in rulesets: %s", str(e)
+        )
+        raise InvalidEventStreamSource(e) from e
 
 
 def _update_k8s_service_name(validated_data: dict) -> str:
@@ -106,15 +115,15 @@ def _update_k8s_service_name(validated_data: dict) -> str:
 
 
 def _extend_extra_vars_from_credentials(
-    validated_data: dict, credential_data: Union[str, Dict]
+    validated_data: dict, extra_vars: dict
 ) -> str:
     if validated_data.get("extra_var"):
         updated_extra_vars = yaml.safe_load(validated_data.get("extra_var"))
-        for key in credential_data.get("extra_vars", []):
-            updated_extra_vars[key] = credential_data["extra_vars"][key]
+        for key, value in extra_vars.items():
+            updated_extra_vars[key] = value
         return yaml.dump(updated_extra_vars)
     else:
-        return yaml.dump(credential_data["extra_vars"])
+        return yaml.dump(extra_vars)
 
 
 def _update_extra_vars_from_eda_credentials(
@@ -125,6 +134,12 @@ def _update_extra_vars_from_eda_credentials(
 ) -> None:
     for eda_credential_id in validated_data["eda_credentials"]:
         eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
+        if (
+            creating
+            and eda_credential.credential_type.name
+            == DefaultCredentialType.AAP
+        ):
+            vault_data.password_used = True
         if eda_credential.credential_type.name in [
             DefaultCredentialType.VAULT,
             DefaultCredentialType.AAP,
@@ -137,9 +152,11 @@ def _update_extra_vars_from_eda_credentials(
 
         user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
 
-        if any(key in user_inputs for key in secret_fields):
-            if creating:
-                vault_data.password_used = True
+        if creating and any(key in user_inputs for key in secret_fields):
+            vault_data.password_used = True
+
+        if not injectors or "extra_vars" not in injectors:
+            continue
 
         for key, value in user_inputs.items():
             if key in secret_fields:
@@ -149,14 +166,16 @@ def _update_extra_vars_from_eda_credentials(
                     vault_id=EDA_SERVER_VAULT_LABEL,
                 )
 
-        data = substitute_variables(injectors, user_inputs)
+        injected_extra_vars = substitute_variables(
+            injectors["extra_vars"], user_inputs
+        )
 
         updated_extra_vars = _extend_extra_vars_from_credentials(
-            validated_data, data
+            validated_data, injected_extra_vars
         )
         # when creating an activation we need to return the updated extra vars
         if creating:
-            return updated_extra_vars
+            validated_data["extra_var"] = updated_extra_vars
         # if not creating, update the existing activation object extra vars
         else:
             activation.extra_var = updated_extra_vars
@@ -203,16 +222,16 @@ def replace_vault_data(extra_var):
 class ActivationSerializer(serializers.ModelSerializer):
     """Serializer for the Activation model."""
 
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=EventStreamOutSerializer(),
-    )
-
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
         child=EdaCredentialSerializer(),
+    )
+
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EventStreamOutSerializer(),
     )
 
     class Meta:
@@ -238,9 +257,10 @@ class ActivationSerializer(serializers.ModelSerializer):
             "modified_at",
             "status_message",
             "awx_token_id",
-            "event_streams",
             "eda_credentials",
             "log_level",
+            "event_streams",
+            "skip_audit_events",
         ]
         read_only_fields = [
             "id",
@@ -256,11 +276,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
 
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=EventStreamOutSerializer(),
-    )
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
@@ -272,6 +287,13 @@ class ActivationListSerializer(serializers.ModelSerializer):
         allow_blank=True,
         help_text="Service name of the activation",
     )
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EventStreamOutSerializer(),
+    )
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -294,12 +316,16 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
             "status_message",
             "awx_token_id",
-            "event_streams",
             "log_level",
             "eda_credentials",
             "k8s_service_name",
+            "event_streams",
+            "source_mappings",
+            "skip_audit_events",
         ]
         read_only_fields = ["id", "created_at", "modified_at"]
 
@@ -307,19 +333,19 @@ class ActivationListSerializer(serializers.ModelSerializer):
         rules_count, rules_fired_count = get_rules_count(
             activation.ruleset_stats
         )
-        event_streams = [
-            EventStreamOutSerializer(event_stream).data
-            for event_stream in activation.event_streams.all()
-        ]
         eda_credentials = [
             EdaCredentialSerializer(credential).data
-            for credential in activation.eda_credentials.all()
+            for credential in activation.eda_credentials.filter(managed=False)
         ]
         extra_var = (
             replace_vault_data(activation.extra_var)
             if activation.extra_var
             else None
         )
+        event_streams = [
+            EventStreamOutSerializer(event_stream).data
+            for event_stream in activation.event_streams.all()
+        ]
 
         return {
             "id": activation.id,
@@ -342,10 +368,14 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "modified_at": activation.modified_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
-            "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
+            "event_streams": event_streams,
+            "source_mappings": activation.source_mappings,
+            "skip_audit_events": activation.skip_audit_events,
+            "created_by": BasicUserSerializer(activation.created_by).data,
+            "modified_by": BasicUserSerializer(activation.modified_by).data,
         }
 
 
@@ -365,19 +395,28 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "user",
             "restart_policy",
             "awx_token_id",
-            "event_streams",
             "log_level",
             "eda_credentials",
             "k8s_service_name",
+            "source_mappings",
+            "skip_audit_events",
         ]
 
     organization_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
+        required=True,
+        allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
     )
     rulebook_id = serializers.IntegerField(
-        validators=[validators.check_if_rulebook_exists]
+        validators=[validators.check_if_rulebook_exists],
+        error_messages={
+            "null": "Rulebook is needed",
+            "required": "Rulebook is required",
+        },
     )
     extra_var = serializers.CharField(
         required=False,
@@ -386,7 +425,11 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validators=[validators.is_extra_var_dict],
     )
     decision_environment_id = serializers.IntegerField(
-        validators=[validators.check_if_de_exists]
+        validators=[validators.check_if_de_exists],
+        error_messages={
+            "null": "Decision Environment is needed",
+            "required": "Decision Environment is required",
+        },
     )
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
@@ -395,17 +438,14 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validators=[validators.check_if_awx_token_exists],
         required=False,
     )
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=serializers.IntegerField(),
-        validators=[validators.check_if_event_streams_exists],
-    )
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
         child=serializers.IntegerField(),
-        validators=[validators.check_multiple_credentials],
+        validators=[
+            validators.check_multiple_credentials,
+            validators.check_single_aap_credential,
+        ],
     )
     k8s_service_name = serializers.CharField(
         required=False,
@@ -416,7 +456,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
-
+        _validate_sources_with_event_streams(data=data)
         return data
 
     def create(self, validated_data):
@@ -435,17 +475,21 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
 
         vault_data = VaultData()
 
-        if validated_data.get("event_streams"):
-            validated_data["rulebook_rulesets"] = _updated_ruleset(
-                validated_data, vault_data
+        if validated_data.get("source_mappings", []):
+            validated_data["rulebook_rulesets"] = _update_event_stream_source(
+                validated_data
             )
+            eda_credentials = validated_data.get("eda_credentials", [])
+            postgres_cred = models.EdaCredential.objects.filter(
+                name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+            ).first()
+            eda_credentials.append(postgres_cred.id)
+            validated_data["eda_credentials"] = eda_credentials
 
         vault = _get_vault_credential_type()
 
         if validated_data.get("eda_credentials"):
-            validated_data[
-                "extra_var"
-            ] = _update_extra_vars_from_eda_credentials(
+            _update_extra_vars_from_eda_credentials(
                 validated_data=validated_data,
                 vault_data=vault_data,
                 creating=True,
@@ -482,7 +526,6 @@ class ActivationInstanceSerializer(serializers.ModelSerializer):
             "git_hash",
             "status_message",
             "activation_id",
-            "event_stream_id",
             "organization_id",
             "started_at",
             "ended_at",
@@ -512,12 +555,12 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     organization = OrganizationRefSerializer()
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
-    restarted_at = serializers.DateTimeField(required=False, allow_null=True)
-    event_streams = serializers.ListField(
-        required=False,
-        allow_null=True,
-        child=EventStreamOutSerializer(),
+    ruleset_stats = YAMLSerializerField(
+        required=True,
+        sort_keys=False,
+        help_text="The stat information about the activation",
     )
+    restarted_at = serializers.DateTimeField(required=False, allow_null=True)
     eda_credentials = serializers.ListField(
         required=False,
         allow_null=True,
@@ -529,6 +572,13 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_blank=True,
         help_text="Service name of the activation",
     )
+    event_streams = serializers.ListField(
+        required=False,
+        allow_null=True,
+        child=EventStreamOutSerializer(),
+    )
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -549,17 +599,22 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restart_count",
             "rulebook_name",
             "current_job_id",
+            "ruleset_stats",
             "rules_count",
             "rules_fired_count",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
             "restarted_at",
             "status_message",
             "awx_token_id",
             "eda_credentials",
-            "event_streams",
             "log_level",
             "k8s_service_name",
+            "event_streams",
+            "source_mappings",
+            "skip_audit_events",
         ]
         read_only_fields = ["id", "created_at", "modified_at", "restarted_at"]
 
@@ -601,18 +656,25 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             if activation.organization
             else None
         )
-        event_streams = [
-            EventStreamOutSerializer(event_stream).data
-            for event_stream in activation.event_streams.all()
-        ]
         eda_credentials = [
             EdaCredentialSerializer(credential).data
-            for credential in activation.eda_credentials.all()
+            for credential in activation.eda_credentials.filter(managed=False)
         ]
         extra_var = (
             replace_vault_data(activation.extra_var)
             if activation.extra_var
             else None
+        )
+        event_streams = [
+            EventStreamOutSerializer(event_stream).data
+            for event_stream in activation.event_streams.all()
+        ]
+        ruleset_stats = (
+            YAMLSerializerField(sort_keys=False).to_representation(
+                activation.ruleset_stats
+            )
+            if activation.ruleset_stats
+            else ""
         )
 
         return {
@@ -634,6 +696,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
             "current_job_id": activation.current_job_id,
+            "ruleset_stats": ruleset_stats,
             "rules_count": rules_count,
             "rules_fired_count": rules_fired_count,
             "created_at": activation.created_at,
@@ -641,10 +704,14 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "restarted_at": restarted_at,
             "status_message": activation.status_message,
             "awx_token_id": activation.awx_token_id,
-            "event_streams": event_streams,
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
+            "event_streams": event_streams,
+            "source_mappings": activation.source_mappings,
+            "skip_audit_events": activation.skip_audit_events,
+            "created_by": BasicUserSerializer(activation.created_by).data,
+            "modified_by": BasicUserSerializer(activation.modified_by).data,
         }
 
 
@@ -657,7 +724,8 @@ class PostActivationSerializer(serializers.ModelSerializer):
     )
     name = serializers.CharField(required=True)
     decision_environment_id = serializers.IntegerField(
-        validators=[validators.check_if_de_exists]
+        validators=[validators.check_if_de_exists],
+        error_messages={"null": "Decision Environment is needed"},
     )
     # TODO: is_activation_valid needs to tell event stream/activation
     awx_token_id = serializers.IntegerField(
@@ -680,7 +748,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=False)
-
+        _validate_sources_with_event_streams(data=data)
         return data
 
     class Meta:
@@ -699,6 +767,8 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "rulebook_id",
             "eda_credentials",
             "k8s_service_name",
+            "source_mappings",
+            "skip_audit_events",
         ]
         read_only_fields = [
             "id",
@@ -724,6 +794,7 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
     data["eda_credentials"] = [
         obj.id for obj in activation.eda_credentials.all()
     ]
+    data["event_streams"] = [obj.id for obj in activation.event_streams.all()]
     serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
@@ -822,7 +893,7 @@ def _validate_rulebook(data: dict, with_token: bool = False) -> None:
         rulesets_data,
     ):
         raise serializers.ValidationError(
-            "The rulebook requires an Awx Token or RH AAP credential.",
+            "The rulebook requires a RH AAP credential.",
         )
 
 
@@ -851,14 +922,16 @@ def _validate_eda_credentials(data: dict) -> None:
     if eda_credential_ids is None:
         return
 
-    existing_keys = []
+    existing_extra_var_keys = []
+    existing_env_var_keys = []
+    existing_file_keys = []
     extra_var = data.get("extra_var")
 
     try:
         vault = _get_vault_credential_type()
         if extra_var:
             existing_data = yaml.safe_load(extra_var)
-            existing_keys = [*existing_data.keys()]
+            existing_extra_var_keys = [*existing_data.keys()]
     except models.CredentialType.DoesNotExist:
         raise serializers.ValidationError(
             f"CredentialType with name '{DefaultCredentialType.VAULT}'"
@@ -874,19 +947,11 @@ def _validate_eda_credentials(data: dict) -> None:
             if eda_credential.credential_type.id == vault.id:
                 continue
 
-            injectors = eda_credential.credential_type.injectors
-
-            for key in injectors.get("extra_vars", []):
-                if key in existing_keys:
-                    message = (
-                        f"Key: {key} already exists in extra var. "
-                        f"It conflicts with credential type: "
-                        f"{eda_credential.credential_type.name}. "
-                        f"Please check injectors."
-                    )
-                    raise serializers.ValidationError(message)
-
-                existing_keys.append(key)
+            _check_injectors(
+                eda_credential, existing_extra_var_keys, "extra_vars"
+            )
+            _check_injectors(eda_credential, existing_file_keys, "file")
+            _check_injectors(eda_credential, existing_env_var_keys, "env")
         except models.EdaCredential.DoesNotExist:
             raise serializers.ValidationError(
                 f"EdaCredential with id {eda_credential_id} does not exist"
@@ -909,3 +974,174 @@ def _get_aap_credentials_if_exists(
         for eda_credential in eda_credentials
         if eda_credential.credential_type.id == aap_credential_type.id
     ]
+
+
+def _validate_sources_with_event_streams(data: dict) -> None:
+    """Ensure all event streams have matching source names."""
+    source_mappings = data.get("source_mappings")
+    if not source_mappings:
+        return
+
+    try:
+        source_mappings = yaml.safe_load(source_mappings)
+    except yaml.MarkedYAMLError as ex:
+        logger.error("Invalid source mappings: %s", str(ex))
+        raise serializers.ValidationError(
+            {
+                SOURCE_MAPPING_ERROR_KEY: [
+                    f"Faild to parse source mappings: '{source_mappings}'"
+                ]
+            }
+        ) from ex
+
+    if not isinstance(source_mappings, list):
+        raise serializers.ValidationError(
+            {
+                SOURCE_MAPPING_ERROR_KEY: [
+                    "Input source mappings should be a list of mappings"
+                ]
+            }
+        )
+
+    # validate each mapping has REQUIRED_KEYS
+    _validate_source_mappings(source_mappings)
+
+    rulebook_id = data.get("rulebook_id")
+    if rulebook_id is None:
+        return
+
+    try:
+        rulebook = models.Rulebook.objects.get(id=rulebook_id)
+    except models.Rulebook.DoesNotExist as ex:
+        raise serializers.ValidationError(
+            {SOURCE_MAPPING_ERROR_KEY: [f"Rulebook {rulebook_id} not found."]}
+        ) from ex
+
+    try:
+        sources = build_source_list(rulebook.rulesets)
+    except ParseError as ex:
+        raise serializers.ValidationError(
+            {SOURCE_MAPPING_ERROR_KEY: [str(ex)]}
+        )
+
+    # validate no extra mappings
+    if len(source_mappings) > len(sources):
+        msg = (
+            f"The rulebook has {len(sources)} source(s) while you have "
+            f"provided {len(source_mappings)} event streams"
+        )
+        raise serializers.ValidationError(
+            {SOURCE_MAPPING_ERROR_KEY: [str(msg)]}
+        )
+
+    # validate no duplicate sources/event_streams in provided source mappings
+    for name in ["source_name", "event_stream_name"]:
+        _check_duplicate_names(name, source_mappings)
+
+    # validate rulebook is not updated during mapping
+    rulebook_hash = get_rulebook_hash(rulebook.rulesets)
+    for source_map in source_mappings:
+        if source_map["rulebook_hash"] != rulebook_hash:
+            msg = (
+                "Rulebook has changed since the sources were mapped. "
+                "Please reattach Event streams again"
+            )
+
+            raise serializers.ValidationError(
+                {SOURCE_MAPPING_ERROR_KEY: [msg]}
+            )
+
+    # validate source_name provided in mapping exists in sources
+    source_names = [source["name"] for source in sources]
+    for source_map in source_mappings:
+        if source_map["source_name"] not in source_names:
+            msg = f"The source {source_map['source_name']} does not exist"
+            raise serializers.ValidationError(
+                {SOURCE_MAPPING_ERROR_KEY: [msg]}
+            )
+
+    # validate event_stream ids and names
+    data["event_streams"] = _get_event_stream_ids(source_mappings)
+
+
+def _validate_source_mappings(mappings: list[dict]) -> None:
+    for mapping in mappings:
+        missing_keys = [key for key in REQUIRED_KEYS if key not in mapping]
+
+        if missing_keys:
+            msg = (
+                f"The source mapping {mapping} is missing the required keys: "
+                f"{missing_keys}"
+            )
+            raise serializers.ValidationError(
+                {SOURCE_MAPPING_ERROR_KEY: [msg]}
+            )
+
+
+def _get_event_stream_ids(source_mappings: list[dict]) -> set:
+    """Get all the event stream ids from source mappings."""
+    event_stream_ids = set()
+    for source_map in source_mappings:
+        try:
+            event_stream = models.EventStream.objects.get(
+                id=source_map["event_stream_id"]
+            )
+            if event_stream.name != source_map["event_stream_name"]:
+                msg = (
+                    f"Event stream {source_map['event_stream_name']} did not"
+                    f" match with name {event_stream.name} in database"
+                )
+                raise serializers.ValidationError(
+                    {SOURCE_MAPPING_ERROR_KEY: [msg]}
+                )
+
+            event_stream_ids.add(event_stream.id)
+        except models.EventStream.DoesNotExist as exc:
+            msg = f"Event stream id {source_map['event_stream_id']} not found"
+            raise serializers.ValidationError(
+                {SOURCE_MAPPING_ERROR_KEY: [msg]}
+            ) from exc
+
+    return event_stream_ids
+
+
+def _check_duplicate_names(
+    check_name: str, source_mappings: list[dict]
+) -> None:
+    msg = {"source_name": "sources", "event_stream_name": "event streams"}
+    duplicate_names = set()
+    names = set()
+
+    for source_map in source_mappings:
+        source_name = source_map[check_name]
+
+        if source_name in names:
+            duplicate_names.add(source_name)
+        else:
+            names.add(source_name)
+
+    if len(duplicate_names) > 0:
+        msg = (
+            f"The following {msg.get(check_name, '')} "
+            f"{', '.join(duplicate_names)} are being used multiple times"
+        )
+        raise serializers.ValidationError({SOURCE_MAPPING_ERROR_KEY: [msg]})
+
+
+def _check_injectors(
+    eda_credential: models.EdaCredential,
+    existing_keys: list[str],
+    injector_type: str,
+) -> None:
+    injectors = eda_credential.credential_type.injectors
+    for key in injectors.get(injector_type, []):
+        if key in existing_keys:
+            message = (
+                f"Key: {key} already exists in {injector_type}. "
+                f"It conflicts with credential type: "
+                f"{eda_credential.credential_type.name}. "
+                f"Please check injectors."
+            )
+            raise serializers.ValidationError(message)
+
+        existing_keys.append(key)

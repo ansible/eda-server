@@ -12,10 +12,60 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pytest
-import redis
+import logging
 
+import pytest
+from django.conf import settings
+
+from aap_eda.core import enums, models
+from aap_eda.core.management.commands.create_initial_data import (
+    CREDENTIAL_TYPES,
+    populate_credential_types,
+)
 from aap_eda.settings import default
+
+
+#################################################################
+# Log capture factory
+#################################################################
+@pytest.fixture
+def caplog_factory(caplog):
+    def _factory(logger):
+        logger.setLevel(logging.INFO)
+        logger.handlers += [caplog.handler]
+        return caplog
+
+    return _factory
+
+
+#################################################################
+# Organization
+#################################################################
+@pytest.fixture
+def default_organization() -> models.Organization:
+    "Corresponds to migration add_default_organization"
+    return models.Organization.objects.get_or_create(
+        name=settings.DEFAULT_ORGANIZATION_NAME,
+        description="The default organization",
+    )[0]
+
+
+#################################################################
+# DB
+#################################################################
+@pytest.fixture
+def preseed_credential_types(
+    default_organization: models.Organization,
+) -> list[models.CredentialType]:
+    """Preseed Credential Types."""
+    return populate_credential_types(CREDENTIAL_TYPES)
+
+
+@pytest.fixture
+def aap_credential_type(preseed_credential_types):
+    return models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
 
 
 #################################################################
@@ -24,19 +74,24 @@ from aap_eda.settings import default
 @pytest.fixture
 def redis_parameters() -> dict:
     """Provide redis parameters based on settings values."""
-    params = (
-        default._rq_common_parameters() | default._rq_redis_client_parameters()
-    )
+    params = default.rq_redis_client_instantiation_parameters()
 
-    # Convert to lowercase for use in establishing a redis client.
-    params = {k.lower(): v for (k, v) in params.items()}
-
-    # We try to avoid conflicting with a deployed environment by using a
+    # TODO: figure out the db oddity described here-in.
+    #
+    # There's an oddity with non-HA unit tests and the use of
+    # an alternate db.
+    #
+    # For pragmatism we've removed the code here which attempted
+    # to avoid conflicting with a deployed environment by using a
     # different database from that of the settings.
-    # This is not guaranteed as the deployed environment could be differently
-    # configured from the default, but in development it should be fine.
-    client = redis.Redis(**params)
-    max_dbs = int(client.config_get("databases")["databases"])
-    params["db"] = (params["db"] + 1) % max_dbs
+    #
+    #
+    # One constant is that DAB RedisCluster, which does not support
+    # alternate dbs passes the EDA unit tests (which are part of
+    # CI processing) and that by using only the 0 db
+    # the same unit tests pass for non-HA whereas using an alternate
+    # db as this code previously did results in non-HA unit tests
+    # failing.
+    #
 
     return params

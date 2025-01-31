@@ -23,11 +23,14 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
+from .event_stream import EventStream
 from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 from .user import AwxToken, User
 
 __all__ = ("Activation",)
+
+DEFAULT_ENABLED = True
 
 
 class Activation(
@@ -36,6 +39,7 @@ class Activation(
     OnDeleteProcessParentMixin,
     BaseOrgModel,
     UniqueNamedModel,
+    PrimordialModel,
 ):
     class Meta:
         db_table = "core_activation"
@@ -52,7 +56,7 @@ class Activation(
         default="",
         blank=True,
     )
-    is_enabled = models.BooleanField(default=True)
+    is_enabled = models.BooleanField(default=DEFAULT_ENABLED)
     git_hash = models.TextField(null=False, default="")
     # TODO(alex) Since local activations are no longer supported
     # this field should be mandatory.
@@ -107,10 +111,6 @@ class Activation(
         null=True,
         default=None,
     )
-    event_streams = models.ManyToManyField(
-        "EventStream",
-        default=None,
-    )
     log_level = models.CharField(
         max_length=20,
         choices=RulebookProcessLogLevel.choices(),
@@ -132,6 +132,22 @@ class Activation(
         blank=True,
         help_text="Name of the kubernetes service",
     )
+    event_streams = models.ManyToManyField(
+        EventStream, related_name="activations", default=None
+    )
+    source_mappings = models.TextField(
+        default="",
+        blank=True,
+        help_text="Mapping between sources and event streams",
+    )
+    skip_audit_events = models.BooleanField(
+        default=False,
+        help_text=("Skip audit events for activation"),
+    )
 
     def get_parent_type(self) -> str:
         return ProcessParentType.ACTIVATION
+
+    def _get_skip_audit_events(self) -> bool:
+        """Activation can optionally skip audit events."""
+        return self.skip_audit_events

@@ -25,13 +25,19 @@ from drf_spectacular.utils import (
     extend_schema,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
-from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.core.enums import Action
+from aap_eda.core.utils.credentials import (
+    build_copy_post_data,
+    inputs_to_store,
+    inputs_to_store_dict,
+)
 from aap_eda.utils import str_to_bool
 
 from .mixins import (
@@ -74,6 +80,7 @@ class EdaCredentialViewSet(
     )
     filterset_class = filters.EdaCredentialFilter
     ordering_fields = ["name"]
+    rbac_action = None
 
     def filter_queryset(self, queryset):
         if queryset.model is models.EdaCredential:
@@ -127,30 +134,7 @@ class EdaCredentialViewSet(
         },
     )
     def create(self, request):
-        serializer = serializers.EdaCredentialCreateSerializer(
-            data=request.data
-        )
-
-        serializer.is_valid(raise_exception=True)
-        serializer.validated_data["inputs"] = inputs_to_store(
-            serializer.validated_data["inputs"]
-        )
-        with transaction.atomic():
-            response = serializer.create(serializer.validated_data)
-            check_related_permissions(
-                request.user,
-                serializer.Meta.model,
-                {},
-                model_to_dict(response),
-            )
-            RoleDefinition.objects.give_creator_permissions(
-                request.user, response
-            )
-
-        return Response(
-            serializers.EdaCredentialSerializer(response).data,
-            status=status.HTTP_201_CREATED,
-        )
+        return self._create_eda_credential(request, request.data)
 
     @extend_schema(
         description="List all EDA credentials",
@@ -181,7 +165,7 @@ class EdaCredentialViewSet(
 
     @extend_schema(
         description="Partial update of an EDA credential",
-        request=serializers.EdaCredentialCreateSerializer,
+        request=serializers.EdaCredentialUpdateSerializer,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EdaCredentialSerializer,
@@ -193,8 +177,14 @@ class EdaCredentialViewSet(
     )
     def partial_update(self, request, pk):
         eda_credential = self.get_object()
-        serializer = serializers.EdaCredentialCreateSerializer(
-            eda_credential, data=request.data, partial=True
+        data = request.data
+
+        data["inputs"] = inputs_to_store_dict(
+            data.get("inputs", {}), eda_credential.inputs
+        )
+
+        serializer = serializers.EdaCredentialUpdateSerializer(
+            eda_credential, data=data, partial=True
         )
         serializer.is_valid(raise_exception=True)
 
@@ -247,6 +237,17 @@ class EdaCredentialViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        if models.EventStream.objects.filter(
+            eda_credential=eda_credential
+        ).exists():
+            raise exceptions.Conflict(
+                f"Credential {eda_credential.name} is being referenced by "
+                "some event streams and cannot be deleted. "
+                "Please delete the EventStream(s) first before the credential "
+                "can be deleted. The EventStream maybe in use by other users "
+                "in the system."
+            )
+
         references = get_references(eda_credential)
 
         if bool(references) and not force:
@@ -257,3 +258,48 @@ class EdaCredentialViewSet(
             )
         self.perform_destroy(eda_credential)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @extend_schema(
+        description="Copy an EDA credential.",
+        request=serializers.EdaCredentialCopySerializer,
+        responses={
+            status.HTTP_201_CREATED: OpenApiResponse(
+                serializers.EdaCredentialSerializer,
+                description="Return the copied EDA credential.",
+            ),
+            status.HTTP_404_NOT_FOUND: OpenApiResponse(
+                None, description="EDA credential not found."
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True, rbac_action=Action.READ)
+    def copy(self, request, pk):
+        eda_credential = self.get_object()
+        post_data = build_copy_post_data(
+            eda_credential, request.data.get("name")
+        )
+        return self._create_eda_credential(request, post_data)
+
+    def _create_eda_credential(self, request, data):
+        """Create a new credential object given payload data."""
+        serializer = serializers.EdaCredentialCreateSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.validated_data["inputs"] = inputs_to_store(
+            serializer.validated_data["inputs"]
+        )
+        with transaction.atomic():
+            response = serializer.create(serializer.validated_data)
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(response),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, response
+            )
+
+        return Response(
+            serializers.EdaCredentialSerializer(response).data,
+            status=status.HTTP_201_CREATED,
+        )

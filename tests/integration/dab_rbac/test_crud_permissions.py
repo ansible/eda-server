@@ -16,6 +16,7 @@ import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
+from django.test import override_settings
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse
 
@@ -56,11 +57,11 @@ def test_add_permissions(
         pytest.skip("Model has no add permission")
 
     url = reverse(f"{get_basename(model)}-list")
-
-    response = user_client.post(url, data=post_data)
-    prior_ct = model.objects.count()
-    assert response.status_code == 403, response.data
-    assert model.objects.count() == prior_ct  # assure nothing was created
+    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
+        prior_ct = model.objects.count()
+        response = user_client.post(url, data=post_data)
+        assert response.status_code == 403, response.data
+        assert model.objects.count() == prior_ct  # assure nothing was created
 
     # Figure out the parent object if we can
     parent_field_name = permission_registry.get_parent_fd_name(model)
@@ -109,8 +110,9 @@ def test_add_permissions(
                     related_perm = "view"
                 give_obj_perm(default_user, related_obj, related_perm)
 
-    response = user_client.post(url, data=post_data, format="json")
-    assert response.status_code == 201, response.data
+    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
+        response = user_client.post(url, data=post_data, format="json")
+        assert response.status_code == 201, response.data
 
     if model.objects.count() == 1:
         obj = model.objects.first()

@@ -14,14 +14,18 @@
 
 import logging
 
+import django_rq
 from django.conf import settings
 
-from aap_eda.core import models
-from aap_eda.core.tasking import get_queue, job, unique_enqueue
+from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
+
+# Wrap the django_rq job decorator so its processing is within our retry
+# code.
+job = tasking.redis_connect_retry()(django_rq.job)
 
 
 @job(PROJECT_TASKS_QUEUE)
@@ -54,9 +58,16 @@ def sync_project(project_id: int):
 # default is the default queue
 def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
     job_id = "monitor_project_tasks"
-    unique_enqueue(queue_name, job_id, _monitor_project_tasks, queue_name)
+    tasking.unique_enqueue(
+        queue_name, job_id, _monitor_project_tasks, queue_name
+    )
 
 
+# Although this is a periodically run task and that could be viewed as
+# providing resilience to Redis connection issues we decorate it with the
+# redis_connect_retry to maintain the model that anything directly dependent on
+# a Redis connection is wrapped by retries.
+@tasking.redis_connect_retry()
 def _monitor_project_tasks(queue_name: str) -> None:
     """Handle project tasks that are stuck.
 
@@ -66,7 +77,7 @@ def _monitor_project_tasks(queue_name: str) -> None:
     """
     logger.info("Task started: Monitor project tasks")
 
-    queue = get_queue(queue_name)
+    queue = django_rq.get_queue(queue_name)
 
     # Filter projects that doesn't have any related job
     pending_projects = models.Project.objects.filter(

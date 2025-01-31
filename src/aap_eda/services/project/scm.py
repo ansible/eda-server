@@ -206,9 +206,9 @@ class ScmRepository:
             msg = str(e)
             if secret:
                 msg = msg.replace(secret, "****", 1)
-                msg = msg.replace(quote(secret), "****", 1)
+                msg = msg.replace(quote(secret, safe=""), "****", 1)
             logger.warning("SCM clone failed: %s", msg)
-            raise ScmError(msg) from None
+            raise e.__class__(msg) from None
         finally:
             if key_file:
                 key_file.close()
@@ -232,11 +232,11 @@ class ScmRepository:
             return url
 
         if user and password:
-            encoded_user = quote(user)
-            encoded_password = quote(password)
+            encoded_user = quote(user, safe="")
+            encoded_password = quote(password, safe="")
             domain = f"{encoded_user}:{encoded_password}@{domain}"
         elif password:
-            encoded_token = quote(password)
+            encoded_token = quote(password, safe="")
             domain = f"{encoded_token}@{domain}"
 
         unparsed = (
@@ -282,7 +282,7 @@ class ScmRepository:
 
 
 class GitAnsibleRunnerExecutor:
-    ERROR_PREFIX = "Failed to clone the project:"
+    ERROR_PREFIX = "Project Import Error:"
 
     def __call__(
         self,

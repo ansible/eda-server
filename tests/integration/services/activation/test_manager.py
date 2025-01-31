@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from _pytest.logging import LogCaptureFixture
+from django.utils import timezone
 from pytest_django.fixtures import SettingsWrapper
 from pytest_lazyfixture import lazy_fixture
 
@@ -43,7 +44,9 @@ def apply_settings(settings: SettingsWrapper, **kwargs):
 
 
 @pytest.fixture
-def rulebook_with_job_template() -> models.Rulebook:
+def rulebook_with_job_template(
+    default_organization: models.Organization,
+) -> models.Rulebook:
     """Return a default rulebook."""
     rulesets = """
 ---
@@ -63,6 +66,7 @@ def rulebook_with_job_template() -> models.Rulebook:
     return models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=rulesets,
+        organization=default_organization,
     )
 
 
@@ -74,11 +78,30 @@ def eda_caplog(caplog_factory) -> LogCaptureFixture:
 
 @pytest.fixture
 def activation_with_instance(
+    default_organization: models.Organization,
     basic_activation: models.Activation,
 ) -> models.Activation:
     """Return an activation with an instance."""
-    models.RulebookProcess.objects.create(activation=basic_activation)
+    models.RulebookProcess.objects.create(
+        activation=basic_activation,
+        organization=default_organization,
+    )
     return basic_activation
+
+
+@pytest.fixture
+def starting_activation(activation_with_instance: models.Activation):
+    """Return a running activation."""
+    activation = activation_with_instance
+    activation.status = enums.ActivationStatus.STARTING
+    activation.save(update_fields=["status"])
+    activation.latest_instance.status = enums.ActivationStatus.STARTING
+    activation.latest_instance.activation_pod_id = "test-pod-id"
+    activation.latest_instance.updated_at = timezone.now()
+    activation.latest_instance.save(
+        update_fields=["status", "activation_pod_id", "updated_at"],
+    )
+    return activation
 
 
 @pytest.fixture
@@ -100,6 +123,7 @@ def basic_activation(
     default_user: models.User,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
 ) -> models.Activation:
     """Return the minimal activation."""
     return models.Activation.objects.create(
@@ -110,6 +134,7 @@ def basic_activation(
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
         log_level=enums.RulebookProcessLogLevel.INFO,
+        organization=default_organization,
     )
 
 
@@ -118,6 +143,7 @@ def new_activation_with_instance(
     default_user: models.User,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
 ) -> models.Activation:
     """Return an activation with an instance."""
     activation = models.Activation.objects.create(
@@ -127,38 +153,18 @@ def new_activation_with_instance(
         rulebook=default_rulebook,
         # rulebook_rulesets is populated by the serializer
         rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
     )
     models.RulebookProcess.objects.create(
         activation=activation,
         status=enums.ActivationStatus.RUNNING,
+        organization=default_organization,
     )
     models.RulebookProcessQueue.objects.create(
         process=activation.latest_instance,
         queue_name="queue_name_test",
     )
     return activation
-
-
-@pytest.fixture
-def new_event_stream_with_instance(
-    default_user: models.User,
-    default_decision_environment: models.DecisionEnvironment,
-    default_rulebook: models.Rulebook,
-) -> models.EventStream:
-    """Return an event stream with an instance."""
-    event_stream = models.EventStream.objects.create(
-        name="new_event_stream_with_instance",
-        user=default_user,
-        decision_environment=default_decision_environment,
-        rulebook=default_rulebook,
-        # rulebook_rulesets is populated by the serializer
-        rulebook_rulesets=default_rulebook.rulesets,
-    )
-    models.RulebookProcess.objects.create(
-        event_stream=event_stream,
-        status=enums.ActivationStatus.RUNNING,
-    )
-    return event_stream
 
 
 @pytest.fixture
@@ -171,6 +177,13 @@ def job_mock():
     mock_job = MagicMock()
     mock_job.origin = "queue_name_test"
     return mock_job
+
+
+@pytest.fixture
+def running_container_status_mock():
+    status_mock = MagicMock()
+    status_mock.status = enums.ActivationStatus.RUNNING
+    return status_mock
 
 
 @pytest.mark.django_db
@@ -263,9 +276,7 @@ def test_start_no_awx_token(
     with pytest.raises(exceptions.ActivationStartError) as exc:
         activation_manager.start()
     assert basic_activation.status == enums.ActivationStatus.ERROR
-    assert "The rulebook requires an Awx Token or RH AAP credential." in str(
-        exc.value
-    )
+    assert "The rulebook requires a RH AAP credential." in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
 
 
@@ -282,7 +293,7 @@ def test_start_no_decision_environment(
         activation_manager.start()
     assert basic_activation.status == enums.ActivationStatus.ERROR
     assert "decision_environment" in str(exc.value)
-    assert "This field may not be null" in str(exc.value)
+    assert "Decision Environment is needed" in str(exc.value)
     assert str(exc.value) in basic_activation.status_message
 
 
@@ -323,17 +334,17 @@ def test_start_first_run(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
+        "rq.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert basic_activation.status == enums.ActivationStatus.RUNNING
+    assert basic_activation.status == enums.ActivationStatus.STARTING
     assert (
         basic_activation.latest_instance.status
-        == enums.ActivationStatus.RUNNING
+        == enums.ActivationStatus.STARTING
     )
     assert basic_activation.latest_instance.activation_pod_id == "test-pod-id"
     assert basic_activation.restart_count == 0
@@ -342,6 +353,65 @@ def test_start_first_run(
         process=basic_activation.latest_instance,
     )
     assert rulebook_process_queue.queue_name == job_mock.origin
+
+
+@pytest.mark.django_db
+def test_monitor_to_running_status(
+    starting_activation: models.Activation,
+    container_engine_mock: MagicMock,
+    running_container_status_mock: MagicMock,
+):
+    """Teset monitor task brings activation to running status"""
+    activation_manager = ActivationManager(
+        db_instance=starting_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.return_value = (
+        running_container_status_mock
+    )
+    activation_manager.monitor()
+    assert starting_activation.status == enums.ActivationStatus.RUNNING
+    assert (
+        starting_activation.latest_instance.status
+        == enums.ActivationStatus.RUNNING
+    )
+    assert starting_activation.restart_count == 0
+
+
+@pytest.mark.django_db
+def test_monitor_to_unexpected_error_status(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test monitor when get_status returns an unexpected error."""
+    activation_manager = ActivationManager(
+        db_instance=running_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.side_effect = (
+        engine_exceptions.ContainerEngineError("unexpected error")
+    )
+    with pytest.raises(exceptions.ActivationMonitorError):
+        activation_manager.monitor()
+    assert running_activation.status == enums.ActivationStatus.ERROR
+    assert "unexpected error" in running_activation.status_message
+
+
+@pytest.mark.django_db
+def test_monitor_container_not_found(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test monitor when get_status returns a container not found error."""
+    activation_manager = ActivationManager(
+        db_instance=running_activation,
+        container_engine=container_engine_mock,
+    )
+    container_engine_mock.get_status.side_effect = (
+        engine_exceptions.ContainerNotFoundError("Not found")
+    )
+    activation_manager.monitor()
+    assert running_activation.status == enums.ActivationStatus.FAILED
 
 
 @pytest.mark.django_db
@@ -359,17 +429,17 @@ def test_start_restart(
     )
     container_engine_mock.start.return_value = "test-pod-id"
     with mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
+        "rq.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start(is_restart=True)
     assert container_engine_mock.start.called
     assert container_engine_mock.update_logs.called
     assert "Starting" in eda_caplog.text
-    assert running_activation.status == enums.ActivationStatus.RUNNING
+    assert running_activation.status == enums.ActivationStatus.STARTING
     assert (
         running_activation.latest_instance.status
-        == enums.ActivationStatus.RUNNING
+        == enums.ActivationStatus.STARTING
     )
     assert (
         running_activation.latest_instance.activation_pod_id == "test-pod-id"
@@ -427,13 +497,37 @@ def test_stop_already_stopped(
     assert not container_engine_mock.cleanup.called
 
 
+@pytest.mark.parametrize(
+    ("before_status", "after_status", "before_msg", "after_msg"),
+    [
+        (
+            enums.ActivationStatus.RUNNING,
+            enums.ActivationStatus.STOPPED,
+            "running",
+            "Stop requested by user.",
+        ),
+        (
+            enums.ActivationStatus.ERROR,
+            enums.ActivationStatus.ERROR,
+            "activation validation failed",
+            "activation validation failed",
+        ),
+    ],
+)
 @pytest.mark.django_db
 def test_stop_running(
     running_activation: models.Activation,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
+    before_status,
+    after_status,
+    before_msg,
+    after_msg,
 ):
     """Test stop verb when activation is running."""
+    running_activation.status = before_status
+    running_activation.status_message = before_msg
+    running_activation.save(update_fields=["status", "status_message"])
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
         db_instance=running_activation,
@@ -443,13 +537,13 @@ def test_stop_running(
     assert "Stopping" in eda_caplog.text
     assert "Cleanup operation requested" in eda_caplog.text
     assert "Activation stopped." in eda_caplog.text
-    assert running_activation.status == enums.ActivationStatus.STOPPED
+    assert running_activation.status == after_status
     assert (
         running_activation.latest_instance.status
         == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
-    assert running_activation.status_message == "Stop requested by user."
+    assert running_activation.status_message == after_msg
     assert container_engine_mock.cleanup.called
 
 
@@ -690,7 +784,7 @@ def test_start_max_running_activations(
     )
 
     with pytest.raises(exceptions.MaxRunningProcessesError), mock.patch(
-        "aap_eda.services.activation.activation_manager.get_current_job",
+        "rq.get_current_job",
         return_value=job_mock,
     ):
         activation_manager.start()
@@ -707,27 +801,11 @@ def test_init_status_manager_with_activation(basic_activation):
     )
 
 
-@pytest.mark.django_db
-def test_init_status_manager_with_event_stream(new_event_stream_with_instance):
-    status_manager = StatusManager(new_event_stream_with_instance)
-    assert status_manager.db_instance == new_event_stream_with_instance
-    assert (
-        status_manager.latest_instance
-        == new_event_stream_with_instance.latest_instance
-    )
-    assert (
-        status_manager.db_instance_type == enums.ProcessParentType.EVENT_STREAM
-    )
-
-
 @pytest.mark.parametrize(
     "process_parent",
     [
         pytest.param(
             lazy_fixture("new_activation_with_instance"),
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream_with_instance"),
         ),
     ],
 )
@@ -751,9 +829,6 @@ def test_status_manager_set_latest_instance_status(process_parent):
     [
         pytest.param(
             lazy_fixture("new_activation_with_instance"),
-        ),
-        pytest.param(
-            lazy_fixture("new_event_stream_with_instance"),
         ),
     ],
 )

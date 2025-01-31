@@ -57,6 +57,7 @@ def test_create_decision_environment(
     default_organization: models.Organization,
     admin_client: APIClient,
     preseed_credential_types,
+    admin_info,
     credential_type,
     status_code,
     status_message,
@@ -66,6 +67,7 @@ def test_create_decision_environment(
         name="eda-credential",
         description="Default Credential",
         credential_type=credential_type,
+        organization=default_organization,
         inputs=inputs_to_store(
             {
                 "username": "dummy-user",
@@ -90,10 +92,171 @@ def test_create_decision_environment(
         result = response.data
         result.pop("created_at")
         result.pop("modified_at")
+        created_by = result.pop("created_by")
+        modified_by = result.pop("modified_by")
         assert result == {"id": id_, **data_in}
         assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
+        assert created_by["username"] == admin_info["username"]
+        assert modified_by["username"] == admin_info["username"]
     else:
         assert status_message in response.data["eda_credential_id"]
+
+
+@pytest.mark.parametrize(
+    ("return_code", "host", "image_url", "unallowed"),
+    [
+        (
+            status.HTTP_201_CREATED,
+            "1.2.3.4",
+            "1.2.3.4/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "1.2.3.4:5000",
+            "1.2.3.4:5000/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com",
+            "registry.com/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com:5000",
+            "registry.com:5000/group/img1",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "registry.com:5000",
+            "registry.com:5000/group/img1:tag",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "https://registry.com",
+            "registry.com/group/img1:tag",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "https://registry.com:5000",
+            "registry.com:5000/group/img1:tag",
+            "",
+        ),
+        (
+            status.HTTP_201_CREATED,
+            "https://registry.com:5000",
+            "registry.com:5000/group/img1:tag@additional-content",
+            "",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "/registry.com",
+            "no host name found",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "https://registry.com/group/img1:tag1",
+            "invalid host name: 'https:'",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry?com/group/img1",
+            "invalid host name: 'registry?com'",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com",
+            "no image path found",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com/",
+            "no image path found",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com/group/:tag",
+            "'group/' does not match OCI name standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com/group/img1:",
+            "'' does not match OCI tag standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com/group/bad^img1",
+            "'group/bad^img1' does not match OCI name standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "registry.com",
+            "registry.com/group/img1:bad^tag",
+            "'bad^tag' does not match OCI tag standard",
+        ),
+        (
+            status.HTTP_400_BAD_REQUEST,
+            "https://registry.com:5000",
+            "registry.com:5000/group/img1:bad^tag@additional-content",
+            "'bad^tag' does not match OCI tag standard",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_decision_environment_url(
+    return_code,
+    host,
+    image_url,
+    unallowed,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    credential = models.EdaCredential.objects.create(
+        name="eda-credential",
+        description="Default Credential",
+        credential_type=credential_type,
+        organization=default_organization,
+        inputs=inputs_to_store(
+            {
+                "username": "dummy-user",
+                "password": "dummy-password",
+                "host": host,
+            }
+        ),
+    )
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": image_url,
+        "organization_id": default_organization.id,
+        "eda_credential_id": credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == return_code
+    if return_code == status.HTTP_400_BAD_REQUEST:
+        errors = response.data.get("non_field_errors")
+        assert f"Image url {image_url} is malformed; {unallowed}" in str(
+            errors
+        )
 
 
 @pytest.mark.parametrize(
@@ -144,6 +307,7 @@ def test_create_decision_environment_with_empty_credential(
         description="Default Credential",
         credential_type=credential_type,
         inputs=inputs_to_store(credential_inputs),
+        organization=default_organization,
     )
     data_in = {
         "name": "de1",
@@ -161,6 +325,167 @@ def test_create_decision_environment_with_empty_credential(
             "non_field_errors"
         )
         assert status_message in str(errors)
+
+
+de_requests = [
+    (
+        True,
+        "1.2.3.4/group/img1",
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1",
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1:latest",
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1@sha256:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
+        "",
+    ),
+    (
+        True,
+        "registry.com/group/img1@sha512:6e8985d6c50cf2eb577f17237ef9c05baa9c2f472a730f13784728cec1fdfab1",  # noqa: E501
+        "",
+    ),
+    (
+        False,
+        "https://registry.com/group/img1:latest",
+        "",
+    ),
+    (
+        False,
+        "registry.com/",
+        "no image path found",
+    ),
+    (
+        False,
+        "registry.com/group/:tag",
+        "'group/' does not match OCI name standard",
+    ),
+    (
+        False,
+        "registry.com/group/img1:",
+        "'' does not match OCI tag standard",
+    ),
+    (
+        False,
+        "registry.com/group/bad^img1",
+        "'group/bad^img1' does not match OCI name standard",
+    ),
+    (
+        False,
+        "registry.com/group/img1:bad^tag",
+        "'bad^tag' does not match OCI tag standard",
+    ),
+    (
+        False,
+        "registry.com:5000/group/img1:bad^tag@additional-content",
+        "'bad^tag' does not match OCI tag standard",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("expected_success", "image_url", "unallowed"),
+    de_requests,
+)
+@pytest.mark.django_db
+def test_create_decision_environment_with_no_credential(
+    expected_success,
+    image_url,
+    unallowed,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": image_url,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    return_code = status.HTTP_400_BAD_REQUEST
+    if expected_success:
+        return_code = status.HTTP_201_CREATED
+
+    assert response.status_code == return_code
+    if return_code == status.HTTP_400_BAD_REQUEST:
+        errors = response.data.get("non_field_errors")
+        assert f"Image url {image_url} is malformed; {unallowed}" in str(
+            errors
+        )
+
+
+@pytest.mark.parametrize(
+    ("expected_success", "image_url", "unallowed"),
+    de_requests,
+)
+@pytest.mark.django_db
+def test_patch_decision_environment_with_no_credential(
+    expected_success,
+    image_url,
+    unallowed,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "quay.io/test/test:latest",
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": image_url,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/" f"{response.data['id']}/",
+        data=data_in,
+    )
+    return_code = status.HTTP_400_BAD_REQUEST
+    if expected_success:
+        return_code = status.HTTP_200_OK
+    assert response.status_code == return_code
+    if return_code == status.HTTP_400_BAD_REQUEST:
+        errors = response.data.get("non_field_errors")
+        assert f"Image url {image_url} is malformed; {unallowed}" in str(
+            errors
+        )
+
+
+@pytest.mark.django_db
+def test_create_decision_environment_with_none_organization(
+    admin_client: APIClient,
+):
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "registry.com/img1:tag1",
+        "organization_id": None,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Organization is needed" in str(response.data)
 
 
 @pytest.mark.django_db
@@ -237,6 +562,7 @@ def test_retrieve_decision_environment_not_exist(admin_client: APIClient):
 def test_partial_update_decision_environment(
     default_decision_environment: models.DecisionEnvironment,
     admin_client: APIClient,
+    default_organization: models.Organization,
     preseed_credential_types,
     credential_type,
     status_code,
@@ -247,6 +573,7 @@ def test_partial_update_decision_environment(
         name="eda-credential",
         description="Default Credential",
         credential_type=credential_type,
+        organization=default_organization,
         inputs=inputs_to_store(
             {
                 "username": "dummy-user",
@@ -292,6 +619,7 @@ def test_partial_update_decision_environment(
 @pytest.mark.django_db
 def test_partial_update_decision_environment_with_image_url_and_host(
     default_decision_environment: models.DecisionEnvironment,
+    default_organization: models.Organization,
     admin_client: APIClient,
     preseed_credential_types,
     inputs,
@@ -306,8 +634,12 @@ def test_partial_update_decision_environment_with_image_url_and_host(
         description="Default Credential",
         credential_type=credential_type,
         inputs=inputs_to_store(inputs),
+        organization=default_organization,
     )
-    data = {"eda_credential_id": credential.id, "image_url": "quay.io"}
+    data = {
+        "eda_credential_id": credential.id,
+        "image_url": "quay.io/path/to/image",
+    }
     response = admin_client.patch(
         f"{api_url_v1}/decision-environments/"
         f"{default_decision_environment.id}/",
@@ -387,6 +719,56 @@ def test_delete_decision_environment_force(
     )
     default_activation.refresh_from_db()
     assert default_activation.decision_environment is None
+
+
+@pytest.mark.django_db
+def test_decision_environment_by_fields(
+    default_organization: models.Organization,
+    default_activation: models.Activation,
+    default_eda_credential: models.EdaCredential,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    base_client.force_authenticate(user=admin_user)
+    data_in = {
+        "name": "de1",
+        "description": "desc here",
+        "image_url": "quay.io/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": default_eda_credential.id,
+    }
+    response = base_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    de = models.DecisionEnvironment.objects.get(id=response.data["id"])
+    assert de.created_by == admin_user
+    assert de.modified_by == admin_user
+
+    base_client.force_authenticate(user=super_user)
+    update_data = {"name": "de_changed"}
+    response = base_client.patch(
+        f"{api_url_v1}/decision-environments/{de.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    de.refresh_from_db()
+    assert de.created_by == admin_user
+    assert de.modified_by == super_user
+
+    response = base_client.get(f"{api_url_v1}/decision-environments/{de.id}/")
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == super_user.username
+
+    response = base_client.get(f"{api_url_v1}/decision-environments/")
+    assert response.status_code == status.HTTP_200_OK
+    results = response.data["results"]
+    # skip the first default_decision_enviroment
+    assert results[1]["created_by"]["username"] == admin_user.username
+    assert results[1]["modified_by"]["username"] == super_user.username
 
 
 # UTILS

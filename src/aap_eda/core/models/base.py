@@ -12,11 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from crum import get_current_user
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.db import models
 
-from .utils import get_default_organization_id
+__all__ = ("BaseOrgModel", "UniqueNamedModel", "PrimordialModel")
 
-__all__ = ("BaseOrgModel", "UniqueNamedModel")
+User = get_user_model()
 
 
 class BaseOrgModel(models.Model):
@@ -26,8 +29,8 @@ class BaseOrgModel(models.Model):
     organization = models.ForeignKey(
         "Organization",
         on_delete=models.CASCADE,
-        default=get_default_organization_id,
-        null=True,
+        blank=False,
+        null=False,
     )
 
 
@@ -42,3 +45,48 @@ class UniqueNamedModel(models.Model):
             "id": self.id,
             "name": self.name,
         }
+
+
+class PrimordialModel(models.Model):
+    """Basic model with common created_by and modified_by fields."""
+
+    class Meta:
+        abstract = True
+
+    created_by = models.ForeignKey(
+        User,
+        related_name="%s(class)s_created+",
+        default=None,
+        null=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+    )
+    modified_by = models.ForeignKey(
+        User,
+        related_name="%s(class)s_modified+",
+        default=None,
+        null=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+    )
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields", [])
+        current_user = get_current_user()
+        if current_user:
+            if isinstance(current_user, AnonymousUser):
+                super().save(*args, **kwargs)
+                return
+
+            # Set `created_by` only for new objects
+            if not self.pk and not self.created_by:
+                self.created_by = current_user
+                if "created_by" not in update_fields:
+                    update_fields.append("created_by")
+
+            # Always update `modified_by`
+            self.modified_by = current_user
+            if "modified_by" not in update_fields:
+                update_fields.append("modified_by")
+
+        super().save(*args, **kwargs)

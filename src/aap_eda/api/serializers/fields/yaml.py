@@ -20,6 +20,10 @@ from rest_framework.exceptions import ValidationError
 class YAMLSerializerField(serializers.Field):
     """Serializer for YAML a superset of JSON."""
 
+    def __init__(self, **kwargs):
+        self.sort_keys = kwargs.pop("sort_keys", True)
+        super().__init__(**kwargs)
+
     def to_internal_value(self, data) -> dict:
         if data:
             try:
@@ -36,4 +40,4 @@ class YAMLSerializerField(serializers.Field):
         return data
 
     def to_representation(self, value) -> str:
-        return yaml.dump(value)
+        return yaml.dump(value, sort_keys=self.sort_keys)

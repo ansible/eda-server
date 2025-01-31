@@ -29,6 +29,7 @@ def fake_job():
 @mock.patch("aap_eda.tasks.project.import_project")
 def test_monitor_project_tasks_import(
     import_task_mock: mock.Mock,
+    default_organization: models.Organization,
     default_queue: Queue,
 ):
     """Test monitor_project_tasks rq task.
@@ -44,6 +45,7 @@ def test_monitor_project_tasks_import(
         name="test_monitor_project_tasks",
         url="https://git.example.com/acme/project-01",
         import_state=models.Project.ImportState.PENDING,
+        organization=default_organization,
     )
     default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
@@ -59,6 +61,7 @@ def test_monitor_project_tasks_import(
 @mock.patch("aap_eda.tasks.project.sync_project")
 def test_monitor_project_tasks_sync(
     sync_task_mock: mock.Mock,
+    default_organization: models.Organization,
     default_queue: Queue,
 ):
     """Test monitor_project_tasks rq task.
@@ -75,6 +78,7 @@ def test_monitor_project_tasks_sync(
         url="https://git.example.com/acme/project-01",
         import_state=models.Project.ImportState.PENDING,
         git_hash="dummy-hash",
+        organization=default_organization,
     )
     default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
@@ -90,6 +94,7 @@ def test_monitor_project_tasks_sync(
 @mock.patch("aap_eda.tasks.project.sync_project")
 def test_monitor_project_tasks_with_job(
     sync_task_mock: mock.Mock,
+    default_organization: models.Organization,
     default_queue: Queue,
 ):
     """Test monitor_project_tasks rq task.
@@ -108,9 +113,10 @@ def test_monitor_project_tasks_with_job(
         import_state=models.Project.ImportState.PENDING,
         git_hash="dummy-hash",
         import_task_id=expected_job_id,
+        organization=default_organization,
     )
     default_queue.enqueue(fake_job, job_id=expected_job_id)
-    default_queue.enqueue(monitor_project_tasks)
+    default_queue.enqueue(monitor_project_tasks, default_queue.name)
 
     worker = DefaultWorker(
         [default_queue], connection=default_queue.connection

@@ -12,107 +12,89 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
+
 from django.db import models
 
-from aap_eda.core.enums import (
-    ActivationStatus,
-    ProcessParentType,
-    RestartPolicy,
-    RulebookProcessLogLevel,
-)
-from aap_eda.core.utils import get_default_log_level
-from aap_eda.services.activation.engine.common import ContainerableMixin
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
-from .base import UniqueNamedModel
-from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
+__all__ = "EventStream"
+
+EDA_EVENT_STREAM_CHANNEL_PREFIX = "eda_event_stream_"
 
 
-class EventStream(
-    StatusHandlerModelMixin,
-    ContainerableMixin,
-    OnDeleteProcessParentMixin,
-    UniqueNamedModel,
-):
-    """Model representing an event stream."""
-
-    router_basename = "eventstream"
-
-    description = models.TextField(default="", blank=True)
-    is_enabled = models.BooleanField(default=True)
-    decision_environment = models.ForeignKey(
-        "DecisionEnvironment",
-        on_delete=models.SET_NULL,
-        null=True,
-    )
-    rulebook = models.ForeignKey(
-        "Rulebook",
-        on_delete=models.SET_NULL,
-        null=True,
-    )
-    extra_var = models.TextField(null=True, blank=True)
-    restart_policy = models.TextField(
-        choices=RestartPolicy.choices(),
-        default=RestartPolicy.ON_FAILURE,
-    )
-    status = models.TextField(
-        choices=ActivationStatus.choices(),
-        default=ActivationStatus.PENDING,
-    )
-    current_job_id = models.TextField(null=True)
-    restart_count = models.IntegerField(default=0)
-    failure_count = models.IntegerField(default=0)  # internal, since last good
-    rulebook_name = models.TextField(
+class EventStream(BaseOrgModel, UniqueNamedModel, PrimordialModel):
+    event_stream_type = models.TextField(
         null=False,
-        help_text="Name of the referenced rulebook",
-        default="",
+        help_text="The type of the event stream based on credential type",
+        default="hmac",
     )
-    rulebook_rulesets = models.TextField(
+    eda_credential = models.ForeignKey(
+        "EdaCredential",
+        blank=True,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+    )
+    additional_data_headers = models.TextField(
+        blank=True,
+        help_text=(
+            "The additional http headers which will "
+            "be added to the event data. The headers "
+            "are comma delimited"
+        ),
+    )
+    test_mode = models.BooleanField(
+        default=False, help_text="Enable test mode"
+    )
+    test_content_type = models.TextField(
+        blank=True,
+        default="",
+        help_text="The content type of test data, when in test mode",
+    )
+    test_content = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "The content recieved, when in test mode, "
+            "stored as a yaml string"
+        ),
+    )
+    test_headers = models.TextField(
+        blank=True,
+        default="",
+        help_text=(
+            "The headers recieved, when in test mode, "
+            "stored as a yaml string"
+        ),
+    )
+    test_error_message = models.TextField(
+        blank=True,
+        default="",
+        help_text="The error message,  when in test mode",
+    )
+    owner = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE,
         null=False,
-        help_text="Content of the last referenced rulebook",
-        default="",
+        help_text="The user who created the webhook",
     )
-    ruleset_stats = models.JSONField(default=dict)
-    user = models.ForeignKey("User", on_delete=models.CASCADE, null=False)
+    uuid = models.UUIDField(default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
-    status_updated_at = models.DateTimeField(null=True)
-    status_message = models.TextField(null=True, default=None)
-    latest_instance = models.OneToOneField(
-        "RulebookProcess",
-        null=True,
-        default=None,
-        on_delete=models.SET_NULL,
-        related_name="+",
+    events_received = models.BigIntegerField(
+        default=0,
+        help_text="The total number of events received by event stream",
     )
-    channel_name = models.TextField(null=True, default=None)
-    source_type = models.TextField(null=False)
-    source_args = models.JSONField(null=True, default=None)
-    log_level = models.CharField(
-        max_length=20,
-        choices=RulebookProcessLogLevel.choices(),
-        default=get_default_log_level,
-    )
-    k8s_service_name = models.TextField(
-        null=True,
-        default=None,
-        blank=True,
-        help_text="Name of the kubernetes service",
+    last_event_received_at = models.DateTimeField(
+        null=True, help_text="The date/time when the last event was received"
     )
 
-    class Meta:
-        db_table = "core_event_stream"
-        indexes = [
-            models.Index(fields=["name"], name="ix_event_stream_name"),
-        ]
-        ordering = ("-created_at",)
+    def _get_channel_name(self) -> str:
+        """Generate the channel name based on the UUID and prefix."""
+        return (
+            f"{EDA_EVENT_STREAM_CHANNEL_PREFIX}"
+            f"{str(self.uuid).replace('-','_')}"
+        )
 
-    def __str__(self) -> str:
-        return f"EventStream {self.name} ({self.id})"
-
-    # Implementation of the ContainerableMixin.
-    def _get_skip_audit_events(self) -> bool:
-        """Event stream skips audit events."""
-        return True
-
-    def get_parent_type(self) -> str:
-        return ProcessParentType.EVENT_STREAM
+    channel_name = property(_get_channel_name)

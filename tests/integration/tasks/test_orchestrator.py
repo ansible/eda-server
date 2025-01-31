@@ -27,8 +27,19 @@ from aap_eda.core.enums import (
 from aap_eda.tasks import orchestrator
 
 
+def fake_task(number: int):
+    pass
+
+
 @pytest.fixture
-def default_rulebook() -> models.Rulebook:
+def eda_caplog(caplog_factory):
+    return caplog_factory(orchestrator.LOGGER)
+
+
+@pytest.fixture
+def default_rulebook(
+    default_organization: models.Organization,
+) -> models.Rulebook:
     """Return a default rulebook."""
     rulesets = """
 ---
@@ -48,11 +59,12 @@ def default_rulebook() -> models.Rulebook:
     return models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=rulesets,
+        organization=default_organization,
     )
 
 
 @pytest.fixture()
-def activation(default_rulebook):
+def activation(default_rulebook, default_organization):
     user = models.User.objects.create_user(
         username="luke.skywalker",
         first_name="Luke",
@@ -63,6 +75,7 @@ def activation(default_rulebook):
     decision_environment = models.DecisionEnvironment.objects.create(
         name="test-decision-environment",
         image_url="localhost:14000/test-image-url",
+        organization=default_organization,
     )
     return models.Activation.objects.create(
         name="test1",
@@ -70,11 +83,12 @@ def activation(default_rulebook):
         decision_environment=decision_environment,
         rulebook=default_rulebook,
         rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
     )
 
 
 @pytest.fixture()
-def max_running_processes():
+def max_running_processes(default_organization: models.Organization):
     user = models.User.objects.create_user(
         username="luke.skywalker2",
         first_name="Luke",
@@ -87,6 +101,7 @@ def max_running_processes():
         activation = models.Activation.objects.create(
             name=f"test_max_running{i}",
             user=user,
+            organization=default_organization,
         )
         status = (
             ActivationStatus.STARTING if i == 0 else ActivationStatus.RUNNING
@@ -95,6 +110,7 @@ def max_running_processes():
             name=f"running{i}",
             activation=activation,
             status=status,
+            organization=default_organization,
         )
         processes.append(process)
         models.RulebookProcessQueue.objects.create(
@@ -164,7 +180,7 @@ def test_manage_not_start(
         return_value=container_engine_mock,
     ):
         with mock.patch(
-            "aap_eda.services.activation.activation_manager.get_current_job",
+            "rq.get_current_job",
             return_value=job_mock,
         ):
             orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
@@ -186,7 +202,7 @@ def test_manage_not_start(
         (orchestrator.restart_rulebook_process, ActivationRequest.RESTART),
     ],
 )
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 @mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_activation_requests(
     get_queue_name_mock,
@@ -216,7 +232,7 @@ def test_activation_requests(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 @mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_monitor_rulebook_processes(
     get_queue_name_mock, enqueue_mock, activation, max_running_processes
@@ -271,6 +287,7 @@ def test_max_running_activation_after_start_job(
     activation,
     max_running_processes,
     container_engine_mock,
+    default_organization: models.Organization,
 ):
     """Check if the max running processes error is handled correctly
     when the limit is reached after the request is started."""
@@ -282,6 +299,7 @@ def test_max_running_activation_after_start_job(
             name="running",
             activation=max_running_processes[0].activation,
             status=ActivationStatus.RUNNING,
+            organization=default_organization,
         )
         original_start_method(instance, *args[1:], **kwargs)
 
@@ -297,7 +315,7 @@ def test_max_running_activation_after_start_job(
         return_value=container_engine_mock,
     ):
         with mock.patch(
-            "aap_eda.services.activation.activation_manager.get_current_job",
+            "rq.get_current_job",
             return_value=job_mock,
         ):
             orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
@@ -309,7 +327,7 @@ def test_max_running_activation_after_start_job(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.tasks.orchestrator.unique_enqueue")
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 def test_monitor_rulebook_processes_unique(enqueue_mock):
     orchestrator.enqueue_monitor_rulebook_processes()
     enqueue_mock.assert_called_once_with(
@@ -317,3 +335,31 @@ def test_monitor_rulebook_processes_unique(enqueue_mock):
         "monitor_rulebook_processes",
         orchestrator.monitor_rulebook_processes,
     )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
+def test_dispatch_existing_rq_jobs(
+    enqueue_mock, activation, eda_caplog, default_queue
+):
+    """Test that the dispatch does not process the request if there is
+    already a job in the queue."""
+    default_queue.enqueue(
+        fake_task,
+        job_id=orchestrator._manage_process_job_id(
+            ProcessParentType.ACTIVATION, activation.id
+        ),
+        number=1,
+    )
+    activation.status = ActivationStatus.STOPPED
+    activation.save(update_fields=["status"])
+    orchestrator.dispatch(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
+    )
+    enqueue_mock.assert_not_called()
+    assert (
+        "can not be processed because there is already a job"
+        in eda_caplog.text
+    )
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.STOPPED

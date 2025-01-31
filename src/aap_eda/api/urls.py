@@ -25,7 +25,6 @@ from drf_spectacular.views import (
     SpectacularYAMLAPIView,
 )
 from rest_framework import routers
-from rest_framework_simplejwt import views as jwt_views
 
 from aap_eda.core import views as core_views
 
@@ -44,7 +43,6 @@ router.register(
 )
 router.register("audit-rules", views.AuditRuleViewSet)
 router.register("users", views.UserViewSet)
-router.register("event-streams", views.EventStreamViewSet)
 router.register(
     "users/me/awx-tokens",
     views.CurrentUserAwxTokenViewSet,
@@ -55,6 +53,12 @@ router.register("eda-credentials", views.EdaCredentialViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
 router.register("organizations", views.OrganizationViewSet)
 router.register("teams", views.TeamViewSet)
+router.register("event-streams", views.EventStreamViewSet)
+router.register(
+    "external_event_stream",
+    views.ExternalEventStreamViewSet,
+    basename="external_event_stream",
+)
 
 openapi_urls = [
     path(
@@ -68,18 +72,19 @@ openapi_urls = [
         name="openapi-yaml",
     ),
     path(
-        "docs",
+        "docs/",
         SpectacularSwaggerView.as_view(url_name="openapi-json"),
         name="openapi-docs",
     ),
     path(
-        "redoc",
+        "redoc/",
         SpectacularRedocView.as_view(url_name="openapi-json"),
         name="openapi-redoc",
     ),
 ]
 
 eda_v1_urls = [
+    path("config/", views.ConfigView.as_view(), name="config"),
     path("status/", core_views.StatusView.as_view(), name="status"),
     path("", include(openapi_urls)),
     path(
@@ -94,7 +99,7 @@ eda_v1_urls = [
     ),
     path(
         "auth/token/refresh/",
-        jwt_views.TokenRefreshView.as_view(),
+        views.TokenRefreshView.as_view(),
         name="token-refresh",
     ),
     path("users/me/", views.CurrentUserView.as_view(), name="current-user"),

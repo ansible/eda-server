@@ -1,5 +1,7 @@
+import base64
 import uuid
 from typing import Generator
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -9,6 +11,7 @@ from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import enums, models
+from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
 
 # TODO(doston): this test module needs a whole refactor to use already
@@ -43,8 +46,8 @@ AAP_INPUTS = {
     "host": "https://eda_controller_url",
     "username": "adam",
     "password": "secret",
-    "ssl_verify": "no",
     "oauth_token": "",
+    "verify_ssl": False,
 }
 
 
@@ -52,8 +55,11 @@ AAP_INPUTS = {
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_without_credentials(
     ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
 ):
-    rulebook_process_with_extra_var = await _prepare_db_data()
+    rulebook_process_with_extra_var = await _prepare_db_data(
+        default_organization
+    )
     rulebook_process_without_extra_var = (
         await _prepare_activation_instance_without_extra_var()
     )
@@ -110,9 +116,14 @@ async def test_handle_workers_without_credentials(
 async def test_handle_workers_with_eda_system_vault_credential(
     ws_communicator: WebsocketCommunicator,
     preseed_credential_types,
+    default_organization: models.Organization,
 ):
-    rulebook_process_id = (
-        await _prepare_activation_instance_with_eda_system_vault_credential()
+    credential = await _prepare_system_vault_credential_async(
+        default_organization
+    )
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [credential],
     )
 
     payload = {
@@ -138,9 +149,13 @@ async def test_handle_workers_with_eda_system_vault_credential(
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_workers_with_controller_info(
-    ws_communicator: WebsocketCommunicator, preseed_credential_types
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_activation_with_controller_info()
+    rulebook_process_id = await _prepare_activation_with_controller_info(
+        default_organization,
+    )
 
     payload = {
         "type": "Worker",
@@ -151,6 +166,8 @@ async def test_handle_workers_with_controller_info(
     for type in [
         "Rulebook",
         "ControllerInfo",
+        "VaultCollection",
+        "EnvVars",
         "EndOfResponse",
     ]:
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
@@ -159,8 +176,12 @@ async def test_handle_workers_with_controller_info(
             assert response["url"] == AAP_INPUTS["host"]
             assert response["username"] == AAP_INPUTS["username"]
             assert response["password"] == AAP_INPUTS["password"]
-            assert response["ssl_verify"] == AAP_INPUTS["ssl_verify"]
+            assert (response["ssl_verify"] == "yes") is AAP_INPUTS[
+                "verify_ssl"
+            ]
             assert response["token"] == AAP_INPUTS["oauth_token"]
+        elif type == "EnvVars":
+            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -173,7 +194,7 @@ async def test_handle_workers_with_validation_errors(
     connected, _ = await communicator.connect(timeout=3)
     assert connected
 
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
 
     payload = {
         "type": "Worker",
@@ -190,7 +211,7 @@ async def test_handle_jobs(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
 
     assert (await get_job_instance_count()) == 0
     assert (await get_activation_instance_job_instance_count()) == 0
@@ -238,7 +259,7 @@ async def test_handle_actions_multiple_firing(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     assert (await get_audit_rule_count()) == 0
@@ -272,7 +293,7 @@ async def test_handle_actions_with_empty_job_uuid(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     assert (await get_audit_rule_count()) == 0
 
     # job uuid is empty string
@@ -297,7 +318,7 @@ async def test_handle_actions(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     assert (await get_audit_rule_count()) == 0
@@ -340,7 +361,7 @@ async def test_rule_status_with_multiple_failed_actions(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     action1 = create_action_payload(
@@ -376,13 +397,13 @@ async def test_handle_heartbeat(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     rulebook_process = await get_rulebook_process(rulebook_process_id)
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+    assert activation.ruleset_stats == {}
 
-    payload = {
-        "type": "SessionStats",
-        "activation_id": rulebook_process_id,
-        "stats": {
+    stats = [
+        {
             "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
             "end": None,
             "numberOfRules": 1,
@@ -395,12 +416,38 @@ async def test_handle_heartbeat(
             "asyncResponses": 0,
             "bytesSentOnAsync": 0,
             "sessionId": 1,
-            "ruleSetName": "ruleset",
+            "ruleSetName": "ruleset1",
         },
-        "reported_at": timezone.now().strftime(DATETIME_FORMAT),
-    }
+        {
+            "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
+            "end": "2024-08-21T18:39:12.331Z",
+            "numberOfRules": 10,
+            "numberOfDisabledRules": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 4000,
+            "eventsMatched": 1,
+            "eventsSuppressed": 3999,
+            "permanentStorageSize": 0,
+            "asyncResponses": 0,
+            "bytesSentOnAsync": 0,
+            "sessionId": 1,
+            "ruleSetName": "ruleset2",
+        },
+    ]
 
-    await ws_communicator.send_json_to(payload)
+    payloads = [
+        {
+            "type": "SessionStats",
+            "activation_id": rulebook_process_id,
+            "stats": stat,
+            "reported_at": timezone.now().strftime(DATETIME_FORMAT),
+        }
+        for stat in stats
+    ]
+
+    for payload in payloads:
+        await ws_communicator.send_json_to(payload)
+
     await ws_communicator.wait()
 
     updated_rulebook_process = await get_rulebook_process(rulebook_process_id)
@@ -408,13 +455,69 @@ async def test_handle_heartbeat(
         updated_rulebook_process.updated_at.strftime(DATETIME_FORMAT)
     ) == payload["reported_at"]
 
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+    assert activation.ruleset_stats is not None
+    assert list(activation.ruleset_stats.keys()) == [
+        stat["ruleSetName"] for stat in stats
+    ]
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_heartbeat_running_status(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
+    rulebook_process_id = await _prepare_db_data(
+        default_organization,
+        ActivationStatus.STARTING,
+    )
+    rulebook_process = await get_rulebook_process(rulebook_process_id)
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+    assert activation.ruleset_stats == {}
+
+    stats = [
+        {
+            "start": rulebook_process.started_at.strftime(DATETIME_FORMAT),
+            "end": None,
+            "numberOfRules": 1,
+            "numberOfDisabledRules": 0,
+            "rulesTriggered": 1,
+            "eventsProcessed": 2000,
+            "eventsMatched": 1,
+            "eventsSuppressed": 1999,
+            "permanentStorageSize": 0,
+            "asyncResponses": 0,
+            "bytesSentOnAsync": 0,
+            "sessionId": 1,
+            "ruleSetName": "ruleset1",
+        },
+    ]
+
+    payloads = [
+        {
+            "type": "SessionStats",
+            "activation_id": rulebook_process_id,
+            "stats": stat,
+            "reported_at": timezone.now().strftime(DATETIME_FORMAT),
+        }
+        for stat in stats
+    ]
+    with patch(
+        "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
+    ) as mock_orchestrator:
+        for payload in payloads:
+            await ws_communicator.send_json_to(payload)
+
+        await ws_communicator.wait()
+        mock_orchestrator.assert_called_once()
+
 
 @pytest.mark.django_db(transaction=True)
 async def test_multiple_rules_for_one_event(
     ws_communicator: WebsocketCommunicator,
     default_organization: models.Organization,
 ):
-    rulebook_process_id = await _prepare_db_data()
+    rulebook_process_id = await _prepare_db_data(default_organization)
     job_instance = await _prepare_job_instance()
 
     matching_events = _matching_events()
@@ -528,6 +631,7 @@ async def test_controller_job_url(
     api_url,
     old_url,
     new_url,
+    default_organization: models.Organization,
 ):
     my_aap_inputs = {
         "host": api_url,
@@ -537,7 +641,7 @@ async def test_controller_job_url(
         "oauth_token": "",
     }
     rulebook_process_id = await _prepare_activation_with_controller_info(
-        my_aap_inputs
+        default_organization, my_aap_inputs
     )
     job_instance = await _prepare_job_instance()
 
@@ -565,6 +669,11 @@ async def test_controller_job_url(
 @database_sync_to_async
 def get_rulebook_process(instance_id):
     return models.RulebookProcess.objects.get(pk=instance_id)
+
+
+@database_sync_to_async
+def get_activation_by_rulebook_process(instance_id):
+    return models.RulebookProcess.objects.get(pk=instance_id).get_parent()
 
 
 @database_sync_to_async
@@ -626,23 +735,30 @@ def get_job_instance_event_count():
 
 
 @database_sync_to_async
-def _prepare_activation_instance_with_eda_system_vault_credential():
+def _prepare_activation_instance_with_credentials(
+    default_organization: models.Organization,
+    credentials: list[models.EdaCredential],
+    system_vault_credential: models.EdaCredential = None,
+):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de_test_name_1",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -652,17 +768,6 @@ def _prepare_activation_instance_with_eda_system_vault_credential():
         email="luke.skywalker@example.com",
         password="secret",
     )
-    vault_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.VAULT
-    )
-
-    credential = models.EdaCredential.objects.create(
-        name="eda_credential",
-        inputs={"vault_id": "adam", "vault_password": "secret"},
-        managed=False,
-        credential_type=vault_credential_type,
-    )
-
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
         restart_policy=enums.RestartPolicy.ALWAYS,
@@ -670,34 +775,43 @@ def _prepare_activation_instance_with_eda_system_vault_credential():
         project=project,
         user=user,
         decision_environment=decision_environment,
+        eda_system_vault_credential=system_vault_credential,
+        organization=default_organization,
     )
-    activation.eda_credentials.add(credential)
+    activation.eda_credentials.add(*credentials)
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
+def _prepare_activation_with_controller_info(
+    default_organization: models.Organization,
+    inputs=AAP_INPUTS,
+):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     decision_environment = models.DecisionEnvironment.objects.create(
         name="de_test_name_1",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -716,7 +830,10 @@ def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
         inputs=inputs,
         managed=False,
         credential_type=aap_credential_type,
+        organization=default_organization,
     )
+
+    system_credential = _prepare_system_vault_credential(default_organization)
 
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
@@ -725,28 +842,35 @@ def _prepare_activation_with_controller_info(inputs=AAP_INPUTS):
         project=project,
         user=user,
         decision_environment=decision_environment,
+        organization=default_organization,
+        eda_system_vault_credential=system_credential,
     )
     activation.eda_credentials.add(credential)
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_db_data():
+def _prepare_db_data(
+    default_organization: models.Organization, status=ActivationStatus.RUNNING
+):
     project, _ = models.Project.objects.get_or_create(
         name="test-project",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook, _ = models.Rulebook.objects.get_or_create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -764,6 +888,7 @@ def _prepare_db_data():
         name="de_test_name_1",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     activation, _ = models.Activation.objects.get_or_create(
@@ -775,46 +900,35 @@ def _prepare_db_data():
         user=user,
         decision_environment=decision_environment,
         awx_token=token[0],
+        status=status,
+        organization=default_organization,
     )
 
     rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
         activation=activation,
-    )
-
-    ruleset, _ = models.Ruleset.objects.get_or_create(
-        name="ruleset",
-        sources=[
-            {
-                "name": "<unnamed>",
-                "type": "range",
-                "config": {"limit": 5},
-                "source": "ansible.eda.range",
-            }
-        ],
-        rulebook=rulebook,
-    )
-
-    rule, _ = models.Rule.objects.get_or_create(
-        name="rule",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset,
+        status=status,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_activation_instance_without_extra_var():
+def _prepare_activation_instance_without_extra_var(
+    default_organization: models.Organization,
+):
     project = models.Project.objects.create(
         name="test-project-no-extra_var",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -832,6 +946,7 @@ def _prepare_activation_instance_without_extra_var():
         name="de_test_name_2",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     activation = models.Activation.objects.create(
@@ -842,27 +957,33 @@ def _prepare_activation_instance_without_extra_var():
         user=user,
         decision_environment=decision_environment,
         awx_token=token[0],
+        organization=default_organization,
     )
 
     rulebook_process = models.RulebookProcess.objects.create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
 
 
 @database_sync_to_async
-def _prepare_activation_instance_no_token():
+def _prepare_activation_instance_no_token(
+    default_organization: models.Organization,
+):
     project = models.Project.objects.create(
         name="test-project-no-token",
         url="https://github.com/test/project",
         git_hash="92156b2b76c6adb9afbd5688550a621bcc2e5782,",
+        organization=default_organization,
     )
 
     rulebook = models.Rulebook.objects.create(
         name="test-rulebook",
         rulesets=TEST_RULESETS,
         project=project,
+        organization=default_organization,
     )
 
     user = models.User.objects.create_user(
@@ -877,6 +998,7 @@ def _prepare_activation_instance_no_token():
         name="de_no_token",
         image_url="de_test_image_url",
         description="de_test_description",
+        organization=default_organization,
     )
 
     activation = models.Activation.objects.create(
@@ -886,10 +1008,12 @@ def _prepare_activation_instance_no_token():
         project=project,
         user=user,
         decision_environment=decision_environment,
+        organization=default_organization,
     )
 
     rulebook_process = models.RulebookProcess.objects.create(
         activation=activation,
+        organization=default_organization,
     )
 
     return rulebook_process.id
@@ -971,3 +1095,252 @@ def _create_event(data, uuid):
         },
         "i": data,
     }
+
+
+@pytest.mark.parametrize(
+    (
+        "credential_type_inputs",
+        "credential_type_injectors",
+        "credential_inputs",
+        "file_contents",
+    ),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                    {"id": "optional", "label": "Optional", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.empty": "",
+                    "template.optional": "{{ optional }}",
+                },
+            },
+            {
+                "cert": "This is a certificate",
+                "key": "This is a key",
+                "optional": "",
+            },
+            [
+                {
+                    "data": base64.b64encode(
+                        "[mycert]\nThis is a certificate".encode()
+                    ).decode(),
+                    "template_key": "template.cert_file",
+                },
+            ],
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "fdata", "label": "File Data", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.myfile": "{{ fdata }}",
+                },
+            },
+            {"fdata": "{'x':[{'name': 'Fred'}]}"},
+            [
+                {
+                    "data": base64.b64encode(
+                        "{'x': [{'name': 'Fred'}]}".encode()
+                    ).decode(),
+                    "template_key": "template.myfile",
+                },
+            ],
+        ),
+        (
+            {},
+            {
+                "file": {
+                    "template.other_file": "abc",
+                },
+            },
+            {},
+            [
+                {
+                    "data": base64.b64encode("abc".encode()).decode(),
+                    "template_key": "template.other_file",
+                },
+            ],
+        ),
+        (
+            {
+                "fields": [
+                    {
+                        "id": "keytab",
+                        "label": "KeyTab",
+                        "format": "binary_base64",
+                        "secret": True,
+                    },
+                ]
+            },
+            {
+                "file": {
+                    "template.keytab_file": "{{ keytab }}",
+                },
+            },
+            {
+                "keytab": base64.b64encode(bytes([1, 2, 3, 4, 5])).decode(),
+            },
+            [
+                {
+                    "data": base64.b64encode(bytes([1, 2, 3, 4, 5])).decode(),
+                    "template_key": "template.keytab_file",
+                    "data_format": "binary",
+                },
+            ],
+        ),
+    ],
+)
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_file_contents(
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    default_organization: models.Organization,
+    credential_type_inputs: dict[str, any],
+    credential_type_injectors: dict[str, any],
+    credential_inputs: dict[str, any],
+    file_contents: list[dict[str, any]],
+):
+    eda_credential = await _prepare_credential(
+        credential_type_inputs,
+        credential_type_injectors,
+        credential_inputs,
+        default_organization,
+    )
+
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [eda_credential],
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+    check_data = [("Rulebook", None)]
+    for fc in file_contents:
+        check_data.append(("FileContents", fc))
+    check_data.append(("EndOfResponse", None))
+
+    for type, data in check_data:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if data:
+            for key, value in data.items():
+                assert response[key] == value
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_handle_workers_with_env_vars(
+    ws_communicator: WebsocketCommunicator,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    eda_credential = await _prepare_aap_credential_async(default_organization)
+    system_credential = await _prepare_system_vault_credential_async(
+        default_organization
+    )
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [eda_credential],
+        system_credential,
+    )
+
+    payload = {
+        "type": "Worker",
+        "activation_id": rulebook_process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    for type in [
+        "Rulebook",
+        "ControllerInfo",
+        "VaultCollection",
+        "EnvVars",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == type
+        if type == "EnvVars":
+            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
+
+
+@database_sync_to_async
+def _prepare_credential(
+    credential_type_inputs: dict,
+    credential_type_injectors: dict,
+    credential_inputs: dict,
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential_type = models.CredentialType.objects.create(
+        name="sample_credential_type",
+        inputs=credential_type_inputs,
+        injectors=credential_type_injectors,
+    )
+
+    return models.EdaCredential.objects.create(
+        name="sample_eda_credential",
+        inputs=credential_inputs,
+        managed=False,
+        credential_type=credential_type,
+        organization=default_organization,
+    )
+
+
+@database_sync_to_async
+def _prepare_aap_credential_async(
+    organization: models.Organization,
+):
+    return _prepare_aap_credential(organization)
+
+
+def _prepare_aap_credential(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+
+    data = "secret"
+    return models.EdaCredential.objects.create(
+        name="eda_aap_credential",
+        inputs={
+            "host": "https://controller_url/",
+            "username": "adam",
+            "password": data,
+        },
+        credential_type=aap_credential_type,
+        organization=organization,
+    )
+
+
+@database_sync_to_async
+def _prepare_system_vault_credential_async(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    return _prepare_system_vault_credential(organization)
+
+
+def _prepare_system_vault_credential(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    vault_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.VAULT
+    )
+
+    return models.EdaCredential.objects.create(
+        name="eda_system_credential",
+        inputs={"vault_id": "adam", "vault_password": "secret"},
+        managed=False,
+        credential_type=vault_credential_type,
+        organization=organization,
+    )

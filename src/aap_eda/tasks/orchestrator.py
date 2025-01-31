@@ -16,22 +16,20 @@ import logging
 import random
 from collections import Counter
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Optional
 
+import django_rq
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django_rq import get_queue
-from rq import Worker
 
 import aap_eda.tasks.activation_request_queue as requests_queue
-from aap_eda.core import models
+from aap_eda.core import models, tasking
 from aap_eda.core.enums import (
     ActivationRequest,
     ActivationStatus,
     ProcessParentType,
 )
-from aap_eda.core.models import Activation, ActivationRequestQueue, EventStream
-from aap_eda.core.tasking import unique_enqueue
+from aap_eda.core.models import Activation, ActivationRequestQueue
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.activation_manager import (
     ActivationManager,
@@ -57,11 +55,9 @@ def _manage_process_job_id(process_parent_type: str, id: int) -> str:
 def get_process_parent(
     process_parent_type: str,
     parent_id: int,
-) -> Union[Activation, EventStream]:
+) -> Activation:
     if process_parent_type == ProcessParentType.ACTIVATION:
         klass = Activation
-    elif process_parent_type == ProcessParentType.EVENT_STREAM:
-        klass = EventStream
     else:
         raise UnknownProcessParentType(
             f"Unknown process parent type {process_parent_type}",
@@ -99,6 +95,7 @@ def _manage(process_parent_type: str, id: int) -> None:
                 break
 
     if not has_request_processed and process_parent.status in [
+        ActivationStatus.STARTING,
         ActivationStatus.RUNNING,
         ActivationStatus.WORKERS_OFFLINE,
     ]:
@@ -109,7 +106,7 @@ def _manage(process_parent_type: str, id: int) -> None:
 
 
 def _run_request(
-    process_parent: Union[Activation, EventStream],
+    process_parent: Activation,
     request: ActivationRequestQueue,
 ) -> bool:
     """Attempt to run a request for an activation via the manager."""
@@ -174,6 +171,15 @@ def dispatch(
         )
         return
     status_manager = StatusManager(process_parent)
+
+    job = tasking.get_pending_job(job_id)
+    if job:
+        LOGGER.info(
+            f"Request {request_type} for {process_parent_type} "
+            f"{process_parent_id} can not be processed "
+            f"because there is already a job {job_id} ",
+        )
+        return
 
     # new processes
     if request_type in [
@@ -302,8 +308,12 @@ def dispatch(
                     msg,
                 )
                 return
+    LOGGER.info(
+        f"Trying to enqueue {process_parent_type} {process_parent_id} "
+        f"request {request_type} to queue {queue_name}"
+    )
 
-    unique_enqueue(
+    tasking.unique_enqueue(
         queue_name,
         job_id,
         _manage,
@@ -368,16 +378,17 @@ def get_queue_name_by_parent_id(
     return process.rulebookprocessqueue.queue_name
 
 
+@tasking.redis_connect_retry()
 def check_rulebook_queue_health(queue_name: str) -> bool:
     """Check for the state of the queue.
 
     Returns True if the queue is healthy, False otherwise.
     Clears the queue if all workers are dead to avoid stuck processes.
     """
-    queue = get_queue(queue_name)
+    queue = django_rq.get_queue(queue_name)
 
     all_workers_dead = True
-    for worker in Worker.all(queue=queue):
+    for worker in tasking.Worker.all(queue=queue):
         last_heartbeat = worker.last_heartbeat
         if last_heartbeat is None:
             continue
@@ -469,15 +480,14 @@ def monitor_rulebook_processes() -> None:
     # monitor running instances
     for process in models.RulebookProcess.objects.filter(
         status__in=[
+            ActivationStatus.STARTING,
             ActivationStatus.RUNNING,
             ActivationStatus.WORKERS_OFFLINE,
         ]
     ):
         process_parent_type = str(process.parent_type)
-        if process_parent_type == ProcessParentType.ACTIVATION:
-            process_parent_id = process.activation_id
-        else:
-            process_parent_id = process.event_stream_id
+        process_parent_id = process.activation_id
+
         dispatch(
             process_parent_type,
             process_parent_id,
@@ -487,7 +497,7 @@ def monitor_rulebook_processes() -> None:
 
 def enqueue_monitor_rulebook_processes() -> None:
     """Wrap monitor_rulebook_processes to ensure only one task is enqueued."""
-    unique_enqueue(
+    tasking.unique_enqueue(
         "default",
         "monitor_rulebook_processes",
         monitor_rulebook_processes,

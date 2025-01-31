@@ -21,7 +21,8 @@ from .activation import (
     ActivationSerializer,
     PostActivationSerializer,
 )
-from .auth import LoginSerializer
+from .auth import JWTTokenSerializer, LoginSerializer, RefreshTokenSerializer
+from .config import ConfigSerializer
 from .credential_type import (
     CredentialTypeCreateSerializer,
     CredentialTypeRefSerializer,
@@ -34,14 +35,12 @@ from .decision_environment import (
     DecisionEnvironmentSerializer,
 )
 from .eda_credential import (
+    EdaCredentialCopySerializer,
     EdaCredentialCreateSerializer,
     EdaCredentialSerializer,
+    EdaCredentialUpdateSerializer,
 )
-from .event_stream import (
-    EventStreamCreateSerializer,
-    EventStreamOutSerializer,
-    EventStreamSerializer,
-)
+from .event_stream import EventStreamInSerializer, EventStreamOutSerializer
 from .organization import (
     OrganizationCreateSerializer,
     OrganizationRefSerializer,
@@ -63,6 +62,7 @@ from .rulebook import (
     RulebookRefSerializer,
     RulebookSerializer,
 )
+from .source import SourceSerializer
 from .team import (
     TeamCreateSerializer,
     TeamDetailSerializer,
@@ -72,16 +72,20 @@ from .team import (
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
+    BasicUserSerializer,
     CurrentUserUpdateSerializer,
     UserCreateUpdateSerializer,
     UserDetailSerializer,
     UserListSerializer,
     UserSerializer,
+    UserUpdateIsSuperuserSerializer,
 )
 
 __all__ = (
     # auth
     "LoginSerializer",
+    "RefreshTokenSerializer",
+    "JWTTokenSerializer",
     # project
     "ProjectSerializer",
     "ProjectCreateRequestSerializer",
@@ -106,29 +110,36 @@ __all__ = (
     "AwxTokenSerializer",
     "AwxTokenCreateSerializer",
     "CurrentUserUpdateSerializer",
+    "BasicUserSerializer",
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",
+    "UserUpdateIsSuperuserSerializer",
     "UserDetailSerializer",
+    # config
+    "ConfigSerializer",
     # credential type
     "CredentialTypeSerializer",
     "CredentialTypeCreateSerializer",
     "CredentialTypeRefSerializer",
     "EdaCredentialSerializer",
     "EdaCredentialCreateSerializer",
+    "EdaCredentialUpdateSerializer",
+    "EdaCredentialCopySerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
-    # event streams
-    "EventStreamSerializer",
-    "EventStreamCreateSerializer",
-    "EventStreamOutSerializer",
     # organizations
     "OrganizationSerializer",
     "OrganizationCreateSerializer",
     "OrganizationRefSerializer",
+    # sources
+    "SourceSerializer",
     # teams
     "TeamSerializer",
     "TeamCreateSerializer",
     "TeamUpdateSerializer",
     "TeamDetailSerializer",
+    # event streams
+    "EventStreamInSerializer",
+    "EventStreamOutSerializer",
 )

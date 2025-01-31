@@ -1,0 +1,62 @@
+# Initialises eda-server with some basic stuff for development and testing.
+# Ansible module docs: https://galaxy.ansible.com/ui/repo/published/ansible/eda/docs/
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    # Development environment defaults
+    # You can override these values or use environment variables
+    # CONTROLLER_HOST, CONTROLLER_USERNAME, CONTROLLER_PASSWORD
+    controller_host: https://localhost:8443
+    controller_username: admin
+    controller_password: testpass
+    organization_name: Default
+    validate_certs: no
+  module_defaults:
+    group/ansible.eda.eda:
+      controller_host: "{{ controller_host }}"
+      controller_username: "{{ controller_username }}"
+      controller_password: "{{ controller_password }}"
+      validate_certs: "{{ validate_certs }}"
+  tasks:
+    - name: Import sample project
+      ansible.eda.project:
+        organization_name: "{{ organization_name }}"
+        url: https://github.com/ansible/eda-sample-project
+        name: Eda sample project
+
+    - name: Create default upstream decision environment
+      ansible.eda.decision_environment:
+        organization_name: "{{ organization_name }}"
+        name: Upstream decision environment
+        image_url: quay.io/ansible/ansible-rulebook:main
+
+    - name: Create a credential for a basic event stream
+      ansible.eda.credential:
+        organization_name: "{{ organization_name }}"
+        name: Basic event stream credential
+        credential_type_name: Basic Event Stream
+        inputs:
+          username: secret
+          password: secret
+
+    - name: Create a basic event stream
+      ansible.eda.event_stream:
+        organization_name: "{{ organization_name }}"
+        name: Basic event stream
+        credential_name: Basic event stream credential
+
+    - name: Get and print the url of the basic event stream
+      block:
+        - name: Get the event stream generated
+          register: event_stream_data
+          ansible.eda.event_stream_info:
+            name: Basic event stream
+
+        - name: Print the event stream url
+          debug:
+            msg: "Basic Event Stream URL: {{ event_stream_data.event_streams[0].url }}"
+
+
+

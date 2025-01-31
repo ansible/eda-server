@@ -42,6 +42,7 @@ def org_admin_rd():
             "delete_organization",
         ],
         content_type=ContentType.objects.get_for_model(models.Organization),
+        managed=True,  # custom roles can not include these permissions
     )
 
 
@@ -54,6 +55,7 @@ def org_member_rd():
             "view_organization",
         ],
         content_type=ContentType.objects.get_for_model(models.Organization),
+        managed=True,
     )
 
 
@@ -187,6 +189,41 @@ def test_create_user_forbidden(
     response = admin_client.post(f"{api_url_v1}/users/", data=create_user_data)
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_update_is_superuser_field(
+    use_shared_resource_setting,
+    superuser_client: APIClient,
+    new_user: models.User,
+):
+    data = {"is_superuser": True}
+
+    response = superuser_client.patch(
+        f"{api_url_v1}/users/{new_user.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_200_OK, response.data
+
+    updated_user = models.User.objects.get(id=new_user.id)
+    assert updated_user.is_superuser is True
+    assert response.data["is_superuser"] == updated_user.is_superuser
+
+
+@pytest.mark.django_db
+def test_update_superuser_field_as_non_superuser(
+    use_shared_resource_setting,
+    admin_client: APIClient,
+    new_user: models.User,
+):
+    data = {"is_superuser": True}
+
+    response = admin_client.patch(
+        f"{api_url_v1}/users/{new_user.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN, response.data
+
+    user_obj = models.User.objects.get(id=new_user.id)
+    assert user_obj.is_superuser is False
 
 
 @pytest.mark.django_db

@@ -63,6 +63,7 @@ Redis queue settings:
 *   - Takes precedence over host and port
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
+* MQ_TLS - Force TLS on when True (default: None)
 * MQ_DB - Redis queue database (default: 0)
 * MQ_USER - Redis user (default: None)
 * MQ_USER_PASSWORD - Redis user passed (default: None)
@@ -93,14 +94,13 @@ To configure a Resource Server for syncing of managed resources:
 
 """
 import os
-from datetime import timedelta
 
 import dynaconf
 from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
+from aap_eda import utils
 from aap_eda.core.enums import RulebookProcessLogLevel
-from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -136,16 +136,16 @@ def _get_secret_key() -> str:
 SECRET_KEY = _get_secret_key()
 
 
-def _get_debug() -> bool:
-    debug = settings.get("DEBUG", False)
-    if isinstance(debug, str):
-        debug = str_to_bool(debug)
-    if not isinstance(debug, bool):
-        raise ImproperlyConfigured("DEBUG setting must be a boolean value.")
-    return debug
+def _get_boolean(name: str, default=False) -> bool:
+    value = settings.get(name, default)
+    if isinstance(value, str):
+        value = utils.str_to_bool(value)
+    if not isinstance(value, bool):
+        raise ImproperlyConfigured("{name} setting must be a boolean value.")
+    return value
 
 
-DEBUG = _get_debug()
+DEBUG = _get_boolean("DEBUG")
 
 ALLOWED_HOSTS = settings.get("ALLOWED_HOSTS", [])
 ALLOWED_HOSTS = (
@@ -176,16 +176,11 @@ JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
     "JWT_REFRESH_TOKEN_LIFETIME_DAYS",
     365,
 )
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=JWT_ACCESS_TOKEN_LIFETIME_MINUTES,
-    ),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
-}
 
 # Application definition
 INSTALLED_APPS = [
     "daphne",
+    "flags",
     # Django apps
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -199,10 +194,15 @@ INSTALLED_APPS = [
     "ansible_base.rbac",
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
+    "ansible_base.rest_filters",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
 ]
+
+# Defines feature flags, and their conditions.
+# See https://cfpb.github.io/django-flags/
+FLAGS = {}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -321,7 +321,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "aap_eda.api.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "aap_eda.api.authentication.WebsocketJWTAuthentication",
         "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -332,6 +332,23 @@ REST_FRAMEWORK = {
     "DEFAULT_METADATA_CLASS": "aap_eda.api.metadata.EDAMetadata",
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
+
+
+def _config_authentication_backends():
+    from django.conf import settings as djsettings
+
+    backend = (
+        "ansible_base.lib.backends.prefixed_user_auth.PrefixedUserAuthBackend"
+    )
+    backends = djsettings.AUTHENTICATION_BACKENDS or []
+    if backend not in backends:
+        backends.append(backend)
+    return backends
+
+
+RENAMED_USERNAME_PREFIX = settings.get("RENAMED_USERNAME_PREFIX", "eda_")
+AUTHENTICATION_BACKENDS = _config_authentication_backends()
+
 
 # ---------------------------------------------------------
 # DEPLOYMENT SETTINGS
@@ -346,6 +363,10 @@ if WEBSOCKET_TOKEN_BASE_URL is None:
         "ws://", "http://"
     ).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_SOCKET_TIMEOUT = settings.get("PODMAN_SOCKET_TIMEOUT", default=0)
+# zero raises an exception, None takes the socket default
+if PODMAN_SOCKET_TIMEOUT == 0:
+    PODMAN_SOCKET_TIMEOUT = None
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
 PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
@@ -358,8 +379,10 @@ CONTAINER_NAME_PREFIX = settings.get("CONTAINER_NAME_PREFIX", "eda")
 # TASKING SETTINGS
 # ---------------------------------------------------------
 RQ = {
-    "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
     "JOB_CLASS": "aap_eda.core.tasking.Job",
+    "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
+    "SCHEDULER_CLASS": "aap_eda.core.tasking.Scheduler",
+    "WORKER_CLASS": "aap_eda.core.tasking.Worker",
 }
 
 REDIS_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
@@ -370,8 +393,18 @@ REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
 REDIS_CLIENT_CACERT_PATH = settings.get("MQ_CLIENT_CACERT_PATH", None)
 REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
 REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
-REDIS_DB = settings.get("MQ_DB", 0)
+REDIS_TLS = settings.get("MQ_TLS", None)
+DEFAULT_REDIS_DB = 0
+REDIS_DB = settings.get("MQ_DB", DEFAULT_REDIS_DB)
 RQ_REDIS_PREFIX = settings.get("RQ_REDIS_PREFIX", "eda-rq")
+
+# The HA cluster hosts is a string of <host>:<port>[,<host>:port>]+
+# and is exhaustive; i.e., not in addition to REDIS_HOST:REDIS_PORT.
+# EDA does not validate the content, but relies on DAB to do so.
+#
+# In establishing an HA Cluster Redis client connection DAB ignores
+# the host and port kwargs.
+REDIS_HA_CLUSTER_HOSTS = settings.get("MQ_REDIS_HA_CLUSTER_HOSTS", "").strip()
 
 
 def _rq_common_parameters():
@@ -387,12 +420,19 @@ def _rq_common_parameters():
             "HOST": REDIS_HOST,
             "PORT": REDIS_PORT,
         }
-        if REDIS_CLIENT_CERT_PATH:
+        if REDIS_TLS:
             params["SSL"] = True
+        else:
+            # TODO: Deprecate implicit setting based on cert path in favor of
+            #       MQ_TLS as the determinant.
+            if REDIS_CLIENT_CERT_PATH and REDIS_TLS is None:
+                params["SSL"] = True
+            else:
+                params["SSL"] = False
     return params
 
 
-def _rq_redis_client_parameters():
+def _rq_redis_client_additional_parameters():
     params = {}
     if (not REDIS_UNIX_SOCKET_PATH) and REDIS_CLIENT_CERT_PATH:
         params |= {
@@ -400,6 +440,36 @@ def _rq_redis_client_parameters():
             "ssl_keyfile": REDIS_CLIENT_KEY_PATH,
             "ssl_ca_certs": REDIS_CLIENT_CACERT_PATH,
         }
+    return params
+
+
+def rq_standalone_redis_client_instantiation_parameters():
+    params = _rq_common_parameters() | _rq_redis_client_additional_parameters()
+
+    # Convert to lowercase for use in instantiating a redis client.
+    params = {k.lower(): v for (k, v) in params.items()}
+    return params
+
+
+def rq_redis_client_instantiation_parameters():
+    params = rq_standalone_redis_client_instantiation_parameters()
+
+    # Include the HA cluster parameters.
+    if REDIS_HA_CLUSTER_HOSTS:
+        params["mode"] = "cluster"
+        params["redis_hosts"] = REDIS_HA_CLUSTER_HOSTS
+        params["socket_keepalive"] = _get_boolean("MQ_SOCKET_KEEP_ALIVE", True)
+        params["socket_connect_timeout"] = settings.get(
+            "MQ_SOCKET_CONNECT_TIMEOUT", 10
+        )
+        params["socket_timeout"] = settings.get("MQ_SOCKET_TIMEOUT", 150)
+        params["cluster_error_retry_attempts"] = settings.get(
+            "MQ_CLUSTER_ERROR_RETRY_ATTEMPTS", 3
+        )
+        from redis.backoff import ConstantBackoff
+        from redis.retry import Retry
+
+        params["retry"] = Retry(backoff=ConstantBackoff(3), retries=20)
     return params
 
 
@@ -435,13 +505,17 @@ def get_rq_queues() -> dict:
     # Configure the default queue
     queues["default"] = _rq_common_parameters()
     queues["default"]["DEFAULT_TIMEOUT"] = DEFAULT_QUEUE_TIMEOUT
-    queues["default"]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
+    queues["default"][
+        "REDIS_CLIENT_KWARGS"
+    ] = _rq_redis_client_additional_parameters()
 
     # Configure the worker queues
     for queue in RULEBOOK_WORKER_QUEUES:
         queues[queue] = _rq_common_parameters()
         queues[queue]["DEFAULT_TIMEOUT"] = DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue]["REDIS_CLIENT_KWARGS"] = _rq_redis_client_parameters()
+        queues[queue][
+            "REDIS_CLIENT_KWARGS"
+        ] = _rq_redis_client_additional_parameters()
 
     return queues
 
@@ -481,7 +555,7 @@ API_PREFIX = settings.get("API_PREFIX", "api/eda").strip("/")
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Event Driven Ansible API",
-    "VERSION": "1.0.0",
+    "VERSION": utils.get_eda_version(),
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/v[0-9]",
     "SCHEMA_PATH_PREFIX_TRIM": True,
@@ -489,6 +563,7 @@ SPECTACULAR_SETTINGS = {
     "PREPROCESSING_HOOKS": [
         "aap_eda.api.openapi.preprocess_filter_api_routes"
     ],
+    "GENERIC_ADDITIONAL_PROPERTIES": "bool",
 }
 
 # ---------------------------------------------------------
@@ -496,6 +571,10 @@ SPECTACULAR_SETTINGS = {
 # ---------------------------------------------------------
 
 APP_LOG_LEVEL = settings.get("APP_LOG_LEVEL", "INFO")
+
+# If DEBUG is set, keep consistent the log level
+if DEBUG:
+    APP_LOG_LEVEL = "DEBUG"
 
 LOGGING = {
     "version": 1,
@@ -518,12 +597,12 @@ LOGGING = {
         },
         "django.request": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
         "django.channels.server": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
         "aap_eda": {
@@ -533,7 +612,7 @@ LOGGING = {
         },
         "ansible_base": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": APP_LOG_LEVEL,
             "propagate": False,
         },
     },
@@ -553,6 +632,9 @@ EDA_CONTROLLER_SSL_VERIFY = settings.get("CONTROLLER_SSL_VERIFY", "yes")
 # RULEBOOK LIVENESS SETTINGS
 # ---------------------------------------------------------
 
+RULEBOOK_READINESS_TIMEOUT_SECONDS = int(
+    settings.get("RULEBOOK_READINESS_TIMEOUT_SECONDS", 30)
+)
 RULEBOOK_LIVENESS_CHECK_SECONDS = int(
     settings.get("RULEBOOK_LIVENESS_CHECK_SECONDS", 300)
 )
@@ -625,9 +707,21 @@ ANSIBLE_BASE_JWT_KEY = settings.get(
     "ANSIBLE_BASE_JWT_KEY", "https://localhost"
 )
 
-ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
-    "ALLOW_LOCAL_RESOURCE_MANAGEMENT", True
-)
+# These settings have defaults in DAB
+# if the file or env var does not define them, leave as default
+if settings.exists("ALLOW_LOCAL_RESOURCE_MANAGEMENT"):
+    ALLOW_LOCAL_RESOURCE_MANAGEMENT = settings.get(
+        "ALLOW_LOCAL_RESOURCE_MANAGEMENT"
+    )
+
+if settings.exists("RESOURCE_SERVICE_PATH"):
+    RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH")
+
+if settings.exists("RESOURCE_SERVER_SYNC_ENABLED"):
+    RESOURCE_SERVER_SYNC_ENABLED = settings.get("RESOURCE_SERVER_SYNC_ENABLED")
+
+if settings.exists("ENABLE_SERVICE_BACKED_SSO"):
+    ENABLE_SERVICE_BACKED_SSO = settings.get("ENABLE_SERVICE_BACKED_SSO")
 
 # ---------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCES REGISTRY SETTINGS
@@ -649,6 +743,16 @@ ANSIBLE_BASE_ROLE_PRECREATE = {}
 
 ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
 
+ALLOW_LOCAL_ASSIGNING_JWT_ROLES = settings.get(
+    "ALLOW_LOCAL_ASSIGNING_JWT_ROLES", False
+)
+
+ALLOW_SHARED_RESOURCE_CUSTOM_ROLES = settings.get(
+    "ALLOW_SHARED_RESOURCE_CUSTOM_ROLES", False
+)
+
+ANSIBLE_BASE_CHECK_RELATED_PERMISSIONS = ["view"]
+
 # --------------------------------------------------------
 # DJANGO ANSIBLE BASE RESOURCE API CLIENT
 # --------------------------------------------------------
@@ -658,7 +762,7 @@ RESOURCE_SERVER = {
     "VALIDATE_HTTPS": settings.get("RESOURCE_SERVER__VALIDATE_HTTPS", False),
 }
 RESOURCE_JWT_USER_ID = settings.get("RESOURCE_JWT_USER_ID", None)
-RESOURCE_SERVICE_PATH = settings.get("RESOURCE_SERVICE_PATH", None)
+
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = settings.get(
     "ANSIBLE_BASE_MANAGED_ROLE_REGISTRY", {}
 )
@@ -677,15 +781,6 @@ ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
 )
 
-_DEFAULT_PG_NOTIFY_DSN = (
-    f"host={ACTIVATION_DB_HOST} "
-    f"port={DATABASES['default']['PORT']} "
-    f"dbname={DATABASES['default']['NAME']} "
-    f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
-)
-
-PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
 PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
 
 SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
@@ -696,3 +791,34 @@ SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
 API_PATH_TO_UI_PATH_MAP = settings.get(
     "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
 )
+
+_db_options = DATABASES["default"].get("OPTIONS", {})
+_DEFAULT_PG_NOTIFY_DSN_SERVER = (
+    f"host={DATABASES['default']['HOST']} "
+    f"port={DATABASES['default']['PORT']} "
+    f"dbname={DATABASES['default']['NAME']} "
+    f"user={DATABASES['default']['USER']} "
+    f"password={DATABASES['default']['PASSWORD']} "
+    f"sslmode={_db_options.get('sslmode','allow')} "
+    f"sslcert={_db_options.get('sslcert','')} "
+    f"sslkey={_db_options.get('sslkey','')} "
+    f"sslrootcert={_db_options.get('sslrootcert','')} "
+)
+
+PG_NOTIFY_DSN_SERVER = settings.get(
+    "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
+)
+
+EVENT_STREAM_BASE_URL = settings.get("EVENT_STREAM_BASE_URL", None)
+if EVENT_STREAM_BASE_URL:
+    EVENT_STREAM_BASE_URL = EVENT_STREAM_BASE_URL.strip("/") + "/"
+
+EVENT_STREAM_MTLS_BASE_URL = settings.get("EVENT_STREAM_MTLS_BASE_URL", None)
+if EVENT_STREAM_MTLS_BASE_URL:
+    EVENT_STREAM_MTLS_BASE_URL = EVENT_STREAM_MTLS_BASE_URL.strip("/") + "/"
+
+MAX_PG_NOTIFY_MESSAGE_SIZE = int(
+    settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
+)
+
+DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"

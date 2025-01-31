@@ -23,3 +23,23 @@ class StatusRequiredError(Exception):
 
 class UnknownStatusError(Exception):
     pass
+
+
+class PGNotifyError(Exception):
+    pass
+
+
+class ParseError(Exception):
+    pass
+
+
+class DuplicateFileTemplateKeyError(Exception):
+    pass
+
+
+class DuplicateEnvKeyError(Exception):
+    pass
+
+
+class InvalidEnvKeyError(Exception):
+    pass

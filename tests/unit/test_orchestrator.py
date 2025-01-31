@@ -16,11 +16,12 @@ import functools
 from datetime import datetime, timedelta
 from unittest import mock
 
+import django_rq
 import pytest
 from django.conf import settings
 
 from aap_eda.core.enums import ProcessParentType
-from aap_eda.core.models import Activation, EventStream, RulebookProcess
+from aap_eda.core.models import Activation, RulebookProcess
 from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
 from aap_eda.tasks.exceptions import UnknownProcessParentType
@@ -74,12 +75,12 @@ def _mock_up_queues(monkeypatch, queues):
     def _get_queue(name: str) -> mock.Mock:
         return mock_queues[name]
 
-    monkeypatch.setattr(orchestrator, "get_queue", _get_queue)
+    monkeypatch.setattr(django_rq, "get_queue", _get_queue)
 
     def _worker_all(queue=None) -> list:
         return queue.workers
 
-    monkeypatch.setattr(orchestrator.Worker, "all", _worker_all)
+    monkeypatch.setattr(orchestrator.tasking.Worker, "all", _worker_all)
 
     def _process_count(queue: mock.Mock) -> None:
         return queue.process_count
@@ -369,20 +370,6 @@ def test_get_process_parent_activation():
     assert result == activation_mock
 
 
-def test_get_process_parent_event_stream():
-    event_stream_id = 1
-    event_stream_mock = mock.Mock(spec=EventStream)
-    EventStream.objects.get = mock.Mock(return_value=event_stream_mock)
-
-    result = get_process_parent(
-        ProcessParentType.EVENT_STREAM,
-        event_stream_id,
-    )
-
-    EventStream.objects.get.assert_called_once_with(id=event_stream_id)
-    assert result == event_stream_mock
-
-
 def test_get_process_parent_unknown_type():
     process_parent_type = "unknown"
     parent_id = 1
@@ -408,9 +395,7 @@ def setup_queue_health():
     timedelta_mock.return_value = timedelta(seconds=60)
 
     patches = {
-        "get_queue": mock.patch(
-            "aap_eda.tasks.orchestrator.get_queue", get_queue_mock
-        ),
+        "get_queue": mock.patch("django_rq.get_queue", get_queue_mock),
         "datetime": mock.patch(
             "aap_eda.tasks.orchestrator.datetime", datetime_mock
         ),
@@ -448,7 +433,9 @@ def test_check_rulebook_queue_health_all_workers_dead(setup_queue_health):
     all_workers_mock = mock.Mock(return_value=[worker_mock])
     datetime_mock.now.return_value = datetime(2022, 1, 1, minute=5)
 
-    with mock.patch("aap_eda.tasks.orchestrator.Worker.all", all_workers_mock):
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
+    ):
         result = check_rulebook_queue_health(queue_name)
 
     get_queue_mock.assert_called_once_with(queue_name)
@@ -474,7 +461,9 @@ def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
     all_workers_mock = mock.Mock(return_value=[worker_mock1, worker_mock2])
     datetime_mock.now.return_value = datetime(2022, 1, 1, hour=6, second=30)
 
-    with mock.patch("aap_eda.tasks.orchestrator.Worker.all", all_workers_mock):
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
+    ):
         result = check_rulebook_queue_health(queue_name)
 
     get_queue_mock.assert_called_once_with(queue_name)

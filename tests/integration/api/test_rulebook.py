@@ -20,6 +20,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import models
+from aap_eda.core.utils.rulebook import DEFAULT_SOURCE_NAME_PREFIX
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -173,6 +174,41 @@ def test_retrieve_json_rulebook_not_exist(admin_client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+@pytest.mark.django_db
+def test_list_sources_from_rulebook(
+    admin_client: APIClient, default_rulebook: models.Rulebook
+):
+    response = admin_client.get(
+        f"{api_url_v1}/rulebooks/{default_rulebook.id}/sources/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    sources = response.data["results"]
+    assert len(sources) == 2
+    assert sources[0]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}1"
+    assert sources[1]["name"] == f"{DEFAULT_SOURCE_NAME_PREFIX}2"
+
+
+@pytest.mark.django_db
+def test_list_sources_from_rulebook_with_exception(
+    admin_client: APIClient, bad_rulebook: models.Rulebook
+):
+    response = admin_client.get(
+        f"{api_url_v1}/rulebooks/{bad_rulebook.id}/sources/"
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.data["errors"] == "Failed to parse rulebook data"
+
+
+@pytest.mark.django_db
+def test_list_sources_from_rulebook_with_404_exception(
+    admin_client: APIClient, bad_rulebook: models.Rulebook
+):
+    response = admin_client.get(f"{api_url_v1}/rulebooks/1492/sources/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.data["detail"] == "Rulebook with ID=1492 does not exist."
+
+
 def assert_rulebook_data(data: Dict[str, Any], rulebook: models.Rulebook):
     assert data == {
         "id": rulebook.id,
@@ -266,7 +302,7 @@ def test_list_audit_rules_ordering(
     ordering_field,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
+        f"{api_url_v1}/audit-rules/?order={ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -276,7 +312,7 @@ def test_list_audit_rules_ordering(
     )
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering=-{ordering_field}"
+        f"{api_url_v1}/audit-rules/?order=-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -294,7 +330,7 @@ def test_list_audit_rules_ordering_activation_name(
 ):
     ordering_field = "activation_instance__name"
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
+        f"{api_url_v1}/audit-rules/?order={ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -305,7 +341,7 @@ def test_list_audit_rules_ordering_activation_name(
     )
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering=-{ordering_field}"
+        f"{api_url_v1}/audit-rules/?order=-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -314,6 +350,34 @@ def test_list_audit_rules_ordering_activation_name(
         audit_rules[0]["activation_instance"]["name"]
         == audit_rule_2.activation_instance.name
     )
+
+
+@pytest.mark.django_db
+def test_list_audit_rules_filter_activation_instance_name(
+    audit_rule_1: models.AuditRule,
+    audit_rule_2: models.AuditRule,
+    admin_client: APIClient,
+):
+    filter_name = audit_rule_1.activation_instance.name
+    response = admin_client.get(
+        f"{api_url_v1}/audit-rules/?activation_instance__name={filter_name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    audit_rules = response.data["results"]
+
+    assert len(audit_rules) == 1
+    assert (
+        audit_rules[0]["activation_instance"]["name"]
+        == audit_rule_1.activation_instance.name
+    )
+    assert list(audit_rules[0]) == [
+        "id",
+        "name",
+        "status",
+        "activation_instance",
+        "organization",
+        "fired_at",
+    ]
 
 
 @pytest.mark.django_db
@@ -390,7 +454,7 @@ def test_list_actions_from_audit_rule_ordering(
     ordering_field,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?order="
         f"{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -401,7 +465,7 @@ def test_list_actions_from_audit_rule_ordering(
     )
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?order="
         f"-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -459,7 +523,7 @@ def test_list_events_from_audit_rule_ordering(
     ordering_field,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?order="
         f"{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -468,7 +532,7 @@ def test_list_events_from_audit_rule_ordering(
     assert events[0][ordering_field] == getattr(audit_event_2, ordering_field)
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?order="
         f"-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -482,8 +546,6 @@ def test_delete_project_and_rulebooks(
     default_project: models.Project,
     default_activation: models.Activation,
     default_rulebook: models.Rulebook,
-    ruleset_1: models.Ruleset,
-    default_rule: models.Rule,
     admin_client: APIClient,
 ):
     response = admin_client.delete(
@@ -495,5 +557,3 @@ def test_delete_project_and_rulebooks(
     assert activation.rulebook is None
     assert not models.Project.objects.filter(id=default_project.id).exists()
     assert not models.Rulebook.objects.filter(id=default_rulebook.id).exists()
-    assert not models.Ruleset.objects.filter(id=ruleset_1.id).exists()
-    assert not models.Rule.objects.filter(id=default_rule.id).exists()

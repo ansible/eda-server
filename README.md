@@ -5,6 +5,7 @@
 [![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
 
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-blue)
 
 # Event Driven Ansible Controller
 
@@ -26,6 +27,14 @@ We ask all of our community members and contributors to adhere to the [Ansible c
 If you have questions or need assistance, please reach out to our community team at <codeofconduct@ansible.com>
 
 Refer to the [Contributing guide](docs/contributing.md) for further information.
+
+## Communication
+
+See the [Communication](https://github.com/ansible/eda-server/blob/main/docs/contributing.md#communication) section of the
+Contributing guide to find out how to get help and contact us.
+
+For more information about getting in touch, see the
+[Ansible communication guide](https://docs.ansible.com/ansible/devel/community/communication.html).
 
 ## Credits
 

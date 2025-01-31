@@ -12,26 +12,23 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
+import copy
 import uuid
 from typing import Any, Dict, List
 from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-import redis
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.test import override_settings
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
-from aap_eda.core.management.commands.create_initial_data import (
-    CREDENTIAL_TYPES,
-    populate_credential_types,
-)
-from aap_eda.core.tasking import Queue
+from aap_eda.core.management.commands import create_initial_data
+from aap_eda.core.tasking import Queue, get_redis_client
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
 
@@ -102,6 +99,11 @@ def admin_user(default_organization, admin_info):
 
 
 @pytest.fixture
+def anonymous_user():
+    return AnonymousUser()
+
+
+@pytest.fixture
 def default_user_awx_token(default_user: models.User):
     return models.AwxToken.objects.create(
         name="admin-awx-token",
@@ -139,6 +141,15 @@ def user_client(
 def admin_client(base_client: APIClient, admin_user: models.User) -> APIClient:
     """Return a pre-configured instance of an APIClient with admin user."""
     base_client.force_authenticate(user=admin_user)
+    return base_client
+
+
+@pytest.fixture
+def anonymous_client(
+    base_client: APIClient, anonymous_user: models.User
+) -> APIClient:
+    """Return a pre-configured instance of an APIClient with anonymous_user."""
+    base_client.force_authenticate(user=anonymous_user)
     return base_client
 
 
@@ -262,6 +273,24 @@ def default_rulesets() -> str:
 
 
 @pytest.fixture
+def bad_rulesets() -> str:
+    return """
+---
+- name: "test
+  sources:
+    - ansible.eda.range:
+        limit: 10
+  rules:
+    - name: example rule"
+      condition: event.i == 8
+      actions:
+        - run_job_template:
+            organization: Default
+            name: example
+"""
+
+
+@pytest.fixture
 def default_run_job_template_rulesets() -> str:
     return """
 ---
@@ -281,7 +310,9 @@ def default_run_job_template_rulesets() -> str:
 
 @pytest.fixture
 def default_rulebook(
-    default_project: models.Project, default_rulesets: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    default_rulesets: str,
 ) -> models.Rulebook:
     """Return a default Rulebook"""
     return models.Rulebook.objects.create(
@@ -289,12 +320,31 @@ def default_rulebook(
         rulesets=default_rulesets,
         description="test rulebook",
         project=default_project,
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def bad_rulebook(
+    default_project: models.Project,
+    default_organization: models.Organization,
+    bad_rulesets: str,
+) -> models.Rulebook:
+    """Return a bad Rulebook."""
+    return models.Rulebook.objects.create(
+        name="bad-rulebook.yml",
+        rulesets=bad_rulesets,
+        description="test bad rulebook",
+        project=default_project,
+        organization=default_organization,
     )
 
 
 @pytest.fixture
 def default_rulebook_with_run_job_template(
-    default_project: models.Project, default_run_job_template_rulesets: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    default_run_job_template_rulesets: str,
 ) -> models.Rulebook:
     """Return a default Rulebook with run_job_template action"""
     return models.Rulebook.objects.create(
@@ -302,6 +352,7 @@ def default_rulebook_with_run_job_template(
         rulesets=default_run_job_template_rulesets,
         description="test rulebook",
         project=default_project,
+        organization=default_organization,
     )
 
 
@@ -325,13 +376,16 @@ def ruleset_with_job_template() -> str:
 
 @pytest.fixture
 def rulebook_with_job_template(
-    default_project: models.Project, ruleset_with_job_template: str
+    default_project: models.Project,
+    default_organization: models.Organization,
+    ruleset_with_job_template: str,
 ) -> models.Rulebook:
     rulebook = models.Rulebook.objects.create(
         name="job-template.yml",
         description="rulebook with job template",
         rulesets=ruleset_with_job_template,
         project=default_project,
+        organization=default_organization,
     )
     return rulebook
 
@@ -348,54 +402,14 @@ def source_list() -> List[dict]:
     ]
 
 
-@pytest.fixture
-def ruleset_1(
-    default_rulebook: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-1",
-        sources=source_list,
-        rulebook=default_rulebook,
-    )
-
-
-@pytest.fixture
-def ruleset_2(
-    default_rulebook: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-2",
-        sources=source_list,
-        rulebook=default_rulebook,
-    )
-
-
-@pytest.fixture
-def ruleset_3(
-    rulebook_with_job_template: models.Rulebook, source_list: List[dict]
-) -> models.Ruleset:
-    return models.Ruleset.objects.create(
-        name="ruleset-3",
-        sources=source_list,
-        rulebook=rulebook_with_job_template,
-    )
-
-
-@pytest.fixture
-def default_rule(ruleset_1: models.Ruleset) -> models.Rule:
-    return models.Rule.objects.create(
-        name="say hello",
-        action={"run_playbook": {"name": "ansible.eda.hello"}},
-        ruleset=ruleset_1,
-    )
-
-
 #################################################################
 # Activations and Activation Instances
 #################################################################
 @pytest.fixture
 def default_activation_instance(
-    default_activation: models.Activation, default_project: models.Project
+    default_activation: models.Activation,
+    default_project: models.Project,
+    default_organization: models.Organization,
 ) -> models.RulebookProcess:
     """Return a list of Activation Instances"""
     instance = models.RulebookProcess.objects.create(
@@ -406,6 +420,7 @@ def default_activation_instance(
         status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
             enums.ActivationStatus.COMPLETED
         ],
+        organization=default_organization,
     )
 
     models.RulebookProcessQueue.objects.create(
@@ -419,6 +434,7 @@ def default_activation_instance(
 @pytest.fixture
 def default_audit_rule(
     default_activation_instance: models.RulebookProcess,
+    default_organization: models.Organization,
 ) -> models.AuditRule:
     return models.AuditRule.objects.create(
         name="default audit rule",
@@ -427,12 +443,14 @@ def default_audit_rule(
         ruleset_uuid=DUMMY_UUID,
         ruleset_name="test-audit-ruleset-name-1",
         activation_instance=default_activation_instance,
+        organization=default_organization,
     )
 
 
 @pytest.fixture
 def audit_rule_1(
     default_activation_instances: List[models.RulebookProcess],
+    default_organization: models.Organization,
 ) -> models.AuditRule:
     return models.AuditRule.objects.create(
         name="rule with 1 action",
@@ -441,12 +459,14 @@ def audit_rule_1(
         ruleset_uuid=DUMMY_UUID,
         ruleset_name="test-audit-ruleset-name-1",
         activation_instance=default_activation_instances[0],
+        organization=default_organization,
     )
 
 
 @pytest.fixture
 def audit_rule_2(
     new_activation_instance: models.RulebookProcess,
+    default_organization: models.Organization,
 ) -> models.AuditRule:
     return models.AuditRule.objects.create(
         name="rule with 2 actions/events",
@@ -455,6 +475,7 @@ def audit_rule_2(
         ruleset_uuid=DUMMY_UUID,
         ruleset_name="test-audit-ruleset-name-2",
         activation_instance=new_activation_instance,
+        organization=default_organization,
     )
 
 
@@ -583,7 +604,7 @@ def activation_payload(
         "project_id": default_project.id,
         "rulebook_id": default_rulebook.id,
         "extra_var": default_extra_var_data,
-        "organization": default_organization.id,
+        "organization_id": default_organization.id,
         "user_id": admin_user.id,
         "restart_policy": enums.RestartPolicy.ON_FAILURE,
         "log_level": enums.RulebookProcessLogLevel.DEBUG,
@@ -649,7 +670,9 @@ def new_activation(
 
 @pytest.fixture
 def default_activation_instances(
-    default_activation: models.Activation, default_project: models.Project
+    default_activation: models.Activation,
+    default_project: models.Project,
+    default_organization: models.Organization,
 ) -> models.RulebookProcess:
     """Return a list of Activation Instances"""
     instances = models.RulebookProcess.objects.bulk_create(
@@ -662,6 +685,7 @@ def default_activation_instances(
                 status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
                     enums.ActivationStatus.COMPLETED
                 ],
+                organization=default_organization,
             ),
             models.RulebookProcess(
                 name="default-activation-instance-2",
@@ -671,6 +695,7 @@ def default_activation_instances(
                 status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
                     enums.ActivationStatus.FAILED
                 ],
+                organization=default_organization,
             ),
         ]
     )
@@ -686,7 +711,9 @@ def default_activation_instances(
 
 @pytest.fixture
 def new_activation_instance(
-    new_activation: models.Activation, default_project: models.Project
+    new_activation: models.Activation,
+    default_project: models.Project,
+    default_organization: models.Organization,
 ) -> models.RulebookProcess:
     """Return an Activation Instance for new_activation fixture"""
     return models.RulebookProcess.objects.create(
@@ -697,6 +724,7 @@ def new_activation_instance(
         status_message=enums.ACTIVATION_STATUS_MESSAGE_MAP[
             enums.ActivationStatus.COMPLETED
         ],
+        organization=default_organization,
     )
 
 
@@ -802,9 +830,7 @@ def credential_type() -> models.CredentialType:
 
 
 @pytest.fixture
-def user_credential_type(
-    default_organization: models.Organization,
-) -> models.CredentialType:
+def user_credential_type() -> models.CredentialType:
     return models.CredentialType.objects.create(
         name="user_type",
         inputs={
@@ -819,7 +845,6 @@ def user_credential_type(
                 "sasl_password": "{{ sasl_password }}",
             }
         },
-        organization=default_organization,
     )
 
 
@@ -846,6 +871,7 @@ def default_registry_credential(
                 "username": "dummy-user",
                 "password": "dummy-password",
                 "host": "quay.io",
+                "verify_ssl": False,
             }
         ),
         organization=default_organization,
@@ -868,6 +894,34 @@ def default_vault_credential(
         inputs=inputs_to_store(
             {"username": "dummy-user", "password": "dummy-password"}
         ),
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def default_aap_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a default Vault Credential"""
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    data = "secret"
+
+    return models.EdaCredential.objects.create(
+        name="default-aap-credential",
+        description="Default RH-AAP Credential",
+        inputs=inputs_to_store(
+            {
+                "host": "https://eda_controller_url",
+                "username": "adam",
+                "password": data,
+                "ssl_verify": "no",
+                "oauth_token": "",
+            }
+        ),
+        credential_type=aap_credential_type,
         organization=default_organization,
     )
 
@@ -952,14 +1006,6 @@ def credential_payload(
 
 
 @pytest.fixture
-def preseed_credential_types(
-    default_organization: models.Organization,
-) -> list[models.CredentialType]:
-    """Preseed Credential Types."""
-    return populate_credential_types(CREDENTIAL_TYPES)
-
-
-@pytest.fixture
 def default_gpg_credential(
     default_organization: models.Organization,
     preseed_credential_types,
@@ -980,15 +1026,6 @@ def default_gpg_credential(
 #################################################################
 # Organizations and Teams
 #################################################################
-@pytest.fixture
-def default_organization() -> models.Organization:
-    "Corresponds to migration add_default_organization"
-    return models.Organization.objects.get_or_create(
-        name=settings.DEFAULT_ORGANIZATION_NAME,
-        description="The default organization",
-    )[0]
-
-
 @pytest.fixture
 def new_organization() -> models.Organization:
     "Return a new organization"
@@ -1018,27 +1055,45 @@ def new_team(default_organization: models.Organization) -> models.Team:
     )
 
 
+# TODO(doston): creating managed roles should be exported to its own
+# management command
+@pytest.fixture
+def create_initial_data_command():
+    """Create all managed roles using create_initial_data command."""
+    return create_initial_data.Command()
+
+
+@pytest.fixture
+def create_managed_org_roles(create_initial_data_command):
+    """Create managed org roles using create_initial_data command."""
+    create_initial_data_command._create_org_roles()
+
+
 #################################################################
 # Redis
 #################################################################
 # fixture for a running redis server
 @pytest.fixture
 def redis_external(redis_parameters):
-    client = redis.Redis(**redis_parameters)
+    client = get_redis_client(**redis_parameters)
     yield client
     client.flushdb()
 
 
 @pytest.fixture
 def test_queue_name(redis_parameters):
-    # Use a separately named copy of the default queue to prevent
-    # cross-environment issues.  Using the eda-server default queue results in
-    # tasks run by tests to execute within eda-server context, if the
-    # eda-server default worker is running, rather than the test context.
-    settings.RQ_QUEUES["test-default"] = settings.RQ_QUEUES["default"]
+    # Use a separately named deep copy of the default queue to prevent
+    # cross-environment issues.  If not using a deep copy the same queue entry
+    # is used as value for the two queues and modifying via either affects the
+    # other.
+    # Using the eda-server default queue results in tasks run by tests to
+    # execute within eda-server context, if the eda-server default worker is
+    # running, rather than the test context.
+    settings.RQ_QUEUES["test-default"] = copy.deepcopy(
+        settings.RQ_QUEUES["default"]
+    )
 
-    # The redis parameters provide the DB to use in an effort to avoid
-    # stepping on a deployed environment.
+    # The redis parameters provide the DB to use.
     settings.RQ_QUEUES["test-default"]["DB"] = redis_parameters["db"]
     return "test-default"
 
@@ -1049,15 +1104,81 @@ def default_queue(test_queue_name, redis_external) -> Queue:
 
 
 @pytest.fixture
-def caplog_factory(caplog):
-    def _factory(logger):
-        logger.setLevel(logging.INFO)
-        logger.handlers += [caplog.handler]
-        return caplog
-
-    return _factory
+def container_engine_mock() -> MagicMock:
+    return create_autospec(ContainerEngine, instance=True)
 
 
 @pytest.fixture
-def container_engine_mock() -> MagicMock:
-    return create_autospec(ContainerEngine, instance=True)
+def default_hmac_credential(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Return a default HMAC Credential"""
+    hmac_credential_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.HMAC
+    )
+    return models.EdaCredential.objects.create(
+        name="default-hmac-credential",
+        description="Default HMAC Credential",
+        credential_type=hmac_credential_type,
+        inputs=inputs_to_store(
+            {
+                "auth_type": "hmac",
+                "hmac_algorithm": "sha256",
+                "secret": "secret",
+                "header_key": "X-Hub-Signature-256",
+                "hmac_format": "hex",
+                "hmac_signature_prefix": "sha256=",
+            }
+        ),
+        organization=default_organization,
+    )
+
+
+@pytest.fixture
+def default_event_streams(
+    default_organization: models.Organization,
+    default_user: models.User,
+    default_hmac_credential: models.EdaCredential,
+) -> List[models.EventStream]:
+    return models.EventStream.objects.bulk_create(
+        [
+            models.EventStream(
+                uuid=uuid.uuid4(),
+                name="test-es-1",
+                owner=default_user,
+                organization=default_organization,
+                eda_credential=default_hmac_credential,
+                test_mode=False,
+            ),
+            models.EventStream(
+                uuid=uuid.uuid4(),
+                name="another-test-es-2",
+                owner=default_user,
+                organization=default_organization,
+                eda_credential=default_hmac_credential,
+                test_mode=True,
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def default_event_stream(
+    default_organization: models.Organization,
+    default_user: models.User,
+    default_hmac_credential: models.EdaCredential,
+) -> models.EventStream:
+    return models.EventStream.objects.create(
+        uuid=uuid.uuid4(),
+        name="test-es-1",
+        owner=default_user,
+        organization=default_organization,
+        eda_credential=default_hmac_credential,
+    )
+
+
+@pytest.fixture
+def activation_payload_skip_audit_events(activation_payload: dict) -> dict:
+    activation_payload["skip_audit_events"] = True
+    return activation_payload

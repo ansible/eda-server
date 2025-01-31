@@ -1,0 +1,71 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+    server_tokens off;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name _;
+    server_tokens off;
+
+    ssl_certificate ${SSL_CERTIFICATE};
+    ssl_certificate_key ${SSL_CERTIFICATE_KEY};
+    ssl_client_certificate ${SSL_CLIENT_CERTIFICATE};
+    ssl_verify_client optional;
+
+    access_log off;
+    # error_log off;
+
+    autoindex off;
+
+    include mime.types;
+    types {
+        application/manifest+json webmanifest;
+    }
+
+    sendfile on;
+
+    root /usr/share/nginx/html;
+
+    location ~ ^/api/eda/ {
+        proxy_pass $EDA_SERVER;
+        proxy_set_header Origin $EDA_SERVER;
+    }
+
+    location /mtls/$EDA_SERVER_UUID/ {
+        if ( $ssl_client_verify != "SUCCESS" ) {
+            return 403;
+        }
+        proxy_pass $EDA_WEBHOOK_SERVER/;
+        proxy_set_header Origin $EDA_WEBHOOK_SERVER;
+        proxy_set_header Subject $ssl_client_s_dn;
+    }
+
+    location /$EDA_SERVER_UUID/ {
+        proxy_pass $EDA_WEBHOOK_SERVER/;
+        proxy_set_header Origin $EDA_WEBHOOK_SERVER;
+    }
+
+    location ~ /api/eda/ws/[0-9a-z-]+ {
+        proxy_pass $EDA_SERVER;
+        proxy_set_header Origin $EDA_SERVER;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+    }
+
+    location ^~ /api/eda/static/ {
+        alias /staticfiles/;
+    }
+
+    location / {
+        autoindex off;
+        expires off;
+        add_header Cache-Control "public, max-age=0, s-maxage=0, must-revalidate" always;
+        try_files $uri /index.html =404;
+    }
+}

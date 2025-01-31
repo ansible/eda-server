@@ -30,14 +30,7 @@ from .job import (
 from .organization import Organization
 from .project import Project
 from .queue import ActivationRequestQueue
-from .rulebook import (
-    AuditAction,
-    AuditEvent,
-    AuditRule,
-    Rule,
-    Rulebook,
-    Ruleset,
-)
+from .rulebook import AuditAction, AuditEvent, AuditRule, Rulebook
 from .rulebook_process import (
     RulebookProcess,
     RulebookProcessLog,
@@ -60,9 +53,7 @@ __all__ = [
     "JobInstance",
     "Job",
     "Project",
-    "Rule",
     "Rulebook",
-    "Ruleset",
     "User",
     "AwxToken",
     "Credential",
@@ -70,19 +61,19 @@ __all__ = [
     "EdaCredential",
     "DecisionEnvironment",
     "ActivationRequestQueue",
-    "EventStream",
     "Organization",
     "Team",
+    "EventStream",
 ]
 
 permission_registry.register(
     Activation,
-    CredentialType,
     EdaCredential,
     DecisionEnvironment,
     Project,
     Organization,
     Team,
+    EventStream,
     parent_field_name="organization",
 )
 permission_registry.register(

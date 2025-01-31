@@ -1,5 +1,9 @@
 [allowlist]
 description = "Global Allowlist"
 
-# Ignore based on any subset of the file path
-paths = ['''tests\/unit\/data''', '''tools\/docker\/redis-tls''']
+paths = [
+    '''tests\/unit\/data''',
+    '''tools\/docker\/redis-tls''',
+    '''tests\/integration\/api\/test_event_stream_ecdsa.py''',
+    '''tools\/docker\/nginx\/certs''',
+] # Ignore based on any subset of the file path

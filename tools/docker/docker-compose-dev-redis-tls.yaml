@@ -8,6 +8,7 @@ x-environment:
   - EDA_MQ_CLIENT_CERT_PATH=${EDA_MQ_CLIENT_CERT_PATH:-/var/lib/eda/redis-tls/client/client.crt}
   - EDA_MQ_CLIENT_KEY_PATH=${EDA_MQ_CLIENT_KEY_PATH:-/var/lib/eda/redis-tls/client/client.key}
   - EDA_MQ_CLIENT_CACERT_PATH=${EDA_MQ_CLIENT_CACERT_PATH:-/var/lib/eda/redis-tls/ca.crt}
+  - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
   - EDA_DB_HOST=postgres
   - EDA_DB_PASSWORD=${EDA_DB_PASSWORD:-'secret'}
   - EDA_ALLOWED_HOSTS=['*']
@@ -33,6 +34,8 @@ x-environment:
   - EDA_PGSSLKEY=${EDA_PGSSLKEY:-./postgres_ssl_config/certs/server.key}
   - EDA_PGSSLROOTCERT=${EDA_PGSSLROOTCERT:-./postgres_ssl_config/certs/ca.crt}
   - EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=${EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT:-True}
+  - EDA_ALLOW_LOCAL_ASSIGNING_JWT_ROLES=${EDA_ALLOW_LOCAL_ASSIGNING_JWT_ROLES:-True}
+  - EDA_ALLOW_SHARED_RESOURCE_CUSTOM_ROLES=${EDA_ALLOW_SHARED_RESOURCE_CUSTOM_ROLES:-True}
   - EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER=${EDA_ANSIBLE_RULEBOOK_FLUSH_AFTER:-100}
   - EDA_DEFAULT_QUEUE_TIMEOUT=${EDA_DEFAULT_QUEUE_TIMEOUT:-300}
   - EDA_DEFAULT_RULEBOOK_QUEUE_TIMEOUT=${EDA_DEFAULT_RULEBOOK_QUEUE_TIMEOUT:-120}
@@ -41,145 +44,21 @@ x-environment:
   - EDA_RESOURCE_SERVER__VALIDATE_HTTPS=${EDA_RESOURCE_SERVER__VALIDATE_HTTPS:-False}
   - EDA_RESOURCE_JWT_USER_ID=${EDA_RESOURCE_JWT_USER_ID:-'@none None'}
   - EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY=${EDA_ANSIBLE_BASE_MANAGED_ROLE_REGISTRY:-@json {}}
+  - EDA_STATIC_URL=${EDA_STATIC_URL:-api/eda/v1/static/}
+  - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/wildcard.crt}
+  - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/wildcard.key}
+  - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
+
 
 services:
-  podman-pre-setup:
-    user: "0"
-    image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
-    privileged: true
-    command: >-
-      chown -R podman /home/podman/.local/share/containers/storage
-    volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
-
   podman:
-    user: "1000"
+    user: ${EDA_PODMAN_USER_ID:-0}
     image: ${EDA_PODMAN_IMAGE:-quay.io/containers/podman}:${EDA_PODMAN_VERSION:-v4}
     privileged: true
     command: >-
       podman system service --time=0 tcp://0.0.0.0:8888
     ports:
       - "${EDA_PODMAN_PORT:-8888}:8888"
-    volumes:
-      - 'podman_data:/home/podman/.local/share/containers/storage'
-    depends_on:
-     - podman-pre-setup
-
-  eda-ui:
-    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui}:${EDA_UI_VERSION:-main}
-    environment: *common-env
-    ports:
-      - '${EDA_UI_PORT:-8443}:443'
-    depends_on:
-      eda-api:
-        condition: service_healthy
-
-  eda-api:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    build:
-      context: ../../
-      dockerfile: tools/docker/Dockerfile
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage migrate
-        && aap-eda-manage create_initial_data
-        && scripts/create_superuser.sh
-        && aap-eda-manage runserver 0.0.0.0:8000
-    ports:
-      - "${EDA_API_PORT:-8000}:8000"
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - '../../:/app/src:z'
-
-  eda-ws:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage runserver 0.0.0.0:8000
-    ports:
-      - "${EDA_WS_PORT:-8001}:8000"
-    depends_on:
-      eda-api:
-        condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-
-  eda-scheduler:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage scheduler
-    depends_on:
-      eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-
-  eda-default-worker:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_DEFAULT_WORKERS:-1}
-    environment: *common-env
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.DefaultWorker
-    depends_on:
-      eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-    restart: always
-
-  eda-activation-worker:
-    image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-2}
-    command:
-      - /bin/bash
-      - -c
-      - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
-    environment: *common-env
-    depends_on:
-      eda-api:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    volumes:
-      - '../../:/app/src:z'
-    restart: always
 
   certs:
     image: ${EDA_CERTBOT_IMAGE:-certbot/certbot}:${EDA_CERTBOT_VERSION:-latest}
@@ -258,6 +137,115 @@ services:
     volumes:
       - ./redis-tls:/var/lib/eda/redis-tls:z
 
+  eda-api:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
+    build:
+      context: ../../
+      dockerfile: tools/docker/Dockerfile
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage migrate
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false aap-eda-manage create_initial_data
+        && ANSIBLE_REVERSE_RESOURCE_SYNC=false scripts/create_superuser.sh
+        && aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - "${EDA_API_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ 'CMD', 'curl', '-q', 'http://localhost:8000/_healthz' ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - '../../:/app/src:z'
+
+  eda-ws:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage runserver 0.0.0.0:8000
+    ports:
+      - "${EDA_WS_PORT:-8001}:8000"
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+
+  eda-scheduler:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage scheduler
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
+  eda-default-worker:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
+    deploy:
+      replicas: ${EDA_DEFAULT_WORKERS:-1}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.DefaultWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
+  eda-activation-worker:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
+    deploy:
+      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.ActivationWorker
+    environment: *common-env
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
+  eda-ui:
+    image: ${EDA_UI_IMAGE:-quay.io/ansible/eda-ui:main}
+    environment: *common-env
+    command: nginx -g "daemon off;"
+    ports:
+      - '${EDA_UI_PORT:-8443}:443'
+    volumes:
+      - './my_certs:/tmp/my_certs:z'
+      - './nginx/certs:/certs:z'
+      - './nginx/default.conf.template:/etc/nginx/templates/default.conf.template:z'
+    depends_on:
+      eda-api:
+        condition: service_healthy
+
 volumes:
   postgres_data: {}
-  podman_data: {}

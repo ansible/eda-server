@@ -20,6 +20,7 @@ env:
   EDA_QA_PATH: "./eda-qa"
   REGISTRY: quay.io
   QUAY_USER: ansible+eda_gha
+  PYTEST_RETRIES: 2
 
 jobs:
   api-e2e-tests:
@@ -75,7 +76,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
-        run: pip install .
+        run: |
+          pip install .
+          pip install pytest-rerunfailures
 
       - name: Run tests
         working-directory: ${{ env.EDA_QA_PATH }}
@@ -83,12 +86,31 @@ jobs:
           EDAQA_FERNET_PASSWORD: ${{ secrets.EDAQA_FERNET_PASSWORD }}
           EDAQA_ENV: authenticated
           EDAQA_MAX_CONCURRENT_ACTIVATIONS: 10
+          EDAQA_UPSTREAM_ENABLED: true
         run: |
           if [ -n "${{ github.event.inputs.pytest_filter }}" ]; then
-            pytest -vv -k "${{ github.event.inputs.pytest_filter }}"
+            pytest -vv -k "${{ github.event.inputs.pytest_filter }}" --junit-xml=eda-qa-e2e-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
           else
-            pytest -vv
+            pytest -vv --junit-xml=eda-qa-e2e-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
           fi
+
+      - name: Setup jUnit reporter
+        run: |
+          pip install httpie
+          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+      - name: Upload jUnit test results (APDE CI)
+        working-directory: ${{ env.EDA_QA_PATH }}
+        if: github.ref == 'refs/heads/main'
+        run: >-
+          http --check-status --ignore-stdin
+          --auth "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
+          -f POST "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+          xunit_xml@eda-qa-e2e-test-results.xml
+          component_name=eda
+          git_commit_sha=${{ env.GIT_SHA }}
+          git_repository_url="https://github.com/${{ github.repository }}"
+
 
       - name: Print EDA logs
         if: always()
@@ -136,7 +158,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.EDA_QA_PATH }}
-        run: pip install .
+        run: |
+          pip install .
+          pip install pytest-rerunfailures
 
       - name: Build eda-server images
         working-directory: .
@@ -153,4 +177,21 @@ jobs:
           # to allow for the time it takes to start the workers inside the tests
           EDAQA_DEFAULT_TIMEOUT: 120
         run: |
-          pytest -vv -s eda_qa/tests/whitebox/upstream
+          pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
+
+      - name: Setup jUnit reporter
+        run: |
+          pip install httpie
+          echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+      - name: Upload jUnit test results (APDE CI)
+        working-directory: ${{ env.EDA_QA_PATH }}
+        if: github.ref == 'refs/heads/main'
+        run: >-
+          http --check-status --ignore-stdin
+          --auth "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
+          -f POST "${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+          xunit_xml@eda-qa-e2e-multinode-test-results.xml
+          component_name=eda
+          git_commit_sha=${{ env.GIT_SHA }}
+          git_repository_url="https://github.com/${{ github.repository }}"

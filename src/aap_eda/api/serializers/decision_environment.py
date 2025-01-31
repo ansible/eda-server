@@ -15,11 +15,16 @@
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 
 
 class DecisionEnvironmentSerializer(serializers.ModelSerializer):
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
+
     class Meta:
         model = models.DecisionEnvironment
         read_only_fields = [
@@ -33,17 +38,30 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
+
+    def to_representation(self, decision_environment):
+        result = super().to_representation(decision_environment)
+        result["created_by"] = BasicUserSerializer(
+            decision_environment.created_by
+        ).data
+        result["modified_by"] = BasicUserSerializer(
+            decision_environment.modified_by
+        ).data
+        return result
 
 
 class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating the DecisionEnvironment."""
 
     organization_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
+        required=True,
+        allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={"null": "Organization is needed"},
     )
     eda_credential_id = serializers.IntegerField(
         required=False,
@@ -55,9 +73,8 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         eda_credential_id = data.get("eda_credential_id")
-        if eda_credential_id:
-            image_url = data.get("image_url") or self.instance.image_url
-            validators.check_if_de_valid(image_url, eda_credential_id)
+        image_url = data.get("image_url") or self.instance.image_url
+        validators.check_if_de_valid(image_url, eda_credential_id)
 
         return data
 
@@ -79,6 +96,8 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
         required=False, allow_null=True
     )
     organization = OrganizationRefSerializer()
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.DecisionEnvironment
@@ -91,34 +110,40 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "eda_credential",
             "created_at",
             "modified_at",
+            "created_by",
+            "modified_by",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+        ]
 
     def to_representation(self, decision_environment):
         eda_credential = (
             EdaCredentialRefSerializer(
-                decision_environment["eda_credential"]
+                decision_environment.eda_credential
             ).data
-            if decision_environment["eda_credential"]
+            if decision_environment.eda_credential
             else None
         )
         organization = (
-            OrganizationRefSerializer(
-                decision_environment["organization"]
-            ).data
-            if decision_environment["organization"]
+            OrganizationRefSerializer(decision_environment.organization).data
+            if decision_environment.organization
             else None
         )
-        return {
-            "id": decision_environment["id"],
-            "name": decision_environment["name"],
-            "description": decision_environment["description"],
-            "image_url": decision_environment["image_url"],
+        result = super().to_representation(decision_environment)
+        result["created_by"] = BasicUserSerializer(
+            decision_environment.created_by
+        ).data
+        result["modified_by"] = BasicUserSerializer(
+            decision_environment.modified_by
+        ).data
+        result |= {
             "organization": organization,
             "eda_credential": eda_credential,
-            "created_at": decision_environment["created_at"],
-            "modified_at": decision_environment["modified_at"],
         }
+        return result
 
 
 class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):

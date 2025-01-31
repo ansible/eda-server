@@ -16,22 +16,25 @@ from unittest import mock
 
 import pytest
 
-from aap_eda.core.models import EdaCredential
+from aap_eda.core import models
 from aap_eda.services.project.scm import ScmError, ScmRepository
 
 
 @pytest.fixture
-def credential() -> EdaCredential:
-    credential = EdaCredential.objects.create(
+def credential(
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential = models.EdaCredential.objects.create(
         name="test-eda-credential",
         inputs={"username": "adam", "password": "secret"},
+        organization=default_organization,
     )
     credential.refresh_from_db()
     return credential
 
 
 @pytest.mark.django_db
-def test_git_clone(credential: EdaCredential):
+def test_git_clone(credential: models.EdaCredential):
     executor = mock.MagicMock()
     with tempfile.TemporaryDirectory() as dest_path:
         repository = ScmRepository.clone(
@@ -65,7 +68,7 @@ def test_git_clone(credential: EdaCredential):
 
 @pytest.mark.django_db
 def test_git_clone_leak_password(
-    credential: EdaCredential,
+    credential: models.EdaCredential,
 ):
     executor = mock.MagicMock()
 
@@ -106,6 +109,28 @@ def test_git_clone_without_ssl_verification():
             },
             env_vars={},
         )
+
+
+@pytest.mark.django_db
+def test_git_clone_empty_project(
+    credential: models.EdaCredential,
+):
+    executor = mock.MagicMock()
+
+    def raise_error(**kwargs):
+        raise ScmError("Project folder is empty.")
+
+    executor.side_effect = raise_error
+
+    with pytest.raises(ScmError) as exc_info:
+        with tempfile.TemporaryDirectory() as dest_path:
+            ScmRepository.clone(
+                "https://git.example.com/repo.git",
+                dest_path,
+                credential=credential,
+                _executor=executor,
+            )
+    assert "Project folder is empty." in str(exc_info)
 
 
 def test_git_rev_parse_head():

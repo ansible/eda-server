@@ -11,6 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+
+import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -29,8 +32,32 @@ from aap_eda import tasks
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
+from aap_eda.core.utils import logging_utils
 
-from .mixins import ResponseSerializerMixin
+from .mixins import RedisDependencyMixin, ResponseSerializerMixin
+
+logger = logging.getLogger(__name__)
+
+resource_name = "Project"
+
+
+class DestroyProjectMixin(mixins.DestroyModelMixin):
+    def destroy(self, request, *args, **kwargs):
+        project = self.get_object()
+
+        response = super().destroy(request, *args, **kwargs)
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Delete",
+                resource_name,
+                project.name,
+                project.id,
+                project.organization,
+            )
+        )
+
+        return response
 
 
 @extend_schema_view(
@@ -56,10 +83,10 @@ from .mixins import ResponseSerializerMixin
 class ProjectViewSet(
     ResponseSerializerMixin,
     mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
+    DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
+    RedisDependencyMixin,
 ):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
@@ -80,27 +107,37 @@ class ProjectViewSet(
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.ProjectSerializer,
                 description="Return a created project.",
-            ),
-        },
+            )
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
         serializer = serializers.ProjectCreateRequestSerializer(
             data=request.data
         )
         serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            project = serializer.save()
-            check_related_permissions(
-                request.user,
-                serializer.Meta.model,
-                {},
-                model_to_dict(serializer.instance),
-            )
-            RoleDefinition.objects.give_creator_permissions(
-                request.user, serializer.instance
-            )
 
-        job = tasks.import_project.delay(project_id=project.id)
+        # Catch Redis connection error and translate, as appropriate, to the
+        # Redis unavailable response.
+        try:
+            with transaction.atomic():
+                project = serializer.save()
+                check_related_permissions(
+                    request.user,
+                    serializer.Meta.model,
+                    {},
+                    model_to_dict(serializer.instance),
+                )
+                RoleDefinition.objects.give_creator_permissions(
+                    request.user, serializer.instance
+                )
+
+                job = tasks.import_project.delay(project_id=project.id)
+        except redis.ConnectionError:
+            # If Redis isn't available we'll generate a Conflict (409).
+            # Anything else we re-raise the exception.
+            self.redis_is_available()
+            raise
 
         # Atomically update `import_task_id` field only.
         models.Project.objects.filter(pk=project.id).update(
@@ -109,6 +146,16 @@ class ProjectViewSet(
         project.import_task_id = job.id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                project.name,
+                project.id,
+                project.organization,
+            )
+        )
+
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
@@ -123,28 +170,19 @@ class ProjectViewSet(
         },
     )
     def retrieve(self, request, pk):
-        project = super().retrieve(request, pk)
-        project.data["eda_credential"] = (
-            models.EdaCredential.objects.get(
-                pk=project.data["eda_credential_id"]
+        project = self.get_object()
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                project.name,
+                project.id,
+                project.organization.name,
             )
-            if project.data["eda_credential_id"]
-            else None
-        )
-        project.data["signature_validation_credential"] = (
-            models.EdaCredential.objects.get(
-                pk=project.data["signature_validation_credential_id"]
-            )
-            if project.data["signature_validation_credential_id"]
-            else None
-        )
-        project.data["organization"] = (
-            models.Organization.objects.get(pk=project.data["organization_id"])
-            if project.data["organization_id"]
-            else None
         )
 
-        return Response(serializers.ProjectReadSerializer(project.data).data)
+        return Response(serializers.ProjectReadSerializer(project).data)
 
     @extend_schema(
         description="Partial update of a project",
@@ -186,10 +224,21 @@ class ProjectViewSet(
                 model_to_dict(project),
             )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Update",
+                resource_name,
+                project.name,
+                project.id,
+                project.organization,
+            )
+        )
+
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
-        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer},
+        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer}
+        | RedisDependencyMixin.redis_unavailable_response(),
         request=None,
         description="Sync a project",
     )
@@ -221,12 +270,28 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
-        job = tasks.sync_project.delay(project_id=project.id)
+        try:
+            job = tasks.sync_project.delay(project_id=project.id)
+        except redis.ConnectionError:
+            # If Redis isn't available we'll generate a Conflict (409).
+            # Anything else we re-raise the exception.
+            self.redis_is_available()
+            raise
 
         project.import_state = models.Project.ImportState.PENDING
         project.import_task_id = job.id
         project.import_error = None
         project.save()
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Sync",
+                resource_name,
+                project.name,
+                project.id,
+                project.organization,
+            )
+        )
 
         serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)

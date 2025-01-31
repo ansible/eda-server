@@ -13,11 +13,13 @@
 #  limitations under the License.
 
 from .activation import ActivationInstanceViewSet, ActivationViewSet
-from .auth import SessionLoginView, SessionLogoutView
+from .auth import SessionLoginView, SessionLogoutView, TokenRefreshView
+from .config import ConfigView
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
 from .event_stream import EventStreamViewSet
+from .external_event_stream import ExternalEventStreamViewSet
 from .organization import OrganizationViewSet
 from .project import ProjectViewSet
 from .root import ApiRootView, ApiV1RootView
@@ -29,6 +31,7 @@ __all__ = (
     # auth
     "SessionLoginView",
     "SessionLogoutView",
+    "TokenRefreshView",
     # project
     "ProjectViewSet",
     "AuditRuleViewSet",
@@ -45,8 +48,6 @@ __all__ = (
     "EdaCredentialViewSet",
     # decision_environment
     "DecisionEnvironmentViewSet",
-    # event_stream
-    "EventStreamViewSet",
     # organizations
     "OrganizationViewSet",
     # teams
@@ -54,4 +55,10 @@ __all__ = (
     # root
     "ApiV1RootView",
     "ApiRootView",
+    # config
+    "ConfigView",
+    # Event stream
+    "EventStreamViewSet",
+    # External event stream
+    "ExternalEventStreamViewSet",
 )

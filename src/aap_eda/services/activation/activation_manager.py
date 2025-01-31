@@ -17,16 +17,16 @@ import logging
 import typing as tp
 from datetime import timedelta
 
+import rq
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from pydantic import ValidationError
-from rq import get_current_job
 
 from aap_eda.api.serializers.activation import is_activation_valid
-from aap_eda.core import models
+from aap_eda.core import models, tasking
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions
@@ -57,7 +57,7 @@ class ActivationManager(StatusManager):
 
     def __init__(
         self,
-        db_instance: tp.Union[models.Activation, models.EventStream],
+        db_instance: models.Activation,
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
     ):
@@ -76,6 +76,11 @@ class ActivationManager(StatusManager):
             )
 
         self.container_logger_class = container_logger_class
+
+    def _update_started_time(self) -> None:
+        """Update latest instance's started_at to now."""
+        self.latest_instance.started_at = timezone.now()
+        self.latest_instance.save(update_fields=["started_at"])
 
     def _set_activation_pod_id(self, pod_id: tp.Optional[str]) -> None:
         """Set the pod id of the activation instance."""
@@ -174,7 +179,6 @@ class ActivationManager(StatusManager):
                 LOGGER.warning(msg)
                 self._cleanup()
                 self.set_latest_instance_status(ActivationStatus.STOPPED)
-                self._set_activation_pod_id(pod_id=None)
 
     def _start_activation_instance(self):
         """Start a new activation instance.
@@ -182,8 +186,6 @@ class ActivationManager(StatusManager):
         Update the status of the activation, latest instance, logs,
         counters and pod id.
         """
-        self.set_status(ActivationStatus.STARTING)
-
         # Ensure status of previous instances
         # For consistency, we should not have previous instances in
         # wrong status. If we create a new instance, it means that
@@ -224,7 +226,10 @@ class ActivationManager(StatusManager):
             self._error_instance(msg)
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
-        except engine_exceptions.ContainerImagePullError as exc:
+        except (
+            engine_exceptions.ContainerImagePullError,
+            engine_exceptions.ContainerLoginError,
+        ) as exc:
             msg = (
                 f"Activation {self.db_instance.id} failed to start. "
                 f"Reason: {exc}"
@@ -248,12 +253,8 @@ class ActivationManager(StatusManager):
             self._error_activation(msg)
             raise exceptions.ActivationStartError(msg) from exc
 
-        # update status
-        self.set_status(ActivationStatus.RUNNING)
-        with transaction.atomic():
-            self.set_latest_instance_status(ActivationStatus.RUNNING)
-            self._set_activation_pod_id(pod_id=container_id)
-        self._reset_failure_count()
+        self._set_activation_pod_id(pod_id=container_id)
+        self._update_started_time()
 
         # update logs
         LOGGER.info(
@@ -353,18 +354,24 @@ class ActivationManager(StatusManager):
             or self._is_in_status(ActivationStatus.ERROR)
         )
 
-    def _is_unresponsive(self) -> bool:
-        if self.db_instance.status in [
+    def _is_unresponsive(self, check_readiness: bool) -> bool:
+        previous_time = None
+        if check_readiness:
+            previous_time = self.latest_instance.started_at
+            timeout = settings.RULEBOOK_READINESS_TIMEOUT_SECONDS
+        elif self.db_instance.status in [
             ActivationStatus.RUNNING,
             ActivationStatus.STARTING,
         ]:
-            cutoff_time = timezone.now() - timedelta(
-                seconds=settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS,
-            )
-            return self.latest_instance.updated_at < cutoff_time
+            previous_time = self.latest_instance.updated_at
+            timeout = settings.RULEBOOK_LIVENESS_TIMEOUT_SECONDS
+
+        if previous_time:
+            cutoff_time = timezone.now() - timedelta(seconds=timeout)
+            return previous_time < cutoff_time
         return False
 
-    def _unresponsive_policy(self):
+    def _unresponsive_policy(self, check_type: str):
         """Apply the unresponsive restart policy."""
         LOGGER.info(
             "Unresponsive policy called for "
@@ -379,7 +386,7 @@ class ActivationManager(StatusManager):
             )
             user_msg = (
                 "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
+                f"{check_type} check for ansible rulebook timed out. "
                 "Restart policy is not applicable."
             )
             container_logger.write(user_msg, flush=True)
@@ -397,7 +404,7 @@ class ActivationManager(StatusManager):
             )
             user_msg = (
                 "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
+                f"{check_type} check for ansible rulebook timed out. "
                 "Activation is going to be restarted."
             )
             container_logger.write(user_msg, flush=True)
@@ -715,7 +722,8 @@ class ActivationManager(StatusManager):
             return
 
         try:
-            self.set_status(ActivationStatus.STOPPING)
+            if self.db_instance.status != ActivationStatus.ERROR:
+                self.set_status(ActivationStatus.STOPPING)
             self._stop_instance()
 
         except engine_exceptions.ContainerEngineError as exc:
@@ -727,7 +735,10 @@ class ActivationManager(StatusManager):
             self._error_activation(msg)
             raise exceptions.ActivationStopError(msg) from exc
         user_msg = "Stop requested by user."
-        self.set_status(ActivationStatus.STOPPED, user_msg)
+        if self.db_instance.status != ActivationStatus.ERROR:
+            # do not overwrite the status and message if the activation
+            # is already in error status
+            self.set_status(ActivationStatus.STOPPED, user_msg)
         container_logger = self.container_logger_class(self.latest_instance.id)
         container_logger.write(user_msg, flush=True)
         LOGGER.info(
@@ -854,6 +865,7 @@ class ActivationManager(StatusManager):
             return
 
         if self.db_instance.status not in [
+            ActivationStatus.STARTING,
             ActivationStatus.RUNNING,
             ActivationStatus.WORKERS_OFFLINE,
         ]:
@@ -865,12 +877,25 @@ class ActivationManager(StatusManager):
             LOGGER.info(msg)
             return
 
+        self._detect_running_status()
+
         # get the status of the container
         container_status = None
-        with contextlib.suppress(engine_exceptions.ContainerNotFoundError):
+        try:
             container_status = self.container_engine.get_status(
                 container_id=self.latest_instance.activation_pod_id,
             )
+        except engine_exceptions.ContainerNotFoundError:
+            pass
+        except engine_exceptions.ContainerEngineError as exc:
+            msg = (
+                f"Monitor operation: activation id: {self.db_instance.id} "
+                f"Failed to get status of the container. Reason: {exc}"
+            )
+            LOGGER.error(msg)
+            self._error_instance(msg)
+            self._error_activation(msg)
+            raise exceptions.ActivationMonitorError(msg) from exc
 
         # Activations in running status must have a container
         # This case prevents cases when the container is externally deleted
@@ -898,17 +923,21 @@ class ActivationManager(StatusManager):
         # Detect unresponsive activation instance
         # TODO: we should decrease the default timeout/livecheck
         # in the future might be configurable per activation
-        if self._is_unresponsive():
+        check_readiness = (
+            self.latest_instance.status == ActivationStatus.STARTING
+        )
+        check_type = "Readiness" if check_readiness else "Liveness"
+        if self._is_unresponsive(check_readiness=check_readiness):
             msg = (
                 "Activation is unresponsive. "
-                "Liveness check for ansible rulebook timed out. "
+                f"{check_type} check for ansible rulebook timed out. "
                 "Applicable restart policy will be applied."
             )
             LOGGER.info(
                 f"Monitor operation: activation id: {self.db_instance.id} "
                 f"{msg}",
             )
-            self._unresponsive_policy()
+            self._unresponsive_policy(check_type=check_type)
             return
 
         # last case is the success case
@@ -948,6 +977,18 @@ class ActivationManager(StatusManager):
                 f"Container {self.latest_instance.activation_pod_id} "
                 "is in an stopped state.",
             )
+
+    def _detect_running_status(self):
+        if (
+            self.latest_instance.status == ActivationStatus.STARTING
+            and self.latest_instance.updated_at
+        ):
+            # safely turn the status to running after updated_at was set
+            # upon receiving at least one heartbeat
+            with transaction.atomic():
+                self.set_status(ActivationStatus.RUNNING)
+                self.set_latest_instance_status(ActivationStatus.RUNNING)
+                self._reset_failure_count()
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
@@ -989,6 +1030,7 @@ class ActivationManager(StatusManager):
 
     @transaction.atomic
     def _create_activation_instance(self):
+        self.set_status(ActivationStatus.STARTING)
         git_hash = (
             self.db_instance.git_hash
             if hasattr(self.db_instance, "git_hash")
@@ -1016,8 +1058,9 @@ class ActivationManager(StatusManager):
             queue_name=queue_name,
         )
 
+    @tasking.redis_connect_retry()
     def _get_queue_name(self) -> str:
-        this_job = get_current_job()
+        this_job = rq.get_current_job()
         return this_job.origin
 
     def _get_container_request(self) -> ContainerRequest:

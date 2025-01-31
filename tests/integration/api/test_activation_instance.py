@@ -166,6 +166,5 @@ def assert_activation_instance_data(
         "started_at": instance.started_at.strftime(DATETIME_FORMAT),
         "ended_at": instance.ended_at,
         "status_message": enums.ACTIVATION_STATUS_MESSAGE_MAP[instance.status],
-        "event_stream_id": None,
         "queue_name": instance.rulebookprocessqueue.queue_name,
     }

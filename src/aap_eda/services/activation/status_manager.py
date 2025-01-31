@@ -62,7 +62,7 @@ class StatusManager:
 
     def __init__(
         self,
-        db_instance: tp.Union[models.Activation, models.EventStream],
+        db_instance: models.Activation,
     ):
         """Initialize the Process Parent Status Manager.
 
@@ -70,10 +70,7 @@ class StatusManager:
             db_instance: The database instance of the process parent.
         """
         self.db_instance = db_instance
-        if isinstance(db_instance, models.Activation):
-            self.db_instance_type = ProcessParentType.ACTIVATION
-        else:
-            self.db_instance_type = ProcessParentType.EVENT_STREAM
+        self.db_instance_type = ProcessParentType.ACTIVATION
 
     @property
     def latest_instance(self) -> tp.Optional[models.RulebookProcess]:

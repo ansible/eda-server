@@ -13,6 +13,7 @@
 #  limitations under the License.
 import logging
 
+import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -32,6 +33,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
+from aap_eda.core.utils import logging_utils
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
     restart_rulebook_process,
@@ -39,12 +41,17 @@ from aap_eda.tasks.orchestrator import (
     stop_rulebook_process,
 )
 
+from .mixins import RedisDependencyMixin
+
 logger = logging.getLogger(__name__)
+
+resource_name = "RulebookActivation"
 
 
 class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
+    RedisDependencyMixin,
 ):
     queryset = models.Activation.objects.all()
     serializer_class = serializers.ActivationSerializer
@@ -67,7 +74,8 @@ class ActivationViewSet(
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
                 description="Invalid data to create activation."
             ),
-        },
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
         context = {"request": request}
@@ -75,6 +83,14 @@ class ActivationViewSet(
             data=request.data, context=context
         )
         serializer.is_valid(raise_exception=True)
+
+        # If we're expected to run this activation we need redis
+        # to be available.
+        if serializer.validated_data.get(
+            "is_enabled",
+            models.activation.DEFAULT_ENABLED,
+        ):
+            self.redis_is_available()
 
         with transaction.atomic():
             response = serializer.create(serializer.validated_data)
@@ -94,6 +110,16 @@ class ActivationViewSet(
                 process_parent_id=response.id,
             )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Create",
+                resource_name,
+                response.name,
+                response.id,
+                response.organization,
+            )
+        )
+
         return Response(
             serializers.ActivationReadSerializer(response).data,
             status=status.HTTP_201_CREATED,
@@ -106,7 +132,8 @@ class ActivationViewSet(
                 None,
                 description="The Activation has been deleted.",
             ),
-        },
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def destroy(self, request, *args, **kwargs):
         activation = self.get_object()
@@ -117,13 +144,32 @@ class ActivationViewSet(
                 "deleted.",
             )
 
-        activation.status = ActivationStatus.DELETING
-        activation.save(update_fields=["status"])
-        logger.info(f"Now deleting {activation.name} ...")
-        delete_rulebook_process(
-            process_parent_type=ProcessParentType.ACTIVATION,
-            process_parent_id=activation.id,
+        audit_log = logging_utils.generate_simple_audit_log(
+            "Delete",
+            resource_name,
+            activation.name,
+            activation.id,
+            activation.organization,
         )
+
+        try:
+            with transaction.atomic():
+                activation.status = ActivationStatus.DELETING
+                activation.save(update_fields=["status"])
+                name = activation.name
+
+                delete_rulebook_process(
+                    process_parent_type=ProcessParentType.ACTIVATION,
+                    process_parent_id=activation.id,
+                )
+                logger.info(f"Now deleting {name} ...")
+        except redis.ConnectionError:
+            # If Redis isn't available we'll generate a Conflict (409).
+            # Anything else we re-raise the exception.
+            self.redis_is_available()
+            raise
+
+        logger.info(audit_log)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -132,6 +178,17 @@ class ActivationViewSet(
     )
     def retrieve(self, request, pk: int):
         activation = self.get_object()
+
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Read",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
+
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
@@ -152,6 +209,15 @@ class ActivationViewSet(
         )
         result = self.paginate_queryset(serializer.data)
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "ListActivations",
+                resource_name,
+                "*",
+                "*",
+                "*",
+            )
+        )
         return self.get_paginated_response(result)
 
     @extend_schema(
@@ -212,9 +278,7 @@ class ActivationViewSet(
                 description="Activation not enabled.",
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
-                None,
-                description="Activation not enabled do to current activation "
-                "status",
+                description="Processing of enable is disallowed."
             ),
         },
     )
@@ -232,7 +296,10 @@ class ActivationViewSet(
             ActivationStatus.RUNNING,
             ActivationStatus.UNRESPONSIVE,
         ]:
-            return Response(status=status.HTTP_409_CONFLICT)
+            return Response(
+                data="Activation not enabled due to current activation status",
+                status=status.HTTP_409_CONFLICT,
+            )
 
         valid, error = is_activation_valid(activation)
         if not valid:
@@ -244,6 +311,9 @@ class ActivationViewSet(
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Redis must be available in order to perform the enable.
+        self.redis_is_available()
 
         logger.info(f"Now enabling {activation.name} ...")
 
@@ -263,6 +333,16 @@ class ActivationViewSet(
             process_parent_id=pk,
         )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Enable",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -273,7 +353,8 @@ class ActivationViewSet(
                 None,
                 description="Activation has been disabled.",
             ),
-        },
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
@@ -282,6 +363,9 @@ class ActivationViewSet(
         self._check_deleting(activation)
 
         if activation.is_enabled:
+            # Redis must be available in order to perform the delete.
+            self.redis_is_available()
+
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
             activation.save(
@@ -292,6 +376,15 @@ class ActivationViewSet(
                 process_parent_id=activation.id,
             )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Disable",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -306,7 +399,8 @@ class ActivationViewSet(
                 None,
                 description="Activation not enabled.",
             ),
-        },
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
@@ -319,8 +413,15 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
+        # Redis must be available in order to perform the restart.
+        self.redis_is_available()
+
         valid, error = is_activation_valid(activation)
         if not valid:
+            stop_rulebook_process(
+                process_parent_type=ProcessParentType.ACTIVATION,
+                process_parent_id=activation.id,
+            )
             activation.status = ActivationStatus.ERROR
             activation.status_message = error
             activation.save(update_fields=["status", "status_message"])
@@ -335,6 +436,15 @@ class ActivationViewSet(
             process_parent_id=activation.id,
         )
 
+        logger.info(
+            logging_utils.generate_simple_audit_log(
+                "Restart",
+                resource_name,
+                activation.name,
+                activation.id,
+                activation.organization,
+            )
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _check_deleting(self, activation):

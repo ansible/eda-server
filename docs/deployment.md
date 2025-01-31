@@ -72,7 +72,7 @@ You can start all services with:
 docker-compose -p eda -f docker-compose-stage.yaml up
 ```
 
-Note: **You can use the environment variables `EDA_IMAGE_URL` and `EDA_UI_IMAGE_URL` to use a different image url. By default is the latest code from the main branch.**
+Note: **You can use the environment variables `EDA_IMAGE_URL` and `EDA_UI_IMAGE` to use a different image url. By default is the latest code from the main branch.**
 
 ## Deploy using Minikube and Taskfile
 
@@ -122,6 +122,7 @@ Minikube is the recommended method for macOS users
 
 **Note**: For fedora, the binary may be `go-task`.
 
-You can now access the UI at <http://localhost:8080/eda/> using the above credentials.
-Also you can inspect the API documentation at <https://localhost:8443/api/eda/v1/docs>
+You can now inspect the API documentation at <https://localhost:8443/api/eda/v1/docs>
 or navigate through the resources with the DRF browsable API at <https://localhost:8443/api/eda/v1/>
+
+You can also access the standalone UI at <http://localhost:8443/> with the default credentials `admin`/`testpass`.

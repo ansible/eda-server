@@ -21,7 +21,7 @@ from aap_eda.settings.default import (
     DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
     ImproperlyConfigured,
     RulebookProcessLogLevel,
-    _get_debug,
+    _get_boolean,
     get_rq_queues,
     get_rulebook_process_log_level,
 )
@@ -159,14 +159,14 @@ def test_rq_queues_custom_host_multiple_queues():
     ],
 )
 @patch("aap_eda.settings.default.settings")
-def test_get_debug(mock_settings, value, expected):
+def test_get_boolean(mock_settings, value, expected):
     mock_settings.get.return_value = value
-    result = _get_debug()
+    result = _get_boolean("DEBUG")
     assert result == expected
 
 
 @patch("aap_eda.settings.default.settings")
-def test_get_debug_exception(mock_settings):
+def test_get_boolean_exception(mock_settings):
     mock_settings.get.return_value = ["something", "else"]
     with pytest.raises(ImproperlyConfigured):
-        _get_debug()
+        _get_boolean("DEBUG")

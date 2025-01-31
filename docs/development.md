@@ -153,8 +153,8 @@ pacman -S python-pre-commit
 ```
 
 **Note:** The `poetry-lock` hook will check to ensure consistency across the poetry.lock and
-pyproject.toml files. In case of conflict, a developer must manually execute either `poetry update`,
-`poetry lock` or `poetry lock --no-update` to resolve it.
+pyproject.toml files. In case of conflict, a developer must manually execute either `poetry update` or
+`poetry lock` to resolve it.
 
 ## Development environment steps
 
@@ -232,6 +232,14 @@ If you use docker or podman, you can start just the postgres instance with:
 task docker:up:postgres
 ```
 
+### Initializing the deployment
+
+You can initialize the deployment with some basic resources useful for development:
+
+```shell
+ansible-playbook  tools/ansible/eda_init.yml
+```
+
 ### Customizing database settings
 
 If you need to run a local or standalone external instance of PostgreSQL service, you will need
@@ -247,8 +255,10 @@ environment variables:
 * `EDA_DB_NAME` – Database name (default: `eda`)
 
 ### TLS-enabled redis
+
 If you wish to run a development environment requiring TLS connections to redis it is a simple
 process...
+
 1. build your container images as described above
 2. start them using `docker-compose -f ./tools/docker/docker-compose-dev-redis-tls.yaml up`
 
@@ -388,4 +398,5 @@ task format:isort
 task format:black
 ```
 
-You can now access the UI at <https://localhost:8443/overview/> with default login username and password(admin/testpass).
+You can now access the api at <https://localhost:8443/api/eda/v1/docs> with the default credentials `admin`/`testpass`.
+You can also access the standalone UI at <http://localhost:8443/>.
