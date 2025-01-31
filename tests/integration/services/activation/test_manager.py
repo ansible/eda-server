@@ -354,6 +354,11 @@ def test_start_first_run(
     )
     assert rulebook_process_queue.queue_name == job_mock.origin
 
+    logs = models.RulebookProcessLog.objects.filter(
+        activation_instance=basic_activation.latest_instance
+    ).all()
+    assert not any("The activation was edited at" in log.log for log in logs)
+
 
 @pytest.mark.django_db
 def test_monitor_to_running_status(
@@ -423,6 +428,8 @@ def test_start_restart(
     preseed_credential_types,
 ):
     """Test start verb for a restarted activation."""
+    running_activation.edited_at = timezone.now()
+    running_activation.save(update_fields=["edited_at"])
     activation_manager = ActivationManager(
         db_instance=running_activation,
         container_engine=container_engine_mock,
@@ -449,6 +456,10 @@ def test_start_restart(
         process=running_activation.latest_instance,
     )
     assert rulebook_process_queue.queue_name == job_mock.origin
+    logs = models.RulebookProcessLog.objects.filter(
+        activation_instance=running_activation.latest_instance
+    ).all()
+    assert any("The activation was edited at" in log.log for log in logs)
 
 
 @pytest.mark.django_db

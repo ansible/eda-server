@@ -1115,8 +1115,10 @@ def test_update_activation(
     )
     assert response.status_code == status.HTTP_200_OK
     data = response.data
+    assert data["edited_at"] is not None
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.name == "another_name"
+    assert activation.edited_at is not None
 
 
 @pytest.mark.django_db
