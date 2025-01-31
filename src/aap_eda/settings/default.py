@@ -195,14 +195,23 @@ INSTALLED_APPS = [
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
     "ansible_base.rest_filters",
+    "ansible_base.feature_flags",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
 ]
 
+
+def toggle_feature_flags(flags, settings):
+    for feature in flags.keys():
+        if feature in settings:
+            flags[feature][0]["value"] = settings.get(feature)
+
+
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
+toggle_feature_flags(FLAGS, settings)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
