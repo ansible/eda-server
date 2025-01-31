@@ -8,10 +8,14 @@ import aap_eda.core.utils.crypto.fields
 class Migration(migrations.Migration):
     dependencies = [
 <<<<<<<< HEAD:src/aap_eda/core/migrations/0059_setting.py
+<<<<<<<< HEAD:src/aap_eda/core/migrations/0059_setting.py
         ("core", ""0058_activation_edited_at),
 ========
         ("core", "0052_remove_eventstream_url"),
 >>>>>>>> 427e15b (rebase from main, migration conflict solved):src/aap_eda/core/migrations/0053_setting.py
+========
+        ("core", "0055_activation_created_by_activation_modified_by_and_more"),
+>>>>>>>> 70efed7 (fix: migration conflict):src/aap_eda/core/migrations/0056_setting.py
     ]
 
     operations = [
