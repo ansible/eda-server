@@ -111,6 +111,7 @@ def test_list_logs_from_activation_instance(
         "id",
         "log",
         "log_timestamp",
+        "log_created_at",
         "activation_instance",
     ]
 

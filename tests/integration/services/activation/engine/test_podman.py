@@ -645,8 +645,7 @@ def test_engine_update_logs(init_podman_data, podman_engine):
     log_handler = DBLogger(init_podman_data.activation_instance.id)
     init_log_read_at = init_podman_data.activation_instance.log_read_at
     message = (
-        "2023-10-31 15:28:01,318 - ansible_rulebook.engine - INFO - "
-        "Calling main in ansible.eda.range"
+        "ansible_rulebook.engine - INFO - Calling main in ansible.eda.range"
     )
 
     container_mock = mock.Mock()
