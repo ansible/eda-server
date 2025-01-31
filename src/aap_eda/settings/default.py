@@ -201,12 +201,17 @@ INSTALLED_APPS = [
     "aap_eda.core",
 ]
 
+
+def toggle_feature_flags(_flags, _settings):
+    for feature in _flags.keys():
+        if feature in _settings:
+            _flags[feature][0]["value"] = _settings.get(feature)
+
+
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
-for feature in FLAGS.keys():
-    if feature in settings:
-        FLAGS[feature][0]["value"] = settings.get(feature)
+toggle_feature_flags(FLAGS, settings)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

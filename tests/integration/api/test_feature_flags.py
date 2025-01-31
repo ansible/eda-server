@@ -1,7 +1,11 @@
 import pytest
+from django.conf import settings
 from django.test import override_settings
+from dynaconf import settings as dynaconf
+from flags.state import flag_state
 from rest_framework import status
 
+from aap_eda.settings.default import toggle_feature_flags
 from tests.integration.constants import api_url_v1
 
 
@@ -33,3 +37,17 @@ def test_feature_flags_override_flags(admin_client):
     assert len(response.data) == 2  # Validates number of feature flags
     assert response.data["FEATURE_SOME_PLATFORM_FLAG_ENABLED"] is False
     assert response.data["FEATURE_SOME_PLATFORM_FLAG_FOO_ENABLED"] is True
+
+
+@override_settings(
+    FLAGS={
+        "FEATURE_SOME_PLATFORM_FLAG_ENABLED": [
+            {"condition": "boolean", "value": False},
+        ],
+    },
+)
+@pytest.mark.django_db
+def test_feature_flags_toggle():
+    dynaconf.configure(FEATURE_SOME_PLATFORM_FLAG_ENABLED=True)
+    toggle_feature_flags(settings.FLAGS, dynaconf)
+    assert flag_state("FEATURE_SOME_PLATFORM_FLAG_ENABLED") is True
