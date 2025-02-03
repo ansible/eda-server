@@ -644,9 +644,9 @@ pg-notify = ["psycopg[binary]"]
 
 [package.source]
 type = "git"
-url = "https://github.com/ansible/dispatcher.git"
-reference = "main"
-resolved_reference = "a32e2451f0d4e2055be5d84ea5f7a985ce5c1696"
+url = "https://github.com/alancoding/dispatcher.git"
+reference = "registry_refactor"
+resolved_reference = "e5b171554b9e9fd4099da2063d3afcd8e487cd13"
 
 [[package]]
 name = "django"
