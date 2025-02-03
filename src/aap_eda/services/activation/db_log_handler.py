@@ -20,6 +20,9 @@ from django.conf import settings
 from django.db import IntegrityError
 
 from aap_eda.core import models
+from aap_eda.core.utils.rulebook_process_logs import (
+    extract_datetime_and_message_from_log_entry,
+)
 from aap_eda.services.activation.engine.common import LogHandler
 from aap_eda.services.activation.engine.exceptions import (
     ContainerUpdateLogsError,
@@ -59,15 +62,14 @@ class DBLogger(LogHandler):
             lines = [lines]
 
         for line in lines:
-            if timestamp:
-                dt = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]}"
-                line = f"{dt} {line}"
+            dt, message = extract_datetime_and_message_from_log_entry(line)
 
             self.activation_instance_log_buffer.append(
                 models.RulebookProcessLog(
-                    log=line,
+                    log=message,
                     activation_instance_id=self.activation_instance_id,
                     log_timestamp=log_timestamp,
+                    log_created_at=dt,
                 )
             )
             self.line_count += 1

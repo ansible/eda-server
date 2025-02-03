@@ -192,6 +192,7 @@ class RulebookProcessLog(models.Model):
     )
     log = models.TextField()
     log_timestamp = models.BigIntegerField(null=False, default=0)
+    log_created_at = models.DateTimeField(null=True)
 
 
 class RulebookProcessQueue(models.Model):
