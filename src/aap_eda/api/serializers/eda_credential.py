@@ -111,6 +111,20 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
         }
 
 
+class EdaCredentialCopySerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        required=True,
+        validators=[validators.check_if_credential_name_used],
+        help_text="Name of the new credintial",
+    )
+
+    class Meta:
+        model = models.EdaCredential
+        fields = [
+            "name",
+        ]
+
+
 class EdaCredentialCreateSerializer(serializers.ModelSerializer):
     credential_type_id = serializers.IntegerField(
         required=True,

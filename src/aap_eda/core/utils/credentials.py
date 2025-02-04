@@ -15,7 +15,6 @@
 import re
 import tempfile
 import typing
-from datetime import datetime
 
 import gnupg
 import jinja2
@@ -520,14 +519,15 @@ def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
             )
 
 
-def build_copy_post_data(eda_credential: "models.EdaCredential") -> dict:
+def build_copy_post_data(
+    eda_credential: "models.EdaCredential", new_cred_name: str
+) -> dict:
     """Build a POST payload data from an existing EDA Credential object."""
     post_data = model_to_dict(eda_credential)
     # Remove 'id' field from post data
     post_data.pop("id")
-    # Form a new name for the new credential
-    current_time = datetime.now().strftime("%H:%M:%S")
-    post_data["name"] = " @ ".join([post_data["name"], current_time])
+    post_data["name"] = new_cred_name
+
     # Update foreign key fields
     post_data["organization_id"] = post_data.pop("organization")
     post_data["credential_type_id"] = post_data.pop("credential_type")

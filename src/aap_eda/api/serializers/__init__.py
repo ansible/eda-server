@@ -37,6 +37,7 @@ from .decision_environment import (
     DecisionEnvironmentSerializer,
 )
 from .eda_credential import (
+    EdaCredentialCopySerializer,
     EdaCredentialCreateSerializer,
     EdaCredentialSerializer,
     EdaCredentialUpdateSerializer,
@@ -128,6 +129,7 @@ __all__ = (
     "EdaCredentialSerializer",
     "EdaCredentialCreateSerializer",
     "EdaCredentialUpdateSerializer",
+    "EdaCredentialCopySerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # organizations

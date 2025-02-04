@@ -13,10 +13,12 @@
 #  limitations under the License.
 import hashlib
 import logging
+import os
 from urllib.parse import urlparse
 
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
@@ -835,6 +837,97 @@ EVENT_STREAM_DYNATRACE_INPUTS = {
     "required": ["auth_type", "username", "password", "http_header_key"],
 }
 
+POSTGRES_CREDENTIAL_INPUTS = {
+    "fields": [
+        {
+            "id": "postgres_db_host",
+            "label": "Postgres DB Host",
+            "help_text": "Postgres DB Server",
+        },
+        {
+            "id": "postgres_db_port",
+            "label": "Postgres DB Port",
+            "help_text": "Postgres DB Port",
+            "default": "5432",
+        },
+        {
+            "id": "postgres_db_name",
+            "label": "Postgres DB Name",
+            "help_text": "Postgres Database name",
+        },
+        {
+            "id": "postgres_db_user",
+            "label": "Postgres DB User",
+            "help_text": "Postgres Database user",
+        },
+        {
+            "id": "postgres_db_password",
+            "label": "Postgres DB Password",
+            "help_text": "Postgres Database password",
+            "secret": True,
+        },
+        {
+            "id": "postgres_sslmode",
+            "label": "Postgres SSL Mode",
+            "help_text": "Postgres SSL Mode",
+            "choices": [
+                "disable",
+                "allow",
+                "prefer",
+                "require",
+                "verify-ca",
+                "verify-full",
+            ],
+            "default": "prefer",
+        },
+        {
+            "id": "postgres_sslcert",
+            "label": "Postgres SSL Certificate",
+            "help_text": "Postgres SSL Certificate",
+            "multiline": True,
+            "default": "",
+        },
+        {
+            "id": "postgres_sslkey",
+            "label": "Postgres SSL Key",
+            "help_text": "Postgres SSL Key",
+            "multiline": True,
+            "secret": True,
+            "default": "",
+        },
+        {
+            "id": "postgres_sslpassword",
+            "label": "Postgres SSL Password",
+            "help_text": "Postgres SSL Password for key",
+            "secret": True,
+            "default": "",
+        },
+        {
+            "id": "postgres_sslrootcert",
+            "label": "Postgres SSL Root Certificate",
+            "help_text": "Postgres SSL Root Certificate",
+            "multiline": True,
+            "default": "",
+        },
+    ]
+}
+
+POSTGRES_CREDENTIAL_INJECTORS = {
+    "extra_vars": {
+        "postgres_db_host": "{{ postgres_db_host }}",
+        "postgres_db_port": "{{ postgres_db_port }}",
+        "postgres_db_name": "{{ postgres_db_name }}",
+        "postgres_db_user": "{{ postgres_db_user }}",
+        "postgres_db_password": "{{ postgres_db_password }}",
+        "postgres_sslpassword": "{{ postgres_sslpassword | default(None) }}",
+        "postgres_sslmode": "{{ postgres_sslmode }}",
+    },
+    "file": {
+        "template.postgres_sslcert": "{{ postgres_sslcert }}",
+        "template.postgres_sslrootcert": "{{ postgres_sslrootcert }}",
+        "template.postgres_sslkey": "{{ postgres_sslkey }}",
+    },
+}
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
@@ -1008,6 +1101,14 @@ CREDENTIAL_TYPES = [
             "the Basic authentication."
         ),
     },
+    {
+        "name": enums.DefaultCredentialType.POSTGRES,
+        "kind": "cloud",
+        "namespace": "postgres",
+        "inputs": POSTGRES_CREDENTIAL_INPUTS,
+        "injectors": POSTGRES_CREDENTIAL_INJECTORS,
+        "managed": True,
+    },
 ]
 
 
@@ -1040,6 +1141,7 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **options):
         self._preload_credential_types()
+        self._update_postgres_credentials()
         self._copy_registry_credentials()
         self._copy_scm_credentials()
         self._create_org_roles()
@@ -1160,6 +1262,57 @@ class Command(BaseCommand):
             "All GITHUB and GITLAB credentials are converted to Source "
             "Control eda-credentials"
         )
+
+    def _update_postgres_credentials(self):
+        cred_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.POSTGRES
+        )
+        _db_options = settings.DATABASES["default"].get("OPTIONS", {})
+        inputs = {
+            "postgres_db_host": settings.ACTIVATION_DB_HOST,
+            "postgres_db_port": settings.DATABASES["default"]["PORT"],
+            "postgres_db_name": settings.DATABASES["default"]["NAME"],
+            "postgres_db_user": settings.DATABASES["default"]["USER"],
+            "postgres_db_password": settings.DATABASES["default"]["PASSWORD"],
+            "postgres_sslmode": _db_options.get("sslmode", "allow"),
+            "postgres_sslcert": "",
+            "postgres_sslkey": "",
+            "postgres_sslrootcert": "",
+        }
+
+        if _db_options.get("sslcert", ""):
+            inputs["postgres_sslcert"] = self._read_file(
+                _db_options["sslcert"],
+                "PGSSLCERT",
+            )
+
+        if _db_options.get("sslkey", ""):
+            inputs["postgres_sslkey"] = self._read_file(
+                _db_options["sslkey"], "PGSSLKEY"
+            )
+
+        if _db_options.get("sslrootcert", ""):
+            inputs["postgres_sslrootcert"] = self._read_file(
+                _db_options["sslrootcert"],
+                "PGSSLROOTCERT",
+            )
+
+        models.EdaCredential.objects.update_or_create(
+            name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME,
+            defaults={
+                "description": "Default PG Notify Credentials",
+                "managed": True,
+                "credential_type": cred_type,
+                "inputs": inputs_to_store(inputs),
+                "organization": get_default_organization(),
+            },
+        )
+
+    def _read_file(self, name: str, key: str):
+        if not os.path.exists(name):
+            raise ImproperlyConfigured(f"Missing {key} file: {name}")
+        with open(name) as f:
+            return f.read()
 
     def _create_org_roles(self):
         org_ct = ContentType.objects.get(model="organization")

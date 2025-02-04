@@ -253,6 +253,16 @@ def check_if_credential_type_exists(credential_type_id: int) -> int:
     return credential_type_id
 
 
+def check_if_credential_name_used(name: str) -> str:
+    if not name:
+        raise serializers.ValidationError("Name parameter is missing.")
+    if models.EdaCredential.objects.filter(name=name).exists():
+        raise serializers.ValidationError(
+            f"Credential name already exists: {name}"
+        )
+    return name
+
+
 def check_if_organization_exists(organization_id: int) -> int:
     try:
         models.Organization.objects.get(pk=organization_id)

@@ -649,7 +649,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.1.3"
+version = "2025.1.31"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -663,6 +663,7 @@ channels = {version = "*", optional = true, markers = "extra == \"channel-auth\"
 cryptography = "*"
 Django = ">=4.2.16,<4.3.0"
 django-crum = "*"
+django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
 django-split-settings = "*"
 djangorestframework = "*"
@@ -674,10 +675,11 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "requests", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular"]
 authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
+feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
 oauth2-provider = ["django-oauth-toolkit (<2.4.0)"]
 redis-client = ["django-redis", "redis"]
@@ -687,8 +689,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2025.1.3"
-resolved_reference = "1cf551b7834453dcfd09de1a18b44f9538f93852"
+reference = "2025.1.31"
+resolved_reference = "26c318ae41659e7f702fab4ed9aa2727db2e583d"
 
 [[package]]
 name = "django-crum"
@@ -1709,18 +1711,17 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "podman"
-version = "4.9.0"
+version = "5.2.0"
 description = "Bindings for Podman RESTful API"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "podman-4.9.0-py3-none-any.whl", hash = "sha256:0613314edb8f51b791e2818438e4b386da3937ae73cf0187b27a1f8bb096ac64"},
-    {file = "podman-4.9.0.tar.gz", hash = "sha256:48683485a5bbcb3f6b2e9e93aa8647faadc5c27918f8b86e04bff1d0822691af"},
+    {file = "podman-5.2.0-py3-none-any.whl", hash = "sha256:e42e907b44af3e8578ac3bd4838040f7dd6b4af091f787e51462b979746703eb"},
+    {file = "podman-5.2.0.tar.gz", hash = "sha256:6a064a3e9dbfc4ee0ee0c51604164e1f58d9d00b10f702c3e570651aee722ec7"},
 ]
 
 [package.dependencies]
-pyxdg = ">=0.26"
 requests = ">=2.24"
 urllib3 = "*"
 
@@ -2245,18 +2246,6 @@ groups = ["main"]
 files = [
     {file = "python-gnupg-0.5.2.tar.gz", hash = "sha256:01d8013931c9fa3f45824bbea7054c03d6e11f258a72e7e086e168dbcb91854c"},
     {file = "python_gnupg-0.5.2-py2.py3-none-any.whl", hash = "sha256:72ce142af6da7f07e433fef148b445fb3e07854acd2f88739008838745c0e9f5"},
-]
-
-[[package]]
-name = "pyxdg"
-version = "0.28"
-description = "PyXDG contains implementations of freedesktop.org standards in python."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "pyxdg-0.28-py2.py3-none-any.whl", hash = "sha256:bdaf595999a0178ecea4052b7f4195569c1ff4d344567bccdc12dfdf02d545ab"},
-    {file = "pyxdg-0.28.tar.gz", hash = "sha256:3267bb3074e934df202af2ee0868575484108581e6f3cb006af1da35395e88b4"},
 ]
 
 [[package]]
@@ -2954,4 +2943,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "902ea6b1c05edfe9e701560a92e6d049060c56bf65a835cfc6b10e72310b1181"
+content-hash = "af92edac99cd98dd22a6900a9e34f57dc4ee061730f49471aef763936b6dafef"

@@ -98,6 +98,7 @@ class DefaultCredentialType(DjangoStrEnum):
     SOURCE_CONTROL = "Source Control"
     AAP = "Red Hat Ansible Automation Platform"
     GPG = "GPG Public Key"
+    POSTGRES = "Postgres"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
