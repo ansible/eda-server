@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0055_activation_created_by_activation_modified_by_and_more"),
+        ("core", "0056_rulebookprocesslog_log_created_at_and_more"),
     ]
 
     operations = [
