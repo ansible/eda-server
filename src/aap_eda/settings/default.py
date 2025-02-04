@@ -195,14 +195,23 @@ INSTALLED_APPS = [
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
     "ansible_base.rest_filters",
+    "ansible_base.feature_flags",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
 ]
 
+
+def toggle_feature_flags(flags, settings):
+    for feature in flags.keys():
+        if feature in settings:
+            flags[feature][0]["value"] = settings.get(feature)
+
+
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
+toggle_feature_flags(FLAGS, settings)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -781,15 +790,6 @@ ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
 )
 
-_DEFAULT_PG_NOTIFY_DSN = (
-    f"host={ACTIVATION_DB_HOST} "
-    f"port={DATABASES['default']['PORT']} "
-    f"dbname={DATABASES['default']['NAME']} "
-    f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
-)
-
-PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
 PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
 
 SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
@@ -801,13 +801,19 @@ API_PATH_TO_UI_PATH_MAP = settings.get(
     "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
 )
 
+_db_options = DATABASES["default"].get("OPTIONS", {})
 _DEFAULT_PG_NOTIFY_DSN_SERVER = (
     f"host={DATABASES['default']['HOST']} "
     f"port={DATABASES['default']['PORT']} "
     f"dbname={DATABASES['default']['NAME']} "
     f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
+    f"password={DATABASES['default']['PASSWORD']} "
+    f"sslmode={_db_options.get('sslmode','allow')} "
+    f"sslcert={_db_options.get('sslcert','')} "
+    f"sslkey={_db_options.get('sslkey','')} "
+    f"sslrootcert={_db_options.get('sslrootcert','')} "
 )
+
 PG_NOTIFY_DSN_SERVER = settings.get(
     "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
 )
@@ -823,3 +829,5 @@ if EVENT_STREAM_MTLS_BASE_URL:
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
+
+DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
