@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0056_alter_activation_options"),
+        ("core", "0057_alter_activation_options"),
     ]
 
     operations = [
