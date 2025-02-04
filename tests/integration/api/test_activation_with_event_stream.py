@@ -748,9 +748,13 @@ def test_bad_src_activation_with_event_stream(
 
 @pytest.mark.django_db
 def test_update_activation_with_everything(
-    admin_client: APIClient, preseed_credential_types
+    admin_client: APIClient,
+    preseed_credential_types,
+    create_initial_data_command,
 ):
-    response = _create_activation_with_everything(admin_client)
+    response = _create_activation_with_everything(
+        admin_client, create_initial_data_command
+    )
     activation_id = response.data["id"]
 
     fks2 = create_activation_related_data(
@@ -800,14 +804,31 @@ def test_update_activation_with_everything(
     ).first()
     for key, val in test_activation2.items():
         if key == "extra_var":
-            assert activation.extra_var == (
+            input_extra_var = (
                 "collections:\n- community.shared\n- benthomasson.eda\n"
                 "custom_password: dummy-password\n"
                 "custom_username: test-2-user\n"
             )
+            assert input_extra_var in activation.extra_var
+            cred_extra_vars = [
+                "postgres_db_host",
+                "postgres_db_name",
+                "postgres_db_password",
+                "postgres_db_port",
+                "postgres_db_user",
+                "postgres_sslmode",
+                "postgres_sslpassword",
+            ]
+            for var in cred_extra_vars:
+                assert var in activation.extra_var
             continue
         if key == "eda_credentials":
-            assert activation.eda_credentials.all()[0].id == val[0]
+            cred_ids = [cred.id for cred in activation.eda_credentials.all()]
+            assert val[0] in cred_ids
+            postgres_cred = models.EdaCredential.objects.get(
+                name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+            )
+            assert postgres_cred.id in cred_ids
             continue
         if key == "source_mappings":
             continue
@@ -859,9 +880,13 @@ def test_update_activation_with_everything(
 
 @pytest.mark.django_db
 def test_copy_activation_with_everything(
-    admin_client: APIClient, preseed_credential_types
+    admin_client: APIClient,
+    preseed_credential_types,
+    create_initial_data_command,
 ):
-    response = _create_activation_with_everything(admin_client)
+    response = _create_activation_with_everything(
+        admin_client, create_initial_data_command
+    )
     data1 = response.data
 
     response2 = admin_client.post(
@@ -906,7 +931,10 @@ def test_copy_activation_with_everything(
     )
 
 
-def _create_activation_with_everything(admin_client):
+def _create_activation_with_everything(
+    admin_client, create_initial_data_command
+):
+    create_initial_data_command.handle()
     fks = create_activation_related_data(["demo"], rulesets=TEST_RULESETS)
     organization = models.Organization.objects.get(pk=fks["organization_id"])
     credential = custom_credential("test", organization)
