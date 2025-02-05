@@ -655,7 +655,10 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
             # update with new event streams
             self.validated_data[
                 "rulebook_rulesets"
-            ] = _update_event_stream_source(self.validated_data, vault_data)
+            ] = _update_event_stream_source(self.validated_data)
+
+            self._insert_pg_notify_credential(activation)
+
         elif rulebook_id:
             # user selects a rulebook but no mapping, clear existing mappings
             self.validated_data["source_mappings"] = ""
@@ -678,6 +681,20 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
                     "organization_id", activation.organization.id
                 ),
             )
+
+    def _insert_pg_notify_credential(self, activation: models.Activation):
+        if "eda_credentials" in self.validated_data:
+            eda_credentials = self.validated_data.get("eda_credentials")
+        else:
+            eda_credentials = [
+                cred.id for cred in activation.eda_credentials.all()
+            ]
+        postgres_cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+        )
+        if postgres_cred.id not in eda_credentials:
+            eda_credentials.append(postgres_cred.id)
+            self.validated_data["eda_credentials"] = eda_credentials
 
     def update(
         self, instance: models.Activation, validated_data: dict
