@@ -204,6 +204,13 @@ class ActivationManager(StatusManager):
 
         self.db_instance.refresh_from_db()
         log_handler = self.container_logger_class(self.latest_instance.id)
+        if self.db_instance.edited_at:
+            edited_at = self.db_instance.edited_at.strftime(
+                "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
+            log_handler.write(
+                f"The activation was edited at {edited_at}", flush=True
+            )
 
         LOGGER.info(
             "Starting container for activation instance: "

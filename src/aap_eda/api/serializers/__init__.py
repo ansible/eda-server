@@ -13,12 +13,14 @@
 #  limitations under the License.
 
 from .activation import (
+    ActivationCopySerializer,
     ActivationCreateSerializer,
     ActivationInstanceLogSerializer,
     ActivationInstanceSerializer,
     ActivationListSerializer,
     ActivationReadSerializer,
     ActivationSerializer,
+    ActivationUpdateSerializer,
     PostActivationSerializer,
 )
 from .auth import JWTTokenSerializer, LoginSerializer, RefreshTokenSerializer
@@ -102,7 +104,9 @@ __all__ = (
     "ActivationSerializer",
     "ActivationListSerializer",
     "ActivationCreateSerializer",
+    "ActivationUpdateSerializer",
     "ActivationReadSerializer",
+    "ActivationCopySerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
     "PostActivationSerializer",

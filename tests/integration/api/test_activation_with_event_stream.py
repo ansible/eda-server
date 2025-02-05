@@ -156,11 +156,40 @@ PARTIAL_TEST_RULESETS = """
 """
 
 
+def custom_credential(
+    name: str, organization: models.Organization
+) -> models.EdaCredential:
+    ctype = models.CredentialType.objects.create(
+        name=name,
+        inputs={
+            "fields": [
+                {"id": "username"},
+                {"id": "password"},
+            ]
+        },
+        injectors={
+            "extra_vars": {
+                "custom_username": "{{ username }}",
+                "custom_password": "{{ password }}",
+            }
+        },
+    )
+    return models.EdaCredential.objects.create(
+        name=name,
+        description="Default Credential",
+        credential_type=ctype,
+        inputs=inputs_to_store(
+            {"username": f"{name}-user", "password": "dummy-password"}
+        ),
+        organization=organization,
+    )
+
+
 def create_activation_related_data(
-    event_stream_names, with_project=True, rulesets=TEST_RULESETS
+    event_stream_names, with_project=True, rulesets=TEST_RULESETS, suffix=""
 ):
     user = models.User.objects.create_user(
-        username="luke.skywalker",
+        username="luke.skywalker" + suffix,
         first_name="Luke",
         last_name="Skywalker",
         email="luke.skywalker@example.com",
@@ -168,8 +197,8 @@ def create_activation_related_data(
     )
     user_id = user.pk
     models.AwxToken.objects.create(
-        name=TEST_AWX_TOKEN["name"],
-        token=TEST_AWX_TOKEN["token"],
+        name=TEST_AWX_TOKEN["name"] + suffix,
+        token=TEST_AWX_TOKEN["token"] + suffix,
         user=user,
     )
     organization = models.Organization.objects.get_or_create(
@@ -180,20 +209,20 @@ def create_activation_related_data(
         name=enums.DefaultCredentialType.REGISTRY
     )
     credential_id = models.EdaCredential.objects.create(
-        name="eda-credential",
+        name="eda-credential" + suffix,
         description="Default Registry Credential",
         credential_type=registry_credential_type,
         inputs=inputs_to_store(
             {
-                "username": "dummy-user",
-                "password": "dummy-password",
+                "username": "dummy-user" + suffix,
+                "password": "dummy-password" + suffix,
                 "host": "quay.io",
             }
         ),
         organization=organization,
     ).pk
     decision_environment_id = models.DecisionEnvironment.objects.create(
-        name=TEST_DECISION_ENV["name"],
+        name=TEST_DECISION_ENV["name"] + suffix,
         image_url=TEST_DECISION_ENV["image_url"],
         description=TEST_DECISION_ENV["description"],
         eda_credential_id=credential_id,
@@ -201,8 +230,8 @@ def create_activation_related_data(
     ).pk
     project_id = (
         models.Project.objects.create(
-            git_hash=TEST_PROJECT["git_hash"],
-            name=TEST_PROJECT["name"],
+            git_hash=TEST_PROJECT["git_hash"] + suffix,
+            name=TEST_PROJECT["name"] + suffix,
             url=TEST_PROJECT["url"],
             description=TEST_PROJECT["description"],
             organization=organization,
@@ -212,7 +241,7 @@ def create_activation_related_data(
     )
     rulebook_id = (
         models.Rulebook.objects.create(
-            name=TEST_RULEBOOK["name"],
+            name=TEST_RULEBOOK["name"] + suffix,
             description=TEST_RULEBOOK["description"],
             rulesets=rulesets,
             project_id=project_id,
@@ -226,14 +255,14 @@ def create_activation_related_data(
         name=enums.EventStreamCredentialType.HMAC
     )
     hmac_credential_id = models.EdaCredential.objects.create(
-        name="default-hmac-credential",
+        name="default-hmac-credential" + suffix,
         description="Default HMAC Credential",
         credential_type=hmac_credential_type,
         inputs=inputs_to_store(
             {
                 "auth_type": "hmac",
                 "hmac_algorithm": "sha256",
-                "secret": "secret",
+                "secret": "secret" + suffix,
                 "header_key": "X-Hub-Signature-256",
                 "hmac_format": "hex",
                 "hmac_signature_prefix": "sha256=",
@@ -532,7 +561,7 @@ def test_create_activation_with_bad_rulebook_hash(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert str(response.data[SOURCE_MAPPING_ERROR_KEY][0]) == (
         "Rulebook has changed since the sources were mapped."
-        " Please reattach Event streams again"
+        " Please reattach event streams"
     )
 
 
@@ -715,3 +744,244 @@ def test_bad_src_activation_with_event_stream(
     assert response.status_code == status_code
     if message:
         assert response.json()[error_key][0] == message
+
+
+@pytest.mark.django_db
+def test_update_activation_with_everything(
+    admin_client: APIClient,
+    preseed_credential_types,
+    create_initial_data_command,
+):
+    response = _create_activation_with_everything(
+        admin_client, create_initial_data_command
+    )
+    activation_id = response.data["id"]
+
+    fks2 = create_activation_related_data(
+        ["demo-2"], rulesets=LEGACY_TEST_RULESETS, suffix="2"
+    )
+    organization = models.Organization.objects.get(pk=fks2["organization_id"])
+    credential2 = custom_credential("test-2", organization)
+    extra_var2 = TEST_EXTRA_VAR.replace(
+        "community.general", "community.shared"
+    )
+
+    test_activation2 = {
+        "name": "test-activation-2",
+        "description": "test activation 2",
+        "extra_var": extra_var2,
+        "eda_credentials": [credential2.id],
+        "decision_environment_id": fks2["decision_environment_id"],
+        "rulebook_id": fks2["rulebook_id"],
+        "skip_audit_events": True,
+        "restart_policy": enums.RestartPolicy.ON_FAILURE,
+        "log_level": enums.RulebookProcessLogLevel.INFO,
+        "k8s_service_name": "demo-service-2",
+    }
+    source_mappings2 = []
+    for event_stream in fks2["event_streams"]:
+        source_mappings2.append(
+            {
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
+                "rulebook_hash": get_rulebook_hash(LEGACY_TEST_RULESETS),
+                "source_name": f"{DEFAULT_SOURCE_NAME_PREFIX}1",
+            }
+        )
+    test_activation2["source_mappings"] = yaml.dump(source_mappings2)
+
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation2
+    )
+    assert_updated_event_stream_mapping(
+        response,
+        ["ansible.eda.pg_listener", "name"],
+        test_activation2["source_mappings"],
+        "demo-2",
+    )
+    activation = models.Activation.objects.filter(
+        id=response.data["id"]
+    ).first()
+    for key, val in test_activation2.items():
+        if key == "extra_var":
+            input_extra_var = (
+                "collections:\n- community.shared\n- benthomasson.eda\n"
+                "custom_password: dummy-password\n"
+                "custom_username: test-2-user\n"
+            )
+            assert input_extra_var in activation.extra_var
+            cred_extra_vars = [
+                "postgres_db_host",
+                "postgres_db_name",
+                "postgres_db_password",
+                "postgres_db_port",
+                "postgres_db_user",
+                "postgres_sslmode",
+                "postgres_sslpassword",
+            ]
+            for var in cred_extra_vars:
+                assert var in activation.extra_var
+            continue
+        if key == "eda_credentials":
+            cred_ids = [cred.id for cred in activation.eda_credentials.all()]
+            assert val[0] in cred_ids
+            postgres_cred = models.EdaCredential.objects.get(
+                name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+            )
+            assert postgres_cred.id in cred_ids
+            continue
+        if key == "source_mappings":
+            continue
+        assert getattr(activation, key) == val
+
+    # test unchanged event stream mapping
+    test_activation3 = {"name": "name3"}
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation3
+    )
+    assert_updated_event_stream_mapping(
+        response,
+        ["ansible.eda.pg_listener", "name"],
+        test_activation2["source_mappings"],
+        "demo-2",
+    )
+
+    # test only changing event stream mapping
+    source_mappings = []
+    for event_stream in fks2["event_streams"]:
+        source_mappings.append(
+            {
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
+                "rulebook_hash": get_rulebook_hash(LEGACY_TEST_RULESETS),
+                "source_name": f"{DEFAULT_SOURCE_NAME_PREFIX}1",
+            }
+        )
+    test_activation4 = {"source_mappings": yaml.dump(source_mappings)}
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation4
+    )
+    assert_updated_event_stream_mapping(
+        response,
+        ["ansible.eda.pg_listener", "name"],
+        test_activation4["source_mappings"],
+        "demo",
+    )
+
+    # test clearing event stream mapping
+    test_activation5 = {"rulebook_id": fks2["rulebook_id"]}
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/", data=test_activation5
+    )
+    assert_updated_event_stream_mapping(
+        response, ["ansible.eda.range"], "", ""
+    )
+
+
+@pytest.mark.django_db
+def test_copy_activation_with_everything(
+    admin_client: APIClient,
+    preseed_credential_types,
+    create_initial_data_command,
+):
+    response = _create_activation_with_everything(
+        admin_client, create_initial_data_command
+    )
+    data1 = response.data
+
+    response2 = admin_client.post(
+        f"{api_url_v1}/activations/{data1['id']}/copy/", {"name": "new name"}
+    )
+    assert response2.status_code == status.HTTP_201_CREATED
+    data2 = response2.data
+
+    assert data1["id"] != data2["id"]
+    assert data2["name"] == "new name"
+    assert data2["is_enabled"] is False
+
+    keys = {
+        "description",
+        "decision_environment",
+        "git_hash",
+        "project",
+        "rulebook",
+        "extra_var",
+        "organization",
+        "restart_policy",
+        "rulebook_name",
+        "log_level",
+        "eda_credentials",
+        "k8s_service_name",
+        "event_streams",
+        "source_mappings",
+    }
+    for key in keys:
+        assert data1[key] == data2[key]
+
+    activation1 = models.Activation.objects.get(id=data1["id"])
+    activation2 = models.Activation.objects.get(id=data2["id"])
+    assert activation1.rulebook_rulesets == activation2.rulebook_rulesets
+    assert (
+        activation1.eda_system_vault_credential
+        != activation2.eda_system_vault_credential
+    )
+    assert (
+        activation1.eda_system_vault_credential.inputs
+        == activation2.eda_system_vault_credential.inputs
+    )
+
+
+def _create_activation_with_everything(
+    admin_client, create_initial_data_command
+):
+    create_initial_data_command.handle()
+    fks = create_activation_related_data(["demo"], rulesets=TEST_RULESETS)
+    organization = models.Organization.objects.get(pk=fks["organization_id"])
+    credential = custom_credential("test", organization)
+
+    test_activation = {
+        "name": "test-activation",
+        "description": "test activation",
+        "is_enabled": False,
+        "extra_var": TEST_EXTRA_VAR,
+        "eda_credentials": [credential.id],
+        "decision_environment_id": fks["decision_environment_id"],
+        "rulebook_id": fks["rulebook_id"],
+        "organization_id": fks["organization_id"],
+        "skip_audit_events": False,
+        "restart_policy": enums.RestartPolicy.ALWAYS,
+        "log_level": enums.RulebookProcessLogLevel.ERROR,
+        "k8s_service_name": "demo-service",
+    }
+    source_mappings = []
+    for event_stream in fks["event_streams"]:
+        source_mappings.append(
+            {
+                "event_stream_name": event_stream.name,
+                "event_stream_id": event_stream.id,
+                "rulebook_hash": get_rulebook_hash(TEST_RULESETS),
+                "source_name": "demo",
+            }
+        )
+    test_activation["source_mappings"] = yaml.dump(source_mappings)
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    return response
+
+
+def assert_updated_event_stream_mapping(
+    response, sources: list, source_mappings: str, event_stream_name: str
+):
+    assert response.status_code == status.HTTP_200_OK
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    swapped_ruleset = yaml.safe_load(activation.rulebook_rulesets)
+    assert sorted(swapped_ruleset[0]["sources"][0].keys()) == sources
+    assert data["source_mappings"].strip() == source_mappings.strip()
+    if event_stream_name:
+        assert data["event_streams"][0]["name"] == "demo-2"
+    else:
+        assert data["event_streams"] == []
