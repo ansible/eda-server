@@ -326,6 +326,27 @@ def test_create_activation_with_vault_extra_var(
 
 
 @pytest.mark.django_db
+def test_create_activation_with_null_credentials(
+    activation_payload: Dict[str, Any],
+    admin_awx_token: models.AwxToken,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    response = admin_client.post(
+        f"{api_url_v1}/activations/",
+        data={
+            **activation_payload,
+            "eda_credentials": None,
+        },
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        str(response.data["eda_credentials"][0])
+        == "This field may not be null."
+    )
+
+
+@pytest.mark.django_db
 def test_list_activations(
     default_activation: models.Activation,
     admin_client: APIClient,
