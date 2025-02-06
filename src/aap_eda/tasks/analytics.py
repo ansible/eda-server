@@ -13,10 +13,6 @@
 #  limitations under the License.
 
 import logging
-from datetime import datetime, timezone
-
-import django_rq
-import rq
 
 from aap_eda.analytics import collector
 from aap_eda.conf import application_settings
@@ -30,39 +26,20 @@ ANALYTICS_JOB_ID = "job_gather_analytics"
 ANALYTICS_TASKS_QUEUE = "default"
 
 
-@tasking.redis_connect_retry()
 def schedule_gather_analytics() -> None:
-    scheduler = django_rq.get_scheduler()
-    func = "aap_eda.tasks.analytics.gather_analytics"
-    scheduled_time = datetime.now(timezone.utc)
     interval = application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL
-    logger.info(
-        f"Adding periodic job {ANALYTICS_SCHEDULE_JOB_ID} "
-        f"to run every {interval} seconds"
-    )
-    scheduler.schedule(
-        scheduled_time=scheduled_time,
-        func=func,
-        interval=interval,
-        id=ANALYTICS_SCHEDULE_JOB_ID,
+    logger.info(f"Schedule analytics to run in {interval} seconds")
+    tasking.enqueue_delay(
+        ANALYTICS_TASKS_QUEUE,
+        ANALYTICS_JOB_ID,
+        interval,
+        auto_gather_analytics,
     )
 
 
-@tasking.redis_connect_retry()
-def reschedule_gather_analytics(new_interval: int, serializer=None) -> None:
-    try:
-        job = tasking.Job.fetch(
-            ANALYTICS_SCHEDULE_JOB_ID, serializer=serializer
-        )
-    except rq.exceptions.NoSuchJobError:
-        logger.warning(f"Job {ANALYTICS_SCHEDULE_JOB_ID} does not exist")
-        return
-    job.meta["interval"] = new_interval
-    job.save()
-    logger.info(
-        f"Reconfigure periodic job {ANALYTICS_SCHEDULE_JOB_ID} with "
-        f"new interval {new_interval} seconds"
-    )
+def auto_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
+    gather_analytics(queue_name)
+    schedule_gather_analytics()
 
 
 def gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
