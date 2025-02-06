@@ -14,19 +14,11 @@
 
 import logging
 from io import StringIO
+from unittest import mock
 
 import pytest
 from django.core.management import call_command
 from django.test import override_settings
-
-from aap_eda.conf import settings_registry
-from aap_eda.conf.settings import application_settings
-
-
-@pytest.fixture(autouse=True)
-def register() -> None:
-    settings_registry.persist_registry_data()
-    return None
 
 
 @pytest.fixture(autouse=True)
@@ -54,18 +46,26 @@ def use_analytic_url(settings):
 @pytest.mark.django_db
 @override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
 def test_gather_analytics_invalid_settings(
-    settings, caplog_factory, analytics_url, tracking_state, expected
+    analytics_settings, caplog_factory, analytics_url, tracking_state, expected
 ):
-    settings.AUTOMATION_ANALYTICS_URL = analytics_url
-    application_settings.INSIGHTS_TRACKING_STATE = tracking_state
+    with mock.patch(
+        "aap_eda.analytics.package.application_settings",
+        new=analytics_settings,
+    ):
+        with mock.patch(
+            "aap_eda.analytics.collector.application_settings",
+            new=analytics_settings,
+        ):
+            analytics_settings.AUTOMATION_ANALYTICS_URL = analytics_url
+            analytics_settings.INSIGHTS_TRACKING_STATE = tracking_state
 
-    out = StringIO()
-    logger = logging.getLogger("aap_eda.analytics")
-    eda_log = caplog_factory(logger)
+            out = StringIO()
+            logger = logging.getLogger("aap_eda.analytics")
+            eda_log = caplog_factory(logger)
 
-    call_command("gather_analytics", "--ship", stdout=out)
+            call_command("gather_analytics", "--ship", stdout=out)
 
-    assert expected in eda_log.text
+            assert expected in eda_log.text
 
 
 @pytest.mark.parametrize(
@@ -127,22 +127,31 @@ def test_gather_analytics_invalid_settings(
 )
 @pytest.mark.django_db
 @override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
-def test_gather_analytics_command(caplog_factory, args, log_level, expected):
-    application_settings.INSIGHTS_TRACKING_STATE = True
-    out = StringIO()
-    logger = logging.getLogger("aap_eda.analytics")
-    eda_log = caplog_factory(logger)
+def test_gather_analytics_command(
+    analytics_settings, caplog_factory, args, log_level, expected
+):
+    with mock.patch(
+        "aap_eda.analytics.collector.application_settings",
+        new=analytics_settings,
+    ):
+        with mock.patch(
+            "aap_eda.analytics.package.application_settings",
+            new=analytics_settings,
+        ):
+            out = StringIO()
+            logger = logging.getLogger("aap_eda.analytics")
+            eda_log = caplog_factory(logger)
 
-    command = "gather_analytics"
-    if args:
-        call_command(command, args, stdout=out)
-    else:
-        call_command(command, stdout=out)
+            command = "gather_analytics"
+            if args:
+                call_command(command, args, stdout=out)
+            else:
+                call_command(command, stdout=out)
 
-    assert any(
-        record.levelname == log_level and record.message == expected
-        for record in eda_log.records
-    )
+            assert any(
+                record.levelname == log_level and record.message == expected
+                for record in eda_log.records
+            )
 
 
 @pytest.mark.django_db
@@ -154,21 +163,25 @@ def test_gather_analytics_command(caplog_factory, args, log_level, expected):
     ],
 )
 def test_gather_analytics_command_by_ff_state(
-    caplog_factory, feature_flag_state, expected
+    analytics_settings, caplog_factory, feature_flag_state, expected
 ):
-    application_settings.INSIGHTS_TRACKING_STATE = True
-    out = StringIO()
-    logger = logging.getLogger("aap_eda.analytics")
-    eda_log = caplog_factory(logger)
-    if feature_flag_state:
-        call_command("enable_flag", "EDA_ANALYTICS", stdout=out)
-    else:
-        call_command("disable_flag", "EDA_ANALYTICS", stdout=out)
+    with mock.patch(
+        "aap_eda.analytics.collector.application_settings",
+        new=analytics_settings,
+    ):
+        analytics_settings.INSIGHTS_TRACKING_STATE = True
+        out = StringIO()
+        logger = logging.getLogger("aap_eda.analytics")
+        eda_log = caplog_factory(logger)
+        if feature_flag_state:
+            call_command("enable_flag", "EDA_ANALYTICS", stdout=out)
+        else:
+            call_command("disable_flag", "EDA_ANALYTICS", stdout=out)
 
-    command = "gather_analytics"
-    call_command(command, stdout=out)
+        command = "gather_analytics"
+        call_command(command, stdout=out)
 
-    assert any(
-        record.levelname == "ERROR" and record.message == expected
-        for record in eda_log.records
-    )
+        assert any(
+            record.levelname == "ERROR" and record.message == expected
+            for record in eda_log.records
+        )
