@@ -445,7 +445,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
     )
     eda_credentials = serializers.ListField(
         required=False,
-        allow_null=True,
+        allow_null=False,
         child=serializers.IntegerField(),
         validators=[
             validators.check_multiple_credentials,
@@ -607,7 +607,7 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
     )
     eda_credentials = serializers.ListField(
         required=False,
-        allow_null=True,
+        allow_null=False,
         child=serializers.IntegerField(),
         validators=[
             validators.check_multiple_credentials,
