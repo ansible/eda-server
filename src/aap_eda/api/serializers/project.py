@@ -190,8 +190,6 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Proxy server for http or https connection",
     )
-    created_by = BasicUserFieldSerializer()
-    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Project
@@ -205,8 +203,6 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "scm_refspec",
             "verify_ssl",
             "proxy",
-            "created_by",
-            "modified_by",
         ]
 
     def validate(self, data):
