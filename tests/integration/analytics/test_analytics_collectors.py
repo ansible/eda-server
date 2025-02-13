@@ -27,6 +27,7 @@ from django.utils.timezone import now
 from insights_analytics_collector import Collector
 
 from aap_eda.analytics import analytics_collectors as collectors
+from aap_eda.analytics.analytics_collectors import config
 from aap_eda.analytics.collector import AnalyticsCollector
 from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
@@ -85,6 +86,31 @@ def activations_with_different_status(
         for data in activation_data
     ]
     return models.Activation.objects.bulk_create(activations)
+
+
+@pytest.mark.parametrize(
+    "env_vars, expected_type",
+    [
+        # OpenShift
+        ({"container": "oci"}, "openshift"),
+        ({"container": "oci", "OTHER_VAR": "value"}, "openshift"),
+        # Kubernetes
+        ({"KUBERNETES_SERVICE_PORT": "443"}, "k8s"),
+        ({"KUBERNETES_SERVICE_PORT": "80", "container": "docker"}, "k8s"),
+        # traditional
+        ({}, "traditional"),
+        ({"PATH": "/usr/bin"}, "traditional"),
+        # corner cases
+        ({"container": "podman"}, "traditional"),
+    ],
+)
+@pytest.mark.django_db
+def test_install_type_detection(env_vars, expected_type):
+    with patch.dict(os.environ, env_vars, clear=True):
+        result = config()
+        assert (
+            result["platform"]["type"] == expected_type
+        ), f"Failed for env: {env_vars}"
 
 
 @pytest.mark.django_db

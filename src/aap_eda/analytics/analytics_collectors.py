@@ -58,6 +58,7 @@ SOURCE_RESERVED_KEYS = ["name", "filters"]
     config=True,
 )
 def config(**kwargs) -> dict:
+    os_info = f"{distro.name(pretty=True)} {distro.version(pretty=True)}"
     install_type = "traditional"
     if os.environ.get("container") == "oci":
         install_type = "openshift"
@@ -67,7 +68,7 @@ def config(**kwargs) -> dict:
         "install_uuid": service_id(),
         "platform": {
             "system": platform.system(),
-            "dist": distro.linux_distribution(),
+            "dist": os_info,
             "release": platform.release(),
             "type": install_type,
         },
@@ -832,7 +833,7 @@ def _get_audit_rule_qs(since: datetime, until: datetime):
     )
 
     if len(activation_instance_ids) == 0:
-        return models.RulebookProcess.objects.none()
+        return models.AuditRule.objects.none()
 
     if len(activation_instance_ids) == 1:
         audit_rules = models.AuditRule.objects.filter(

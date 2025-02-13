@@ -857,3 +857,6 @@ INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
 # Available methods:
 # https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
 AUTOMATION_AUTH_METHOD = settings.get("AUTOMATION_AUTH_METHOD", "user-pass")
+INSIGHTS_TRACKING_STATE = settings.get("INSIGHTS_TRACKING_STATE", True)
+REDHAT_USERNAME = settings.get("REDHAT_USERNAME", "")
+REDHAT_PASSWORD = settings.get("REDHAT_PASSWORD", "")

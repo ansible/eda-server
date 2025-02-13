@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import base64
 import logging
 import re
 from typing import Optional, Tuple
@@ -20,68 +19,99 @@ from typing import Optional, Tuple
 import requests
 import yaml
 from django.utils.dateparse import parse_datetime
+from requests.auth import AuthBase, HTTPBasicAuth
 
 from aap_eda.core import enums, models
-from aap_eda.utils import str_to_bool
 
 logger = logging.getLogger("aap_eda.analytics")
+
+
+class TokenAuth(AuthBase):
+    def __init__(self, token: str):
+        self.token = token
+
+    def __call__(self, r):
+        r.headers["Authorization"] = f"Bearer {self.token}"
+        return r
 
 
 def datetime_hook(dt: dict) -> dict:
     new_dt = {}
     for key, value in dt.items():
         try:
-            new_dt[key] = parse_datetime(value)
-        except TypeError:
+            new_dt[key] = parse_datetime(value) or value
+        except (TypeError, ValueError):
             new_dt[key] = value
     return new_dt
 
 
 def collect_controllers_info() -> dict:
-    aap_credentia_type = models.CredentialType.objects.get(
+    aap_credential_type = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.AAP
     )
     credentials = models.EdaCredential.objects.filter(
-        credential_type=aap_credentia_type
+        credential_type=aap_credential_type
     )
     info = {}
+
     for credential in credentials:
-        controller_info = {}
-        inputs = yaml.safe_load(credential.inputs.get_secret_value())
-        host = inputs["host"]
-        url = f"{host}/api/v2/ping/"
-        verify = inputs.get("verify_ssl", False)
-        if isinstance(verify, str):
-            verify = str_to_bool(verify)
-
-        token = inputs.get("oauth_token")
-
-        controller_info["credential_id"] = credential.id
-        controller_info["inputs"] = inputs
-        if token:
-            headers = {"Authorization": f"Bearer {token}"}
-            logger.info("Use Bearer token to ping the controller.")
-        else:
-            user_pass = f"{inputs.get('username')}:{inputs.get('password')}"
-            auth_value = (
-                f"Basic {base64.b64encode(user_pass.encode()).decode()}"
-            )
-            headers = {"Authorization": f"{auth_value}"}
-            logger.info("Use Basic authentication to ping the controller.")
-
         try:
-            resp = requests.get(url, headers=headers, verify=verify)
-            resp_json = resp.json()
-            controller_info["install_uuid"] = resp_json["install_uuid"]
+            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+            host = inputs["host"].removesuffix("/api/controller/")
+            if not info.get(host):
+                url = f"{host}/api/v2/ping/"
+                auth = _get_auth(inputs)
+                verify = inputs.get("verify_ssl", False)
 
-            info[host] = controller_info
+                controller_info = {
+                    "credential_id": credential.id,
+                    "inputs": inputs,
+                }
+
+                # quickly to retrieve controller's info. timeout=3
+                resp = requests.get(url, auth=auth, verify=verify, timeout=3)
+                resp.raise_for_status()
+                controller_info["install_uuid"] = resp.json()["install_uuid"]
+                info[host] = controller_info
+
+        except KeyError as e:
+            logger.error(f"Missing key in credential inputs: {e}")
+            continue
+        except yaml.YAMLError as e:
+            logger.error(
+                f"YAML parsing error for credential {credential.id}: {e}"
+            )
+            continue
         except requests.exceptions.RequestException as e:
             logger.warning(
-                "Failed to connect with controller using credential "
-                f"{credential.name}: {e}"
+                f"Controller connection failed for {credential.name}: {e}"
             )
+            continue
+        except Exception as e:
+            logger.exception(
+                f"Unexpected error processing credential {credential.id}: {e}"
+            )
+            continue
 
     return info
+
+
+def _get_auth(inputs: dict) -> AuthBase:
+    # priority：Token > Basic Auth
+    if token := inputs.get("oauth_token"):
+        logger.debug("Use Bearer authentication")
+        return TokenAuth(token)
+
+    username = inputs.get("username")
+    password = inputs.get("password")
+    if username and password:
+        logger.debug("Use Basic authentication")
+        return HTTPBasicAuth(username, password)
+
+    raise ValueError(
+        "Invalid authentication configuration, must provide "
+        "Token or username/password"
+    )
 
 
 def extract_job_details(
@@ -89,7 +119,11 @@ def extract_job_details(
     controllers_info: dict,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     for host, info in controllers_info.items():
-        if not url.startswith(host):
+        if not url.lower().startswith(host.lower()):
+            continue
+
+        install_uuid = info.get("install_uuid")
+        if not install_uuid:
             continue
 
         pattern = r"/jobs/([a-zA-Z]+)/(\d+)/"
@@ -104,6 +138,6 @@ def extract_job_details(
                 else "run_workflow_template"
             )
             job_number = match.group(2)
-            return job_type, str(job_number), info["install_uuid"]
+            return job_type, str(job_number), install_uuid
 
     return None, None, None
