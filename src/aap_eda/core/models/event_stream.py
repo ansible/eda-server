@@ -16,14 +16,14 @@ import uuid
 
 from django.db import models
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 __all__ = "EventStream"
 
 EDA_EVENT_STREAM_CHANNEL_PREFIX = "eda_event_stream_"
 
 
-class EventStream(BaseOrgModel, UniqueNamedModel):
+class EventStream(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     event_stream_type = models.TextField(
         null=False,
         help_text="The type of the event stream based on credential type",

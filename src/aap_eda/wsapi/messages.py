@@ -78,6 +78,11 @@ class ExtraVars(BaseModel):
     type: str = "ExtraVars"
 
 
+class EnvVars(BaseModel):
+    data: str
+    type: str = "EnvVars"
+
+
 # ssl_verify is either yes|no, future may have cert
 class ControllerInfo(BaseModel):
     type: str = "ControllerInfo"
@@ -104,3 +109,12 @@ class HeartbeatMessage(BaseModel):
     activation_id: int
     stats: dict = {}
     reported_at: str
+
+
+class FileContentMessage(BaseModel):
+    type: str = "FileContents"
+    template_key: str
+    data: str
+    eof: bool = False
+    data_format: Optional[str] = "text"
+    encoding: Optional[str] = "base64"

@@ -24,7 +24,6 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
@@ -32,6 +31,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.exceptions import ParseError
 from aap_eda.core.utils.rulebook import build_source_list
+from aap_eda.utils.openapi import generate_query_params
 
 
 @extend_schema_view(
@@ -146,21 +146,13 @@ class RulebookViewSet(
                 description="Return a list of fired rules.",
             ),
         },
+        parameters=generate_query_params(serializers.AuditRuleSerializer()),
     ),
 )
 class AuditRuleViewSet(
     viewsets.ReadOnlyModelViewSet,
 ):
     queryset = models.AuditRule.objects.all()
-    filter_backends = (defaultfilters.DjangoFilterBackend, OrderingFilter)
-    filterset_class = filters.AuditRuleFilter
-    ordering_fields = [
-        "id",
-        "name",
-        "status",
-        "activation_instance__name",
-        "fired_at",
-    ]
 
     def filter_queryset(self, queryset):
         if queryset.model is models.AuditRule:
@@ -194,19 +186,15 @@ class AuditRuleViewSet(
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this rule audit.",  # noqa: E501
-            )
-        ],
+            ),
+        ]
+        + generate_query_params(
+            serializers.AuditActionSerializer(),
+        ),
     )
     @action(
         detail=False,
         queryset=models.AuditAction.objects.order_by("id"),
-        filterset_class=filters.AuditRuleActionFilter,
-        ordering_fields=[
-            "name",
-            "status",
-            "url",
-            "fired_at",
-        ],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/actions",
     )
@@ -237,18 +225,13 @@ class AuditRuleViewSet(
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this Audit Rule.",  # noqa: E501
-            )
-        ],
+            ),
+        ]
+        + generate_query_params(serializers.AuditEventSerializer()),
     )
     @action(
         detail=False,
         queryset=models.AuditEvent.objects.order_by("-received_at"),
-        filterset_class=filters.AuditRuleEventFilter,
-        ordering_fields=[
-            "source_name",
-            "source_type",
-            "received_at",
-        ],
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/events",
     )

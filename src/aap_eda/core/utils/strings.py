@@ -41,6 +41,21 @@ def _render_string_or_return_value(value: Any, context: Dict) -> Any:
     return value
 
 
+def extract_variables(template_string: str) -> set[str]:
+    env = jinja2.Environment(autoescape=True)
+    ast = env.parse(template_string)
+    variables = set()
+
+    def _extract_variables(node):
+        if isinstance(node, jinja2.nodes.Name):
+            variables.add(node.name)
+        for child in node.iter_child_nodes():
+            _extract_variables(child)
+
+    _extract_variables(ast)
+    return variables
+
+
 def substitute_variables(
     value: Union[str, int, Dict, List], context: Dict
 ) -> Union[str, int, Dict, List]:

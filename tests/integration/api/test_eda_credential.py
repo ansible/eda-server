@@ -6,7 +6,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
-from aap_eda.core.utils.credentials import ENCRYPTED_STRING, inputs_to_store
+from aap_eda.core.utils.credentials import (
+    ENCRYPTED_STRING,
+    inputs_to_display,
+    inputs_to_store,
+)
 from tests.integration.conftest import DUMMY_GPG_KEY
 from tests.integration.constants import api_url_v1
 
@@ -157,7 +161,25 @@ def test_create_eda_credential_with_none_credential_type(
         f"{api_url_v1}/eda-credentials/", data=data_in
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "This field may not be null." in response.data["credential_type_id"]
+    assert "Credential Type is needed" in response.data["credential_type_id"]
+
+
+@pytest.mark.django_db
+def test_create_eda_credential_with_none_organization(
+    admin_client: APIClient,
+):
+    data = "secret"
+    data_in = {
+        "name": "eda-credential",
+        "inputs": {"username": "adam", "password": data},
+        "credential_type_id": None,
+        "organization_id": None,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Organization is needed" in response.data["organization_id"]
 
 
 @pytest.mark.parametrize(
@@ -1068,3 +1090,139 @@ def test_retrieve_eda_credential_with_empty_encrypted_fields(
     assert "ssh_key_unlock" not in keys
     assert "username" in keys
     assert "password" in keys
+
+
+@pytest.mark.django_db
+def test_custom_credential_type_empty_inputs(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    injectors = {"extra_vars": {"abc": "123"}}
+    credential_type = models.CredentialType.objects.create(
+        name="demo_type", inputs={}, injectors=injectors
+    )
+    data = {
+        "name": "demo-credential",
+        "inputs": {},
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+    response = admin_client.post(f"{api_url_v1}/eda-credentials/", data=data)
+    assert response.status_code == status.HTTP_201_CREATED
+    result = response.data
+    assert result["name"] == "demo-credential"
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_success(
+    admin_client: APIClient,
+    default_registry_credential,
+):
+    data = {"name": "name_of_copied_cretential"}
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    new_credential = response.data
+    assert new_credential["id"] != default_registry_credential.id
+    assert (
+        new_credential["credential_type"]["id"]
+        == default_registry_credential.credential_type.id
+    )
+    assert default_registry_credential.name != new_credential["name"]
+    assert new_credential["name"] == data["name"]
+    assert new_credential["inputs"] == inputs_to_display(
+        default_registry_credential.credential_type.inputs,
+        default_registry_credential.inputs,
+    )
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_duplicate_name(
+    admin_client: APIClient,
+    default_registry_credential,
+):
+    name_of_copied_cretential = default_registry_credential.name
+    data = {"name": name_of_copied_cretential}
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_name_param_missing(
+    admin_client: APIClient,
+    default_registry_credential,
+):
+    data = {"name": ""}
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{default_registry_credential.id}/copy/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_copy_eda_credential_not_found(
+    admin_client: APIClient,
+):
+    response = admin_client.post(f"{api_url_v1}/eda-credentials/0/copy/")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
+def test_eda_credential_by_fields(
+    credential_type: models.CredentialType,
+    default_organization: models.Organization,
+    admin_user: models.User,
+    super_user: models.User,
+    base_client: APIClient,
+):
+    inputs = {"username": "adam"}
+    data_in = {
+        "name": "eda-credential-by-fields",
+        "inputs": inputs,
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+
+    base_client.force_authenticate(user=admin_user)
+    response = base_client.post(f"{api_url_v1}/eda-credentials/", data=data_in)
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    credential = models.EdaCredential.objects.get(id=response.data["id"])
+    assert credential.created_by == admin_user
+    assert credential.modified_by == admin_user
+
+    response = base_client.get(
+        f"{api_url_v1}/eda-credentials/{credential.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == admin_user.username
+
+    response = base_client.get(f"{api_url_v1}/eda-credentials/")
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.data["results"][0]
+    assert data["created_by"]["username"] == admin_user.username
+    assert data["modified_by"]["username"] == admin_user.username
+
+    base_client.force_authenticate(user=super_user)
+    update_data = {"name": "update eda-credentials fields"}
+    response = base_client.patch(
+        f"{api_url_v1}/eda-credentials/{credential.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["created_by"]["username"] == admin_user.username
+    assert response.data["modified_by"]["username"] == super_user.username
+
+    credential.refresh_from_db()
+
+    assert credential.created_by == admin_user
+    assert credential.modified_by == super_user

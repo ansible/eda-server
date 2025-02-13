@@ -1,5 +1,5 @@
 # Build eda-ui
-FROM docker.io/node:18-alpine AS ui-builder
+FROM mirror.gcr.io/node:18-alpine AS ui-builder
 
 WORKDIR /app/ansible-ui
 
@@ -9,7 +9,7 @@ RUN npm ci --omit=dev --omit=optional --ignore-scripts
 COPY tmp/ansible-ui /app/ansible-ui
 RUN cd /app/ansible-ui && npm run build:eda
 
-FROM docker.io/nginx
+FROM mirror.gcr.io/nginx
 ARG NGINX_CONF=tools/docker/nginx/default.conf
 ARG NGINX_CONFIGURATION_PATH=/etc/nginx/conf.d/
 

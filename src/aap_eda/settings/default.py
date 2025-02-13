@@ -99,8 +99,8 @@ import dynaconf
 from django.core.exceptions import ImproperlyConfigured
 from split_settings.tools import include
 
+from aap_eda import utils
 from aap_eda.core.enums import RulebookProcessLogLevel
-from aap_eda.utils import str_to_bool
 
 default_settings_file = "/etc/eda/settings.yaml"
 
@@ -139,7 +139,7 @@ SECRET_KEY = _get_secret_key()
 def _get_boolean(name: str, default=False) -> bool:
     value = settings.get(name, default)
     if isinstance(value, str):
-        value = str_to_bool(value)
+        value = utils.str_to_bool(value)
     if not isinstance(value, bool):
         raise ImproperlyConfigured("{name} setting must be a boolean value.")
     return value
@@ -194,14 +194,24 @@ INSTALLED_APPS = [
     "ansible_base.rbac",
     "ansible_base.resource_registry",
     "ansible_base.jwt_consumer",
+    "ansible_base.rest_filters",
+    "ansible_base.feature_flags",
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
 ]
 
+
+def toggle_feature_flags(flags, settings):
+    for feature in flags.keys():
+        if feature in settings:
+            flags[feature][0]["value"] = settings.get(feature)
+
+
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
+toggle_feature_flags(FLAGS, settings)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -362,6 +372,10 @@ if WEBSOCKET_TOKEN_BASE_URL is None:
         "ws://", "http://"
     ).replace("wss://", "https://")
 PODMAN_SOCKET_URL = settings.get("PODMAN_SOCKET_URL", None)
+PODMAN_SOCKET_TIMEOUT = settings.get("PODMAN_SOCKET_TIMEOUT", default=0)
+# zero raises an exception, None takes the socket default
+if PODMAN_SOCKET_TIMEOUT == 0:
+    PODMAN_SOCKET_TIMEOUT = None
 PODMAN_MEM_LIMIT = settings.get("PODMAN_MEM_LIMIT", "200m")
 PODMAN_ENV_VARS = settings.get("PODMAN_ENV_VARS", {})
 PODMAN_MOUNTS = settings.get("PODMAN_MOUNTS", [])
@@ -550,7 +564,7 @@ API_PREFIX = settings.get("API_PREFIX", "api/eda").strip("/")
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Event Driven Ansible API",
-    "VERSION": "1.0.0",
+    "VERSION": utils.get_eda_version(),
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/v[0-9]",
     "SCHEMA_PATH_PREFIX_TRIM": True,
@@ -558,6 +572,7 @@ SPECTACULAR_SETTINGS = {
     "PREPROCESSING_HOOKS": [
         "aap_eda.api.openapi.preprocess_filter_api_routes"
     ],
+    "GENERIC_ADDITIONAL_PROPERTIES": "bool",
 }
 
 # ---------------------------------------------------------
@@ -775,15 +790,6 @@ ACTIVATION_DB_HOST = settings.get(
     "ACTIVATION_DB_HOST", "host.containers.internal"
 )
 
-_DEFAULT_PG_NOTIFY_DSN = (
-    f"host={ACTIVATION_DB_HOST} "
-    f"port={DATABASES['default']['PORT']} "
-    f"dbname={DATABASES['default']['NAME']} "
-    f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
-)
-
-PG_NOTIFY_DSN = settings.get("PG_NOTIFY_DSN", _DEFAULT_PG_NOTIFY_DSN)
 PG_NOTIFY_TEMPLATE_RULEBOOK = settings.get("PG_NOTIFY_TEMPLATE_RULEBOOK", None)
 
 SAFE_PLUGINS_FOR_PORT_FORWARD = settings.get(
@@ -795,13 +801,19 @@ API_PATH_TO_UI_PATH_MAP = settings.get(
     "API_PATH_UI_PATH_MAP", {"/api/controller": "/execution", "/": "/#"}
 )
 
+_db_options = DATABASES["default"].get("OPTIONS", {})
 _DEFAULT_PG_NOTIFY_DSN_SERVER = (
     f"host={DATABASES['default']['HOST']} "
     f"port={DATABASES['default']['PORT']} "
     f"dbname={DATABASES['default']['NAME']} "
     f"user={DATABASES['default']['USER']} "
-    f"password={DATABASES['default']['PASSWORD']}"
+    f"password={DATABASES['default']['PASSWORD']} "
+    f"sslmode={_db_options.get('sslmode','allow')} "
+    f"sslcert={_db_options.get('sslcert','')} "
+    f"sslkey={_db_options.get('sslkey','')} "
+    f"sslrootcert={_db_options.get('sslrootcert','')} "
 )
+
 PG_NOTIFY_DSN_SERVER = settings.get(
     "PG_NOTIFY_DSN_SERVER", _DEFAULT_PG_NOTIFY_DSN_SERVER
 )
@@ -817,3 +829,5 @@ if EVENT_STREAM_MTLS_BASE_URL:
 MAX_PG_NOTIFY_MESSAGE_SIZE = int(
     settings.get("MAX_PG_NOTIFY_MESSAGE_SIZE", 6144)
 )
+
+DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"

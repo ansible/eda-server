@@ -13,12 +13,14 @@
 #  limitations under the License.
 
 from .activation import (
+    ActivationCopySerializer,
     ActivationCreateSerializer,
     ActivationInstanceLogSerializer,
     ActivationInstanceSerializer,
     ActivationListSerializer,
     ActivationReadSerializer,
     ActivationSerializer,
+    ActivationUpdateSerializer,
     PostActivationSerializer,
 )
 from .auth import JWTTokenSerializer, LoginSerializer, RefreshTokenSerializer
@@ -35,6 +37,7 @@ from .decision_environment import (
     DecisionEnvironmentSerializer,
 )
 from .eda_credential import (
+    EdaCredentialCopySerializer,
     EdaCredentialCreateSerializer,
     EdaCredentialSerializer,
     EdaCredentialUpdateSerializer,
@@ -71,6 +74,7 @@ from .team import (
 from .user import (
     AwxTokenCreateSerializer,
     AwxTokenSerializer,
+    BasicUserSerializer,
     CurrentUserUpdateSerializer,
     UserCreateUpdateSerializer,
     UserDetailSerializer,
@@ -100,7 +104,9 @@ __all__ = (
     "ActivationSerializer",
     "ActivationListSerializer",
     "ActivationCreateSerializer",
+    "ActivationUpdateSerializer",
     "ActivationReadSerializer",
+    "ActivationCopySerializer",
     "ActivationInstanceSerializer",
     "ActivationInstanceLogSerializer",
     "PostActivationSerializer",
@@ -108,6 +114,7 @@ __all__ = (
     "AwxTokenSerializer",
     "AwxTokenCreateSerializer",
     "CurrentUserUpdateSerializer",
+    "BasicUserSerializer",
     "UserSerializer",
     "UserListSerializer",
     "UserCreateUpdateSerializer",
@@ -122,6 +129,7 @@ __all__ = (
     "EdaCredentialSerializer",
     "EdaCredentialCreateSerializer",
     "EdaCredentialUpdateSerializer",
+    "EdaCredentialCopySerializer",
     # decision environment
     "DecisionEnvironmentSerializer",
     # organizations

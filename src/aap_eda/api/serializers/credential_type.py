@@ -40,14 +40,14 @@ class CredentialTypeSerializer(serializers.ModelSerializer):
 
 class CredentialTypeCreateSerializer(serializers.ModelSerializer):
     inputs = serializers.JSONField(
-        required=True,
-        allow_null=False,
+        required=False,
+        default=dict,
         help_text="Inputs of the credential type",
         validators=[validators.check_if_schema_valid],
     )
     injectors = serializers.JSONField(
-        required=True,
-        allow_null=False,
+        required=False,
+        default=dict,
         help_text="Injectors of the credential type",
     )
 

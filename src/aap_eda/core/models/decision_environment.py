@@ -14,12 +14,12 @@
 
 from django.db import models
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 __all__ = ("DecisionEnvironment",)
 
 
-class DecisionEnvironment(BaseOrgModel, UniqueNamedModel):
+class DecisionEnvironment(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     router_basename = "decisionenvironment"
 
     class Meta:

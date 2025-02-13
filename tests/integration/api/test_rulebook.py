@@ -302,7 +302,7 @@ def test_list_audit_rules_ordering(
     ordering_field,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
+        f"{api_url_v1}/audit-rules/?order={ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -312,7 +312,7 @@ def test_list_audit_rules_ordering(
     )
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering=-{ordering_field}"
+        f"{api_url_v1}/audit-rules/?order=-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -330,7 +330,7 @@ def test_list_audit_rules_ordering_activation_name(
 ):
     ordering_field = "activation_instance__name"
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering={ordering_field}"
+        f"{api_url_v1}/audit-rules/?order={ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -341,7 +341,7 @@ def test_list_audit_rules_ordering_activation_name(
     )
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/?ordering=-{ordering_field}"
+        f"{api_url_v1}/audit-rules/?order=-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
     audit_rules = response.data["results"]
@@ -350,6 +350,34 @@ def test_list_audit_rules_ordering_activation_name(
         audit_rules[0]["activation_instance"]["name"]
         == audit_rule_2.activation_instance.name
     )
+
+
+@pytest.mark.django_db
+def test_list_audit_rules_filter_activation_instance_name(
+    audit_rule_1: models.AuditRule,
+    audit_rule_2: models.AuditRule,
+    admin_client: APIClient,
+):
+    filter_name = audit_rule_1.activation_instance.name
+    response = admin_client.get(
+        f"{api_url_v1}/audit-rules/?activation_instance__name={filter_name}"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    audit_rules = response.data["results"]
+
+    assert len(audit_rules) == 1
+    assert (
+        audit_rules[0]["activation_instance"]["name"]
+        == audit_rule_1.activation_instance.name
+    )
+    assert list(audit_rules[0]) == [
+        "id",
+        "name",
+        "status",
+        "activation_instance",
+        "organization",
+        "fired_at",
+    ]
 
 
 @pytest.mark.django_db
@@ -426,7 +454,7 @@ def test_list_actions_from_audit_rule_ordering(
     ordering_field,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?order="
         f"{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -437,7 +465,7 @@ def test_list_actions_from_audit_rule_ordering(
     )
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/actions/?order="
         f"-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -495,7 +523,7 @@ def test_list_events_from_audit_rule_ordering(
     ordering_field,
 ):
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?order="
         f"{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -504,7 +532,7 @@ def test_list_events_from_audit_rule_ordering(
     assert events[0][ordering_field] == getattr(audit_event_2, ordering_field)
 
     response = admin_client.get(
-        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?ordering="
+        f"{api_url_v1}/audit-rules/{audit_rule_2.id}/events/?order="
         f"-{ordering_field}"
     )
     assert response.status_code == status.HTTP_200_OK

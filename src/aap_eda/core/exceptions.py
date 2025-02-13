@@ -31,3 +31,15 @@ class PGNotifyError(Exception):
 
 class ParseError(Exception):
     pass
+
+
+class DuplicateFileTemplateKeyError(Exception):
+    pass
+
+
+class DuplicateEnvKeyError(Exception):
+    pass
+
+
+class InvalidEnvKeyError(Exception):
+    pass

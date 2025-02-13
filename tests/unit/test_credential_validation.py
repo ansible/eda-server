@@ -20,6 +20,7 @@ from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
     PROTECTED_PASSPHRASE_ERROR,
     SUPPORTED_KEYS_IN_INJECTORS,
+    add_default_values_to_user_inputs,
     validate_injectors,
     validate_inputs,
     validate_schema,
@@ -39,15 +40,6 @@ def test_validate_schema():
 
     errors = validate_schema(bad_schema_format)
     assert "schema must be in dict format" in errors
-
-    no_fields_schema = {
-        "id": "username",
-        "label": "Username",
-        "type": "string",
-    }
-
-    errors = validate_schema(no_fields_schema)
-    assert "'fields' must exist and non empty" in errors
 
     eda_prefix_id_schema = {
         "fields": [
@@ -437,14 +429,13 @@ def test_validate_injectors():
     bad_injectors = {"name": "fred"}
     errors = validate_injectors(inputs, bad_injectors)
     assert (
-        f"Injectors must have keys defined in {SUPPORTED_KEYS_IN_INJECTORS}"
-        in errors["injectors"]
+        "Injectors must have keys defined in "
+        f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}" in errors["injectors"]
     )
 
-    for key in SUPPORTED_KEYS_IN_INJECTORS:
-        valid_injectors = {key: {"name": "fred"}}
-        errors = validate_injectors(inputs, valid_injectors)
-        assert errors == {}
+    valid_injectors = {"extra_vars": {"username": "fred"}}
+    errors = validate_injectors(inputs, valid_injectors)
+    assert errors == {}
 
 
 @pytest.mark.parametrize(
@@ -642,3 +633,68 @@ def test_validate_registry_host_name(aap_credential_type):
         {"host": "invalid@name"},
     )
     assert "Host format invalid" in errors["inputs.host"]
+
+
+@pytest.mark.django_db
+def test_add_default_values_to_user_inputs():
+    user_inputs = {"host": "https://eda_controller_url"}
+    schema = {
+        "fields": [
+            {
+                "id": "host",
+                "label": "Red Hat Ansible Automation Platform",
+                "type": "string",
+            },
+            {
+                "id": "username",
+                "label": "Username",
+                "type": "string",
+                "default": "sysadmin",
+                "help_text": (
+                    "Red Hat Ansible Automation Platform username id"
+                    " to authenticate as.This should not be set if"
+                    " an OAuth token is being used."
+                ),
+            },
+            {
+                "id": "need_password",
+                "label": "Need Password",
+                "type": "boolean",
+                "default": True,
+                "secret": True,
+            },
+            {
+                "id": "oauth_token",
+                "label": "OAuth Token",
+                "type": "string",
+                "secret": True,
+                "help_text": (
+                    "An OAuth token to use to authenticate with."
+                    "This should not be set if username/password"
+                    " are being used."
+                ),
+            },
+            {
+                "id": "verify_ssl",
+                "label": "Verify SSL",
+                "type": "boolean",
+                "secret": False,
+            },
+        ],
+        "required": ["host"],
+    }
+    add_default_values_to_user_inputs(schema, user_inputs)
+    assert list(user_inputs.keys()) == [
+        "host",
+        "username",
+        "need_password",
+        "oauth_token",
+        "verify_ssl",
+    ]
+    assert list(user_inputs.values()) == [
+        "https://eda_controller_url",
+        "sysadmin",
+        True,
+        "",
+        False,
+    ]

@@ -23,7 +23,7 @@ from aap_eda.core.enums import (
 from aap_eda.core.utils import get_default_log_level
 from aap_eda.services.activation.engine.common import ContainerableMixin
 
-from .base import BaseOrgModel, UniqueNamedModel
+from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 from .event_stream import EventStream
 from .mixins import OnDeleteProcessParentMixin, StatusHandlerModelMixin
 from .user import AwxToken, User
@@ -39,6 +39,7 @@ class Activation(
     OnDeleteProcessParentMixin,
     BaseOrgModel,
     UniqueNamedModel,
+    PrimordialModel,
 ):
     class Meta:
         db_table = "core_activation"
@@ -49,7 +50,7 @@ class Activation(
             ("disable_activation", "Can disable an activation"),
             ("restart_activation", "Can restart an activation"),
         ]
-        default_permissions = ["add", "view", "delete"]
+        default_permissions = ["add", "view", "change", "delete"]
 
     description = models.TextField(
         default="",
@@ -95,6 +96,7 @@ class Activation(
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
+    edited_at = models.DateTimeField(null=True)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
     latest_instance = models.OneToOneField(

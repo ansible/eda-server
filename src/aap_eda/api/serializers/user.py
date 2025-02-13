@@ -60,6 +60,17 @@ class UserDetailSerializer(serializers.ModelSerializer):
         ]
 
 
+class BasicUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.User
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+        ]
+
+
 class UserListSerializer(serializers.Serializer):
     id = serializers.IntegerField(
         required=True, help_text="The ID of the user"

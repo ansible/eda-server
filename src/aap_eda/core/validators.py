@@ -24,6 +24,7 @@ from rest_framework import serializers
 
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
+    check_reserved_keys_in_extra_vars,
     validate_registry_host_name,
     validate_schema,
 )
@@ -61,7 +62,9 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     return decision_environment_id
 
 
-def check_if_de_valid(image_url: str, eda_credential_id: int):
+def check_if_de_valid(
+    image_url: str, eda_credential_id: tp.Optional[int] = None
+):
     # The OCI standard format for the image url is a combination of a host
     # (with optional port) separated from the image path (with optional tag) by
     # a slash: <host>[:port]/<path>[:tag].
@@ -101,8 +104,14 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url}
         )
 
-    split = path.split(":", 1)
-    name = split[0]
+    digest = False
+    if "@sha256" in path or "@sha512" in path:
+        split = path.split("@", 1)
+        name = split[0]
+        digest = True
+    else:
+        split = path.split(":", 1)
+        name = split[0]
     # Get the tag sans any additional content.  Any additional content
     # is passed without validation.
     tag = split[1] if (len(split) > 1) else None
@@ -120,7 +129,7 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url, "name": name}
         )
 
-    if (tag is not None) and (
+    if (not digest and tag is not None) and (
         not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
     ):
         raise serializers.ValidationError(
@@ -131,38 +140,40 @@ def check_if_de_valid(image_url: str, eda_credential_id: int):
             % {"image_url": image_url, "tag": tag}
         )
 
-    credential = get_credential_if_exists(eda_credential_id)
-    inputs = yaml.safe_load(credential.inputs.get_secret_value())
-    credential_host = inputs.get("host")
+    if eda_credential_id:
+        credential = get_credential_if_exists(eda_credential_id)
+        inputs = yaml.safe_load(credential.inputs.get_secret_value())
+        credential_host = inputs.get("host")
 
-    if not credential_host:
-        raise serializers.ValidationError(
-            _("Credential %(name)s needs to have host information")
-            % {"name": credential.name}
-        )
-
-    # Check that the host matches the credential host.
-    # For backward compatibility when creating a new DE with an old credential
-    # we need to separate any scheme from the host before doing the compare.
-    parsed_credential_host = urllib.parse.urlparse(credential_host)
-    # If there's a netloc that's the host to use; if not, it's the path if
-    # there is no scheme else it's the scheme and path joined by a colon.
-    if parsed_credential_host.netloc:
-        parsed_host = parsed_credential_host.netloc
-    else:
-        parsed_host = parsed_credential_host.path
-        if parsed_credential_host.scheme:
-            parsed_host = ":".join(
-                [parsed_credential_host.scheme, parsed_host]
+        if not credential_host:
+            raise serializers.ValidationError(
+                _("Credential %(name)s needs to have host information")
+                % {"name": credential.name}
             )
 
-    if host != parsed_host:
-        msg = _(
-            "DecisionEnvironment image url: %(image_url)s does "
-            "not match with the credential host: %(host)s"
-        ) % {"image_url": image_url, "host": credential_host}
+        # Check that the host matches the credential host.
+        # For backward compatibility when creating a new DE with
+        # an old credential we need to separate any
+        # scheme from the host before doing the compare.
+        parsed_credential_host = urllib.parse.urlparse(credential_host)
+        # If there's a netloc that's the host to use; if not, it's the path if
+        # there is no scheme else it's the scheme and path joined by a colon.
+        if parsed_credential_host.netloc:
+            parsed_host = parsed_credential_host.netloc
+        else:
+            parsed_host = parsed_credential_host.path
+            if parsed_credential_host.scheme:
+                parsed_host = ":".join(
+                    [parsed_credential_host.scheme, parsed_host]
+                )
 
-        raise serializers.ValidationError(msg)
+        if host != parsed_host:
+            msg = _(
+                "DecisionEnvironment image url: %(image_url)s does "
+                "not match with the credential host: %(host)s"
+            ) % {"image_url": image_url, "host": credential_host}
+
+            raise serializers.ValidationError(msg)
 
 
 def get_credential_if_exists(eda_credential_id: int) -> models.EdaCredential:
@@ -242,6 +253,16 @@ def check_if_credential_type_exists(credential_type_id: int) -> int:
     return credential_type_id
 
 
+def check_if_credential_name_used(name: str) -> str:
+    if not name:
+        raise serializers.ValidationError("Name parameter is missing.")
+    if models.EdaCredential.objects.filter(name=name).exists():
+        raise serializers.ValidationError(
+            f"Credential name already exists: {name}"
+        )
+    return name
+
+
 def check_if_organization_exists(organization_id: int) -> int:
     try:
         models.Organization.objects.get(pk=organization_id)
@@ -308,6 +329,7 @@ def is_extra_var_dict(extra_var: str):
             raise serializers.ValidationError(
                 "Extra var is not in object format"
             )
+        check_reserved_keys_in_extra_vars(data)
     except yaml.YAMLError:
         raise serializers.ValidationError(
             "Extra var must be in JSON or YAML format"
@@ -445,3 +467,11 @@ def check_credential_types_for_event_stream(eda_credential_id: int) -> int:
 
     _validate_event_stream_settings(name)
     return eda_credential_id
+
+
+def check_if_activation_name_used(name: str) -> str:
+    if models.Activation.objects.filter(name=name).first():
+        raise serializers.ValidationError(
+            f"Activation with name {name} already exists"
+        )
+    return name

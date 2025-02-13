@@ -153,8 +153,8 @@ pacman -S python-pre-commit
 ```
 
 **Note:** The `poetry-lock` hook will check to ensure consistency across the poetry.lock and
-pyproject.toml files. In case of conflict, a developer must manually execute either `poetry update`,
-`poetry lock` or `poetry lock --no-update` to resolve it.
+pyproject.toml files. In case of conflict, a developer must manually execute either `poetry update` or
+`poetry lock` to resolve it.
 
 ## Development environment steps
 

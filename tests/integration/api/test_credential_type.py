@@ -11,12 +11,15 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from typing import Optional
+
 import pytest
 from pytest_lazyfixture import lazy_fixture
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import SUPPORTED_KEYS_IN_INJECTORS
 from tests.integration.constants import api_url_v1
 
 INPUT = {
@@ -77,19 +80,37 @@ INPUT_SANS_TYPE = {
 
 
 @pytest.mark.django_db
-def test_create_credential_type(superuser_client: APIClient):
-    injectors = {
-        "extra_vars": {
-            "host": "localhost",
-            "username": "adam",
-            "password": "password",
-            "verify_ssl": False,
-        }
-    }
+@pytest.mark.parametrize(
+    ("inputs", "injectors"),
+    [
+        (
+            {},
+            {},
+        ),
+        (
+            INPUT,
+            {},
+        ),
+        (
+            {},
+            {
+                "extra_vars": {
+                    "host": "localhost",
+                    "username": "adam",
+                    "password": "password",
+                    "verify_ssl": False,
+                }
+            },
+        ),
+    ],
+)
+def test_create_credential_type(
+    superuser_client: APIClient, inputs, injectors
+):
     data_in = {
         "name": "credential_type_1",
         "description": "desc here",
-        "inputs": INPUT,
+        "inputs": inputs,
         "injectors": injectors,
     }
 
@@ -98,30 +119,6 @@ def test_create_credential_type(superuser_client: APIClient):
     )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["name"] == "credential_type_1"
-
-    data_in = {
-        "name": "credential_type_2",
-        "description": "desc here",
-        "inputs": INPUT,
-    }
-
-    response = superuser_client.post(
-        f"{api_url_v1}/credential-types/", data=data_in
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "This field is required." in response.data["injectors"]
-
-    data_in = {
-        "name": "credential_type_3",
-        "description": "desc here",
-        "injectors": injectors,
-    }
-
-    response = superuser_client.post(
-        f"{api_url_v1}/credential-types/", data=data_in
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "This field is required." in response.data["inputs"]
 
 
 @pytest.mark.django_db
@@ -192,30 +189,77 @@ def test_create_credential_type_sans_type(superuser_client: APIClient):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("inputs", "injectors", "status_code", "error_message"),
+    ("inputs", "injectors", "error_key", "error_message"),
     [
         (
             {"a": "b"},
             {"a": "b"},
-            status.HTTP_400_BAD_REQUEST,
-            "'fields' must exist and non empty",
+            "injectors",
+            "Injectors must have keys defined in "
+            f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}",
         ),
         (
             {"fields": {"id": "username"}},
             {"username": "fred"},
-            status.HTTP_400_BAD_REQUEST,
+            "inputs",
             "'fields' must be a list",
         ),
         (
             {"fields": [{"id": "username"}]},
             {"username": "fred"},
-            status.HTTP_400_BAD_REQUEST,
+            "inputs",
             "label must exist and be a string",
+        ),
+        (
+            {
+                "fields": [
+                    {
+                        "id": "username",
+                        "label": "Username",
+                        "type": "string",
+                        "default": "adam",
+                    },
+                ]
+            },
+            {
+                "extra_vars": {
+                    "keyfile": "{{ keyfile  }}",
+                },
+            },
+            "injectors",
+            "Injector key: keyfile has a value which refers to an undefined "
+            "key error",
+        ),
+        (
+            {},
+            {
+                "extra_vars": {
+                    "eda": "123",
+                },
+            },
+            "injectors",
+            (
+                "Extra vars key 'eda' cannot be one of these "
+                "reserved keys 'ansible, eda'"
+            ),
+        ),
+        (
+            {},
+            {
+                "extra_vars": {
+                    "ansible": "123",
+                },
+            },
+            "injectors",
+            (
+                "Extra vars key 'ansible' cannot be one of "
+                "these reserved keys 'ansible, eda'"
+            ),
         ),
     ],
 )
 def test_create_credential_type_with_schema_validate_errors(
-    superuser_client: APIClient, inputs, injectors, status_code, error_message
+    superuser_client: APIClient, inputs, injectors, error_key, error_message
 ):
     data_in = {
         "name": "credential_type_1",
@@ -227,8 +271,8 @@ def test_create_credential_type_with_schema_validate_errors(
     response = superuser_client.post(
         f"{api_url_v1}/credential-types/", data=data_in
     )
-    assert response.status_code == status_code
-    assert error_message in response.data["inputs"]
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert error_message in str(response.data[error_key])
 
 
 @pytest.mark.django_db
@@ -327,42 +371,16 @@ def test_delete_credential_type_with_credentials(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("old_inputs", "new_inputs", "status_code", "passed", "message"),
-    [
-        (
-            {"fields": [{"id": "username", "label": "Username"}]},
-            {},
-            status.HTTP_400_BAD_REQUEST,
-            False,
-            "'fields' must exist and non empty",
-        ),
-        (
-            {"fields": [{"id": "username", "label": "Username"}]},
-            {"c": "d"},
-            status.HTTP_400_BAD_REQUEST,
-            False,
-            "'fields' must exist and non empty",
-        ),
-        (
-            {"username": "fred"},
-            {"fields": [{"id": "username", "label": "Username"}]},
-            status.HTTP_200_OK,
-            True,
-            {"id": "username", "label": "Username"},
-        ),
-    ],
+    "new_inputs",
+    [{}, {"c": "d"}, {"username": "fred"}],
 )
 def test_partial_update_inputs_credential_type(
     superuser_client: APIClient,
-    old_inputs,
     new_inputs,
-    status_code,
-    passed,
-    message,
 ):
     obj = models.CredentialType.objects.create(
         name="type",
-        inputs=old_inputs,
+        inputs={"fields": [{"id": "username", "label": "Username"}]},
         injectors={},
         managed=False,
     )
@@ -373,36 +391,39 @@ def test_partial_update_inputs_credential_type(
     response = superuser_client.patch(
         f"{api_url_v1}/credential-types/{obj.id}/", data=data
     )
-    assert response.status_code == status_code
+    assert response.status_code == status.HTTP_200_OK
 
-    if passed:
-        obj.refresh_from_db()
-        assert obj.inputs == new_inputs
-    else:
-        assert message in response.data["inputs"]
+    obj.refresh_from_db()
+    assert obj.inputs == new_inputs
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("new_injectors", "status_code", "key", "message"),
+    ("new_injectors", "status_code", "message"),
     [
         (
             {},
-            status.HTTP_400_BAD_REQUEST,
-            "injectors",
-            "Injectors must have keys defined in ['extra_vars']",
-        ),
-        (
-            {"c": "d"},
-            status.HTTP_400_BAD_REQUEST,
-            "injectors",
-            "Injectors must have keys defined in ['extra_vars']",
+            status.HTTP_200_OK,
+            None,
         ),
         (
             {"extra_vars": {"username": "Adam"}},
             status.HTTP_200_OK,
             None,
-            None,
+        ),
+        (
+            {"c": "d"},
+            status.HTTP_400_BAD_REQUEST,
+            (
+                "Injectors must have keys defined in "
+                f"{sorted(SUPPORTED_KEYS_IN_INJECTORS)}"
+            ),
+        ),
+        (
+            {"extra_vars": {"username": "{{ name }}"}},
+            status.HTTP_400_BAD_REQUEST,
+            "Injector key: username has a value which refers to an undefined "
+            "key error",
         ),
     ],
 )
@@ -410,7 +431,6 @@ def test_partial_update_injectors_credential_type(
     superuser_client: APIClient,
     new_injectors,
     status_code,
-    key,
     message,
 ):
     obj = models.CredentialType.objects.create(
@@ -429,7 +449,7 @@ def test_partial_update_injectors_credential_type(
         obj.refresh_from_db()
         assert obj.injectors == new_injectors
     else:
-        assert message in response.data[key]
+        assert message in str(response.data["injectors"])
 
 
 @pytest.mark.django_db
@@ -534,3 +554,247 @@ def test_credential_types_based_on_namespace(
     data = response.json()
     for credential_type in data["results"]:
         assert credential_type["namespace"] == "event_stream"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("inputs", "injectors", "status_code", "key", "message"),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.key_file": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            None,
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "xyz.cert_file": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            ("Injector file key: xyz.cert_file should start with template"),
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template": "[mycert]\n{{ cert }}",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            None,
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template.cert_file.abc": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Injector file key: template.cert_file.abc "
+                "cannot contain multiple dots"
+            ),
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                    "template": "[mykey]\n{{ key }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Injector file key: template cannot be mixed "
+                "with fully qualified keys"
+            ),
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "cert", "label": "Certificate", "type": "string"},
+                    {"id": "key", "label": "Key", "type": "string"},
+                ]
+            },
+            {
+                "file": {
+                    "template": "[mykey]\n{{ key }}",
+                    "template.cert_file": "[mycert]\n{{ cert }}",
+                },
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            (
+                "Injector file key: template.cert_file "
+                "cannot be mixed with template key"
+            ),
+        ),
+    ],
+)
+def test_create_credential_type_with_file(
+    superuser_client: APIClient,
+    inputs: dict,
+    injectors: dict,
+    status_code: int,
+    key: str,
+    message: Optional[str],
+):
+    data_in = {
+        "name": "credential_type_1",
+        "description": "desc here",
+        "inputs": inputs,
+        "injectors": injectors,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+    assert response.status_code == status_code
+    if message and key:
+        assert message in response.data[key]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("inputs", "injectors", "status_code", "key", "message"),
+    [
+        (
+            {
+                "fields": [
+                    {"id": "name", "label": "Name", "type": "string"},
+                    {"id": "age", "label": "Age", "type": "string"},
+                ]
+            },
+            {
+                "extra_vars": {
+                    "template.filename": "{{ name }}",
+                    "age": "{{ age }}",
+                },
+                "file": {"template.filename": "Name = {{ name }}"},
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            "template.filename already exists",
+        ),
+        (
+            {"fields": [{"id": "name", "label": "Name", "type": "string"}]},
+            {
+                "extra_vars": {"myname": "{{ name }}"},
+                "env": {"myname": "{{ name }}"},
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "injectors",
+            "myname already exists",
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "name", "label": "Name", "type": "string"},
+                    {"id": "age", "label": "Age", "type": "string"},
+                ]
+            },
+            {
+                "extra_vars": {
+                    "name": "{{ name }}",
+                    "age": "{{ age }}",
+                },
+                "file": {"template": "Name = {{ name }}"},
+                "env": {
+                    "NAME": "{{ name }}",
+                    "AGE": "{{ age }}",
+                    "FNAME": "{{ eda.filename }}",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            "",
+        ),
+        (
+            {
+                "fields": [
+                    {"id": "name", "label": "Name", "type": "string"},
+                    {"id": "age", "label": "Age", "type": "string"},
+                ]
+            },
+            {
+                "extra_vars": {
+                    "name": "{{ name }}",
+                    "age": "{{ age }}",
+                },
+                "file": {
+                    "template.file1": "Name = {{ name }}",
+                    "template.file2": "Age = {{ age }}",
+                },
+                "env": {
+                    "NAME": "{{ eda.filename.file1 }}",
+                    "AGE": "{{ eda.filename.file2 }}",
+                    "FNAME": "X",
+                },
+            },
+            status.HTTP_201_CREATED,
+            "",
+            "",
+        ),
+    ],
+)
+def test_create_credential_type_with_duplicates(
+    superuser_client: APIClient,
+    inputs: dict,
+    injectors: dict,
+    status_code: int,
+    key: str,
+    message: str,
+):
+    data_in = {
+        "name": "credential_type_1",
+        "inputs": inputs,
+        "injectors": injectors,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+    assert response.status_code == status_code
+    if message and key:
+        assert message in response.data[key][0]

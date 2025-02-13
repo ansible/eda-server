@@ -21,25 +21,39 @@ import jinja2
 import validators
 import yaml
 from django.core.exceptions import ValidationError
+from django.forms import model_to_dict
+from django.utils.translation import gettext_lazy as _
 from jinja2.nativetypes import NativeTemplate
 from rest_framework import serializers
 
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
+from aap_eda.core.utils.crypto.base import SecretValue
 
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
+
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
 ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
-SUPPORTED_KEYS_IN_INJECTORS = ["extra_vars"]
+SUPPORTED_KEYS_IN_INJECTORS = {"env", "extra_vars", "file"}
 PROTECTED_PASSPHRASE_ERROR = (
     "The key is passphrase protected, please provide passphrase."
 )
 
+RESERVED_EXTRA_VAR_KEYS = {"ansible", "eda"}
+
 
 class InjectorMissingKeyException(Exception):
+    pass
+
+
+class InjectorInvalidTemplateKey(Exception):
+    pass
+
+
+class InjectorDuplicateKey(Exception):
     pass
 
 
@@ -61,7 +75,7 @@ def inputs_to_display(schema: dict, inputs: str) -> dict:
 def get_secret_fields(schema: dict) -> list[str]:
     return [
         field["id"]
-        for field in schema["fields"]
+        for field in schema.get("fields", [])
         if "secret" in field and bool(field["secret"])
     ]
 
@@ -194,10 +208,10 @@ def validate_schema(schema: dict) -> list[str]:
         return errors
 
     fields = schema.get("fields")
-
     if not fields:
-        errors.append("'fields' must exist and non empty")
-    elif not isinstance(fields, list):
+        return errors
+
+    if not isinstance(fields, list):
         errors.append("'fields' must be a list")
     else:
         id_fields = _get_id_fields(schema)
@@ -267,17 +281,15 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
     if not isinstance(injectors, dict):
         errors.append("Injectors must be in Key-Value pairs format")
 
-    if not any(
-        support_key in injectors.keys()
-        for support_key in SUPPORTED_KEYS_IN_INJECTORS
-    ):
+    injector_keys = set(injectors.keys())
+    if not injector_keys.issubset(SUPPORTED_KEYS_IN_INJECTORS):
         errors.append(
             "Injectors must have keys defined in"
-            f" {SUPPORTED_KEYS_IN_INJECTORS}"
+            f" {sorted(SUPPORTED_KEYS_IN_INJECTORS)}"
         )
 
-    context = _default_context(schema)
-
+    context = _default_context(schema, injectors)
+    key_names = []
     for field in SUPPORTED_KEYS_IN_INJECTORS:
         input_data = injectors.get(field)
         if not input_data:
@@ -287,15 +299,32 @@ def validate_injectors(schema: dict, injectors: dict) -> dict:
             errors.append(f"{field} must be a dict type")
             continue
 
+        try:
+            if field in ["extra_vars", "env"]:
+                check_reserved_keys_in_extra_vars(input_data)
+        except ValidationError as e:
+            errors.append(e.message)
+            continue
+
         for k, v in input_data.items():
             try:
+                if k in key_names:
+                    raise InjectorDuplicateKey(
+                        f"Injector {field} key: {k} already exists"
+                    )
+
+                if field == "file":
+                    _validate_file_template_key(k, key_names)
                 if isinstance(v, str):
                     _check_jinja_string(v, context)
+                key_names.append(k)
             except InjectorMissingKeyException as e:
                 errors.append(
                     f"Injector key: {k} has a value which refers to an"
                     f" undefined key error: {e}"
                 )
+            except (InjectorInvalidTemplateKey, InjectorDuplicateKey) as e:
+                errors.append(f"{e}")
 
     return {"injectors": errors} if bool(errors) else {}
 
@@ -327,28 +356,29 @@ def _get_id_fields(schema: dict) -> list[str]:
     return [field.get("id") for field in fields if field.get("id")]
 
 
-def _default_context(schema: dict) -> dict:
-    results = {}
+def _default_context(schema: dict, injectors: dict) -> dict:
+    context = {}
 
     fields = schema.get("fields", [])
 
     for field in fields:
         field_type = field.get("type")
         if field_type == "boolean":
-            results[field["id"]] = True
+            context[field["id"]] = True
         else:
-            results[field["id"]] = ""
+            context[field["id"]] = ""
 
         default = field.get("default")
         if default:
-            results[field["id"]] = default
+            context[field["id"]] = default
 
         choices = field.get("choices")
         if choices:
             if isinstance(choices, list):
-                results[field["id"]] = choices[0]
+                context[field["id"]] = choices[0]
 
-    return results
+    _add_file_template_keys(context, injectors.get("file", {}))
+    return context
 
 
 def _check_jinja_string(value: str, context: dict) -> str:
@@ -431,3 +461,121 @@ def _validate_gpg_public_key(key_data: str) -> list[str]:
             errors.append(msg)
 
     return errors
+
+
+def _validate_file_template_key(key: str, key_names: list[str]) -> None:
+    keys = key.split(".")
+    if keys[0] != "template":
+        raise InjectorInvalidTemplateKey(
+            _(
+                "Injector %(injector_type)s key: %(key)s "
+                "should start with template"
+            )
+            % {"injector_type": "file", "key": key}
+        )
+    if len(keys) > 2:
+        raise InjectorInvalidTemplateKey(
+            _(
+                "Injector %(injector_type)s key: %(key)s "
+                "cannot contain multiple dots"
+            )
+            % {"injector_type": "file", "key": key}
+        )
+
+    if len(keys) == 1:
+        for known_key in key_names:
+            if known_key.startswith("template"):
+                raise InjectorInvalidTemplateKey(
+                    _(
+                        "Injector %(injector_type)s key: %(key)s "
+                        "cannot be mixed with fully qualified keys"
+                    )
+                    % {"injector_type": "file", "key": key}
+                )
+    if len(keys) == 2:
+        for known_key in key_names:
+            if known_key == "template":
+                raise InjectorInvalidTemplateKey(
+                    _(
+                        "Injector %(injector_type)s key: %(key)s "
+                        "cannot be mixed with template key"
+                    )
+                    % {"injector_type": "file", "key": key}
+                )
+
+
+def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
+    for key in data.keys():
+        if key in RESERVED_EXTRA_VAR_KEYS:
+            raise ValidationError(
+                _(
+                    "Extra vars key '%(key)s' cannot be one of these "
+                    "reserved keys '%(reserved)s'"
+                )
+                % {
+                    "key": key,
+                    "reserved": ", ".join(sorted((RESERVED_EXTRA_VAR_KEYS))),
+                }
+            )
+
+
+def build_copy_post_data(
+    eda_credential: "models.EdaCredential", new_cred_name: str
+) -> dict:
+    """Build a POST payload data from an existing EDA Credential object."""
+    post_data = model_to_dict(eda_credential)
+    # Remove 'id' field from post data
+    post_data.pop("id")
+    post_data["name"] = new_cred_name
+
+    # Update foreign key fields
+    post_data["organization_id"] = post_data.pop("organization")
+    post_data["credential_type_id"] = post_data.pop("credential_type")
+    # Decrypt 'inputs' field value for post data
+    if (
+        eda_credential.credential_type
+        and eda_credential.credential_type.inputs
+    ):
+        inputs = (
+            eda_credential.inputs.get_secret_value()
+            if isinstance(eda_credential.inputs, SecretValue)
+            else eda_credential.inputs
+        )
+        decoded_inputs = inputs_from_store(inputs)
+        post_data["inputs"] = decoded_inputs
+
+    return post_data
+
+
+def _add_file_template_keys(context: dict, files: dict):
+    for key in files.keys():
+        parts = key.split(".")
+        # case key == "template"
+        if len(parts) == 1:
+            if "eda" in context and "filename" in context["eda"]:
+                continue
+            context["eda"] = {"filename": ""}
+            continue
+
+        # else case key == "template.file1"
+        if "eda" in context and "filename" in context["eda"]:
+            if isinstance(context["eda"]["filename"], str):
+                continue
+            context["eda"]["filename"][parts[1]] = ""
+        else:
+            context["eda"] = {"filename": {parts[1]: ""}}
+
+
+def add_default_values_to_user_inputs(schema: dict, inputs: dict) -> dict:
+    for field in schema.get("fields", []):
+        key = field.get("id")
+        field_type = field.get("type", "string")
+        default_value = field.get("default")
+
+        if key not in inputs:
+            if field_type == "string":
+                inputs[key] = default_value or ""
+            if field_type == "boolean":
+                inputs[key] = default_value or False
+
+    return inputs

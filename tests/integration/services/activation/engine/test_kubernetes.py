@@ -612,7 +612,7 @@ def test_update_logs(init_kubernetes_data, kubernetes_engine):
     ):
         pod_mock.status.container_statuses = get_pod_statuses("running")
         log_mock = mock.Mock()
-        message = "2023-10-30 19:18:48,375 INFO Result is kept for 500 seconds"
+        message = "INFO Result is kept for 500 seconds"
         with mock.patch.object(engine.client, "core_api") as core_api_mock:
             core_api_mock.read_namespaced_pod_log.return_value = log_mock
             log_mock.splitlines.return_value = [

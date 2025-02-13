@@ -20,12 +20,18 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
 
 
 class EventStreamInSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(required=True, allow_null=False)
+    organization_id = serializers.IntegerField(
+        required=True,
+        allow_null=False,
+        error_messages={"null": "Organization is needed"},
+    )
     owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
     eda_credential_id = serializers.IntegerField(
         required=True,
@@ -33,6 +39,7 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         validators=[
             validators.check_credential_types_for_event_stream,
         ],
+        error_messages={"null": "EdaCredential is needed"},
     )
 
     def validate(self, data):
@@ -77,6 +84,8 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
         required=True, allow_null=False
     )
     url = serializers.SerializerMethodField()
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.EventStream
@@ -100,6 +109,8 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             "organization",
             "eda_credential",
             "event_stream_type",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 
@@ -122,3 +133,9 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             if obj.organization
             else None
         )
+
+    def to_representation(self, instance):
+        result = super().to_representation(instance)
+        result["created_by"] = BasicUserSerializer(instance.created_by).data
+        result["modified_by"] = BasicUserSerializer(instance.modified_by).data
+        return result

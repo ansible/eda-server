@@ -17,7 +17,9 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
+from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
+from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
 from aap_eda.core.utils.credentials import inputs_to_display, validate_inputs
 from aap_eda.core.utils.crypto.base import SecretValue
@@ -50,6 +52,8 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
     )
     organization = OrganizationRefSerializer()
     references = EdaCredentialReferenceField(required=False, allow_null=True)
+    created_by = BasicUserFieldSerializer()
+    modified_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.EdaCredential
@@ -66,6 +70,8 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "inputs",
             "credential_type",
             "references",
+            "created_by",
+            "modified_by",
             *read_only_fields,
         ]
 
@@ -98,7 +104,25 @@ class EdaCredentialSerializer(serializers.ModelSerializer):
             "references": self.references,
             "created_at": eda_credential.created_at,
             "modified_at": eda_credential.modified_at,
+            "created_by": BasicUserSerializer(eda_credential.created_by).data,
+            "modified_by": BasicUserSerializer(
+                eda_credential.modified_by
+            ).data,
         }
+
+
+class EdaCredentialCopySerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        required=True,
+        validators=[validators.check_if_credential_name_used],
+        help_text="Name of the new credintial",
+    )
+
+    class Meta:
+        model = models.EdaCredential
+        fields = [
+            "name",
+        ]
 
 
 class EdaCredentialCreateSerializer(serializers.ModelSerializer):
@@ -106,11 +130,19 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_credential_type_exists],
+        error_messages={
+            "null": "Credential Type is needed",
+            "required": "Credential Type is required",
+        },
     )
     organization_id = serializers.IntegerField(
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
     )
     inputs = serializers.JSONField()
 
@@ -146,6 +178,7 @@ class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
         required=True,
         allow_null=False,
         validators=[validators.check_if_organization_exists],
+        error_messages={"null": "Organization is needed"},
     )
     inputs = serializers.JSONField()
 

@@ -32,6 +32,7 @@ from aap_eda.services.activation.engine.common import (
 )
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
+    ContainerEngineError,
     ContainerEngineInitError,
     ContainerImagePullError,
     ContainerLoginError,
@@ -39,7 +40,12 @@ from aap_eda.services.activation.engine.exceptions import (
     ContainerStartError,
     ContainerUpdateLogsError,
 )
-from aap_eda.services.activation.engine.podman import Engine, get_podman_client
+from aap_eda.services.activation.engine.podman import (
+    Engine,
+    _get_podman_socket_url,
+    get_podman_client,
+)
+from aap_eda.settings.default import settings as orig_dynaconf_settings
 
 from .utils import InitData, get_ansible_rulebook_cmdline, get_request
 
@@ -102,6 +108,62 @@ def podman_engine(init_podman_data):
         )
 
         yield engine
+
+
+def test_podman_socket_url_from_settings(settings):
+    """Test when PODMAN_SOCKET_URL is set in settings."""
+    settings.PODMAN_SOCKET_URL = "custom_socket_url"
+    result = _get_podman_socket_url()
+    assert result == "custom_socket_url"
+
+
+def test_podman_socket_url_as_root(settings):
+    """Test when the user is root (uid=0)."""
+    settings.PODMAN_SOCKET_URL = None
+    with mock.patch("os.getuid", return_value=0):
+        result = _get_podman_socket_url()
+        assert result == "unix:///run/podman/podman.sock"
+
+
+def test_podman_socket_url_non_root_with_xdg_runtime_dir(settings):
+    """Test for a non-root user with XDG_RUNTIME_DIR set."""
+    settings.PODMAN_SOCKET_URL = None
+    with mock.patch("os.getuid", return_value=1000), mock.patch(
+        "os.getenv",
+        return_value="/custom/runtime/dir",
+    ):
+        result = _get_podman_socket_url()
+        assert result == "unix:///custom/runtime/dir/podman/podman.sock"
+
+
+@mock.patch.dict(os.environ, clear=True)
+def test_podman_socket_url_non_root_without_xdg_runtime_dir(settings):
+    """Test for a non-root user without XDG_RUNTIME_DIR set."""
+    settings.PODMAN_SOCKET_URL = None
+    with mock.patch("os.getuid", return_value=1000):
+        result = _get_podman_socket_url()
+        assert result == "unix:///run/user/1000/podman/podman.sock"
+
+
+def test_get_podman_client_with_timeout(settings):
+    """Test setting the timeout for the Podman client."""
+    settings.PODMAN_SOCKET_TIMEOUT = 10
+    client = get_podman_client()
+    assert client.api.timeout == 10
+
+
+def test_get_podman_client_with_zero_timeout():
+    """Test setting the timeout for the Podman client to zero."""
+    with mock.patch("aap_eda.settings.default.settings.get") as get_mock:
+
+        def get_side_effect(*args, **kwargs):
+            if args[0] == "PODMAN_SOCKET_TIMEOUT":
+                return 0
+            return orig_dynaconf_settings.get(*args, **kwargs)
+
+        get_mock.side_effect = get_side_effect
+        client = get_podman_client()
+        assert client.api.timeout is None
 
 
 def test_get_podman_client(settings):
@@ -471,10 +533,37 @@ def test_engine_get_status(podman_engine):
 
 
 @pytest.mark.django_db
-def test_engine_get_status_with_exception(podman_engine):
+def test_engine_get_status_with_not_found_exception(podman_engine):
     engine = podman_engine
 
-    engine.client.containers.exists.return_value = None
+    engine.client.containers.get.side_effect = NotFound("Not found")
+
+    with pytest.raises(
+        ContainerNotFoundError, match="Container id 100 not found"
+    ):
+        engine.get_status("100")
+
+
+@pytest.mark.django_db
+def test_engine_get_status_with_api_error_exception(podman_engine):
+    engine = podman_engine
+
+    engine.client.containers.get.side_effect = APIError("unexpected error")
+
+    with pytest.raises(ContainerEngineError):
+        engine.get_status("100")
+
+
+@pytest.mark.django_db
+def test_engine_get_status_with_500_not_found(podman_engine):
+    engine = podman_engine
+    error_msg = (
+        "no container with ID "
+        "fe244749060b9b546af41eb4256f8e527a031748a64ea3ec93bd821daffc8d89 "
+        "found in database: no such container"
+    )
+
+    engine.client.containers.get.side_effect = APIError(error_msg)
 
     with pytest.raises(
         ContainerNotFoundError, match="Container id 100 not found"
@@ -556,8 +645,7 @@ def test_engine_update_logs(init_podman_data, podman_engine):
     log_handler = DBLogger(init_podman_data.activation_instance.id)
     init_log_read_at = init_podman_data.activation_instance.log_read_at
     message = (
-        "2023-10-31 15:28:01,318 - ansible_rulebook.engine - INFO - "
-        "Calling main in ansible.eda.range"
+        "ansible_rulebook.engine - INFO - Calling main in ansible.eda.range"
     )
 
     container_mock = mock.Mock()

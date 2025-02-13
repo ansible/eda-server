@@ -56,9 +56,9 @@ class ResourceType(DjangoStrEnum):
 
 
 class Action(DjangoStrEnum):
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
+    CREATE = "add"
+    READ = "view"
+    UPDATE = "change"
     DELETE = "delete"
     ENABLE = "enable"
     DISABLE = "disable"
@@ -98,6 +98,7 @@ class DefaultCredentialType(DjangoStrEnum):
     SOURCE_CONTROL = "Source Control"
     AAP = "Red Hat Ansible Automation Platform"
     GPG = "GPG Public Key"
+    POSTGRES = "Postgres"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

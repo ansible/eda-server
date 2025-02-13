@@ -27,6 +27,15 @@ from aap_eda.core.enums import (
 from aap_eda.tasks import orchestrator
 
 
+def fake_task(number: int):
+    pass
+
+
+@pytest.fixture
+def eda_caplog(caplog_factory):
+    return caplog_factory(orchestrator.LOGGER)
+
+
 @pytest.fixture
 def default_rulebook(
     default_organization: models.Organization,
@@ -326,3 +335,31 @@ def test_monitor_rulebook_processes_unique(enqueue_mock):
         "monitor_rulebook_processes",
         orchestrator.monitor_rulebook_processes,
     )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
+def test_dispatch_existing_rq_jobs(
+    enqueue_mock, activation, eda_caplog, default_queue
+):
+    """Test that the dispatch does not process the request if there is
+    already a job in the queue."""
+    default_queue.enqueue(
+        fake_task,
+        job_id=orchestrator._manage_process_job_id(
+            ProcessParentType.ACTIVATION, activation.id
+        ),
+        number=1,
+    )
+    activation.status = ActivationStatus.STOPPED
+    activation.save(update_fields=["status"])
+    orchestrator.dispatch(
+        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
+    )
+    enqueue_mock.assert_not_called()
+    assert (
+        "can not be processed because there is already a job"
+        in eda_caplog.text
+    )
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.STOPPED

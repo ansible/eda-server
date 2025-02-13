@@ -30,8 +30,7 @@ repos:
         pass_filenames: false
         entry: command -v task > /dev/null && CMD=task || CMD=go-task; ${CMD} lint:migrations
   - repo: https://github.com/python-poetry/poetry
-    rev: '1.4.0'
+    rev: '2.0.1'
     hooks:
       - id: poetry-check
       - id: poetry-lock
-        args: ["--check"]

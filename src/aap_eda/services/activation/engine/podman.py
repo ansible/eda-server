@@ -37,25 +37,26 @@ from .common import (
 LOGGER = logging.getLogger(__name__)
 
 
+def _get_podman_socket_url() -> str:
+    if settings.PODMAN_SOCKET_URL:
+        return settings.PODMAN_SOCKET_URL
+    if os.getuid() == 0:
+        return "unix:///run/podman/podman.sock"
+    xdg_runtime_dir = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    return f"unix://{xdg_runtime_dir}/podman/podman.sock"
+
+
 def get_podman_client() -> PodmanClient:
     """Podman client factory."""
+    params = {"timeout": settings.PODMAN_SOCKET_TIMEOUT}
+    podman_url = _get_podman_socket_url()
+    params["base_url"] = podman_url
+    LOGGER.info(f"Using podman socket: {podman_url}")
     try:
-        podman_url = settings.PODMAN_SOCKET_URL
-        if podman_url:
-            return PodmanClient(base_url=podman_url)
-
-        if os.getuid() == 0:
-            podman_url = "unix:///run/podman/podman.sock"
-        else:
-            xdg_runtime_dir = os.getenv(
-                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-            )
-            podman_url = f"unix://{xdg_runtime_dir}/podman/podman.sock"
-        LOGGER.info(f"Using podman socket: {podman_url}")
-        return PodmanClient(base_url=podman_url)
+        return PodmanClient(**params)
     except ValueError as e:
         LOGGER.error(f"Failed to initialize podman client: f{e}")
-        raise exceptions.ContainerEngineInitError(str(e))
+        raise exceptions.ContainerEngineInitError(str(e)) from e
 
 
 class Engine(ContainerEngine):
@@ -173,12 +174,19 @@ class Engine(ContainerEngine):
             raise exceptions.ContainerStartError(error_message) from e
 
     def get_status(self, container_id: str) -> ContainerStatus:
-        if not self.client.containers.exists(container_id):
+        try:
+            container = self.client.containers.get(container_id)
+        except NotFound:
             raise exceptions.ContainerNotFoundError(
                 f"Container id {container_id} not found"
             )
-
-        container = self.client.containers.get(container_id)
+        except APIError as exc:
+            # podman might return a 500 error when the container is not found.
+            if "no such container" in str(exc):
+                raise exceptions.ContainerNotFoundError(
+                    f"Container id {container_id} not found"
+                )
+            raise exceptions.ContainerEngineError(str(exc)) from exc
         error_msg = container.attrs.get("State").get("Error", "")
 
         # Check container status
@@ -398,7 +406,7 @@ class Engine(ContainerEngine):
                 pod_args[key] = value
 
         for key, value in pod_args.items():
-            LOGGER.debug("Key %s Value %s", key, value)
+            LOGGER.debug("Pod arg %s: %s", key, value)
 
         LOGGER.info(pod_args)
         return pod_args

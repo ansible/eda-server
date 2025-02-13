@@ -1,22 +1,29 @@
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "aap-eda"
+version = "0.2.0"
+description = ""
+readme = "README.md"
+authors = [
+    { name = "Ansible, Inc.", email = "Red Hat, Inc. <info@ansible.com>" },
+]
+requires-python = ">=3.11,<3.13"
+
+[project.scripts]
+aap-eda-manage = 'aap_eda.manage:main'
+
 
 # -------------------------------------
 # Poetry: Metadata
 # -------------------------------------
-
 [tool.poetry]
-name = "aap-eda"
-version = "0.2.0"
-description = ""
-authors = ["Red Hat, Inc. <info@ansible.com>"]
-readme = "README.md"
+requires-poetry = ">=2.0,<3.0"
 packages = [{ include = "aap_eda", from = "src" }]
 include = ["aap_eda/data/playbooks/*.yml"]
 
-[tool.poetry.scripts]
-aap-eda-manage = 'aap_eda.manage:main'
 
 # -------------------------------------
 # Poetry: Dependencies
@@ -39,14 +46,16 @@ django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
-podman = "4.9.*"
+podman = "5.2.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.1.31", extras = [
     "channel-auth",
     "rbac",
     "redis-client",
     "resource-registry",
     "jwt-consumer",
+    "rest-filters",
+    "feature-flags",
 ] }
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
