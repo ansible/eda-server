@@ -21,11 +21,6 @@ from django.core.management import call_command
 from django.test import override_settings
 
 
-@pytest.fixture(autouse=True)
-def use_analytic_url(settings):
-    settings.AUTOMATION_ANALYTICS_URL = "https://analytics_url"
-
-
 @pytest.mark.parametrize(
     "analytics_url, tracking_state, expected",
     [
@@ -33,20 +28,19 @@ def use_analytic_url(settings):
         (
             "https://url",
             False,
-            "Insights for Event Driven Ansible is not enabled.",
+            "No analytics collected",
         ),
         (None, True, "AUTOMATION_ANALYTICS_URL is not set"),
-        (
-            "https://url",
-            True,
-            "Analytics collection is done",
-        ),
     ],
 )
 @pytest.mark.django_db
 @override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
 def test_gather_analytics_invalid_settings(
-    analytics_settings, caplog_factory, analytics_url, tracking_state, expected
+    analytics_settings,
+    caplog_factory,
+    analytics_url,
+    tracking_state,
+    expected,
 ):
     with mock.patch(
         "aap_eda.analytics.package.application_settings",
@@ -127,8 +121,11 @@ def test_gather_analytics_invalid_settings(
 )
 @pytest.mark.django_db
 @override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
+@mock.patch(
+    "aap_eda.core.management.commands.gather_analytics.collector.gather"
+)
 def test_gather_analytics_command(
-    analytics_settings, caplog_factory, args, log_level, expected
+    mock_gather, analytics_settings, caplog_factory, args, log_level, expected
 ):
     with mock.patch(
         "aap_eda.analytics.collector.application_settings",

@@ -260,3 +260,6 @@ INSIGHTS_CERT_PATH: str = ""
 # Available methods:
 # https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
 AUTOMATION_AUTH_METHOD: str = "user-pass"
+INSIGHTS_TRACKING_STATE: bool = True
+REDHAT_USERNAME: str = ""
+REDHAT_PASSWORD: str = ""
