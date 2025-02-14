@@ -268,7 +268,6 @@ class ActivationSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
-            "edited_at",
             "rulebook_name",
         ]
 
@@ -865,7 +864,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
-            "edited_at",
             "restarted_at",
         ]
 
@@ -1027,7 +1025,6 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "modified_at",
-            "edited_at",
         ]
 
 
