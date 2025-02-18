@@ -1,6 +1,5 @@
 #  Copyright 2024 Red Hat, Inc.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
@@ -12,17 +11,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 import os
 import platform
+import uuid
 from collections import Counter
 from datetime import datetime
-from typing import Any, Generator, Tuple
+from typing import Any, Generator, List, Optional, Tuple
 
 import distro
 import yaml
 from ansible_base.resource_registry.models.service_identifier import service_id
 from django.conf import settings
-from django.db import connection
+from django.db import DatabaseError, connection
 from django.db.models import (
     Case,
     Count,
@@ -32,6 +33,7 @@ from django.db.models import (
     Manager,
     OuterRef,
     Q,
+    QuerySet,
     Subquery,
     Value,
     When,
@@ -47,6 +49,8 @@ from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.exceptions import ParseError
 from aap_eda.utils import get_eda_version
+
+logger = logging.getLogger("aap_eda.analytics")
 
 SOURCE_RESERVED_KEYS = ["name", "filters"]
 
@@ -121,9 +125,9 @@ def jobs_stats(since: datetime, full_path: str, until: datetime, **kwargs):
     format="csv",
     description="Stats for activations",
 )
-def activation_stats(
+def activations_stats(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     has_ended_at_states = [
         ActivationStatus.FAILED.value,
         ActivationStatus.STOPPED.value,
@@ -170,19 +174,7 @@ def activation_stats(
         "max_restart_count",
     )
 
-    query = (
-        str(activations.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-    for status in has_ended_at_states:
-        query = query.replace(status, f"'{status}'")
-
-    return _copy_table(
-        "activations_stats",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("activations_stats", activations, full_path)
 
 
 @register(
@@ -193,7 +185,7 @@ def activation_stats(
 )
 def activations_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     queryset = _get_query(models.Activation.objects, since, until).values(
         "id",
         "organization_id",
@@ -226,67 +218,61 @@ def activations_table(
         "skip_audit_events",
     )
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "activations", f"COPY ({query}) TO STDOUT WITH CSV HEADER", full_path
-    )
+    return _copy_table("activations", queryset, full_path)
 
 
 @register(
-    "audit_action_table",
+    "audit_actions_table",
     "1.0",
     format="csv",
     description="Data on audit_actions",
 )
 def audit_actions_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     audit_actions = _get_audit_action_qs(since, until)
 
-    if not bool(audit_actions):
-        return
+    if not audit_actions.exists():
+        return []
 
-    audit_action_query = (
-        f"COPY ({audit_actions.query}) TO STDOUT WITH CSV HEADER"
-    )
-
-    return _copy_table("audit_actions", audit_action_query, full_path)
+    return _copy_table("audit_actions", audit_actions, full_path)
 
 
 @register(
-    "audit_event_table",
+    "audit_events_table",
     "1.0",
     format="csv",
     description="Data on audit_events",
 )
 def audit_events_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     audit_actions = _get_audit_action_qs(since, until)
-    if not bool(audit_actions):
-        return
+    if not audit_actions.exists():
+        return []
 
-    audit_event_query = _get_audit_event_query(audit_actions)
-    if not bool(audit_event_query):
-        return
+    audit_event_query = _get_audit_event_query(audit_actions).values(
+        "id",
+        "source_name",
+        "source_type",
+        "received_at",
+        "rule_fired_at",
+    )
+    if not audit_event_query.exists():
+        return []
 
     return _copy_table("audit_events", audit_event_query, full_path)
 
 
 @register(
-    "audit_rule_table",
+    "audit_rules_table",
     "1.0",
     format="csv",
     description="Data on audit_rules",
 )
 def audit_rules_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     audit_rules = _get_audit_rule_qs(since, until).values(
         "id",
         "organization_id",
@@ -297,25 +283,24 @@ def audit_rules_table(
         "rule_uuid",
         "ruleset_uuid",
         "ruleset_name",
+        "job_instance_id",
         "activation_instance_id",
     )
-    if not bool(audit_rules):
-        return
+    if not audit_rules.exists():
+        return []
 
-    audit_rule_query = f"COPY ({audit_rules.query}) TO STDOUT WITH CSV HEADER"
-
-    return _copy_table("audit_rules", audit_rule_query, full_path)
+    return _copy_table("audit_rules", audit_rules, full_path)
 
 
 @register(
-    "eda_credential_table",
+    "eda_credentials_table",
     "1.0",
     format="csv",
     description="Data on eda_credentials",
 )
 def eda_credentials_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     queryset = _get_query(models.EdaCredential.objects, since, until).values(
         "id",
         "organization_id",
@@ -327,52 +312,32 @@ def eda_credentials_table(
         "credential_type_id",
     )
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "eda_credentials",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("eda_credentials", queryset, full_path)
 
 
 @register(
-    "credential_type_table",
+    "credential_types_table",
     "1.0",
     format="csv",
     description="Data on credential_types",
 )
 def credential_types_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     queryset = _get_query(models.CredentialType.objects, since, until)
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "credential_types",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("credential_types", queryset, full_path)
 
 
 @register(
-    "decision_environment_table",
+    "decision_environments_table",
     "1.0",
     format="csv",
     description="Data on decision_environments",
 )
 def decision_environments_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     queryset = _get_query(
         models.DecisionEnvironment.objects, since, until
     ).values(
@@ -386,28 +351,18 @@ def decision_environments_table(
         "modified_at",
     )
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "decision_environments",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("decision_environments", queryset, full_path)
 
 
 @register(
-    "event_stream_table",
+    "event_streams_table",
     "1.0",
     format="csv",
     description="Data on event_streams",
 )
 def event_streams_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     event_streams = (
         models.EventStream.objects.filter(
             Q(created_at__gt=since, created_at__lte=until)
@@ -428,15 +383,7 @@ def event_streams_table(
         "last_event_received_at",
     )
 
-    query = (
-        str(event_streams.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "event_streams", f"COPY ({query}) TO STDOUT WITH CSV HEADER", full_path
-    )
+    return _copy_table("event_streams", event_streams, full_path)
 
 
 @register(
@@ -447,7 +394,7 @@ def event_streams_table(
 )
 def event_streams_by_activation_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     activations = models.Activation.objects.filter(
         Q(created_at__gt=since, created_at__lte=until)
         | Q(modified_at__gt=since, modified_at__lte=until)
@@ -458,7 +405,7 @@ def event_streams_by_activation_table(
         event_streams |= activation.event_streams.all()
 
     if not bool(event_streams):
-        return
+        return event_streams
 
     event_streams = event_streams.annotate(
         event_stream_id=F("id"),
@@ -474,9 +421,7 @@ def event_streams_by_activation_table(
         "activation_id",
     )
 
-    query = f"COPY ({event_streams.query}) TO STDOUT WITH CSV HEADER"
-
-    return _copy_table("event_streams_by_activation", query, full_path)
+    return _copy_table("event_streams_by_activation", event_streams, full_path)
 
 
 @register(
@@ -487,7 +432,7 @@ def event_streams_by_activation_table(
 )
 def event_streams_by_running_activations_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     running_states = [
         ActivationStatus.RUNNING,
         ActivationStatus.STARTING,
@@ -507,7 +452,7 @@ def event_streams_by_running_activations_table(
         event_streams |= activation.event_streams.all()
 
     if not bool(event_streams):
-        return
+        return models.EventStream.objects.none()
 
     event_streams = event_streams.annotate(
         event_stream_id=F("id"),
@@ -523,20 +468,20 @@ def event_streams_by_running_activations_table(
         "activation_id",
     )
 
-    query = f"COPY ({event_streams.query}) TO STDOUT WITH CSV HEADER"
-
     return _copy_table(
-        "event_streams_by_running_activations", query, full_path
+        "event_streams_by_running_activations", event_streams, full_path
     )
 
 
 @register(
-    "project_table",
+    "projects_table",
     "1.0",
     format="csv",
     description="Data on projects",
 )
-def projects_table(since: datetime, full_path: str, until: datetime, **kwargs):
+def projects_table(
+    since: datetime, full_path: str, until: datetime, **kwargs
+) -> list[str]:
     queryset = _get_query(models.Project.objects, since, until).values(
         "id",
         "organization_id",
@@ -559,77 +504,47 @@ def projects_table(since: datetime, full_path: str, until: datetime, **kwargs):
         "signature_validation_credential_id",
     )
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "projects",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("projects", queryset, full_path)
 
 
 @register(
-    "rulebook_table",
+    "rulebooks_table",
     "1.0",
     format="csv",
     description="Data on rulebooks",
 )
 def rulebooks_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     queryset = _get_query(models.Rulebook.objects, since, until)
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "rulebooks",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("rulebooks", queryset, full_path)
 
 
 @register(
-    "rulebook_process_table",
+    "rulebook_processes_table",
     "1.0",
     format="csv",
     description="Data on rulebook_processes",
 )
 def rulebook_processes_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     args = {"started_at": True}
     queryset = _get_query(models.RulebookProcess.objects, since, until, **args)
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "rulebook_processes",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("rulebook_processes", queryset, full_path)
 
 
 @register(
-    "organization_table",
+    "organizations_table",
     "1.0",
     format="csv",
     description="Data on organizations",
 )
 def organizations_table(
     since: datetime, full_path: str, until: datetime, **kwargs
-):
+) -> list[str]:
     args = {"created": True}
     queryset = _get_query(
         models.Organization.objects, since, until, **args
@@ -641,40 +556,22 @@ def organizations_table(
         "description",
     )
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "organizations",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("organizations", queryset, full_path)
 
 
 @register(
-    "team_table",
+    "teams_table",
     "1.0",
     format="csv",
     description="Data on teams",
 )
-def teams_table(since: datetime, full_path: str, until: datetime, **kwargs):
+def teams_table(
+    since: datetime, full_path: str, until: datetime, **kwargs
+) -> list[str]:
     args = {"created": True}
     queryset = _get_query(models.Team.objects, since, until, **args)
 
-    query = (
-        str(queryset.query)
-        .replace(_datetime_format(since), f"'{since.isoformat()}'")
-        .replace(_datetime_format(until), f"'{until.isoformat()}'")
-    )
-
-    return _copy_table(
-        "teams",
-        f"COPY ({query}) TO STDOUT WITH CSV HEADER",
-        full_path,
-    )
+    return _copy_table("teams", queryset, full_path)
 
 
 @register(
@@ -684,7 +581,7 @@ def teams_table(since: datetime, full_path: str, until: datetime, **kwargs):
 )
 def activation_sources(
     since: datetime, full_path: str, until: datetime, **kwargs
-) -> dict:
+) -> dict[str, dict[str, Any]]:
     sources = {}
     activations = models.Activation.objects.filter(
         Q(created_at__gt=since, created_at__lte=until)
@@ -755,25 +652,15 @@ def _gen_stream_data(
     yield from stream_dict.items()
 
 
-def _datetime_format(dt: datetime) -> str:
-    """Convert datetime object to string."""
-    if dt.microsecond == 0:
-        iso_format = dt.strftime("%Y-%m-%d %H:%M:%S%z")
-    else:
-        iso_format = dt.strftime("%Y-%m-%d %H:%M:%S.%f%z")
-
-    return iso_format[:-2] + ":" + iso_format[-2:]
-
-
 def _get_query(
-    objects: Manager, since: datetime, until: datetime, **kwargs
+    objects: Manager, since: datetime, to: datetime, **kwargs
 ) -> str:
     """Construct sql query with datetime params."""
     if kwargs.get("started_at"):
         qs = (
             objects.filter(
-                Q(started_at__gt=since, started_at__lte=until)
-                | Q(updated_at__gt=since, updated_at__lte=until)
+                Q(started_at__gt=since, started_at__lte=to)
+                | Q(updated_at__gt=since, updated_at__lte=to)
             )
             .order_by("id")
             .distinct()
@@ -781,8 +668,8 @@ def _get_query(
     elif kwargs.get("created"):
         qs = (
             objects.filter(
-                Q(created__gt=since, created__lte=until)
-                | Q(modified__gt=since, modified__lte=until)
+                Q(created__gt=since, created__lte=to)
+                | Q(modified__gt=since, modified__lte=to)
             )
             .order_by("id")
             .distinct()
@@ -790,8 +677,8 @@ def _get_query(
     else:
         qs = (
             objects.filter(
-                Q(created_at__gt=since, created_at__lte=until)
-                | Q(modified_at__gt=since, modified_at__lte=until)
+                Q(created_at__gt=since, created_at__lte=to)
+                | Q(modified_at__gt=since, modified_at__lte=to)
             )
             .order_by("id")
             .distinct()
@@ -800,7 +687,7 @@ def _get_query(
     return qs
 
 
-def _get_audit_event_query(actions: list[models.AuditAction]):
+def _get_audit_event_query(actions: list[models.AuditAction]) -> QuerySet:
     events = models.AuditEvent.objects.none()
     for action in actions:
         events |= action.audit_events.all()
@@ -808,15 +695,10 @@ def _get_audit_event_query(actions: list[models.AuditAction]):
     if not bool(events):
         return
 
-    query = str(events.distinct().query)
-
-    for action in actions:
-        query = query.replace(str(action.id), f"'{action.id}'")
-
-    return f"COPY ({query}) TO STDOUT WITH CSV HEADER"
+    return events.distinct()
 
 
-def _get_audit_rule_qs(since: datetime, until: datetime):
+def _get_audit_rule_qs(since: datetime, until: datetime) -> QuerySet:
     activation_instance_ids = (
         models.RulebookProcess.objects.filter(
             Q(
@@ -843,11 +725,10 @@ def _get_audit_rule_qs(since: datetime, until: datetime):
         audit_rules = models.AuditRule.objects.filter(
             activation_instance_id__in=tuple(activation_instance_ids)
         ).order_by("id")
-
     return audit_rules
 
 
-def _get_audit_action_qs(since: datetime, until: datetime):
+def _get_audit_action_qs(since: datetime, until: datetime) -> QuerySet:
     audit_rules = _get_audit_rule_qs(since, until)
     audit_rule_ids = audit_rules.values_list("id").distinct()
 
@@ -866,12 +747,66 @@ def _get_audit_action_qs(since: datetime, until: datetime):
     return audit_actions
 
 
-def _copy_table(table, query, path):
-    file_path = os.path.join(path, table + "_table.csv")
-    file = CsvFileSplitter(filespec=file_path)
-    with connection.cursor() as cursor:
-        with cursor.copy(query) as copy:
-            while data := copy.read():
-                byte_data = bytes(data)
-                file.write(byte_data.decode())
-    return file.file_list()
+def _copy_table(
+    table: str, queryset: QuerySet, path: str, buffer_size: int = 1024 * 1024
+) -> Optional[List[str]]:
+    """Export large datasets to CSV files using PostgreSQL COPY.
+
+    Args:
+        table (str): Source table name for file naming
+        query (QuerySet): Django QuerySet generating the COPY command, include:
+                          - Filter conditions
+                          - Selected fields
+                          Example: Model.objects.filter(...).values(...)
+        path (str): Output directory path with write permissions
+        buffer_size (int): In-memory buffer size in bytes.
+                           (Default: 1048576 = 1MB)
+
+    Returns:
+        Optional[List[str]]:
+        On success: List of chunked file paths
+        On failure: None
+
+    Raises:
+        DatabaseError: Connection/query failures
+        IOError: Filesystem permission issues
+    """
+    try:
+        view_name = f"temp_{table}_{uuid.uuid4().hex[:8]}"
+        file_path = os.path.join(path, table + "_table.csv")
+        file = CsvFileSplitter(filespec=file_path)
+
+        with connection.cursor() as cursor:
+            sql, params = queryset.query.sql_with_params()
+            create_view_sql = f"""
+                CREATE TEMPORARY VIEW {view_name} AS
+                {sql}
+            """
+            cursor.execute(create_view_sql, params)
+
+            copy_sql = f"""
+                COPY (SELECT * FROM {view_name})
+                TO STDOUT WITH CSV HEADER
+            """
+            with cursor.copy(copy_sql) as copy:
+                while True:
+                    data = copy.read()
+                    if not data:
+                        break
+                    byte_data = bytes(data)
+                    # Process data in chunks of buffer_size
+                    for i in range(0, len(byte_data), buffer_size):
+                        chunk = byte_data[i : i + buffer_size]
+                        file.write(chunk.decode())
+
+            cursor.execute(f"DROP VIEW IF EXISTS {view_name}")
+        return file.file_list()
+    except DatabaseError as e:
+        logger.error(f"Database error occurred: {e}")
+        return None
+    except IOError as e:
+        logger.error(f"File I/O error occurred: {e}")
+        return None
+    except Exception as e:
+        logger.exception(f"An unexpected error occurred: {e}")
+        return None
