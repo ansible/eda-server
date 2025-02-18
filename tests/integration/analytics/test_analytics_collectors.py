@@ -14,20 +14,23 @@
 import csv
 import io
 import json
+import logging
 import os
 import tarfile
 import tempfile
 import uuid
 from datetime import timedelta
 from typing import IO, List
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from django.db import DatabaseError
+from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from insights_analytics_collector import Collector
 
 from aap_eda.analytics import analytics_collectors as collectors
-from aap_eda.analytics.analytics_collectors import config
+from aap_eda.analytics.analytics_collectors import _copy_table, config
 from aap_eda.analytics.collector import AnalyticsCollector
 from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
@@ -86,6 +89,13 @@ def activations_with_different_status(
         for data in activation_data
     ]
     return models.Activation.objects.bulk_create(activations)
+
+
+@pytest.fixture
+def mock_queryset():
+    qs = MagicMock(spec=QuerySet)
+    qs.query.sql_with_params.return_value = ("SELECT * FROM test_table", ())
+    return qs
 
 
 @pytest.mark.parametrize(
@@ -261,7 +271,7 @@ def test_activations_sources(
 
 
 @pytest.mark.django_db
-def test_activation_stats(
+def test_activations_stats(
     default_activation_instances: List[models.RulebookProcess],
     default_activation: models.Activation,
     new_activation: models.Activation,
@@ -273,7 +283,7 @@ def test_activation_stats(
     default_activation.failure_count = 2
     default_activation.save(update_fields=["restart_count", "failure_count"])
     with tempfile.TemporaryDirectory() as tmpdir:
-        collectors.activation_stats(
+        collectors.activations_stats(
             time_start, tmpdir, until=now() + timedelta(seconds=1)
         )
         with open(os.path.join(tmpdir, "activations_stats_table.csv")) as f:
@@ -394,6 +404,7 @@ def assert_audit_rules(expected_audit_rules):
                 "rule_uuid",
                 "ruleset_uuid",
                 "ruleset_name",
+                "job_instance_id",
                 "activation_instance_id",
             ]
             assert len(lines) == len(expected_audit_rules)
@@ -488,13 +499,34 @@ def assert_audit_events(expected_audit_events):
                 "source_name",
                 "source_type",
                 "received_at",
-                "payload",
                 "rule_fired_at",
             ]
             assert len(lines) == len(expected_audit_events)
             assert sorted([line[0] for line in lines]) == sorted(
                 [event.id for event in expected_audit_events]
             )
+
+
+@pytest.mark.django_db
+def test_empty_audit_event_returns_empty():
+    until = now()
+    time_start = until - timedelta(hours=9)
+    mock_audit_event_query = MagicMock(spec=QuerySet)
+    mock_audit_event_query.values.return_value.exists.return_value = False
+
+    with patch(
+        "aap_eda.analytics.analytics_collectors._get_audit_action_qs",
+        return_value=MagicMock(exists=lambda: True),
+    ), patch(
+        "aap_eda.analytics.analytics_collectors._get_audit_event_query",
+        return_value=mock_audit_event_query,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = collectors.audit_events_table(
+                time_start, tmpdir, until=now() + timedelta(seconds=1)
+            )
+
+            assert result == []
 
 
 @pytest.mark.django_db
@@ -899,3 +931,89 @@ def test_teams_table_collector(
             assert lines[0][0] == str(default_team.id)
             assert lines[0][5] == default_team.name
             assert lines[0][6] == default_team.description
+
+
+@pytest.mark.django_db
+def test_database_error_propagation(tmp_path, mock_queryset, caplog_factory):
+    logger = logging.getLogger("aap_eda.analytics")
+    eda_log = caplog_factory(logger)
+
+    with patch("django.db.connection.cursor") as mock_cursor:
+        mock_cursor.return_value.__enter__.return_value.execute.side_effect = (
+            DatabaseError("View creation failed")
+        )
+
+        result = _copy_table("test", mock_queryset, str(tmp_path))
+
+        assert result is None
+        assert "Database error occurred: View creation failed" in eda_log.text
+
+
+@pytest.mark.django_db
+def test_copy_operation_failure(tmp_path, mock_queryset, caplog_factory):
+    logger = logging.getLogger("aap_eda.analytics")
+    eda_log = caplog_factory(logger)
+
+    mock_copy = MagicMock()
+    mock_copy.read.side_effect = DatabaseError("COPY stream broken")
+
+    with patch("django.db.connection.cursor") as mock_cursor:
+        ctx = mock_cursor.return_value.__enter__.return_value
+        ctx.copy.return_value.__enter__.return_value = mock_copy
+
+        result = _copy_table("test", mock_queryset, str(tmp_path))
+
+        assert result is None
+        assert "COPY stream broken" in eda_log.text
+
+
+@pytest.mark.parametrize(
+    "exception,expected_log",
+    [
+        (DatabaseError("Connection lost"), "Database error occurred"),
+        (OSError("Permission denied"), "File I/O error occurred"),
+        (MemoryError(), "An unexpected error occurred"),
+    ],
+)
+@pytest.mark.django_db
+def test_error_handling_scenarios(
+    exception, expected_log, tmp_path, mock_queryset, caplog_factory
+):
+    logger = logging.getLogger("aap_eda.analytics")
+    eda_log = caplog_factory(logger)
+
+    with patch(
+        "aap_eda.analytics.analytics_collectors.connection.cursor"
+    ) as mock_cursor:
+        mock_cursor.return_value.__enter__.return_value.execute.side_effect = (
+            exception
+        )
+
+        result = _copy_table("test", mock_queryset, str(tmp_path))
+
+        assert result is None
+        assert expected_log in eda_log.text
+
+
+@pytest.mark.django_db
+def test_view_cleanup(tmp_path, mock_queryset):
+    mock_copy = MagicMock()
+    mock_copy.read.side_effect = [
+        "COPY stream broken\n".encode(),
+        "".encode(),
+    ]
+
+    with patch("django.db.connection.cursor") as mock_cursor:
+        ctx = mock_cursor.return_value.__enter__.return_value
+        ctx.copy.return_value.__enter__.return_value = mock_copy
+        mock_execute = mock_cursor.return_value.__enter__.return_value.execute
+
+        _copy_table("test", mock_queryset, str(tmp_path))
+
+        drop_calls = [
+            call[0][0]
+            for call in mock_execute.call_args_list
+            if "DROP VIEW" in call[0][0]
+        ]
+        assert len(drop_calls) == 1
+        assert "IF EXISTS" in drop_calls[0]
