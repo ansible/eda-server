@@ -13,11 +13,13 @@
 #  limitations under the License.
 
 
+import time
 from unittest import mock
 
 import pytest
+from rq.serializers import DefaultSerializer
 
-from aap_eda.core.tasking import DefaultWorker, Job, Queue
+from aap_eda.core.tasking import DefaultWorker, Job, Queue, Scheduler
 from aap_eda.tasks import analytics
 
 
@@ -29,11 +31,11 @@ def analytics_settings():
         INSIGHTS_TRACKING_STATE = True
         AUTOMATION_ANALYTICS_LAST_GATHER = None
         AUTOMATION_ANALYTICS_LAST_ENTRIES = '{"key": "value"}'
+        AUTOMATION_ANALYTICS_GATHER_INTERVAL = 2
 
     return Settings()
 
 
-@pytest.mark.django_db
 def test_gather_analytics(analytics_settings, default_queue: Queue):
     with mock.patch("aap_eda.analytics.collector.gather") as mock_method:
         with mock.patch(
@@ -61,40 +63,42 @@ def test_gather_analytics(analytics_settings, default_queue: Queue):
             assert result.type == result.Type.FAILED
 
 
-"""
-@pytest.mark.django_db
-def test_schedule_and_reschedule(default_queue: Queue):
+def test_auto_gather_analytics():
+    with mock.patch("aap_eda.tasks.analytics.gather_analytics") as mock_gather:
+        with mock.patch(
+            "aap_eda.tasks.analytics.schedule_gather_analytics"
+        ) as mock_schdule:
+            analytics.auto_gather_analytics()
+            mock_gather.assert_called_once()
+            mock_schdule.assert_called_once()
+
+
+def test_schedule_gather_analytics(analytics_settings, default_queue: Queue):
     scheduler = Scheduler(
         queue_name=default_queue.name, connection=default_queue.connection
     )
     with mock.patch(
-        "aap_eda.tasks.analytics.django_rq.get_scheduler",
+        "aap_eda.core.tasking.django_rq.get_scheduler",
         return_value=scheduler,
     ):
-        analytics.schedule_gather_analytics()
-        scheduler.run(burst=True)
-        job = Job.fetch(
-            analytics.ANALYTICS_SCHEDULE_JOB_ID,
-            default_queue.connection,
-            serializer=DefaultSerializer,
-        )
-        # the first job scheduled to run immediately
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        assert abs(job.enqueued_at - now) < timedelta(seconds=1)
-        assert (
-            job.meta["interval"]
-            == application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL
-        )
+        with mock.patch(
+            "aap_eda.tasks.analytics.application_settings",
+            new=analytics_settings,
+        ):
+            analytics.schedule_gather_analytics(default_queue.name)
+            scheduler.run(burst=True)
+            job = Job.fetch(
+                analytics.ANALYTICS_SCHEDULE_JOB_ID,
+                default_queue.connection,
+                serializer=DefaultSerializer,
+            )
+            assert job.enqueued_at is None
+            assert (
+                job.func_name
+                == "aap_eda.tasks.analytics.auto_gather_analytics"
+            )
 
-        analytics.reschedule_gather_analytics(
-            500, serializer=DefaultSerializer
-        )
-        job.refresh()
-        assert job.meta["interval"] == 500
-
-
-@pytest.mark.django_db
-def test_reschedule_without_scheduler():
-    # should not raise any error
-    analytics.reschedule_gather_analytics(500)
-"""
+            time.sleep(analytics_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL)
+            scheduler.run(burst=True)
+            job.refresh()
+            assert job.enqueued_at is not None
