@@ -34,13 +34,13 @@ jobs:
         run: poetry install --no-root --only=lint
 
       - name: Lint with black
-        run: poetry run black --check -- .
+        run: poetry run black --check .
 
       - name: Lint with isort
-        run: poetry run isort --check -- .
+        run: poetry run isort --check .
 
       - name: Lint with ruff
-        run: poetry run ruff --show-source -- .
+        run: poetry run ruff --show-source .
 
       - name: Lint with flake8
         run: poetry run flake8 . --count --show-source --statistics
