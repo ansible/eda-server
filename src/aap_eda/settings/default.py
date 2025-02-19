@@ -212,11 +212,10 @@ def toggle_feature_flags(flags, settings):
 # See https://cfpb.github.io/django-flags/
 FLAGS = {}
 FLAGS = {
-    "EDA_ANALYTICS": [
+    "FEATURE_EDA_ANALYTICS_ENABLED": [
         {
             "condition": "boolean",
-            "value": settings.get("FEATURE_EDA_ANALYTICS", True),
-            "required": settings.get("FEATURE_EDA_ANALYTICS", True),
+            "value": True,
         }
     ]
 }
@@ -546,7 +545,7 @@ RQ_QUEUES = get_rq_queues()
 RULEBOOK_QUEUE_NAME = settings.get("RULEBOOK_QUEUE_NAME", "activation")
 
 RQ_STARTUP_JOBS = []
-if settings.get("FEATURE_EDA_ANALYTICS", True):
+if settings.get("FEATURE_EDA_ANALYTICS_ENABLED", True):
     RQ_STARTUP_JOBS = [
         {
             "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
