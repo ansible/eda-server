@@ -242,14 +242,22 @@ class SettingsRegistry(object):
         url = f"{settings.RESOURCE_SERVER['URL']}/{sync_slug}"
         token = resource_server.get_service_token()
         logger.info(f"Getting remote settings from {url}")
-        res = requests.get(
-            url,
-            headers={"X-ANSIBLE-SERVICE-AUTH": token},
-            verify=settings.RESOURCE_SERVER["VALIDATE_HTTPS"],
-        )
+        try:
+            res = requests.get(
+                url,
+                headers={"X-ANSIBLE-SERVICE-AUTH": token},
+                verify=settings.RESOURCE_SERVER["VALIDATE_HTTPS"],
+            )
+        except requests.RequestException as e:
+            msg = (
+                "Failed to fetch settings from gateway. Exception: "
+                f"{str(e)}. Default or stored values will be used"
+            )
+            logger.error(msg)
+            return
         if not res.ok:
             msg = (
-                "Failed to fetch settings from gateway. Status code"
+                "Failed to fetch settings from gateway. HTTP status code "
                 f"{res.status_code}. Default or stored values will be used"
             )
             logger.error(msg)

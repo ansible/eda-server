@@ -26,12 +26,12 @@ ANALYTICS_JOB_ID = "job_gather_analytics"
 ANALYTICS_TASKS_QUEUE = "default"
 
 
-def schedule_gather_analytics() -> None:
+def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
     interval = application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL
     logger.info(f"Schedule analytics to run in {interval} seconds")
     tasking.enqueue_delay(
-        ANALYTICS_TASKS_QUEUE,
-        ANALYTICS_JOB_ID,
+        queue_name,
+        ANALYTICS_SCHEDULE_JOB_ID,
         interval,
         auto_gather_analytics,
     )
