@@ -107,6 +107,7 @@ services:
       retries: 10
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
 
   eda-ws:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -121,6 +122,8 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -142,6 +145,7 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
 
   eda-activation-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -163,6 +167,7 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
 
   eda-scheduler:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -198,6 +203,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    volumes:
+      - '../../:/app/src:z'
 
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}
