@@ -1,4 +1,4 @@
-#  Copyright 2022 Red Hat, Inc.
+#  Copyright 2025 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -11,24 +11,23 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""
-WSGI config.
-
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/4.1/howto/deployment/wsgi/
-"""
-
 import logging
-import os
+import sys
 
-from django.core.wsgi import get_wsgi_application
 
-from aap_eda.logging.startup import startup_logging
+class UnconditionalLogger:
+    """Log unconditional messages regardless of log level."""
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
-logger = logging.getLogger(__name__)
-startup_logging(logger)
+    unconditional_level = sys.maxsize
+    unconditional_level_name = "ALWAYS"
 
-application = get_wsgi_application()
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+        logging.addLevelName(
+            self.unconditional_level,
+            self.unconditional_level_name,
+        )
+
+    def log(self, *args, **kwargs):
+        """Log at the unconditional level."""
+        self.logger.log(self.unconditional_level, *args, **kwargs)
