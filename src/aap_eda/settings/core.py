@@ -14,6 +14,17 @@
 
 # Define all settings use internally, not exposed to users for overwriting.
 
+# Defines feature flags, and their conditions.
+# See https://cfpb.github.io/django-flags/
+FLAGS = {
+    "FEATURE_EDA_ANALYTICS_ENABLED": [
+        {
+            "condition": "boolean",
+            "value": True,
+        }
+    ]
+}
+
 INSTALLED_APPS = [
     "daphne",
     "flags",
@@ -142,6 +153,13 @@ DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
 DEFAULT_WORKER_TTL = 5
 
 RQ_STARTUP_JOBS = []
+if FLAGS["FEATURE_EDA_ANALYTICS_ENABLED"][0]["value"]:
+    RQ_STARTUP_JOBS.append(
+        {
+            "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
+            "job_id": "start_analytics_scheduler",
+        }
+    )
 
 # Id of the scheduler job it's required when we have multiple instances of
 # the scheduler running to avoid duplicate jobs
@@ -183,15 +201,3 @@ ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
 ANSIBLE_BASE_CHECK_RELATED_PERMISSIONS = ["view"]
 
 DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
-
-# Defines feature flags, and their conditions.
-# See https://cfpb.github.io/django-flags/
-FLAGS = {
-    "EDA_ANALYTICS": [
-        {
-            "condition": "boolean",
-            "value": True,
-            "required": True,
-        }
-    ]
-}

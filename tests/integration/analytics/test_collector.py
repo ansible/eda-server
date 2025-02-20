@@ -44,7 +44,8 @@ def collector():
 @patch("aap_eda.analytics.collector.flag_enabled")
 @patch("aap_eda.analytics.collector.AnalyticsCollector")
 def test_gather_when_enabled(mock_collector_cls, mock_flag_enabled):
-    """Test gather function when EDA_ANALYTICS is enabled"""
+    """Test gather function when FEATURE_EDA_ANALYTICS_ENABLED
+    is set to True"""
     mock_flag_enabled.return_value = True
     mock_collector_cls.return_value = MagicMock()
     mock_logger = MagicMock()
@@ -56,7 +57,7 @@ def test_gather_when_enabled(mock_collector_cls, mock_flag_enabled):
         logger=mock_logger,
     )
 
-    mock_flag_enabled.assert_called_once_with("EDA_ANALYTICS")
+    mock_flag_enabled.assert_called_once_with("FEATURE_EDA_ANALYTICS_ENABLED")
     mock_collector_cls.assert_called_once_with(
         collector_module=ANY,
         collection_type="manual",
@@ -67,13 +68,16 @@ def test_gather_when_enabled(mock_collector_cls, mock_flag_enabled):
 
 @patch("aap_eda.analytics.collector.flag_enabled")
 def test_gather_when_disabled(mock_flag_enabled):
-    """Test gather function when EDA_ANALYTICS is disabled"""
+    """Test gather function when FEATURE_EDA_ANALYTICS_ENABLED
+    is set to False"""
     mock_flag_enabled.return_value = False
     mock_logger = MagicMock()
 
     result = gather(logger=mock_logger)
 
-    mock_logger.info.assert_called_once_with("EDA_ANALYTICS is disabled.")
+    mock_logger.info.assert_called_once_with(
+        "FEATURE_EDA_ANALYTICS_ENABLED is set to False."
+    )
     assert result is None
 
 
