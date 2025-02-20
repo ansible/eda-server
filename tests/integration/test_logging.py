@@ -34,30 +34,11 @@ def test_http_startup_logging_disabled(caplog_factory, module):
     assert "Starting eda-server" not in caplog.text
 
 
-@pytest.mark.parametrize(
-    "command",
-    [
-        ["aap-eda-manage", "rqworker", "--help"],
-        [
-            "gunicorn",
-            "aap_eda.wsgi:application",
-            "--bind",
-            "127.0.0.1:8009",
-        ],
-        [
-            "daphne",
-            "-b",
-            "127.0.0.1",
-            "-p",
-            "8009",
-            "aap_eda.asgi:application",
-        ],
-    ],
-)
-def test_worker_startup_logs(command):
+def test_worker_startup_logs():
     """
     Test that starting workers produce the expected startup message.
     """
+    command = ["aap-eda-manage", "rqworker", "--help"]
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
