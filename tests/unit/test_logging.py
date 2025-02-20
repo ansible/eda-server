@@ -8,6 +8,7 @@ from aap_eda.logging.startup import SETTINGS_LIST_FOR_LOGGING, startup_logging
 from aap_eda.utils import get_eda_version
 
 
+@override_settings(SECRET_KEY="some_random_not_so_secret_key")
 def test_startup_logging(caplog_factory):
     logger = logging.getLogger(__name__)
     caplog = caplog_factory(logger)
@@ -22,7 +23,7 @@ def test_startup_logging(caplog_factory):
         assert str(getattr(settings, setting)) in caplog.text
 
     # some assertions to check that sensitive data is not logged
-    assert settings.SECRET_KEY not in caplog.text
+    assert "some_random_not_so_secret_key" not in caplog.text
     database_password = getattr(
         settings.DATABASES["default"], "PASSWORD", None
     )
