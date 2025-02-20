@@ -578,7 +578,7 @@ SPECTACULAR_SETTINGS = {
 # ---------------------------------------------------------
 # LOGGING SETTINGS
 # ---------------------------------------------------------
-
+STARTUP_LOGGING_ENABLED = settings.get("STARTUP_LOGGING_ENABLED", True)
 APP_LOG_LEVEL = settings.get("APP_LOG_LEVEL", "INFO")
 
 # If DEBUG is set, keep consistent the log level
