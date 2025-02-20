@@ -34,7 +34,9 @@ from django.test import override_settings
     ],
 )
 @pytest.mark.django_db
-@override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
+@override_settings(
+    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]}
+)
 def test_gather_analytics_invalid_settings(
     analytics_settings,
     caplog_factory,
@@ -120,7 +122,9 @@ def test_gather_analytics_invalid_settings(
     ],
 )
 @pytest.mark.django_db
-@override_settings(FLAGS={"EDA_ANALYTICS": [("boolean", True)]})
+@override_settings(
+    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]}
+)
 @mock.patch(
     "aap_eda.core.management.commands.gather_analytics.collector.gather"
 )
@@ -156,7 +160,7 @@ def test_gather_analytics_command(
     "feature_flag_state, expected",
     [
         (True, "Either --ship or --dry-run needs to be set."),
-        (False, "EDA_ANALYTICS is disabled."),
+        (False, "FEATURE_EDA_ANALYTICS_ENABLED is set to False."),
     ],
 )
 def test_gather_analytics_command_by_ff_state(
@@ -170,13 +174,15 @@ def test_gather_analytics_command_by_ff_state(
         out = StringIO()
         logger = logging.getLogger("aap_eda.analytics")
         eda_log = caplog_factory(logger)
-        if feature_flag_state:
-            call_command("enable_flag", "EDA_ANALYTICS", stdout=out)
-        else:
-            call_command("disable_flag", "EDA_ANALYTICS", stdout=out)
-
-        command = "gather_analytics"
-        call_command(command, stdout=out)
+        with override_settings(
+            FLAGS={
+                "FEATURE_EDA_ANALYTICS_ENABLED": [
+                    ("boolean", feature_flag_state)
+                ]
+            }
+        ):
+            command = "gather_analytics"
+            call_command(command, stdout=out)
 
         assert any(
             record.levelname == "ERROR" and record.message == expected

@@ -88,8 +88,8 @@ class AnalyticsCollector(Collector):
 def gather(collection_type="scheduled", since=None, until=None, logger=None):
     if not logger:
         logger = logging.getLogger("aap_eda.analytics")
-    if not flag_enabled("EDA_ANALYTICS"):
-        logger.info("EDA_ANALYTICS is disabled.")
+    if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
+        logger.info("FEATURE_EDA_ANALYTICS_ENABLED is set to False.")
         return
     collector = AnalyticsCollector(
         collector_module=analytics_collectors,

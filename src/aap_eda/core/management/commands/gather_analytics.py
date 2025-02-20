@@ -71,8 +71,8 @@ class Command(BaseCommand):
         opt_since = options.get("since")
         opt_until = options.get("until")
 
-        if not flag_enabled("EDA_ANALYTICS"):
-            self.logger.error("EDA_ANALYTICS is disabled.")
+        if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
+            self.logger.error("FEATURE_EDA_ANALYTICS_ENABLED is set to False.")
             return
 
         since = parser.parse(opt_since) if opt_since else None
