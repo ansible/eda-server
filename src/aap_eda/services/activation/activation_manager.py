@@ -15,6 +15,7 @@
 import contextlib
 import logging
 import typing as tp
+import uuid
 from datetime import timedelta
 
 import rq
@@ -35,6 +36,7 @@ from aap_eda.services.activation.restart_helper import (
     system_cancel_restart_activation,
     system_restart_activation,
 )
+from aap_eda.utils.log_tracking_id_filter import assign_log_tracking_id
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
@@ -68,6 +70,7 @@ class ActivationManager(StatusManager):
             container_engine: The container engine to use.
         """
         super().__init__(db_instance)
+        self._set_log_tracking_id()
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -105,6 +108,12 @@ class ActivationManager(StatusManager):
         """Increase the restart count of the activation."""
         self.db_instance.restart_count += 1
         self.db_instance.save(update_fields=["restart_count", "modified_at"])
+
+    @run_with_lock
+    def _save_log_tracking_id(self, log_tracking_id: str):
+        """Reset the log_tracking_id of the activation."""
+        self.db_instance.log_tracking_id = log_tracking_id
+        self.db_instance.save(update_fields=["log_tracking_id"])
 
     @run_with_lock
     def _check_start_prerequirements(self) -> None:
@@ -661,6 +670,14 @@ class ActivationManager(StatusManager):
     def _error_activation(self, msg: str):
         LOGGER.error(msg)
         self.set_status(ActivationStatus.ERROR, msg)
+
+    def _set_log_tracking_id(self):
+        if not self.db_instance.log_tracking_id:
+            tracking_id = str(uuid.uuid4())
+            self._save_log_tracking_id(tracking_id)
+            assign_log_tracking_id(tracking_id)
+        else:
+            assign_log_tracking_id(self.db_instance.log_tracking_id)
 
     def start(self, is_restart: bool = False):
         """Start an activation.
