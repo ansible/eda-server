@@ -17,6 +17,6 @@ class CoreConfig(AppConfig):
         # Run the startup logging for rq worker
 
         if "rqworker" in sys.argv:
-            from aap_eda.logging.startup import startup_logging
+            from aap_eda.utils.logging import startup_logging
 
             startup_logging(logger)

@@ -4,8 +4,8 @@ import platform
 from django.conf import settings
 from django.test import override_settings
 
-from aap_eda.logging.startup import SETTINGS_LIST_FOR_LOGGING, startup_logging
 from aap_eda.utils import get_eda_version
+from aap_eda.utils.logging import SETTINGS_LIST_FOR_LOGGING, startup_logging
 
 
 @override_settings(SECRET_KEY="some_random_not_so_secret_key")

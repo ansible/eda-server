@@ -26,7 +26,7 @@ import os
 from channels.routing import ProtocolTypeRouter
 from django.core.asgi import get_asgi_application
 
-from aap_eda.logging.startup import startup_logging
+from aap_eda.utils.logging import startup_logging
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "aap_eda.settings.default")
 

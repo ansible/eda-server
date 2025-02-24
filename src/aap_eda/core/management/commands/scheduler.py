@@ -79,7 +79,7 @@ from django.conf import settings
 from django_rq.management.commands import rqscheduler
 
 from aap_eda.core import tasking
-from aap_eda.logging.startup import startup_logging
+from aap_eda.utils.logging import startup_logging
 
 logger = logging.getLogger(__name__)
 

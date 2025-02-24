@@ -11,14 +11,32 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
 import logging
 import platform
+import sys
 
 from django.conf import settings
 
-from aap_eda.logging import UnconditionalLogger
 from aap_eda.utils import get_eda_version
+
+
+class UnconditionalLogger:
+    """Log unconditional messages regardless of log level."""
+
+    unconditional_level = sys.maxsize
+    unconditional_level_name = "ALWAYS"
+
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+        logging.addLevelName(
+            self.unconditional_level,
+            self.unconditional_level_name,
+        )
+
+    def log(self, *args, **kwargs):
+        """Log at the unconditional level."""
+        self.logger.log(self.unconditional_level, *args, **kwargs)
+
 
 # Whitelist of settings that are safe to log at startup
 # There are many, only the most relevant, configurable ones are listed here
