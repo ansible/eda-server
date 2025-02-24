@@ -145,6 +145,7 @@ class Activation(
         default=False,
         help_text=("Skip audit events for activation"),
     )
+    request_id = models.TextField(null=True)
 
     def get_parent_type(self) -> str:
         return ProcessParentType.ACTIVATION

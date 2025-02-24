@@ -472,6 +472,9 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
+        validated_data["request_id"] = self.context["request"].headers.get(
+            "x-request-id", ""
+        )
 
         if settings.DEPLOYMENT_TYPE == "k8s":
             validated_data["k8s_service_name"] = _update_k8s_service_name(

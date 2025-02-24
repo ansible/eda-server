@@ -69,6 +69,7 @@ pyjwt = { version = "2.7.*", extras = ["crypto"] }
 ecdsa = "0.18.*"
 validators = "^0.34.0"
 django-flags = "^5.0.13"
+django-request-id = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

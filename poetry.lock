@@ -761,6 +761,21 @@ redis = ">=3,<4.0.0 || >4.0.0,<4.0.1 || >4.0.1"
 hiredis = ["redis[hiredis] (>=3,!=4.0.0,!=4.0.1)"]
 
 [[package]]
+name = "django-request-id"
+version = "1.0.0"
+description = "Augment each request with unique id for logging purposes"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "django-request-id-1.0.0.tar.gz", hash = "sha256:0eb7ef17e21ff5efe5014e5b3cc6d22fc3396d4ea9d5b353bba2c43107998368"},
+    {file = "django_request_id-1.0.0-py2.py3-none-any.whl", hash = "sha256:f7f296a7c6de44193af9461c72cbdb6a12887fffe00a7dcfa0f43a4ec67e4643"},
+]
+
+[package.dependencies]
+django = "*"
+
+[[package]]
 name = "django-rq"
 version = "2.8.0"
 description = "An app that provides django integration for RQ (Redis Queue)"
@@ -2943,4 +2958,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "af92edac99cd98dd22a6900a9e34f57dc4ee061730f49471aef763936b6dafef"
+content-hash = "3d62ae3bb601beda098b724445df91b4277d349b0bf219c6be2997ce1b537088"
