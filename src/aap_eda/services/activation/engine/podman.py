@@ -351,6 +351,9 @@ class Engine(ContainerEngine):
     ) -> Image:
         try:
             log_handler.write(f"Pulling image {request.image_url}", True)
+            log_handler.write(
+                f"Logging request_id: {request.request_id}", True
+            )
             LOGGER.info(f"Pulling image : {request.image_url}")
             kwargs = {}
             if request.credential:

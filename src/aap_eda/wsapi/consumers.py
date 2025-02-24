@@ -28,6 +28,9 @@ from aap_eda.core.utils.credentials import (
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.tasks import orchestrator
+from aap_eda.utils.websocket_request_id_filter import (
+    assign_request_id_websocket,
+)
 
 from .messages import (
     ActionMessage,
@@ -97,8 +100,25 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
+    async def _set_request_id(self, data):
+        headers = dict(
+            (k.decode().lower(), v.decode())
+            for k, v in self.scope.get("headers", [])
+        )
+        if headers.get("x-request-id"):
+            self.request_id = headers.get("x-request-id")
+        elif "activation_id" in data:
+            self.request_id = await self.get_activation_instance_request_id(
+                data["activation_id"]
+            )
+        else:
+            self.request_id = ""
+
+        await assign_request_id_websocket(self.request_id)
+
     async def receive(self, text_data=None, bytes_data=None):
         data = json.loads(text_data)
+        await self._set_request_id(data)
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
 
         msg_type = MessageType(data.get("type"))
@@ -372,6 +392,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         logger.info(f"ActivationInstanceJobInstance {instance.id} is created.")
 
         return job_instance
+
+    @database_sync_to_async
+    def get_activation_instance_request_id(
+        self, rulebook_process_id: str
+    ) -> str:
+        return models.RulebookProcess.objects.get(
+            id=rulebook_process_id
+        ).request_id
 
     @database_sync_to_async
     def get_activation(self, rulebook_process_id: str) -> models.Activation:

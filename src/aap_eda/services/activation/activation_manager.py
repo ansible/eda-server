@@ -35,6 +35,9 @@ from aap_eda.services.activation.restart_helper import (
     system_cancel_restart_activation,
     system_restart_activation,
 )
+from aap_eda.utils.activation_request_id_filter import (
+    assign_request_id_activation,
+)
 
 from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
@@ -68,6 +71,7 @@ class ActivationManager(StatusManager):
             container_engine: The container engine to use.
         """
         super().__init__(db_instance)
+        self._set_request_id()
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -662,6 +666,14 @@ class ActivationManager(StatusManager):
         LOGGER.error(msg)
         self.set_status(ActivationStatus.ERROR, msg)
 
+    def _set_request_id(self):
+        if self.db_instance.latest_instance:
+            assign_request_id_activation(
+                self.db_instance.latest_instance.request_id
+            )
+        else:
+            assign_request_id_activation(self.db_instance.request_id)
+
     def start(self, is_restart: bool = False):
         """Start an activation.
 
@@ -1048,6 +1060,7 @@ class ActivationManager(StatusManager):
             "status": ActivationStatus.STARTING,
             "git_hash": git_hash,
             "organization": self.db_instance.organization,
+            "request_id": self.db_instance.request_id,
         }
         args[f"{self.db_instance_type}"] = self.db_instance
         try:

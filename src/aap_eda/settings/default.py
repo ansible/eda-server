@@ -181,6 +181,7 @@ JWT_REFRESH_TOKEN_LIFETIME_DAYS = settings.get(
 INSTALLED_APPS = [
     "daphne",
     "flags",
+    "request_id",
     # Django apps
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -214,6 +215,7 @@ FLAGS = {}
 toggle_feature_flags(FLAGS, settings)
 
 MIDDLEWARE = [
+    "request_id.middleware.RequestIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -588,14 +590,39 @@ if DEBUG:
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id_filter": {
+            "()": "request_id.logging.RequestIdFilter",
+        },
+        "activation_id_filter": {
+            "()": "aap_eda.utils.activation_request_id_filter.ActivationRequestIdFilter",
+        },
+        "websocket_id_filter": {
+            "()": "aap_eda.utils.websocket_request_id_filter.WebSocketRequestIdFilter",
+        },
+    },
     "formatters": {
         "simple": {
-            "format": "{asctime} {name} {levelname:<8} {message}",
+            "format": "{asctime} {levelname:<8} {request_id} {name} {message}",
             "style": "{",
         },
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "filters": ["request_id_filter"],
+        },
+        "websocket": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "filters": ["websocket_id_filter"],
+        },
+        "activation": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "filters": ["activation_id_filter"],
+        },
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
@@ -619,7 +646,22 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        "aap_eda.wsapi.consumers": {
+            "handlers": ["websocket"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "aap_eda.services.activation": {
+            "handlers": ["activation"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
         "ansible_base": {
+            "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "daphne": {
             "handlers": ["console"],
             "level": APP_LOG_LEVEL,
             "propagate": False,

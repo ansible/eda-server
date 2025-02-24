@@ -88,7 +88,8 @@ class ActivationViewSet(
         | RedisDependencyMixin.redis_unavailable_response(),
     )
     def create(self, request):
-        serializer = self.get_serializer(data=request.data)
+        context = {"request": request}
+        serializer = self.get_serializer(data=request.data, context=context)
         serializer.is_valid(raise_exception=True)
 
         # If we're expected to run this activation we need redis

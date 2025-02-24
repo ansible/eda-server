@@ -70,6 +70,7 @@ class RulebookProcess(BaseOrgModel):
     activation_pod_id = models.TextField(null=True)
     status_message = models.TextField(null=True, default=None)
     log_read_at = models.DateTimeField(null=True)
+    request_id = models.TextField(null=True)
 
     class Meta:
         db_table = "core_rulebook_process"
