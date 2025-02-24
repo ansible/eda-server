@@ -33,13 +33,3 @@ def test_startup_logging(caplog_factory):
 
     for word in ["SECRET", "PASSWORD"]:
         assert word not in caplog.text
-
-
-def test_startup_logging_disabled(caplog_factory):
-    logger = logging.getLogger(__name__)
-    caplog = caplog_factory(logger)
-
-    with override_settings(STARTUP_LOGGING_ENABLED=False):
-        startup_logging(logger)
-
-    assert not caplog.text

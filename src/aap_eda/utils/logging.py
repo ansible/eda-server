@@ -78,9 +78,6 @@ SETTINGS_LIST_FOR_LOGGING = [
 
 def startup_logging(logger: logging.Logger) -> None:
     """Log unconditional messages for startup."""
-    if not settings.STARTUP_LOGGING_ENABLED:
-        return
-
     unconditional_logger = UnconditionalLogger(logger)
 
     unconditional_logger.log(f"Starting eda-server {get_eda_version()}")
