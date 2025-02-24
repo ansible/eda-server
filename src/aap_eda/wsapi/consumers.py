@@ -28,6 +28,7 @@ from aap_eda.core.utils.credentials import (
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.tasks import orchestrator
+from aap_eda.utils.log_tracking_id_filter import assign_log_tracking_id
 
 from .messages import (
     ActionMessage,
@@ -100,6 +101,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         data = json.loads(text_data)
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
+
+        await self._set_log_tracking_id(data)
 
         msg_type = MessageType(data.get("type"))
 
@@ -178,6 +181,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def handle_actions(self, message: ActionMessage):
         logger.info(f"Start to handle actions: {message}")
         await self.insert_audit_rule_data(message)
+
+    async def _set_log_tracking_id(self, data: dict):
+        log_tracking_id = ""
+        activation_instance_id = data.get("activation_id")
+        if activation_instance_id:
+            activation = await self.get_activation(activation_instance_id)
+            log_tracking_id = activation.log_tracking_id
+
+        assign_log_tracking_id(log_tracking_id)
 
     @database_sync_to_async
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
