@@ -45,7 +45,9 @@ from aap_eda.services.activation.engine.podman import (
     _get_podman_socket_url,
     get_podman_client,
 )
-from aap_eda.settings.default import settings as orig_dynaconf_settings
+from aap_eda.settings.default import (  # noqa: N811
+    DYNACONF as orig_dynaconf_settings,
+)
 
 from .utils import InitData, get_ansible_rulebook_cmdline, get_request
 
@@ -154,7 +156,7 @@ def test_get_podman_client_with_timeout(settings):
 
 def test_get_podman_client_with_zero_timeout():
     """Test setting the timeout for the Podman client to zero."""
-    with mock.patch("aap_eda.settings.default.settings.get") as get_mock:
+    with mock.patch("aap_eda.settings.default.DYNACONF.get") as get_mock:
 
         def get_side_effect(*args, **kwargs):
             if args[0] == "PODMAN_SOCKET_TIMEOUT":
