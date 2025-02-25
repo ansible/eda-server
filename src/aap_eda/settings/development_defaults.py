@@ -1,4 +1,4 @@
-#  Copyright 2023 Red Hat, Inc.
+#  Copyright 2025 Red Hat, Inc.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -11,14 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-# flake8: noqa
-import os
-
-os.environ.setdefault("EDA_DEBUG", "true")
-os.environ.setdefault("EDA_SECRET_KEY", "insecure")
-os.environ.setdefault("EDA_DB_PASSWORD", "secret")
-os.environ.setdefault("EDA_DB_HOST", "localhost")
-os.environ.setdefault("EDA_MQ_HOST", "localhost")
-
-from .default import *
+DEBUG = True
+SECRET_KEY = "insecure"
+DB_PASSWORD = "secret"
+DB_HOST = "localhost"
+MQ_HOST = "localhost"
