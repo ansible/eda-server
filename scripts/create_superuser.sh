@@ -27,7 +27,7 @@ usage() {
 
 create_user() {
     if ! command -v poetry &>/dev/null; then
-        log-warn "poetry is not installed, please install poetry(version >= 1.4.0) first."
+        log-warn "poetry is not installed, please install poetry(version >= 2.0) first."
         exit 1
     fi
 
