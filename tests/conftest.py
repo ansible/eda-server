@@ -22,7 +22,7 @@ from aap_eda.core.management.commands.create_initial_data import (
     CREDENTIAL_TYPES,
     populate_credential_types,
 )
-from aap_eda.settings import default
+from aap_eda.settings import redis as redis_settings
 
 
 #################################################################
@@ -74,7 +74,7 @@ def aap_credential_type(preseed_credential_types):
 @pytest.fixture
 def redis_parameters() -> dict:
     """Provide redis parameters based on settings values."""
-    params = default.rq_redis_client_instantiation_parameters()
+    params = redis_settings.rq_redis_client_instantiation_parameters()
 
     # TODO: figure out the db oddity described here-in.
     #
