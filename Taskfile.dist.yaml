@@ -21,8 +21,8 @@ tasks:
   dev:init:
     desc: "Initialize local development environment"
     cmds:
-      - cmd: poetry install -E dev
-      - cmd: pre-commit install
+      - poetry install -E dev
+      - pre-commit install
 
   run:api:
     desc: "Run API server locally"
@@ -99,7 +99,7 @@ tasks:
       - poetry run isort -- {{.CLI_ARGS | default "."}}
 
   lint:ruff:
-    desc: "Check code with `flake8`."
+    desc: "Check code with `ruff`."
     cmds:
       - poetry run ruff -- {{.CLI_ARGS | default "."}}
 
