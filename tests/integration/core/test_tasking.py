@@ -27,7 +27,7 @@ from aap_eda.core.tasking import (
     logger,
     unique_enqueue,
 )
-from aap_eda.settings import default
+from aap_eda.settings import redis as redis_settings
 
 
 @pytest.fixture
@@ -82,32 +82,52 @@ def test_get_pending_job_non_existing_job():
     assert result is None
 
 
-@patch("aap_eda.settings.default.REDIS_UNIX_SOCKET_PATH", "path/to/socket")
+@patch(
+    "aap_eda.settings.redis.settings.REDIS_UNIX_SOCKET_PATH", "path/to/socket"
+)
 def test_unix_dab_url():
     url = _create_url_from_parameters(
-        **default.rq_redis_client_instantiation_parameters()
+        **redis_settings.rq_redis_client_instantiation_parameters()
     )
     assert url == "unix://path/to/socket"
 
 
-@patch("aap_eda.settings.default.REDIS_UNIX_SOCKET_PATH", None)
-@patch("aap_eda.settings.default.REDIS_CLIENT_CERT_PATH", None)
-@patch("aap_eda.settings.default.REDIS_HOST", "a-host")
-@patch("aap_eda.settings.default.REDIS_PORT", 6379)
+@patch("aap_eda.settings.redis.settings.REDIS_UNIX_SOCKET_PATH", None)
+@patch("aap_eda.settings.redis.settings.REDIS_CLIENT_CERT_PATH", None)
+@patch("aap_eda.settings.redis.settings.REDIS_HOST", "a-host")
+@patch("aap_eda.settings.redis.settings.REDIS_PORT", 6379)
 def test_redis_dab_url():
     url = _create_url_from_parameters(
-        **default.rq_redis_client_instantiation_parameters()
+        **redis_settings.rq_redis_client_instantiation_parameters()
     )
     assert url == "redis://a-host:6379"
 
 
-@patch("aap_eda.settings.default.REDIS_UNIX_SOCKET_PATH", None)
-@patch("aap_eda.settings.default.REDIS_CLIENT_CERT_PATH", "path/to/cert")
-@patch("aap_eda.settings.default.REDIS_HOST", "a-different-host")
-@patch("aap_eda.settings.default.REDIS_PORT", 6380)
+@patch("aap_eda.settings.redis.settings.REDIS_UNIX_SOCKET_PATH", None)
+@patch("aap_eda.settings.redis.settings.REDIS_CLIENT_CERT_PATH", None)
+@patch("aap_eda.settings.redis.settings.REDIS_PORT", 6379)
+@patch("aap_eda.settings.redis.settings.REDIS_TLS", "yes")
+@patch("aap_eda.settings.redis.settings.REDIS_HA_CLUSTER_HOSTS", "h1,h2")
+@patch("aap_eda.settings.redis.settings.MQ_SOCKET_KEEP_ALIVE", True)
+@patch("aap_eda.settings.redis.settings.MQ_SOCKET_CONNECT_TIMEOUT", 30)
+@patch("aap_eda.settings.redis.settings.MQ_SOCKET_TIMEOUT", 150)
+@patch("aap_eda.settings.redis.settings.MQ_CLUSTER_ERROR_RETRY_ATTEMPTS", 3)
+def test_redis_ha_dab_url():
+    url = _create_url_from_parameters(
+        **redis_settings.rq_redis_client_instantiation_parameters()
+    )
+    assert url == "rediss://localhost:6379"
+
+
+@patch("aap_eda.settings.redis.settings.REDIS_UNIX_SOCKET_PATH", None)
+@patch(
+    "aap_eda.settings.redis.settings.REDIS_CLIENT_CERT_PATH", "path/to/cert"
+)
+@patch("aap_eda.settings.redis.settings.REDIS_HOST", "a-different-host")
+@patch("aap_eda.settings.redis.settings.REDIS_PORT", 6380)
 def test_rediss_dab_url():
     url = _create_url_from_parameters(
-        **default.rq_redis_client_instantiation_parameters()
+        **redis_settings.rq_redis_client_instantiation_parameters()
     )
     assert url == "rediss://a-different-host:6380"
 
@@ -127,14 +147,14 @@ def test_worker_dab_client(default_queue: Queue):
     worker = DefaultWorker(
         [default_queue],
         connection=redis.Redis(
-            **default.rq_standalone_redis_client_instantiation_parameters()
+            **redis_settings.rq_standalone_redis_client_instantiation_parameters()  # noqa: E501
         ),
     )
     assert isinstance(worker.connection, type(default_queue.connection))
 
     # Verify if given a DABRedis/DABRedisCluster connection the worker uses it.
     connection = get_redis_client(
-        **default.rq_redis_client_instantiation_parameters()
+        **redis_settings.rq_redis_client_instantiation_parameters()
     )
     worker = DefaultWorker(
         [default_queue],
