@@ -20,7 +20,7 @@ FLAGS = {
     "FEATURE_EDA_ANALYTICS_ENABLED": [
         {
             "condition": "boolean",
-            "value": True,
+            "value": False,
         }
     ]
 }
