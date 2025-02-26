@@ -379,6 +379,13 @@ class Engine(ContainerEngine):
             log_handler.write(msg, True)
             raise exceptions.ContainerImagePullError(msg) from e
         except APIError as e:
+            if e.status_code == 401:
+                msg = messages.IMAGE_PULL_ERROR.format(
+                    image_url=request.image_url,
+                )
+                LOGGER.error(msg)
+                log_handler.write(msg, True)
+                raise exceptions.ContainerImagePullError(msg)
             LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
         except rq.timeouts.JobTimeoutException as e:
