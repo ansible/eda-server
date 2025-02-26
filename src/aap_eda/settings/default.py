@@ -587,14 +587,37 @@ if DEBUG:
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "activation_id_filter": {
+            "()": "aap_eda.utils.log_tracking_id_filter.LogTrackingIdFilter",
+        },
+    },
     "formatters": {
         "simple": {
-            "format": "{asctime} {name} {levelname:<8} {message}",
+            "format": "{asctime} {levelname:<8} {name} {message}",
+            "style": "{",
+        },
+        "tracking": {
+            "format": "{asctime} {levelname:<8} [{log_tracking_id}] {name}"
+            " {message}",
             "style": "{",
         },
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+        "websocket": {
+            "class": "logging.StreamHandler",
+            "formatter": "tracking",
+            "filters": ["activation_id_filter"],
+        },
+        "activation": {
+            "class": "logging.StreamHandler",
+            "formatter": "tracking",
+            "filters": ["activation_id_filter"],
+        },
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
@@ -615,6 +638,16 @@ LOGGING = {
         },
         "aap_eda": {
             "handlers": ["console"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "aap_eda.wsapi.consumers": {
+            "handlers": ["websocket"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+        "aap_eda.services.activation": {
+            "handlers": ["activation"],
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
