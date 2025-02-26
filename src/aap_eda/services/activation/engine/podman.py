@@ -363,14 +363,6 @@ class Engine(ContainerEngine):
                 }
             image = self.client.images.pull(request.image_url, **kwargs)
 
-            # https://github.com/containers/podman-py/issues/301
-            if not image.id:
-                msg = messages.IMAGE_PULL_ERROR.format(
-                    image_url=request.image_url,
-                )
-                LOGGER.error(msg)
-                log_handler.write(msg, True)
-                raise exceptions.ContainerImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound as e:
