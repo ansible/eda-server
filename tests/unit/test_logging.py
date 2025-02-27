@@ -4,7 +4,7 @@ import platform
 from django.conf import settings
 from django.test import override_settings
 
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 from aap_eda.utils.logging import SETTINGS_LIST_FOR_LOGGING, startup_logging
 
 
@@ -15,7 +15,7 @@ def test_startup_logging(caplog_factory):
     startup_logging(logger)
 
     assert "Starting eda-server" in caplog.text
-    assert get_eda_version() in caplog.text
+    assert get_package_version("aap-eda") in caplog.text
     assert "Python version" in caplog.text
     assert platform.python_version() in caplog.text
     for setting in SETTINGS_LIST_FOR_LOGGING:

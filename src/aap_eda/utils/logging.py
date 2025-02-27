@@ -17,7 +17,7 @@ import sys
 
 from django.conf import settings
 
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 
 
 class UnconditionalLogger:
@@ -75,13 +75,25 @@ SETTINGS_LIST_FOR_LOGGING = [
     "EVENT_STREAM_BASE_URL",
 ]
 
+LOGGING_PACKAGE_VERSIONS = [
+    "podman",
+    "kubernetes",
+    "django-ansible-base",
+]
+
 
 def startup_logging(logger: logging.Logger) -> None:
     """Log unconditional messages for startup."""
     unconditional_logger = UnconditionalLogger(logger)
 
-    unconditional_logger.log(f"Starting eda-server {get_eda_version()}")
+    unconditional_logger.log(
+        f"Starting eda-server {get_package_version('aap-eda')}",
+    )
     unconditional_logger.log(f"Python version: {platform.python_version()}")
+    for pkg in LOGGING_PACKAGE_VERSIONS:
+        unconditional_logger.log(
+            f"{pkg} library version: {get_package_version(pkg)}",
+        )
     unconditional_logger.log(
         f"Platform: {platform.platform()} {platform.architecture()}",
     )

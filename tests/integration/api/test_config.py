@@ -14,7 +14,7 @@
 import pytest
 from django.conf import settings
 
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 from tests.integration.constants import api_url_v1
 
 
@@ -24,6 +24,6 @@ def test_v1_config(admin_client):
     assert response.status_code == 200
     assert response.data == {
         "time_zone": settings.TIME_ZONE,
-        "version": get_eda_version(),
+        "version": get_package_version("aap-eda"),
         "deployment_type": settings.DEPLOYMENT_TYPE,
     }

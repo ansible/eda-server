@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from aap_eda.api.serializers import ConfigSerializer
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 
 
 class ConfigView(APIView):
@@ -38,7 +38,7 @@ class ConfigView(APIView):
     def get(self, request):
         data = {
             "time_zone": settings.TIME_ZONE,
-            "version": get_eda_version(),
+            "version": get_package_version("aap-eda"),
             "deployment_type": settings.DEPLOYMENT_TYPE,
         }
 
