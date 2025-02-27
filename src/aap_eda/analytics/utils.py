@@ -14,16 +14,32 @@
 
 import logging
 import re
-from typing import Optional, Tuple
+from functools import lru_cache
+from typing import Any, Optional, Tuple
 
 import requests
 import yaml
+from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from requests.auth import AuthBase, HTTPBasicAuth
 
+from aap_eda.conf import application_settings
 from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import inputs_from_store
 
 logger = logging.getLogger("aap_eda.analytics")
+
+
+class MissingUserPasswordError(Exception):
+    """Raised when required user credentials are missing."""
+
+    pass
+
+
+CREDENTIAL_SOURCES = [
+    ("REDHAT", ("REDHAT_USERNAME", "REDHAT_PASSWORD")),
+    ("SUBSCRIPTIONS", ("SUBSCRIPTIONS_USERNAME", "SUBSCRIPTIONS_PASSWORD")),
+]
 
 
 class TokenAuth(AuthBase):
@@ -141,3 +157,77 @@ def extract_job_details(
             return job_type, str(job_number), install_uuid
 
     return None, None, None
+
+
+def _get_credential_value(field: str, *setting_envs: Tuple[Any, str]) -> str:
+    credential = _get_analytics_credential()
+    if credential:
+        inputs = inputs_from_store(credential.inputs.get_secret_value())
+        return inputs.get(field)
+
+    for env, key in setting_envs:
+        if value := getattr(env, key, None):
+            return value
+    raise ValueError(f"No valid {field} found")
+
+
+def get_analytics_url() -> str:
+    return _get_credential_value(
+        "analytics_url",
+        (application_settings, "AUTOMATION_ANALYTICS_URL"),
+        (settings, "AUTOMATION_ANALYTICS_URL"),
+    )
+
+
+def get_username() -> str:
+    validate_credential()
+    return _get_credential_value(
+        "username",
+        (settings, "REDHAT_USERNAME"),
+        (application_settings, "REDHAT_USERNAME"),
+        (application_settings, "SUBSCRIPTIONS_USERNAME"),
+    )
+
+
+def get_password() -> str:
+    validate_credential()
+    return _get_credential_value(
+        "password",
+        (settings, "REDHAT_PASSWORD"),
+        (application_settings, "REDHAT_PASSWORD"),
+        (application_settings, "SUBSCRIPTIONS_PASSWORD"),
+    )
+
+
+def get_analytics_interval() -> str:
+    return _get_credential_value(
+        "gather_interval",
+        (application_settings, "AUTOMATION_ANALYTICS_GATHER_INTERVAL"),
+    )
+
+
+def validate_credential() -> None:
+    if _get_analytics_credential():
+        return
+
+    has_valid = []
+    for setting in (application_settings, settings):
+        for _, keys in CREDENTIAL_SOURCES:
+            has_valid.append(
+                getattr(setting, keys[0], None)
+                and getattr(setting, keys[1], None)
+            )
+
+    if not any(has_valid):
+        logger.error("Missing required credentials in settings")
+        raise MissingUserPasswordError("Valid credentials not found")
+
+
+@lru_cache(maxsize=1)
+def _get_analytics_credential():
+    analytics_type = models.CredentialType.objects.get(
+        name=enums.AnalyticsCredentialType.BASIC
+    )
+    return models.EdaCredential.objects.filter(
+        credential_type=analytics_type
+    ).first()

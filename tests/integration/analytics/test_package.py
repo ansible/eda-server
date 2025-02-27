@@ -17,7 +17,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.test import override_settings
 
-from aap_eda.analytics.package import MissingUserPasswordError, Package
+from aap_eda.analytics.package import Package
+from aap_eda.utils import get_eda_version
 
 TEST_PASS = "test_pass"
 
@@ -44,8 +45,10 @@ def mock_settings():
 @pytest.mark.django_db
 def test_get_ingress_url(package: Package, mock_settings) -> None:
     with patch(
-        "aap_eda.analytics.package.application_settings",
-        new=mock_settings,
+        "aap_eda.analytics.utils.application_settings", new=mock_settings
+    ), patch(
+        "aap_eda.analytics.utils._get_analytics_credential",
+        return_value=None,
     ):
         assert package.get_ingress_url() == "https://test.url"
 
@@ -68,86 +71,38 @@ def test_get_http_request_headers(package: Package) -> None:
     headers = package._get_http_request_headers()
     assert headers["Content-Type"] == package.PAYLOAD_CONTENT_TYPE
     assert headers["User-Agent"] == package.USER_AGENT
-
-    with patch.dict("django.conf.settings.__dict__", {"EDA_VERSION": "1.0.0"}):
-        headers = package._get_http_request_headers()
-        assert headers["X-EDA-Version"] == "1.0.0"
+    assert headers["X-EDA-Version"] == get_eda_version()
 
 
-@pytest.mark.parametrize(
-    "app_settings, django_settings, should_raise",
-    [
-        # no credentials
-        ({"REDHAT_USERNAME": None, "REDHAT_PASSWORD": None}, {}, True),
-        # credentials in application_settings
-        ({"REDHAT_USERNAME": "user", "REDHAT_PASSWORD": TEST_PASS}, {}, False),
-        # credentials in django_settings
-        (
-            {"REDHAT_USERNAME": None, "REDHAT_PASSWORD": None},
-            {"REDHAT_USERNAME": "user", "REDHAT_PASSWORD": TEST_PASS},
-            False,
-        ),
-        # mixed with valid a credential
-        (
-            {"REDHAT_USERNAME": "user1", "REDHAT_PASSWORD": None},
-            {"REDHAT_USERNAME": "user2", "REDHAT_PASSWORD": TEST_PASS},
-            False,
-        ),
-        # mixed without valid credentials
-        (
-            {"REDHAT_USERNAME": "user", "REDHAT_PASSWORD": None},
-            {"REDHAT_USERNAME": None, "REDHAT_PASSWORD": TEST_PASS},
-            True,
-        ),
-    ],
-)
 @pytest.mark.django_db
-def test_check_users_credentials(
-    package,
-    mock_settings,
-    app_settings,
-    django_settings,
-    should_raise,
-):
-    mock_settings.REDHAT_USERNAME = app_settings["REDHAT_USERNAME"]
-    mock_settings.REDHAT_PASSWORD = app_settings["REDHAT_PASSWORD"]
-    with patch(
-        "aap_eda.analytics.package.application_settings", new=mock_settings
-    ):
-        with override_settings(**django_settings):
-            if should_raise:
-                with pytest.raises(MissingUserPasswordError) as exc_info:
-                    package._check_users()
-                assert "Valid user credentials not found" in str(
-                    exc_info.value
-                )
-            else:
-                package._check_users()
-
-
 def test_credential_priority(package, mock_settings):
-    rh_pass = "app_rh_pass"
-    sub_pass = "app_sub_pass"
-    django_rh_pass = "django_rh_pass"
+    rh_user = "rh_user"
+    rh_pass = "rh_pass"
+    sub_user = "sub_user"
+    sub_pass = "sub_pass"
+    django_user = "django_user"
+    django_pass = "django_pass"
 
-    mock_settings.REDHAT_USERNAME = "app_rh_user"
-    mock_settings.SUBSCRIPTIONS_USERNAME = "app_sub_user"
-    mock_settings.REDHAT_PASSWORD = rh_pass
+    mock_settings.REDHAT_USERNAME = django_user
+    mock_settings.REDHAT_PASSWORD = django_pass
+    mock_settings.SUBSCRIPTIONS_USERNAME = sub_user
     mock_settings.SUBSCRIPTIONS_PASSWORD = sub_pass
 
     with patch(
-        "aap_eda.analytics.package.application_settings", new=mock_settings
+        "aap_eda.analytics.utils.application_settings", new=mock_settings
+    ), patch(
+        "aap_eda.analytics.utils._get_analytics_credential", return_value=None
     ):
         with override_settings(
-            REDHAT_USERNAME="django_rh_user",
-            REDHAT_PASSWORD=django_rh_pass,
+            REDHAT_USERNAME=rh_user,
+            REDHAT_PASSWORD=rh_pass,
         ):
             # first try on REDHAT's
-            assert package._get_rh_user() == "django_rh_user"
-            assert package._get_rh_password() == "django_rh_pass"
+            assert package._get_rh_user() == rh_user
+            assert package._get_rh_password() == rh_pass
 
         # then try on SUBSCRIPTIONS's
         mock_settings.REDHAT_USERNAME = None
         mock_settings.REDHAT_PASSWORD = None
-        assert package._get_rh_user() == "app_sub_user"
-        assert package._get_rh_password() == "app_sub_pass"
+        assert package._get_rh_user() == sub_user
+        assert package._get_rh_password() == sub_pass

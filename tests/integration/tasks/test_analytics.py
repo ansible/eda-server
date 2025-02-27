@@ -73,6 +73,7 @@ def test_auto_gather_analytics():
             mock_schdule.assert_called_once()
 
 
+@pytest.mark.django_db
 def test_schedule_gather_analytics(analytics_settings, default_queue: Queue):
     scheduler = Scheduler(
         queue_name=default_queue.name, connection=default_queue.connection
@@ -82,23 +83,29 @@ def test_schedule_gather_analytics(analytics_settings, default_queue: Queue):
         return_value=scheduler,
     ):
         with mock.patch(
-            "aap_eda.tasks.analytics.application_settings",
+            "aap_eda.analytics.utils.application_settings",
             new=analytics_settings,
         ):
-            analytics.schedule_gather_analytics(default_queue.name)
-            scheduler.run(burst=True)
-            job = Job.fetch(
-                analytics.ANALYTICS_SCHEDULE_JOB_ID,
-                default_queue.connection,
-                serializer=DefaultSerializer,
-            )
-            assert job.enqueued_at is None
-            assert (
-                job.func_name
-                == "aap_eda.tasks.analytics.auto_gather_analytics"
-            )
+            with mock.patch(
+                "aap_eda.analytics.utils._get_analytics_credential",
+                return_value=None,
+            ):
+                analytics.schedule_gather_analytics(default_queue.name)
+                scheduler.run(burst=True)
+                job = Job.fetch(
+                    analytics.ANALYTICS_SCHEDULE_JOB_ID,
+                    default_queue.connection,
+                    serializer=DefaultSerializer,
+                )
+                assert job.enqueued_at is None
+                assert (
+                    job.func_name
+                    == "aap_eda.tasks.analytics.auto_gather_analytics"
+                )
 
-            time.sleep(analytics_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL)
-            scheduler.run(burst=True)
-            job.refresh()
-            assert job.enqueued_at is not None
+                time.sleep(
+                    analytics_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL
+                )
+                scheduler.run(burst=True)
+                job.refresh()
+                assert job.enqueued_at is not None

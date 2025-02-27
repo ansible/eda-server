@@ -14,7 +14,7 @@
 
 import logging
 
-from aap_eda.analytics import collector
+from aap_eda.analytics import collector, utils
 from aap_eda.conf import application_settings
 from aap_eda.core import tasking
 
@@ -27,7 +27,7 @@ ANALYTICS_TASKS_QUEUE = "default"
 
 
 def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
-    interval = application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL
+    interval = utils.get_analytics_interval()
     logger.info(f"Schedule analytics to run in {interval} seconds")
     tasking.enqueue_delay(
         queue_name,
