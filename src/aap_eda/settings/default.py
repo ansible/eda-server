@@ -564,7 +564,7 @@ API_PREFIX = settings.get("API_PREFIX", "api/eda").strip("/")
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Event Driven Ansible API",
-    "VERSION": utils.get_eda_version(),
+    "VERSION": utils.get_package_version("aap-eda"),
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": f"/{API_PREFIX}/v[0-9]",
     "SCHEMA_PATH_PREFIX_TRIM": True,

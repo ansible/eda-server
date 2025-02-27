@@ -22,7 +22,11 @@ from drf_spectacular.utils import OpenApiParameter
 from rest_framework import serializers
 
 from aap_eda.core.utils.strings import extract_variables
-from aap_eda.utils import get_eda_version, str_to_bool
+from aap_eda.utils import (
+    get_package_version,
+    logger as utils_logger,
+    str_to_bool,
+)
 from aap_eda.utils.openapi import generate_query_params
 
 
@@ -45,12 +49,15 @@ def test_str_to_bool(value, expected):
     assert str_to_bool(value) == expected
 
 
-def test_get_eda_version():
-    assert get_eda_version() == version("aap-eda")
+def test_get_package_version(caplog_factory):
+    eda_caplog = caplog_factory(utils_logger)
+    assert get_package_version("aap-eda") == version("aap-eda")
+    assert get_package_version("podman") == version("podman")
 
-    # assert outcome when aap-eda package is not found
+    # assert outcome when package is not found
     with patch("importlib.metadata.version", side_effect=PackageNotFoundError):
-        assert get_eda_version() == "unknown"
+        assert get_package_version("aap-eda") == "unknown"
+        assert "Cannot read version" in eda_caplog.text
 
 
 @pytest.mark.parametrize(
