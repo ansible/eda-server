@@ -24,6 +24,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
+from flags.state import flag_enabled
 
 from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
@@ -913,6 +914,45 @@ POSTGRES_CREDENTIAL_INPUTS = {
     ]
 }
 
+ANALYTICS_CREDENTIAL_INPUTS = {
+    "fields": [
+        {
+            "id": "analytics_url",
+            "label": "Analytics URL",
+            "type": "string",
+            "help_text": "Analytics endpoint for data uploading",
+        },
+        {
+            "id": "auth_type",
+            "label": "Analytics Authentication Type",
+            "type": "string",
+            "default": "basic",
+            "hidden": True,
+        },
+        {
+            "id": "username",
+            "label": "Username",
+            "type": "string",
+            "help_text": "The username of REDHAT or SUBSCRIPTIONS",
+        },
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+            "help_text": "The password of REDHAT or SUBSCRIPTIONS",
+        },
+        {
+            "id": "gather_interval",
+            "label": "Analytics Gather Interval",
+            "type": "string",
+            "help_text": "The time interval between each collection (secs)",
+            "default": "14400",
+        },
+    ],
+    "required": ["analytics_url", "auth_type", "username", "password"],
+}
+
 POSTGRES_CREDENTIAL_INJECTORS = {
     "extra_vars": {
         "postgres_db_host": "{{ postgres_db_host }}",
@@ -1110,6 +1150,17 @@ CREDENTIAL_TYPES = [
         "injectors": POSTGRES_CREDENTIAL_INJECTORS,
         "managed": True,
     },
+    {
+        "name": enums.AnalyticsCredentialType.BASIC,
+        "namespace": "analytics",
+        "kind": "basic",
+        "inputs": ANALYTICS_CREDENTIAL_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for analytics that use for authentication."
+        ),
+    },
 ]
 
 
@@ -1119,6 +1170,13 @@ def populate_credential_types(
     created_credential_types = []
 
     for credential_type_data in credential_types:
+        if (
+            not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED")
+            and credential_type_data.get("name")
+            == enums.AnalyticsCredentialType.BASIC
+        ):
+            continue
+
         new_type, created = models.CredentialType.objects.get_or_create(
             name=credential_type_data["name"],
             defaults={
