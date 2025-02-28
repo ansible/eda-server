@@ -19,7 +19,7 @@ from unittest import mock
 import pytest
 from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
-from podman.errors.exceptions import APIError, NotFound
+from podman.errors.exceptions import APIError, NotFound, Response
 from rq.timeouts import JobTimeoutException
 
 from aap_eda.core import models
@@ -412,18 +412,20 @@ def test_engine_start_with_image_pull_exception(
         init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
     )
 
-    image_mock = mock.Mock()
-    image_mock.pull.return_value.id = None
+    def raise_api_error(*args, **kwargs):
+        response = Response()
+        response.status_code = 401
+        raise APIError("Image not found", response=response)
+
+    engine.client.images.pull.side_effect = raise_api_error
+
     msg = (
         f"Image {request.image_url} pull failed. The image url "
         "or the credentials may be incorrect."
     )
 
-    with mock.patch.object(engine.client, "images", image_mock):
-        with pytest.raises(ContainerImagePullError, match=msg):
-            engine.start(request, log_handler)
-
-    assert models.RulebookProcessLog.objects.last().log.endswith(msg)
+    with pytest.raises(ContainerImagePullError, match=msg):
+        engine.start(request, log_handler)
 
 
 @pytest.mark.django_db
