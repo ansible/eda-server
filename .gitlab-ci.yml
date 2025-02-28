@@ -1,0 +1,34 @@
+---
+stages:
+  - lint
+  - build
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAMESPACE == "ansible"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == "ansible"
+    - if: $CI_COMMIT_BRANCH =~ /^stable/ && $CI_PROJECT_NAMESPACE == "ansible"
+
+default:
+  tags:
+    - shared-podman
+
+lint:
+  image: quay.io/aap-ci/fedora-python-jenkins-agent:latest
+  stage: lint
+  script:
+    - python3.11 -m venv /tmp/.venv/ && source /tmp/.venv/bin/activate
+    - pip install poetry
+    - poetry install --no-root --only=lint
+    - poetry run black --check .
+    - poetry run isort --check .
+    - poetry run ruff --show-source .
+    - poetry run flake8 . --count --show-source --statistics
+
+build:
+  image: quay.io/ansible-ci/ci-runner:latest
+  timeout: 10 minutes
+  stage: build
+  script:
+    - podman build -f tools/docker/Dockerfile  .
+  retry: 2
