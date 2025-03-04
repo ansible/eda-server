@@ -174,3 +174,16 @@ class CustomEventStreamCredentialType(DjangoStrEnum):
     GITHUB = "GitHub Event Stream"
     SNOW = "ServiceNow Event Stream"
     DYNATRACE = "Dynatrace Event Stream"
+
+
+class AnalyticsCredentialType(DjangoStrEnum):
+    """Types of authentication for Analytics."""
+
+    BASIC = "Basic Analytics"
+    OAUTH = "OAuth Analytics"
+
+
+SINGLETON_CREDENTIAL_TYPES = [
+    AnalyticsCredentialType.BASIC,
+    AnalyticsCredentialType.OAUTH,
+]

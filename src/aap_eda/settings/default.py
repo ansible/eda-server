@@ -850,11 +850,22 @@ DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
 # --------------------------------------------------------
 # METRICS COLLECTIONS:
 # --------------------------------------------------------
-AUTOMATION_ANALYTICS_URL = settings.get("AUTOMATION_ANALYTICS_URL", "")
-INSIGHTS_CERT_PATH = settings.get("INSIGHTS_CERT_PATH", "")
+AUTOMATION_ANALYTICS_URL = settings.get(
+    "AUTOMATION_ANALYTICS_URL",
+    "https://cloud.redhat.com/api/ingress/v1/upload",
+)
+OIDC_TOKEN_URL = settings.get(
+    "OIDC_TOKEN_URL",
+    "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",  # noqa: E501
+)
+ANALYTICS_PROXY_URL = settings.get("ANALYTICS_PROXY_URL", None)
+INSIGHTS_CERT_PATH = settings.get(
+    "INSIGHTS_CERT_PATH", "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+)
 # Available methods:
-# https://github.com/RedHatInsights/insights-analytics-collector/blob/main/insights_analytics_collector/package.py#L27
-AUTOMATION_AUTH_METHOD = settings.get("AUTOMATION_AUTH_METHOD", "user-pass")
-INSIGHTS_TRACKING_STATE = settings.get("INSIGHTS_TRACKING_STATE", True)
+AUTOMATION_AUTH_METHOD = settings.get(
+    "AUTOMATION_AUTH_METHOD", "service-account"
+)
+INSIGHTS_TRACKING_STATE = _get_boolean("INSIGHTS_TRACKING_STATE")
 REDHAT_USERNAME = settings.get("REDHAT_USERNAME", "")
 REDHAT_PASSWORD = settings.get("REDHAT_PASSWORD", "")
