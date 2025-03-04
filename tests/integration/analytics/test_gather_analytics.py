@@ -35,7 +35,8 @@ from django.test import override_settings
 )
 @pytest.mark.django_db
 @override_settings(
-    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]}
+    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]},
+    AUTOMATION_AUTH_METHOD="user-pass",
 )
 def test_gather_analytics_invalid_settings(
     analytics_settings,
@@ -45,23 +46,24 @@ def test_gather_analytics_invalid_settings(
     expected,
 ):
     with mock.patch(
-        "aap_eda.analytics.package.application_settings",
+        "aap_eda.analytics.utils.get_insights_tracking_state",
+        return_value=tracking_state,
+    ), mock.patch(
+        "aap_eda.analytics.utils.get_analytics_url",
+        return_value=analytics_url,
+    ), mock.patch(
+        "aap_eda.analytics.collector.application_settings",
         new=analytics_settings,
     ):
-        with mock.patch(
-            "aap_eda.analytics.collector.application_settings",
-            new=analytics_settings,
-        ):
-            analytics_settings.AUTOMATION_ANALYTICS_URL = analytics_url
-            analytics_settings.INSIGHTS_TRACKING_STATE = tracking_state
+        analytics_settings.AUTOMATION_ANALYTICS_URL = analytics_url
 
-            out = StringIO()
-            logger = logging.getLogger("aap_eda.analytics")
-            eda_log = caplog_factory(logger)
+        out = StringIO()
+        logger = logging.getLogger("aap_eda.analytics")
+        eda_log = caplog_factory(logger)
 
-            call_command("gather_analytics", "--ship", stdout=out)
+        call_command("gather_analytics", "--ship", stdout=out)
 
-            assert expected in eda_log.text
+        assert expected in eda_log.text
 
 
 @pytest.mark.parametrize(
@@ -136,8 +138,7 @@ def test_gather_analytics_command(
         new=analytics_settings,
     ):
         with mock.patch(
-            "aap_eda.analytics.package.application_settings",
-            new=analytics_settings,
+            "aap_eda.analytics.utils.get_analytics_url",
         ):
             out = StringIO()
             logger = logging.getLogger("aap_eda.analytics")

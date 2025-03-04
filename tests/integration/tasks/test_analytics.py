@@ -13,13 +13,10 @@
 #  limitations under the License.
 
 
-import time
 from unittest import mock
 
 import pytest
-from rq.serializers import DefaultSerializer
 
-from aap_eda.core.tasking import DefaultWorker, Job, Queue, Scheduler
 from aap_eda.tasks import analytics
 
 
@@ -36,33 +33,6 @@ def analytics_settings():
     return Settings()
 
 
-def test_gather_analytics(analytics_settings, default_queue: Queue):
-    with mock.patch("aap_eda.analytics.collector.gather") as mock_method:
-        with mock.patch(
-            "aap_eda.tasks.analytics.application_settings",
-            new=analytics_settings,
-        ):
-            # purposely fail the gather() method in order to assert it
-            # gets called
-            mock_method.side_effect = AssertionError("gather called")
-
-            default_queue.enqueue(
-                analytics.gather_analytics, default_queue.name
-            )
-
-            worker = DefaultWorker(
-                [default_queue], connection=default_queue.connection
-            )
-            worker.work(burst=True)
-
-            job = Job.fetch(
-                analytics.ANALYTICS_JOB_ID, default_queue.connection
-            )
-            result = job.latest_result()
-            assert "AssertionError: gather called" in result.exc_string
-            assert result.type == result.Type.FAILED
-
-
 def test_auto_gather_analytics():
     with mock.patch("aap_eda.tasks.analytics.gather_analytics") as mock_gather:
         with mock.patch(
@@ -73,32 +43,115 @@ def test_auto_gather_analytics():
             mock_schdule.assert_called_once()
 
 
-def test_schedule_gather_analytics(analytics_settings, default_queue: Queue):
-    scheduler = Scheduler(
-        queue_name=default_queue.name, connection=default_queue.connection
-    )
-    with mock.patch(
-        "aap_eda.core.tasking.django_rq.get_scheduler",
-        return_value=scheduler,
-    ):
-        with mock.patch(
-            "aap_eda.tasks.analytics.application_settings",
-            new=analytics_settings,
-        ):
-            analytics.schedule_gather_analytics(default_queue.name)
-            scheduler.run(burst=True)
-            job = Job.fetch(
-                analytics.ANALYTICS_SCHEDULE_JOB_ID,
-                default_queue.connection,
-                serializer=DefaultSerializer,
-            )
-            assert job.enqueued_at is None
-            assert (
-                job.func_name
-                == "aap_eda.tasks.analytics.auto_gather_analytics"
-            )
+def test_schedule_gather_analytics_success():
+    test_interval = 3600
+    test_queue = "test_queue"
 
-            time.sleep(analytics_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL)
-            scheduler.run(burst=True)
-            job.refresh()
-            assert job.enqueued_at is not None
+    with mock.patch(
+        "aap_eda.tasks.analytics.utils.get_analytics_interval"
+    ) as mock_interval, mock.patch(
+        "aap_eda.tasks.analytics.tasking.enqueue_delay"
+    ) as mock_enqueue, mock.patch(
+        "aap_eda.tasks.analytics.logger.info"
+    ) as mock_logger:
+        mock_interval.return_value = test_interval
+
+        analytics.schedule_gather_analytics(test_queue)
+
+        mock_interval.assert_called_once()
+        mock_logger.assert_called_once_with(
+            f"Schedule analytics to run in {test_interval} seconds"
+        )
+        mock_enqueue.assert_called_once_with(
+            test_queue,
+            analytics.ANALYTICS_SCHEDULE_JOB_ID,
+            test_interval,
+            analytics.auto_gather_analytics,
+        )
+
+
+@pytest.mark.django_db
+def test_schedule_gather_analytics_with_default_queue():
+    with mock.patch(
+        "aap_eda.tasks.analytics.utils.get_analytics_interval"
+    ) as mock_interval, mock.patch(
+        "aap_eda.tasks.analytics.tasking.enqueue_delay"
+    ) as mock_enqueue:
+        mock_interval.return_value = 300
+        analytics.schedule_gather_analytics()
+
+        mock_enqueue.assert_called_once_with(
+            analytics.ANALYTICS_TASKS_QUEUE,
+            analytics.ANALYTICS_SCHEDULE_JOB_ID,
+            300,
+            analytics.auto_gather_analytics,
+        )
+
+
+@pytest.mark.django_db
+def test_schedule_gather_analytics_error_handling():
+    with mock.patch(
+        "aap_eda.tasks.analytics.utils.get_analytics_interval",
+        return_value=5,
+    ), mock.patch(
+        "aap_eda.tasks.analytics.tasking.enqueue_delay"
+    ) as mock_enqueue:
+        mock_enqueue.side_effect = RuntimeError("Queue connection failed")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            analytics.schedule_gather_analytics()
+
+        assert "Queue connection failed" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "tracking_state, expected_logs",
+    [
+        (True, ["Collecting EDA analytics", "Analytics collection is done"]),
+        (False, ["INSIGHTS_TRACKING_STATE is not enabled"]),
+    ],
+    ids=["tracking_enabled", "tracking_disabled"],
+)
+def test_gather_analytics(tracking_state, expected_logs):
+    with mock.patch(
+        "aap_eda.tasks.analytics.utils.get_insights_tracking_state"
+    ) as mock_tracking, mock.patch(
+        "aap_eda.tasks.analytics.collector.gather"
+    ) as mock_gather, mock.patch(
+        "aap_eda.tasks.analytics.logger.info"
+    ) as mock_logger:
+        mock_tracking.return_value = tracking_state
+        mock_gather.return_value = (
+            ["file1.tgz", "file2.tgz"] if tracking_state else []
+        )
+
+        analytics._gather_analytics()
+
+        for log in expected_logs:
+            mock_logger.assert_any_call(log)
+
+
+def test_gather_analytics_enqueue():
+    with mock.patch(
+        "aap_eda.tasks.analytics.tasking.unique_enqueue"
+    ) as mock_enqueue:
+        analytics.gather_analytics()
+
+        mock_enqueue.assert_called_once_with(
+            analytics.ANALYTICS_TASKS_QUEUE,
+            analytics.ANALYTICS_JOB_ID,
+            analytics._gather_analytics,
+        )
+
+
+def test_gather_analytics_no_files():
+    with mock.patch(
+        "aap_eda.tasks.analytics.utils.get_insights_tracking_state",
+        return_value=True,
+    ), mock.patch(
+        "aap_eda.tasks.analytics.collector.gather", return_value=[]
+    ), mock.patch(
+        "aap_eda.tasks.analytics.logger.info"
+    ) as mock_logger:
+        analytics._gather_analytics()
+        mock_logger.assert_any_call("No analytics collected")

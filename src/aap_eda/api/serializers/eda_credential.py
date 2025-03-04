@@ -20,7 +20,7 @@ from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
 from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
-from aap_eda.core import models, validators
+from aap_eda.core import enums, models, validators
 from aap_eda.core.utils.credentials import inputs_to_display, validate_inputs
 from aap_eda.core.utils.crypto.base import SecretValue
 
@@ -150,6 +150,18 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
         credential_type = models.CredentialType.objects.get(
             id=data.get("credential_type_id")
         )
+
+        # Analytics only allows one credential
+        if (
+            credential_type.name in enums.SINGLETON_CREDENTIAL_TYPES
+            and models.EdaCredential.objects.filter(
+                credential_type=credential_type
+            ).exists()
+        ):
+            raise serializers.ValidationError(
+                "Only one credential is allowed for type: "
+                f"{credential_type.name}"
+            )
 
         inputs = data.get("inputs", {})
         errors = validate_inputs(
