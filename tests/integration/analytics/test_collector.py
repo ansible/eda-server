@@ -18,6 +18,7 @@ from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from django.db import connection
+from django.test import override_settings
 
 from aap_eda.analytics.collector import AnalyticsCollector, gather
 
@@ -99,27 +100,39 @@ def test_gather_uses_default_logger(mock_collector_cls, mock_flag_enabled):
         mock_logger.info.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "feature_flag_state, insights_tracking_state, expected",
+    [
+        (True, True, True),
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+    ],
+)
 @pytest.mark.django_db
-def test_shipping_enabled_returns_true(collector, mock_settings):
-    mock_settings.INSIGHTS_TRACKING_STATE = True
+def test_shipping_disabled_logs_warning(
+    collector,
+    feature_flag_state,
+    insights_tracking_state,
+    expected,
+):
     with patch(
-        "aap_eda.analytics.collector.application_settings",
-        new=mock_settings,
+        "aap_eda.analytics.utils.get_insights_tracking_state",
+        return_value=insights_tracking_state,
     ):
-        assert collector._is_shipping_configured() is True
+        with override_settings(
+            FLAGS={
+                "FEATURE_EDA_ANALYTICS_ENABLED": [
+                    ("boolean", feature_flag_state)
+                ]
+            }
+        ):
+            assert collector._is_shipping_configured() is expected
 
-
-@pytest.mark.django_db
-def test_shipping_disabled_logs_warning(collector, mock_settings):
-    mock_settings.INSIGHTS_TRACKING_STATE = False
-    with patch(
-        "aap_eda.analytics.collector.application_settings",
-        new=mock_settings,
-    ):
-        assert collector._is_shipping_configured() is False
-        collector.logger.warning.assert_called_once_with(
-            "Insights for Event Driven Ansible is not enabled."
-        )
+            if not expected:
+                collector.logger.warning.assert_called_once_with(
+                    "Insights for Event Driven Ansible is not enabled."
+                )
 
 
 @pytest.mark.django_db

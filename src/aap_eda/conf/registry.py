@@ -29,6 +29,7 @@ from aap_eda.core.models import Setting
 from aap_eda.core.utils.crypto.base import SecretValue
 
 RESYNC_INTERVAL = 10
+ANALYTICS_GATHER_INTERVAL = 4 * 3600  # 4 hours
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ _APPLICATION_SETTING_REGISTRIES = [
     RegistryData(
         name="AUTOMATION_ANALYTICS_GATHER_INTERVAL",
         type=int,
-        default=14400,
+        default=ANALYTICS_GATHER_INTERVAL,
         label="Automation Analytics Gather Interval",
         help_text="Interval (in seconds) between data gathering.",
         sync_group="_GATEWAY_ANALYTICS_SETTING_SYNC",

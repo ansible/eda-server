@@ -1,10 +1,14 @@
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.test import APIClient
 
+from aap_eda.api.serializers.eda_credential import (
+    EdaCredentialCreateSerializer,
+)
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
     ENCRYPTED_STRING,
@@ -1226,3 +1230,55 @@ def test_eda_credential_by_fields(
 
     assert credential.created_by == admin_user
     assert credential.modified_by == super_user
+
+
+@pytest.mark.django_db
+def test_singleton_credential_validation():
+    mock_cred_type = MagicMock()
+    mock_cred_type.name = enums.SINGLETON_CREDENTIAL_TYPES[0]
+
+    with patch.object(
+        models.CredentialType, "objects"
+    ) as mock_cred_type_manager, patch.object(
+        models.EdaCredential.objects, "filter"
+    ) as mock_filter:
+        mock_cred_type_manager.get.return_value = mock_cred_type
+        mock_filter.return_value.exists.return_value = True
+
+        serializer = EdaCredentialCreateSerializer()
+        data = {
+            "credential_type_id": 1,
+            "name": "test_analytics",
+            "inputs": {},
+            "organization_id": 1,
+        }
+
+        with pytest.raises(serializers.ValidationError) as exc_info:
+            serializer.validate(data)
+
+        assert "Only one credential is allowed" in str(exc_info.value)
+        assert mock_cred_type.name in str(exc_info.value)
+
+
+@pytest.mark.django_db
+def test_non_singleton_credential_allows_multiple():
+    mock_cred_type = MagicMock()
+    mock_cred_type.name = "git_repo"
+
+    with patch.object(
+        models.CredentialType, "objects"
+    ) as mock_cred_type_manager, patch.object(
+        models.EdaCredential.objects, "filter"
+    ) as mock_filter:
+        mock_cred_type_manager.get.return_value = mock_cred_type
+        mock_filter.return_value.exists.return_value = True
+
+        serializer = EdaCredentialCreateSerializer()
+        data = {
+            "credential_type_id": 1,
+            "name": "test_git",
+            "inputs": {},
+            "organization_id": 1,
+        }
+
+        serializer.validate(data)

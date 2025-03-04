@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import json
+import time
 import uuid
 from datetime import datetime
 from typing import List
@@ -20,15 +21,30 @@ from unittest import mock
 
 import pytest
 import yaml
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from requests import Request
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException, SSLError, Timeout
 
 from aap_eda.analytics.utils import (
+    MissingUserPasswordError,
+    ServiceToken,
     TokenAuth,
+    _get_analytics_credentials,
+    _get_credential_value,
+    _validate_credential,
     collect_controllers_info,
     datetime_hook,
     extract_job_details,
+    generate_token,
+    get_analytics_interval,
+    get_auth_mode,
+    get_cert_path,
+    get_client_id,
+    get_client_secret,
+    get_insights_tracking_state,
+    get_oidc_token_url,
+    get_proxy_url,
 )
 from aap_eda.core import models
 
@@ -40,6 +56,31 @@ def basic_request():
         url="https://example.com",
         headers={"Content-Type": "application/json"},
     ).prepare()
+
+
+@pytest.fixture
+def mock_oidc_config():
+    with mock.patch(
+        "aap_eda.analytics.utils.get_oidc_token_url"
+    ) as mock_url, mock.patch(
+        "aap_eda.analytics.utils.get_client_id"
+    ) as mock_id, mock.patch(
+        "aap_eda.analytics.utils.get_client_secret"
+    ) as mock_secret, mock.patch(
+        "aap_eda.analytics.utils.get_cert_path"
+    ) as mock_cert:
+        mock_url.return_value = "https://oidc.example.com/token"
+        mock_id.return_value = "test_client"
+        mock_secret.return_value = "test_secret"
+        mock_cert.return_value = "/path/to/cert"
+        yield
+
+
+@pytest.fixture
+def mock_credentials():
+    credential = mock.MagicMock()
+    credential.inputs.get_secret_value.return_value = "encrypted_data"
+    return [credential]
 
 
 def test_datetime_hook():
@@ -357,3 +398,370 @@ def test_auth_header(basic_request, token, expected):
 
     assert modified_request.headers["Authorization"] == expected
     assert modified_request.headers["Content-Type"] == "application/json"
+
+
+def test_generate_token_success(mock_oidc_config):
+    with mock.patch("requests.post") as mock_post:
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "access_token": "test_token",
+            "expires_in": 3600,
+        }
+        mock_post.return_value = mock_response
+
+        result = generate_token()
+
+        assert isinstance(result, ServiceToken)
+        assert result.access_token == "test_token"
+        assert result.expires_in == 3600
+        mock_post.assert_called_once_with(
+            "https://oidc.example.com/token",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={
+                "client_id": "test_client",
+                "client_secret": "test_secret",
+                "grant_type": "client_credentials",
+            },
+            verify="/path/to/cert",
+            timeout=(31, 31),
+        )
+
+
+def test_missing_oidc_configuration():
+    with mock.patch(
+        "aap_eda.analytics.utils.get_oidc_token_url", return_value=None
+    ), mock.patch(
+        "aap_eda.analytics.utils.get_client_id", return_value=None
+    ), mock.patch(
+        "aap_eda.analytics.utils.get_client_secret", return_value=None
+    ):
+        with pytest.raises(ValueError) as exc_info:
+            generate_token()
+
+        assert "Missing required OIDC configuration" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "exception,expected_error",
+    [
+        (SSLError(), SSLError),
+        (Timeout(), Timeout),
+        (RequestException("Error"), RequestException),
+    ],
+)
+def test_token_request_exceptions(mock_oidc_config, exception, expected_error):
+    with mock.patch("requests.post", side_effect=exception) as mock_post:
+        with pytest.raises(expected_error):
+            generate_token()
+
+        mock_post.assert_called_once()
+
+
+def test_invalid_token_response(mock_oidc_config):
+    with mock.patch("requests.post") as mock_post:
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"invalid": "data"}
+        mock_post.return_value = mock_response
+
+        result = generate_token()
+
+        assert result.access_token == ""
+        assert result.expires_in == 0
+
+
+def test_http_error_response(mock_oidc_config):
+    with mock.patch("requests.post") as mock_post:
+        mock_response = mock.Mock()
+        mock_response.status_code = 400
+        mock_response.raise_for_status.side_effect = RequestException(
+            "Bad request"
+        )
+        mock_post.return_value = mock_response
+
+        with pytest.raises(RequestException):
+            generate_token()
+
+
+@pytest.mark.parametrize(
+    "expires_in, expected_expires_at",
+    [
+        (3600, 1000 + 3600),  # Normal case
+        (0, 1000),  # Zero expiration time
+        (-300, 1000 - 300),  # Negative expiration time
+    ],
+)
+def test_expires_at_property(expires_in, expected_expires_at):
+    with mock.patch("time.time") as mock_time:
+        # Freeze initial time at 1000 seconds
+        mock_time.return_value = 1000
+
+        token = ServiceToken(expires_in=expires_in)
+
+        assert token.expires_at == expected_expires_at
+
+
+@pytest.mark.parametrize(
+    "current_time, expires_in, expected",
+    [
+        # Not expired scenarios
+        (1500, 600, False),
+        (1599, 600, False),
+        # Expired scenarios
+        (1600, 600, True),
+        (2000, 600, True),
+        # Special cases
+        (1000, 0, True),
+        (900, -100, True),
+    ],
+)
+def test_is_expired(current_time, expires_in, expected):
+    """Test token expiration status under various time conditions."""
+    with mock.patch("time.time") as mock_time:
+        # Set initial creation time to 1000
+        mock_time.return_value = 1000
+        token = ServiceToken(expires_in=expires_in)
+
+        # Simulate current time check
+        mock_time.return_value = current_time
+
+        assert token.is_expired() == expected
+
+
+def test_real_time_expiration():
+    token = ServiceToken(expires_in=1)
+    assert (
+        not token.is_expired()
+    ), "Token should be valid immediately after creation"
+
+    # Wait just over the expiration threshold
+    time.sleep(1.1)
+    assert token.is_expired(), "Token should expire after 1 second"
+
+
+def test_get_credential_from_store(mock_credentials):
+    """Test credential retrieval from credential store."""
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_get_creds:
+        mock_get_creds.return_value = mock_credentials
+        with mock.patch(
+            "aap_eda.analytics.utils.inputs_from_store"
+        ) as mock_inputs:
+            mock_inputs.return_value = {"client_id": "test_id"}
+
+            result = _get_credential_value(
+                "client_id",
+                (settings, "REDHAT_USERNAME"),
+                (settings, "REDHAT_PASSWORD"),
+            )
+
+            assert result == "test_id"
+
+
+def test_get_from_settings():
+    """Test fallback to Django settings when no credentials found."""
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_get_creds:
+        mock_get_creds.return_value = []
+        with mock.patch.object(settings, "REDHAT_USERNAME", "setting_user"):
+            result = _get_credential_value(
+                "username",
+                (settings, "REDHAT_USERNAME"),
+                (settings, "REDHAT_PASSWORD"),
+            )
+
+            assert result == "setting_user"
+
+
+def test_multiple_setting_sources():
+    """Test priority of multiple setting sources."""
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_get_creds:
+        mock_get_creds.return_value = []
+        with mock.patch.object(settings, "REDHAT_USERNAME", "first_user"):
+            result = _get_credential_value(
+                "username",
+                (settings, "REDHAT_USERNAME"),
+                (settings, "SUBSCRIPTIONS_USERNAME"),
+            )
+
+            assert result == "first_user"
+
+
+def test_missing_value_returns_empty():
+    """Test missing value returns empty string."""
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_get_creds:
+        mock_get_creds.return_value = []
+
+        result = _get_credential_value(
+            "missing_field",
+            (settings, "NON_EXISTENT_SETTING"),
+        )
+
+        assert result is None
+
+
+def test_get_cert_path():
+    """Test INSIGHTS_CERT_PATH retrieval."""
+    with mock.patch.object(settings, "INSIGHTS_CERT_PATH", "/custom/path"):
+        assert get_cert_path() == "/custom/path"
+
+
+def test_get_auth_mode():
+    """Test AUTOMATION_AUTH_METHOD retrieval."""
+    with mock.patch.object(settings, "AUTOMATION_AUTH_METHOD", "oidc"):
+        assert get_auth_mode() == "oidc"
+
+
+def test_get_oidc_token_url():
+    """Test OIDC_TOKEN_URL retrieval."""
+    with mock.patch.object(
+        settings, "OIDC_TOKEN_URL", "https://oidc.example.com"
+    ):
+        assert get_oidc_token_url() == "https://oidc.example.com"
+
+
+def test_get_proxy_url():
+    """Test ANALYTICS_PROXY_URL retrieval."""
+    with mock.patch.object(
+        settings, "ANALYTICS_PROXY_URL", "https://proxy:8080"
+    ):
+        assert get_proxy_url() == "https://proxy:8080"
+
+
+def test_get_insights_tracking_state():
+    with mock.patch(
+        "aap_eda.analytics.utils._get_credential_value"
+    ) as mock_get:
+        mock_get.return_value = True
+        assert get_insights_tracking_state() is True
+
+
+def test_get_client_id():
+    """Test client ID retrieval."""
+    with mock.patch(
+        "aap_eda.analytics.utils._get_credential_value"
+    ) as mock_get_value:
+        mock_get_value.return_value = "test_client_id"
+        assert get_client_id() == "test_client_id"
+        mock_get_value.assert_called_once_with("client_id")
+
+
+def test_get_client_secret():
+    """Test client secret retrieval."""
+    with mock.patch(
+        "aap_eda.analytics.utils._get_credential_value"
+    ) as mock_get_value:
+        mock_get_value.return_value = "test_secret"
+        assert get_client_secret() == "test_secret"
+        mock_get_value.assert_called_once_with("client_secret")
+
+
+def test_get_analytics_interval_valid_conversion():
+    with mock.patch(
+        "aap_eda.analytics.utils._get_credential_value"
+    ) as mock_get:
+        mock_get.return_value = "300"
+        assert get_analytics_interval() == 300
+
+
+def test_get_analytics_interval_invalid_fallback():
+    with mock.patch(
+        "aap_eda.analytics.utils._get_credential_value"
+    ) as mock_get:
+        mock_get.return_value = "invalid"
+        result = get_analytics_interval()
+        assert isinstance(result, int)
+
+
+def test_validate_credential_with_existing_credentials():
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_creds:
+        mock_creds.return_value.exists.return_value = True
+        _validate_credential()
+
+
+@pytest.mark.django_db
+def test_validate_credential_with_settings_credentials():
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_creds, mock.patch(
+        "aap_eda.analytics.utils.settings"
+    ) as mock_settings:
+        data = "pass"
+        mock_creds.return_value.exists.return_value = False
+        mock_settings.REDHAT_USERNAME = "user"
+        mock_settings.REDHAT_PASSWORD = data
+        _validate_credential()
+
+
+def test_validate_credential_error_handling():
+    mock_app_settings = mock.MagicMock()
+    mock_app_settings.configure_mock(
+        SUBSCRIPTIONS_USERNAME=None,
+        SUBSCRIPTIONS_PASSWORD=None,
+        REDHAT_USERNAME=None,
+        REDHAT_PASSWORD=None,
+    )
+
+    mock_django_settings = mock.MagicMock()
+    mock_django_settings.configure_mock(
+        REDHAT_USERNAME=None,
+        REDHAT_PASSWORD=None,
+        SUBSCRIPTIONS_USERNAME=None,
+        SUBSCRIPTIONS_PASSWORD=None,
+    )
+
+    with mock.patch(
+        "aap_eda.analytics.utils._get_analytics_credentials"
+    ) as mock_creds, mock.patch(
+        "aap_eda.analytics.utils.settings", mock_django_settings
+    ), mock.patch(
+        "aap_eda.analytics.utils.application_settings", mock_app_settings
+    ), mock.patch(
+        "aap_eda.analytics.utils.logger.error"
+    ) as mock_logger:
+        mock_creds.return_value.exists.return_value = False
+
+        with pytest.raises(MissingUserPasswordError) as exc_info:
+            _validate_credential()
+
+        mock_logger.assert_called_once_with(
+            "Missing required credentials in settings"
+        )
+        assert "Valid credentials not found" in str(exc_info.value)
+
+
+@pytest.mark.django_db
+def test_get_analytics_credentials():
+    mock_cred_type = mock.MagicMock(spec=models.CredentialType)
+    mock_cred_type.kind = "test_auth_mode"
+
+    mock_credential = mock.MagicMock(spec=models.EdaCredential)
+    mock_credential.credential_type = mock_cred_type
+
+    with mock.patch(
+        "aap_eda.analytics.utils.get_auth_mode", return_value="test_auth_mode"
+    ), mock.patch.object(
+        models.CredentialType.objects, "filter"
+    ) as mock_type_filter, mock.patch.object(
+        models.EdaCredential.objects, "filter"
+    ) as mock_cred_filter:
+        mock_type_filter.return_value = [mock_cred_type]
+        mock_cred_filter.return_value = [mock_credential]
+
+        credentials = _get_analytics_credentials()
+
+        mock_type_filter.assert_called_once_with(kind="test_auth_mode")
+        mock_cred_filter.assert_called_once_with(
+            credential_type__in=[mock_cred_type]
+        )
+
+        assert credentials == [mock_credential]

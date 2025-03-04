@@ -35,7 +35,10 @@ class AnalyticsCollector(Collector):
         return package.Package
 
     def _is_shipping_configured(self) -> bool:
-        if not application_settings.INSIGHTS_TRACKING_STATE:
+        if (
+            not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED")
+            or not utils.get_insights_tracking_state()
+        ):
             self.logger.warning(
                 "Insights for Event Driven Ansible is not enabled."
             )
