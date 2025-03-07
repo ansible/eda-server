@@ -17,7 +17,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dynaconf import Dynaconf
 
 from aap_eda.core.enums import RulebookProcessLogLevel
-from aap_eda.settings import constants, defaults
+from aap_eda.settings import core, defaults
 from aap_eda.settings.defaults import (
     DEFAULT_QUEUE_TIMEOUT,
     DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
@@ -32,14 +32,14 @@ from aap_eda.settings.post_load import (
 
 @pytest.fixture
 def mock_settings():
-    settings = Dynaconf(settings_files=[defaults.__file__, constants.__file__])
+    settings = Dynaconf(settings_files=[defaults.__file__, core.__file__])
     settings.SECRET_KEY = "secret"
     return settings
 
 
 @pytest.fixture
 def redis_settings(mock_settings):
-    mock_settings.REDIS_DB = constants.DEFAULT_REDIS_DB
+    mock_settings.REDIS_DB = core.DEFAULT_REDIS_DB
     mock_settings.REDIS_USER = defaults.MQ_USER
     mock_settings.REDIS_USER_PASSWORD = defaults.MQ_USER_PASSWORD
     mock_settings.REDIS_UNIX_SOCKET_PATH = defaults.MQ_UNIX_SOCKET_PATH

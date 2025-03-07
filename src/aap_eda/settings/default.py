@@ -36,7 +36,7 @@ load_standard_settings_files(
     DYNACONF
 )  # /etc/ansible-automation-platform/*.yaml
 load_envvars(DYNACONF)  # load envvars prefixed with EDA_
-DYNACONF.load_file("constants.py")  # load internal non-overwritable settings
+DYNACONF.load_file("core.py")  # load internal non-overwritable settings
 post_loading(DYNACONF)
 load_dab_settings(DYNACONF)
 export(__name__, DYNACONF)  # export back to django.conf.settings

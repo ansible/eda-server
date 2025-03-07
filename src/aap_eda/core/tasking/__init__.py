@@ -22,10 +22,7 @@ from ansible_base.lib.redis.client import (
 from django.conf import settings
 from rq import results as rq_results
 
-from aap_eda.settings import (
-    constants as setting_constants,
-    redis as redis_settings,
-)
+from aap_eda.settings import core as core_settings, redis as redis_settings
 
 __all__ = [
     "Job",
@@ -134,7 +131,7 @@ def _prune_redis_kwargs(**kwargs) -> dict[str, typing.Any]:
     db = kwargs.get("db", None)
     if (db is not None) and (kwargs.get("mode", "") == "cluster"):
         del kwargs["db"]
-        if db != setting_constants.DEFAULT_REDIS_DB:
+        if db != core_settings.DEFAULT_REDIS_DB:
             logger.info(
                 f"clustered redis supports only the default db"
                 f"; db specified: {db}"

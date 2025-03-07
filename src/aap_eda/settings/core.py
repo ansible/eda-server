@@ -12,7 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# Application definition
+# Define all settings use internally, not exposed to users for overwriting.
+
 INSTALLED_APPS = [
     "daphne",
     "flags",

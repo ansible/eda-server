@@ -98,7 +98,7 @@ To configure a Resource Server for syncing of managed resources:
 
 from typing import NewType, Optional, Union
 
-from aap_eda.settings import constants
+from aap_eda.settings import core
 
 StrToList = NewType("StrToList", Union[list, str])
 UrlSlash = NewType("UrlSlash", Optional[str])
@@ -159,7 +159,7 @@ MQ_CLIENT_CACERT_PATH: Optional[str] = None
 MQ_CLIENT_CERT_PATH: Optional[str] = None
 MQ_CLIENT_KEY_PATH: Optional[str] = None
 MQ_TLS: Optional[str] = None
-MQ_DB: int = constants.DEFAULT_REDIS_DB
+MQ_DB: int = core.DEFAULT_REDIS_DB
 
 # The HA cluster hosts is a string of <host>:<port>[,<host>:port>]+
 # and is exhaustive; i.e., not in addition to REDIS_HOST:REDIS_PORT.
