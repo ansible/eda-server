@@ -1132,14 +1132,19 @@ def test_update_activation(
 
     id = response.data["id"]
     response = admin_client.patch(
-        f"{api_url_v1}/activations/{id}/", data={"name": "another_name"}
+        f"{api_url_v1}/activations/{id}/",
+        data={"name": "another_name", "is_enabled": True},
     )
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert data["edited_at"] is not None
+    assert data["edited_by"]["username"] == "test.admin"
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.name == "another_name"
     assert activation.edited_at is not None
+    assert activation.edited_by.username == "test.admin"
+    assert activation.is_enabled is True
+    assert activation.status == enums.ActivationStatus.PENDING
 
 
 @pytest.mark.django_db
@@ -1180,7 +1185,7 @@ def test_update_enabled_activation(
     assert response.status_code == status.HTTP_409_CONFLICT
     assert (
         response.data
-        == "Activation is not in disabled mode or in stopped status"
+        == "Activation is not in disabled mode and in stopped status"
     )
 
 

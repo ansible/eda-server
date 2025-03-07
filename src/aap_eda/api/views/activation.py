@@ -155,7 +155,9 @@ class ActivationViewSet(
             ActivationStatus.WORKERS_OFFLINE,
         ]:
             return Response(
-                data="Activation is not in disabled mode or in stopped status",
+                data=(
+                    "Activation is not in disabled mode and in stopped status"
+                ),
                 status=status.HTTP_409_CONFLICT,
             )
         serializer = self.get_serializer(
@@ -165,6 +167,7 @@ class ActivationViewSet(
         serializer.prepare_update(activation)
 
         old_data = model_to_dict(activation)
+        is_enabled = serializer.validated_data.pop("is_enabled", False)
         with transaction.atomic():
             serializer.update(activation, serializer.validated_data)
             check_related_permissions(
@@ -183,6 +186,11 @@ class ActivationViewSet(
                 activation.organization,
             )
         )
+
+        if is_enabled:
+            response = self._start(activation)
+            if response.status_code >= status.HTTP_400_BAD_REQUEST:
+                return response
 
         return Response(serializers.ActivationReadSerializer(activation).data)
 
@@ -346,7 +354,9 @@ class ActivationViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
         activation = self.get_object()
+        return self._start(activation)
 
+    def _start(self, activation: models.Activation) -> Response:
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -391,7 +401,7 @@ class ActivationViewSet(
         )
         start_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
-            process_parent_id=pk,
+            process_parent_id=activation.id,
         )
 
         logger.info(
