@@ -99,6 +99,14 @@ class Activation(
     edited_at = models.DateTimeField(null=True)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
+    edited_by = models.ForeignKey(
+        User,
+        related_name="%s(class)s_edited+",
+        default=None,
+        null=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+    )
     latest_instance = models.OneToOneField(
         "RulebookProcess",
         null=True,
