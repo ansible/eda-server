@@ -21,10 +21,10 @@ def str_to_bool(value: str) -> bool:
     return value.lower() in ("yes", "true", "1")
 
 
-def get_eda_version() -> str:
-    """Return EDA version as defined in the aap-eda package."""
+def get_package_version(package_name: str) -> str:
+    """Return version of the given package."""
     try:
-        return importlib.metadata.version("aap-eda")
+        return importlib.metadata.version(package_name)
     except importlib.metadata.PackageNotFoundError:
-        logger.error("Cannot read version from aap-eda package")
+        logger.error("Cannot read version from %s package", package_name)
         return "unknown"
