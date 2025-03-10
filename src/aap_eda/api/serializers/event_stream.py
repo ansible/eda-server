@@ -125,7 +125,10 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
         return urljoin(settings.EVENT_STREAM_BASE_URL, path)
 
     def get_owner(self, obj) -> str:
-        return f"{obj.owner.username}"
+        if obj.owner:
+            return f"{obj.owner.username}"
+        else:
+            return ""
 
     def get_organization(self, obj) -> Optional[OrganizationRefSerializer]:
         return (
