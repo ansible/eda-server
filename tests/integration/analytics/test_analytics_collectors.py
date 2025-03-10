@@ -283,7 +283,7 @@ def test_activations_stats(
     default_activation.failure_count = 2
     default_activation.save(update_fields=["restart_count", "failure_count"])
     with tempfile.TemporaryDirectory() as tmpdir:
-        collectors.activations_stats(
+        collectors.activations_stats_table(
             time_start, tmpdir, until=now() + timedelta(seconds=1)
         )
         with open(os.path.join(tmpdir, "activations_stats_table.csv")) as f:
@@ -920,17 +920,15 @@ def test_teams_table_collector(
             assert header == [
                 "id",
                 "modified",
-                "modified_by_id",
                 "created",
-                "created_by_id",
                 "name",
                 "description",
                 "organization_id",
             ]
             assert len(lines) == 1
             assert lines[0][0] == str(default_team.id)
-            assert lines[0][5] == default_team.name
-            assert lines[0][6] == default_team.description
+            assert lines[0][3] == default_team.name
+            assert lines[0][4] == default_team.description
 
 
 @pytest.mark.django_db
