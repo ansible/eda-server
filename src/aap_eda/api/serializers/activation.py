@@ -296,6 +296,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
     )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
+    edited_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -321,6 +322,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "edited_at",
             "created_by",
             "modified_by",
+            "edited_by",
             "status_message",
             "awx_token_id",
             "log_level",
@@ -380,6 +382,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "skip_audit_events": activation.skip_audit_events,
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
+            "edited_by": BasicUserSerializer(activation.edited_by).data,
         }
 
 
@@ -565,6 +568,7 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
+            "is_enabled",
             "decision_environment_id",
             "rulebook_id",
             "extra_var",
@@ -629,6 +633,7 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         rulebook_id = self.validated_data.get("rulebook_id")
         self.validated_data["user_id"] = self.context["request"].user.id
         self.validated_data["edited_at"] = timezone.now()
+        self.validated_data["edited_by"] = self.context["request"].user
         if rulebook_id:
             rulebook = models.Rulebook.objects.get(id=rulebook_id)
             self.validated_data["rulebook_name"] = rulebook.name
@@ -822,6 +827,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
+    edited_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -850,6 +856,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "edited_at",
             "created_by",
             "modified_by",
+            "edited_by",
             "restarted_at",
             "status_message",
             "awx_token_id",
@@ -962,6 +969,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "skip_audit_events": activation.skip_audit_events,
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
+            "edited_by": BasicUserSerializer(activation.modified_by).data,
         }
 
 
