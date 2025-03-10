@@ -26,15 +26,31 @@ def test_worker_startup_logs():
     Test that starting workers produce the expected startup message.
     """
     command = ["aap-eda-manage", "rqworker", "--help"]
+    timeout = 10
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        bufsize=1,
+        universal_newlines=True,
     )
 
-    time.sleep(3)
+    expected_message = "Starting eda-server"
+    found = False
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        line = process.stderr.readline()
+        if expected_message in line:
+            found = True
+            break
+
     process.terminate()
     stdout, stderr = process.communicate(timeout=3)
 
-    assert "Starting eda-server" in stderr
+    error_message = (
+        f"Expected message '{expected_message}' "
+        f"not found in stderr output: {stderr}"
+    )
+    assert found, error_message
