@@ -221,26 +221,66 @@ def _get_spectacular_settings(settings: Dynaconf) -> dict:
     }
 
 
+STREAM_HANDLER = "logging.StreamHandler"
+
+
 def _get_logging_setup(settings: Dynaconf) -> dict:
     return {
         "version": 1,
         "disable_existing_loggers": False,
+        "filters": {
+            "activation_id_filter": {
+                "()": "aap_eda.utils.log_tracking_id_filter.LogTrackingIdFilter",  # noqa: E501
+            },
+        },
         "formatters": {
             "simple": {
-                "format": "{asctime} {name} {levelname:<8} {message}",
+                "format": "{asctime} {levelname:<8} {name} {message}",
+                "style": "{",
+            },
+            "simple_with_request": {
+                "format": "{asctime} {levelname:<8} [rid:{request_id}] "
+                "{name} {message}",
+                "style": "{",
+            },
+            "simple_with_tracking": {
+                "format": "{asctime} {levelname:<8} [tid:{log_tracking_id}] "
+                "{name} {message}",
+                "style": "{",
+            },
+            "verbose": {
+                "format": "{asctime} {levelname:<8} [rid:{request_id}] "
+                "[tid:{log_tracking_id}] {name}"
+                " {message}",
                 "style": "{",
             },
         },
         "handlers": {
             "console": {
-                "class": "logging.StreamHandler",
+                "class": STREAM_HANDLER,
                 "formatter": "simple",
+                "filters": ["activation_id_filter"],
+            },
+            "request_handler": {
+                "class": STREAM_HANDLER,
+                "formatter": "simple_with_request",
+                "filters": ["activation_id_filter"],
+            },
+            "tracking_handler": {
+                "class": STREAM_HANDLER,
+                "formatter": "simple_with_tracking",
+                "filters": ["activation_id_filter"],
+            },
+            "verbose_handler": {
+                "class": STREAM_HANDLER,
+                "formatter": "verbose",
+                "filters": ["activation_id_filter"],
             },
         },
         "root": {"handlers": ["console"], "level": "WARNING"},
         "loggers": {
             "django": {
-                "handlers": ["console"],
+                "handlers": ["request_handler"],
                 "level": "WARNING",
                 "propagate": False,
             },
@@ -256,6 +296,26 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             },
             "aap_eda": {
                 "handlers": ["console"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
+            "aap_eda.wsapi.consumers": {
+                "handlers": ["tracking_handler"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
+            "aap_eda.services.activation": {
+                "handlers": ["verbose_handler"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
+            "aap_eda.tasks.orchestrator": {
+                "handlers": ["verbose_handler"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
+            "ansible_base.jwt_consumer": {
+                "handlers": ["request_handler"],
                 "level": settings.APP_LOG_LEVEL,
                 "propagate": False,
             },
