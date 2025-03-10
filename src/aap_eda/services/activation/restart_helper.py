@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import uuid
 
 from django.db.utils import IntegrityError
 
@@ -65,7 +66,7 @@ def _queue_auto_start(process_parent_type: str, id: int) -> None:
     LOGGER.info(f"Requesting auto-start for {process_parent_type} {id}")
     try:
         requests_queue.push(
-            process_parent_type, id, ActivationRequest.AUTO_START
+            process_parent_type, id, ActivationRequest.AUTO_START, uuid.uuid4()
         )
     except IntegrityError as exc:
         LOGGER.warning(exc)

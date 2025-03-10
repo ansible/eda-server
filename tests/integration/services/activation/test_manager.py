@@ -15,7 +15,7 @@
 # TODO(alex) dedup code and fixtures across all the tests
 
 from unittest import mock
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from _pytest.logging import LogCaptureFixture
@@ -852,18 +852,3 @@ def test_status_manager_set_status(process_parent):
     )
     assert process_parent.status == enums.ActivationStatus.PENDING
     assert process_parent.status_message == "Activation is pending"
-
-
-@pytest.mark.django_db
-def test_assign_log_tracking_id_when_exists(container_engine_mock):
-    db_instance_mock = MagicMock()
-    db_instance_mock.log_tracking_id = "test-tracking-id-123"
-
-    manager = ActivationManager(db_instance_mock, container_engine_mock)
-
-    with patch(
-        "aap_eda.services.activation.activation_manager.assign_log_tracking_id"
-    ) as mock_assign:
-        manager._set_log_tracking_id()
-
-        mock_assign.assert_called_once_with("test-tracking-id-123")

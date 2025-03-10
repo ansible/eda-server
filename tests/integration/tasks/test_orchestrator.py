@@ -221,6 +221,7 @@ def test_activation_requests(
         orchestrator._manage,
         ProcessParentType.ACTIVATION,
         activation.id,
+        "",
     ]
     if queued_request == ActivationRequest.DELETE:
         enqueue_mock.assert_called_once_with(*enqueue_args)
@@ -247,6 +248,7 @@ def test_monitor_rulebook_processes(
             orchestrator._manage,
             ProcessParentType.ACTIVATION,
             activation.id,
+            "",
         )
     ]
     for running in max_running_processes:
@@ -259,6 +261,7 @@ def test_monitor_rulebook_processes(
                 orchestrator._manage,
                 ProcessParentType.ACTIVATION,
                 running.activation.id,
+                "",
             )
         )
 

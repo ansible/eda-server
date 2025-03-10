@@ -12,20 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import contextvars
 import logging
 
-log_tracking_id_var = contextvars.ContextVar("log_tracking_id")
+from aap_eda.middleware.request_log_middleware import (
+    get_log_tracking_id,
+    get_request_id,
+)
 
 
 class LogTrackingIdFilter(logging.Filter):
     def filter(self, record):
-        record.log_tracking_id = log_tracking_id_var.get(
-            "Log tracking id not set"
-        )
+        record.log_tracking_id = get_log_tracking_id()
+        record.request_id = get_request_id()
 
         return True
-
-
-def assign_log_tracking_id(log_tracking_id):
-    log_tracking_id_var.set(log_tracking_id)

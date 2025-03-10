@@ -34,6 +34,7 @@ class ActivationRequestQueue(models.Model):
     activation = models.ForeignKey(
         "Activation", on_delete=models.CASCADE, null=True
     )
+    request_id = models.TextField(blank=True)
 
 
 __all__ = [

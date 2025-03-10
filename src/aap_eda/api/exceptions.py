@@ -11,6 +11,9 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+import traceback
+
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
@@ -35,8 +38,20 @@ __all__ = (
     "api_fallback_handler",
 )
 
+logger = logging.getLogger(__name__)
+
+
+def log_exception_without_data(exc_type, exc_value, exc_traceback):
+    logger.error(exc_type.__name__ + ": " + str(exc_value))
+    if exc_traceback is not None:
+        for frame in traceback.extract_tb(exc_traceback)[::-1]:
+            logger.error(
+                frame.filename + ":" + str(frame.lineno) + " " + frame.name
+            )
+
 
 def api_fallback_handler(exc, context):
+    log_exception_without_data(type(exc), exc, exc.__traceback__)
     response = exception_handler(exc, context)
     if (response is None) and (not settings.DEBUG):
         response = Response(
