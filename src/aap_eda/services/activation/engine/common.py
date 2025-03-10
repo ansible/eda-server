@@ -122,6 +122,7 @@ class ContainerRequest(BaseModel):
     env_vars: tp.Optional[dict] = None
     extra_args: tp.Optional[dict] = None
     k8s_service_name: tp.Optional[str] = None
+    x_request_id: tp.Optional[str] = None
 
 
 class ContainerableMixinError(Exception):
@@ -167,6 +168,7 @@ class ContainerableMixin:
             mounts=settings.PODMAN_MOUNTS,
             cmdline=self._build_cmdline(),
             k8s_service_name=self.k8s_service_name,
+            x_request_id=self.x_request_id,
         )
 
     def get_restart_policy(self) -> str:

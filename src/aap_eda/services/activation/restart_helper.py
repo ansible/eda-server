@@ -40,16 +40,23 @@ def system_cancel_restart_activation(
 
 
 def system_restart_activation(
-    process_parent_type: str, id: int, delay_seconds: int
+    process_parent_type: str,
+    id: int,
+    delay_seconds: int,
+    x_request_id: str = None,
 ) -> None:
     """Create a request from the system to start the activation.
 
     This function is intended to be used by the manager to schedule
     a start of the activation for restart policies.
     """
+
+    extra = {"x_request_id": x_request_id} if x_request_id else {}
+
     LOGGER.debug(
         f"Queuing auto-start for {process_parent_type} {id} "
         f"in {delay_seconds} seconds",
+        extra=extra,
     )
     enqueue_delay(
         "default",

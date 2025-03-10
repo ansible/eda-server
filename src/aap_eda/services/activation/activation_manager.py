@@ -60,6 +60,7 @@ class ActivationManager(StatusManager):
         db_instance: models.Activation,
         container_engine: tp.Optional[ContainerEngine] = None,
         container_logger_class: type[DBLogger] = DBLogger,
+        x_request_id: tp.Optional[str] = None,
     ):
         """Initialize the Activation Manager.
 
@@ -68,6 +69,17 @@ class ActivationManager(StatusManager):
             container_engine: The container engine to use.
         """
         super().__init__(db_instance)
+        self.x_request_id = x_request_id
+
+        # If x_request_id is provided, log the initialization with it
+        if self.x_request_id:
+            logger = logging.getLogger("django.request")
+            extra = {"x_request_id": self.x_request_id}
+            logger.info(
+                f"Activation Manager initialized for activation {db_instance.id}",
+                extra=extra,
+            )
+
         if container_engine:
             self.container_engine = container_engine
         else:
@@ -421,7 +433,10 @@ class ActivationManager(StatusManager):
                 user_msg,
             )
             system_restart_activation(
-                self.db_instance_type, self.db_instance.id, delay_seconds=1
+                self.db_instance_type,
+                self.db_instance.id,
+                delay_seconds=1,
+                x_request_id=self.x_request_id,
             )
 
     def _missing_container_policy(self):
@@ -448,7 +463,10 @@ class ActivationManager(StatusManager):
         else:
             msg += " Restart policy is applied."
             system_restart_activation(
-                self.db_instance_type, self.db_instance.id, delay_seconds=1
+                self.db_instance_type,
+                self.db_instance.id,
+                delay_seconds=1,
+                x_request_id=self.x_request_id,
             )
 
         self.set_status(
@@ -494,6 +512,7 @@ class ActivationManager(StatusManager):
                 self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE,
+                x_request_id=self.x_request_id,
             )
         else:
             LOGGER.info(
@@ -630,6 +649,7 @@ class ActivationManager(StatusManager):
                 self.db_instance_type,
                 self.db_instance.id,
                 delay_seconds=settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE,
+                x_request_id=self.x_request_id,
             )
 
     def _fail_instance(self, msg: tp.Optional[str] = None):
@@ -757,21 +777,28 @@ class ActivationManager(StatusManager):
         """User requested restart."""
         container_logger = self.container_logger_class(self.latest_instance.id)
 
+        extra = (
+            {"x_request_id": self.x_request_id} if self.x_request_id else {}
+        )
         LOGGER.info(
-            "Restart operation requested for activation id: "
-            "{self.db_instance.id} ",
+            f"Restart operation requested for activation id: {self.db_instance.id} ",
+            extra=extra,
         )
         self.stop()
 
         LOGGER.info(
             f"Activation manager activation id: {self.db_instance.id} "
             "Activation restart scheduled for 1 second.",
+            extra=extra,
         )
         user_msg = "Restart requested by user. "
         self.set_status(ActivationStatus.PENDING, user_msg)
         container_logger.write(user_msg, flush=True)
         system_restart_activation(
-            self.db_instance_type, self.db_instance.id, delay_seconds=1
+            self.db_instance_type,
+            self.db_instance.id,
+            delay_seconds=1,
+            x_request_id=self.x_request_id,
         )
 
     def delete(self):

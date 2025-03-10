@@ -52,7 +52,9 @@ def test_system_cancel_restart_activation(activation):
 
     delay = 5
     system_restart_activation(
-        ProcessParentType.ACTIVATION, activation.id, delay
+        ProcessParentType.ACTIVATION,
+        activation.id,
+        delay,
     )
 
     # Sleep for half the delay and verify the job is still in the scheduler.

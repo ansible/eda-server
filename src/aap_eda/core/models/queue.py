@@ -30,6 +30,13 @@ class ActivationRequestQueue(models.Model):
     )
     process_parent_id = models.BigIntegerField(null=False)
 
+    x_request_id = models.UUIDField(
+        default="00000000-0000-0000-0000-000000000000",
+        editable=False,
+        unique=True,
+        null=True,
+    )
+
     # TODO: can be removed later
     activation = models.ForeignKey(
         "Activation", on_delete=models.CASCADE, null=True
