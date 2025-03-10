@@ -93,7 +93,7 @@ class Activation(
         help_text="Content of the last referenced rulebook",
     )
     ruleset_stats = models.JSONField(default=dict)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     edited_at = models.DateTimeField(null=True)
