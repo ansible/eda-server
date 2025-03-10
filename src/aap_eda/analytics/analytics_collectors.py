@@ -120,12 +120,12 @@ def jobs_stats(since: datetime, full_path: str, until: datetime, **kwargs):
 
 
 @register(
-    "activations_stats",
+    "activations_stats_table",
     "1.0",
     format="csv",
     description="Stats for activations",
 )
-def activations_stats(
+def activations_stats_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ) -> list[str]:
     has_ended_at_states = [
@@ -569,7 +569,14 @@ def teams_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ) -> list[str]:
     args = {"created": True}
-    queryset = _get_query(models.Team.objects, since, until, **args)
+    queryset = _get_query(models.Team.objects, since, until, **args).values(
+        "id",
+        "modified",
+        "created",
+        "name",
+        "description",
+        "organization_id",
+    )
 
     return _copy_table("teams", queryset, full_path)
 
