@@ -3,7 +3,7 @@ import logging
 
 from django.conf import settings
 
-from dispatcher.control import Control
+from dispatcher.factories import get_control_from_settings
 
 
 logger = logging.getLogger(__name__)
@@ -19,9 +19,7 @@ def enqueue_delay(
 
 
 def queue_cancel_job(queue_name: str, job_id: str) -> None:
-    ctl = Control(
-        queue_name, config={"conninfo": settings.PG_NOTIFY_DSN_SERVER}
-    )
+    ctl = get_control_from_settings(default_publish_channel=queue_name)
     canceled_data = ctl.control_with_reply("cancel", data={"uuid": job_id})
     if canceled_data:
         logger.warning(f"Canceled jobs in flight: {canceled_data}")

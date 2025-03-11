@@ -537,6 +537,10 @@ CELERYBEAT_SCHEDULE = {
 RQ_CRON_JOBS = []
 RQ_SCHEDULER_JOB_INTERVAL = settings.get("SCHEDULER_JOB_INTERVAL", 5)
 
+# Related to new dispatcherd, TODO: handle via DAB
+DISPATCHERD_MIN_WORKERS = 4
+DISPATCHERD_MAX_WORKERS = 4
+
 # ---------------------------------------------------------
 # APPLICATION SETTINGS
 # ---------------------------------------------------------

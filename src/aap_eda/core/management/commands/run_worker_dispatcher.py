@@ -12,15 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import asyncio
 import logging
 
 from django.conf import settings
-from django.core.cache import cache
 from django.core.management.base import BaseCommand
-from django.db import connection
 
-from dispatcher.main import DispatcherMain
+from dispatcher import run_service
+from dispatcher.config import settings, setup
 
 logger = logging.getLogger(__name__)
 
@@ -35,29 +33,12 @@ class Command(BaseCommand):
     # help='print the internal state of any running dispatchers')
 
     def handle(self, *args, **options):
-        # NOTE: using a channel named "default" will give a postgres SynaxError
-        # It seems to be some kind of reserved variable name in postgres.
-        dispatcher_config = {
-            "producers": {
-                "brokers": {
-                    "pg_notify": {"conninfo": settings.PG_NOTIFY_DSN_SERVER},
-                    "channels": ["eda_workers"],
-                },
-                "scheduled": settings.CELERYBEAT_SCHEDULE,
-            },
-            "pool": {"max_workers": 4},
+        original_config = settings.serialize()
+        new_config = original_config.copy()
+        new_config['brokers']['pg_notify']['channels'] = ['eda_workers']
+        new_config['producers'] = {
+            "ScheduledProducer": {"task_schedule": settings.CELERYBEAT_SCHEDULE},
         }
+        setup(new_config)
 
-        loop = asyncio.get_event_loop()
-        dispatcher = DispatcherMain(dispatcher_config)
-
-        # Ensure that the database conn is restarted.
-        # This is necessary to prevent SQL errors.
-        connection.close()
-        cache.close()
-        try:
-            loop.run_until_complete(dispatcher.main())
-        except KeyboardInterrupt:
-            logger.info("run_worker_dispatch entry point leaving")
-        finally:
-            loop.close()
+        run_service()

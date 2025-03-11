@@ -640,13 +640,13 @@ develop = false
 pyyaml = "*"
 
 [package.extras]
-pg-notify = ["psycopg[binary]"]
+pg-notify = ["psycopg[binary] (>=3.2.0)"]
 
 [package.source]
 type = "git"
-url = "https://github.com/ansible/dispatcher.git"
+url = "https://github.com/ansible/dispatcherd.git"
 reference = "main"
-resolved_reference = "a32e2451f0d4e2055be5d84ea5f7a985ce5c1696"
+resolved_reference = "4a3093e843ca73f4eaca4b9791be3c10ebfe9974"
 
 [[package]]
 name = "django"
@@ -2976,4 +2976,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "0eef25d2d227ff0df60a52c68eca8d880c92afac0a7b5c8e9aa3f2fdb970f0c6"
+content-hash = "ad6c7a387e0aa3eadde4ac1cca2af9e3d4897b9742c6b7709a83dd1961f84320"

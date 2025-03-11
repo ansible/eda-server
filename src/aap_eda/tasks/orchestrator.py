@@ -34,8 +34,8 @@ from aap_eda.services.activation.activation_manager import (
     StatusManager,
 )
 from ansible_base.lib.utils.db import advisory_lock
-from dispatcher.control import Control
 from dispatcher.publish import task
+from dispatcher.factories import get_control_from_settings
 
 from .exceptions import UnknownProcessParentType
 
@@ -395,10 +395,7 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
     Returns True if the queue is healthy, False otherwise.
     Clears the queue if all workers are dead to avoid stuck processes.
     """
-    ctl = Control(
-        queue_name.replace("-", "_"),
-        config={"conninfo": settings.PG_NOTIFY_DSN_SERVER},
-    )
+    ctl = get_control_from_settings(default_publish_channel=queue_name.replace("-", "_"))
     alive = ctl.control_with_reply("alive")
     if not alive:
         LOGGER.warning(
