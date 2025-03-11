@@ -649,7 +649,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.1.31"
+version = "2025.3.7"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -665,8 +665,8 @@ Django = ">=4.2.16,<4.3.0"
 django-crum = "*"
 django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
-django-split-settings = "*"
 djangorestframework = "*"
+dynaconf = ">=3.2.10,<4.0.0"
 inflection = "*"
 pyjwt = {version = "*", optional = true, markers = "extra == \"jwt-consumer\" or extra == \"resource-registry\""}
 redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
@@ -689,8 +689,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2025.1.31"
-resolved_reference = "26c318ae41659e7f702fab4ed9aa2727db2e583d"
+reference = "2025.3.7"
+resolved_reference = "18dbf67f859737aa79084cd8e982a209d8d40546"
 
 [[package]]
 name = "django-crum"
@@ -846,14 +846,14 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "dynaconf"
-version = "3.2.4"
+version = "3.2.10"
 description = "The dynamic configurator for your Python Project"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "dynaconf-3.2.4-py2.py3-none-any.whl", hash = "sha256:858f9806fab2409c4f5442614c2605d4c4071d5e5153b0e7f24a225f27465aed"},
-    {file = "dynaconf-3.2.4.tar.gz", hash = "sha256:2e6adebaa587f4df9241a16a4bec3fda521154d26b15f3258fde753a592831b6"},
+    {file = "dynaconf-3.2.10-py2.py3-none-any.whl", hash = "sha256:7f70a4b8a8861efb88d8267aeb6f246c791dc34ecbb8299c26a19abd59113df6"},
+    {file = "dynaconf-3.2.10.tar.gz", hash = "sha256:8dbeef31a2343c8342c9b679772c3d005b4801c587cf2f525f98f57ec2f607f1"},
 ]
 
 [package.extras]
@@ -861,7 +861,7 @@ all = ["configobj", "hvac", "redis", "ruamel.yaml"]
 configobj = ["configobj"]
 ini = ["configobj"]
 redis = ["redis"]
-test = ["configobj", "django", "flake8", "flake8-debugger", "flake8-print", "flake8-todo", "flask (>=0.12)", "hvac (>=1.1.0)", "pep8-naming", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
+test = ["configobj", "django", "flask (>=0.12)", "hvac (>=1.1.0)", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
 toml = ["toml"]
 vault = ["hvac"]
 yaml = ["ruamel.yaml"]
@@ -2188,6 +2188,24 @@ docs = ["sphinx", "sphinx-rtd-theme"]
 testing = ["Django", "django-configurations (>=2.0)"]
 
 [[package]]
+name = "pytest-env"
+version = "1.0.1"
+description = "py.test plugin that allows you to add environment variables."
+optional = false
+python-versions = ">=3.7"
+groups = ["test"]
+files = [
+    {file = "pytest_env-1.0.1-py3-none-any.whl", hash = "sha256:e8faf927c6fcdbbc8fe3317506acc116713c9708d01652a0fd945f9ae27b71aa"},
+    {file = "pytest_env-1.0.1.tar.gz", hash = "sha256:603fe216e8e03a5d134989cb41317c59aabef013d2250c71b864ab0798fbe6f6"},
+]
+
+[package.dependencies]
+pytest = ">=7.3.1"
+
+[package.extras]
+test = ["coverage (>=7.2.7)", "pytest-mock (>=3.10)"]
+
+[[package]]
 name = "pytest-lazy-fixture"
 version = "0.6.3"
 description = "It helps to use fixtures in pytest.mark.parametrize"
@@ -2945,4 +2963,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "2c8e496182c292958311628238a8154b36ed479d16435b80f4f8e2bb05dd5081"
+content-hash = "01c2b50ca1f8eacf6b935b49dc8ae40f3906f64fbd0c592314fa393fb8986acf"

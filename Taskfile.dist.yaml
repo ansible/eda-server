@@ -1,7 +1,8 @@
 version: "3"
 
 env:
-  DJANGO_SETTINGS_MODULE: "aap_eda.settings.development"
+  EDA_MODE: development
+  DJANGO_SETTINGS_MODULE: "aap_eda.settings.default"
 
 vars:
   DOCKER_COMPOSE: '{{ default "docker-compose" .DOCKER_COMPOSE }}'
