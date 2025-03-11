@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+from datetime import datetime
 from typing import Optional, get_type_hints
 
 from django.core.exceptions import ImproperlyConfigured
@@ -170,9 +172,9 @@ def get_rq_queues(settings: Dynaconf) -> dict:
     # Configure the default queue
     queues["default"] = _rq_common_parameters(settings)
     queues["default"]["DEFAULT_TIMEOUT"] = settings.DEFAULT_QUEUE_TIMEOUT
-    queues["default"][
-        "REDIS_CLIENT_KWARGS"
-    ] = _rq_redis_client_additional_parameters(settings)
+    queues["default"]["REDIS_CLIENT_KWARGS"] = (
+        _rq_redis_client_additional_parameters(settings)
+    )
 
     # Configure the worker queues
     for queue in settings.RULEBOOK_WORKER_QUEUES:
@@ -180,9 +182,9 @@ def get_rq_queues(settings: Dynaconf) -> dict:
         queues[queue][
             "DEFAULT_TIMEOUT"
         ] = settings.DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue][
-            "REDIS_CLIENT_KWARGS"
-        ] = _rq_redis_client_additional_parameters(settings)
+        queues[queue]["REDIS_CLIENT_KWARGS"] = (
+            _rq_redis_client_additional_parameters(settings)
+        )
 
     return queues
 
@@ -470,3 +472,40 @@ def post_loading(loaded_settings: Dynaconf):
         if key not in loaded_settings or settings[key] != loaded_settings[key]
     }
     loaded_settings.update(data, loader_identifier="settings:post_loading")
+
+
+def configure_logging():
+    """
+    Configure logging and ensure that the rulebook_timestamp
+    replaces the default asctime field.
+    """
+    log_format = "%(rulebook_timestamp)s - %(levelname)s - %(message)s"
+    logging.basicConfig(level=logging.DEBUG, format=log_format)
+
+
+def get_logging_settings():
+    """
+    Returns the logging settings dictionary with an entry for TeeSystemLogger.
+    """
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "tee_formatter": {
+                "format": "%(rulebook_timestamp)s - %(levelname)s - %(message)s"
+            }
+        },
+        "handlers": {
+            "teeloggerhandler": {
+                "class": "logging.StreamHandler",
+                "formatter": "tee_formatter",
+            }
+        },
+        "loggers": {
+            "aap_eda.services.activation.tee_log_handler": {
+                "handlers": ["teeloggerhandler"],
+                "level": logging.DEBUG,
+                "propagate": False,
+            }
+        },
+    }
