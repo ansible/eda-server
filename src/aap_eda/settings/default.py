@@ -11,17 +11,24 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import os
+
 from ansible_base.lib.dynamic_config import (
     export,
     factory,
     load_dab_settings,
     load_envvars,
     load_standard_settings_files,
+    toggle_feature_flags,
 )
 
 from .post_load import post_loading
 
-EDA_SETTINGS_FILE = "/etc/eda/settings.yaml"
+EDA_SETTINGS_FILE = os.environ.get(
+    "EDA_SETTINGS_FILE", "/etc/eda/settings.yaml"
+)
+
+os.environ["EDA_MODE"] = os.environ.get("EDA_MODE", "production")
 
 DYNACONF = factory(
     __name__,
@@ -31,7 +38,12 @@ DYNACONF = factory(
     settings_files=["defaults.py"],
 )
 
-DYNACONF.load_file(EDA_SETTINGS_FILE)
+# Insert the custom file in the list of standard settings so DAB loads it
+# without requiring mode based sections.
+DYNACONF.set(
+    "ANSIBLE_STANDARD_SETTINGS_FILES", f"@insert 3 {EDA_SETTINGS_FILE}"
+)
+
 load_standard_settings_files(
     DYNACONF
 )  # /etc/ansible-automation-platform/*.yaml
@@ -39,4 +51,14 @@ load_envvars(DYNACONF)  # load envvars prefixed with EDA_
 DYNACONF.load_file("core.py")  # load internal non-overwritable settings
 post_loading(DYNACONF)
 load_dab_settings(DYNACONF)
+
+# toggle feature flags, considering flags coming from
+# /etc/ansible-automation-platform/*.yaml
+# and envvars like `EDA_FEATURE_FOO_ENABLED=true
+DYNACONF.update(
+    toggle_feature_flags(DYNACONF),
+    loader_identifier="settings:toggle_feature_flags",
+    merge=True,
+)
+
 export(__name__, DYNACONF)  # export back to django.conf.settings

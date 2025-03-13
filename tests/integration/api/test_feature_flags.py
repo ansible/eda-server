@@ -1,10 +1,10 @@
 import pytest
+from ansible_base.lib.dynamic_config import toggle_feature_flags
 from django.conf import settings
 from django.test import override_settings
 from flags.state import flag_state
 from rest_framework import status
 
-from aap_eda.settings.post_load import toggle_feature_flags
 from tests.integration.constants import api_url_v1
 
 
