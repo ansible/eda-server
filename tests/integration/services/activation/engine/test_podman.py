@@ -237,7 +237,9 @@ def test_engine_start(
     engine.start(request, log_handler)
 
     engine.client.containers.run.assert_called_once()
-    assert models.RulebookProcessLog.objects.count() == 4
+    assert (
+        models.RulebookProcessLog.objects.count() == 5
+    )  # new line for tracking id
     for log in models.RulebookProcessLog.objects.all():
         assert log.log_timestamp > 0
     assert models.RulebookProcessLog.objects.last().log.endswith("is running.")

@@ -331,8 +331,14 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams",
             "source_mappings",
             "skip_audit_events",
+            "log_tracking_id",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+            "log_tracking_id",
+        ]
 
     def to_representation(self, activation):
         rules_count, rules_fired_count = get_rules_count(
@@ -380,6 +386,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "log_tracking_id": activation.log_tracking_id,
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
             "edited_by": BasicUserSerializer(activation.edited_by).data,
@@ -474,6 +481,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
+        validated_data["log_tracking_id"] = str(uuid.uuid4())
 
         if settings.DEPLOYMENT_TYPE == "k8s":
             validated_data["k8s_service_name"] = _update_k8s_service_name(
@@ -825,6 +833,12 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    log_tracking_id = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text="Log tracking ID of the activation",
+    )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
     edited_by = BasicUserFieldSerializer()
@@ -866,12 +880,14 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams",
             "source_mappings",
             "skip_audit_events",
+            "log_tracking_id",
         ]
         read_only_fields = [
             "id",
             "created_at",
             "modified_at",
             "restarted_at",
+            "log_tracking_id",
         ]
 
     def to_representation(self, activation):
@@ -967,6 +983,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "log_tracking_id": activation.log_tracking_id,
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
             "edited_by": BasicUserSerializer(activation.modified_by).data,

@@ -1049,6 +1049,7 @@ def test_restart_activation_with_required_token_deleted(
         mock_stop.assert_called_once_with(
             process_parent_type=enums.ProcessParentType.ACTIVATION,
             process_parent_id=activation_id,
+            request_id="",
         )
 
 

@@ -759,7 +759,7 @@ class ActivationManager(StatusManager):
 
         LOGGER.info(
             "Restart operation requested for activation id: "
-            "{self.db_instance.id} ",
+            f"{self.db_instance.id} ",
         )
         self.stop()
 

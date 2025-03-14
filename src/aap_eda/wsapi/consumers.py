@@ -27,6 +27,10 @@ from aap_eda.core.utils.credentials import (
     get_secret_fields,
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
+from aap_eda.middleware.request_log_middleware import (
+    assign_log_tracking_id,
+    assign_request_id,
+)
 from aap_eda.tasks import orchestrator
 
 from .messages import (
@@ -99,8 +103,11 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         data = json.loads(text_data)
-        logger.debug(f"AnsibleRulebookConsumer received: {data}")
 
+        await self._set_request_id()
+        await self._set_log_tracking_id(data)
+
+        logger.debug(f"AnsibleRulebookConsumer received: {data}")
         msg_type = MessageType(data.get("type"))
 
         try:
@@ -126,7 +133,10 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             logger.error(f"Failed to parse {data} due to Env error: {err}")
 
     async def handle_workers(self, message: WorkerMessage):
-        logger.info(f"Start to handle workers: {message}")
+        logger.info(
+            "Start to handle workers: activation_instance_id: "
+            f"{message.activation_id}"
+        )
         activation = await self.get_activation(message.activation_id)
         rulesets = activation.rulebook_rulesets
         extra_var = activation.extra_var
@@ -178,6 +188,21 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def handle_actions(self, message: ActionMessage):
         logger.info(f"Start to handle actions: {message}")
         await self.insert_audit_rule_data(message)
+
+    async def _set_log_tracking_id(self, data: dict):
+        activation_instance_id = data.get("activation_id")
+        if activation_instance_id:
+            activation = await self.get_activation(activation_instance_id)
+            assign_log_tracking_id(activation.log_tracking_id)
+
+    async def _set_request_id(self):
+        headers = {
+            k.decode().lower(): v.decode()
+            for k, v in self.scope.get("headers", [])
+        }
+        request_id = headers.get("x-request-id", "")
+
+        assign_request_id(request_id)
 
     @database_sync_to_async
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:
