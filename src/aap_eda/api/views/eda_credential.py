@@ -18,7 +18,6 @@ from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
 from django.forms import model_to_dict
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -29,7 +28,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api import exceptions, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
 from aap_eda.core.enums import Action
@@ -39,6 +38,7 @@ from aap_eda.core.utils.credentials import (
     inputs_to_store_dict,
 )
 from aap_eda.utils import str_to_bool
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import (
     CreateModelMixin,
@@ -74,11 +74,6 @@ class EdaCredentialViewSet(
 ):
     queryset = models.EdaCredential.objects.all()
     serializer_class = serializers.EdaCredentialSerializer
-    filter_backends = (
-        KindFilterBackend,
-        defaultfilters.DjangoFilterBackend,
-    )
-    filterset_class = filters.EdaCredentialFilter
     ordering_fields = ["name"]
     rbac_action = None
 
@@ -142,9 +137,15 @@ class EdaCredentialViewSet(
             OpenApiParameter(
                 "credential_type__kind",
                 type=str,
-                description="Kind of CredentialType",
+                description="Filter by credential_type__kind",
             ),
-        ],
+            OpenApiParameter(
+                "credential_type_id",
+                type=int,
+                description="Filter by credential_type_id",
+            ),
+        ]
+        + generate_query_params(serializers.EdaCredentialSerializer()),
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EdaCredentialSerializer(many=True),
