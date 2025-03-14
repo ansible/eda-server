@@ -1,11 +1,12 @@
 from typing import Any, Dict
 
 import pytest
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.core.validators import raise_de_validation_error
 from tests.integration.constants import api_url_v1
 
 
@@ -253,7 +254,7 @@ def test_create_decision_environment_url(
     )
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
-        errors = response.data.get("non_field_errors")
+        errors = response.data.get("image_url")
         assert f"Image url {image_url} is malformed; {unallowed}" in str(
             errors
         )
@@ -322,7 +323,7 @@ def test_create_decision_environment_with_empty_credential(
     assert response.status_code == status_code
     if status_message:
         errors = response.data.get("eda_credential_id") or response.data.get(
-            "non_field_errors"
+            "image_url"
         )
         assert status_message in str(errors)
 
@@ -419,7 +420,7 @@ def test_create_decision_environment_with_no_credential(
 
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
-        errors = response.data.get("non_field_errors")
+        errors = response.data.get("image_url")
         assert f"Image url {image_url} is malformed; {unallowed}" in str(
             errors
         )
@@ -463,7 +464,7 @@ def test_patch_decision_environment_with_no_credential(
         return_code = status.HTTP_200_OK
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
-        errors = response.data.get("non_field_errors")
+        errors = response.data.get("image_url")
         assert f"Image url {image_url} is malformed; {unallowed}" in str(
             errors
         )
@@ -648,7 +649,7 @@ def test_partial_update_decision_environment_with_image_url_and_host(
     assert response.status_code == status_code
     if status_message:
         errors = response.data.get("eda_credential_id") or response.data.get(
-            "non_field_errors"
+            "image_url"
         )
         assert status_message in str(errors)
 
@@ -769,6 +770,20 @@ def test_decision_environment_by_fields(
     # skip the first default_decision_enviroment
     assert results[1]["created_by"]["username"] == admin_user.username
     assert results[1]["modified_by"]["username"] == super_user.username
+
+
+@pytest.mark.parametrize(
+    ("creating_de"),
+    [True, False],
+)
+@pytest.mark.django_db
+def test_raise_de_validation_error(creating_de):
+    with pytest.raises(serializers.ValidationError) as validation_error:
+        raise_de_validation_error("test", creating_de=creating_de)
+        if creating_de:
+            assert "image_url" in validation_error
+        else:
+            assert "image_url" not in validation_error
 
 
 # UTILS
