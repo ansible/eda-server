@@ -138,7 +138,7 @@ RENAMED_USERNAME_PREFIX: str = "eda_"
 # ---------------------------------------------------------
 DEPLOYMENT_TYPE: str = "podman"
 WEBSOCKET_BASE_URL: str = "ws://localhost:8000"
-WEBSOCKET_SSL_VERIFY: str = "yes"
+WEBSOCKET_SSL_VERIFY: Union[bool, str] = "yes"
 WEBSOCKET_TOKEN_BASE_URL: Optional[str] = None
 PODMAN_SOCKET_URL: Optional[str] = None
 PODMAN_SOCKET_TIMEOUT: int = 0
@@ -193,7 +193,7 @@ SCHEDULER_JOB_INTERVAL: int = 5
 # ---------------------------------------------------------
 CONTROLLER_URL: str = "default_controller_url"
 CONTROLLER_TOKEN: str = "default_controller_token"
-CONTROLLER_SSL_VERIFY: str = "yes"
+CONTROLLER_SSL_VERIFY: Union[bool, str] = "yes"
 
 # ---------------------------------------------------------
 # RULEBOOK LIVENESS SETTINGS
