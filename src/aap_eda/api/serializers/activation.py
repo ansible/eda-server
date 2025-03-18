@@ -160,7 +160,8 @@ def _update_extra_vars_from_eda_credentials(
             continue
 
         for key, value in user_inputs.items():
-            if key in secret_fields:
+            if key in secret_fields and value is not None:
+                logger.info("Encrypting secret field %s", key)
                 user_inputs[key] = encrypt_string(
                     password=vault_data.password,
                     plaintext=value,

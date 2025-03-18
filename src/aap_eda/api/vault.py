@@ -36,16 +36,22 @@ if VAULT_COMMAND is None:
 
 
 def encrypt_string(password: str, plaintext: str, vault_id: str) -> str:
-    tmp = tempfile.NamedTemporaryFile("w+t")
-    os.chmod(tmp.name, 0o600)
-    tmp.write(password)
-    tmp.flush()
-    label = f"{vault_id}@{tmp.name}"
+    try:
+        tmp = tempfile.NamedTemporaryFile("w+t")
+        os.chmod(tmp.name, 0o600)
+        tmp.write(password)
+        tmp.flush()
+        label = f"{vault_id}@{tmp.name}"
 
-    child = pexpect.spawn(f"ansible-vault encrypt_string --vault-id {label}")
-    child.expect("Reading plaintext input from stdin*")
-    child.sendline(plaintext)
-    child.sendcontrol("D")
+        child = pexpect.spawn(
+            f"ansible-vault encrypt_string --vault-id {label}"
+        )
+        child.expect("Reading plaintext input from stdin*")
+        child.sendline(plaintext)
+        child.sendcontrol("D")
+    except Exception as e:
+        msg = "Failed to encrypt string"
+        raise AnsibleVaultEncryptionFailed(msg) from e
 
     encrypted_successful_found = False
     encrypted_start = False
