@@ -112,9 +112,11 @@ class ActivationViewSet(
             )
 
         if response.is_enabled:
+            request_id = request.headers.get("x-request-id", "")
             start_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
+                request_id=request_id,
             )
 
         logger.info(
@@ -188,7 +190,7 @@ class ActivationViewSet(
         )
 
         if is_enabled:
-            response = self._start(activation)
+            response = self._start(request, activation)
             if response.status_code >= status.HTTP_400_BAD_REQUEST:
                 return response
 
@@ -227,9 +229,11 @@ class ActivationViewSet(
                 activation.save(update_fields=["status"])
                 name = activation.name
 
+                request_id = request.headers.get("x-request-id", "")
                 delete_rulebook_process(
                     process_parent_type=ProcessParentType.ACTIVATION,
                     process_parent_id=activation.id,
+                    request_id=request_id,
                 )
                 logger.info(f"Now deleting {name} ...")
         except redis.ConnectionError:
@@ -354,9 +358,9 @@ class ActivationViewSet(
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
         activation = self.get_object()
-        return self._start(activation)
+        return self._start(request, activation)
 
-    def _start(self, activation: models.Activation) -> Response:
+    def _start(self, request, activation: models.Activation) -> Response:
         if activation.is_enabled:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -399,9 +403,12 @@ class ActivationViewSet(
                 "modified_at",
             ]
         )
+
+        request_id = request.headers.get("x-request-id", "")
         start_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
+            request_id=request_id,
         )
 
         logger.info(
@@ -442,9 +449,11 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
+            request_id = request.headers.get("x-request-id", "")
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
+                request_id=request_id,
             )
 
         logger.info(
@@ -488,10 +497,12 @@ class ActivationViewSet(
         self.redis_is_available()
 
         valid, error = is_activation_valid(activation)
+        request_id = request.headers.get("x-request-id", "")
         if not valid:
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
+                request_id=request_id,
             )
             activation.status = ActivationStatus.ERROR
             activation.status_message = error
@@ -505,6 +516,7 @@ class ActivationViewSet(
         restart_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
+            request_id=request_id,
         )
 
         logger.info(

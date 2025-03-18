@@ -23,7 +23,12 @@ from .exceptions import UnknownProcessParentType
 
 
 @transaction.atomic
-def push(parent_type: str, parent_id: int, request: ActivationRequest) -> None:
+def push(
+    parent_type: str,
+    parent_id: int,
+    request: ActivationRequest,
+    request_id: str = "",
+) -> None:
     if parent_type == ProcessParentType.ACTIVATION:
         model = Activation
     else:
@@ -35,6 +40,7 @@ def push(parent_type: str, parent_id: int, request: ActivationRequest) -> None:
         process_parent_type=parent_type,
         process_parent_id=parent_id,
         request=request,
+        request_id=request_id,
     )
 
     # Check that the parent referenced still exists.

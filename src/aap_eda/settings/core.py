@@ -39,6 +39,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    "aap_eda.middleware.request_log_middleware.RequestLogMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
