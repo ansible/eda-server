@@ -46,6 +46,7 @@
         organization_name: "{{ organization_name }}"
         name: Basic event stream
         credential_name: Basic event stream credential
+        forward_events: True
 
     - name: Get and print the url of the basic event stream
       block:
