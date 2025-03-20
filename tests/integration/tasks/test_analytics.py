@@ -34,15 +34,17 @@ def analytics_settings():
 
 
 def test_auto_gather_analytics():
-    with mock.patch("aap_eda.tasks.analytics.gather_analytics") as mock_gather:
-        with mock.patch(
-            "aap_eda.tasks.analytics.schedule_gather_analytics"
-        ) as mock_schdule:
-            analytics.auto_gather_analytics()
-            mock_gather.assert_called_once()
-            mock_schdule.assert_called_once()
+    with mock.patch(
+        "aap_eda.tasks.analytics.gather_analytics"
+    ) as mock_gather, mock.patch(
+        "aap_eda.tasks.analytics.schedule_gather_analytics"
+    ) as mock_schdule:
+        analytics.auto_gather_analytics()
+        mock_gather.assert_called_once()
+        mock_schdule.assert_called_once()
 
 
+@pytest.mark.django_db
 def test_schedule_gather_analytics_success():
     test_interval = 3600
     test_queue = "test_queue"
@@ -53,7 +55,10 @@ def test_schedule_gather_analytics_success():
         "aap_eda.tasks.analytics.tasking.enqueue_delay"
     ) as mock_enqueue, mock.patch(
         "aap_eda.tasks.analytics.logger.info"
-    ) as mock_logger:
+    ) as mock_logger, mock.patch(
+        "aap_eda.tasks.analytics.flag_enabled",
+        return_value=True,
+    ):
         mock_interval.return_value = test_interval
 
         analytics.schedule_gather_analytics(test_queue)
@@ -76,7 +81,10 @@ def test_schedule_gather_analytics_with_default_queue():
         "aap_eda.tasks.analytics.utils.get_analytics_interval"
     ) as mock_interval, mock.patch(
         "aap_eda.tasks.analytics.tasking.enqueue_delay"
-    ) as mock_enqueue:
+    ) as mock_enqueue, mock.patch(
+        "aap_eda.tasks.analytics.flag_enabled",
+        return_value=True,
+    ):
         mock_interval.return_value = 300
         analytics.schedule_gather_analytics()
 
@@ -95,7 +103,10 @@ def test_schedule_gather_analytics_error_handling():
         return_value=5,
     ), mock.patch(
         "aap_eda.tasks.analytics.tasking.enqueue_delay"
-    ) as mock_enqueue:
+    ) as mock_enqueue, mock.patch(
+        "aap_eda.tasks.analytics.flag_enabled",
+        return_value=True,
+    ):
         mock_enqueue.side_effect = RuntimeError("Queue connection failed")
 
         with pytest.raises(RuntimeError) as exc_info:

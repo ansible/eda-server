@@ -48,7 +48,7 @@ from aap_eda.analytics.utils import (
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.core.exceptions import ParseError
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 
 logger = logging.getLogger("aap_eda.analytics")
 
@@ -78,7 +78,7 @@ def config(**kwargs) -> dict:
         },
         # skip license related info so far
         "eda_log_level": settings.APP_LOG_LEVEL,
-        "eda_version": get_eda_version(),
+        "eda_version": get_package_version("aap-eda"),
     }
 
 

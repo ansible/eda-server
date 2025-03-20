@@ -255,17 +255,14 @@ MAX_PG_NOTIFY_MESSAGE_SIZE: int = 6144
 # --------------------------------------------------------
 # METRICS COLLECTIONS:
 # --------------------------------------------------------
-# --------------------------------------------------------
-# METRICS COLLECTIONS:
-# --------------------------------------------------------
 AUTOMATION_ANALYTICS_URL: str = (
     "https://cloud.redhat.com/api/ingress/v1/upload"
 )
-OIDC_TOKEN_URL = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"  # noqa: E501
+OIDC_TOKEN_URL: str = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"  # noqa: E501
 ANALYTICS_PROXY_URL: Optional[str] = None
 INSIGHTS_CERT_PATH: str = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
-# Available methods:
 AUTOMATION_AUTH_METHOD: str = "service-account"
 INSIGHTS_TRACKING_STATE: bool = False
+AUTOMATION_ANALYTICS_GATHER_INTERVAL: int = 14400
 REDHAT_USERNAME: str = ""
 REDHAT_PASSWORD: str = ""

@@ -16,7 +16,7 @@ from insights_analytics_collector import Package as InsightsAnalyticsPackage
 
 from aap_eda.analytics import utils
 from aap_eda.analytics.utils import ServiceToken
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 
 
 class FailedToUploadPayload(Exception):
@@ -62,7 +62,7 @@ class Package(InsightsAnalyticsPackage):
         return {
             "Content-Type": self.PAYLOAD_CONTENT_TYPE,
             "User-Agent": self.USER_AGENT,
-            "X-EDA-Version": get_eda_version(),
+            "X-EDA-Version": get_package_version("aap-eda"),
         }
 
     def _send_data(self, url, files, session):

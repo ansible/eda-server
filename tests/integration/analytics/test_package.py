@@ -18,7 +18,7 @@ import pytest
 from django.test import override_settings
 
 from aap_eda.analytics.package import FailedToUploadPayload, Package
-from aap_eda.utils import get_eda_version
+from aap_eda.utils import get_package_version
 
 TEST_PASS = "test_pass"
 
@@ -81,7 +81,7 @@ def test_get_http_request_headers(package: Package) -> None:
     headers = package._get_http_request_headers()
     assert headers["Content-Type"] == package.PAYLOAD_CONTENT_TYPE
     assert headers["User-Agent"] == package.USER_AGENT
-    assert headers["X-EDA-Version"] == get_eda_version()
+    assert headers["X-EDA-Version"] == get_package_version("aap-eda")
 
 
 @pytest.mark.django_db

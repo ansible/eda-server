@@ -299,6 +299,7 @@ def get_insights_tracking_state() -> bool:
 def get_analytics_interval() -> int:
     interval = _get_credential_value(
         "gather_interval",
+        (settings, "AUTOMATION_ANALYTICS_GATHER_INTERVAL"),
         (application_settings, "AUTOMATION_ANALYTICS_GATHER_INTERVAL"),
     )
     try:

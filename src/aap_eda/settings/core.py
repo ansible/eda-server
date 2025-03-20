@@ -152,14 +152,12 @@ RQ = {
 DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
 DEFAULT_WORKER_TTL = 5
 
-RQ_STARTUP_JOBS = []
-if FLAGS["FEATURE_EDA_ANALYTICS_ENABLED"][0]["value"]:
-    RQ_STARTUP_JOBS.append(
-        {
-            "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
-            "job_id": "start_analytics_scheduler",
-        }
-    )
+RQ_STARTUP_JOBS = [
+    {
+        "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
+        "job_id": "start_analytics_scheduler",
+    },
+]
 
 # Id of the scheduler job it's required when we have multiple instances of
 # the scheduler running to avoid duplicate jobs
