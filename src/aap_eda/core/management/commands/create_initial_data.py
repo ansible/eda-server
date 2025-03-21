@@ -24,7 +24,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
+from flags.state import flag_enabled
 
+from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
 from aap_eda.core.models.utils import get_default_organization
 from aap_eda.core.tasking import enable_redis_prefix
@@ -912,6 +914,92 @@ POSTGRES_CREDENTIAL_INPUTS = {
     ]
 }
 
+ANALYTICS_CREDENTIAL_OAUTH_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": "Analytics Authentication Type",
+            "type": "string",
+            "default": "oauth",
+            "hidden": True,
+        },
+        {
+            "id": "client_id",
+            "label": "Client ID",
+            "type": "string",
+            "help_text": ("The Client ID from the Authorization Server."),
+        },
+        {
+            "id": "client_secret",
+            "label": "Client Secret",
+            "type": "string",
+            "secret": True,
+            "help_text": ("The Client Secret from the Authorization Server."),
+        },
+        {
+            "id": "gather_interval",
+            "label": "Analytics Gather Interval",
+            "type": "string",
+            "help_text": "The time interval between each collection (secs)",
+            "default": "14400",
+        },
+        {
+            "id": "insights_tracking_state",
+            "label": "Insights Tracking State",
+            "type": "boolean",
+            "default": False,
+            "help_text": (
+                "Enables the service to gather data on automation "
+                "and send it to Automation Analytics"
+            ),
+        },
+    ],
+    "required": ["auth_type", "client_id", "client_secret"],
+}
+
+ANALYTICS_CREDENTIAL_BASIC_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": "Analytics Authentication Type",
+            "type": "string",
+            "default": "basic",
+            "hidden": True,
+        },
+        {
+            "id": "username",
+            "label": "Username",
+            "type": "string",
+            "help_text": "The username of REDHAT or SUBSCRIPTIONS",
+        },
+        {
+            "id": "password",
+            "label": "Password",
+            "type": "string",
+            "secret": True,
+            "help_text": "The password of REDHAT or SUBSCRIPTIONS",
+        },
+        {
+            "id": "gather_interval",
+            "label": "Analytics Gather Interval",
+            "type": "string",
+            "help_text": "The time interval between each collection (secs)",
+            "default": "14400",
+        },
+        {
+            "id": "insights_tracking_state",
+            "label": "Insights Tracking State",
+            "type": "boolean",
+            "default": False,
+            "help_text": (
+                "Enables the service to gather data on automation "
+                "and send it to Automation Analytics"
+            ),
+        },
+    ],
+    "required": ["auth_type", "username", "password"],
+}
+
 POSTGRES_CREDENTIAL_INJECTORS = {
     "extra_vars": {
         "postgres_db_host": "{{ postgres_db_host }}",
@@ -1109,6 +1197,28 @@ CREDENTIAL_TYPES = [
         "injectors": POSTGRES_CREDENTIAL_INJECTORS,
         "managed": True,
     },
+    {
+        "name": enums.AnalyticsCredentialType.BASIC,
+        "namespace": "analytics",
+        "kind": "user-pass",
+        "inputs": ANALYTICS_CREDENTIAL_BASIC_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for analytics that use for authentication."
+        ),
+    },
+    {
+        "name": enums.AnalyticsCredentialType.OAUTH,
+        "namespace": "analytics",
+        "kind": "service-account",
+        "inputs": ANALYTICS_CREDENTIAL_OAUTH_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for analytics that use for authentication."
+        ),
+    },
 ]
 
 
@@ -1118,6 +1228,14 @@ def populate_credential_types(
     created_credential_types = []
 
     for credential_type_data in credential_types:
+        # Analytics credential types are only available when it's enabled
+        if (
+            not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED")
+            and credential_type_data.get("name")
+            in enums.SINGLETON_CREDENTIAL_TYPES
+        ):
+            continue
+
         new_type, created = models.CredentialType.objects.get_or_create(
             name=credential_type_data["name"],
             defaults={
@@ -1140,6 +1258,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        settings_registry.persist_registry_data()
         self._preload_credential_types()
         self._update_postgres_credentials()
         self._copy_registry_credentials()

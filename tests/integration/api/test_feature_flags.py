@@ -14,7 +14,7 @@ def test_feature_flags_list_endpoint(admin_client):
     assert response.status_code == status.HTTP_200_OK, response.data
     # Test number of feature flags.
     # Modify each time a flag is added to default settings
-    assert len(response.data) == 0
+    assert len(response.data) == 1
 
 
 @override_settings(
