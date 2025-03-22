@@ -36,10 +36,10 @@ from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
 
-from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
 from .status_manager import StatusManager, run_with_lock
+from .tee_log_handler import TeeSystemLogger
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class ActivationManager(StatusManager):
         self,
         db_instance: models.Activation,
         container_engine: tp.Optional[ContainerEngine] = None,
-        container_logger_class: type[DBLogger] = DBLogger,
+        container_logger_class: type[TeeSystemLogger] = TeeSystemLogger,
     ):
         """Initialize the Activation Manager.
 
@@ -203,7 +203,9 @@ class ActivationManager(StatusManager):
         self._create_activation_instance()
 
         self.db_instance.refresh_from_db()
-        log_handler = self.container_logger_class(self.latest_instance.id)
+        log_handler = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         if self.db_instance.edited_at:
             edited_at = self.db_instance.edited_at.strftime(
                 "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -287,7 +289,7 @@ class ActivationManager(StatusManager):
             )
             return
 
-        log_handler = self.container_logger_class(latest_instance.id)
+        log_handler = self.container_logger_class(latest_instance.id, LOGGER)
 
         try:
             self.container_engine.cleanup(
@@ -384,7 +386,9 @@ class ActivationManager(StatusManager):
             "Unresponsive policy called for "
             f"activation id: {self.db_instance.id}",
         )
-        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         if self.db_instance.restart_policy == RestartPolicy.NEVER:
             LOGGER.info(
                 f"Activation id: {self.db_instance.id} "
@@ -429,7 +433,9 @@ class ActivationManager(StatusManager):
             "Missing container policy called for "
             f"activation id: {self.db_instance.id}",
         )
-        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         msg = "Missing container for running activation."
         try:
             self._fail_instance(msg)
@@ -462,7 +468,9 @@ class ActivationManager(StatusManager):
 
         Completed containers are only restart with ALWAYS policy.+
         """
-        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         LOGGER.info(
             "Completed policy called for "
             f"activation id: {self.db_instance.id}",
@@ -517,7 +525,9 @@ class ActivationManager(StatusManager):
             )
 
     def _failed_policy(self, container_msg: str):
-        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         """Apply the failed restart policy."""
         LOGGER.info(
             "Failed policy called for "
@@ -746,16 +756,20 @@ class ActivationManager(StatusManager):
             # do not overwrite the status and message if the activation
             # is already in error status
             self.set_status(ActivationStatus.STOPPED, user_msg)
-        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         container_logger.write(user_msg, flush=True)
         LOGGER.info(
-            f"Stop operation activation id: {self.db_instance.id} "
+            f"Stop operation activation id: {self.db_instance.id, LOGGER} "
             "Activation stopped.",
         )
 
     def restart(self):
         """User requested restart."""
-        container_logger = self.container_logger_class(self.latest_instance.id)
+        container_logger = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
 
         LOGGER.info(
             "Restart operation requested for activation id: "
@@ -999,7 +1013,9 @@ class ActivationManager(StatusManager):
 
     def update_logs(self):
         """Update the logs of the latest instance of the activation."""
-        log_handler = self.container_logger_class(self.latest_instance.id)
+        log_handler = self.container_logger_class(
+            self.latest_instance.id, LOGGER
+        )
         try:
             self._check_latest_instance_and_pod_id()
         except (
