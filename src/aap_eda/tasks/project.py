@@ -19,8 +19,8 @@ from django.conf import settings
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportError, ProjectImportService
 from ansible_base.lib.utils.db import advisory_lock
-from dispatcher.factories import get_control_from_settings
-from dispatcher.publish import task
+from dispatcherd.factories import get_control_from_settings
+from dispatcherd.publish import task
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "eda_workers"
@@ -77,7 +77,9 @@ def _monitor_project_tasks_no_lock() -> None:
     """
     logger.info("Task started: Monitor project tasks")
 
-    ctl = get_control_from_settings(default_publish_channel=PROJECT_TASKS_QUEUE)
+    ctl = get_control_from_settings(
+        default_publish_channel=PROJECT_TASKS_QUEUE
+    )
 
     # Filter projects that doesn't have any related job
     pending_projects = models.Project.objects.filter(

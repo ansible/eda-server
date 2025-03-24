@@ -19,7 +19,7 @@ from django.db.utils import IntegrityError
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.tasking import enqueue_delay, queue_cancel_job
-from dispatcher.publish import task
+from dispatcherd.publish import task
 
 LOGGER = logging.getLogger(__name__)
 

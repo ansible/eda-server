@@ -17,14 +17,14 @@ import logging
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from dispatcher import run_service
-from dispatcher.config import settings, setup
+from dispatcherd import run_service
+from dispatcherd.config import settings as dispatcher_settings, setup
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Run the worker dispatcher."
+    help = "Run the worker dispatcherd."
 
     # # TODO: stuff to support this isn't in yet
     # def add_arguments(self, parser):
@@ -33,11 +33,13 @@ class Command(BaseCommand):
     # help='print the internal state of any running dispatchers')
 
     def handle(self, *args, **options):
-        original_config = settings.serialize()
+        original_config = dispatcher_settings.serialize()
         new_config = original_config.copy()
-        new_config['brokers']['pg_notify']['channels'] = ['eda_workers']
-        new_config['producers'] = {
-            "ScheduledProducer": {"task_schedule": settings.CELERYBEAT_SCHEDULE},
+        new_config["brokers"]["pg_notify"]["channels"] = ["eda_workers"]
+        new_config["producers"] = {
+            "ScheduledProducer": {
+                "task_schedule": settings.CELERYBEAT_SCHEDULE
+            },
         }
         setup(new_config)
 

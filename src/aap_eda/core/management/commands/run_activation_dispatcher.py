@@ -17,16 +17,16 @@ import logging
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from dispatcher import run_service
-from dispatcher.config import settings as dispatcher_settings
-from dispatcher.config import setup
+from dispatcherd import run_service
+from dispatcherd.config import settings as dispatcher_settings
+from dispatcherd.config import setup
 
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Run the activation worker dispatcher."
+    help = "Run the activation worker dispatcherd."
 
     # # TODO: stuff to support this isn't in yet
     # def add_arguments(self, parser):
@@ -37,7 +37,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         original_config = dispatcher_settings.serialize()
         new_config = original_config.copy()
-        new_config['brokers']['pg_notify']['channels'] = [
+        new_config["brokers"]["pg_notify"]["channels"] = [
             settings.RULEBOOK_QUEUE_NAME.replace("-", "_")
         ]
         setup(new_config)

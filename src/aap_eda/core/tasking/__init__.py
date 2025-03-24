@@ -1,9 +1,10 @@
 """Tools for running background tasks."""
+
 import logging
 
 from django.conf import settings
 
-from dispatcher.factories import get_control_from_settings
+from dispatcherd.factories import get_control_from_settings
 
 
 logger = logging.getLogger(__name__)

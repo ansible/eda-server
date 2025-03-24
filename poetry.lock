@@ -627,7 +627,7 @@ files = [
 ]
 
 [[package]]
-name = "dispatcher"
+name = "dispatcherd"
 version = "0.1.0"
 description = "An asyncio-based dispatcher for tasks in a worker pool."
 optional = false
@@ -640,13 +640,13 @@ develop = false
 pyyaml = "*"
 
 [package.extras]
-pg-notify = ["psycopg[binary] (>=3.2.0)"]
+pg-notify = ["psycopg[binary] (>=3.2.4)"]
 
 [package.source]
 type = "git"
 url = "https://github.com/ansible/dispatcherd.git"
 reference = "main"
-resolved_reference = "4a3093e843ca73f4eaca4b9791be3c10ebfe9974"
+resolved_reference = "299d7ea37ac37a37b8aae906fc2f3a2e773f54b2"
 
 [[package]]
 name = "django"
@@ -2976,4 +2976,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "ad6c7a387e0aa3eadde4ac1cca2af9e3d4897b9742c6b7709a83dd1961f84320"
+content-hash = "bab6105b90f61dd35f8f7aa490a36c782f2e0062ad4c7fec9f76eca381246e6d"
