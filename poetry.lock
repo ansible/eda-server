@@ -646,7 +646,7 @@ pg-notify = ["psycopg[binary] (>=3.2.4)"]
 type = "git"
 url = "https://github.com/ansible/dispatcherd.git"
 reference = "main"
-resolved_reference = "299d7ea37ac37a37b8aae906fc2f3a2e773f54b2"
+resolved_reference = "ed4fde53131c7b996e21c88c107ba513f4277742"
 
 [[package]]
 name = "django"
