@@ -643,6 +643,10 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         self.validated_data["user_id"] = self.context["request"].user.id
         self.validated_data["edited_at"] = timezone.now()
         self.validated_data["edited_by"] = self.context["request"].user
+        if settings.DEPLOYMENT_TYPE == "k8s":
+            self.validated_data["k8s_service_name"] = _update_k8s_service_name(
+                self.validated_data
+            )
         if rulebook_id:
             rulebook = models.Rulebook.objects.get(id=rulebook_id)
             self.validated_data["rulebook_name"] = rulebook.name
