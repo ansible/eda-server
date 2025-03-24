@@ -13,6 +13,7 @@
 #  limitations under the License.
 from typing import Any, Dict, List
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 import redis
@@ -1120,30 +1121,38 @@ def test_activation_by_fields(
 
 
 @pytest.mark.django_db
+@patch("aap_eda.api.serializers.activation.settings.DEPLOYMENT_TYPE", "k8s")
 def test_update_activation(
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
     admin_client: APIClient,
 ):
     activation_payload["is_enabled"] = False
+    activation_payload["k8s_service_name"] = "myservice"
     response = admin_client.post(
         f"{api_url_v1}/activations/", data=activation_payload
     )
     assert response.status_code == status.HTTP_201_CREATED
 
     id = response.data["id"]
+    updated_data = {
+        "description": "another_name",
+        "is_enabled": True,
+        "k8s_service_name": "",
+    }
     response = admin_client.patch(
         f"{api_url_v1}/activations/{id}/",
-        data={"name": "another_name", "is_enabled": True},
+        data=updated_data,
     )
     assert response.status_code == status.HTTP_200_OK
     data = response.data
     assert data["edited_at"] is not None
     assert data["edited_by"]["username"] == "test.admin"
     activation = models.Activation.objects.filter(id=data["id"]).first()
-    assert activation.name == "another_name"
+    assert activation.description == "another_name"
     assert activation.edited_at is not None
     assert activation.edited_by.username == "test.admin"
+    assert activation.k8s_service_name == activation.name
     assert activation.is_enabled is True
     assert activation.status == enums.ActivationStatus.PENDING
 
