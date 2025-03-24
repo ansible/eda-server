@@ -29,5 +29,5 @@ venv/
 coverage.xml
 test-results.xml
 
-# Dispatcher development
-./dispatcher/
+# Dispatcherd development
+./dispatcherd/

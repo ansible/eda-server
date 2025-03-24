@@ -34,8 +34,8 @@ from aap_eda.services.activation.activation_manager import (
     StatusManager,
 )
 from ansible_base.lib.utils.db import advisory_lock
-from dispatcher.publish import task
-from dispatcher.factories import get_control_from_settings
+from dispatcherd.publish import task
+from dispatcherd.factories import get_control_from_settings
 
 from .exceptions import UnknownProcessParentType
 
@@ -322,7 +322,7 @@ def dispatch(
                 )
                 return
 
-    # TODO: sanitize or escape channel names on dispatcher side
+    # TODO: sanitize or escape channel names on dispatcherd side
     _manage.apply_async(
         args=[process_parent_type, process_parent_id],
         queue=queue_name.replace("-", "_"),
@@ -395,7 +395,9 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
     Returns True if the queue is healthy, False otherwise.
     Clears the queue if all workers are dead to avoid stuck processes.
     """
-    ctl = get_control_from_settings(default_publish_channel=queue_name.replace("-", "_"))
+    ctl = get_control_from_settings(
+        default_publish_channel=queue_name.replace("-", "_")
+    )
     alive = ctl.control_with_reply("alive")
     if not alive:
         LOGGER.warning(

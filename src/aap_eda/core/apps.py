@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
-from dispatcher.config import setup as dispatcher_setup
+from dispatcherd.config import setup as dispatcher_setup
 
 
 class CoreConfig(AppConfig):
@@ -22,7 +22,9 @@ class CoreConfig(AppConfig):
                         "max_workers": settings.DISPATCHERD_MAX_WORKERS,
                     },
                     "process_manager_cls": "ForkServerManager",
-                    "process_manager_kwargs": {"preload_modules": ['aap_eda.core.tasking.hazmat']},
+                    "process_manager_kwargs": {
+                        "preload_modules": ["aap_eda.core.tasking.hazmat"]
+                    },
                 },
                 "brokers": {
                     "pg_notify": {

@@ -22,7 +22,7 @@ from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
-from dispatcher.worker.task import DispatcherCancel
+from dispatcherd.worker.task import DispatcherCancel
 
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.utils import str_to_bool
