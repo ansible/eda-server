@@ -13,6 +13,8 @@
     controller_password: testpass
     organization_name: Default
     validate_certs: no
+    create_activations: False
+    number_of_activations: 15
   module_defaults:
     group/ansible.eda.eda:
       controller_host: "{{ controller_host }}"
@@ -59,4 +61,14 @@
             msg: "Basic Event Stream URL: {{ event_stream_data.event_streams[0].url }}"
 
 
-
+    - name: Create activations async
+      when: create_activations
+      loop: "{{ range(1, number_of_activations + 1) | list }}"
+      async: 10
+      poll: 0
+      ansible.eda.rulebook_activation:
+        organization_name: "Default"
+        decision_environment_name: "Upstream decision environment"
+        project_name: "Eda sample project"
+        rulebook_name: range_long_running.yml
+        name: "Long running test activation {{ item }}"
