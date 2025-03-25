@@ -83,7 +83,7 @@ class Engine(ContainerEngine):
                 container = self.client.containers.get(container_id)
                 try:
                     container.stop(ignore=True)
-                    LOGGER.info(f"Container {container_id} is cleaned up.")
+                    LOGGER.info(f"Container {container_id} is stopped.")
                     self.update_logs(container_id, log_handler)
                     self._cleanup(container_id, log_handler)
                     log_handler.write(
