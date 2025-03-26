@@ -14,6 +14,7 @@
 
 import logging
 import random
+import uuid
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional
@@ -30,6 +31,10 @@ from aap_eda.core.enums import (
     ProcessParentType,
 )
 from aap_eda.core.models import Activation, ActivationRequestQueue
+from aap_eda.middleware.request_log_middleware import (
+    assign_log_tracking_id,
+    assign_request_id,
+)
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.activation_manager import (
     ActivationManager,
@@ -66,7 +71,7 @@ def get_process_parent(
     return klass.objects.get(id=parent_id)
 
 
-def _manage(process_parent_type: str, id: int) -> None:
+def _manage(process_parent_type: str, id: int, request_id: str = "") -> None:
     """Manage the activation with the given id.
 
     It will run pending user requests or monitor the activation
@@ -99,6 +104,8 @@ def _manage(process_parent_type: str, id: int) -> None:
         ActivationStatus.RUNNING,
         ActivationStatus.WORKERS_OFFLINE,
     ]:
+        assign_request_id(request_id)
+        assign_log_tracking_id(process_parent.log_tracking_id)
         LOGGER.info(
             f"Processing monitor request for {process_parent_type} {id}",
         )
@@ -110,6 +117,8 @@ def _run_request(
     request: ActivationRequestQueue,
 ) -> bool:
     """Attempt to run a request for an activation via the manager."""
+    assign_request_id(request.request_id)
+    assign_log_tracking_id(process_parent.log_tracking_id)
     process_parent_type = type(process_parent).__name__
     LOGGER.info(
         f"Processing request {request.request} for {process_parent_type} "
@@ -149,16 +158,12 @@ def dispatch(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
+    request_id: str = "",
 ):
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
-
-    LOGGER.info(
-        f"Dispatching request {request_type} for {process_parent_type} "
-        f"{process_parent_id}",
-    )
 
     try:
         process_parent = get_process_parent(
@@ -170,6 +175,15 @@ def dispatch(
             f"request {request_type} can not be dispatched.",
         )
         return
+
+    assign_request_id(request_id)
+    assign_log_tracking_id(process_parent.log_tracking_id)
+
+    LOGGER.info(
+        f"Dispatching request {request_type} for {process_parent_type} "
+        f"{process_parent_id}",
+    )
+
     status_manager = StatusManager(process_parent)
 
     job = tasking.get_pending_job(job_id)
@@ -319,6 +333,7 @@ def dispatch(
         _manage,
         process_parent_type,
         process_parent_id,
+        request_id,
     )
 
 
@@ -410,53 +425,62 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
 def start_rulebook_process(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
+    request_id: str = "",
 ) -> None:
     """Create a request to start the activation with the given id."""
     requests_queue.push(
         process_parent_type,
         process_parent_id,
         ActivationRequest.START,
+        request_id,
     )
 
 
 def stop_rulebook_process(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
+    request_id: str = "",
 ) -> None:
     """Create a request to stop the activation with the given id."""
     requests_queue.push(
         process_parent_type,
         process_parent_id,
         ActivationRequest.STOP,
+        request_id,
     )
 
 
 def delete_rulebook_process(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
+    request_id: str = "",
 ) -> None:
     """Create a request to delete the activation with the given id."""
     requests_queue.push(
         process_parent_type,
         process_parent_id,
         ActivationRequest.DELETE,
+        request_id,
     )
     dispatch(
         process_parent_type,
         process_parent_id,
         ActivationRequest.DELETE,
+        request_id,
     )
 
 
 def restart_rulebook_process(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
+    request_id: str = "",
 ) -> None:
     """Create a request to restart the activation with the given id."""
     requests_queue.push(
         process_parent_type,
         process_parent_id,
         ActivationRequest.RESTART,
+        request_id,
     )
 
 
@@ -475,6 +499,7 @@ def monitor_rulebook_processes() -> None:
             request.process_parent_type,
             request.process_parent_id,
             request.request,
+            request.request_id,
         )
 
     # monitor running instances
@@ -492,6 +517,7 @@ def monitor_rulebook_processes() -> None:
             process_parent_type,
             process_parent_id,
             None,
+            str(uuid.uuid4()),
         )
 
 

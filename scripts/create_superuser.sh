@@ -26,6 +26,11 @@ usage() {
 }
 
 create_user() {
+    if ! command -v poetry &>/dev/null; then
+        log-warn "poetry is not installed, please install poetry(version >= 2.0) first."
+        exit 1
+    fi
+
     log-debug "poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput"
     local _result
     _result=$(poetry run /usr/bin/env src/aap_eda/manage.py createsuperuser --noinput 2>&1 || true)
@@ -60,7 +65,7 @@ while getopts p:u:e:h opt; do
         u) export DJANGO_SUPERUSER_USERNAME=$OPTARG ;;
         e) export DJANGO_SUPERUSER_EMAIL=$OPTARG ;;
         h) usage ;;
-        *) log-err "Invalid flag supplied"; exit 2
+        *) log-err "Invalid flag supplied"; usage; exit 2
     esac
 done
 

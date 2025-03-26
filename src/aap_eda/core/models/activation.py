@@ -93,12 +93,20 @@ class Activation(
         help_text="Content of the last referenced rulebook",
     )
     ruleset_stats = models.JSONField(default=dict)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     edited_at = models.DateTimeField(null=True)
     status_updated_at = models.DateTimeField(null=True)
     status_message = models.TextField(null=True, default=None)
+    edited_by = models.ForeignKey(
+        User,
+        related_name="%s(class)s_edited+",
+        default=None,
+        null=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+    )
     latest_instance = models.OneToOneField(
         "RulebookProcess",
         null=True,
@@ -145,6 +153,7 @@ class Activation(
         default=False,
         help_text=("Skip audit events for activation"),
     )
+    log_tracking_id = models.TextField(blank=True)
 
     def get_parent_type(self) -> str:
         return ProcessParentType.ACTIVATION

@@ -36,7 +36,6 @@ dev = ["psycopg-binary"]
 python = ">=3.11,<3.13"
 django = ">=4.2,<4.3"
 djangorestframework = "3.15.*"
-dynaconf = ">=3.1.12,<3.3"
 drf-spectacular = ">=0.26.5,<0.27"
 channels = { version = "4.0.*", extras = ["daphne"] }
 psycopg-binary = { version = "*", optional = true }
@@ -46,9 +45,9 @@ django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
-podman = "5.2.*"
+podman = "5.4.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.1.31", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.3.7", extras = [
     "channel-auth",
     "rbac",
     "redis-client",
@@ -69,9 +68,12 @@ pyjwt = { version = "2.7.*", extras = ["crypto"] }
 ecdsa = "0.18.*"
 validators = "^0.34.0"
 django-flags = "^5.0.13"
+insights-analytics-collector = "^0.3.2"
+distro = "^1.9.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
+pytest-env = "*"
 pytest-django = "*"
 pytest-asyncio = "*"
 requests = { version = "*", python = "<4.0" }

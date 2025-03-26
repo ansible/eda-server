@@ -160,7 +160,8 @@ def _update_extra_vars_from_eda_credentials(
             continue
 
         for key, value in user_inputs.items():
-            if key in secret_fields:
+            if key in secret_fields and value is not None:
+                logger.info("Encrypting secret field %s", key)
                 user_inputs[key] = encrypt_string(
                     password=vault_data.password,
                     plaintext=value,
@@ -296,6 +297,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
     )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
+    edited_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -321,6 +323,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "edited_at",
             "created_by",
             "modified_by",
+            "edited_by",
             "status_message",
             "awx_token_id",
             "log_level",
@@ -329,8 +332,14 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams",
             "source_mappings",
             "skip_audit_events",
+            "log_tracking_id",
         ]
-        read_only_fields = ["id", "created_at", "modified_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "modified_at",
+            "log_tracking_id",
+        ]
 
     def to_representation(self, activation):
         rules_count, rules_fired_count = get_rules_count(
@@ -378,8 +387,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "log_tracking_id": activation.log_tracking_id,
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
+            "edited_by": BasicUserSerializer(activation.edited_by).data,
         }
 
 
@@ -471,6 +482,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         validated_data["rulebook_rulesets"] = rulebook.rulesets
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
+        validated_data["log_tracking_id"] = str(uuid.uuid4())
 
         if settings.DEPLOYMENT_TYPE == "k8s":
             validated_data["k8s_service_name"] = _update_k8s_service_name(
@@ -565,6 +577,7 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "description",
+            "is_enabled",
             "decision_environment_id",
             "rulebook_id",
             "extra_var",
@@ -629,6 +642,11 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         rulebook_id = self.validated_data.get("rulebook_id")
         self.validated_data["user_id"] = self.context["request"].user.id
         self.validated_data["edited_at"] = timezone.now()
+        self.validated_data["edited_by"] = self.context["request"].user
+        if settings.DEPLOYMENT_TYPE == "k8s":
+            self.validated_data["k8s_service_name"] = _update_k8s_service_name(
+                self.validated_data
+            )
         if rulebook_id:
             rulebook = models.Rulebook.objects.get(id=rulebook_id)
             self.validated_data["rulebook_name"] = rulebook.name
@@ -820,8 +838,15 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_null=True,
         child=EventStreamOutSerializer(),
     )
+    log_tracking_id = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text="Log tracking ID of the activation",
+    )
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
+    edited_by = BasicUserFieldSerializer()
 
     class Meta:
         model = models.Activation
@@ -850,6 +875,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "edited_at",
             "created_by",
             "modified_by",
+            "edited_by",
             "restarted_at",
             "status_message",
             "awx_token_id",
@@ -859,12 +885,14 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams",
             "source_mappings",
             "skip_audit_events",
+            "log_tracking_id",
         ]
         read_only_fields = [
             "id",
             "created_at",
             "modified_at",
             "restarted_at",
+            "log_tracking_id",
         ]
 
     def to_representation(self, activation):
@@ -960,8 +988,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "log_tracking_id": activation.log_tracking_id,
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
+            "edited_by": BasicUserSerializer(activation.modified_by).data,
         }
 
 

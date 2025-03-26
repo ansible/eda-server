@@ -5,3 +5,4 @@ secret:
     - tools/docker/nginx/redis-tls/*
     - tests/unit/data/*
     - tests/integration/api/test_event_stream_ecdsa.py
+    - tools/docker/postgres_ssl_config/certs/

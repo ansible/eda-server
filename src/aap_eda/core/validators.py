@@ -50,20 +50,19 @@ def check_if_rulebook_exists(rulebook_id: int) -> int:
 
 
 def check_if_de_exists(decision_environment_id: int) -> int:
-    try:
-        de = models.DecisionEnvironment.objects.get(pk=decision_environment_id)
-        if de.eda_credential_id:
-            check_if_de_valid(de.image_url, de.eda_credential_id)
-    except models.DecisionEnvironment.DoesNotExist:
-        raise serializers.ValidationError(
-            f"DecisionEnvironment with id {decision_environment_id} "
-            "does not exist"
-        )
-    return decision_environment_id
+    if models.DecisionEnvironment.objects.filter(
+        id=decision_environment_id
+    ).exists():
+        return decision_environment_id
+    raise serializers.ValidationError(
+        f"DecisionEnvironment with id {decision_environment_id} "
+        "does not exist"
+    )
 
 
 def check_if_de_valid(
-    image_url: str, eda_credential_id: tp.Optional[int] = None
+    image_url: str,
+    eda_credential_id: tp.Optional[int] = None,
 ):
     # The OCI standard format for the image url is a combination of a host
     # (with optional port) separated from the image path (with optional tag) by
@@ -80,29 +79,27 @@ def check_if_de_valid(
     path = split[1] if len(split) > 1 else None
 
     if host == "":
-        raise serializers.ValidationError(
-            _("Image url %(image_url)s is malformed; no host name found")
-            % {"image_url": image_url}
-        )
+        message = _(
+            "Image url %(image_url)s is malformed; no host name found"
+        ) % {"image_url": image_url}
+        raise serializers.ValidationError({"image_url": message})
 
     try:
         validate_registry_host_name(host)
     except serializers.ValidationError:
         # We raise our own instance of this exception in order to assert
         # control over the format of the message.
-        raise serializers.ValidationError(
-            _(
-                "Image url %(image_url)s is malformed; "
-                "invalid host name: '%(host)s'"
-            )
-            % {"image_url": image_url, "host": host}
-        )
+        message = _(
+            "Image url %(image_url)s is malformed; "
+            "invalid host name: '%(host)s'"
+        ) % {"image_url": image_url, "host": host}
+        raise serializers.ValidationError({"image_url": message})
 
     if (path is None) or (path == ""):
-        raise serializers.ValidationError(
-            _("Image url %(image_url)s is malformed; no image path found")
-            % {"image_url": image_url}
-        )
+        message = _(
+            "Image url %(image_url)s is malformed; no image path found"
+        ) % {"image_url": image_url}
+        raise serializers.ValidationError({"image_url": message})
 
     digest = False
     if "@sha256" in path or "@sha512" in path:
@@ -121,24 +118,20 @@ def check_if_de_valid(
         r"[[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*",  # noqa: E501
         name,
     ):
-        raise serializers.ValidationError(
-            _(
-                "Image url %(image_url)s is malformed; "
-                "'%(name)s' does not match OCI name standard"
-            )
-            % {"image_url": image_url, "name": name}
-        )
+        message = _(
+            "Image url %(image_url)s is malformed; "
+            "'%(name)s' does not match OCI name standard"
+        ) % {"image_url": image_url, "name": name}
+        raise serializers.ValidationError({"image_url": message})
 
     if (not digest and tag is not None) and (
         not re.fullmatch(r"[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}", tag)
     ):
-        raise serializers.ValidationError(
-            _(
-                "Image url %(image_url)s is malformed; "
-                "'%(tag)s' does not match OCI tag standard"
-            )
-            % {"image_url": image_url, "tag": tag}
-        )
+        message = _(
+            "Image url %(image_url)s is malformed; "
+            "'%(tag)s' does not match OCI tag standard"
+        ) % {"image_url": image_url, "tag": tag}
+        raise serializers.ValidationError({"image_url": message})
 
     if eda_credential_id:
         credential = get_credential_if_exists(eda_credential_id)
@@ -146,10 +139,10 @@ def check_if_de_valid(
         credential_host = inputs.get("host")
 
         if not credential_host:
-            raise serializers.ValidationError(
-                _("Credential %(name)s needs to have host information")
-                % {"name": credential.name}
-            )
+            message = _(
+                "Credential %(name)s needs to have host information"
+            ) % {"name": credential.name}
+            raise serializers.ValidationError({"image_url": message})
 
         # Check that the host matches the credential host.
         # For backward compatibility when creating a new DE with
@@ -168,12 +161,11 @@ def check_if_de_valid(
                 )
 
         if host != parsed_host:
-            msg = _(
+            message = _(
                 "DecisionEnvironment image url: %(image_url)s does "
                 "not match with the credential host: %(host)s"
             ) % {"image_url": image_url, "host": credential_host}
-
-            raise serializers.ValidationError(msg)
+            raise serializers.ValidationError({"image_url": message})
 
 
 def get_credential_if_exists(eda_credential_id: int) -> models.EdaCredential:

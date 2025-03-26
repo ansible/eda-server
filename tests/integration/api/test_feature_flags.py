@@ -1,11 +1,10 @@
 import pytest
+from ansible_base.lib.dynamic_config import toggle_feature_flags
 from django.conf import settings
 from django.test import override_settings
-from dynaconf import settings as dynaconf
 from flags.state import flag_state
 from rest_framework import status
 
-from aap_eda.settings.default import toggle_feature_flags
 from tests.integration.constants import api_url_v1
 
 
@@ -15,7 +14,7 @@ def test_feature_flags_list_endpoint(admin_client):
     assert response.status_code == status.HTTP_200_OK, response.data
     # Test number of feature flags.
     # Modify each time a flag is added to default settings
-    assert len(response.data) == 0
+    assert len(response.data) == 1
 
 
 @override_settings(
@@ -45,9 +44,17 @@ def test_feature_flags_override_flags(admin_client):
             {"condition": "boolean", "value": False},
         ],
     },
+    FEATURE_SOME_PLATFORM_FLAG_ENABLED=True,
 )
 @pytest.mark.django_db
 def test_feature_flags_toggle():
-    dynaconf.configure(FEATURE_SOME_PLATFORM_FLAG_ENABLED=True)
-    toggle_feature_flags(settings.FLAGS, dynaconf)
+    settings_override = {
+        "FLAGS": settings.FLAGS,
+        "FEATURE_SOME_PLATFORM_FLAG_ENABLED": settings.FEATURE_SOME_PLATFORM_FLAG_ENABLED,  # noqa: E501
+    }
+    assert toggle_feature_flags(settings_override) == {
+        "FLAGS__FEATURE_SOME_PLATFORM_FLAG_ENABLED": [
+            {"condition": "boolean", "value": True},
+        ]
+    }
     assert flag_state("FEATURE_SOME_PLATFORM_FLAG_ENABLED") is True

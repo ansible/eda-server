@@ -22,7 +22,7 @@ from ansible_base.lib.redis.client import (
 from django.conf import settings
 from rq import results as rq_results
 
-from aap_eda.settings import default
+from aap_eda.settings import core as core_settings, redis as redis_settings
 
 __all__ = [
     "Job",
@@ -131,7 +131,7 @@ def _prune_redis_kwargs(**kwargs) -> dict[str, typing.Any]:
     db = kwargs.get("db", None)
     if (db is not None) and (kwargs.get("mode", "") == "cluster"):
         del kwargs["db"]
-        if db != default.DEFAULT_REDIS_DB:
+        if db != core_settings.DEFAULT_REDIS_DB:
             logger.info(
                 f"clustered redis supports only the default db"
                 f"; db specified: {db}"
@@ -151,7 +151,7 @@ def get_redis_client(**kwargs) -> typing.Union[DABRedis, DABRedisCluster]:
 
 def get_redis_status() -> dict:
     """Query DAB for the status of Redis."""
-    kwargs = default.rq_redis_client_instantiation_parameters()
+    kwargs = redis_settings.rq_redis_client_instantiation_parameters()
     kwargs = _prune_redis_kwargs(**kwargs)
     return _get_redis_status(_create_url_from_parameters(**kwargs), **kwargs)
 
@@ -329,7 +329,7 @@ def _get_necessary_client_connection(
 ) -> rq.Connection:
     if not isinstance(connection, (DABRedis, DABRedisCluster)):
         connection = get_redis_client(
-            **default.rq_redis_client_instantiation_parameters()
+            **redis_settings.rq_redis_client_instantiation_parameters()
         )
     return connection
 

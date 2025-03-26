@@ -1,11 +1,13 @@
 x-environment:
   &common-env
+  - EDA_MODE=${EDA_MODE:-development}
+  - EDA_DB_USER=eda
   - EDA_DB_HOST=postgres
   - EDA_MQ_HOST=${EDA_MQ_HOST:-redis}
   - EDA_MQ_PORT=${EDA_MQ_PORT:-6379}
   - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
   - DJANGO_SETTINGS_MODULE=aap_eda.settings.default
-  - EDA_DB_PASSWORD=secret
+  - EDA_DB_PASSWORD='@none None'
   - EDA_SECRET_KEY=secret
   - EDA_ALLOWED_HOSTS=['*']
   - EDA_DEPLOYMENT_TYPE=podman
@@ -64,9 +66,9 @@ services:
       - '${EDA_PG_PORT:-5432}:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
-      - "${PWD}/tools/docker/postgres_ssl_config/postgresql-cfg:/opt/app-root/src/postgresql-cfg:z"
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/opt/app-root/src/certs:z"
-      - "${PWD}/tools/docker/postgres_ssl_config/hba:/opt/app-root/src/hba:z"
+      - "./postgres_ssl_config/postgresql-cfg:/opt/app-root/src/postgresql-cfg:z"
+      - "./postgres_ssl_config/certs:/opt/app-root/src/certs:z"
+      - "./postgres_ssl_config/hba:/opt/app-root/src/hba:z"
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
@@ -112,7 +114,7 @@ services:
       retries: 10
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/pg_certs:z"
+      - "./postgres_ssl_config/certs:/pg_certs:z"
 
   eda-ws:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -128,7 +130,7 @@ services:
       eda-api:
         condition: service_healthy
     volumes:
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/pg_certs:z"
+      - "./postgres_ssl_config/certs:/pg_certs:z"
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -150,7 +152,7 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/pg_certs:z"
+      - "./postgres_ssl_config/certs:/pg_certs:z"
 
   eda-activation-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -172,7 +174,7 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/pg_certs:z"
+      - "./postgres_ssl_config/certs:/pg_certs:z"
 
   eda-scheduler:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -187,7 +189,7 @@ services:
         condition: service_healthy
     restart: always
     volumes:
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/pg_certs:z"
+      - "./postgres_ssl_config/certs:/pg_certs:z"
 
   eda-webhook-api:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -211,7 +213,7 @@ services:
       retries: 10
       start_period: 15s
     volumes:
-      - "${PWD}/tools/docker/postgres_ssl_config/certs:/pg_certs:z"
+      - "./postgres_ssl_config/certs:/pg_certs:z"
 
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}

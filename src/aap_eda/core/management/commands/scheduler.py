@@ -79,6 +79,7 @@ from django.conf import settings
 from django_rq.management.commands import rqscheduler
 
 from aap_eda.core import tasking
+from aap_eda.utils.logging import startup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ RQ_CRON_JOBS = getattr(settings, "RQ_CRON_JOBS", None)
 def delete_scheduled_jobs(scheduler: rq_scheduler.Scheduler) -> None:
     """Cancel any existing jobs in the scheduler when the app starts up."""
     for job in scheduler.get_jobs():
-        logging.info("Deleting scheduled job: %s", job)
+        logger.info("Deleting scheduled job: %s", job)
         job.delete()
 
 
@@ -168,7 +169,9 @@ class Command(rqscheduler.Command):
         # but we want to manage it through settings
         options["interval"] = settings.RQ_SCHEDULER_JOB_INTERVAL
 
-        logging.info("Initializing scheduler")
+        startup_logging(logger)
+        logger.info("Initializing scheduler")
+
         scheduler = django_rq.get_scheduler()
         delete_scheduled_jobs(scheduler)
         add_startup_jobs(scheduler)

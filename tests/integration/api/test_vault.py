@@ -15,6 +15,7 @@ import pytest
 
 from aap_eda.api.vault import (
     AnsibleVaultDecryptionFailed,
+    AnsibleVaultEncryptionFailed,
     decrypt,
     encrypt_string,
 )
@@ -35,6 +36,11 @@ def test_vault_strings(plaintext):
 
     assert label in vault_string
     assert plaintext == decrypted_value
+
+
+def test_encrypt_with_exception():
+    with pytest.raises(AnsibleVaultEncryptionFailed):
+        encrypt_string("bad", None, label)
 
 
 def test_failed_decrypt():

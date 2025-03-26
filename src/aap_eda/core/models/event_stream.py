@@ -75,8 +75,8 @@ class EventStream(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     )
     owner = models.ForeignKey(
         "User",
-        on_delete=models.CASCADE,
-        null=False,
+        on_delete=models.SET_NULL,
+        null=True,
         help_text="The user who created the webhook",
     )
     uuid = models.UUIDField(default=uuid.uuid4)

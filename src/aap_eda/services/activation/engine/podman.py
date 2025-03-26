@@ -83,7 +83,7 @@ class Engine(ContainerEngine):
                 container = self.client.containers.get(container_id)
                 try:
                     container.stop(ignore=True)
-                    LOGGER.info(f"Container {container_id} is cleaned up.")
+                    LOGGER.info(f"Container {container_id} is stopped.")
                     self.update_logs(container_id, log_handler)
                     self._cleanup(container_id, log_handler)
                     log_handler.write(
@@ -351,6 +351,10 @@ class Engine(ContainerEngine):
     ) -> Image:
         try:
             log_handler.write(f"Pulling image {request.image_url}", True)
+            log_handler.write(
+                f"Log tracking id: {request.log_tracking_id}",
+                True,
+            )
             LOGGER.info(f"Pulling image : {request.image_url}")
             kwargs = {}
             if request.credential:
@@ -363,14 +367,6 @@ class Engine(ContainerEngine):
                 }
             image = self.client.images.pull(request.image_url, **kwargs)
 
-            # https://github.com/containers/podman-py/issues/301
-            if not image.id:
-                msg = messages.IMAGE_PULL_ERROR.format(
-                    image_url=request.image_url,
-                )
-                LOGGER.error(msg)
-                log_handler.write(msg, True)
-                raise exceptions.ContainerImagePullError(msg)
             LOGGER.info("Downloaded image")
             return image
         except ImageNotFound as e:
@@ -379,6 +375,13 @@ class Engine(ContainerEngine):
             log_handler.write(msg, True)
             raise exceptions.ContainerImagePullError(msg) from e
         except APIError as e:
+            if e.status_code == 401:
+                msg = messages.IMAGE_PULL_ERROR.format(
+                    image_url=request.image_url,
+                )
+                LOGGER.error(msg)
+                log_handler.write(msg, True)
+                raise exceptions.ContainerImagePullError(msg)
             LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
         except rq.timeouts.JobTimeoutException as e:

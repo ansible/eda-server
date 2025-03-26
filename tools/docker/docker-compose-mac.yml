@@ -48,6 +48,16 @@ x-environment:
   - SSL_CERTIFICATE=${SSL_CERTIFICATE:-/certs/wildcard.crt}
   - SSL_CERTIFICATE_KEY=${SSL_CERTIFICATE_KEY:-/certs/wildcard.key}
   - SSL_CLIENT_CERTIFICATE=${SSL_CLIENT_CERTIFICATE:-/certs/client.crt}
+  - EDA_FEATURE_EDA_ANALYTICS_ENABLED=${EDA_FEATURE_EDA_ANALYTICS_ENABLED:-True}
+  - EDA_AUTOMATION_ANALYTICS_URL=${EDA_AUTOMATION_ANALYTICS_URL:-}
+  - EDA_INSIGHTS_CERT_PATH=${EDA_INSIGHTS_CERT_PATH:-/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem}
+  - EDA_OIDC_TOKEN_URL=${EDA_OIDC_TOKEN_URL:-https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token}
+  - EDA_ANALYTICS_PROXY_URL=${EDA_ANALYTICS_PROXY_URL:-'@none None'}
+  - EDA_AUTOMATION_AUTH_METHOD=${EDA_AUTOMATION_AUTH_METHOD:-'service-account'}
+  - EDA_INSIGHTS_TRACKING_STATE=${EDA_INSIGHTS_TRACKING_STATE:-False}
+  - EDA_AUTOMATION_ANALYTICS_GATHER_INTERVAL=${EDA_AUTOMATION_ANALYTICS_GATHER_INTERVAL:-14400}
+  - EDA_REDHAT_USERNAME=${EDA_REDHAT_USERNAME:-''}
+  - EDA_REDHAT_PASSWORD=${EDA_REDHAT_PASSWORD:-''}
 
 
 services:
@@ -107,6 +117,7 @@ services:
       retries: 10
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
 
   eda-ws:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -121,6 +132,8 @@ services:
     depends_on:
       eda-api:
         condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
 
   eda-default-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -142,6 +155,7 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
 
   eda-activation-worker:
     user: "${EDA_POD_USER_ID:-0}"
@@ -163,6 +177,7 @@ services:
     restart: always
     volumes:
       - ${EDA_HOST_PODMAN_SOCKET_URL:-/run/user/501/podman/podman.sock}:/run/podman/podman.sock:z
+      - '../../:/app/src:z'
 
   eda-scheduler:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -198,6 +213,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    volumes:
+      - '../../:/app/src:z'
 
   squid:
     image: ${EDA_SQUID_IMAGE:-quay.io/openshifttest/squid-proxy}:${EDA_SQUID_VERSION:-1.2.0}

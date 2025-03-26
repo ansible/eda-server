@@ -627,6 +627,18 @@ files = [
 ]
 
 [[package]]
+name = "distro"
+version = "1.9.0"
+description = "Distro - an OS platform information API"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2"},
+    {file = "distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed"},
+]
+
+[[package]]
 name = "django"
 version = "4.2.16"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
@@ -649,7 +661,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.1.31"
+version = "2025.3.7"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -665,8 +677,8 @@ Django = ">=4.2.16,<4.3.0"
 django-crum = "*"
 django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
-django-split-settings = "*"
 djangorestframework = "*"
+dynaconf = ">=3.2.10,<4.0.0"
 inflection = "*"
 pyjwt = {version = "*", optional = true, markers = "extra == \"jwt-consumer\" or extra == \"resource-registry\""}
 redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
@@ -689,8 +701,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2025.1.31"
-resolved_reference = "26c318ae41659e7f702fab4ed9aa2727db2e583d"
+reference = "2025.3.7"
+resolved_reference = "18dbf67f859737aa79084cd8e982a209d8d40546"
 
 [[package]]
 name = "django-crum"
@@ -846,14 +858,14 @@ sidecar = ["drf-spectacular-sidecar"]
 
 [[package]]
 name = "dynaconf"
-version = "3.2.4"
+version = "3.2.10"
 description = "The dynamic configurator for your Python Project"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "dynaconf-3.2.4-py2.py3-none-any.whl", hash = "sha256:858f9806fab2409c4f5442614c2605d4c4071d5e5153b0e7f24a225f27465aed"},
-    {file = "dynaconf-3.2.4.tar.gz", hash = "sha256:2e6adebaa587f4df9241a16a4bec3fda521154d26b15f3258fde753a592831b6"},
+    {file = "dynaconf-3.2.10-py2.py3-none-any.whl", hash = "sha256:7f70a4b8a8861efb88d8267aeb6f246c791dc34ecbb8299c26a19abd59113df6"},
+    {file = "dynaconf-3.2.10.tar.gz", hash = "sha256:8dbeef31a2343c8342c9b679772c3d005b4801c587cf2f525f98f57ec2f607f1"},
 ]
 
 [package.extras]
@@ -861,7 +873,7 @@ all = ["configobj", "hvac", "redis", "ruamel.yaml"]
 configobj = ["configobj"]
 ini = ["configobj"]
 redis = ["redis"]
-test = ["configobj", "django", "flake8", "flake8-debugger", "flake8-print", "flake8-todo", "flask (>=0.12)", "hvac (>=1.1.0)", "pep8-naming", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
+test = ["configobj", "django", "flask (>=0.12)", "hvac (>=1.1.0)", "pytest", "pytest-cov", "pytest-mock", "pytest-xdist", "python-dotenv", "radon", "redis", "toml"]
 toml = ["toml"]
 vault = ["hvac"]
 yaml = ["ruamel.yaml"]
@@ -1179,6 +1191,22 @@ files = [
     {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
     {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
 ]
+
+[[package]]
+name = "insights-analytics-collector"
+version = "0.3.2"
+description = "Collector Package for Insights for AAP"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "insights-analytics-collector-0.3.2.tar.gz", hash = "sha256:c8464e2f602b01e42574bdad85ed4c8afca9d613c8c886fcbe72f592899f520b"},
+    {file = "insights_analytics_collector-0.3.2-py3-none-any.whl", hash = "sha256:0e88b938d05df83ced969fd0ee29e8452745240ae622fde75aded97a56ee1cf8"},
+]
+
+[package.dependencies]
+django = "*"
+requests = "*"
 
 [[package]]
 name = "ipython"
@@ -1711,14 +1739,14 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "podman"
-version = "5.2.0"
+version = "5.4.0.1"
 description = "Bindings for Podman RESTful API"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "podman-5.2.0-py3-none-any.whl", hash = "sha256:e42e907b44af3e8578ac3bd4838040f7dd6b4af091f787e51462b979746703eb"},
-    {file = "podman-5.2.0.tar.gz", hash = "sha256:6a064a3e9dbfc4ee0ee0c51604164e1f58d9d00b10f702c3e570651aee722ec7"},
+    {file = "podman-5.4.0.1-py3-none-any.whl", hash = "sha256:abd32e49a66bf18a680d9a0ac3989a3f4a3cc7293bc2a5060653276d8ee712f4"},
+    {file = "podman-5.4.0.1.tar.gz", hash = "sha256:ee537aaa44ba530fad7cd939d886a7632f9f7018064e7831e8cb614c54cb1789"},
 ]
 
 [package.dependencies]
@@ -1726,7 +1754,9 @@ requests = ">=2.24"
 urllib3 = "*"
 
 [package.extras]
+docs = ["sphinx"]
 progress-bar = ["rich (>=12.5.1)"]
+test = ["coverage", "fixtures", "pytest", "requests-mock", "tox"]
 
 [[package]]
 name = "prompt-toolkit"
@@ -2184,6 +2214,24 @@ pytest = ">=5.4.0"
 [package.extras]
 docs = ["sphinx", "sphinx-rtd-theme"]
 testing = ["Django", "django-configurations (>=2.0)"]
+
+[[package]]
+name = "pytest-env"
+version = "1.0.1"
+description = "py.test plugin that allows you to add environment variables."
+optional = false
+python-versions = ">=3.7"
+groups = ["test"]
+files = [
+    {file = "pytest_env-1.0.1-py3-none-any.whl", hash = "sha256:e8faf927c6fcdbbc8fe3317506acc116713c9708d01652a0fd945f9ae27b71aa"},
+    {file = "pytest_env-1.0.1.tar.gz", hash = "sha256:603fe216e8e03a5d134989cb41317c59aabef013d2250c71b864ab0798fbe6f6"},
+]
+
+[package.dependencies]
+pytest = ">=7.3.1"
+
+[package.extras]
+test = ["coverage (>=7.2.7)", "pytest-mock (>=3.10)"]
 
 [[package]]
 name = "pytest-lazy-fixture"
@@ -2943,4 +2991,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "af92edac99cd98dd22a6900a9e34f57dc4ee061730f49471aef763936b6dafef"
+content-hash = "39c1526518b82cc207e047b464c601a5c9e5189c09973f238acb07bb76196b64"

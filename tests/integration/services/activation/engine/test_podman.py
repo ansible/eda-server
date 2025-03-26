@@ -19,7 +19,7 @@ from unittest import mock
 import pytest
 from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
-from podman.errors.exceptions import APIError, NotFound
+from podman.errors.exceptions import APIError, NotFound, Response
 from rq.timeouts import JobTimeoutException
 
 from aap_eda.core import models
@@ -45,7 +45,9 @@ from aap_eda.services.activation.engine.podman import (
     _get_podman_socket_url,
     get_podman_client,
 )
-from aap_eda.settings.default import settings as orig_dynaconf_settings
+from aap_eda.settings.default import (  # noqa: N811
+    DYNACONF as orig_dynaconf_settings,
+)
 
 from .utils import InitData, get_ansible_rulebook_cmdline, get_request
 
@@ -154,7 +156,7 @@ def test_get_podman_client_with_timeout(settings):
 
 def test_get_podman_client_with_zero_timeout():
     """Test setting the timeout for the Podman client to zero."""
-    with mock.patch("aap_eda.settings.default.settings.get") as get_mock:
+    with mock.patch("aap_eda.settings.default.DYNACONF.get") as get_mock:
 
         def get_side_effect(*args, **kwargs):
             if args[0] == "PODMAN_SOCKET_TIMEOUT":
@@ -235,7 +237,9 @@ def test_engine_start(
     engine.start(request, log_handler)
 
     engine.client.containers.run.assert_called_once()
-    assert models.RulebookProcessLog.objects.count() == 4
+    assert (
+        models.RulebookProcessLog.objects.count() == 5
+    )  # new line for tracking id
     for log in models.RulebookProcessLog.objects.all():
         assert log.log_timestamp > 0
     assert models.RulebookProcessLog.objects.last().log.endswith("is running.")
@@ -412,18 +416,20 @@ def test_engine_start_with_image_pull_exception(
         init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
     )
 
-    image_mock = mock.Mock()
-    image_mock.pull.return_value.id = None
+    def raise_api_error(*args, **kwargs):
+        response = Response()
+        response.status_code = 401
+        raise APIError("Image not found", response=response)
+
+    engine.client.images.pull.side_effect = raise_api_error
+
     msg = (
         f"Image {request.image_url} pull failed. The image url "
         "or the credentials may be incorrect."
     )
 
-    with mock.patch.object(engine.client, "images", image_mock):
-        with pytest.raises(ContainerImagePullError, match=msg):
-            engine.start(request, log_handler)
-
-    assert models.RulebookProcessLog.objects.last().log.endswith(msg)
+    with pytest.raises(ContainerImagePullError, match=msg):
+        engine.start(request, log_handler)
 
 
 @pytest.mark.django_db

@@ -253,7 +253,7 @@ def test_create_decision_environment_url(
     )
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
-        errors = response.data.get("non_field_errors")
+        errors = response.data.get("image_url")
         assert f"Image url {image_url} is malformed; {unallowed}" in str(
             errors
         )
@@ -322,7 +322,7 @@ def test_create_decision_environment_with_empty_credential(
     assert response.status_code == status_code
     if status_message:
         errors = response.data.get("eda_credential_id") or response.data.get(
-            "non_field_errors"
+            "image_url"
         )
         assert status_message in str(errors)
 
@@ -419,7 +419,7 @@ def test_create_decision_environment_with_no_credential(
 
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
-        errors = response.data.get("non_field_errors")
+        errors = response.data.get("image_url")
         assert f"Image url {image_url} is malformed; {unallowed}" in str(
             errors
         )
@@ -463,7 +463,7 @@ def test_patch_decision_environment_with_no_credential(
         return_code = status.HTTP_200_OK
     assert response.status_code == return_code
     if return_code == status.HTTP_400_BAD_REQUEST:
-        errors = response.data.get("non_field_errors")
+        errors = response.data.get("image_url")
         assert f"Image url {image_url} is malformed; {unallowed}" in str(
             errors
         )
@@ -648,7 +648,7 @@ def test_partial_update_decision_environment_with_image_url_and_host(
     assert response.status_code == status_code
     if status_message:
         errors = response.data.get("eda_credential_id") or response.data.get(
-            "non_field_errors"
+            "image_url"
         )
         assert status_message in str(errors)
 

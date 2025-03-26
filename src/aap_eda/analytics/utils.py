@@ -1,0 +1,338 @@
+#  Copyright 2024 Red Hat, Inc.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+import logging
+import re
+import time
+from typing import Any, Optional, Tuple
+
+import requests
+import yaml
+from django.conf import settings
+from django.utils.dateparse import parse_datetime
+from requests.auth import AuthBase, HTTPBasicAuth
+
+from aap_eda.conf import application_settings
+from aap_eda.conf.registry import ANALYTICS_GATHER_INTERVAL
+from aap_eda.core import enums, models
+from aap_eda.core.utils.credentials import inputs_from_store
+
+logger = logging.getLogger("aap_eda.analytics")
+
+
+class MissingUserPasswordError(Exception):
+    """Raised when required user credentials are missing."""
+
+    pass
+
+
+CREDENTIAL_SOURCES = [
+    ("REDHAT_USERNAME", "REDHAT_PASSWORD"),
+    ("SUBSCRIPTIONS_USERNAME", "SUBSCRIPTIONS_PASSWORD"),
+]
+
+
+class TokenAuth(AuthBase):
+    def __init__(self, token: str):
+        self.token = token
+
+    def __call__(self, r):
+        r.headers["Authorization"] = f"Bearer {self.token}"
+        return r
+
+
+def datetime_hook(dt: dict) -> dict:
+    new_dt = {}
+    for key, value in dt.items():
+        try:
+            new_dt[key] = parse_datetime(value) or value
+        except (TypeError, ValueError):
+            new_dt[key] = value
+    return new_dt
+
+
+def collect_controllers_info() -> dict:
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    credentials = models.EdaCredential.objects.filter(
+        credential_type=aap_credential_type
+    )
+    info = {}
+
+    for credential in credentials:
+        try:
+            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+            host = inputs["host"].removesuffix("/api/controller/")
+            if not info.get(host):
+                url = f"{host}/api/v2/ping/"
+                auth = _get_auth(inputs)
+                verify = inputs.get("verify_ssl", False)
+
+                controller_info = {
+                    "credential_id": credential.id,
+                    "inputs": inputs,
+                }
+
+                # quickly to retrieve controller's info. timeout=3
+                resp = requests.get(url, auth=auth, verify=verify, timeout=3)
+                resp.raise_for_status()
+                controller_info["install_uuid"] = resp.json()["install_uuid"]
+                info[host] = controller_info
+
+        except KeyError as e:
+            logger.error(f"Missing key in credential inputs: {e}")
+            continue
+        except yaml.YAMLError as e:
+            logger.error(
+                f"YAML parsing error for credential {credential.id}: {e}"
+            )
+            continue
+        except requests.exceptions.RequestException as e:
+            logger.warning(
+                f"Controller connection failed for {credential.name}: {e}"
+            )
+            continue
+        except Exception as e:
+            logger.exception(
+                f"Unexpected error processing credential {credential.id}: {e}"
+            )
+            continue
+
+    return info
+
+
+def _get_auth(inputs: dict) -> AuthBase:
+    # priority：Token > Basic Auth
+    if token := inputs.get("oauth_token"):
+        logger.debug("Use Bearer authentication")
+        return TokenAuth(token)
+
+    username = inputs.get("username")
+    password = inputs.get("password")
+    if username and password:
+        logger.debug("Use Basic authentication")
+        return HTTPBasicAuth(username, password)
+
+    raise ValueError(
+        "Invalid authentication configuration, must provide "
+        "Token or username/password"
+    )
+
+
+def extract_job_details(
+    url: str,
+    controllers_info: dict,
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    for host, info in controllers_info.items():
+        if not url.lower().startswith(host.lower()):
+            continue
+
+        install_uuid = info.get("install_uuid")
+        if not install_uuid:
+            continue
+
+        pattern = r"/jobs/([a-zA-Z]+)/(\d+)/"
+
+        match = re.search(pattern, url)
+
+        if match:
+            job_type = match.group(1)
+            job_type = (
+                "run_job_template"
+                if job_type == "playbook"
+                else "run_workflow_template"
+            )
+            job_number = match.group(2)
+            return job_type, str(job_number), install_uuid
+
+    return None, None, None
+
+
+class ServiceToken:
+    """Service Token generated by OIDC."""
+
+    access_token: str
+    expires_in: int
+
+    def __init__(self, access_token: str = "", expires_in: int = 0):
+        self.access_token = access_token
+        self.expires_in = expires_in
+        self._now = int(time.time())
+
+    @property
+    def expires_at(self) -> int:
+        return self._now + self.expires_in
+
+    def is_expired(self) -> bool:
+        return int(time.time()) >= self.expires_at
+
+
+def generate_token() -> ServiceToken:
+    token_url = get_oidc_token_url()
+    client_id = get_client_id()
+    client_secret = get_client_secret()
+
+    if not all([client_id, client_secret, token_url]):
+        raise ValueError("Missing required OIDC configuration")
+
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "grant_type": "client_credentials",
+    }
+
+    try:
+        resp = requests.post(
+            token_url,
+            headers=headers,
+            data=data,
+            verify=get_cert_path(),
+            timeout=(31, 31),
+        )
+        resp.raise_for_status()
+    except requests.exceptions.SSLError:
+        logger.error("SSL certificate verification failed")
+        raise
+    except requests.exceptions.Timeout:
+        logger.error("Token request timed out")
+        raise
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Token request failed: {str(e)}")
+        raise
+
+    data = resp.json()
+
+    return ServiceToken(
+        access_token=data.get("access_token", ""),
+        expires_in=data.get("expires_in", 0),
+    )
+
+
+def _get_credential_value(field: str, *setting_envs: Tuple[Any, str]) -> str:
+    credentials = _get_analytics_credentials()
+    for credential in credentials:
+        inputs = inputs_from_store(credential.inputs.get_secret_value())
+        if value := inputs.get(field):
+            return value
+
+    for env, key in setting_envs:
+        if value := getattr(env, key, None):
+            return value
+
+
+def get_cert_path() -> str:
+    return settings.INSIGHTS_CERT_PATH
+
+
+def get_auth_mode() -> str:
+    return settings.AUTOMATION_AUTH_METHOD
+
+
+def get_oidc_token_url() -> str:
+    return settings.OIDC_TOKEN_URL
+
+
+def get_proxy_url() -> str:
+    return settings.ANALYTICS_PROXY_URL
+
+
+def get_analytics_url() -> str:
+    return (
+        application_settings.AUTOMATION_ANALYTICS_URL
+        or settings.AUTOMATION_ANALYTICS_URL
+    )
+
+
+def get_client_id() -> str:
+    return _get_credential_value("client_id")
+
+
+def get_client_secret() -> str:
+    return _get_credential_value("client_secret")
+
+
+def get_username() -> str:
+    _validate_credential()
+    return _get_credential_value(
+        "username",
+        (settings, "REDHAT_USERNAME"),
+        (application_settings, "REDHAT_USERNAME"),
+        (application_settings, "SUBSCRIPTIONS_USERNAME"),
+    )
+
+
+def get_password() -> str:
+    _validate_credential()
+    return _get_credential_value(
+        "password",
+        (settings, "REDHAT_PASSWORD"),
+        (application_settings, "REDHAT_PASSWORD"),
+        (application_settings, "SUBSCRIPTIONS_PASSWORD"),
+    )
+
+
+def get_insights_tracking_state() -> bool:
+    return (
+        _get_credential_value(
+            "insights_tracking_state",
+            (settings, "INSIGHTS_TRACKING_STATE"),
+            (application_settings, "INSIGHTS_TRACKING_STATE"),
+        )
+        or False
+    )
+
+
+def get_analytics_interval() -> int:
+    interval = _get_credential_value(
+        "gather_interval",
+        (settings, "AUTOMATION_ANALYTICS_GATHER_INTERVAL"),
+        (application_settings, "AUTOMATION_ANALYTICS_GATHER_INTERVAL"),
+    )
+    try:
+        return int(interval)
+    except ValueError as e:
+        logger.error(
+            f"Invalid analytics interval value '{interval}'. "
+            f"Using default interval. Error: {str(e)}"
+        )
+        return ANALYTICS_GATHER_INTERVAL
+
+
+def _validate_credential() -> None:
+    if _get_analytics_credentials().exists():
+        return
+
+    has_valid = []
+    for setting in (application_settings, settings):
+        for values in CREDENTIAL_SOURCES:
+            has_valid.append(
+                getattr(setting, values[0], None)
+                and getattr(setting, values[1], None)
+            )
+
+    if not any(has_valid):
+        logger.error("Missing required credentials in settings")
+        raise MissingUserPasswordError("Valid credentials not found")
+
+
+def _get_analytics_credentials():
+    analytics_types = models.CredentialType.objects.filter(
+        kind=get_auth_mode()
+    )
+    return models.EdaCredential.objects.filter(
+        credential_type__in=list(analytics_types)
+    )

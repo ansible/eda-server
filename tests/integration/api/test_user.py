@@ -11,14 +11,22 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import secrets
+from typing import Any, Dict
+
 import pytest
-from ansible_base.rbac.models import RoleDefinition
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import APIClient
 
-from aap_eda.core import models
+from aap_eda.core import enums, models
+from tests.integration.api.test_event_stream import (
+    create_event_stream,
+    create_event_stream_credential,
+    get_default_test_org,
+)
 from tests.integration.constants import api_url_v1
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -562,3 +570,66 @@ def test_list_users_filter_by_ansible_id(
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_resources_remain_after_user_delete(
+    base_client: APIClient,
+    admin_user: models.User,
+    default_user: models.User,
+    preseed_credential_types,
+    default_organization,
+    activation_payload: Dict[str, Any],
+):
+    # Give default user permission to create resources
+    admin_role = RoleDefinition.objects.create(
+        name="Elevated User",
+        content_type=ContentType.objects.get_for_model(default_organization),
+    )
+    admin_role.permissions.add(*DABPermission.objects.all())
+    admin_role.give_permission(default_user, default_organization)
+    base_client.force_authenticate(user=default_user)
+
+    # Create activation
+    response = base_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Create event stream credential
+    secret = secrets.token_hex(32)
+    inputs = {
+        "auth_type": "basic",
+        "username": default_user.username,
+        "password": secret,
+        "http_header_key": "Authorization",
+    }
+    obj = create_event_stream_credential(
+        base_client, enums.EventStreamCredentialType.BASIC.value, inputs
+    )
+    # Create event stream
+    data_in = {
+        "name": "test-es-1",
+        "eda_credential_id": obj["id"],
+        "event_stream_type": obj["credential_type"]["kind"],
+        "organization_id": get_default_test_org().id,
+        "test_mode": True,
+    }
+    event_stream = create_event_stream(base_client, data_in)
+
+    # Delete user
+    base_client.force_authenticate(user=admin_user)
+    response = base_client.delete(f"{api_url_v1}/users/{default_user.id}/")
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    # Ensure activation and event stream remain
+    assert models.EventStream.objects.filter(id=event_stream.id).count() == 1
+    assert models.Activation.objects.filter(id=activation_id).count() == 1
+
+    # Ensure user is marked as deleted in event stream return
+    response = base_client.get(
+        f"{api_url_v1}/event-streams/{event_stream.id}/"
+    )
+    assert response.status_code == 200
+    assert response.data["owner"] == ""

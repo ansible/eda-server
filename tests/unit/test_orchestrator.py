@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import functools
+import uuid
 from datetime import datetime, timedelta
 from unittest import mock
 
@@ -20,13 +21,14 @@ import django_rq
 import pytest
 from django.conf import settings
 
-from aap_eda.core.enums import ProcessParentType
+from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.core.models import Activation, RulebookProcess
 from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
 from aap_eda.tasks.exceptions import UnknownProcessParentType
 from aap_eda.tasks.orchestrator import (
     HealthyQueueNotFoundError,
+    _manage,
     check_rulebook_queue_health,
     get_least_busy_queue_name,
     get_process_parent,
@@ -239,6 +241,29 @@ def three_queues_two_candidates(monkeypatch):
             },
         },
     )
+
+
+@pytest.fixture
+def process_parent():
+    parent = mock.Mock(spec=Activation)
+    parent.id = 1
+    parent.status = ActivationStatus.RUNNING
+    parent.log_tracking_id = str(uuid.uuid4())
+    return parent
+
+
+@pytest.fixture
+def mock_get_parent():
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.get_process_parent"
+    ) as mock_get:
+        yield mock_get
+
+
+@pytest.fixture
+def mock_requests_queue():
+    with mock.patch("aap_eda.tasks.orchestrator.requests_queue") as mock_queue:
+        yield mock_queue
 
 
 @pytest.mark.parametrize(
@@ -470,3 +495,25 @@ def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
     all_workers_mock.assert_called_once_with(queue=queue_mock)
     queue_mock.empty.assert_not_called()
     assert result is True
+
+
+def test_manage_monitor_called_with_no_requests(
+    process_parent, mock_get_parent, mock_requests_queue
+):
+    mock_get_parent.return_value = process_parent
+    mock_requests_queue.peek_all.return_value = []
+    manager_mock = mock.Mock()
+
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.ActivationManager"
+    ) as mock_manager, mock.patch(
+        "aap_eda.tasks.orchestrator.assign_request_id"
+    ) as mock_assign_req, mock.patch(
+        "aap_eda.tasks.orchestrator.assign_log_tracking_id"
+    ) as mock_assign_log:
+        mock_manager.return_value = manager_mock
+        _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
+
+    mock_assign_req.assert_called_once_with("x_request_id")
+    mock_assign_log.assert_called_once_with(process_parent.log_tracking_id)
+    manager_mock.monitor.assert_called_once()
