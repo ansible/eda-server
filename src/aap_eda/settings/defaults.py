@@ -141,11 +141,11 @@ WEBSOCKET_BASE_URL: str = "ws://localhost:8000"
 WEBSOCKET_SSL_VERIFY: Union[bool, str] = "yes"
 WEBSOCKET_TOKEN_BASE_URL: Optional[str] = None
 PODMAN_SOCKET_URL: Optional[str] = None
-PODMAN_SOCKET_TIMEOUT: int = 0
-PODMAN_MEM_LIMIT: str = "200m"
+PODMAN_SOCKET_TIMEOUT: Optional[int] = 0
+PODMAN_MEM_LIMIT: Optional[str] = "200m"
 PODMAN_ENV_VARS: Optional[dict] = {}
-PODMAN_MOUNTS: list = []
-PODMAN_EXTRA_ARGS: dict = {}
+PODMAN_MOUNTS: Optional[list] = []
+PODMAN_EXTRA_ARGS: Optional[dict] = {}
 DEFAULT_PULL_POLICY: str = "Always"
 CONTAINER_NAME_PREFIX: str = "eda"
 
