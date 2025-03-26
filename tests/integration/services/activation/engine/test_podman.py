@@ -296,7 +296,7 @@ def test_engine_start_with_credential(
         command=request.cmdline.command_and_args(),
         stdout=True,
         stderr=True,
-        remove=True,
+        remove=False,
         detach=True,
         name=request.name,
         ports={"8080/tcp": 8080},
