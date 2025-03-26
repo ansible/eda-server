@@ -81,21 +81,20 @@ class Engine(ContainerEngine):
         try:
             if self.client.containers.exists(container_id):
                 container = self.client.containers.get(container_id)
-                try:
-                    container.stop(ignore=True)
-                    LOGGER.info(f"Container {container_id} is stopped.")
-                    self.update_logs(container_id, log_handler)
-                    self._cleanup(container_id, log_handler)
-                    log_handler.write(
-                        f"Container {container_id} is cleaned up.",
-                        flush=True,
-                    )
-                except NotFound:
-                    LOGGER.info(f"Container {container_id} not found.")
-                    log_handler.write(
-                        f"Container {container_id} not found.",
-                        flush=True,
-                    )
+                container.stop(ignore=True)
+                LOGGER.info(f"Container {container_id} is stopped.")
+                self.update_logs(container_id, log_handler)
+                self._cleanup(container_id, log_handler)
+                log_handler.write(
+                    f"Container {container_id} is cleaned up.",
+                    flush=True,
+                )
+        except NotFound:
+            LOGGER.warning(f"Container {container_id} not found.")
+            log_handler.write(
+                f"Container {container_id} not found.",
+                flush=True,
+            )
         # ContainerCleanupError handled by the manager
         except APIError as e:
             raise exceptions.ContainerCleanupError(str(e)) from e
@@ -146,7 +145,7 @@ class Engine(ContainerEngine):
                 command=command,
                 stdout=True,
                 stderr=True,
-                remove=True,
+                remove=False,
                 detach=True,
                 **pod_args,
             )
@@ -307,11 +306,10 @@ class Engine(ContainerEngine):
         try:
             if self.client.containers.exists(container_id):
                 container = self.client.containers.get(container_id)
-                try:
-                    container.remove(force=True, v=True)
-                    LOGGER.info(f"Container {container_id} is cleaned up.")
-                except NotFound:
-                    LOGGER.info(f"Container {container_id} not found.")
+                container.remove(force=True, v=True)
+                LOGGER.info(f"Container {container_id} is cleaned up.")
+        except NotFound:
+            LOGGER.warning(f"Container {container_id} not found.")
         except APIError as e:
             LOGGER.error(f"Failed to cleanup {container_id}: {e}")
             raise exceptions.ContainerCleanupError(str(e))
