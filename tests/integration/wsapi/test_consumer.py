@@ -1,5 +1,7 @@
 import base64
+import logging
 import uuid
+from datetime import datetime
 from typing import Generator
 from unittest.mock import patch
 
@@ -7,12 +9,13 @@ import pytest
 import pytest_asyncio
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import enums, models
 from aap_eda.core.models.activation import ActivationStatus
-from aap_eda.wsapi.consumers import AnsibleRulebookConsumer
+from aap_eda.wsapi.consumers import AnsibleRulebookConsumer, logger
 
 # TODO(doston): this test module needs a whole refactor to use already
 # existing fixtures over from API conftest.py instead of creating new objects
@@ -49,6 +52,11 @@ AAP_INPUTS = {
     "oauth_token": "",
     "verify_ssl": False,
 }
+
+
+@pytest.fixture
+def eda_caplog(caplog_factory):
+    return caplog_factory(logger)
 
 
 @pytest.fixture
@@ -735,6 +743,11 @@ def get_job_instance_event_count():
 
 
 @database_sync_to_async
+def remove_credential_type(cred_type: models.CredentialType):
+    cred_type.delete()
+
+
+@database_sync_to_async
 def _prepare_activation_instance_with_credentials(
     default_organization: models.Organization,
     credentials: list[models.EdaCredential],
@@ -1272,6 +1285,100 @@ async def test_handle_workers_with_env_vars(
         assert response["type"] == type
         if type == "EnvVars":
             assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_receive_object_not_exist(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+):
+    # Use invalid activation_id to trigger ObjectDoesNotExist
+    payload = {
+        "type": "Job",
+        "job_id": "940730a1-8b6f-45f3-84c9-bde8f04390e0",
+        "ansible_rulebook_id": 100000000,
+        "name": "ansible.eda.hello",
+        "ruleset": "ruleset",
+        "rule": "rule",
+        "hosts": "hosts",
+        "action": "run_playbook",
+    }
+    await ws_communicator.send_json_to(payload)
+    await ws_communicator.wait()
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_insert_audit_rule_invalid_activation(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+    eda_caplog,
+):
+    await _prepare_db_data(default_organization)
+
+    # Test with invalid activation ID
+    invalid_activation_id = 100000000
+    job_uuid = "940730a1-8b6f-45f3-84c9-bde8f04390e0"
+
+    payload = create_action_payload(
+        str(uuid.uuid4()),
+        invalid_activation_id,
+        job_uuid,
+        str(uuid.uuid4()),
+        datetime.now().isoformat(),
+        _matching_events(),
+    )
+
+    initial_audit_count = await get_audit_rule_count()
+
+    with patch(
+        "aap_eda.wsapi.consumers.AnsibleRulebookConsumer._set_log_tracking_id"
+    ):
+        await ws_communicator.send_json_to(payload)
+        await ws_communicator.wait()
+
+        # Verify no audit records created and error is logged
+        assert await get_audit_rule_count() == initial_audit_count
+        assert "RulebookProcess 100000000 not found" in eda_caplog.text
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_activation_with_exception(
+    ws_communicator: WebsocketCommunicator,
+    eda_caplog,
+):
+    consumer = AnsibleRulebookConsumer()
+
+    invalid_uuid = "100000000"
+    with pytest.raises(ObjectDoesNotExist):
+        await consumer.get_activation(invalid_uuid)
+
+    assert "RulebookProcess 100000000 not found" in eda_caplog.text
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_controller_info_from_aap_cred(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    caplog_factory,
+):
+    eda_caplog = caplog_factory(logger, logging.DEBUG)
+    eda_credential = await _prepare_aap_credential_async(default_organization)
+    rulebook_process_id = await _prepare_activation_instance_with_credentials(
+        default_organization,
+        [eda_credential],
+    )
+    activation = await get_activation_by_rulebook_process(rulebook_process_id)
+
+    consumer = AnsibleRulebookConsumer()
+    result = await consumer.get_controller_info_from_aap_cred(activation)
+    assert result.url == "https://controller_url/"
+    assert result.username == "adam"
+
+    await remove_credential_type(eda_credential.credential_type)
+    result = await consumer.get_controller_info_from_aap_cred(activation)
+    assert result is None
+    assert "AAP credential type not found" in eda_caplog.text
 
 
 @database_sync_to_async

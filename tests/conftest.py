@@ -30,8 +30,8 @@ from aap_eda.settings import redis as redis_settings
 #################################################################
 @pytest.fixture
 def caplog_factory(caplog):
-    def _factory(logger):
-        logger.setLevel(logging.INFO)
+    def _factory(logger, level=logging.INFO):
+        logger.setLevel(level)
         logger.handlers += [caplog.handler]
         return caplog
 
