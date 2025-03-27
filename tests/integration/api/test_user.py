@@ -565,8 +565,9 @@ def test_list_users_filter_by_ansible_id(
         },
     }
 
+    fake_ansible_id = "918b16e3-82b9-4487-8e23-df0ff50afee8"
     response = admin_client.get(
-        f"{api_url_v1}/users/?resource__ansible_id=non-existent-org"
+        f"{api_url_v1}/users/?resource__ansible_id={fake_ansible_id}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0
@@ -633,3 +634,17 @@ def test_resources_remain_after_user_delete(
     )
     assert response.status_code == 200
     assert response.data["owner"] == ""
+
+
+@pytest.mark.django_db
+def test_list_users_filter_by_password(
+    default_user: models.User, admin_client: APIClient
+):
+    response = admin_client.get(
+        f"{api_url_v1}/users/?password__icontains={default_user.password}"
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert (
+        "Filtering on field password is not allowed."
+        in response.data["detail"]
+    )

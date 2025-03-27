@@ -14,7 +14,6 @@
 from ansible_base.rbac.api.permissions import AnsibleBaseUserPermissions
 from ansible_base.rbac.policies import visible_users
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -26,8 +25,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import serializers
 from aap_eda.core import models
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import (
     CreateModelMixin,
@@ -185,6 +185,7 @@ class CurrentUserAwxTokenViewSet(
                 description="Return a list of users.",
             ),
         },
+        parameters=generate_query_params(serializers.UserSerializer()),
     ),
     retrieve=extend_schema(
         description="Retrieve a user by their id",
@@ -236,9 +237,7 @@ class UserViewSet(
     queryset = models.User.objects.filter(is_service_account=False).order_by(
         "id"
     )
-    filter_backends = (DjangoFilterBackend,)
     permission_classes = [AnsibleBaseUserPermissions]
-    filterset_class = filters.UserFilter
 
     def filter_queryset(self, qs):
         qs = visible_users(self.request.user, queryset=qs)
