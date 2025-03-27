@@ -162,14 +162,10 @@ class ActivationViewSet(
                 ),
                 status=status.HTTP_409_CONFLICT,
             )
-        data = request.data
-        if "name" not in data:
-            data["name"] = activation.name
-        if "k8s_service_name" not in data:
-            data["k8s_service_name"] = activation.k8s_service_name
         serializer = self.get_serializer(
-            instance=activation, data=data, partial=True
+            instance=activation, data=request.data, partial=True
         )
+        serializer.refill_needed_data(request.data, activation)
         serializer.is_valid(raise_exception=True)
         serializer.prepare_update(activation)
 

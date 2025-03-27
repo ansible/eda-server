@@ -925,3 +925,90 @@ def test_create_activation_with_empty_credential(
         f"{api_url_v1}/activations/", data=test_activation
     )
     assert response.status_code == status_code
+
+
+@pytest.mark.django_db
+def test_update_activation_credentials(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    activation_payload: Dict[str, Any],
+):
+    credential_type1_inputs = {
+        "fields": [
+            {"id": "var1", "label": "Var1", "type": "string"},
+            {"id": "var2", "label": "Var2", "type": "int"},
+        ]
+    }
+    credential_type1_injectors = {
+        "extra_vars": {
+            "MY_VAR1": "{{ var1 }}",
+            "MY_VAR2": "{{ var2 }}",
+        },
+    }
+    credential_type1 = models.CredentialType.objects.create(
+        name="credential_type1",
+        inputs=credential_type1_inputs,
+        injectors=credential_type1_injectors,
+    )
+    eda_credential1 = _create_credential(
+        admin_client,
+        "credential-1",
+        {"var1": "foo", "var2": 100},
+        credential_type1.id,
+        default_organization.id,
+    )
+    test_activation = {
+        "name": "test_activation",
+        "decision_environment_id": activation_payload[
+            "decision_environment_id"
+        ],
+        "rulebook_id": activation_payload["rulebook_id"],
+        "organization_id": default_organization.id,
+        "eda_credentials": [eda_credential1["id"]],
+        "extra_var": "USER_VAR: custom\n",
+        "is_enabled": False,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=test_activation
+    )
+    assert response.data["eda_credentials"][0]["id"] == eda_credential1["id"]
+    assert (
+        response.data["extra_var"]
+        == "MY_VAR1: foo\nMY_VAR2: 100\nUSER_VAR: custom\n"
+    )
+
+    credential_type2_inputs = {
+        "fields": [
+            {"id": "var3", "label": "Var3", "type": "string"},
+        ]
+    }
+    credential_type1_injectors = {
+        "extra_vars": {
+            "MY_VAR3": "{{ var3 }}",
+        },
+    }
+    credential_type2 = models.CredentialType.objects.create(
+        name="credential_type2",
+        inputs=credential_type2_inputs,
+        injectors=credential_type1_injectors,
+    )
+    eda_credential2 = _create_credential(
+        admin_client,
+        "credential-2",
+        {"var3": "foo3"},
+        credential_type2.id,
+        default_organization.id,
+    )
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{response.data['id']}/",
+        data={"eda_credentials": [eda_credential2["id"]]},
+    )
+    assert response.data["eda_credentials"][0]["id"] == eda_credential2["id"]
+    assert response.data["extra_var"] == "MY_VAR3: foo3\nUSER_VAR: custom\n"
+
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{response.data['id']}/",
+        data={"eda_credentials": []},
+    )
+    assert len(response.data["eda_credentials"]) == 0
+    assert response.data["extra_var"] == "USER_VAR: custom\n"

@@ -184,6 +184,35 @@ def _update_extra_vars_from_eda_credentials(
             activation.save(update_fields=["extra_var"])
 
 
+def _get_user_extra_vars(activation: models.Activation) -> str:
+    if not activation.extra_var:
+        return ""
+    extra_vars = yaml.safe_load(activation.extra_var)
+
+    # remove extra_vars injected from credentials
+    for eda_credential in activation.eda_credentials.all():
+        injectors = eda_credential.credential_type.injectors
+        if not injectors or "extra_vars" not in injectors:
+            continue
+
+        for key, _value in injectors["extra_vars"].items():
+            extra_vars.pop(key, None)
+    return yaml.dump(extra_vars)
+
+
+def _update_event_streams_and_credential(validated_data: dict):
+    validated_data["rulebook_rulesets"] = _update_event_stream_source(
+        validated_data
+    )
+    eda_credentials = validated_data.get("eda_credentials", [])
+    postgres_cred = models.EdaCredential.objects.filter(
+        name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+    ).first()
+    if postgres_cred.id not in eda_credentials:
+        eda_credentials.append(postgres_cred.id)
+    validated_data["eda_credentials"] = eda_credentials
+
+
 def _create_system_eda_credential(
     password: str, vault: models.CredentialType, organization_id: Optional[int]
 ) -> models.EdaCredential:
@@ -492,15 +521,7 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
         vault_data = VaultData()
 
         if validated_data.get("source_mappings", []):
-            validated_data["rulebook_rulesets"] = _update_event_stream_source(
-                validated_data
-            )
-            eda_credentials = validated_data.get("eda_credentials", [])
-            postgres_cred = models.EdaCredential.objects.filter(
-                name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
-            ).first()
-            eda_credentials.append(postgres_cred.id)
-            validated_data["eda_credentials"] = eda_credentials
+            _update_event_streams_and_credential(validated_data)
 
         if validated_data.get("eda_credentials"):
             _update_extra_vars_from_eda_credentials(
@@ -633,6 +654,23 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         validators=[validators.check_if_rfc_1035_compliant],
     )
 
+    def refill_needed_data(
+        self, data: dict, activation: models.Activation
+    ) -> None:
+        if "name" not in data:
+            data["name"] = activation.name
+        if "k8s_service_name" not in data:
+            data["k8s_service_name"] = activation.k8s_service_name
+        if "extra_var" not in data:
+            data["extra_var"] = _get_user_extra_vars(activation)
+        if "eda_credentials" not in data:
+            data["eda_credentials"] = [
+                cred.id
+                for cred in activation.eda_credentials.filter(managed=False)
+            ]
+        if "source_mappings" not in data:
+            data["source_mappings"] = activation.source_mappings
+
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
@@ -669,16 +707,9 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
                     "rulebook_rulesets"
                 ] = activation.rulebook.rulesets
 
-            # update with new event streams
-            self.validated_data[
-                "rulebook_rulesets"
-            ] = _update_event_stream_source(self.validated_data)
-
-            self._insert_pg_notify_credential(activation)
-
-        elif rulebook_id:
-            # user selects a rulebook but no mapping, clear existing mappings
-            self.validated_data["source_mappings"] = ""
+            _update_event_streams_and_credential(self.validated_data)
+        else:
+            # no mappings, clear event_streams
             self.validated_data["event_streams"] = []
 
         if self.validated_data.get("eda_credentials"):
@@ -698,20 +729,6 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
                     "organization_id", activation.organization.id
                 ),
             )
-
-    def _insert_pg_notify_credential(self, activation: models.Activation):
-        if "eda_credentials" in self.validated_data:
-            eda_credentials = self.validated_data.get("eda_credentials")
-        else:
-            eda_credentials = [
-                cred.id for cred in activation.eda_credentials.all()
-            ]
-        postgres_cred = models.EdaCredential.objects.get(
-            name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
-        )
-        if postgres_cred.id not in eda_credentials:
-            eda_credentials.append(postgres_cred.id)
-            self.validated_data["eda_credentials"] = eda_credentials
 
     def update(
         self, instance: models.Activation, validated_data: dict
