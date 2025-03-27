@@ -16,3 +16,14 @@ SECRET_KEY = "insecure"
 DB_PASSWORD = "secret"
 DB_HOST = "localhost"
 MQ_HOST = "localhost"
+
+ANSIBLE_BASE_MANAGED_ROLE_REGISTRY = {}
+ANSIBLE_BASE_JWT_KEY = "https://localhost"
+ANSIBLE_BASE_JWT_VALIDATE_CERT = False
+ALLOW_LOCAL_RESOURCE_MANAGEMENT: True
+
+RESOURCE_SERVER = {
+    "URL": None,
+    "SECRET_KEY": None,
+    "VALIDATE_HTTPS": False,
+}
