@@ -10,6 +10,7 @@ import yaml
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import DatabaseError
 from django.utils import timezone
 
@@ -127,7 +128,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 await self.handle_heartbeat(HeartbeatMessage.parse_obj(data))
             else:
                 logger.warning(f"Unsupported message received: {data}")
-        except DatabaseError as err:
+        except (DatabaseError, ObjectDoesNotExist) as err:
             logger.error(f"Failed to parse {data} due to DB error: {err}")
         except InvalidEnvKeyError as err:
             logger.error(f"Failed to parse {data} due to Env error: {err}")
@@ -289,9 +290,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             rule_uuid=message.rule_uuid, fired_at=message.rule_run_at
         ).first()
 
-        activation_instance = models.RulebookProcess.objects.filter(
-            id=message.activation_id
-        ).first()
+        try:
+            activation_instance = models.RulebookProcess.objects.get(
+                id=message.activation_id
+            )
+        except ObjectDoesNotExist:
+            logger.error(f"RulebookProcess {message.activation_id} not found")
+            raise
+
         if audit_rule is None:
             activation_org = models.Organization.objects.filter(
                 id=activation_instance.organization.id
@@ -400,10 +406,14 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_activation(self, rulebook_process_id: str) -> models.Activation:
-        rulebook_process_instance = models.RulebookProcess.objects.get(
-            id=rulebook_process_id
-        )
-        return rulebook_process_instance.get_parent()
+        try:
+            rulebook_process_instance = models.RulebookProcess.objects.get(
+                id=rulebook_process_id
+            )
+            return rulebook_process_instance.get_parent()
+        except ObjectDoesNotExist:
+            logger.error(f"RulebookProcess {rulebook_process_id} not found")
+            raise
 
     @database_sync_to_async
     def get_awx_token(self, activation: models.Activation) -> tp.Optional[str]:
@@ -438,23 +448,25 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         self, activation: models.Activation
     ) -> tp.Optional[ControllerInfo]:
         """Get AAP Credential from Activation."""
-        aap_credential_type = models.CredentialType.objects.get(
-            name=DefaultCredentialType.AAP
-        )
-        for eda_credential in activation.eda_credentials.all():
-            if eda_credential.credential_type.id == aap_credential_type.id:
-                inputs = yaml.safe_load(
-                    eda_credential.inputs.get_secret_value()
-                )
-                return ControllerInfo(
-                    url=inputs["host"],
-                    token=inputs.get("oauth_token", ""),
-                    ssl_verify="yes" if inputs.get("verify_ssl") else "no",
-                    username=inputs.get("username", ""),
-                    password=inputs.get("password", ""),
-                )
-
-        return None
+        try:
+            aap_credential_type = models.CredentialType.objects.get(
+                name=DefaultCredentialType.AAP
+            )
+            for eda_credential in activation.eda_credentials.all():
+                if eda_credential.credential_type.id == aap_credential_type.id:
+                    inputs = yaml.safe_load(
+                        eda_credential.inputs.get_secret_value()
+                    )
+                    return ControllerInfo(
+                        url=inputs["host"],
+                        token=inputs.get("oauth_token", ""),
+                        ssl_verify="yes" if inputs.get("verify_ssl") else "no",
+                        username=inputs.get("username", ""),
+                        password=inputs.get("password", ""),
+                    )
+        except ObjectDoesNotExist:
+            logger.debug("AAP credential type not found")
+            return None
 
     @database_sync_to_async
     def get_eda_system_vault_passwords(
