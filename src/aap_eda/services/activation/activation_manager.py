@@ -36,10 +36,10 @@ from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
 
-from .db_log_handler import DBLogger
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
 from .status_manager import StatusManager, run_with_lock
+from .tee_system_logger import TeeSystemLogger
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class ActivationManager(StatusManager):
         self,
         db_instance: models.Activation,
         container_engine: tp.Optional[ContainerEngine] = None,
-        container_logger_class: type[DBLogger] = DBLogger,
+        container_logger_class: type[TeeSystemLogger] = TeeSystemLogger,
     ):
         """Initialize the Activation Manager.
 
