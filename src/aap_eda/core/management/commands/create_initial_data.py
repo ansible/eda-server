@@ -294,11 +294,30 @@ AAP_INPUTS = {
             "type": "boolean",
             "secret": False,
         },
+        {
+            "id": "request_timeout",
+            "label": ("Request Timeout"),
+            "type": "string",
+            "secret": False,
+            "default": "10",
+            "help_text": (
+                "Specify the timeout Ansible should use in requests to"
+                "the host. Defaults to 10s",
+            ),
+        },
     ],
     "required": ["host"],
 }
 
 AAP_INJECTORS = {
+    "extra_vars": {
+        "aap_hostname": "{{host}}",
+        "aap_username": "{{username}}",
+        "aap_password": "{{password}}",
+        "aap_token": "{{oauth_token}}",
+        "aap_request_timeout": "{{request_timeout}}",
+        "aap_verify_ssl": "{{verify_ssl}}",
+    },
     "env": {
         "TOWER_HOST": "{{host}}",
         "TOWER_USERNAME": "{{username}}",
@@ -310,7 +329,14 @@ AAP_INJECTORS = {
         "CONTROLLER_PASSWORD": "{{password}}",
         "CONTROLLER_VERIFY_SSL": "{{verify_ssl}}",
         "CONTROLLER_OAUTH_TOKEN": "{{oauth_token}}",
-    }
+        "CONTROLLER_REQUEST_TIMEOUT": "{{request_timeout}}",
+        "AAP_HOSTNAME": "{{host}}",
+        "AAP_USERNAME": "{{username}}",
+        "AAP_PASSWORD": "{{password}}",
+        "AAP_VERIFY_SSL": "{{verify_ssl}}",
+        "AAP_TOKEN": "{{oauth_token}}",
+        "AAP_REQUEST_TIMEOUT": "{{request_timeout}}",
+    },
 }
 
 VAULT_INPUTS = {
