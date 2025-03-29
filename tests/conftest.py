@@ -38,6 +38,16 @@ def caplog_factory(caplog):
     return _factory
 
 
+@pytest.fixture
+def caplog_debug_factory(caplog):
+    def _factory(logger):
+        logger.setLevel(logging.DEBUG)
+        logger.handlers += [caplog.handler]
+        return caplog
+
+    return _factory
+
+
 #################################################################
 # Organization
 #################################################################

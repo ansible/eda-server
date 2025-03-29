@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+from datetime import datetime
 from typing import Optional, get_type_hints
 
 from django.core.exceptions import ImproperlyConfigured
@@ -254,6 +256,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 " {message}",
                 "style": "{",
             },
+            "ansible_rulebook": {
+                "format": "{rulebook_timestamp} {levelname:<8} [tid:{log_tracking_id}] "
+                "[aiid: {activation_instance_id}] {message}",
+                "style": "{",
+            },
         },
         "handlers": {
             "console": {
@@ -274,6 +281,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             "verbose_handler": {
                 "class": STREAM_HANDLER,
                 "formatter": "verbose",
+                "filters": ["activation_id_filter"],
+            },
+            "ansible_rulebook_handler": {
+                "class": STREAM_HANDLER,
+                "formatter": "ansible_rulebook",
                 "filters": ["activation_id_filter"],
             },
         },
@@ -322,6 +334,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             "ansible_base": {
                 "handlers": ["console"],
                 "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
+            "aap_eda.services.activation.tee_system_logger": {
+                "handlers": ["ansible_rulebook_handler"],
+                "level": logging.DEBUG,  # controlled by activation UI, please do not alter
                 "propagate": False,
             },
         },
