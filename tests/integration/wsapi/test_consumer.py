@@ -189,7 +189,7 @@ async def test_handle_workers_with_controller_info(
             ]
             assert response["token"] == AAP_INPUTS["oauth_token"]
         elif type == "EnvVars":
-            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
+            assert response["data"].startswith("QUFQX0hPU1ROQU1FOiBodHRwczovL")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1284,7 +1284,7 @@ async def test_handle_workers_with_env_vars(
         response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
         assert response["type"] == type
         if type == "EnvVars":
-            assert response["data"].startswith("Q09OVFJPTExFUl9IT1NUOiBodHRwc")
+            assert response["data"].startswith("QUFQX0hPU1ROQU1FOiBodHRwczovL")
 
 
 @pytest.mark.django_db(transaction=True)
