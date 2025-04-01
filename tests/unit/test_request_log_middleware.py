@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import uuid
+
 import pytest
 from django.http import HttpResponse
 from django.test import RequestFactory
@@ -63,8 +65,11 @@ def test_process_request_without_header(middleware, request_obj):
 
     middleware.process_request(request_obj)
 
-    assert request_obj.id == ""
-    assert get_request_id() == ""
+    request_uuid_obj = uuid.UUID(request_obj.id)
+    assert request_uuid_obj.version == 4
+
+    request_id_obj = uuid.UUID(get_request_id())
+    assert request_id_obj.version == 4
 
 
 def test_process_response(middleware, request_obj):

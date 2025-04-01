@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import re
 from typing import Any, Dict, List
 from unittest import mock
 from unittest.mock import patch
@@ -1016,6 +1017,13 @@ def test_create_activation_with_invalid_token(
     )
 
 
+class IsUUID:
+    pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"  # noqa: E501
+
+    def __eq__(self, other):
+        return re.match(self.pattern, other, re.IGNORECASE) is not None
+
+
 @pytest.mark.django_db
 def test_restart_activation_with_required_token_deleted(
     admin_client: APIClient,
@@ -1050,7 +1058,7 @@ def test_restart_activation_with_required_token_deleted(
         mock_stop.assert_called_once_with(
             process_parent_type=enums.ProcessParentType.ACTIVATION,
             process_parent_id=activation_id,
-            request_id="",
+            request_id=IsUUID(),
         )
 
 

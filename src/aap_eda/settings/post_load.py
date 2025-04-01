@@ -299,6 +299,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 "level": settings.APP_LOG_LEVEL,
                 "propagate": False,
             },
+            "aap_eda.api": {
+                "handlers": ["request_handler"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
             "aap_eda.wsapi.consumers": {
                 "handlers": ["tracking_handler"],
                 "level": settings.APP_LOG_LEVEL,
