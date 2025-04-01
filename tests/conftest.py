@@ -29,10 +29,18 @@ from aap_eda.settings import redis as redis_settings
 # Log capture factory
 #################################################################
 @pytest.fixture
-def caplog_factory(caplog):
+def caplog_factory(caplog, request):
     def _factory(logger, level=logging.INFO):
         logger.setLevel(level)
-        logger.handlers += [caplog.handler]
+        original_handlers = logger.handlers[:]
+        logger.addHandler(caplog.handler)
+
+        def restore_handlers():
+            logger.removeHandler(caplog.handler)
+            logger.handlers = original_handlers
+
+        request.addfinalizer(restore_handlers)
+
         return caplog
 
     return _factory

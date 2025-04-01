@@ -338,7 +338,7 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             "aap_eda.services.activation.tee_system_logger": {
                 "handlers": ["ansible_rulebook_handler"],
                 # controlled by activation UI, please do not alter
-                "level": logging.DEBUG,
+                "level": "DEBUG",
                 "propagate": False,
             },
         },

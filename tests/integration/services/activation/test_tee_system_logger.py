@@ -19,8 +19,8 @@ import pytest
 
 from aap_eda.core.models.rulebook_process import RulebookProcessLog
 from aap_eda.services.activation.tee_system_logger import (
-    TeeSystemLogger,
     LOGGER,
+    TeeSystemLogger,
 )
 
 log_test_data = [
@@ -54,8 +54,7 @@ def test_logging(
     caplog_factory, default_activation_instance, log_lines, expectations
 ):
     """Test that TeeSystemLogger writes to DB and log."""
-    logger = logging.getLogger("aap_eda.services.activation.tee_system_logger")
-    eda_log = caplog_factory(logger, level=logging.DEBUG)
+    eda_log = caplog_factory(LOGGER, level=logging.DEBUG)
 
     obj = TeeSystemLogger(default_activation_instance.id)
     for line in log_lines:

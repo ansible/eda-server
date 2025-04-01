@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import logging
-import sys
 from datetime import datetime, timezone
 
 from aap_eda.services.activation.db_log_handler import DBLogger
