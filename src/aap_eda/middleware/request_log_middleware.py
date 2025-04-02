@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import uuid
 from contextvars import ContextVar
 
 from django.utils.deprecation import MiddlewareMixin
@@ -21,7 +22,13 @@ request_id_var = ContextVar("request_id", default="")
 
 class RequestLogMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        req_id = request.headers.get("X-Request-ID", "")
+        req_id = request.headers.get("X-Request-ID")
+
+        if not req_id:
+            req_id = str(uuid.uuid4())
+            request.META["HTTP_X_REQUEST_ID"] = req_id
+            request.__dict__.pop("headers", None)
+
         request.id = req_id
 
         request_id_var.set(req_id)

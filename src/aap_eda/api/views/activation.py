@@ -112,11 +112,10 @@ class ActivationViewSet(
             )
 
         if response.is_enabled:
-            request_id = request.headers.get("x-request-id", "")
             start_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=response.id,
-                request_id=request_id,
+                request_id=request.headers.get("x-request-id"),
             )
 
         logger.info(
@@ -230,11 +229,10 @@ class ActivationViewSet(
                 activation.save(update_fields=["status"])
                 name = activation.name
 
-                request_id = request.headers.get("x-request-id", "")
                 delete_rulebook_process(
                     process_parent_type=ProcessParentType.ACTIVATION,
                     process_parent_id=activation.id,
-                    request_id=request_id,
+                    request_id=request.headers.get("x-request-id"),
                 )
                 logger.info(f"Now deleting {name} ...")
         except redis.ConnectionError:
@@ -405,11 +403,10 @@ class ActivationViewSet(
             ]
         )
 
-        request_id = request.headers.get("x-request-id", "")
         start_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
-            request_id=request_id,
+            request_id=request.headers.get("x-request-id"),
         )
 
         logger.info(
@@ -450,11 +447,10 @@ class ActivationViewSet(
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]
             )
-            request_id = request.headers.get("x-request-id", "")
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
-                request_id=request_id,
+                request_id=request.headers.get("x-request-id"),
             )
 
         logger.info(
@@ -498,12 +494,11 @@ class ActivationViewSet(
         self.redis_is_available()
 
         valid, error = is_activation_valid(activation)
-        request_id = request.headers.get("x-request-id", "")
         if not valid:
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
-                request_id=request_id,
+                request_id=request.headers.get("x-request-id"),
             )
             activation.status = ActivationStatus.ERROR
             activation.status_message = error
@@ -517,7 +512,7 @@ class ActivationViewSet(
         restart_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
             process_parent_id=activation.id,
-            request_id=request_id,
+            request_id=request.headers.get("x-request-id"),
         )
 
         logger.info(
