@@ -14,7 +14,6 @@
 import hashlib
 import logging
 import os
-from urllib.parse import urlparse
 
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition

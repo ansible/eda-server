@@ -15,7 +15,6 @@
 from ansible_base.rbac import permission_registry
 
 from .activation import Activation
-from .credential import Credential
 from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
 from .eda_credential import EdaCredential
