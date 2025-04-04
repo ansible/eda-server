@@ -56,7 +56,6 @@ __all__ = [
     "Rulebook",
     "User",
     "AwxToken",
-    "Credential",
     "CredentialType",
     "EdaCredential",
     "DecisionEnvironment",

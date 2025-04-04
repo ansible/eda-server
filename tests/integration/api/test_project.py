@@ -625,8 +625,8 @@ def test_update_project_with_400(
     data = {
         "name": new_project.name,
         "git_hash": default_project.git_hash,
-        "credential_id": default_project.credential_id,
     }
+
     # test empty string validator
     response = admin_client.patch(
         f"{api_url_v1}/projects/{default_project.id}/", data={"name": ""}

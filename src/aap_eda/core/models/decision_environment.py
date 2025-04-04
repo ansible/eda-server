@@ -33,7 +33,6 @@ class DecisionEnvironment(BaseOrgModel, UniqueNamedModel, PrimordialModel):
 
     description = models.TextField(default="", blank=True, null=False)
     image_url = models.TextField(blank=False, null=False)
-    # TODO: used by migration, remove it later
     eda_credential = models.ForeignKey(
         "EdaCredential",
         blank=True,
