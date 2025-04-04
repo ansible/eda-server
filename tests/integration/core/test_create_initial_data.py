@@ -16,12 +16,10 @@ import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 
-from aap_eda.core import enums, models
 from aap_eda.core.management.commands.create_initial_data import (
     ORG_ROLES,
     Command,
 )
-from aap_eda.core.utils.credentials import inputs_from_store
 
 
 #################################################################
