@@ -1287,8 +1287,6 @@ class Command(BaseCommand):
         settings_registry.persist_registry_data()
         self._preload_credential_types()
         self._update_postgres_credentials()
-        self._copy_registry_credentials()
-        self._copy_scm_credentials()
         self._create_org_roles()
         self._create_obj_roles()
         self._remove_deprecated_credential_kinds()
@@ -1306,107 +1304,6 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"New credential type {credential_type.name} is added."
             )
-
-    def _copy_registry_credentials(self):
-        credentials = models.Credential.objects.filter(
-            credential_type=enums.CredentialType.REGISTRY
-        ).all()
-        if not credentials:
-            return
-
-        default_organization = get_default_organization()
-
-        cred_type = models.CredentialType.objects.filter(
-            name=enums.DefaultCredentialType.REGISTRY
-        ).first()
-        for cred in credentials:
-            de = models.DecisionEnvironment.objects.filter(
-                credential=cred
-            ).first()
-            host = "quay.io"
-            if de:
-                image_url = (
-                    de.image_url.replace("http://", "")
-                    .replace("https://", "")
-                    .replace("//", "")
-                )
-                host = urlparse(f"//{image_url}").hostname
-            inputs = {
-                "host": host,
-                "username": cred.username,
-                "password": cred.secret.get_secret_value(),
-            }
-            eda_cred, created = models.EdaCredential.objects.get_or_create(
-                name=cred.name,
-                defaults={
-                    "description": cred.description,
-                    "managed": False,
-                    "credential_type": cred_type,
-                    "inputs": inputs_to_store(inputs),
-                    "organization": default_organization,
-                },
-            )
-            if created:
-                models.DecisionEnvironment.objects.filter(
-                    credential=cred
-                ).update(eda_credential=eda_cred, credential=None)
-                cred.delete()
-            else:
-                info_msg = (
-                    f"Registry Credential {cred.name} already converted to "
-                    "EdaCredential. Skip the duplicated one."
-                )
-                LOGGER.info(info_msg)
-
-        self.stdout.write(
-            "All REGISTRY credentials are converted to Container Registry "
-            "eda-credentials"
-        )
-
-    def _copy_scm_credentials(self):
-        types = [enums.CredentialType.GITHUB, enums.CredentialType.GITLAB]
-        credentials = models.Credential.objects.filter(
-            credential_type__in=types
-        ).all()
-        if not credentials:
-            return
-
-        default_organization = get_default_organization()
-
-        cred_type = models.CredentialType.objects.filter(
-            name=enums.DefaultCredentialType.SOURCE_CONTROL
-        ).first()
-        for cred in credentials:
-            inputs = {
-                "username": cred.username,
-                "password": cred.secret.get_secret_value(),
-            }
-            eda_cred, created = models.EdaCredential.objects.get_or_create(
-                name=cred.name,
-                defaults={
-                    "description": cred.description,
-                    "managed": False,
-                    "credential_type": cred_type,
-                    "inputs": inputs_to_store(inputs),
-                    "organization": default_organization,
-                },
-            )
-            if created:
-                models.Project.objects.filter(credential=cred).update(
-                    eda_credential=eda_cred, credential=None
-                )
-                cred.delete()
-            else:
-                info_msg = (
-                    f"Git Credential {cred.name} already converted to "
-                    "EdaCredential. Skip the duplicated one."
-                )
-                LOGGER.info(info_msg)
-
-        self.stdout.write(
-            "All GITHUB and GITLAB credentials are converted to Source "
-            "Control eda-credentials"
-        )
 
     def _update_postgres_credentials(self):
         cred_type = models.CredentialType.objects.get(
