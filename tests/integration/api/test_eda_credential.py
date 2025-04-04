@@ -414,16 +414,9 @@ def test_list_eda_credentials_with_kind_filter(
     assert len(response.data["results"]) == 0
 
     response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
-        "&credential_type__kind=vault",
+        f"{api_url_v1}/eda-credentials/?credential_type__kind__in=scm,vault",
     )
     assert len(response.data["results"]) == 1
-
-    response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
-        "&credential_type__kind=registry",
-    )
-    assert len(response.data["results"]) == 2
 
     response = admin_client.get(
         f"{api_url_v1}/eda-credentials/?"
@@ -431,10 +424,10 @@ def test_list_eda_credentials_with_kind_filter(
     )
     assert len(response.data["results"]) == 2
 
-    name_prefix = default_registry_credential.name[0]
+    name_prefix = default_registry_credential.name.split("-")[0]
     response = admin_client.get(
-        f"{api_url_v1}/eda-credentials/?credential_type__kind=scm"
-        f"&credential_type__kind=registry&name={name_prefix}",
+        f"{api_url_v1}/eda-credentials/?credential_type__kind__in=scm,registry"
+        f"&name__contains={name_prefix}",
     )
     assert len(response.data["results"]) == 1
 
