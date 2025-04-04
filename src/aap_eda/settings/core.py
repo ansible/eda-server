@@ -16,13 +16,21 @@
 
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
+DISPATCHERD_FEATURE_FLAG_NAME = "FEATURE_DISPATCHERD_ENABLED"
+
 FLAGS = {
     "FEATURE_EDA_ANALYTICS_ENABLED": [
         {
             "condition": "boolean",
             "value": False,
-        }
-    ]
+        },
+    ],
+    DISPATCHERD_FEATURE_FLAG_NAME: [
+        {
+            "condition": "boolean",
+            "value": False,
+        },
+    ],
 }
 
 INSTALLED_APPS = [
