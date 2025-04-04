@@ -77,6 +77,7 @@ import django_rq
 import rq_scheduler
 from django.conf import settings
 from django_rq.management.commands import rqscheduler
+from flags.state import flag_enabled
 
 from aap_eda.core import tasking
 from aap_eda.utils.logging import startup_logging
@@ -165,6 +166,17 @@ class Command(rqscheduler.Command):
     help = "Runs RQ scheduler with configured jobs."
 
     def handle(self, *args, **options) -> None:
+        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            self.stderr.write(
+                self.style.ERROR(
+                    "This command is not supported when "
+                    f"{settings.DISPATCHERD_FEATURE_FLAG_NAME} is enabled. "
+                    "Please disable the feature flag in your settings "
+                    "or update your deployment.",
+                )
+            )
+            raise SystemExit(1)
+
         # interval can be set through the command line
         # but we want to manage it through settings
         options["interval"] = settings.RQ_SCHEDULER_JOB_INTERVAL
