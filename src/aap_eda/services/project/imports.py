@@ -235,7 +235,7 @@ class ProjectImportService:
                     )
                     continue
                 if not info:
-                    logger.debug("Not a rulebook file: %s", path)
+                    logger.warning("Not a rulebook file: %s", path)
                     continue
                 yield info
 

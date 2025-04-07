@@ -1378,7 +1378,7 @@ async def test_get_controller_info_from_aap_cred(
     await remove_credential_type(eda_credential.credential_type)
     result = await consumer.get_controller_info_from_aap_cred(activation)
     assert result is None
-    assert "AAP credential type not found" in eda_caplog.text
+    assert '"AAP" credential type not found' in eda_caplog.text
 
 
 @database_sync_to_async

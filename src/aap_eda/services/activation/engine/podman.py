@@ -321,6 +321,7 @@ class Engine(ContainerEngine):
 
         return ports
 
+    # TODO: remove this obsolete method
     def _login(self, request: ContainerRequest) -> None:
         credential = request.credential
         if not credential:
@@ -334,9 +335,7 @@ class Engine(ContainerEngine):
                 registry=registry,
             )
 
-            LOGGER.debug(
-                f"{credential.username} login succeeded to {registry}"
-            )
+            LOGGER.info(f"{credential.username} login succeeded to {registry}")
         except APIError as e:
             LOGGER.error(
                 f"Login failed: {e.explanation}",

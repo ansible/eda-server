@@ -157,7 +157,7 @@ class ActivationManager(StatusManager):
         if not self.latest_instance.activation_pod_id:
             # how we want to handle this case?
             # for now we raise an error and let the monitor correct it
-            msg = f"Activation {self.db_instance.id} has not pod id."
+            msg = f"Activation {self.db_instance.id} has no pod id"
             raise exceptions.ActivationInstancePodIdNotFound(msg)
 
     def _check_non_finalized_instances(self) -> None:
@@ -393,7 +393,7 @@ class ActivationManager(StatusManager):
             )
             user_msg = (
                 "Activation is unresponsive. "
-                f"{check_type} check for ansible rulebook timed out. "
+                f"{check_type} check for ansible-rulebook timed out. "
                 "Restart policy is not applicable."
             )
             container_logger.write(user_msg, flush=True)
@@ -411,7 +411,7 @@ class ActivationManager(StatusManager):
             )
             user_msg = (
                 "Activation is unresponsive. "
-                f"{check_type} check for ansible rulebook timed out. "
+                f"{check_type} check for ansible-rulebook timed out. "
                 "Activation is going to be restarted."
             )
             container_logger.write(user_msg, flush=True)
@@ -476,7 +476,7 @@ class ActivationManager(StatusManager):
             user_msg = (
                 f"Activation completed. It will attempt to restart in "
                 f"{settings.ACTIVATION_RESTART_SECONDS_ON_COMPLETE} seconds "
-                f"according to the restart policy {RestartPolicy.ALWAYS}."
+                f"according to the restart policy {RestartPolicy.ALWAYS}. "
                 "It may take longer if there is no capacity available."
             )
             if container_msg:
@@ -595,7 +595,7 @@ class ActivationManager(StatusManager):
                 f"Activation failed. It will attempt to restart {count_msg} in"
                 f" {settings.ACTIVATION_RESTART_SECONDS_ON_FAILURE} seconds "
                 "according to the restart policy "
-                f"{self.db_instance.restart_policy}."
+                f"{self.db_instance.restart_policy}. "
                 "It may take longer if there is no capacity available."
             )
             if container_msg:
@@ -682,16 +682,16 @@ class ActivationManager(StatusManager):
         try:
             if self._is_already_running():
                 msg = f"Activation {self.db_instance.id} is already running."
-                LOGGER.info(msg)
+                LOGGER.warning(msg)
                 return
         except (
             exceptions.ActivationInstanceNotFound,
             exceptions.ActivationInstancePodIdNotFound,
         ):
-            LOGGER.info(
+            LOGGER.warning(
                 f"Start operation activation id: {self.db_instance.id} "
-                "Expected activation instance or pod id but not found, "
-                "recreating.",
+                "Expected activation instance or pod id but neither "
+                "were found, recreating.",
             )
 
         self._start_activation_instance()
@@ -721,7 +721,7 @@ class ActivationManager(StatusManager):
                 LOGGER.info(msg)
                 return
         except exceptions.ActivationInstanceNotFound:
-            LOGGER.info(
+            LOGGER.error(
                 f"Stop operation activation id: {self.db_instance.id} "
                 "No instance found.",
             )
@@ -786,7 +786,7 @@ class ActivationManager(StatusManager):
         # We catch all exceptions here to ensure that the activation is deleted
         except Exception as exc:
             msg = (
-                f"Activation {self.db_instance.id} failed to cleanup. "
+                f"Activation {self.db_instance.id} failed to clean up. "
                 f"Reason: {exc}"
             )
             LOGGER.error(msg)
@@ -1027,7 +1027,7 @@ class ActivationManager(StatusManager):
         except engine_exceptions.ContainerEngineError as exc:
             msg = (
                 f"Logs for activation {self.db_instance.id} could not be "
-                f"fetch. Reason: {exc}"
+                f"retrieved. Reason: {exc}"
             )
             LOGGER.error(msg)
             log_handler.write(msg, flush=True)

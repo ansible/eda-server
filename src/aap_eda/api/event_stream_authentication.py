@@ -74,8 +74,8 @@ class HMACAuthentication(EventStreamAuthentication):
             )
         else:
             message = (
-                f"Invalid signature encoding {self.signature_encoding} "
-                "should be either base64 or hex"
+                f"Invalid signature encoding {self.signature_encoding}. "
+                "Should be either base64 or hex"
             )
             logger.warning(message)
             raise AuthenticationFailed(message)
@@ -181,7 +181,7 @@ class Oauth2JwtAuthentication(EventStreamAuthentication):
                 options=options,
             )
         except jwt.exceptions.PyJWTError as err:
-            message = f"JWT Error {err}"
+            message = f"JWT error: {err}"
             logger.warning(message)
             raise AuthenticationFailed(message) from err
 

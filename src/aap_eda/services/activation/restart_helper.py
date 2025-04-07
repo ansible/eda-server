@@ -36,7 +36,7 @@ def system_cancel_restart_activation(
 
     The restart may not exist.
     """
-    LOGGER.debug(f"Cancelling auto-start for {process_parent_type} {id}")
+    LOGGER.info(f"Cancelling auto-start for {process_parent_type} {id}")
     queue_cancel_job("default", auto_start_job_id(process_parent_type, id))
 
 
@@ -48,7 +48,7 @@ def system_restart_activation(
     This function is intended to be used by the manager to schedule
     a start of the activation for restart policies.
     """
-    LOGGER.debug(
+    LOGGER.info(
         f"Queuing auto-start for {process_parent_type} {id} "
         f"in {delay_seconds} seconds",
     )

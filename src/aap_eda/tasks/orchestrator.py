@@ -213,7 +213,7 @@ def dispatch(
                 "There may be an issue with the system; please contact "
                 "the administrator."
             )
-            LOGGER.warning(msg)
+            LOGGER.error(msg)
             status_manager.set_status(
                 ActivationStatus.PENDING,
                 msg,
@@ -257,7 +257,7 @@ def dispatch(
                     "There may be an issue with the system; please "
                     "contact the administrator."
                 )
-                LOGGER.warning(msg)
+                LOGGER.error(msg)
                 status_manager.set_status(
                     ActivationStatus.PENDING,
                     msg,
@@ -294,18 +294,16 @@ def dispatch(
                     ActivationStatus.WORKERS_OFFLINE,
                     msg,
                 )
-                LOGGER.warning(msg)
+                LOGGER.error(msg)
                 return
 
             # The queue is unhealthy, but this is a restart.
             # The priority is to adhere to the restart policy and
             # execute the task.
             LOGGER.warning(
-                f"Restarting {process_parent_type} {process_parent_id} "
-                "on the least busy queue; The workers of its associated queue "
-                f"'{queue_name}' are failing liveness checks. "
-                "There may be an issue with the worker node; please contact "
-                "the administrator.",
+                f"Forcing user restart of {process_parent_type} "
+                f"{process_parent_id} on the least busy queue; "
+                "after failing liveness checks of current associated queue"
             )
             try:
                 queue_name = get_least_busy_queue_name()
@@ -316,7 +314,7 @@ def dispatch(
                     f"{process_parent_id}. There may be an issue "
                     "with the system; please contact the administrator."
                 )
-                LOGGER.warning(msg)
+                LOGGER.error(msg)
                 status_manager.set_status(
                     ActivationStatus.PENDING,
                     msg,
