@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     # Third party apps
     "rest_framework",
     "drf_spectacular",
-    "django_rq",
     "django_filters",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
@@ -54,6 +53,9 @@ INSTALLED_APPS = [
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
+    # rq_worker needs to be loaded after the core app
+    # to wrap the rq worker command
+    "django_rq",
 ]
 
 
