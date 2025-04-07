@@ -999,11 +999,21 @@ def test_update_activation_credentials(
         credential_type2.id,
         default_organization.id,
     )
+
     response = admin_client.patch(
         f"{api_url_v1}/activations/{response.data['id']}/",
         data={"eda_credentials": [eda_credential2["id"]]},
     )
     assert response.data["eda_credentials"][0]["id"] == eda_credential2["id"]
+    assert response.data["extra_var"] == "MY_VAR3: foo3\nUSER_VAR: custom\n"
+
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{response.data['id']}/",
+        data={
+            "eda_credentials": [eda_credential2["id"]],
+            "extra_var": "MY_VAR3: foo3\nUSER_VAR: custom\n",
+        },
+    )
     assert response.data["extra_var"] == "MY_VAR3: foo3\nUSER_VAR: custom\n"
 
     response = admin_client.patch(
