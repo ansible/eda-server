@@ -14,6 +14,7 @@
 
 import logging
 
+from ansible_base.lib.utils.db import advisory_lock
 from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
@@ -32,22 +33,36 @@ def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
         return
     interval = utils.get_analytics_interval()
     logger.info(f"Schedule analytics to run in {interval} seconds")
-    tasking.enqueue_delay(
-        queue_name,
-        ANALYTICS_SCHEDULE_JOB_ID,
-        interval,
-        auto_gather_analytics,
-    )
+    with advisory_lock(ANALYTICS_SCHEDULE_JOB_ID, wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                "Another instance of schedule_gather_analytics"
+                " is already running",
+            )
+            return
+
+        tasking.enqueue_delay(
+            queue_name,
+            ANALYTICS_SCHEDULE_JOB_ID,
+            interval,
+            auto_gather_analytics,
+        )
 
 
-def auto_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
-    gather_analytics(queue_name)
+def auto_gather_analytics() -> None:
     schedule_gather_analytics()
+    gather_analytics()
 
 
-def gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
-    logger.info("Queue EDA analytics")
-    tasking.unique_enqueue(queue_name, ANALYTICS_JOB_ID, _gather_analytics)
+def gather_analytics() -> None:
+    logger.info("Running EDA gather analytics")
+    with advisory_lock(ANALYTICS_JOB_ID, wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                "Another instance of gather analytics is already running"
+            )
+            return
+        _gather_analytics()
 
 
 def _gather_analytics() -> None:

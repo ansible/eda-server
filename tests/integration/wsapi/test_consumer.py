@@ -511,13 +511,13 @@ async def test_handle_heartbeat_running_status(
         for stat in stats
     ]
     with patch(
-        "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
+        "aap_eda.tasks.orchestrator.monitor_rulebook_processes"
     ) as mock_orchestrator:
         for payload in payloads:
             await ws_communicator.send_json_to(payload)
 
         await ws_communicator.wait()
-        mock_orchestrator.assert_called_once()
+        mock_orchestrator.delay.assert_called_once()
 
 
 @pytest.mark.django_db(transaction=True)

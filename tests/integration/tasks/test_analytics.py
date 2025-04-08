@@ -13,11 +13,15 @@
 #  limitations under the License.
 
 
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
+from threading import Lock
 from unittest import mock
 
 import pytest
 
 from aap_eda.tasks import analytics
+from tests.integration.utils import ThreadSafeList
 
 
 @pytest.fixture
@@ -142,17 +146,41 @@ def test_gather_analytics(tracking_state, expected_logs):
             mock_logger.assert_any_call(log)
 
 
-def test_gather_analytics_enqueue():
-    with mock.patch(
-        "aap_eda.tasks.analytics.tasking.unique_enqueue"
-    ) as mock_enqueue:
-        analytics.gather_analytics()
+@pytest.mark.django_db
+def test_gather_analytics_uniqueness():
+    call_log = []
+    lock = Lock()
 
-        mock_enqueue.assert_called_once_with(
-            analytics.ANALYTICS_TASKS_QUEUE,
-            analytics.ANALYTICS_JOB_ID,
-            analytics._gather_analytics,
-        )
+    def gather_analytics_wrapper_call(shared_list):
+        """Patch _gather_analytics in a thread-safe way inside each thread."""
+        import importlib
+
+        import aap_eda.tasks.analytics
+
+        importlib.reload(aap_eda.tasks.analytics)
+
+        with mock.patch(
+            "aap_eda.tasks.analytics._gather_analytics"
+        ) as mock_fn:
+
+            def record_call():
+                time.sleep(1)
+                shared_list.append("called")
+
+            mock_fn.side_effect = record_call
+            aap_eda.tasks.analytics.gather_analytics()
+
+    def thread_safe_call():
+        gather_analytics_wrapper_call(ThreadSafeList(call_log, lock))
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(thread_safe_call),
+            executor.submit(thread_safe_call),
+        ]
+        wait(futures, timeout=3)
+
+    assert len(call_log) == 1
 
 
 def test_gather_analytics_no_files():

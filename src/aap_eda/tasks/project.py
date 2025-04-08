@@ -15,6 +15,7 @@
 import logging
 
 import django_rq
+from ansible_base.lib.utils.db import advisory_lock
 from django.conf import settings
 
 from aap_eda.core import models, tasking
@@ -30,37 +31,57 @@ job = tasking.redis_connect_retry()(django_rq.job)
 
 @job(PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
-    logger.info(f"Task started: Import project ( {project_id=} )")
+    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already importing project {project_id}, exiting"
+            )
+            return
 
-    project = models.Project.objects.get(pk=project_id)
-    try:
-        ProjectImportService().import_project(project)
-    except ProjectImportError as e:
-        logger.error(e, exc_info=settings.DEBUG)
+        logger.info(f"Task started: Import project ( {project_id=} )")
 
-    logger.info(f"Task complete: Import project ( project_id={project.id} )")
+        project = models.Project.objects.get(pk=project_id)
+        try:
+            ProjectImportService().import_project(project)
+        except ProjectImportError as e:
+            logger.error(e, exc_info=settings.DEBUG)
+
+        logger.info(
+            f"Task complete: Import project ( project_id={project.id} )"
+        )
 
 
 @job(PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
-    logger.info(f"Task started: Sync project ( {project_id=} )")
+    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already syncing project {project_id}, exiting"
+            )
+            return
 
-    project = models.Project.objects.get(pk=project_id)
-    try:
-        ProjectImportService().sync_project(project)
-    except ProjectImportError as e:
-        logger.error(e, exc_info=settings.DEBUG)
+        logger.info(f"Task started: Sync project ( {project_id=} )")
 
-    logger.info(f"Task complete: Sync project ( project_id={project.id} )")
+        project = models.Project.objects.get(pk=project_id)
+        try:
+            ProjectImportService().sync_project(project)
+        except ProjectImportError as e:
+            logger.error(e, exc_info=settings.DEBUG)
+
+        logger.info(f"Task complete: Sync project ( project_id={project.id} )")
 
 
 # Started by the scheduler, unique concurrent execution on specified queue;
 # default is the default queue
 def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
-    job_id = "monitor_project_tasks"
-    tasking.unique_enqueue(
-        queue_name, job_id, _monitor_project_tasks, queue_name
-    )
+    with advisory_lock("monitor_project_tasks", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                "Another task already running monitor_project_tasks, exiting"
+            )
+            return
+
+        _monitor_project_tasks(queue_name=queue_name)
 
 
 # Although this is a periodically run task and that could be viewed as

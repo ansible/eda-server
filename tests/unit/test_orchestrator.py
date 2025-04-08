@@ -497,6 +497,7 @@ def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
     assert result is True
 
 
+@pytest.mark.django_db
 def test_manage_monitor_called_with_no_requests(
     process_parent, mock_get_parent, mock_requests_queue
 ):
