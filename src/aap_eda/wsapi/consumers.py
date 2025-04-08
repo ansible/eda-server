@@ -28,10 +28,7 @@ from aap_eda.core.utils.credentials import (
     get_secret_fields,
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
-from aap_eda.middleware.request_log_middleware import (
-    assign_log_tracking_id,
-    assign_request_id,
-)
+from aap_eda.middleware.request_log_middleware import assign_log_tracking_id
 from aap_eda.tasks import orchestrator
 
 from .messages import (
@@ -105,7 +102,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         data = json.loads(text_data)
 
-        await self._set_request_id()
         await self._set_log_tracking_id(data)
 
         logger.debug(f"AnsibleRulebookConsumer received: {data}")
@@ -195,15 +191,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         if activation_instance_id:
             activation = await self.get_activation(activation_instance_id)
             assign_log_tracking_id(activation.log_tracking_id)
-
-    async def _set_request_id(self):
-        headers = {
-            k.decode().lower(): v.decode()
-            for k, v in self.scope.get("headers", [])
-        }
-        request_id = headers.get("x-request-id", "")
-
-        assign_request_id(request_id)
 
     @database_sync_to_async
     def handle_heartbeat(self, message: HeartbeatMessage) -> None:

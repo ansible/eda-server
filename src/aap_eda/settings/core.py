@@ -16,13 +16,21 @@
 
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
+DISPATCHERD_FEATURE_FLAG_NAME = "FEATURE_DISPATCHERD_ENABLED"
+
 FLAGS = {
     "FEATURE_EDA_ANALYTICS_ENABLED": [
         {
             "condition": "boolean",
             "value": False,
-        }
-    ]
+        },
+    ],
+    DISPATCHERD_FEATURE_FLAG_NAME: [
+        {
+            "condition": "boolean",
+            "value": False,
+        },
+    ],
 }
 
 INSTALLED_APPS = [
@@ -36,7 +44,6 @@ INSTALLED_APPS = [
     # Third party apps
     "rest_framework",
     "drf_spectacular",
-    "django_rq",
     "django_filters",
     "ansible_base.rbac",
     "ansible_base.resource_registry",
@@ -46,6 +53,9 @@ INSTALLED_APPS = [
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
+    # rq_worker needs to be loaded after the core app
+    # to wrap the rq worker command
+    "django_rq",
 ]
 
 

@@ -254,6 +254,12 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 " {message}",
                 "style": "{",
             },
+            "ansible_rulebook": {
+                "format": "{rulebook_timestamp} {levelname:<8} "
+                "[tid:{log_tracking_id}] "
+                "[aiid: {activation_instance_id}] {message}",
+                "style": "{",
+            },
         },
         "handlers": {
             "console": {
@@ -276,6 +282,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 "formatter": "verbose",
                 "filters": ["activation_id_filter"],
             },
+            "ansible_rulebook_handler": {
+                "class": STREAM_HANDLER,
+                "formatter": "ansible_rulebook",
+                "filters": ["activation_id_filter"],
+            },
         },
         "root": {"handlers": ["console"], "level": "WARNING"},
         "loggers": {
@@ -296,6 +307,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
             },
             "aap_eda": {
                 "handlers": ["console"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
+            "aap_eda.api": {
+                "handlers": ["request_handler"],
                 "level": settings.APP_LOG_LEVEL,
                 "propagate": False,
             },
@@ -328,6 +344,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 "handlers": ["console"],
                 # "level": settings.APP_LOG_LEVEL,
                 "level": "DEBUG",  # TODO: this is for demo!!
+                "propagate": False,
+            "aap_eda.services.activation.tee_system_logger": {
+                "handlers": ["ansible_rulebook_handler"],
+                # controlled by activation UI, please do not alter
+                "level": "DEBUG",
                 "propagate": False,
             },
         },

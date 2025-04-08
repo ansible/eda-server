@@ -184,10 +184,12 @@ def _update_extra_vars_from_eda_credentials(
             activation.save(update_fields=["extra_var"])
 
 
-def _get_user_extra_vars(activation: models.Activation) -> str:
-    if not activation.extra_var:
+def _get_user_extra_vars(
+    activation: models.Activation, extra_var_str: str
+) -> str:
+    if not extra_var_str:
         return ""
-    extra_vars = yaml.safe_load(activation.extra_var)
+    extra_vars = yaml.safe_load(extra_var_str)
 
     # remove extra_vars injected from credentials
     for eda_credential in activation.eda_credentials.all():
@@ -662,7 +664,8 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
         if "k8s_service_name" not in data:
             data["k8s_service_name"] = activation.k8s_service_name
         if "extra_var" not in data:
-            data["extra_var"] = _get_user_extra_vars(activation)
+            data["extra_var"] = activation.extra_var
+        data["extra_var"] = _get_user_extra_vars(activation, data["extra_var"])
         if "eda_credentials" not in data:
             data["eda_credentials"] = [
                 cred.id
