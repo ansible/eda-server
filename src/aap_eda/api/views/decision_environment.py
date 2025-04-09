@@ -21,6 +21,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
@@ -41,6 +42,11 @@ resource_name = "DecisionEnvironment"
 
 class CreateDecisionEnvironmentMixin(CreateModelMixin):
     def create(self, request, *args, **kwargs):
+        # Restrict creation to superusers
+        if not request.user.is_superuser:
+            raise PermissionDenied(
+                "Only superusers can create a Decision Environment."
+            )
         response = super().create(request, *args, **kwargs)
 
         logger.info(
