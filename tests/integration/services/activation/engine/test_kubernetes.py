@@ -586,14 +586,36 @@ def test_cleanup(init_kubernetes_data, kubernetes_engine):
     log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     job_name = "eda-job"
 
-    with mock.patch.object(engine, "_delete_secret") as secret_mock:
-        with mock.patch.object(engine, "_delete_services") as services_mock:
-            with mock.patch.object(engine, "_delete_job") as job_mock:
-                engine.cleanup(job_name, log_handler)
-                secret_mock.assert_called_once()
-                services_mock.assert_called_once()
-                job_mock.assert_called_once()
+    # Mock the _delete_secret, _delete_services, _delete_job methods
+    with (
+        mock.patch.object(engine, "_delete_secret") as secret_mock,
+        mock.patch.object(engine, "_delete_services") as services_mock,
+        mock.patch.object(engine, "_delete_job") as job_mock,
+    ):
+        # Mock the CoreV1Api client directly instead of engine.core_v1
+        with mock.patch("kubernetes.client.CoreV1Api") as mock_core_v1_api:
+            # Create a mock instance of the CoreV1Api
+            mock_core_v1 = mock.MagicMock()
+            mock_core_v1_api.return_value = mock_core_v1
 
+            # Mock the list_namespaced_pod method to simulate 404 ApiException
+            mock_list_namespaced_pod = mock.MagicMock()
+            mock_core_v1.list_namespaced_pod = mock_list_namespaced_pod
+
+            # Simulate the 404 ApiException when trying to list the pod
+            mock_list_namespaced_pod.side_effect = ApiException(
+                status=404, reason="Not Found"
+            )
+
+            engine.cleanup(job_name, log_handler)
+
+            # Verify the mock methods were called once
+            secret_mock.assert_called_once()
+            services_mock.assert_called_once()
+            job_mock.assert_called_once()
+
+            # Ensure the core_v1.list_namespaced_pod method was called
+            mock_list_namespaced_pod.assert_called_once()
     assert models.RulebookProcessLog.objects.last().log.endswith(
         f"Job {job_name} is cleaned up."
     )

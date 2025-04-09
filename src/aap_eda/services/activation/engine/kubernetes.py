@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-
 import base64
 import json
 import logging
@@ -188,6 +187,46 @@ class Engine(ContainerEngine):
     def _get_ports(self, found_ports: list[tuple]) -> list[int]:
         return [port for _, port in found_ports]
 
+    def _wait_for_pod_deletion(
+        self,
+        pod_name: str,
+        log_handler: LogHandler,
+    ):
+        core_v1 = k8sclient.CoreV1Api()
+        w = watch.Watch()
+
+        log_handler.write(
+            f"Waiting for pod '{pod_name}' to be deleted...", flush=True
+        )
+        try:
+            for event in w.stream(
+                core_v1.list_namespaced_pod,
+                namespace=self.namespace,
+                field_selector=f"metadata.name={pod_name}",
+                timeout_seconds=60,
+            ):
+                if event["type"] == "DELETED":
+                    # Pod successfully deleted
+                    w.stop()
+                    log_handler.write(
+                        f"Pod '{pod_name}' has been deleted.", flush=True
+                    )
+                    return
+        except ApiException as e:
+            if e.status == 404:
+                message = (
+                    f"Pod '{pod_name}' not found (404), "
+                    "assuming it's already deleted."
+                )
+                log_handler.write(message, flush=True)
+                return
+            log_handler.write(
+                f"Error while waiting for deletion: {e}", flush=True
+            )
+            raise ContainerCleanupError(
+                f"Error during cleanup: {str(e)}"
+            ) from e
+
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         self.job_name = container_id
 
@@ -197,6 +236,7 @@ class Engine(ContainerEngine):
         self._delete_services(log_handler)
         self._delete_job(log_handler)
 
+        self._wait_for_pod_deletion(container_id, log_handler)
         log_handler.write(f"Job {container_id} is cleaned up.", flush=True)
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
