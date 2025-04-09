@@ -16,12 +16,10 @@ import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 
-from aap_eda.core import enums, models
 from aap_eda.core.management.commands.create_initial_data import (
     ORG_ROLES,
     Command,
 )
-from aap_eda.core.utils.credentials import inputs_from_store
 
 
 #################################################################
@@ -87,82 +85,3 @@ def test_remove_extra_permission():
     assert perm in auditor_role.permissions.all()
     Command().handle()
     assert perm not in auditor_role.permissions.all()
-
-
-#################################################################
-# Credentials
-#################################################################
-def create_old_registry_credential(default_organization: models.Organization):
-    credential = models.Credential.objects.create(
-        name="registry cred",
-        credential_type=enums.CredentialType.REGISTRY,
-        username="fred",
-        secret="mysec",
-    )
-    de = models.DecisionEnvironment.objects.create(
-        name="my DE",
-        image_url="private-reg.com/fred/de",
-        credential=credential,
-        organization=default_organization,
-    )
-    return credential, de
-
-
-def create_old_git_credential(default_organization: models.Organization):
-    credential = models.Credential.objects.create(
-        name="git cred",
-        credential_type=enums.CredentialType.GITHUB,
-        username="fred",
-        secret="mysec",
-    )
-    project = models.Project.objects.create(
-        name="my project",
-        url="github.com/fred/projects",
-        credential=credential,
-        organization=default_organization,
-    )
-    return credential, project
-
-
-@pytest.mark.django_db
-def test_copy_registry_credentials(
-    default_organization: models.Organization, caplog
-):
-    credential, de = create_old_registry_credential(default_organization)
-    Command().handle()
-
-    assert not models.Credential.objects.filter(id=credential.id).exists()
-    de.refresh_from_db()
-    assert de.eda_credential.name == credential.name
-    assert not de.eda_credential.managed
-    inputs = inputs_from_store(de.eda_credential.inputs.get_secret_value())
-    assert inputs["host"] == "private-reg.com"
-    assert inputs["username"] == "fred"
-    assert inputs["password"] == "mysec"
-
-    credential.id = None
-    credential.save()
-    Command().handle()
-    assert models.Credential.objects.filter(id=credential.id).exists()
-
-
-@pytest.mark.django_db
-def test_copy_project_credentials(
-    default_organization: models.Organization, caplog
-):
-    credential, project = create_old_git_credential(default_organization)
-    Command().handle()
-
-    assert not models.Credential.objects.filter(id=credential.id).exists()
-    project.refresh_from_db()
-    assert project.eda_credential.name == credential.name
-    assert not project.eda_credential.managed
-    inputs = inputs_from_store(
-        project.eda_credential.inputs.get_secret_value()
-    )
-    assert inputs["username"] == "fred"
-    assert inputs["password"] == "mysec"
-    credential.id = None
-    credential.save()
-    Command().handle()
-    assert models.Credential.objects.filter(id=credential.id).exists()

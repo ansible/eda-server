@@ -60,14 +60,6 @@ class Project(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     proxy = EncryptedTextField(blank=True, default="")
     git_hash = models.TextField()
     verify_ssl = models.BooleanField(default=True)
-    # TODO: used by migration, remove it later
-    credential = models.ForeignKey(
-        "Credential",
-        blank=True,
-        null=True,
-        default=None,
-        on_delete=models.SET_NULL,
-    )
     eda_credential = models.ForeignKey(
         "EdaCredential",
         blank=True,
