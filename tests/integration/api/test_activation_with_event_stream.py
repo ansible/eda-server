@@ -873,13 +873,13 @@ def test_update_activation_with_everything(
     # test clearing event stream mapping
     test_activation5 = {
         "rulebook_id": fks2["rulebook_id"],
-        "source_mappings": "",
+        "source_mappings": "[]\n",
     }
     response = admin_client.patch(
         f"{api_url_v1}/activations/{activation_id}/", data=test_activation5
     )
     assert_updated_event_stream_mapping(
-        response, ["ansible.eda.range"], "", ""
+        response, ["ansible.eda.range"], "[]", ""
     )
     assert response.data["extra_var"] != extra_var
     assert response.data["extra_var"] in extra_var

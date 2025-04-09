@@ -703,7 +703,7 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
             vault_data = VaultData(inputs["vault_password"], True)
         else:
             vault_data = VaultData()
-        if self.validated_data.get("source_mappings", []):
+        if yaml.safe_load(self.validated_data.get("source_mappings", "")):
             if not rulebook_id:
                 # load the original ruleset
                 self.validated_data[
