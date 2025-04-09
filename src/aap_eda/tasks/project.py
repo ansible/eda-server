@@ -37,22 +37,37 @@ def import_project(project_id: int):
                 f"Another task already importing project {project_id}, exiting"
             )
             return
+        _import_project(project_id)
 
-        logger.info(f"Task started: Import project ( {project_id=} )")
 
-        project = models.Project.objects.get(pk=project_id)
-        try:
-            ProjectImportService().import_project(project)
-        except ProjectImportError as e:
-            logger.error(e, exc_info=settings.DEBUG)
+def _import_project(project_id: int):
+    """Import project without lock.
 
-        logger.info(
-            f"Task complete: Import project ( project_id={project.id} )"
-        )
+    This function is intended to be run by the tasking system inside the lock.
+    """
+    logger.info(f"Task started: Import project ( {project_id=} )")
+
+    project = models.Project.objects.get(pk=project_id)
+    try:
+        ProjectImportService().import_project(project)
+    except ProjectImportError as e:
+        logger.error(e, exc_info=settings.DEBUG)
+
+    logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
 @job(PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
+    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already syncing project {project_id}, exiting"
+            )
+            return
+        _sync_project(project_id)
+
+
+def _sync_project(project_id: int):
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
@@ -81,7 +96,7 @@ def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
             )
             return
 
-        _monitor_project_tasks(queue_name=queue_name)
+        _monitor_project_tasks(queue_name)
 
 
 # Although this is a periodically run task and that could be viewed as

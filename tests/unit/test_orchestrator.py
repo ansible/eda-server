@@ -27,7 +27,6 @@ from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
 from aap_eda.tasks.exceptions import UnknownProcessParentType
 from aap_eda.tasks.orchestrator import (
-    HealthyQueueNotFoundError,
     _manage,
     check_rulebook_queue_health,
     get_least_busy_queue_name,
@@ -289,6 +288,8 @@ def test_get_least_busy_queue_name(fixture, request):
         expected_queue = min(responsive_queues, key=lambda q: q.count())
         assert get_least_busy_queue_name() == expected_queue.name
     else:
+        from aap_eda.tasks.orchestrator import HealthyQueueNotFoundError
+
         with pytest.raises(HealthyQueueNotFoundError):
             get_least_busy_queue_name()
 

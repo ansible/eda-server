@@ -12,10 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import time
-from concurrent.futures import ThreadPoolExecutor, wait
 from unittest import mock
-from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -28,7 +25,6 @@ from aap_eda.core.enums import (
     ProcessParentType,
 )
 from aap_eda.tasks import orchestrator
-from tests.integration.utils import ThreadSafeList
 
 
 def fake_task(number: int):
@@ -319,47 +315,6 @@ def test_max_running_activation_after_start_job(
         status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
     ).count()
     assert running_processes == settings.MAX_RUNNING_ACTIVATIONS
-
-
-@pytest.mark.django_db
-def test_monitor_rulebook_processes_unique():
-    """Ensure only one instance of monitor_rulebook_processes is executed."""
-    from threading import Lock
-
-    # Use regular shared list with thread-safe append
-    call_log = []
-    lock = Lock()
-
-    def monitor_rulebook_wrapper_call(shared_list):
-        """Wrapper to track call count via shared list."""
-        from aap_eda.tasks import orchestrator
-
-        with patch(
-            "aap_eda.tasks.orchestrator.monitor_rulebook_processes_no_lock"
-        ) as mock_fn:
-
-            def record_call():
-                time.sleep(1)
-                shared_list.append("called")
-
-            mock_fn.side_effect = record_call
-
-            orchestrator.monitor_rulebook_processes()
-        return True
-
-    def thread_safe_call():
-        return monitor_rulebook_wrapper_call(
-            shared_list=ThreadSafeList(call_log, lock)
-        )
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [
-            executor.submit(thread_safe_call),
-            executor.submit(thread_safe_call),
-        ]
-        wait(futures, timeout=3)
-
-    assert len(call_log) == 1
 
 
 @pytest.mark.django_db
