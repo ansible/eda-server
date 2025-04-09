@@ -772,7 +772,7 @@ def test_delete_with_exception(
     activation_manager.delete()
     assert container_engine_mock.cleanup.called
     assert "Delete operation requested" in eda_caplog.text
-    assert "failed to cleanup." in eda_caplog.text
+    assert "failed to clean up." in eda_caplog.text
     assert (
         models.Activation.objects.filter(id=running_activation.id).count() == 0
     )

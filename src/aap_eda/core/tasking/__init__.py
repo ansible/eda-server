@@ -153,14 +153,21 @@ def get_redis_status() -> dict:
     """Query DAB for the status of Redis."""
     kwargs = redis_settings.rq_redis_client_instantiation_parameters()
     kwargs = _prune_redis_kwargs(**kwargs)
-    return _get_redis_status(_create_url_from_parameters(**kwargs), **kwargs)
+    response = _get_redis_status(
+        _create_url_from_parameters(**kwargs), **kwargs
+    )
+    status = response["status"]
+    if status == constants.STATUS_GOOD:
+        logger.debug(f"Redis status: {status}")
+    else:
+        logger.info(f"Redis status: {status}")
+    return response
 
 
 def is_redis_failed() -> bool:
     """Return a boolean indicating if Redis is in a failed state."""
     response = get_redis_status()
     status = response["status"]
-    logger.debug(f"Redis status: {status}")
     return status == constants.STATUS_FAILED
 
 
@@ -496,11 +503,11 @@ class Worker(rq.Worker):
             # break out of the loop.
             if (value is not None) or self.is_shutting_down:
                 if value is not None:
-                    logger.debug(f"Working exited normally with {value}")
+                    logger.info(f"Worker exited normally with {value}")
                 break
 
             logger.error(
-                "Work exited no return value, going to restart the worker"
+                "Worker exited with no return value, restarting the worker"
             )
 
         return value

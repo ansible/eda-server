@@ -126,7 +126,7 @@ def swap_event_stream_sources(
                         event_stream_name, source, event_stream_sources
                     )
                     new_sources.append(updated_source)
-                    LOGGER.debug(
+                    LOGGER.info(
                         "Source %s updated with Event Stream Source",
                         event_stream_name,
                     )
@@ -135,7 +135,7 @@ def swap_event_stream_sources(
                     LOGGER.warning(msg)
                     new_sources.append(source)
             else:
-                LOGGER.debug("Source %s left intact", src_name)
+                LOGGER.info("Source %s left intact", src_name)
                 new_sources.append(source)
 
         ruleset["sources"] = new_sources
@@ -151,5 +151,5 @@ def _updated_event_stream_source(
     updated_source[source_type] = event_stream_sources[name][source_type]
     if "filters" in source:
         updated_source["filters"] = source["filters"]
-    LOGGER.debug("Source %s updated with Event Stream Source", name)
+    LOGGER.info("Source %s updated with Event Stream Source", name)
     return updated_source

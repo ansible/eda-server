@@ -57,7 +57,7 @@ def test_get_package_version(caplog_factory):
     # assert outcome when package is not found
     with patch("importlib.metadata.version", side_effect=PackageNotFoundError):
         assert get_package_version("aap-eda") == "unknown"
-        assert "Cannot read version" in eda_caplog.text
+        assert "returning 'unknown' version" in eda_caplog.text
 
 
 @pytest.mark.parametrize(

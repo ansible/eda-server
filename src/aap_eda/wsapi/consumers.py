@@ -226,7 +226,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
 
             # TODO: broadcasting
-            logger.debug(f"Job instance {job_instance.id} is broadcasting.")
+            logger.info(f"Job instance {job_instance.id} is broadcasting.")
 
         created = event_data.get("created")
         if created:
@@ -452,7 +452,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                         password=inputs.get("password", ""),
                     )
         except ObjectDoesNotExist:
-            logger.debug("AAP credential type not found")
+            logger.warning('"AAP" credential type not found')
             return None
 
     @database_sync_to_async
@@ -521,7 +521,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 urlparts.fragment,
             ]
         )
-        logger.debug("Updated Job URL %s", result)
+        logger.info("Updated Job URL %s", result)
         return result
 
     @database_sync_to_async
@@ -549,7 +549,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                     template, binary_fields, value, inputs
                 )
                 if not message:
-                    logger.info(
+                    logger.warning(
                         f"{template} is skipped because its content is empty"
                     )
                     continue

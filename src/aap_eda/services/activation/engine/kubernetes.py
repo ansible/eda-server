@@ -167,8 +167,8 @@ class Engine(ContainerEngine):
                     status=ActivationStatus.FAILED,
                     message=container_status.state.terminated.message or "",
                 )
-                LOGGER.info(
-                    f"Pod exited with {exit_code}, reason "
+                LOGGER.warning(
+                    f"Pod exited with {exit_code}. Reason: "
                     f"{container_status.state.terminated.reason}"
                 )
         else:
@@ -391,7 +391,7 @@ class Engine(ContainerEngine):
                 )
                 LOGGER.info(f"Created Service: {service_name}")
             else:
-                LOGGER.info(f"Service already exists: {service_name}")
+                LOGGER.warning(f"Service already exists: {service_name}")
                 opened_ports = [
                     port_item.port for port_item in service.items[0].spec.ports
                 ]
