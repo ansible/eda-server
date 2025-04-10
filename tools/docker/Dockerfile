@@ -5,6 +5,7 @@ ARG STATIC_ROOT=/var/lib/eda/static
 
 # python3.11 and python3.12 supported
 ARG PYTHON_BIN="python3.11"
+ARG ANSIBLE_CORE_VER=2.16
 
 RUN useradd --uid "$USER_ID" --gid 0 --home-dir /app --create-home eda \
     && mkdir -p /app/.local /var/lib/eda/ \
@@ -57,7 +58,7 @@ RUN poetry install -E all --no-root --no-cache \
     && ${PYTHON_BIN} -m pip install gunicorn
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
-RUN pip install ansible-core
+RUN pip install ansible-core==${ANSIBLE_CORE_VER}
 RUN EDA_SECRET_KEY=dummy EDA_STATIC_ROOT=${STATIC_ROOT} aap-eda-manage collectstatic --noinput --clear
 
 USER 0
