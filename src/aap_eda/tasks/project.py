@@ -68,22 +68,15 @@ def sync_project(project_id: int):
 
 
 def _sync_project(project_id: int):
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
-        if not acquired:
-            logger.debug(
-                f"Another task already syncing project {project_id}, exiting"
-            )
-            return
+    logger.info(f"Task started: Sync project ( {project_id=} )")
 
-        logger.info(f"Task started: Sync project ( {project_id=} )")
+    project = models.Project.objects.get(pk=project_id)
+    try:
+        ProjectImportService().sync_project(project)
+    except ProjectImportError as e:
+        logger.error(e, exc_info=settings.DEBUG)
 
-        project = models.Project.objects.get(pk=project_id)
-        try:
-            ProjectImportService().sync_project(project)
-        except ProjectImportError as e:
-            logger.error(e, exc_info=settings.DEBUG)
-
-        logger.info(f"Task complete: Sync project ( project_id={project.id} )")
+    logger.info(f"Task complete: Sync project ( project_id={project.id} )")
 
 
 # Started by the scheduler, unique concurrent execution on specified queue;
