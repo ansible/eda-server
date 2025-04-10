@@ -173,11 +173,9 @@ RQ_STARTUP_JOBS = [
 # the scheduler running to avoid duplicate jobs
 RQ_PERIODIC_JOBS = [
     {
-        "func": (
-            "aap_eda.tasks.orchestrator.enqueue_monitor_rulebook_processes"
-        ),
+        "func": ("aap_eda.tasks.orchestrator.monitor_rulebook_processes"),
         "interval": 5,
-        "id": "enqueue_monitor_rulebook_processes",
+        "id": "monitor_rulebook_processes",
     },
     {
         "func": "aap_eda.tasks.project.monitor_project_tasks",
