@@ -315,7 +315,7 @@ AAP_INJECTORS = {
         "aap_password": "{{password}}",
         "aap_token": "{{oauth_token}}",
         "aap_request_timeout": "{{request_timeout}}",
-        "aap_verify_ssl": "{{verify_ssl}}",
+        "aap_validate_certs": "{{verify_ssl}}",
     },
     "env": {
         "TOWER_HOST": "{{host}}",
@@ -332,7 +332,7 @@ AAP_INJECTORS = {
         "AAP_HOSTNAME": "{{host}}",
         "AAP_USERNAME": "{{username}}",
         "AAP_PASSWORD": "{{password}}",
-        "AAP_VERIFY_SSL": "{{verify_ssl}}",
+        "AAP_VALIDATE_CERTS": "{{verify_ssl}}",
         "AAP_TOKEN": "{{oauth_token}}",
         "AAP_REQUEST_TIMEOUT": "{{request_timeout}}",
     },
