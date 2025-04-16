@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import pytest
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from dynaconf import Dynaconf
 
@@ -43,7 +44,7 @@ def redis_settings(mock_settings):
     mock_settings.REDIS_USER = defaults.MQ_USER
     mock_settings.REDIS_USER_PASSWORD = defaults.MQ_USER_PASSWORD
     mock_settings.REDIS_UNIX_SOCKET_PATH = defaults.MQ_UNIX_SOCKET_PATH
-    mock_settings.REDIS_HOST = defaults.MQ_HOST
+    mock_settings.REDIS_HOST = settings.MQ_HOST
     mock_settings.REDIS_PORT = defaults.MQ_PORT
     mock_settings.REDIS_TLS = defaults.MQ_TLS
     mock_settings.REDIS_CLIENT_KEY_PATH = defaults.MQ_CLIENT_KEY_PATH
