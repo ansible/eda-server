@@ -13,24 +13,21 @@
 #  limitations under the License.
 
 import re
-
-
-class InvalidRFC1035LabelError(Exception):
-    pass
+import uuid
 
 
 def create_k8s_service_name(activation_name: str) -> str:
     """Attempt to convert the activation name to a 1035 name.
 
-    Convert dot(.) underscore(_) space( ) to - and convert it to lowercase
+    Convert non qualified letters to - and convert it to lowercase
     """
-    name = re.sub(r"[._\s+]", "-", activation_name.lower())
-    if not is_rfc_1035_compliant(name):
-        raise InvalidRFC1035LabelError(
-            "Please provide a name, that's a valid RFC 1035 name, "
-            "couldn't auto generate a service name"
-        )
+    name = re.sub(r"[^a-z0-9\-]+", "-", activation_name.lower())
+    name = re.sub(r"^[0-9-]+", "", name.rstrip("-"))
+    if len(name) > 63:
+        name = f"{name[0:61]}-{name[-1]}"
 
+    if not name:
+        name = f"service-{uuid.uuid4()}"
     return name
 
 
