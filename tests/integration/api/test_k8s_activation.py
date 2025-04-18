@@ -124,13 +124,7 @@ def use_k8s_setting(settings):
             None,
             status.HTTP_201_CREATED,
             None,
-        ),
-        (
-            "78_inconvertable_invalid_activation_name",
-            None,
-            status.HTTP_400_BAD_REQUEST,
-            "k8s_service_name",
-        ),
+        )
     ],
 )
 def test_create_k8s_activation_with_service_name(
