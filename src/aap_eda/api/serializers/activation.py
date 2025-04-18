@@ -48,10 +48,7 @@ from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
 from aap_eda.core.exceptions import ParseError
 from aap_eda.core.utils.credentials import get_secret_fields
-from aap_eda.core.utils.k8s_service_name import (
-    InvalidRFC1035LabelError,
-    create_k8s_service_name,
-)
+from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
 from aap_eda.core.utils.rulebook import (
     build_source_list,
     get_rulebook_hash,
@@ -1149,13 +1146,6 @@ def _validate_credentials_and_token_and_rulebook(
 
     # validate rulebook
     _validate_rulebook(data, awx_token is not None)
-
-    # validate if activation name is compatible with RFC 1035
-    if not data.get("k8s_service_name") and settings.DEPLOYMENT_TYPE == "k8s":
-        try:
-            create_k8s_service_name(data["name"])
-        except InvalidRFC1035LabelError as e:
-            raise serializers.ValidationError({"k8s_service_name": [str(e)]})
 
 
 def _validate_awx_token(data: dict) -> models.AwxToken:
