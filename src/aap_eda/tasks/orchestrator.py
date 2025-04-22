@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import django_rq
+from ansible_base.lib.utils.db import advisory_lock
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -42,6 +43,11 @@ from aap_eda.services.activation.activation_manager import (
 )
 
 from .exceptions import UnknownProcessParentType
+
+# Wrap the django_rq job decorator so its processing is within our retry
+# code.
+job = tasking.redis_connect_retry()(django_rq.job)
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +78,26 @@ def get_process_parent(
 
 
 def _manage(process_parent_type: str, id: int, request_id: str = "") -> None:
+    """Wrap the _manage_no_lock function.
+
+    It ensures that only one task is executed at a time.
+    """
+    with advisory_lock(
+        _manage_process_job_id(process_parent_type, id), wait=False
+    ) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"Method _manage({process_parent_type}, {id}) "
+                "already being ran, exiting",
+            )
+            return
+
+        _manage_no_lock(process_parent_type, id, request_id)
+
+
+def _manage_no_lock(
+    process_parent_type: str, id: int, request_id: str = ""
+) -> None:
     """Manage the activation with the given id.
 
     It will run pending user requests or monitor the activation
@@ -160,7 +186,16 @@ def dispatch(
     request_type: Optional[ActivationRequest],
     request_id: str = "",
 ):
+    """Dispatch the request to the right queue.
+
+    In multiqueue environments, the queue represents the node.
+    This dispatcher implements a basic load balancing algorithm
+    that selects the least busy queue to process the request and
+    checks the health of the queue before dispatching the request.
+    Handles workers offline and unhealthy queues.
+    """
     job_id = _manage_process_job_id(process_parent_type, process_parent_id)
+
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
@@ -178,6 +213,14 @@ def dispatch(
 
     assign_request_id(request_id)
     assign_log_tracking_id(process_parent.log_tracking_id)
+
+    with advisory_lock(job_id, wait=False) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"_manage({job_id}) already being ran, "
+                f"not dispatching request {request_type}",
+            )
+            return
 
     LOGGER.info(
         f"Dispatching request {request_type} for {process_parent_type} "
@@ -432,6 +475,7 @@ def start_rulebook_process(
         ActivationRequest.START,
         request_id,
     )
+    monitor_rulebook_processes.delay()
 
 
 def stop_rulebook_process(
@@ -446,6 +490,7 @@ def stop_rulebook_process(
         ActivationRequest.STOP,
         request_id,
     )
+    monitor_rulebook_processes.delay()
 
 
 def delete_rulebook_process(
@@ -460,12 +505,7 @@ def delete_rulebook_process(
         ActivationRequest.DELETE,
         request_id,
     )
-    dispatch(
-        process_parent_type,
-        process_parent_id,
-        ActivationRequest.DELETE,
-        request_id,
-    )
+    monitor_rulebook_processes.delay()
 
 
 def restart_rulebook_process(
@@ -480,13 +520,14 @@ def restart_rulebook_process(
         ActivationRequest.RESTART,
         request_id,
     )
+    monitor_rulebook_processes.delay()
 
 
-def monitor_rulebook_processes() -> None:
+def monitor_rulebook_processes_no_lock() -> None:
     """Monitor activations scheduled task.
 
     Started by the scheduler, executed by the default worker.
-    It enqueues a task for each activation that needs to be managed.
+    It dispatches a task for each activation that needs to be managed.
     Handles both user requests and monitoring of running activations.
     It will not enqueue a task if there is already one for the same
     activation.
@@ -519,10 +560,18 @@ def monitor_rulebook_processes() -> None:
         )
 
 
-def enqueue_monitor_rulebook_processes() -> None:
-    """Wrap monitor_rulebook_processes to ensure only one task is enqueued."""
-    tasking.unique_enqueue(
-        "default",
-        "monitor_rulebook_processes",
-        monitor_rulebook_processes,
-    )
+@job("default")
+def monitor_rulebook_processes() -> None:
+    """Wrap monitor_rulebook_processes_no_lock.
+
+    Ensures only one task is executed.
+    """
+    with advisory_lock("monitor_rulebook_processes", wait=False) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                "monitor_rulebook_process being ran by "
+                "another process, exiting",
+            )
+            return
+
+        monitor_rulebook_processes_no_lock()

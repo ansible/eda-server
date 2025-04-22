@@ -142,19 +142,6 @@ def test_gather_analytics(tracking_state, expected_logs):
             mock_logger.assert_any_call(log)
 
 
-def test_gather_analytics_enqueue():
-    with mock.patch(
-        "aap_eda.tasks.analytics.tasking.unique_enqueue"
-    ) as mock_enqueue:
-        analytics.gather_analytics()
-
-        mock_enqueue.assert_called_once_with(
-            analytics.ANALYTICS_TASKS_QUEUE,
-            analytics.ANALYTICS_JOB_ID,
-            analytics._gather_analytics,
-        )
-
-
 def test_gather_analytics_no_files():
     with mock.patch(
         "aap_eda.tasks.analytics.utils.get_insights_tracking_state",

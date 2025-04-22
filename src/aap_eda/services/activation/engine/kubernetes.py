@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-
 import base64
 import json
 import logging
@@ -23,6 +22,7 @@ from dateutil import parser
 from kubernetes import client as k8sclient, config, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
+from rest_framework import status
 
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.engine.exceptions import (
@@ -55,6 +55,7 @@ POD_FAILED_REASONS = [
     IMAGE_PULL_BACK_OFF,
     IMAGE_PULL_ERROR,
 ]
+POD_DELETE_TIMEOUT = 60
 
 
 @dataclass
@@ -114,6 +115,7 @@ class Engine(ContainerEngine):
         # f"{request.id}-{uuid.uuid4()}" #noqa: E800
         try:
             log_handler.write("Creating Job")
+            log_handler.write(f"Log tracking id: {request.log_tracking_id}")
             log_handler.write(f"Image URL is {request.image_url}", flush=True)
             self._create_job(request, log_handler)
             LOGGER.info("Waiting for pod to start")
@@ -197,6 +199,7 @@ class Engine(ContainerEngine):
         self._delete_services(log_handler)
         self._delete_job(log_handler)
 
+        self._wait_for_pod_to_be_deleted(container_id, log_handler)
         log_handler.write(f"Job {container_id} is cleaned up.", flush=True)
 
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
@@ -524,6 +527,50 @@ class Engine(ContainerEngine):
         except ApiException as e:
             raise ContainerStartError(
                 f"Pod {self.pod_name} failed with error {e}"
+            ) from e
+
+        finally:
+            watcher.stop()
+
+    def _wait_for_pod_to_be_deleted(
+        self, pod_name: str, log_handler: LogHandler
+    ) -> None:
+        log_handler.write(
+            f"Waiting for pod '{pod_name}' to be deleted...",
+            flush=True,
+        )
+        watcher = watch.Watch()
+        try:
+            for event in watcher.stream(
+                self.client.core_api.list_namespaced_pod,
+                namespace=self.namespace,
+                label_selector=f"job-name={self.job_name}",
+                timeout_seconds=POD_DELETE_TIMEOUT,
+            ):
+                LOGGER.debug(f"Received event: {event}")
+                pod_name = event["object"].metadata.name
+                pod_phase = event["object"].status.phase
+                LOGGER.debug(f"Pod {pod_name} - {pod_phase}")
+
+                if event["type"] == "DELETED":
+                    # Pod successfully deleted
+                    log_handler.write(
+                        f"Pod '{pod_name}' has been deleted.", flush=True
+                    )
+                    break
+        except ApiException as e:
+            if e.status == status.HTTP_404_NOT_FOUND:
+                message = (
+                    f"Pod '{pod_name}' not found (404), "
+                    "assuming it's already deleted."
+                )
+                log_handler.write(message, flush=True)
+                return
+            log_handler.write(
+                f"Error while waiting for deletion: {e}", flush=True
+            )
+            raise ContainerCleanupError(
+                f"Error during cleanup: {str(e)}"
             ) from e
 
         finally:

@@ -106,7 +106,6 @@ class ActivationManager(StatusManager):
         self.db_instance.restart_count += 1
         self.db_instance.save(update_fields=["restart_count", "modified_at"])
 
-    @run_with_lock
     def _check_start_prerequirements(self) -> None:
         """Check if the activation can be started."""
         disallowed_statuses = [

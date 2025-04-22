@@ -18,10 +18,12 @@ import pytest
 from kubernetes import client as k8sclient
 from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
+from rest_framework import status
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.services.activation.db_log_handler import DBLogger
+from aap_eda.services.activation.engine.common import LogHandler
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineError,
@@ -40,6 +42,11 @@ from aap_eda.services.activation.engine.kubernetes import (
 )
 
 from .utils import get_request
+
+
+@pytest.fixture
+def mock_log_handler():
+    return mock.MagicMock(spec=LogHandler)
 
 
 def get_container_state(phase: str):
@@ -302,7 +309,7 @@ def test_engine_start(
         f"{init_kubernetes_data.activation_instance.id}"
     )
 
-    assert models.RulebookProcessLog.objects.count() == 5
+    assert models.RulebookProcessLog.objects.count() == 6
     assert models.RulebookProcessLog.objects.last().log.endswith(
         f"Job {engine.job_name} is running"
     )
@@ -580,8 +587,97 @@ def test_delete_job_with_exception(init_kubernetes_data, kubernetes_engine):
             engine._delete_job(log_handler)
 
 
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@mock.patch(
+    "aap_eda.services.activation.engine.kubernetes.k8sclient.CoreV1Api"
+)
 @pytest.mark.django_db
-def test_cleanup(init_kubernetes_data, kubernetes_engine):
+def test_wait_for_pod_to_be_deleted_success(
+    mock_core_api, mock_watch, kubernetes_engine, mock_log_handler
+):
+    # Setup mock watch stream
+    mock_watch_instance = mock.MagicMock()
+    mock_watch.return_value = mock_watch_instance
+
+    # Simulate a DELETE event
+    mock_metadata = mock.MagicMock()
+    mock_metadata.name = "test-pod"
+
+    mock_watch_instance.stream.return_value = [
+        {
+            "type": "DELETED",
+            "object": mock.MagicMock(
+                metadata=mock_metadata,
+                status=mock.MagicMock(phase="Terminating"),
+            ),
+        }
+    ]
+
+    kubernetes_engine._wait_for_pod_to_be_deleted("test-pod", mock_log_handler)
+
+    # Verify log handler was called correctly
+    mock_log_handler.write.assert_any_call(
+        "Waiting for pod 'test-pod' to be deleted...", flush=True
+    )
+    mock_log_handler.write.assert_any_call(
+        "Pod 'test-pod' has been deleted.", flush=True
+    )
+    mock_watch_instance.stop.assert_called_once()
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@mock.patch(
+    "aap_eda.services.activation.engine.kubernetes.k8sclient.CoreV1Api"
+)
+@pytest.mark.django_db
+def test_wait_for_pod_to_be_deleted_not_found(
+    mock_core_api, mock_watch, kubernetes_engine, mock_log_handler
+):
+    # Setup mock to raise 404 error
+    mock_watch_instance = mock.MagicMock()
+    mock_watch.return_value = mock_watch_instance
+    mock_watch_instance.stream.side_effect = ApiException(
+        status=status.HTTP_404_NOT_FOUND
+    )
+
+    kubernetes_engine._wait_for_pod_to_be_deleted("test-pod", mock_log_handler)
+
+    mock_log_handler.write.assert_any_call(
+        "Pod 'test-pod' not found (404), assuming it's already deleted.",
+        flush=True,
+    )
+    mock_watch_instance.stop.assert_called_once()
+
+
+@mock.patch("aap_eda.services.activation.engine.kubernetes.watch.Watch")
+@mock.patch(
+    "aap_eda.services.activation.engine.kubernetes.k8sclient.CoreV1Api"
+)
+@pytest.mark.django_db
+def test_wait_for_pod_to_be_deleted_error(
+    mock_core_api, mock_watch, kubernetes_engine, mock_log_handler
+):
+    # Setup mock to raise other API error
+    mock_watch_instance = mock.MagicMock()
+    mock_watch.return_value = mock_watch_instance
+    mock_watch_instance.stream.side_effect = ApiException(
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR, reason="test-failure"
+    )
+
+    with pytest.raises(ContainerCleanupError):
+        kubernetes_engine._wait_for_pod_to_be_deleted(
+            "test-pod", mock_log_handler
+        )
+
+    mock_log_handler.write.assert_any_call(
+        "Error while waiting for deletion: (500)\nReason: test-failure\n",
+        flush=True,
+    )
+    mock_watch_instance.stop.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_cleanup_orig(init_kubernetes_data, kubernetes_engine):
     engine = kubernetes_engine
     log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     job_name = "eda-job"
@@ -589,10 +685,11 @@ def test_cleanup(init_kubernetes_data, kubernetes_engine):
     with mock.patch.object(engine, "_delete_secret") as secret_mock:
         with mock.patch.object(engine, "_delete_services") as services_mock:
             with mock.patch.object(engine, "_delete_job") as job_mock:
-                engine.cleanup(job_name, log_handler)
-                secret_mock.assert_called_once()
-                services_mock.assert_called_once()
-                job_mock.assert_called_once()
+                with mock.patch.object(engine, "_wait_for_pod_to_be_deleted"):
+                    engine.cleanup(job_name, log_handler)
+                    secret_mock.assert_called_once()
+                    services_mock.assert_called_once()
+                    job_mock.assert_called_once()
 
     assert models.RulebookProcessLog.objects.last().log.endswith(
         f"Job {job_name} is cleaned up."

@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import pytest
 import redis
+from django.conf import settings
 
 from aap_eda.core.tasking import (
     DefaultWorker,
@@ -116,7 +117,7 @@ def test_redis_ha_dab_url():
     url = _create_url_from_parameters(
         **redis_settings.rq_redis_client_instantiation_parameters()
     )
-    assert url == "rediss://localhost:6379"
+    assert url == f"rediss://{settings.REDIS_HOST}:6379"
 
 
 @patch("aap_eda.settings.redis.settings.REDIS_UNIX_SOCKET_PATH", None)
