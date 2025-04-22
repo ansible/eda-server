@@ -19,6 +19,8 @@ from collections import Counter
 from typing import Optional
 
 from ansible_base.lib.utils.db import advisory_lock
+from dispatcherd.factories import get_control_from_settings
+from dispatcherd.publish import task
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -39,16 +41,8 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
-from ansible_base.lib.utils.db import advisory_lock
-from dispatcherd.publish import task
-from dispatcherd.factories import get_control_from_settings
 
 from .exceptions import UnknownProcessParentType
-
-# Wrap the django_rq job decorator so its processing is within our retry
-# code.
-job = tasking.redis_connect_retry()(django_rq.job)
-
 
 LOGGER = logging.getLogger(__name__)
 

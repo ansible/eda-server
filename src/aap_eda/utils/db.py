@@ -3,16 +3,15 @@
 
 # NOTE: this should come from DAB eventually, dependency not added yet
 
-import psycopg
-from typing import Union
 from copy import deepcopy
+from typing import Union
 
+import psycopg
 from django.conf import settings
 from django.db import DEFAULT_DB_ALIAS, connection
 from django.db.backends.postgresql.base import (
     DatabaseWrapper as PsycopgDatabaseWrapper,
 )
-
 
 # Django settings.DATABASES['alias'] dictionary type
 dj_db_dict = dict[str, Union[str, int]]

@@ -2,9 +2,8 @@
 
 import logging
 
-from django.conf import settings
 from dispatcherd.factories import get_control_from_settings
-
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 

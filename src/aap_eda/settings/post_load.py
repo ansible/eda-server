@@ -170,9 +170,9 @@ def get_rq_queues(settings: Dynaconf) -> dict:
     # Configure the default queue
     queues["default"] = _rq_common_parameters(settings)
     queues["default"]["DEFAULT_TIMEOUT"] = settings.DEFAULT_QUEUE_TIMEOUT
-    queues["default"]["REDIS_CLIENT_KWARGS"] = (
-        _rq_redis_client_additional_parameters(settings)
-    )
+    queues["default"][
+        "REDIS_CLIENT_KWARGS"
+    ] = _rq_redis_client_additional_parameters(settings)
 
     # Configure the worker queues
     for queue in settings.RULEBOOK_WORKER_QUEUES:
@@ -180,9 +180,9 @@ def get_rq_queues(settings: Dynaconf) -> dict:
         queues[queue][
             "DEFAULT_TIMEOUT"
         ] = settings.DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue]["REDIS_CLIENT_KWARGS"] = (
-            _rq_redis_client_additional_parameters(settings)
-        )
+        queues[queue][
+            "REDIS_CLIENT_KWARGS"
+        ] = _rq_redis_client_additional_parameters(settings)
 
     return queues
 

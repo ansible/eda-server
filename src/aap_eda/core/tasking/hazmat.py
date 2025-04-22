@@ -2,7 +2,6 @@ import django
 from django.core.cache import cache
 from django.db import connection
 
-
 """This module is an optimization for dispatcherd workers
 
 This sets up Django pre-fork, which must be implemented as a module to run on-import

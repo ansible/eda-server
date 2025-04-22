@@ -16,13 +16,12 @@ import logging
 import os
 
 from dateutil import parser
+from dispatcherd.worker.task import DispatcherCancel
 from django.conf import settings
 from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
-
-from dispatcherd.worker.task import DispatcherCancel
 
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.utils import str_to_bool

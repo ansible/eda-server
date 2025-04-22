@@ -14,13 +14,10 @@
 
 import logging
 
+from dispatcherd import run_service
+from dispatcherd.config import settings as dispatcher_settings, setup
 from django.conf import settings
 from django.core.management.base import BaseCommand
-
-from dispatcherd import run_service
-from dispatcherd.config import settings as dispatcher_settings
-from dispatcherd.config import setup
-
 
 logger = logging.getLogger(__name__)
 

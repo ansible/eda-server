@@ -13,15 +13,14 @@
 #  limitations under the License.
 
 import logging
-from django.conf import settings
 
 from ansible_base.lib.utils.db import advisory_lock
+from dispatcherd.publish import task
+from django.conf import settings
 from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
-from dispatcherd.publish import task
-from ansible_base.lib.utils.db import advisory_lock
 
 logger = logging.getLogger(__name__)
 

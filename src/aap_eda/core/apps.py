@@ -1,8 +1,8 @@
 import logging
 import sys
 
-from django.apps import AppConfig
 from dispatcherd.config import setup as dispatcher_setup
+from django.apps import AppConfig
 
 logger = logging.getLogger(__name__)
 

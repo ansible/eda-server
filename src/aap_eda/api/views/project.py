@@ -106,7 +106,7 @@ class ProjectViewSet(
                 serializers.ProjectSerializer,
                 description="Return a created project.",
             )
-        }
+        },
     )
     def create(self, request):
         serializer = serializers.ProjectCreateRequestSerializer(

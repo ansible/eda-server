@@ -14,18 +14,13 @@
 
 import logging
 
-<<<<<<< HEAD
-import django_rq
 from ansible_base.lib.utils.db import advisory_lock
-=======
->>>>>>> 33f31c4 (rebase: dispatcher poc at 20250325 from b3fc0d9b43)
+from dispatcherd.factories import get_control_from_settings
+from dispatcherd.publish import task
 from django.conf import settings
 
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportError, ProjectImportService
-from ansible_base.lib.utils.db import advisory_lock
-from dispatcherd.factories import get_control_from_settings
-from dispatcherd.publish import task
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "eda_workers"
