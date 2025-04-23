@@ -54,9 +54,7 @@ def test_get_ingress_url(package: Package, mock_settings) -> None:
     mock_credentials = MagicMock()
     mock_credentials.return_value.exists.return_value = False
 
-    with patch(
-        "aap_eda.analytics.utils.application_settings", new=mock_settings
-    ), patch(
+    with patch("aap_eda.analytics.utils.settings", new=mock_settings), patch(
         "aap_eda.analytics.utils._get_analytics_credentials",
         return_value=mock_credentials,
     ):
