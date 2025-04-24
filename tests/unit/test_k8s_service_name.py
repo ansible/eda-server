@@ -15,7 +15,6 @@
 import pytest
 
 from aap_eda.core.utils.k8s_service_name import (
-    InvalidRFC1035LabelError,
     create_k8s_service_name,
     is_rfc_1035_compliant,
 )
@@ -43,16 +42,26 @@ def test_rfc_1035_compliant(name, expect):
     assert is_rfc_1035_compliant(name) is expect
 
 
+@pytest.mark.parametrize(
+    ("name", "service"),
+    [
+        ("good-name", "good-name"),
+        ("Upper [a] space..(dot)_A", "upper-a-space-dot-a"),
+        ("33_abcdefghijklm--", "abcdefghijklm"),
+        (
+            "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",  # noqa: E501
+            "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghi-z",
+        ),
+    ],
+)
 @pytest.mark.django_db
-def test_create_k8s_service_name():
-    activation = "good-name"
-    service_name = create_k8s_service_name(activation)
-    assert service_name == activation
+def test_create_k8s_service_name(name, service):
+    service_name = create_k8s_service_name(name)
+    assert service_name == service
+    assert is_rfc_1035_compliant(service_name)
 
-    upper_activation = "Upper  space..dot_A"
-    service_name = create_k8s_service_name(upper_activation)
-    assert service_name == "upper--space--dot-a"
 
-    invalid_activation = "33_abcdefghijklm"
-    with pytest.raises(InvalidRFC1035LabelError):
-        create_k8s_service_name(invalid_activation)
+def test_create_k8s_service_name_empty():
+    service_name = create_k8s_service_name("[]")
+    assert service_name.startswith("service-")
+    assert is_rfc_1035_compliant(service_name)
