@@ -14,4 +14,4 @@
 
 # EDA_SERVER_VAULT_LABEL is reserved for system vault password identifiers
 EDA_SERVER_VAULT_LABEL = "EDA_SERVER"
-SOURCE_MAPPING_ERROR_KEY = "rulebook"
+SOURCE_MAPPING_ERROR_KEY = "source_mappings"
