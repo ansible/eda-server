@@ -251,10 +251,9 @@ def get_proxy_url() -> str:
 
 
 def get_analytics_url() -> str:
-    return (
-        application_settings.AUTOMATION_ANALYTICS_URL
-        or settings.AUTOMATION_ANALYTICS_URL
-    )
+    # TODO: Temporarily remove checking on the gateway's application_settings
+    # Remeber to add it back when gateway supports analytics
+    return settings.AUTOMATION_ANALYTICS_URL
 
 
 def get_client_id() -> str:
