@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from ansible_base.lib.constants import STATUS_FAILED, STATUS_GOOD
 from django.db import connection
 from django.db.utils import OperationalError
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -54,9 +55,12 @@ class StatusView(APIView):
     def get(self, request):
         try:
             connection.ensure_connection()
-            return Response({"status": "OK"}, status=status.HTTP_200_OK)
+            return Response({"status": STATUS_GOOD}, status=status.HTTP_200_OK)
         except OperationalError:
             return Response(
-                {"status": "error", "message": "Database connection failed"},
+                {
+                    "status": STATUS_FAILED,
+                    "message": "Database connection failed",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
