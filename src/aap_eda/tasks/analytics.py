@@ -14,6 +14,7 @@
 
 import logging
 
+import django_rq
 from ansible_base.lib.utils.db import advisory_lock
 from flags.state import flag_enabled
 
@@ -27,13 +28,19 @@ ANALYTICS_SCHEDULE_JOB_ID = "gather_analytics"
 ANALYTICS_JOB_ID = "job_gather_analytics"
 ANALYTICS_TASKS_QUEUE = "default"
 
+# Wrap the django_rq job decorator so its processing is within our retry
+# code.
+job = tasking.redis_connect_retry()(django_rq.job)
 
-def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
+
+def schedule_gather_analytics(
+    queue_name: str = ANALYTICS_TASKS_QUEUE, cancel: bool = False
+) -> None:
     if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
         return
     interval = utils.get_analytics_interval()
     logger.info(f"Schedule analytics to run in {interval} seconds")
-    with advisory_lock(ANALYTICS_SCHEDULE_JOB_ID, wait=False) as acquired:
+    with advisory_lock(ANALYTICS_SCHEDULE_JOB_ID, wait=cancel) as acquired:
         if not acquired:
             logger.debug(
                 "Another instance of schedule_gather_analytics"
@@ -41,12 +48,23 @@ def schedule_gather_analytics(queue_name: str = ANALYTICS_TASKS_QUEUE) -> None:
             )
             return
 
+        if cancel:
+            logger.info("Cancel perviously scheduled analytics jobs")
+            tasking.queue_cancel_job(queue_name, ANALYTICS_SCHEDULE_JOB_ID)
+
         tasking.enqueue_delay(
             queue_name,
             ANALYTICS_SCHEDULE_JOB_ID,
             interval,
             auto_gather_analytics,
         )
+
+
+@job(ANALYTICS_TASKS_QUEUE)
+def reschedule_gather_analytics(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    schedule_gather_analytics(queue_name, cancel=True)
 
 
 def auto_gather_analytics() -> None:

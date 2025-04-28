@@ -1282,3 +1282,71 @@ def test_non_singleton_credential_allows_multiple():
         }
 
         serializer.validate(data)
+
+
+@pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.eda_credential.get_analytics_interval_if_exist",
+    return_value=100,
+)
+def test_create_eda_credential_for_analytics(
+    mock_get_analytics_interval,
+    admin_client: APIClient,
+    credential_type: models.CredentialType,
+    default_organization: models.Organization,
+):
+    fake_secret = "secret"
+    data_in = {
+        "name": "eda-credential",
+        "inputs": {"username": "adam", "password": fake_secret},
+        "credential_type_id": credential_type.id,
+        "organization_id": default_organization.id,
+    }
+    with patch(
+        "aap_eda.api.views.eda_credential.reschedule_gather_analytics.delay"
+    ) as mock_reschedule:
+        response = admin_client.post(
+            f"{api_url_v1}/eda-credentials/", data=data_in
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        mock_reschedule.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.eda_credential.get_analytics_interval_if_exist",
+    side_effect=[100, 200, 100, 100],
+)
+def test_update_eda_credential_for_analytics(
+    mock_get_analytics_interval,
+    admin_client: APIClient,
+    credential_type: models.CredentialType,
+    default_organization: models.Organization,
+):
+    fake_secret = "secret"
+    obj = models.EdaCredential.objects.create(
+        name="eda-credential",
+        inputs={"username": "adam", "password": fake_secret},
+        credential_type_id=credential_type.id,
+        managed=True,
+        organization=default_organization,
+    )
+    # first try, interval 100 -> 200
+    with patch(
+        "aap_eda.api.views.eda_credential.reschedule_gather_analytics.delay"
+    ) as mock_reschedule:
+        response = admin_client.patch(
+            f"{api_url_v1}/eda-credentials/{obj.id}/", data={}
+        )
+        assert response.status_code == status.HTTP_200_OK
+        mock_reschedule.assert_called_once()
+
+    # second try, no internval change 100 -> 100
+    with patch(
+        "aap_eda.api.views.eda_credential.reschedule_gather_analytics.delay"
+    ) as mock_reschedule:
+        response = admin_client.patch(
+            f"{api_url_v1}/eda-credentials/{obj.id}/", data={}
+        )
+        assert response.status_code == status.HTTP_200_OK
+        mock_reschedule.assert_not_called()

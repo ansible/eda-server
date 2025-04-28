@@ -311,6 +311,13 @@ def get_analytics_interval() -> int:
         return ANALYTICS_GATHER_INTERVAL
 
 
+def get_analytics_interval_if_exist(credential: models.EdaCredential) -> int:
+    if credential.credential_type.kind != get_auth_mode():
+        return 0
+    inputs = inputs_from_store(credential.inputs.get_secret_value())
+    return inputs.get("gather_interval", 0)
+
+
 def _validate_credential() -> None:
     if _get_analytics_credentials().exists():
         return
