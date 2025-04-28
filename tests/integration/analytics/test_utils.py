@@ -620,9 +620,11 @@ def test_get_auth_mode():
 
 
 def test_get_oidc_token_url():
-    """Test OIDC_TOKEN_URL retrieval."""
+    """Test AUTOMATION_ANALYTICS_OIDC_TOKEN_URL retrieval."""
     with mock.patch.object(
-        settings, "OIDC_TOKEN_URL", "https://oidc.example.com"
+        settings,
+        "AUTOMATION_ANALYTICS_OIDC_TOKEN_URL",
+        "https://oidc.example.com",
     ):
         assert get_oidc_token_url() == "https://oidc.example.com"
 
