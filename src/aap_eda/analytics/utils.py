@@ -243,7 +243,7 @@ def get_auth_mode() -> str:
 
 
 def get_oidc_token_url() -> str:
-    return settings.OIDC_TOKEN_URL
+    return settings.AUTOMATION_ANALYTICS_OIDC_TOKEN_URL
 
 
 def get_proxy_url() -> str:
