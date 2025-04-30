@@ -29,6 +29,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
+from aap_eda.analytics.utils import get_analytics_interval_if_exist
 from aap_eda.api import exceptions, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
@@ -38,6 +39,7 @@ from aap_eda.core.utils.credentials import (
     inputs_to_store,
     inputs_to_store_dict,
 )
+from aap_eda.tasks.analytics import reschedule_gather_analytics
 from aap_eda.utils import str_to_bool
 
 from .mixins import (
@@ -195,6 +197,7 @@ class EdaCredentialViewSet(
                 eda_credential.inputs,
             )
 
+        old_interval = get_analytics_interval_if_exist(eda_credential)
         old_data = model_to_dict(eda_credential)
         for key, value in serializer.validated_data.items():
             setattr(eda_credential, key, value)
@@ -208,6 +211,10 @@ class EdaCredentialViewSet(
                 model_to_dict(eda_credential),
             )
 
+        eda_credential.refresh_from_db()
+        new_interval = get_analytics_interval_if_exist(eda_credential)
+        if new_interval != old_interval:
+            reschedule_gather_analytics.delay()
         return Response(
             serializers.EdaCredentialSerializer(eda_credential).data,
         )
@@ -298,6 +305,9 @@ class EdaCredentialViewSet(
             RoleDefinition.objects.give_creator_permissions(
                 request.user, response
             )
+
+        if get_analytics_interval_if_exist(response) > 0:
+            reschedule_gather_analytics.delay()
 
         return Response(
             serializers.EdaCredentialSerializer(response).data,

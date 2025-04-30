@@ -38,6 +38,7 @@ from aap_eda.analytics.utils import (
     extract_job_details,
     generate_token,
     get_analytics_interval,
+    get_analytics_interval_if_exist,
     get_auth_mode,
     get_cert_path,
     get_client_id,
@@ -680,6 +681,27 @@ def test_get_analytics_interval_invalid_fallback():
         mock_get.return_value = "invalid"
         result = get_analytics_interval()
         assert isinstance(result, int)
+
+
+@pytest.mark.parametrize(
+    "cred_kind, expected",
+    [("analytics", 300), ("other", 0)],
+)
+@pytest.mark.django_db
+def test_get_analytics_interval_if_exists(cred_kind, expected):
+    mock_cred_type = mock.MagicMock(spec=models.CredentialType)
+    mock_cred_type.kind = cred_kind
+
+    mock_credential = mock.MagicMock(spec=models.EdaCredential)
+    mock_credential.credential_type = mock_cred_type
+    mock_credential.inputs.get_secret_value.return_value = (
+        "gather_interval: 300"
+    )
+
+    with mock.patch(
+        "aap_eda.analytics.utils.get_auth_mode", return_value="analytics"
+    ):
+        assert get_analytics_interval_if_exist(mock_credential) == expected
 
 
 def test_validate_credential_with_existing_credentials():

@@ -115,6 +115,33 @@ def test_schedule_gather_analytics_error_handling():
         assert "Queue connection failed" in str(exc_info.value)
 
 
+@pytest.mark.django_db
+def test_reschedule_gather_analytics():
+    with mock.patch(
+        "aap_eda.tasks.analytics.utils.get_analytics_interval"
+    ) as mock_interval, mock.patch(
+        "aap_eda.tasks.analytics.tasking.enqueue_delay"
+    ) as mock_enqueue, mock.patch(
+        "aap_eda.tasks.analytics.tasking.queue_cancel_job"
+    ) as mock_cancel_job, mock.patch(
+        "aap_eda.tasks.analytics.flag_enabled",
+        return_value=True,
+    ):
+        mock_interval.return_value = 300
+        analytics.reschedule_gather_analytics()
+
+        mock_cancel_job.assert_called_once_with(
+            analytics.ANALYTICS_TASKS_QUEUE,
+            analytics.ANALYTICS_SCHEDULE_JOB_ID,
+        )
+        mock_enqueue.assert_called_once_with(
+            analytics.ANALYTICS_TASKS_QUEUE,
+            analytics.ANALYTICS_SCHEDULE_JOB_ID,
+            300,
+            analytics.auto_gather_analytics,
+        )
+
+
 @pytest.mark.parametrize(
     "tracking_state, expected_logs",
     [
