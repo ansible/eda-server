@@ -149,6 +149,23 @@ REST_FRAMEWORK = {
 DEFAULT_REDIS_DB = 0
 
 # ---------------------------------------------------------
+# DISPATCHERD SETTINGS
+# ---------------------------------------------------------
+
+DISPATCHERD_DEFAULT_CHANNEL = "default"
+DISPATCHERD_STARTUP_TASKS = {}
+DISPATCHERD_SCHEDULE_TASKS = {}
+
+# DISPATCHERD_STARTUP_TASKS = {
+#     "aap_eda.tasks.analytics.schedule_gather_analytics": {},
+# }
+
+# DISPATCHERD_SCHEDULE_TASKS = {
+#     "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 5},
+#     "aap_eda.tasks.project._monitor_project_tasks": {"schedule": 30},
+# }
+
+# ---------------------------------------------------------
 # TASKING SETTINGS
 # ---------------------------------------------------------
 RQ = {
