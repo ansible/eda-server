@@ -28,3 +28,6 @@ venv/
 .coverage*
 coverage.xml
 test-results.xml
+
+# Dispatcherd development
+dispatcherd/
