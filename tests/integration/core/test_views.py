@@ -1,5 +1,7 @@
+from unittest.mock import patch
+
 import pytest
-from ansible_base.lib.constants import STATUS_GOOD
+from ansible_base.lib.constants import STATUS_FAILED, STATUS_GOOD
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -22,3 +24,48 @@ def test_status_view():
     response = client.get(f"{api_url_v1}/status/")
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {"status": STATUS_GOOD}
+
+
+@pytest.mark.django_db
+def test_status_view_database_failure():
+    client = APIClient()
+    client.force_authenticate(user=None)
+    with patch(
+        "aap_eda.core.views.StatusView._check_database", return_value=False
+    ):
+        response = client.get(f"{api_url_v1}/status/")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data == {
+            "status": STATUS_FAILED,
+            "message": "Database connection failed",
+        }
+
+
+@pytest.mark.django_db
+def test_status_view_redis_failure():
+    client = APIClient()
+    client.force_authenticate(user=None)
+    with patch(
+        "aap_eda.core.views.StatusView._check_redis", return_value=False
+    ):
+        response = client.get(f"{api_url_v1}/status/")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data == {
+            "status": STATUS_FAILED,
+            "message": "Redis connection failed",
+        }
+
+
+@pytest.mark.django_db
+def test_status_view_both_failures():
+    client = APIClient()
+    client.force_authenticate(user=None)
+    with patch(
+        "aap_eda.core.views.StatusView._check_database", return_value=False
+    ), patch("aap_eda.core.views.StatusView._check_redis", return_value=False):
+        response = client.get(f"{api_url_v1}/status/")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.data == {
+            "status": STATUS_FAILED,
+            "message": "Database connection failed; Redis connection failed",
+        }
