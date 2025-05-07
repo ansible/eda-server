@@ -14,7 +14,7 @@
 
 """Wrapper for rqworker command."""
 
-from dispatcherd import run_service
+from dispatcherd import run_service as run_dispatcherd_service
 from dispatcherd.config import setup as dispatcherd_setup
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
@@ -43,23 +43,12 @@ class Command(BaseCommand):
 
             # Use rqworker expected args to determine worker type
             if "ActivationWorker" in options["worker_class"]:
-                worker_settings = settings.DISPATCHERD_DEFAULT_SETTINGS.copy()
-                worker_settings["brokers"]["pg_notify"]["channels"] = [
-                    settings.RULEBOOK_QUEUE_NAME.replace("-", "_")
-                ]
-                dispatcherd_setup(worker_settings)
+                dispatcherd_setup(
+                    settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS,
+                )
 
             elif "DefaultWorker" in options["worker_class"]:
-                worker_settings = settings.DISPATCHERD_DEFAULT_SETTINGS.copy()
-                worker_settings["producers"] = {
-                    "ScheduledProducer": {
-                        "task_schedule": settings.DISPATCHERD_SCHEDULE_TASKS,
-                    },
-                    "OnStartProducer": {
-                        "task_list": settings.DISPATCHERD_STARTUP_TASKS,
-                    },
-                }
-                dispatcherd_setup(worker_settings)
+                dispatcherd_setup(settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS)
             else:
                 self.style.ERROR(
                     "Invalid worker class. "
@@ -67,7 +56,7 @@ class Command(BaseCommand):
                 )
                 raise SystemExit(1)
 
-            run_service()
+            run_dispatcherd_service()
 
         # run rqworker command if dispatcherd is not enabled
         return rqworker.Command.handle(self, *args, **options)

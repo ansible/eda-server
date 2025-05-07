@@ -518,6 +518,30 @@ def post_loading(loaded_settings: Dynaconf):
         "publish": {"default_broker": "pg_notify"},
     }
 
+    settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS = {
+        **settings.DISPATCHERD_DEFAULT_SETTINGS,
+        "producers": {
+            "ScheduledProducer": {
+                "task_schedule": settings.DISPATCHERD_SCHEDULE_TASKS,
+            },
+            "OnStartProducer": {
+                "task_list": settings.DISPATCHERD_STARTUP_TASKS,
+            },
+        },
+    }
+
+    settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS = {
+        **settings.DISPATCHERD_DEFAULT_SETTINGS,
+        "brokers": {
+            "pg_notify": {
+                **settings.DISPATCHERD_DEFAULT_SETTINGS["brokers"][
+                    "pg_notify"
+                ],
+                "channels": [settings.RULEBOOK_QUEUE_NAME.replace("-", "_")],
+            },
+        },
+    }
+
     data = {
         key: settings[key]
         for key in settings
