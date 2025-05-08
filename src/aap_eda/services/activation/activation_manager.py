@@ -1064,10 +1064,8 @@ class ActivationManager(StatusManager):
             queue_name=queue_name,
         )
 
-    @tasking.redis_connect_retry()
     def _get_queue_name(self) -> str:
-        this_job = rq.get_current_job()
-        return this_job.origin
+        return settings.RULEBOOK_QUEUE_NAME
 
     def _get_container_request(self) -> ContainerRequest:
         try:
