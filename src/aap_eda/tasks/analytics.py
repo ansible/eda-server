@@ -20,6 +20,8 @@ from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
+from flags.state import flag_enabled
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +62,27 @@ def schedule_gather_analytics(
         )
 
 
-@job(ANALYTICS_TASKS_QUEUE)
 def reschedule_gather_analytics(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    """Reschedule the gather analytics job.
+
+    Proxy for reschedule_gather_analytics_rq and
+    reschedule_gather_analytics_dispatcherd.
+    """
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        return reschedule_gather_analytics_dispatcherd(queue_name)
+    return reschedule_gather_analytics_rq(queue_name)
+
+
+@job(ANALYTICS_TASKS_QUEUE)
+def reschedule_gather_analytics_rq(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    schedule_gather_analytics(queue_name, cancel=True)
+
+
+def reschedule_gather_analytics_dispatcherd(
     queue_name: str = ANALYTICS_TASKS_QUEUE,
 ) -> None:
     schedule_gather_analytics(queue_name, cancel=True)
