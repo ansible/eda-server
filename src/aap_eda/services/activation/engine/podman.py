@@ -17,6 +17,7 @@ import os
 
 from dateutil import parser
 from django.conf import settings
+from flags.state import flag_enabled
 from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
@@ -32,13 +33,10 @@ from .common import (
     ContainerStatus,
     LogHandler,
 )
-from flags.state import flag_enabled
 
 # DISPATCHERD feature flag
 if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
-    from dispatcherd.worker.task import (
-        DispatcherCancel as JobTimeoutException,
-    )
+    from dispatcherd.worker.task import DispatcherCancel as JobTimeoutException
 else:
     from rq.timeouts import JobTimeoutException
 
