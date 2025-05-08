@@ -16,7 +16,9 @@ import logging
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
+from dispatcherd.publish import task
 from django.conf import settings
+from flags.state import flag_enabled
 
 from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
@@ -26,11 +28,41 @@ PROJECT_TASKS_QUEUE = "default"
 
 # Wrap the django_rq job decorator so its processing is within our retry
 # code.
+
+# For rq
 job = tasking.redis_connect_retry()(django_rq.job)
 
 
 @job(PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
+    """Import project async task.
+
+    Proxy for import_project_dispatcherd and import_project_rq.
+    """
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        return import_project_dispatcherd(project_id)
+
+    return import_project_rq(project_id)
+
+
+# task decorator is equivalent a "job" decorator for dispatcherd
+# TODO: move to submit_task (preferred way to submit tasks)
+# Now we keep the decorator to take advantage of the "delay" method
+# and limit changes to the code for the implementation of dispatcherd
+# under a feature flag.
+@task(queue=PROJECT_TASKS_QUEUE)
+def import_project_dispatcherd(project_id: int):
+    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already importing project {project_id}, exiting"
+            )
+            return
+        _import_project(project_id)
+
+
+@job(PROJECT_TASKS_QUEUE)
+def import_project_rq(project_id: int):
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(

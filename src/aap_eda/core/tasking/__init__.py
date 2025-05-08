@@ -19,14 +19,14 @@ from ansible_base.lib.redis.client import (
     get_redis_client as _get_redis_client,
     get_redis_status as _get_redis_status,
 )
+from dispatcherd.factories import get_control_from_settings
+from dispatcherd.processors.delayer import Delayer
+from dispatcherd.publish import submit_task
 from django.conf import settings
+from flags.state import flag_enabled
 from rq import results as rq_results
 
 from aap_eda.settings import core as core_settings, redis as redis_settings
-from dispatcherd.publish import submit_task
-from dispatcherd.processors.delayer import Delayer
-from flags.state import flag_enabled
-from dispatcherd.factories import get_control_from_settings
 
 __all__ = [
     "Job",

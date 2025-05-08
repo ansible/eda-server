@@ -15,9 +15,9 @@
 import logging
 import sys
 
+from dispatcherd.config import setup as dispatcher_setup
 from django.apps import AppConfig
 from django.conf import settings
-from flags.state import flag_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +38,4 @@ class CoreConfig(AppConfig):
             startup_logging(logger)
 
         # Enable default dispatcher config. Workers may override this
-        self.configure_dispatcher()
-
-    def configure_dispatcher(self):
-        """Configure dispatcher settings."""
-        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
-            from dispatcherd.config import setup as dispatcher_setup
-
-            dispatcher_setup(settings.DISPATCHERD_DEFAULT_SETTINGS)
+        dispatcher_setup(settings.DISPATCHERD_DEFAULT_SETTINGS)
