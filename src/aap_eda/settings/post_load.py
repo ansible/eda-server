@@ -496,7 +496,7 @@ def post_loading(loaded_settings: Dynaconf):
         "service": {
             "process_manager_cls": "ForkServerManager",
             "process_manager_kwargs": {
-                "preload_modules": ["aap_eda.core.tasking.hazmat"],
+                "preload_modules": ["aap_eda.core.hazmat"],
             },
         },
         "brokers": {
