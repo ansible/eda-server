@@ -26,6 +26,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
+from flags.state import flag_enabled
 from rest_framework import exceptions, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -94,11 +95,11 @@ class ActivationViewSet(
         serializer.is_valid(raise_exception=True)
 
         # If we're expected to run this activation we need redis
-        # to be available.
+        # to be available. Needed only for rq.
         if serializer.validated_data.get(
             "is_enabled",
             models.activation.DEFAULT_ENABLED,
-        ):
+        ) and not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
             self.redis_is_available()
 
         with transaction.atomic():
@@ -388,8 +389,10 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Redis must be available in order to perform the enable.
-        self.redis_is_available()
+        # Redis must be available in order to perform the enable. Needed only
+        # for rq.
+        if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            self.redis_is_available()
 
         logger.info(f"Now enabling {activation.name} ...")
 
@@ -442,7 +445,9 @@ class ActivationViewSet(
 
         if activation.is_enabled:
             # Redis must be available in order to perform the delete.
-            self.redis_is_available()
+            # Needed only for rq.
+            if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+                self.redis_is_available()
 
             activation.status = ActivationStatus.STOPPING
             activation.is_enabled = False
@@ -520,7 +525,9 @@ class ActivationViewSet(
             )
 
         # Redis must be available in order to perform the restart.
-        self.redis_is_available()
+        # Needed only for rq.
+        if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            self.redis_is_available()
 
         valid, error = is_activation_valid(activation)
         if not valid:

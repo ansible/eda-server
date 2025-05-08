@@ -16,12 +16,12 @@ import logging
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
+from django.conf import settings
+from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
 from aap_eda.settings import features
-from flags.state import flag_enabled
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
