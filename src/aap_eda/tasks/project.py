@@ -33,43 +33,35 @@ PROJECT_TASKS_QUEUE = "default"
 job = tasking.redis_connect_retry()(django_rq.job)
 
 
-@job(PROJECT_TASKS_QUEUE)
 def import_project(project_id: int):
     """Import project async task.
 
     Proxy for import_project_dispatcherd and import_project_rq.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
-        return import_project_dispatcherd(project_id)
-
-    return import_project_rq(project_id)
-
-
-# task decorator is equivalent a "job" decorator for dispatcherd
-# TODO: move to submit_task (preferred way to submit tasks)
-# Now we keep the decorator to take advantage of the "delay" method
-# and limit changes to the code for the implementation of dispatcherd
-# under a feature flag.
-@task(queue=PROJECT_TASKS_QUEUE)
-def import_project_dispatcherd(project_id: int):
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
                 f"Another task already importing project {project_id}, exiting"
             )
             return
-        _import_project(project_id)
-
-
-@job(PROJECT_TASKS_QUEUE)
-def import_project_rq(project_id: int):
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
-        if not acquired:
-            logger.debug(
-                f"Another task already importing project {project_id}, exiting"
-            )
-            return
-        _import_project(project_id)
+        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            # task decorator is equivalent a "job" decorator for dispatcherd
+            # TODO: move to submit_task (preferred way to submit tasks)
+            # Now we keep the decorator to take advantage of the "delay" method
+            # and limit changes to the code for the implementation of dispatcherd
+            # under a feature flag.
+            logger.info("dispatcherd1")
+            job_data, _ = task(queue=PROJECT_TASKS_QUEUE)(
+                _import_project
+            ).delay(project_id=project_id)
+            job_id = job_data["uuid"]
+            return job_id
+        # rq
+        job_data = job(PROJECT_TASKS_QUEUE)(_import_project).delay(
+            project_id=project_id
+        )
+        job_id = job_data.id
+        return job_id
 
 
 def _import_project(project_id: int):
