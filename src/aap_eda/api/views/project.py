@@ -16,6 +16,7 @@ import logging
 import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
+from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters.rest_framework import DjangoFilterBackend
@@ -24,6 +25,7 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
+from flags.state import flag_enabled
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -117,8 +119,9 @@ class ProjectViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        # check if redis is available
-        self.redis_is_available()
+        # check if redis is available, needed only for rq
+        if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            self.redis_is_available()
 
         # Catch Redis connection error and translate, as appropriate, to the
         # Redis unavailable response.
@@ -270,7 +273,9 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
-        self.redis_is_available()
+        # check if redis is available, needed only for rq
+        if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            self.redis_is_available()
 
         try:
             job = tasks.sync_project.delay(project_id=project.id)
