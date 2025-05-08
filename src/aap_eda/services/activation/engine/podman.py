@@ -34,13 +34,6 @@ from .common import (
     LogHandler,
 )
 
-# DISPATCHERD feature flag
-if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
-    from dispatcherd.worker.task import DispatcherCancel as JobTimeoutException
-else:
-    from rq.timeouts import JobTimeoutException
-
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -83,6 +76,25 @@ class Engine(ContainerEngine):
         except APIError as e:
             LOGGER.error(f"Failed to initialize podman engine: f{e}")
             raise exceptions.ContainerEngineInitError(str(e))
+
+        self.JobTimeoutException = self._get_job_timeout_exception()
+
+    def _get_job_timeout_exception(self):
+        """
+        Get the job timeout exception class based on the dispatcherd feature flag.
+
+        This can not be done at the module level, because the feature flag
+        state cannot be checked before the app registry is ready.
+        """
+
+        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+            from dispatcherd.worker.task import (
+                DispatcherCancel as JobTimeoutException,
+            )
+        else:
+            from rq.timeouts import JobTimeoutException
+
+        return JobTimeoutException
 
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         try:
@@ -388,7 +400,7 @@ class Engine(ContainerEngine):
                 raise exceptions.ContainerImagePullError(msg)
             LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
-        except JobTimeoutException as e:
+        except self.JobTimeoutException as e:
             msg = f"Timeout: {e}"
             LOGGER.error(msg)
             log_handler.write(msg, True)
