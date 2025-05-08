@@ -21,6 +21,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from aap_eda.core.tasking import is_redis_failed
+
 from .serializers import StatusResponseSerializer
 
 
@@ -41,6 +43,18 @@ class HealthView(APIView):
 class StatusView(APIView):
     permission_classes = [AllowAny]
 
+    @staticmethod
+    def _check_database():
+        try:
+            connection.ensure_connection()
+            return True
+        except OperationalError:
+            return False
+
+    @staticmethod
+    def _check_redis() -> bool:
+        return not is_redis_failed()
+
     @extend_schema(
         description="Get the current status of EDA.",
         responses={
@@ -53,14 +67,21 @@ class StatusView(APIView):
         },
     )
     def get(self, request):
-        try:
-            connection.ensure_connection()
+        errors = []
+
+        if not self._check_database():
+            errors.append("Database connection failed")
+
+        if not self._check_redis():
+            errors.append("Redis connection failed")
+
+        if not errors:
             return Response({"status": STATUS_GOOD}, status=status.HTTP_200_OK)
-        except OperationalError:
-            return Response(
-                {
-                    "status": STATUS_FAILED,
-                    "message": "Database connection failed",
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+
+        return Response(
+            {
+                "status": STATUS_FAILED,
+                "message": "; ".join(errors),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
