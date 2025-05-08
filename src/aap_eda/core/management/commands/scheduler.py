@@ -77,9 +77,9 @@ import django_rq
 import rq_scheduler
 from django.conf import settings
 from django_rq.management.commands import rqscheduler
-from flags.state import flag_enabled
 
 from aap_eda.core import tasking
+from aap_eda.settings import features
 from aap_eda.utils.logging import startup_logging
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ class Command(rqscheduler.Command):
     help = "Runs RQ scheduler with configured jobs."
 
     def handle(self, *args, **options) -> None:
-        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        if features.DISPATCHERD:
             self.stderr.write(
                 self.style.ERROR(
                     "This command is not supported when "
