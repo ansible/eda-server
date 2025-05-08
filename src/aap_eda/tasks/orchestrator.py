@@ -180,7 +180,7 @@ def _run_request(
     return True
 
 
-def dispatch(
+def queue_dispatch(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
@@ -534,7 +534,7 @@ def monitor_rulebook_processes_no_lock() -> None:
     """
     # run pending user requests
     for request in requests_queue.list_requests():
-        dispatch(
+        queue_dispatch(
             request.process_parent_type,
             request.process_parent_id,
             request.request,
@@ -552,7 +552,7 @@ def monitor_rulebook_processes_no_lock() -> None:
         process_parent_type = str(process.parent_type)
         process_parent_id = process.activation_id
 
-        dispatch(
+        queue_dispatch(
             process_parent_type,
             process_parent_id,
             None,
