@@ -15,7 +15,6 @@
 import logging
 import os
 
-import rq
 from dateutil import parser
 from django.conf import settings
 from podman import PodmanClient
@@ -33,6 +32,16 @@ from .common import (
     ContainerStatus,
     LogHandler,
 )
+from flags.state import flag_enabled
+
+# DISPATCHERD feature flag
+if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    from dispatcherd.worker.task import (
+        DispatcherCancel as JobTimeoutException,
+    )
+else:
+    from rq.timeouts import JobTimeoutException
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -381,7 +390,7 @@ class Engine(ContainerEngine):
                 raise exceptions.ContainerImagePullError(msg)
             LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
-        except rq.timeouts.JobTimeoutException as e:
+        except JobTimeoutException as e:
             msg = f"Timeout: {e}"
             LOGGER.error(msg)
             log_handler.write(msg, True)

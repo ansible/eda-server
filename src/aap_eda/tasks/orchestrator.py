@@ -43,6 +43,9 @@ from aap_eda.services.activation.activation_manager import (
 )
 
 from .exceptions import UnknownProcessParentType
+from flags.state import flag_enabled
+from dispatcherd.factories import get_control_from_settings
+
 
 # Wrap the django_rq job decorator so its processing is within our retry
 # code.
@@ -229,15 +232,6 @@ def queue_dispatch(
 
     status_manager = StatusManager(process_parent)
 
-    job = tasking.get_pending_job(job_id)
-    if job:
-        LOGGER.info(
-            f"Request {request_type} for {process_parent_type} "
-            f"{process_parent_id} can not be processed "
-            f"because there is already a job {job_id} ",
-        )
-        return
-
     # new processes
     if request_type in [
         ActivationRequest.START,
@@ -376,6 +370,10 @@ def queue_dispatch(
         process_parent_id,
         request_id,
     )
+    LOGGER.info(
+        f"_manage({job_id}) submitted to queue {queue_name} "
+        f"request={request_type}",
+    )
 
 
 def get_least_busy_queue_name() -> str:
@@ -434,9 +432,19 @@ def get_queue_name_by_parent_id(
     return process.rulebookprocessqueue.queue_name
 
 
-@tasking.redis_connect_retry()
 def check_rulebook_queue_health(queue_name: str) -> bool:
     """Check for the state of the queue.
+
+    Proxy for rq and dispatcherd functions.
+    """
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        return check_rulebook_queue_health_dispatcherd(queue_name)
+    return check_rulebook_queue_health_rq(queue_name)
+
+
+@tasking.redis_connect_retry()
+def check_rulebook_queue_health_rq(queue_name: str) -> bool:
+    """Check for the state of the queue in rq.
 
     Returns True if the queue is healthy, False otherwise.
     Clears the queue if all workers are dead to avoid stuck processes.
@@ -462,6 +470,23 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
     return True
 
 
+def check_rulebook_queue_health_dispatcherd(queue_name: str) -> bool:
+    """Check for the state of the queue in dispatcherd.
+
+    Returns True if the queue is healthy, False otherwise.
+
+    """
+    ctl = get_control_from_settings(
+        default_publish_channel=queue_name.replace("-", "_")
+    )
+    alive = ctl.control_with_reply("alive")
+    if not alive:
+        LOGGER.warning(
+            f"Worker queue {queue_name} was found to not be healthy"
+        )
+    return bool(alive)
+
+
 # Internal start/restart requests are sent by the manager in restart_helper.py
 def start_rulebook_process(
     process_parent_type: ProcessParentType,
@@ -475,7 +500,6 @@ def start_rulebook_process(
         ActivationRequest.START,
         request_id,
     )
-    monitor_rulebook_processes.delay()
 
 
 def stop_rulebook_process(
@@ -490,7 +514,6 @@ def stop_rulebook_process(
         ActivationRequest.STOP,
         request_id,
     )
-    monitor_rulebook_processes.delay()
 
 
 def delete_rulebook_process(
@@ -505,7 +528,6 @@ def delete_rulebook_process(
         ActivationRequest.DELETE,
         request_id,
     )
-    monitor_rulebook_processes.delay()
 
 
 def restart_rulebook_process(
@@ -520,7 +542,6 @@ def restart_rulebook_process(
         ActivationRequest.RESTART,
         request_id,
     )
-    monitor_rulebook_processes.delay()
 
 
 def monitor_rulebook_processes_no_lock() -> None:
@@ -560,7 +581,6 @@ def monitor_rulebook_processes_no_lock() -> None:
         )
 
 
-@job("default")
 def monitor_rulebook_processes() -> None:
     """Wrap monitor_rulebook_processes_no_lock.
 

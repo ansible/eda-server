@@ -16,7 +16,6 @@ import logging
 import uuid
 
 from django.db.utils import IntegrityError
-
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core.enums import ActivationRequest
 from aap_eda.core.tasking import enqueue_delay, queue_cancel_job
@@ -37,6 +36,9 @@ def system_cancel_restart_activation(
     The restart may not exist.
     """
     LOGGER.info(f"Cancelling auto-start for {process_parent_type} {id}")
+
+    # TODO: remove hardcoded queue name, for now both, dispatcherd and rqworker
+    # are using the same default queue name
     queue_cancel_job("default", auto_start_job_id(process_parent_type, id))
 
 
@@ -66,7 +68,10 @@ def _queue_auto_start(process_parent_type: str, id: int) -> None:
     LOGGER.info(f"Requesting auto-start for {process_parent_type} {id}")
     try:
         requests_queue.push(
-            process_parent_type, id, ActivationRequest.AUTO_START, uuid.uuid4()
+            process_parent_type,
+            id,
+            ActivationRequest.AUTO_START,
+            str(uuid.uuid4()),
         )
     except IntegrityError as exc:
         LOGGER.warning(exc)

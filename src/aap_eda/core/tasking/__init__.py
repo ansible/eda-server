@@ -23,6 +23,10 @@ from django.conf import settings
 from rq import results as rq_results
 
 from aap_eda.settings import core as core_settings, redis as redis_settings
+from dispatcherd.publish import submit_task
+from dispatcherd.processors.delayer import Delayer
+from flags.state import flag_enabled
+from dispatcherd.factories import get_control_from_settings
 
 __all__ = [
     "Job",
@@ -578,44 +582,51 @@ class ActivationWorker(Worker):
         )
 
 
-@redis_connect_retry()
 def enqueue_delay(
     queue_name: str, job_id: str, delay: int, *args, **kwargs
-) -> Job:
-    """Enqueue a job to run after specific seconds."""
-    scheduler = django_rq.get_scheduler(name=queue_name)
-    return scheduler.enqueue_at(
-        datetime.utcnow() + timedelta(seconds=delay),
-        job_id=job_id,
-        *args,
-        **kwargs,
-    )
+) -> typing.Optional[Job]:
+    """Enqueue a job to run after specific seconds.
 
-
-@redis_connect_retry()
-def queue_cancel_job(queue_name: str, job_id: str) -> None:
-    scheduler = django_rq.get_scheduler(name=queue_name)
-    scheduler.cancel(job_id)
-
-
-@redis_connect_retry()
-def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> Job:
-    """Enqueue a new job if it is not already enqueued.
-
-    Detects if a job with the same id is already enqueued and if it is
-    it will return it instead of enqueuing a new one.
+    Proxy for enqueue_delay_rq and enqueue_delay_dispatcherd.
     """
-    job = get_pending_job(job_id)
-    if job:
-        logger.info(
-            f"Skip enqueing job: {job_id} because it is already enqueued"
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        return enqueue_delay_dispatcherd(
+            queue_name, job_id, delay, *args, **kwargs
         )
-        return job
+    return enqueue_delay_rq(queue_name, job_id, delay, *args, **kwargs)
 
-    queue = django_rq.get_queue(name=queue_name)
-    kwargs["job_id"] = job_id
-    logger.info(f"Enqueing unique job: {job_id}")
-    return queue.enqueue(*args, **kwargs)
+
+def queue_cancel_job(queue_name: str, job_id: str) -> None:
+    """Cancel a job in the queue.
+
+    Proxy for queue_cancel_job_rq and queue_cancel_job_dispatcherd.
+    """
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        queue_cancel_job_dispatcherd(queue_name, job_id)
+    else:
+        queue_cancel_job_rq(queue_name, job_id)
+
+
+@redis_connect_retry()
+def unique_enqueue(
+    queue_name: str, job_id: str, *args, **kwargs
+) -> typing.Optional[Job]:
+    """Enqueue a new job.
+
+    Proxy for unique_enqueue_rq and enqueue_job_dispatcherd.
+
+    We still calling it unique_enqueue to limit the impact of
+    changing the name in the codebase, but the uniqueness is not
+    strictly necessary in rq because now we are enforcing it
+    through advisory locks.
+    In case of rq we preserve the original behavior, in case of
+    dispatcherd we just enqueue the job.
+    """
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        return enqueue_job_dispatcherd(
+            queue_name=queue_name, job_id=job_id, *args, **kwargs
+        )
+    return unique_enqueue_rq(queue_name, job_id, *args, **kwargs)
 
 
 @redis_connect_retry()
@@ -643,3 +654,85 @@ def job_from_queue(
     ]:
         return job
     return None
+
+
+def enqueue_delay_dispatcherd(
+    queue_name: str, job_id: str, delay: int, *args, **kwargs
+) -> None:
+    """Enqueue a job to run after specific seconds in dispatcherd."""
+    fn = args[0]
+    args = tuple(args[1:])
+
+    submit_task(
+        fn,
+        args=args,
+        kwargs=kwargs,
+        queue=queue_name,
+        uuid=job_id,
+        processor_options=[Delayer.Params(delay=delay)],
+    )
+
+
+@redis_connect_retry()
+def enqueue_delay_rq(
+    queue_name: str, job_id: str, delay: int, *args, **kwargs
+) -> Job:
+    """Enqueue a job to run after specific seconds in rq."""
+    scheduler = django_rq.get_scheduler(name=queue_name)
+    return scheduler.enqueue_at(
+        datetime.utcnow() + timedelta(seconds=delay),
+        job_id=job_id,
+        *args,
+        **kwargs,
+    )
+
+
+@redis_connect_retry()
+def queue_cancel_job_rq(queue_name: str, job_id: str) -> None:
+    scheduler = django_rq.get_scheduler(name=queue_name)
+    scheduler.cancel(job_id)
+
+
+def queue_cancel_job_dispatcherd(queue_name: str, job_id: str) -> None:
+    ctl = get_control_from_settings(default_publish_channel=queue_name)
+    canceled_data = ctl.control_with_reply("cancel", data={"uuid": job_id})
+    if canceled_data:
+        logger.warning(f"Canceled jobs in flight: {canceled_data}")
+    else:
+        logger.debug(f"No jobs running with id {job_id} to cancel")
+
+
+@redis_connect_retry()
+def unique_enqueue_rq(queue_name: str, job_id: str, *args, **kwargs) -> Job:
+    """Enqueue a new job if it is not already enqueued.
+
+    Detects if a job with the same id is already enqueued and if it is
+    it will return it instead of enqueuing a new one.
+    """
+    job = get_pending_job(job_id)
+    if job:
+        logger.info(
+            f"Skip enqueing job: {job_id} because it is already enqueued"
+        )
+        return job
+
+    queue = django_rq.get_queue(name=queue_name)
+    kwargs["job_id"] = job_id
+    logger.info(f"Enqueing unique job: {job_id}")
+    return queue.enqueue(*args, **kwargs)
+
+
+def enqueue_job_dispatcherd(
+    queue_name: str, job_id: str, *args, **kwargs
+) -> None:
+    """Enqueue a job in dispatcherd."""
+    fn = args[0]
+    args = tuple(args[1:])
+
+    submit_task(
+        fn,
+        args=args,
+        kwargs=kwargs,
+        queue=queue_name,
+        uuid=job_id,
+    )

@@ -209,9 +209,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 message.stats["ruleSetName"]
             ] = message.stats
             activation.save(update_fields=["ruleset_stats"])
-
-            if activation.status == ActivationStatus.STARTING:
-                orchestrator.monitor_rulebook_processes.delay()
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."
