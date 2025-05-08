@@ -88,8 +88,35 @@ def _import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@job(PROJECT_TASKS_QUEUE)
 def sync_project(project_id: int):
+    """Sync project async task.
+
+    Proxy for sync_project_dispatcherd and sync_project_rq.
+    """
+    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        return sync_project_dispatcherd(project_id)
+
+    return sync_project_rq(project_id)
+
+
+# task decorator is equivalent a "job" decorator for dispatcherd
+# TODO: move to submit_task (preferred way to submit tasks)
+# Now we keep the decorator to take advantage of the "delay" method
+# and limit changes to the code for the implementation of dispatcherd
+# under a feature flag.
+@task(queue=PROJECT_TASKS_QUEUE)
+def sync_project_dispatcherd(project_id: int):
+    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already syncing project {project_id}, exiting"
+            )
+            return
+        _sync_project(project_id)
+
+
+@job(PROJECT_TASKS_QUEUE)
+def sync_project_rq(project_id: int):
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
