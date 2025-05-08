@@ -169,10 +169,8 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  eda-default-worker:
+  eda-default-worker-1:
     image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_DEFAULT_WORKERS:-2}
     environment: *common-env
     command:
       - /bin/bash
@@ -187,10 +185,24 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  eda-activation-worker-node1:
+  eda-default-worker-2:
     image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+    environment: *common-env
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.DefaultWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
+  eda-activation-worker1-node1:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     environment:
       <<: *common-env
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node1'
@@ -208,10 +220,27 @@ services:
       - '../../:/app/src:z'
     restart: always
 
-  eda-activation-worker-node2:
+  eda-activation-worker2-node1:
     image: ${EDA_IMAGE:-localhost/aap-eda}
-    deploy:
-      replicas: ${EDA_ACTIVATION_WORKERS:-2}
+    environment:
+      <<: *common-env
+      EDA_RULEBOOK_QUEUE_NAME: 'activation-node1'
+      EDA_PODMAN_SOCKET_URL: tcp://podman-node1:8888
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.ActivationWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
+  eda-activation-worker1-node2:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
     environment:
       <<: *common-env
       EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
@@ -228,6 +257,26 @@ services:
     volumes:
       - '../../:/app/src:z'
     restart: always
+
+  eda-activation-worker2-node2:
+    image: ${EDA_IMAGE:-localhost/aap-eda}
+    environment:
+      <<: *common-env
+      EDA_RULEBOOK_QUEUE_NAME: 'activation-node2'
+      EDA_PODMAN_SOCKET_URL: tcp://podman-node2:8888
+    command:
+      - /bin/bash
+      - -c
+      - >-
+        aap-eda-manage rqworker
+        --worker-class aap_eda.core.tasking.ActivationWorker
+    depends_on:
+      eda-api:
+        condition: service_healthy
+    volumes:
+      - '../../:/app/src:z'
+    restart: always
+
 
   eda-webhook-api:
     image: ${EDA_IMAGE:-localhost/aap-eda}
