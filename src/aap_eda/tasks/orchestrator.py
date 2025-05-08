@@ -21,8 +21,10 @@ from typing import Optional
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
+from dispatcherd.factories import get_control_from_settings
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from flags.state import flag_enabled
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models, tasking
@@ -43,9 +45,6 @@ from aap_eda.services.activation.activation_manager import (
 )
 
 from .exceptions import UnknownProcessParentType
-from flags.state import flag_enabled
-from dispatcherd.factories import get_control_from_settings
-
 
 # Wrap the django_rq job decorator so its processing is within our retry
 # code.

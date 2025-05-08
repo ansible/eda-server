@@ -20,6 +20,9 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django_rq.management.commands import rqworker
 from flags.state import flag_enabled
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -55,7 +58,9 @@ class Command(BaseCommand):
                 )
                 raise SystemExit(1)
 
+            logger.info("Starting worker with dispatcherd.")
             run_dispatcherd_service()
 
         # run rqworker command if dispatcherd is not enabled
+        logger.info("Starting worker with rqworker.")
         return rqworker.Command.handle(self, *args, **options)
