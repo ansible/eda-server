@@ -14,6 +14,8 @@
 
 """Wrapper for rqworker command."""
 
+import logging
+
 from dispatcherd import run_service as run_dispatcherd_service
 from dispatcherd.config import setup as dispatcherd_setup
 from django.conf import settings
@@ -21,6 +23,8 @@ from django.core.management.base import BaseCommand, CommandParser
 from django_rq.management.commands import rqworker
 
 from aap_eda.settings import features
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -56,7 +60,9 @@ class Command(BaseCommand):
                 )
                 raise SystemExit(1)
 
+            logger.info("Starting worker with dispatcherd.")
             run_dispatcherd_service()
 
         # run rqworker command if dispatcherd is not enabled
+        logger.info("Starting worker with rqworker.")
         return rqworker.Command.handle(self, *args, **options)
