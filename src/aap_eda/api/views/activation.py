@@ -16,6 +16,7 @@ import logging
 import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
+from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
@@ -40,6 +41,7 @@ from aap_eda.tasks.orchestrator import (
     start_rulebook_process,
     stop_rulebook_process,
 )
+from aap_eda.utils import str_to_bool
 
 from .mixins import RedisDependencyMixin
 
@@ -476,15 +478,42 @@ class ActivationViewSet(
                 None,
                 description="Activation not enabled.",
             ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None,
+                description="Activation blocked while Workers offline.",
+            ),
         }
         | RedisDependencyMixin.redis_unavailable_response(),
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force restart after worker node offline",
+                required=False,
+                type=bool,
+            )
+        ],
     )
     @action(methods=["post"], detail=True, rbac_action=Action.RESTART)
     def restart(self, request, pk):
         activation = self.get_object()
-
         self._check_deleting(activation)
+        force_restart = str_to_bool(
+            request.query_params.get("force", "false"),
+        )
 
+        if (
+            settings.DEPLOYMENT_TYPE == "podman"
+            and activation.status == ActivationStatus.WORKERS_OFFLINE
+            and not force_restart
+        ):
+            # block the restart and return an error
+            raise api_exc.Conflict(
+                "An activation with an activation_status of 'Workers offline' "
+                "cannot be Restarted because this will leave an orphaned "
+                "container running on one of the 'activation-worker-node's. "
+                "If you want to force a restart, please add the "
+                "/?force=true query param."
+            )
         if not activation.is_enabled:
             raise api_exc.Forbidden(
                 detail="Activation is disabled and cannot be run."
