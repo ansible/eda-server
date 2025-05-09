@@ -15,20 +15,14 @@
 from unittest import mock
 
 import pytest
-from django.conf import settings
 from django.core.management import call_command
-from django.test import override_settings
 from django_rq.management.commands import rqscheduler, rqworker
 
 
-@override_settings(
-    FLAGS={
-        settings.DISPATCHERD_FEATURE_FLAG_NAME: [
-            {"condition": "boolean", "value": True},
-        ],
-    }
-)
 @pytest.mark.django_db
+@mock.patch(
+    "aap_eda.core.management.commands.rqworker.features.DISPATCHERD", True
+)
 def test_rqworker_command_feature_flag_enabled(capsys):
     with pytest.raises(SystemExit) as exc_info:
         call_command(
@@ -40,14 +34,10 @@ def test_rqworker_command_feature_flag_enabled(capsys):
     assert "DISPATCHERD feature not implemented yet" in captured.err
 
 
-@override_settings(
-    FLAGS={
-        settings.DISPATCHERD_FEATURE_FLAG_NAME: [
-            {"condition": "boolean", "value": False},
-        ],
-    }
-)
 @pytest.mark.django_db
+@mock.patch(
+    "aap_eda.core.management.commands.rqworker.features.DISPATCHERD", False
+)
 @mock.patch.object(rqworker.Command, "handle", return_value=None)
 def test_rqworker_command_feature_flag_disabled(
     mock_rqworker_handle,
@@ -60,14 +50,10 @@ def test_rqworker_command_feature_flag_disabled(
     mock_rqworker_handle.assert_called_once()
 
 
-@override_settings(
-    FLAGS={
-        settings.DISPATCHERD_FEATURE_FLAG_NAME: [
-            {"condition": "boolean", "value": False},
-        ],
-    }
-)
 @pytest.mark.django_db
+@mock.patch(
+    "aap_eda.core.management.commands.scheduler.features.DISPATCHERD", False
+)
 @mock.patch.object(rqscheduler.Command, "handle", return_value=None)
 def test_rqscheduler_command_feature_flag_disabled(
     mock_rqscheduler_handle,
@@ -77,14 +63,10 @@ def test_rqscheduler_command_feature_flag_disabled(
     mock_rqscheduler_handle.assert_called_once()
 
 
-@override_settings(
-    FLAGS={
-        settings.DISPATCHERD_FEATURE_FLAG_NAME: [
-            {"condition": "boolean", "value": True},
-        ],
-    }
-)
 @pytest.mark.django_db
+@mock.patch(
+    "aap_eda.core.management.commands.scheduler.features.DISPATCHERD", True
+)
 @mock.patch.object(rqscheduler.Command, "handle", return_value=None)
 def test_rqscheduler_command_feature_flag_enabled(
     mock_rqscheduler_handle,

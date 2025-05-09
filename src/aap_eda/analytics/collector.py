@@ -16,13 +16,14 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import connection
-from flags.state import flag_enabled
 from insights_analytics_collector import Collector
 
 from aap_eda.analytics import analytics_collectors, package, utils
 from aap_eda.conf.settings import application_settings
+from aap_eda.settings import features
 
 
 class AnalyticsCollector(Collector):
@@ -35,10 +36,7 @@ class AnalyticsCollector(Collector):
         return package.Package
 
     def _is_shipping_configured(self) -> bool:
-        if (
-            not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED")
-            or not utils.get_insights_tracking_state()
-        ):
+        if not features.ANALYTICS or not utils.get_insights_tracking_state():
             self.logger.warning(
                 "Insights for Event Driven Ansible is not enabled."
             )
@@ -91,8 +89,8 @@ class AnalyticsCollector(Collector):
 def gather(collection_type="scheduled", since=None, until=None, logger=None):
     if not logger:
         logger = logging.getLogger("aap_eda.analytics")
-    if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
-        logger.info("FEATURE_EDA_ANALYTICS_ENABLED is set to False.")
+    if not features.ANALYTICS:
+        logger.info(f"{settings.ANALYTICS_FEATURE_FLAG_NAME} is set to False.")
         return
     collector = AnalyticsCollector(
         collector_module=analytics_collectors,
