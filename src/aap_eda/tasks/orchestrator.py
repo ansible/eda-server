@@ -242,6 +242,10 @@ def dispatch(
         )
         try:
             queue_name = get_least_busy_queue_name()
+            LOGGER.info(
+                f"Found least busy queue {queue_name} for "
+                f"{process_parent_type} {process_parent_id}",
+            )
         except HealthyQueueNotFoundError:
             msg = (
                 f"There are no healthy queues to process the start request "

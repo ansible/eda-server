@@ -275,12 +275,18 @@ class ProjectViewSet(
         self.redis_is_available()
 
         try:
-            job_id = sync_project(project.id)
+            job_id = tasks.sync_project(project.id)
         except redis.ConnectionError:
             return RedisDependencyMixin.redis_unavailable_response()
 
         project.import_state = models.Project.ImportState.PENDING
-        project.import_task_id = job_id
+
+        # We may not have the job_id if the job is already running
+        # Unlikely, since we checked the state above, but better safe than sorry
+        # and don't overwrite the job_id if it is already set.
+        if job_id:
+            project.import_task_id = job_id
+
         project.import_error = None
         project.save()
 
@@ -296,20 +302,3 @@ class ProjectViewSet(
 
         serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
-
-
-def sync_project(project_id: int) -> str:
-    """
-    Proxy for sync task call for rq and dispatcherd.
-
-    Although the api .delay() is the same for both, the
-    response is different.
-    """
-    if features.DISPATCHERD:
-        job, _ = tasks.sync_project.delay(project_id=project_id)
-        job_id = job["uuid"]
-    else:  # rq
-        job = tasks.sync_project.delay(project_id=project_id)
-        job_id = job.id
-
-    return job_id

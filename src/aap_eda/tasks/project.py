@@ -13,10 +13,11 @@
 #  limitations under the License.
 
 import logging
+import typing as tp
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
-from dispatcherd.publish import task
+from dispatcherd.publish import submit_task, task
 from django.conf import settings
 
 from aap_eda.core import models, tasking
@@ -28,12 +29,10 @@ PROJECT_TASKS_QUEUE = "default"
 
 # Wrap the django_rq job decorator so its processing is within our retry
 # code.
-
-# For rq
 job = tasking.redis_connect_retry()(django_rq.job)
 
 
-def import_project(project_id: int):
+def import_project(project_id: int) -> tp.Optional[str]:
     """Import project async task.
 
     Proxy for import_project_dispatcherd and import_project_rq.
@@ -43,25 +42,37 @@ def import_project(project_id: int):
             logger.debug(
                 f"Another task already importing project {project_id}, exiting"
             )
-            return
+            return None
+
         if features.DISPATCHERD:
-            # task decorator is equivalent a "job" decorator for dispatcherd
-            # TODO: move to submit_task (preferred way to submit tasks)
-            # Now we keep the decorator to take advantage of the "delay" method
-            # and limit changes to the code for the implementation of dispatcherd
-            # under a feature flag.
-            logger.info("dispatcherd1")
-            job_data, _ = task(queue=PROJECT_TASKS_QUEUE)(
-                _import_project
-            ).delay(project_id=project_id)
-            job_id = job_data["uuid"]
-            return job_id
+            return import_project_dispatcherd(project_id)
+
         # rq
-        job_data = job(PROJECT_TASKS_QUEUE)(_import_project).delay(
-            project_id=project_id
-        )
-        job_id = job_data.id
-        return job_id
+        return import_project_rq(project_id)
+
+
+def import_project_dispatcherd(project_id: int) -> str:
+    """Submit import project task to dispatcherd."""
+
+    # TODO: submit_task is preferred, but we still need to decorate the
+    # function to register it.
+    # Waiting for an alternative to be implemented in dispatcherd,
+    # probably through configuration.
+    task(queue=PROJECT_TASKS_QUEUE)(_import_project)
+    job_data, _ = submit_task(
+        _import_project,
+        kwargs={"project_id": project_id},
+        queue=PROJECT_TASKS_QUEUE,
+    )
+    return job_data["uuid"]
+
+
+def import_project_rq(project_id: int) -> str:
+    """Submit import project task to rq."""
+    job_data = job(PROJECT_TASKS_QUEUE)(_import_project).delay(
+        project_id=project_id,
+    )
+    return job_data.id
 
 
 def _import_project(project_id: int):
@@ -80,42 +91,46 @@ def _import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-def sync_project(project_id: int):
+def sync_project(project_id: int) -> tp.Optional[str]:
     """Sync project async task.
 
     Proxy for sync_project_dispatcherd and sync_project_rq.
     """
-    if features.DISPATCHERD:
-        return sync_project_dispatcherd(project_id)
-
-    return sync_project_rq(project_id)
-
-
-# task decorator is equivalent a "job" decorator for dispatcherd
-# TODO: move to submit_task (preferred way to submit tasks)
-# Now we keep the decorator to take advantage of the "delay" method
-# and limit changes to the code for the implementation of dispatcherd
-# under a feature flag.
-@task(queue=PROJECT_TASKS_QUEUE)
-def sync_project_dispatcherd(project_id: int):
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
                 f"Another task already syncing project {project_id}, exiting"
             )
             return
-        _sync_project(project_id)
+        if features.DISPATCHERD:
+            return sync_project_dispatcherd(project_id)
+
+        # rq
+        return sync_project_rq(project_id)
+
+
+def sync_project_dispatcherd(project_id: int):
+    """Submit import project task to dispatcherd."""
+    # TODO: submit_task is preferred, but we still need to decorate the
+    # function to register it.
+    # Waiting for an alternative to be implemented in dispatcherd,
+    # probably through configuration.
+    task(queue=PROJECT_TASKS_QUEUE)(_sync_project)
+    job_data, _ = submit_task(
+        _sync_project,
+        kwargs={"project_id": project_id},
+        queue=PROJECT_TASKS_QUEUE,
+    )
+    return job_data["uuid"]
 
 
 @job(PROJECT_TASKS_QUEUE)
 def sync_project_rq(project_id: int):
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
-        if not acquired:
-            logger.debug(
-                f"Another task already syncing project {project_id}, exiting"
-            )
-            return
-        _sync_project(project_id)
+    """Submit import project task to rq."""
+    job_data = job(PROJECT_TASKS_QUEUE)(_sync_project).delay(
+        project_id=project_id,
+    )
+    return job_data.id
 
 
 def _sync_project(project_id: int):
@@ -132,6 +147,12 @@ def _sync_project(project_id: int):
 
 # Started by the scheduler, unique concurrent execution on specified queue;
 # default is the default queue
+
+
+# TODO: Remove/redising this task. It was added when redis availability was not
+# guaranteed. After removing redis this would not be needed.
+# We still need to handle the case when there are no workers available.
+# Durable tasks should be the solution for this problem.
 def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
     with advisory_lock("monitor_project_tasks", wait=False) as acquired:
         if not acquired:
@@ -147,6 +168,8 @@ def monitor_project_tasks(queue_name: str = PROJECT_TASKS_QUEUE):
 # providing resilience to Redis connection issues we decorate it with the
 # redis_connect_retry to maintain the model that anything directly dependent on
 # a Redis connection is wrapped by retries.
+
+
 @tasking.redis_connect_retry()
 def _monitor_project_tasks(queue_name: str) -> None:
     """Handle project tasks that are stuck.
