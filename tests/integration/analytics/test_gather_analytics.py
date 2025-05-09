@@ -17,6 +17,7 @@ from io import StringIO
 from unittest import mock
 
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 from django.test import override_settings
 
@@ -35,8 +36,11 @@ from django.test import override_settings
 )
 @pytest.mark.django_db
 @override_settings(
-    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]},
     AUTOMATION_AUTH_METHOD="user-pass",
+)
+@mock.patch(
+    "aap_eda.core.management.commands.gather_analytics.features.ANALYTICS",
+    True,
 )
 def test_gather_analytics_invalid_settings(
     analytics_settings,
@@ -124,14 +128,15 @@ def test_gather_analytics_invalid_settings(
     ],
 )
 @pytest.mark.django_db
-@override_settings(
-    FLAGS={"FEATURE_EDA_ANALYTICS_ENABLED": [("boolean", True)]}
-)
 @mock.patch(
     "aap_eda.core.management.commands.gather_analytics.collector.gather"
 )
+@mock.patch(
+    "aap_eda.core.management.commands.gather_analytics.features.ANALYTICS",
+    True,
+)
 def test_gather_analytics_command(
-    mock_gather, analytics_settings, caplog_factory, args, log_level, expected
+    analytics_settings, caplog_factory, args, log_level, expected
 ):
     with mock.patch(
         "aap_eda.analytics.collector.application_settings",
@@ -161,7 +166,7 @@ def test_gather_analytics_command(
     "feature_flag_state, expected",
     [
         (True, "Either --ship or --dry-run needs to be set."),
-        (False, "FEATURE_EDA_ANALYTICS_ENABLED is set to False."),
+        (False, f"{settings.ANALYTICS_FEATURE_FLAG_NAME} is set to False."),
     ],
 )
 def test_gather_analytics_command_by_ff_state(
@@ -170,20 +175,15 @@ def test_gather_analytics_command_by_ff_state(
     with mock.patch(
         "aap_eda.analytics.collector.application_settings",
         new=analytics_settings,
+    ), mock.patch(
+        "aap_eda.core.management.commands.gather_analytics.features.ANALYTICS",
+        feature_flag_state,
     ):
         analytics_settings.INSIGHTS_TRACKING_STATE = True
         out = StringIO()
         logger = logging.getLogger("aap_eda.analytics")
         eda_log = caplog_factory(logger)
-        with override_settings(
-            FLAGS={
-                "FEATURE_EDA_ANALYTICS_ENABLED": [
-                    ("boolean", feature_flag_state)
-                ]
-            }
-        ):
-            command = "gather_analytics"
-            call_command(command, stdout=out)
+        call_command("gather_analytics", stdout=out)
 
         assert any(
             record.levelname == "ERROR" and record.message == expected
