@@ -18,10 +18,10 @@ import django_rq
 from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.publish import task
 from django.conf import settings
-from flags.state import flag_enabled
 
 from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
+from aap_eda.settings import features
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
@@ -44,7 +44,7 @@ def import_project(project_id: int):
                 f"Another task already importing project {project_id}, exiting"
             )
             return
-        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        if features.DISPATCHERD:
             # task decorator is equivalent a "job" decorator for dispatcherd
             # TODO: move to submit_task (preferred way to submit tasks)
             # Now we keep the decorator to take advantage of the "delay" method
@@ -85,7 +85,7 @@ def sync_project(project_id: int):
 
     Proxy for sync_project_dispatcherd and sync_project_rq.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         return sync_project_dispatcherd(project_id)
 
     return sync_project_rq(project_id)

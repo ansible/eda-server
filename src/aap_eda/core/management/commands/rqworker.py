@@ -14,13 +14,15 @@
 
 """Wrapper for rqworker command."""
 
+import logging
+
 from dispatcherd import run_service as run_dispatcherd_service
 from dispatcherd.config import setup as dispatcherd_setup
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django_rq.management.commands import rqworker
-from flags.state import flag_enabled
-import logging
+
+from aap_eda.settings import features
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ class Command(BaseCommand):
         return rqworker.Command.add_arguments(self, parser)
 
     def handle(self, *args, **options) -> None:
-        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        if features.DISPATCHERD:
             if "worker_class" not in options:
                 self.style.ERROR("Missing required argument: --worker-class")
                 raise SystemExit(1)

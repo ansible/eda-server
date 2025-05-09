@@ -16,11 +16,10 @@ import logging
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
-from django.conf import settings
-from flags.state import flag_enabled
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
+from aap_eda.settings import features
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ job = tasking.redis_connect_retry()(django_rq.job)
 def schedule_gather_analytics(
     queue_name: str = ANALYTICS_TASKS_QUEUE, cancel: bool = False
 ) -> None:
-    if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
+    if not features.ANALYTICS:
         return
     interval = utils.get_analytics_interval()
     logger.info(f"Schedule analytics to run in {interval} seconds")
@@ -69,7 +68,7 @@ def reschedule_gather_analytics(
     Proxy for reschedule_gather_analytics_rq and
     reschedule_gather_analytics_dispatcherd.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         return reschedule_gather_analytics_dispatcherd(queue_name)
     return reschedule_gather_analytics_rq(queue_name)
 
