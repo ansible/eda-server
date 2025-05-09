@@ -18,7 +18,6 @@ from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from django.db import connection
-from django.test import override_settings
 
 from aap_eda.analytics.collector import AnalyticsCollector, gather
 
@@ -42,12 +41,11 @@ def collector():
     return collector
 
 
-@patch("aap_eda.analytics.collector.flag_enabled")
+@patch("aap_eda.analytics.collector.features.ANALYTICS", True)
 @patch("aap_eda.analytics.collector.AnalyticsCollector")
-def test_gather_when_enabled(mock_collector_cls, mock_flag_enabled):
+def test_gather_when_enabled(mock_collector_cls):
     """Test gather function when FEATURE_EDA_ANALYTICS_ENABLED
     is set to True"""
-    mock_flag_enabled.return_value = True
     mock_collector_cls.return_value = MagicMock()
     mock_logger = MagicMock()
 
@@ -58,7 +56,6 @@ def test_gather_when_enabled(mock_collector_cls, mock_flag_enabled):
         logger=mock_logger,
     )
 
-    mock_flag_enabled.assert_called_once_with("FEATURE_EDA_ANALYTICS_ENABLED")
     mock_collector_cls.assert_called_once_with(
         collector_module=ANY,
         collection_type="manual",
@@ -67,27 +64,19 @@ def test_gather_when_enabled(mock_collector_cls, mock_flag_enabled):
     assert result is not None
 
 
-@patch("aap_eda.analytics.collector.flag_enabled")
-def test_gather_when_disabled(mock_flag_enabled):
+@patch("aap_eda.analytics.collector.features.ANALYTICS", False)
+def test_gather_when_disabled():
     """Test gather function when FEATURE_EDA_ANALYTICS_ENABLED
     is set to False"""
-    mock_flag_enabled.return_value = False
     mock_logger = MagicMock()
-
     result = gather(logger=mock_logger)
-
-    mock_logger.info.assert_called_once_with(
-        "FEATURE_EDA_ANALYTICS_ENABLED is set to False."
-    )
     assert result is None
 
 
 @pytest.mark.django_db
-@patch("aap_eda.analytics.collector.flag_enabled")
+@patch("aap_eda.analytics.collector.features.ANALYTICS", True)
 @patch("aap_eda.analytics.collector.AnalyticsCollector")
-def test_gather_uses_default_logger(mock_collector_cls, mock_flag_enabled):
-    mock_flag_enabled.return_value = True
-
+def test_gather_uses_default_logger(mock_collector_cls):
     with patch(
         "aap_eda.analytics.collector.logging.getLogger"
     ) as mock_get_logger:
@@ -119,20 +108,15 @@ def test_shipping_disabled_logs_warning(
     with patch(
         "aap_eda.analytics.utils.get_insights_tracking_state",
         return_value=insights_tracking_state,
+    ), patch(
+        "aap_eda.analytics.collector.features.ANALYTICS", feature_flag_state
     ):
-        with override_settings(
-            FLAGS={
-                "FEATURE_EDA_ANALYTICS_ENABLED": [
-                    ("boolean", feature_flag_state)
-                ]
-            }
-        ):
-            assert collector._is_shipping_configured() is expected
+        assert collector._is_shipping_configured() is expected
 
-            if not expected:
-                collector.logger.warning.assert_called_once_with(
-                    "Insights for Event Driven Ansible is not enabled."
-                )
+        if not expected:
+            collector.logger.warning.assert_called_once_with(
+                "Insights for Event Driven Ansible is not enabled."
+            )
 
 
 @pytest.mark.django_db

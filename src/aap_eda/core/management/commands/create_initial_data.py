@@ -23,13 +23,13 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
-from flags.state import flag_enabled
 
 from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
 from aap_eda.core.models.utils import get_default_organization
 from aap_eda.core.tasking import enable_redis_prefix
 from aap_eda.core.utils.credentials import inputs_to_store
+from aap_eda.settings import features
 
 NEW_HELP_TEXT = (
     "Red Hat Ansible Automation Platform base URL to authenticate with.",
@@ -1255,7 +1255,7 @@ def populate_credential_types(
     for credential_type_data in credential_types:
         # Analytics credential types are only available when it's enabled
         if (
-            not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED")
+            not features.ANALYTICS
             and credential_type_data.get("name")
             in enums.SINGLETON_CREDENTIAL_TYPES
         ):

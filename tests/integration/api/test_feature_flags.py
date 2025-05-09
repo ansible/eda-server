@@ -15,7 +15,7 @@ def test_feature_flags_list_endpoint(admin_client):
     # Validates expected default feature flags
     # Modify each time a flag is added to default settings
     assert len(response.data) == 2
-    assert response.data["FEATURE_EDA_ANALYTICS_ENABLED"] is False
+    assert response.data[settings.ANALYTICS_FEATURE_FLAG_NAME] is False
     assert response.data[settings.DISPATCHERD_FEATURE_FLAG_NAME] is False
 
 
