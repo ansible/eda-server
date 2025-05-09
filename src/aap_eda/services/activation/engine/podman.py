@@ -17,13 +17,13 @@ import os
 
 from dateutil import parser
 from django.conf import settings
-from flags.state import flag_enabled
 from podman import PodmanClient
 from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.settings import features
 from aap_eda.utils import str_to_bool
 
 from . import exceptions, messages
@@ -87,7 +87,7 @@ class Engine(ContainerEngine):
         state cannot be checked before the app registry is ready.
         """
 
-        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        if features.DISPATCHERD:
             from dispatcherd.worker.task import (
                 DispatcherCancel as JobTimeoutException,
             )

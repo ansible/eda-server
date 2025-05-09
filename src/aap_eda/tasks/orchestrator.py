@@ -24,7 +24,6 @@ from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.factories import get_control_from_settings
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from flags.state import flag_enabled
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda.core import models, tasking
@@ -43,6 +42,7 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
+from aap_eda.settings import features
 
 from .exceptions import UnknownProcessParentType
 
@@ -436,7 +436,7 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
 
     Proxy for rq and dispatcherd functions.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         return check_rulebook_queue_health_dispatcherd(queue_name)
     return check_rulebook_queue_health_rq(queue_name)
 

@@ -26,7 +26,11 @@ from django.conf import settings
 from flags.state import flag_enabled
 from rq import results as rq_results
 
-from aap_eda.settings import core as core_settings, redis as redis_settings
+from aap_eda.settings import (
+    core as core_settings,
+    features,
+    redis as redis_settings,
+)
 
 __all__ = [
     "Job",
@@ -589,7 +593,7 @@ def enqueue_delay(
 
     Proxy for enqueue_delay_rq and enqueue_delay_dispatcherd.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         return enqueue_delay_dispatcherd(
             queue_name, job_id, delay, *args, **kwargs
         )
@@ -601,7 +605,7 @@ def queue_cancel_job(queue_name: str, job_id: str) -> None:
 
     Proxy for queue_cancel_job_rq and queue_cancel_job_dispatcherd.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         queue_cancel_job_dispatcherd(queue_name, job_id)
     else:
         queue_cancel_job_rq(queue_name, job_id)
@@ -622,7 +626,7 @@ def unique_enqueue(
     In case of rq we preserve the original behavior, in case of
     dispatcherd we just enqueue the job.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         return enqueue_job_dispatcherd(
             queue_name=queue_name, job_id=job_id, *args, **kwargs
         )
