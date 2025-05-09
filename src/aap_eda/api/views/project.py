@@ -16,7 +16,6 @@ import logging
 import redis
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
-from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters.rest_framework import DjangoFilterBackend
@@ -25,7 +24,6 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
-from flags.state import flag_enabled
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -35,6 +33,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
+from aap_eda.settings import features
 
 from .mixins import RedisDependencyMixin, ResponseSerializerMixin
 
@@ -119,9 +118,8 @@ class ProjectViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        # check if redis is available, needed only for rq
-        if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
-            self.redis_is_available()
+        # check if redis is available
+        self.redis_is_available()
 
         # Catch Redis connection error and translate, as appropriate, to the
         # Redis unavailable response.
@@ -273,9 +271,8 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
-        # check if redis is available, needed only for rq
-        if not flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
-            self.redis_is_available()
+        # check if redis is available
+        self.redis_is_available()
 
         try:
             job_id = sync_project(project.id)
@@ -308,7 +305,7 @@ def sync_project(project_id: int) -> str:
     Although the api .delay() is the same for both, the
     response is different.
     """
-    if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+    if features.DISPATCHERD:
         job, _ = tasks.sync_project.delay(project_id=project_id)
         job_id = job["uuid"]
     else:  # rq
