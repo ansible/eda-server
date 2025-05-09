@@ -21,9 +21,8 @@ from ansible_base.lib.redis.client import (
 )
 from dispatcherd.factories import get_control_from_settings
 from dispatcherd.processors.delayer import Delayer
-from dispatcherd.publish import submit_task
+from dispatcherd.publish import submit_task, task
 from django.conf import settings
-from flags.state import flag_enabled
 from rq import results as rq_results
 
 from aap_eda.settings import (
@@ -611,7 +610,6 @@ def queue_cancel_job(queue_name: str, job_id: str) -> None:
         queue_cancel_job_rq(queue_name, job_id)
 
 
-@redis_connect_retry()
 def unique_enqueue(
     queue_name: str, job_id: str, *args, **kwargs
 ) -> typing.Optional[Job]:
@@ -627,9 +625,7 @@ def unique_enqueue(
     dispatcherd we just enqueue the job.
     """
     if features.DISPATCHERD:
-        return enqueue_job_dispatcherd(
-            queue_name=queue_name, job_id=job_id, *args, **kwargs
-        )
+        return enqueue_job_dispatcherd(queue_name, job_id, *args, **kwargs)
     return unique_enqueue_rq(queue_name, job_id, *args, **kwargs)
 
 
@@ -666,6 +662,11 @@ def enqueue_delay_dispatcherd(
     """Enqueue a job to run after specific seconds in dispatcherd."""
     fn = args[0]
     args = tuple(args[1:])
+    # TODO: submit_task is preferred, but we still need to decorate the
+    # function to register it.
+    # Waiting for an alternative to be implemented in dispatcherd,
+    # probably through configuration.
+    task(queue=queue_name)(fn)
 
     submit_task(
         fn,
@@ -732,11 +733,21 @@ def enqueue_job_dispatcherd(
     """Enqueue a job in dispatcherd."""
     fn = args[0]
     args = tuple(args[1:])
+    logger.debug(
+        f"Enqueing job: {job_id} with args: {args} and kwargs: {kwargs}, queue: {queue_name} and fn: {fn}"
+    )
 
-    submit_task(
+    # TODO: submit_task is preferred, but we still need to decorate the
+    # function to register it.
+    # Waiting for an alternative to be implemented in dispatcherd,
+    # probably through configuration.
+    task(queue=queue_name)(fn)
+
+    job, queue = submit_task(
         fn,
         args=args,
         kwargs=kwargs,
         queue=queue_name,
-        uuid=job_id,
+        # uuid=job_id, #TODO ask for overriding this
     )
+    logger.debug(f"Enqueued job: {job} with queue: {queue}")
