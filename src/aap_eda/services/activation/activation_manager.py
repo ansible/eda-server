@@ -17,7 +17,6 @@ import logging
 import typing as tp
 from datetime import timedelta
 
-import rq
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
