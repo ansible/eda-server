@@ -25,6 +25,7 @@ from aap_eda.core.utils.strings import extract_variables
 from aap_eda.utils import (
     get_package_version,
     logger as utils_logger,
+    sanitize_postgres_identifier,
     str_to_bool,
 )
 from aap_eda.utils.openapi import generate_query_params
@@ -174,3 +175,33 @@ def test_generate_query_params(serializer, expected_params):
 
     for param, expected in zip(query_params, expected_params):
         assert param.__dict__ == expected.__dict__
+
+
+@pytest.mark.parametrize(
+    "input_str,expected_output",
+    [
+        ("valid_name", "valid_name"),
+        ("Valid123", "Valid123"),
+        ("_underscore", "_underscore"),
+        ("hello-world", "hello_world"),
+        ("bad@name!", "bad_name_"),
+        ("some space", "some_space"),
+        ("123name", "_123name"),
+        ("9abc", "_9abc"),
+        ("@@@", "___"),
+        ("123", "_123"),
+    ],
+)
+def test_sanitize_postgres_identifier_valid_cases(input_str, expected_output):
+    assert sanitize_postgres_identifier(input_str) == expected_output
+
+
+def test_empty_identifier_raises():
+    with pytest.raises(ValueError, match="Identifier cannot be empty."):
+        sanitize_postgres_identifier("")
+
+
+def test_identifier_exceeding_length_limit_raises():
+    too_long = "a" * 64
+    with pytest.raises(ValueError, match="exceeds 63 characters"):
+        sanitize_postgres_identifier(too_long)

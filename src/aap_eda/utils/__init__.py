@@ -13,6 +13,8 @@
 #  limitations under the License.
 import importlib.metadata
 import logging
+import re
+from functools import cache
 
 logger = logging.getLogger(__name__)
 
@@ -32,3 +34,31 @@ def get_package_version(package_name: str) -> str:
             package_name,
         )
         return "unknown"
+
+
+@cache
+def sanitize_postgres_identifier(identifier: str) -> str:
+    """
+    Sanitize an input string to conform to PostgreSQL identifier rules.
+
+    Initially intended to be used for pg_notify channel names.
+    """
+    max_identifier_length = 63
+    if not identifier:
+        raise ValueError("Identifier cannot be empty.")
+
+    # Replace invalid characters with underscores
+    sanitized = re.sub(r"\W", "_", identifier)
+
+    # Ensure it starts with a valid character
+    if not re.match(r"[A-Za-z_]", sanitized[0]):
+        sanitized = f"_{sanitized}"
+
+    # Ensure length
+    if len(sanitized) > max_identifier_length:
+        raise ValueError(
+            f"Sanitized channel name exceeds {max_identifier_length} "
+            "characters."
+        )
+
+    return sanitized
