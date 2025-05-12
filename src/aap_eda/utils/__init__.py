@@ -47,18 +47,26 @@ def sanitize_postgres_identifier(identifier: str) -> str:
     if not identifier:
         raise ValueError("Identifier cannot be empty.")
 
-    # Replace invalid characters with underscores
-    sanitized = re.sub(r"\W", "_", identifier)
+    if len(identifier) > max_identifier_length:
+        raise ValueError(
+            f"Identifier exceeds {max_identifier_length} characters."
+        )
+
+    sanitized = identifier
 
     # Ensure it starts with a valid character
-    if not re.match(r"[A-Za-z_]", sanitized[0]):
-        sanitized = f"_{sanitized}"
+    if not re.match(r"[A-Za-z_]", identifier[0]):
+        if len(identifier) == max_identifier_length:
+            raise ValueError(
+                f"Identifier has invalid first character and "
+                f"{max_identifier_length} characters. "
+                "It can not be sanitized to a valid "
+                "PostgreSQL identifier below "
+                f"{max_identifier_length} characters."
+            )
+        sanitized = f"_{identifier}"
 
-    # Ensure length
-    if len(sanitized) > max_identifier_length:
-        raise ValueError(
-            f"Sanitized channel name exceeds {max_identifier_length} "
-            "characters."
-        )
+    # Replace invalid characters with underscores
+    sanitized = re.sub(r"\W", "_", sanitized)
 
     return sanitized

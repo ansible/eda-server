@@ -188,8 +188,10 @@ def test_generate_query_params(serializer, expected_params):
         ("some space", "some_space"),
         ("123name", "_123name"),
         ("9abc", "_9abc"),
-        ("@@@", "___"),
+        ("@@@", "____"),
         ("123", "_123"),
+        ("a" * 63, "a" * 63),
+        (("1" + "a" * 61), ("_1" + "a" * 61)),
     ],
 )
 def test_sanitize_postgres_identifier_valid_cases(input_str, expected_output):
@@ -204,4 +206,10 @@ def test_empty_identifier_raises():
 def test_identifier_exceeding_length_limit_raises():
     too_long = "a" * 64
     with pytest.raises(ValueError, match="exceeds 63 characters"):
+        sanitize_postgres_identifier(too_long)
+
+
+def test_identifier_with_invalid_first_character_raises():
+    too_long = "1" + "a" * 62
+    with pytest.raises(ValueError, match="invalid first character"):
         sanitize_postgres_identifier(too_long)
