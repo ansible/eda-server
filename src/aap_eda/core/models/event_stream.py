@@ -16,6 +16,8 @@ import uuid
 
 from django.db import models
 
+from aap_eda.utils import sanitize_postgres_identifier
+
 from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 __all__ = "EventStream"
@@ -92,9 +94,7 @@ class EventStream(BaseOrgModel, UniqueNamedModel, PrimordialModel):
 
     def _get_channel_name(self) -> str:
         """Generate the channel name based on the UUID and prefix."""
-        return (
-            f"{EDA_EVENT_STREAM_CHANNEL_PREFIX}"
-            f"{str(self.uuid).replace('-','_')}"
-        )
+        channel_name = f"{EDA_EVENT_STREAM_CHANNEL_PREFIX}{str(self.uuid)}"
+        return sanitize_postgres_identifier(channel_name)
 
     channel_name = property(_get_channel_name)
