@@ -56,8 +56,7 @@ def test_schedule_gather_analytics_success():
     ) as mock_enqueue, mock.patch(
         "aap_eda.tasks.analytics.logger.info"
     ) as mock_logger, mock.patch(
-        "aap_eda.tasks.analytics.flag_enabled",
-        return_value=True,
+        "aap_eda.tasks.analytics.features.ANALYTICS", True
     ):
         mock_interval.return_value = test_interval
 
@@ -82,8 +81,7 @@ def test_schedule_gather_analytics_with_default_queue():
     ) as mock_interval, mock.patch(
         "aap_eda.tasks.analytics.tasking.enqueue_delay"
     ) as mock_enqueue, mock.patch(
-        "aap_eda.tasks.analytics.flag_enabled",
-        return_value=True,
+        "aap_eda.tasks.analytics.features.ANALYTICS", True
     ):
         mock_interval.return_value = 300
         analytics.schedule_gather_analytics()
@@ -104,8 +102,7 @@ def test_schedule_gather_analytics_error_handling():
     ), mock.patch(
         "aap_eda.tasks.analytics.tasking.enqueue_delay"
     ) as mock_enqueue, mock.patch(
-        "aap_eda.tasks.analytics.flag_enabled",
-        return_value=True,
+        "aap_eda.tasks.analytics.features.ANALYTICS", True
     ):
         mock_enqueue.side_effect = RuntimeError("Queue connection failed")
 
@@ -124,8 +121,7 @@ def test_reschedule_gather_analytics():
     ) as mock_enqueue, mock.patch(
         "aap_eda.tasks.analytics.tasking.queue_cancel_job"
     ) as mock_cancel_job, mock.patch(
-        "aap_eda.tasks.analytics.flag_enabled",
-        return_value=True,
+        "aap_eda.tasks.analytics.features.ANALYTICS", True
     ):
         mock_interval.return_value = 300
         analytics.reschedule_gather_analytics()
