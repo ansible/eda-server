@@ -25,6 +25,7 @@ from dispatcherd.publish import submit_task
 from django.conf import settings
 from rq import results as rq_results
 
+from aap_eda import utils
 from aap_eda.settings import (
     core as core_settings,
     features,
@@ -670,7 +671,7 @@ def enqueue_delay_dispatcherd(
         fn,
         args=args,
         kwargs=kwargs,
-        queue=queue_name,
+        queue=utils.sanitize_postgres_identifier(queue_name),
         uuid=job_id,
         processor_options=[Delayer.Params(delay=delay)],
     )
@@ -736,6 +737,6 @@ def enqueue_job_dispatcherd(
         fn,
         args=args,
         kwargs=kwargs,
-        queue=queue_name,
+        queue=utils.sanitize_postgres_identifier(queue_name),
         uuid=job_id,
     )

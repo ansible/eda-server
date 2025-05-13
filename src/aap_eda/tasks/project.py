@@ -19,6 +19,7 @@ from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.publish import task
 from django.conf import settings
 
+from aap_eda import utils
 from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
 from aap_eda.settings import features
@@ -51,9 +52,10 @@ def import_project(project_id: int):
             # and limit changes to the code for the implementation of dispatcherd
             # under a feature flag.
             logger.info("dispatcherd1")
-            job_data, _ = task(queue=PROJECT_TASKS_QUEUE)(
-                _import_project
-            ).delay(project_id=project_id)
+            queue = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
+            job_data, _ = task(queue=queue)(_import_project).delay(
+                project_id=project_id
+            )
             job_id = job_data["uuid"]
             return job_id
         # rq
@@ -96,7 +98,7 @@ def sync_project(project_id: int):
 # Now we keep the decorator to take advantage of the "delay" method
 # and limit changes to the code for the implementation of dispatcherd
 # under a feature flag.
-@task(queue=PROJECT_TASKS_QUEUE)
+@task(queue=utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE))
 def sync_project_dispatcherd(project_id: int):
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
