@@ -13,12 +13,14 @@
 #  limitations under the License.
 
 import logging
+import typing as tp
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
-from dispatcherd.publish import task
+from dispatcherd.publish import submit_task
 from django.conf import settings
 
+from aap_eda import utils
 from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
 from aap_eda.settings import features
@@ -33,7 +35,7 @@ PROJECT_TASKS_QUEUE = "default"
 job = tasking.redis_connect_retry()(django_rq.job)
 
 
-def import_project(project_id: int):
+def import_project(project_id: int) -> tp.Optional[str]:
     """Import project async task.
 
     Proxy for import_project_dispatcherd and import_project_rq.
@@ -43,25 +45,28 @@ def import_project(project_id: int):
             logger.debug(
                 f"Another task already importing project {project_id}, exiting"
             )
-            return
+            return None
         if features.DISPATCHERD:
-            # task decorator is equivalent a "job" decorator for dispatcherd
-            # TODO: move to submit_task (preferred way to submit tasks)
-            # Now we keep the decorator to take advantage of the "delay" method
-            # and limit changes to the code for the implementation of dispatcherd
-            # under a feature flag.
-            logger.info("dispatcherd1")
-            job_data, _ = task(queue=PROJECT_TASKS_QUEUE)(
-                _import_project
-            ).delay(project_id=project_id)
-            job_id = job_data["uuid"]
-            return job_id
+            return import_project_dispatcherd(project_id)
+
         # rq
-        job_data = job(PROJECT_TASKS_QUEUE)(_import_project).delay(
-            project_id=project_id
-        )
-        job_id = job_data.id
-        return job_id
+        job_data = import_project_rq.delay(project_id=project_id)
+        return job_data.id
+
+
+def import_project_dispatcherd(project_id: int) -> str:
+    queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
+    job_data, queue = submit_task(
+        _import_project,
+        queue=queue_name,
+        args=(project_id,),
+    )
+    return job_data["uuid"]
+
+
+@job(PROJECT_TASKS_QUEUE)
+def import_project_rq(project_id: int):
+    _import_project(project_id)
 
 
 def _import_project(project_id: int):
@@ -80,42 +85,37 @@ def _import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-def sync_project(project_id: int):
+def sync_project(project_id: int) -> tp.Optional[str]:
     """Sync project async task.
 
     Proxy for sync_project_dispatcherd and sync_project_rq.
     """
-    if features.DISPATCHERD:
-        return sync_project_dispatcherd(project_id)
-
-    return sync_project_rq(project_id)
-
-
-# task decorator is equivalent a "job" decorator for dispatcherd
-# TODO: move to submit_task (preferred way to submit tasks)
-# Now we keep the decorator to take advantage of the "delay" method
-# and limit changes to the code for the implementation of dispatcherd
-# under a feature flag.
-@task(queue=PROJECT_TASKS_QUEUE)
-def sync_project_dispatcherd(project_id: int):
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+    with advisory_lock(f"sync_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
                 f"Another task already syncing project {project_id}, exiting"
             )
-            return
-        _sync_project(project_id)
+            return None
+        if features.DISPATCHERD:
+            return sync_project_dispatcherd(project_id)
+        # rq
+        job_data = sync_project_rq.delay(project_id=project_id)
+        return job_data.id
+
+
+def sync_project_dispatcherd(project_id: int) -> str:
+    queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
+    job_data, queue = submit_task(
+        _sync_project,
+        queue=queue_name,
+        args=(project_id,),
+    )
+    return job_data["uuid"]
 
 
 @job(PROJECT_TASKS_QUEUE)
 def sync_project_rq(project_id: int):
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
-        if not acquired:
-            logger.debug(
-                f"Another task already syncing project {project_id}, exiting"
-            )
-            return
-        _sync_project(project_id)
+    _sync_project(project_id)
 
 
 def _sync_project(project_id: int):
