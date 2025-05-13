@@ -537,7 +537,11 @@ def post_loading(loaded_settings: Dynaconf):
                 **settings.DISPATCHERD_DEFAULT_SETTINGS["brokers"][
                     "pg_notify"
                 ],
-                "channels": [settings.RULEBOOK_QUEUE_NAME.replace("-", "_")],
+                "channels": [
+                    utils.sanitize_postgres_identifier(
+                        settings.RULEBOOK_QUEUE_NAME,
+                    )
+                ],
             },
         },
     }

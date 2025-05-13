@@ -20,6 +20,7 @@ from ansible_base.lib.utils.db import advisory_lock
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
 from aap_eda.settings import features
+from aap_eda.utils import sanitize_postgres_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ def reschedule_gather_analytics_rq(
 def reschedule_gather_analytics_dispatcherd(
     queue_name: str = ANALYTICS_TASKS_QUEUE,
 ) -> None:
+    queue_name = sanitize_postgres_identifier(queue_name)
     schedule_gather_analytics(queue_name, cancel=True)
 
 
