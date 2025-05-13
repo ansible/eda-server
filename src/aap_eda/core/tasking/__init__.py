@@ -23,7 +23,6 @@ from dispatcherd.factories import get_control_from_settings
 from dispatcherd.processors.delayer import Delayer
 from dispatcherd.publish import submit_task
 from django.conf import settings
-from flags.state import flag_enabled
 from rq import results as rq_results
 
 from aap_eda.settings import (
