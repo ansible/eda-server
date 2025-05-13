@@ -70,7 +70,7 @@ validators = "^0.34.0"
 django-flags = "^5.0.13"
 insights-analytics-collector = "^0.3.2"
 distro = "^1.9.0"
-dispatcherd = { version = "v2025.04.30", extras = ["pg_notify", "metrics"] }
+dispatcherd = { version = "v2025.05.12", extras = ["pg_notify", "metrics"] }
 
 
 [tool.poetry.group.test.dependencies]
