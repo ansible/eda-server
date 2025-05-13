@@ -584,6 +584,38 @@ def test_restart_activation(
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("force_restart", "expected_response"),
+    [
+        (
+            "true",
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            "false",
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+)
+@patch("aap_eda.api.serializers.activation.settings.DEPLOYMENT_TYPE", "podman")
+def test_restart_activation_workers_offline(
+    force_restart,
+    expected_response,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    default_activation.status = enums.ActivationStatus.WORKERS_OFFLINE
+    default_activation.save(update_fields=["status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{default_activation.id}/restart/"
+        f"?force={force_restart}"
+    )
+    assert response.status_code == expected_response
+
+
 @pytest.mark.parametrize(
     ("missing_field", "error_message"),
     [
