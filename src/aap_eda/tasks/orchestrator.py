@@ -26,6 +26,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 import aap_eda.tasks.activation_request_queue as requests_queue
+from aap_eda import utils
 from aap_eda.core import models, tasking
 from aap_eda.core.enums import (
     ActivationRequest,
@@ -476,7 +477,7 @@ def check_rulebook_queue_health_dispatcherd(queue_name: str) -> bool:
 
     """
     ctl = get_control_from_settings(
-        default_publish_channel=queue_name.replace("-", "_")
+        default_publish_channel=utils.sanitize_postgres_identifier(queue_name)
     )
     alive = ctl.control_with_reply("alive")
     if not alive:
