@@ -627,9 +627,7 @@ def unique_enqueue(
     dispatcherd we just enqueue the job.
     """
     if features.DISPATCHERD:
-        return enqueue_job_dispatcherd(
-            queue_name=queue_name, job_id=job_id, *args, **kwargs
-        )
+        return enqueue_job_dispatcherd(queue_name, job_id, *args, **kwargs)
     return unique_enqueue_rq(queue_name, job_id, *args, **kwargs)
 
 

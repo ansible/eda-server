@@ -33,7 +33,6 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
-from aap_eda.settings import features
 
 from .mixins import RedisDependencyMixin, ResponseSerializerMixin
 
@@ -140,7 +139,6 @@ class ProjectViewSet(
         except redis.ConnectionError:
             return RedisDependencyMixin.redis_unavailable_response()
 
-        # Atomically update `import_task_id` field only.
         models.Project.objects.filter(pk=project.id).update(
             import_task_id=job_id
         )
@@ -275,13 +273,18 @@ class ProjectViewSet(
         self.redis_is_available()
 
         try:
-            job_id = sync_project(project.id)
+            job_id = tasks.sync_project(project.id)
         except redis.ConnectionError:
             return RedisDependencyMixin.redis_unavailable_response()
 
         project.import_state = models.Project.ImportState.PENDING
-        project.import_task_id = job_id
-        project.import_error = None
+
+        # job_id can be none if there is already a task running.
+        # this is unlikely since we check the state above
+        # but safety first
+        if job_id:
+            project.import_task_id = job_id
+
         project.save()
 
         logger.info(
@@ -296,20 +299,3 @@ class ProjectViewSet(
 
         serializer = serializers.ProjectSerializer(project)
         return Response(status=status.HTTP_202_ACCEPTED, data=serializer.data)
-
-
-def sync_project(project_id: int) -> str:
-    """
-    Proxy for sync task call for rq and dispatcherd.
-
-    Although the api .delay() is the same for both, the
-    response is different.
-    """
-    if features.DISPATCHERD:
-        job, _ = tasks.sync_project.delay(project_id=project_id)
-        job_id = job["uuid"]
-    else:  # rq
-        job = tasks.sync_project.delay(project_id=project_id)
-        job_id = job.id
-
-    return job_id
