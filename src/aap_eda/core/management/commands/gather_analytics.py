@@ -16,10 +16,11 @@ import logging
 from datetime import timezone
 
 from dateutil import parser
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
-from flags.state import flag_enabled
 
 from aap_eda.analytics import collector
+from aap_eda.settings import features
 
 
 class Command(BaseCommand):
@@ -71,8 +72,10 @@ class Command(BaseCommand):
         opt_since = options.get("since")
         opt_until = options.get("until")
 
-        if not flag_enabled("FEATURE_EDA_ANALYTICS_ENABLED"):
-            self.logger.error("FEATURE_EDA_ANALYTICS_ENABLED is set to False.")
+        if not features.ANALYTICS:
+            self.logger.error(
+                f"{settings.ANALYTICS_FEATURE_FLAG_NAME} is set to False."
+            )
             return
 
         since = parser.parse(opt_since) if opt_since else None

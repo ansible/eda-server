@@ -333,7 +333,7 @@ def test_dispatch_existing_rq_jobs(
     )
     activation.status = ActivationStatus.STOPPED
     activation.save(update_fields=["status"])
-    orchestrator.dispatch(
+    orchestrator.queue_dispatch(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
     enqueue_mock.assert_not_called()

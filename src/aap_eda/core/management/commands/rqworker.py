@@ -17,7 +17,8 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django_rq.management.commands import rqworker
-from flags.state import flag_enabled
+
+from aap_eda.settings import features
 
 
 class Command(BaseCommand):
@@ -33,7 +34,7 @@ class Command(BaseCommand):
         return rqworker.Command.add_arguments(self, parser)
 
     def handle(self, *args, **options) -> None:
-        if flag_enabled(settings.DISPATCHERD_FEATURE_FLAG_NAME):
+        if features.DISPATCHERD:
             self.stderr.write(
                 self.style.ERROR(
                     "DISPATCHERD feature not implemented yet. "
