@@ -47,3 +47,19 @@ class InvalidEnvKeyError(Exception):
 
 class GracefulExit(Exception):
     pass
+
+
+class SourceCredentialMissing(Exception):
+    pass
+
+
+class TargetCredentialMissing(Exception):
+    pass
+
+
+class RuntimeErrorFetchingExternalSecret(Exception):
+    pass
+
+
+class UnknownPluginType(Exception):
+    pass

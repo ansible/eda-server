@@ -118,3 +118,10 @@ class InvalidEventStreamSource(APIException):
         "Configuration Error: Event Stream source could not be "
         "updated in ruleset"
     )
+
+
+class ExternalSMSException(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = (
+        "External SMS Error: not able to fetch secrets from external SMS"
+    )
