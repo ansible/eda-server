@@ -906,7 +906,17 @@ class ActivationManager(StatusManager):
         # Activations in running status must have a container
         # This case prevents cases when the container is externally deleted
         if container_status is None:
-            self._missing_container_policy()
+            if self.latest_instance.queue_name != self._get_queue_name():
+                msg = (
+                    f"Monitor operation: activation id: {self.db_instance.id} "
+                    "Activation is not running on this worker. "
+                    f"Instance queue {self.latest_instance.queue_name} "
+                    f"Node queue name {self._get_queue_name()}"
+                    "Nothing to do."
+                )
+                LOGGER.info(msg)
+            else:
+                self._missing_container_policy()
             return
 
         LOGGER.info(
