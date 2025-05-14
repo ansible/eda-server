@@ -27,7 +27,7 @@ from aap_eda.api.constants import (
     EDA_SERVER_VAULT_LABEL,
     SOURCE_MAPPING_ERROR_KEY,
 )
-from aap_eda.api.exceptions import InvalidEventStreamSource
+from aap_eda.api.exceptions import ExternalSMSError, InvalidEventStreamSource
 from aap_eda.api.serializers.decision_environment import (
     DecisionEnvironmentRefSerializer,
 )
@@ -46,8 +46,11 @@ from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
-from aap_eda.core.exceptions import ParseError
-from aap_eda.core.utils.credentials import get_secret_fields
+from aap_eda.core.exceptions import CredentialPluginError, ParseError
+from aap_eda.core.utils.credentials import (
+    get_resolved_secrets,
+    get_secret_fields,
+)
 from aap_eda.core.utils.k8s_service_name import create_k8s_service_name
 from aap_eda.core.utils.rulebook import (
     build_source_list,
@@ -147,8 +150,10 @@ def _update_extra_vars_from_eda_credentials(
         schema_inputs = eda_credential.credential_type.inputs
         injectors = eda_credential.credential_type.injectors
         secret_fields = get_secret_fields(schema_inputs)
-
-        user_inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
+        try:
+            user_inputs = get_resolved_secrets(eda_credential)
+        except CredentialPluginError as err:
+            raise ExternalSMSError(str(err))
 
         if creating and any(key in user_inputs for key in secret_fields):
             vault_data.password_used = True

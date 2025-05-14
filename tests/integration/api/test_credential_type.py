@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from typing import Optional
+from unittest.mock import patch
 
 import pytest
 from pytest_lazyfixture import lazy_fixture
@@ -78,11 +79,57 @@ INPUT_SANS_TYPE = {
     "required": ["host"],
 }
 
+EXTERNAL_CREDENTIAL_INPUT = {
+    "fields": [
+        {
+            "id": "host",
+            "label": "Authentication URL",
+            "type": "string",
+            "help_text": (
+                "Authentication endpoint for the container registry."
+            ),
+            "default": "quay.io",
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "password",
+            "label": "Password or Token",
+            "type": "string",
+            "secret": True,
+            "help_text": ("A password or token used to authenticate with"),
+        },
+        {
+            "id": "verify_ssl",
+            "label": "Verify SSL",
+            "type": "boolean",
+            "default": True,
+        },
+    ],
+    "metadata": [
+        {
+            "id": "secret_backend",
+            "label": "Name of Secret Backend",
+            "type": "string",
+            "help_text": ("The name of the kv secret backend"),
+        },
+        {
+            "id": "secret_path",
+            "label": "Path to secret",
+            "type": "string",
+        },
+    ],
+    "required": ["host", "secret_backend"],
+}
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("inputs", "injectors"),
     [
+        (
+            EXTERNAL_CREDENTIAL_INPUT,
+            {},
+        ),
         (
             {},
             {},
@@ -798,3 +845,107 @@ def test_create_credential_type_with_duplicates(
     assert response.status_code == status_code
     if message and key:
         assert message in response.data[key][0]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    (
+        "inputs",
+        "metadata",
+        "status_code",
+        "raise_exception",
+        "credential_type_id",
+    ),
+    [
+        (
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": "token123",
+            },
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_404_NOT_FOUND,
+            False,
+            9989,
+        ),
+        (
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": "token123",
+            },
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_202_ACCEPTED,
+            False,
+            None,
+        ),
+        (
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": "token123",
+            },
+            {"secret_path_missing": "secret/foo", "secret_key": "bar"},
+            status.HTTP_400_BAD_REQUEST,
+            False,
+            None,
+        ),
+        (
+            {
+                "api_version": "v2",
+                "token": "token123",
+            },
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_400_BAD_REQUEST,
+            False,
+            None,
+        ),
+        (
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": "token123",
+            },
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_400_BAD_REQUEST,
+            True,
+            None,
+        ),
+    ],
+)
+def test_credential_type_test(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    inputs: dict,
+    metadata: dict,
+    status_code: int,
+    raise_exception: bool,
+    credential_type_id: Optional[int],
+):
+    hashi_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+
+    data_in = {
+        "inputs": inputs,
+        "metadata": metadata,
+    }
+    if credential_type_id:
+        url = f"{api_url_v1}/credential-types/{credential_type_id}/test/"
+    else:
+        url = f"{api_url_v1}/credential-types/{hashi_type.id}/test/"
+
+    if raise_exception:
+        with patch(
+            "aap_eda.api.views.credential_type.run_plugin",
+            side_effect=Exception("kaboom"),
+        ):
+            response = superuser_client.post(url, data=data_in)
+            assert response.status_code == status_code
+    else:
+        with patch(
+            "aap_eda.api.views.credential_type.run_plugin", return_value="abc"
+        ):
+            response = superuser_client.post(url, data=data_in)
+            assert response.status_code == status_code

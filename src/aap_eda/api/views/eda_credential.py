@@ -30,10 +30,11 @@ from rest_framework.filters import BaseFilterBackend
 from rest_framework.response import Response
 
 from aap_eda.analytics.utils import get_analytics_interval_if_exist
-from aap_eda.api import exceptions, filters, serializers
+from aap_eda.api import exceptions, exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.eda_credential import get_references
 from aap_eda.core import models
 from aap_eda.core.enums import Action
+from aap_eda.core.utils.credential_plugins import run_plugin
 from aap_eda.core.utils.credentials import (
     build_copy_post_data,
     inputs_to_store,
@@ -286,6 +287,86 @@ class EdaCredentialViewSet(
             eda_credential, request.data.get("name")
         )
         return self._create_eda_credential(request, post_data)
+
+    @extend_schema(
+        description="Test an external EDA credential.",
+        request=serializers.EdaCredentialTestSerializer,
+        responses={
+            status.HTTP_202_ACCEPTED: OpenApiResponse(
+                None,
+                description="Test was successful.",
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                None, description="Test failed."
+            ),
+        },
+    )
+    @action(methods=["post"], detail=True, rbac_action=Action.READ)
+    def test(self, request, pk):
+        eda_credential = self.get_object()
+        serializer = serializers.EdaCredentialTestSerializer(
+            data=request.data, instance=eda_credential
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            run_plugin(
+                eda_credential.credential_type.namespace,
+                serializer.validated_data["inputs"],
+                serializer.validated_data["metadata"],
+            )
+        except Exception as err:
+            logger.error(
+                "Plugin : %s call failed %s",
+                eda_credential.credential_type.namespace,
+                err,
+            )
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={})
+
+        return Response(status=status.HTTP_202_ACCEPTED, data={})
+
+    @extend_schema(
+        description="List all input_sources for the Credential",
+        request=None,
+        responses={
+            status.HTTP_200_OK: serializers.CredentialInputSourceSerializer(
+                many=True
+            ),
+        },
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description=(
+                    "A unique integer value identifying this credential."
+                ),
+            )
+        ],
+    )
+    @action(
+        detail=False,
+        rbac_action=Action.READ,
+        url_path="(?P<id>[^/.]+)/input_sources",
+    )
+    def input_sources(self, request, id):
+        credential_exists = (
+            models.EdaCredential.access_qs(request.user).filter(id=id).exists()
+        )
+        if not credential_exists:
+            raise api_exc.NotFound(
+                code=status.HTTP_404_NOT_FOUND,
+                detail=f"Credential with ID={id} does not exist.",
+            )
+
+        input_sources = models.CredentialInputSource.objects.filter(
+            target_credential_id=id,
+        )
+        result = self.paginate_queryset(input_sources)
+        serializer = serializers.CredentialInputSourceSerializer(
+            result, many=True
+        )
+        return self.get_paginated_response(serializer.data)
 
     def _create_eda_credential(self, request, data):
         """Create a new credential object given payload data."""
