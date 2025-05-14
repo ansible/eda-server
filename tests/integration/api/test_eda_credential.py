@@ -1,4 +1,6 @@
+import secrets
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -103,6 +105,39 @@ SBqu6MJcWs10pvXFObGksT7gpxT2hMMLX/pz8wfOMLVaDlLlZrTebHJcxAUQHyYPWbp5ni
 hzhhV19kdlZMmjYxQUE2POfyeBw=
 -----END OPENSSH PRIVATE KEY-----
 """
+
+EXTERNAL_CREDENTIAL_INPUT = {
+    "fields": [
+        {
+            "id": "url",
+            "label": "Authentication URL",
+            "type": "string",
+            "help_text": ("Authentication url for the external service."),
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "password",
+            "label": "Password or Token",
+            "type": "string",
+            "secret": True,
+            "help_text": ("A password or token used to authenticate with"),
+        },
+    ],
+    "metadata": [
+        {
+            "id": "secret_backend",
+            "label": "Name of Secret Backend",
+            "type": "string",
+            "help_text": ("The name of the kv secret backend"),
+        },
+        {
+            "id": "secret_path",
+            "label": "Path to secret",
+            "type": "string",
+        },
+    ],
+    "required": ["url", "secret_backend"],
+}
 
 
 @pytest.mark.parametrize(
@@ -1350,3 +1385,205 @@ def test_update_eda_credential_for_analytics(
         )
         assert response.status_code == status.HTTP_200_OK
         mock_reschedule.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("inputs", "status_code"),
+    [
+        (
+            {
+                "url": "https://www.example.com",
+                "password": secrets.token_hex(32),
+            },
+            status.HTTP_201_CREATED,
+        ),
+        (
+            {
+                "url": "https://www.example.com",
+                "password": secrets.token_hex(32),
+                "invalid_key": "bad",
+            },
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (
+            {"password": secrets.token_hex(32)},
+            status.HTTP_400_BAD_REQUEST,
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_external_credential_type(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+    inputs,
+    status_code,
+):
+    credential_type_data_in = {
+        "name": "external_cred",
+        "inputs": EXTERNAL_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "external_cred"
+    credential_data_in = {
+        "name": "eda-credential",
+        "inputs": inputs,
+        "credential_type_id": response.data["id"],
+        "organization_id": default_organization.id,
+    }
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status_code
+
+
+@pytest.mark.parametrize(
+    ("metadata", "status_code", "raise_exception"),
+    [
+        (
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_202_ACCEPTED,
+            False,
+        ),
+        (
+            {"secret_key": "bar"},
+            status.HTTP_400_BAD_REQUEST,
+            False,
+        ),
+        (
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_400_BAD_REQUEST,
+            True,
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_external_credential_test(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    metadata: dict,
+    status_code: int,
+    raise_exception: bool,
+):
+    hashi_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+
+    data_in = {
+        "name": "eda-credential",
+        "inputs": {
+            "url": "https://www.example.com",
+            "api_version": "v2",
+            "token": secrets.token_hex(32),
+        },
+        "credential_type_id": hashi_type.id,
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    obj = response.json()
+    if raise_exception:
+        with patch(
+            "aap_eda.api.views.eda_credential.run_plugin",
+            side_effect=Exception("kaboom"),
+        ):
+            response = admin_client.post(
+                f"{api_url_v1}/eda-credentials/{obj['id']}/test/",
+                data={"metadata": metadata},
+            )
+            assert response.status_code == status_code
+    else:
+        with patch(
+            "aap_eda.api.views.eda_credential.run_plugin", return_value="abc"
+        ):
+            response = admin_client.post(
+                f"{api_url_v1}/eda-credentials/{obj['id']}/test/",
+                data={"metadata": metadata},
+            )
+            assert response.status_code == status_code
+
+
+@pytest.mark.parametrize(
+    ("metadata", "count", "expected_status", "credential_id"),
+    [
+        (
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            1,
+            status.HTTP_200_OK,
+            None,
+        ),
+        (None, 0, status.HTTP_200_OK, None),
+        (
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            0,
+            status.HTTP_404_NOT_FOUND,
+            98888,
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_credential_input_sources(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    default_registry_credential: models.EdaCredential,
+    metadata: Optional[dict],
+    count: int,
+    expected_status: int,
+    credential_id: Optional[int],
+):
+    if metadata:
+        hashi_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+        )
+
+        data_in = {
+            "name": "eda-credential-2",
+            "inputs": {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": secrets.token_hex(32),
+            },
+            "credential_type_id": hashi_type.id,
+            "organization_id": default_organization.id,
+        }
+        response = admin_client.post(
+            f"{api_url_v1}/eda-credentials/", data=data_in
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        source_credential = response.json()
+
+        data_in = {
+            "source_credential": source_credential["id"],
+            "target_credential": default_registry_credential.id,
+            "input_field_name": "password",
+            "organization_id": default_organization.id,
+            "metadata": metadata,
+        }
+        response = admin_client.post(
+            f"{api_url_v1}/credential-input-sources/", data=data_in
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    if not credential_id:
+        credential_id = default_registry_credential.id
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/{credential_id}/input_sources/"
+    )
+    assert response.status_code == expected_status
+
+    if expected_status == status.HTTP_200_OK:
+        obj = response.json()
+        assert obj["count"] == count
+        if count > 0:
+            assert obj["results"][0]["input_field_name"] == "password"
