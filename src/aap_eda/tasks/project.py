@@ -31,9 +31,6 @@ PROJECT_TASKS_QUEUE = "default"
 # Wrap the django_rq job decorator so its processing is within our retry
 # code.
 
-# For rq
-job = tasking.redis_connect_retry()(django_rq.job)
-
 
 def import_project(project_id: int) -> tp.Optional[str]:
     """Import project async task.
@@ -50,7 +47,7 @@ def import_project(project_id: int) -> tp.Optional[str]:
             return import_project_dispatcherd(project_id)
 
         # rq
-        job_data = import_project_rq.delay(project_id=project_id)
+        job_data = import_project_rq(project_id)
         return job_data.id
 
 
@@ -64,9 +61,10 @@ def import_project_dispatcherd(project_id: int) -> str:
     return job_data["uuid"]
 
 
-@job(PROJECT_TASKS_QUEUE)
-def import_project_rq(project_id: int):
-    _import_project(project_id)
+@tasking.redis_connect_retry()
+def import_project_rq(project_id: int) -> tasking.Job:
+    queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
+    return queue.enqueue(_import_project, project_id=project_id)
 
 
 def _import_project(project_id: int):
@@ -99,7 +97,7 @@ def sync_project(project_id: int) -> tp.Optional[str]:
         if features.DISPATCHERD:
             return sync_project_dispatcherd(project_id)
         # rq
-        job_data = sync_project_rq.delay(project_id=project_id)
+        job_data = sync_project_rq(project_id)
         return job_data.id
 
 
@@ -113,9 +111,10 @@ def sync_project_dispatcherd(project_id: int) -> str:
     return job_data["uuid"]
 
 
-@job(PROJECT_TASKS_QUEUE)
+@tasking.redis_connect_retry()
 def sync_project_rq(project_id: int):
-    _sync_project(project_id)
+    queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
+    return queue.enqueue(_sync_project, project_id=project_id)
 
 
 def _sync_project(project_id: int):
