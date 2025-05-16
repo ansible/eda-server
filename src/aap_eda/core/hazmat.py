@@ -18,9 +18,10 @@ from django.db import connection
 
 """This module is an optimization for dispatcherd workers
 
-This sets up Django pre-fork, which must be implemented as a module to run on-import
-for compatibility with multiprocessing forkserver.
-This should never be imported by other modules, which is why it is called hazmat.
+This sets up Django pre-fork, which must be implemented
+as a module to run on-import for compatibility with multiprocessing
+forkserver. This should never be imported by other modules,
+which is why it is called hazmat.
 """
 
 
