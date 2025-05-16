@@ -111,6 +111,7 @@ def test_project_job_uniqueness(module_data):
     def _wrapper_call(shared_list):
         """Patch fn_mock in a thread-safe way inside each thread."""
         import importlib
+
         from aap_eda.settings import features
 
         module = importlib.import_module(module_data["module_path"])
