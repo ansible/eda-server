@@ -22,14 +22,12 @@ from aap_eda.core.exceptions import (
     DuplicateFileTemplateKeyError,
     InvalidEnvKeyError,
 )
-from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.core.utils.credentials import (
     add_default_values_to_user_inputs,
     get_secret_fields,
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.middleware.request_log_middleware import assign_log_tracking_id
-from aap_eda.tasks import orchestrator
 
 from .messages import (
     ActionMessage,
