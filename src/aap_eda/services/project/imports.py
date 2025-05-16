@@ -65,6 +65,7 @@ def _project_import_wrapper(
         try:
             func(self, project)
             project.import_state = models.Project.ImportState.COMPLETED
+            project.import_error = error
         except ProjectImportWarning as e:
             # import status should show completed but with an error message
             project.import_state = models.Project.ImportState.COMPLETED

@@ -214,7 +214,7 @@ class EdaCredentialViewSet(
         eda_credential.refresh_from_db()
         new_interval = get_analytics_interval_if_exist(eda_credential)
         if new_interval != old_interval:
-            reschedule_gather_analytics.delay()
+            reschedule_gather_analytics()
         return Response(
             serializers.EdaCredentialSerializer(eda_credential).data,
         )
@@ -307,7 +307,7 @@ class EdaCredentialViewSet(
             )
 
         if get_analytics_interval_if_exist(response) > 0:
-            reschedule_gather_analytics.delay()
+            reschedule_gather_analytics()
 
         return Response(
             serializers.EdaCredentialSerializer(response).data,

@@ -20,6 +20,7 @@ from ansible_base.lib.utils.db import advisory_lock
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
 from aap_eda.settings import features
+from aap_eda.utils import sanitize_postgres_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +61,30 @@ def schedule_gather_analytics(
         )
 
 
-@job(ANALYTICS_TASKS_QUEUE)
 def reschedule_gather_analytics(
     queue_name: str = ANALYTICS_TASKS_QUEUE,
 ) -> None:
+    """Reschedule the gather analytics job.
+
+    Proxy for reschedule_gather_analytics_rq and
+    reschedule_gather_analytics_dispatcherd.
+    """
+    if features.DISPATCHERD:
+        return reschedule_gather_analytics_dispatcherd(queue_name)
+    return reschedule_gather_analytics_rq(queue_name)
+
+
+@job(ANALYTICS_TASKS_QUEUE)
+def reschedule_gather_analytics_rq(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    schedule_gather_analytics(queue_name, cancel=True)
+
+
+def reschedule_gather_analytics_dispatcherd(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    queue_name = sanitize_postgres_identifier(queue_name)
     schedule_gather_analytics(queue_name, cancel=True)
 
 

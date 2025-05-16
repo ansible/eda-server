@@ -176,8 +176,7 @@ def test_create_or_update_project_with_right_signature_credential(
     status_code,
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
-    job = mock.Mock(id=job_id)
-    import_project_task.delay.return_value = job
+    import_project_task.return_value = job_id
     credential = create_custom_credential(
         credential_type=credential_type, organization=default_organization
     )
@@ -245,7 +244,7 @@ def test_create_or_update_project_with_right_signature_credential(
         assert_project_data(response.data, project)
 
         # Check that import task job was created
-        import_project_task.delay.assert_called_with(project_id=project.id)
+        import_project_task.assert_called_with(project.id)
     else:
         assert (
             "The type of credential can only be one of ['Source Control']"
@@ -327,8 +326,7 @@ def test_create_or_update_project_with_right_eda_credential(
     status_code,
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
-    job = mock.Mock(id=job_id)
-    import_project_task.delay.return_value = job
+    import_project_task.return_value = job_id
     credential = create_custom_credential(
         credential_type=credential_type, organization=default_organization
     )
@@ -398,7 +396,7 @@ def test_create_or_update_project_with_right_eda_credential(
         assert_project_data(response.data, project)
 
         # Check that import task job was created
-        import_project_task.delay.assert_called_with(project_id=project.id)
+        import_project_task.assert_called_with(project.id)
     else:
         assert (
             "The type of credential can only be one of ['GPG Public Key']"
@@ -452,7 +450,7 @@ def test_create_project_redis_unavailable(
     def raise_connection_error(*args, **kwargs):
         raise redis.ConnectionError("redis unavailable")
 
-    import_project_task.delay.side_effect = raise_connection_error
+    import_project_task.side_effect = raise_connection_error
 
     credential = create_custom_credential(
         credential_type=enums.DefaultCredentialType.GPG,
@@ -565,8 +563,7 @@ def test_sync_project(
     default_project.save(update_fields=["import_state"])
 
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
-    job = mock.Mock(id=job_id)
-    sync_project_task.delay.return_value = job
+    sync_project_task.return_value = job_id
 
     response = admin_client.post(
         f"{api_url_v1}/projects/{default_project.id}/sync/"
@@ -581,9 +578,7 @@ def test_sync_project(
 
     assert_project_data(data, default_project)
 
-    sync_project_task.delay.assert_called_once_with(
-        project_id=default_project.id,
-    )
+    sync_project_task.assert_called_once_with(default_project.id)
 
 
 @pytest.mark.django_db
@@ -613,7 +608,7 @@ def test_sync_project_conflict_already_running(
         "detail": "Project import or sync is already running."
     }
 
-    sync_project_task.delay.assert_not_called()
+    sync_project_task.assert_not_called()
     default_project.refresh_from_db()
     assert default_project.import_state == initial_state
     assert default_project.import_task_id is None
@@ -637,7 +632,7 @@ def test_sync_project_redis_unavailable(
     def raise_connection_error(*args, **kwargs):
         raise redis.ConnectionError("redis unavailable")
 
-    sync_project_task.delay.side_effect = raise_connection_error
+    sync_project_task.side_effect = raise_connection_error
 
     response = admin_client.post(
         f"{api_url_v1}/projects/{default_project.id}/sync/"
@@ -823,8 +818,7 @@ def test_project_by_fields(
     base_client: APIClient,
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
-    job = mock.Mock(id=job_id)
-    import_project_task.delay.return_value = job
+    import_project_task.return_value = job_id
 
     body = {
         "name": "test-project-01",

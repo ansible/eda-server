@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
+from contextlib import contextmanager
 from unittest import mock
 
 import pytest
@@ -33,7 +35,7 @@ def fake_task(number: int):
 
 @pytest.fixture
 def eda_caplog(caplog_factory):
-    return caplog_factory(orchestrator.LOGGER)
+    return caplog_factory(orchestrator.LOGGER, level=logging.DEBUG)
 
 
 @pytest.fixture
@@ -319,27 +321,29 @@ def test_max_running_activation_after_start_job(
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
-def test_dispatch_existing_rq_jobs(
-    enqueue_mock, activation, eda_caplog, default_queue
-):
+def test_dispatch_existing_rq_jobs(enqueue_mock, activation, eda_caplog):
     """Test that the dispatch does not process the request if there is
-    already a job in the queue."""
-    default_queue.enqueue(
-        fake_task,
-        job_id=orchestrator._manage_process_job_id(
-            ProcessParentType.ACTIVATION, activation.id
-        ),
-        number=1,
+    already a job currently running."""
+    job_id = orchestrator._manage_process_job_id(
+        ProcessParentType.ACTIVATION, activation.id
     )
     activation.status = ActivationStatus.STOPPED
     activation.save(update_fields=["status"])
-    orchestrator.queue_dispatch(
-        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
-    )
-    enqueue_mock.assert_not_called()
-    assert (
-        "can not be processed because there is already a job"
-        in eda_caplog.text
-    )
-    activation.refresh_from_db()
-    assert activation.status == ActivationStatus.STOPPED
+
+    @contextmanager
+    def advisory_lock_mock(*args, **kwargs):
+        yield False
+
+    with mock.patch(
+        "aap_eda.tasks.orchestrator.advisory_lock", advisory_lock_mock
+    ):
+        orchestrator.queue_dispatch(
+            ProcessParentType.ACTIVATION,
+            activation.id,
+            ActivationRequest.START,
+        )
+
+        enqueue_mock.assert_not_called()
+        assert f"_manage({job_id}) already being ran, " in eda_caplog.text
+        activation.refresh_from_db()
+        assert activation.status == ActivationStatus.STOPPED

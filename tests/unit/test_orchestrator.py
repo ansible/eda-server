@@ -275,6 +275,7 @@ def mock_requests_queue():
         "two_queues_neither_responsive",
     ],
 )
+@pytest.mark.django_db
 def test_get_least_busy_queue_name(fixture, request):
     queues = request.getfixturevalue(fixture)
 
@@ -294,6 +295,7 @@ def test_get_least_busy_queue_name(fixture, request):
             get_least_busy_queue_name()
 
 
+@pytest.mark.django_db
 def test_get_least_busy_queue_name_multiple_queues(
     three_queues_two_candidates,
 ):
@@ -350,6 +352,7 @@ def multi_queue_various_states(monkeypatch):
     )
 
 
+@pytest.mark.django_db
 def test_check_rulebook_queue_health(multi_queue_various_states):
     queues = multi_queue_various_states
 
