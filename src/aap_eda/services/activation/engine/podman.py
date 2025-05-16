@@ -80,13 +80,11 @@ class Engine(ContainerEngine):
         self.JobTimeoutException = self._get_job_timeout_exception()
 
     def _get_job_timeout_exception(self):
-        """
-        Get the job timeout exception class based on the dispatcherd feature flag.
+        """Get the exception class based on the dispatcherd feature flag.
 
         This can not be done at the module level, because the feature flag
         state cannot be checked before the app registry is ready.
         """
-
         if features.DISPATCHERD:
             from dispatcherd.worker.task import (
                 DispatcherCancel as JobTimeoutException,

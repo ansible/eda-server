@@ -25,7 +25,7 @@ from django.utils import timezone
 from pydantic import ValidationError
 
 from aap_eda.api.serializers.activation import is_activation_valid
-from aap_eda.core import models, tasking
+from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, RestartPolicy
 from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.engine import exceptions as engine_exceptions

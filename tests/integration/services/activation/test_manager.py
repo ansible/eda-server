@@ -14,7 +14,6 @@
 """Activation Manager tests."""
 # TODO(alex) dedup code and fixtures across all the tests
 
-from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
