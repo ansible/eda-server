@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from _pytest.logging import LogCaptureFixture
+from django.conf import settings as django_settings
 from django.utils import timezone
 from pytest_django.fixtures import SettingsWrapper
 from pytest_lazyfixture import lazy_fixture
@@ -35,7 +36,6 @@ from aap_eda.services.activation.engine.common import (
     ContainerRequest,
 )
 from aap_eda.services.activation.status_manager import StatusManager
-from django.conf import settings as django_settings
 
 
 def apply_settings(settings: SettingsWrapper, **kwargs):
