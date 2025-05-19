@@ -23,15 +23,15 @@ from django_rq.management.commands import rqscheduler, rqworker
 @mock.patch(
     "aap_eda.core.management.commands.rqworker.features.DISPATCHERD", True
 )
-def test_rqworker_command_feature_flag_enabled(capsys):
-    with pytest.raises(SystemExit) as exc_info:
-        call_command(
-            "rqworker",
-            worker_class="aap_eda.core.tasking.ActivationWorker",
-        )
-    assert exc_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "DISPATCHERD feature not implemented yet" in captured.err
+@mock.patch(
+    "aap_eda.core.management.commands.rqworker.run_dispatcherd_service",
+)
+def test_rqworker_command_feature_flag_enabled(dispatcherd_service_mock):
+    call_command(
+        "rqworker",
+        worker_class="aap_eda.core.tasking.ActivationWorker",
+    )
+    dispatcherd_service_mock.assert_called_once()
 
 
 @pytest.mark.django_db

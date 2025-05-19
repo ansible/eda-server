@@ -62,6 +62,7 @@ class Command(BaseCommand):
 
             logger.info("Starting worker with dispatcherd.")
             run_dispatcherd_service()
+            return None
 
         # run rqworker command if dispatcherd is not enabled
         logger.info("Starting worker with rqworker.")
