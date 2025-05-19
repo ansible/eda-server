@@ -190,6 +190,12 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Proxy server for http or https connection",
     )
+    url = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Source control repository URL.",
+    )
 
     class Meta:
         model = models.Project
@@ -203,6 +209,7 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
             "scm_refspec",
             "verify_ssl",
             "proxy",
+            "url",
         ]
 
     def validate(self, data):

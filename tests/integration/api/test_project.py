@@ -791,6 +791,27 @@ def test_partial_update_project_bad_proxy(
 
 
 @pytest.mark.django_db
+def test_partial_update_project_url(
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    original_url = new_project.url
+    new_url = "https://git.example.com/foo-bar"
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{new_project.id}/",
+        data={"url": new_url},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["url"] == new_url
+
+    new_project.refresh_from_db()
+    assert new_project.url == new_url
+    assert new_project.url != original_url
+
+
+@pytest.mark.django_db
 def test_delete_project(
     new_project: models.Project,
     admin_client: APIClient,
