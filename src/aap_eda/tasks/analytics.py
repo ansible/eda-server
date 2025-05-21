@@ -14,7 +14,6 @@
 
 import logging
 
-import django_rq
 from ansible_base.lib.utils.db import advisory_lock
 
 from aap_eda.analytics import collector, utils
@@ -28,10 +27,6 @@ logger = logging.getLogger(__name__)
 ANALYTICS_SCHEDULE_JOB_ID = "gather_analytics"
 ANALYTICS_JOB_ID = "job_gather_analytics"
 ANALYTICS_TASKS_QUEUE = "default"
-
-# Wrap the django_rq job decorator so its processing is within our retry
-# code.
-job = tasking.redis_connect_retry()(django_rq.job)
 
 
 def schedule_gather_analytics(
@@ -74,7 +69,6 @@ def reschedule_gather_analytics(
     return reschedule_gather_analytics_rq(queue_name)
 
 
-@job(ANALYTICS_TASKS_QUEUE)
 def reschedule_gather_analytics_rq(
     queue_name: str = ANALYTICS_TASKS_QUEUE,
 ) -> None:
