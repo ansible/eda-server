@@ -20,6 +20,10 @@ def test_http_startup_logging(caplog_factory, module):
 
     assert "Starting eda-server" in caplog.text
 
+    # hardcoded value to not depends on settings
+    # and be able to handle unexpected lookups
+    assert "HOST: localhost" in caplog.text
+
 
 def test_worker_startup_logs():
     """

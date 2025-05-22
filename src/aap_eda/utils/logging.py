@@ -101,13 +101,13 @@ def startup_logging(logger: logging.Logger) -> None:
 
     # Database settings
     unconditional_logger.log("  Default database:")
+    if not settings.DATABASES or not settings.DATABASES.get("default"):
+        logger.error(
+            "Expected setting DATABASES not found or empty",
+        )
     for setting in ["USER", "HOST", "PORT", "OPTIONS"]:
-        if hasattr(settings.DATABASES["default"], setting):
-            unconditional_logger.log(
-                f"    {setting}: "
-                f"{getattr(settings.DATABASES['default'], setting)}",
-            )
-
+        value = settings.DATABASES["default"].get(setting)
+        unconditional_logger.log(f"    {setting}: {value}")
     # Resource server is relevant but can contain sensitive information
     resource_server = settings.RESOURCE_SERVER.get("URL")
     unconditional_logger.log(f"  Resource server: {resource_server}")
