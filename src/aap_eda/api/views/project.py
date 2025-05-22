@@ -211,6 +211,7 @@ class ProjectViewSet(
 
         update_fields = []
         old_data = model_to_dict(project)
+
         for key, value in serializer.validated_data.items():
             setattr(project, key, value)
             update_fields.append(key)
