@@ -628,14 +628,14 @@ files = [
 
 [[package]]
 name = "dispatcherd"
-version = "2025.5.12"
+version = "2025.5.19"
 description = "An asyncio-based dispatcher for tasks in a worker pool."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "dispatcherd-2025.5.12-py3-none-any.whl", hash = "sha256:1293d2a73a02377f1bfd52d185e38e327f0d555048682d1bdf7a1e7edb6b86a6"},
-    {file = "dispatcherd-2025.5.12.tar.gz", hash = "sha256:d4959e41240c16192eb15160c9123372691941eeb00b61a78e91d1735a293e5f"},
+    {file = "dispatcherd-2025.5.19-py3-none-any.whl", hash = "sha256:f77c1948d8bf88d079de3a14c3ff2def6b12190fa040103071b05024d7bef9cc"},
+    {file = "dispatcherd-2025.5.19.tar.gz", hash = "sha256:5b4b26e3a00934b59007e34b39f1df253feeb23b37a01d3a825f6741e0cb6ed8"},
 ]
 
 [package.dependencies]
@@ -3023,4 +3023,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "14f2697617705e5e11796390f20fdef3032e3d02353da5f1cf763ddefcf72527"
+content-hash = "407ebe011c6024e245c6f1a50fda29dcdcca9b8429e3e007e74eaac7d5135b68"
