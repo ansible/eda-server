@@ -3,6 +3,7 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Generator
+from unittest import mock
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +16,7 @@ from pydantic.error_wrappers import ValidationError
 
 from aap_eda.core import enums, models
 from aap_eda.core.models.activation import ActivationStatus
+from aap_eda.services.activation.activation_manager import ActivationManager
 from aap_eda.wsapi.consumers import AnsibleRulebookConsumer, logger
 
 # TODO(doston): this test module needs a whole refactor to use already
@@ -510,14 +512,23 @@ async def test_handle_heartbeat_running_status(
         }
         for stat in stats
     ]
-    with patch(
-        "aap_eda.tasks.orchestrator.monitor_rulebook_processes"
-    ) as mock_orchestrator:
-        for payload in payloads:
-            await ws_communicator.send_json_to(payload)
 
-        await ws_communicator.wait()
-        mock_orchestrator.delay.assert_called_once()
+    for payload in payloads:
+        await ws_communicator.send_json_to(payload)
+
+    await ws_communicator.wait()
+
+    activation = await monitor_activation(activation)
+    assert activation.status == ActivationStatus.RUNNING
+
+
+@database_sync_to_async
+def monitor_activation(activation: models.Activation):
+    activation.latest_instance.activation_pod_id = "test"
+    activation.latest_instance.save(update_fields=["activation_pod_id"])
+    ActivationManager(activation, container_engine=mock.Mock()).monitor()
+    activation.refresh_from_db()
+    return activation
 
 
 @pytest.mark.django_db(transaction=True)

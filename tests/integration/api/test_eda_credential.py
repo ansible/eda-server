@@ -1303,7 +1303,7 @@ def test_create_eda_credential_for_analytics(
         "organization_id": default_organization.id,
     }
     with patch(
-        "aap_eda.api.views.eda_credential.reschedule_gather_analytics.delay"
+        "aap_eda.api.views.eda_credential.reschedule_gather_analytics"
     ) as mock_reschedule:
         response = admin_client.post(
             f"{api_url_v1}/eda-credentials/", data=data_in
@@ -1333,7 +1333,7 @@ def test_update_eda_credential_for_analytics(
     )
     # first try, interval 100 -> 200
     with patch(
-        "aap_eda.api.views.eda_credential.reschedule_gather_analytics.delay"
+        "aap_eda.api.views.eda_credential.reschedule_gather_analytics"
     ) as mock_reschedule:
         response = admin_client.patch(
             f"{api_url_v1}/eda-credentials/{obj.id}/", data={}
@@ -1343,7 +1343,7 @@ def test_update_eda_credential_for_analytics(
 
     # second try, no internval change 100 -> 100
     with patch(
-        "aap_eda.api.views.eda_credential.reschedule_gather_analytics.delay"
+        "aap_eda.api.views.eda_credential.reschedule_gather_analytics"
     ) as mock_reschedule:
         response = admin_client.patch(
             f"{api_url_v1}/eda-credentials/{obj.id}/", data={}

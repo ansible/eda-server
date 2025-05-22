@@ -346,6 +346,11 @@ def _get_logging_setup(settings: Dynaconf) -> dict:
                 "level": "DEBUG",
                 "propagate": False,
             },
+            "dispatcherd": {
+                "handlers": ["console"],
+                "level": settings.APP_LOG_LEVEL,
+                "propagate": False,
+            },
         },
     }
 
@@ -485,6 +490,61 @@ def post_loading(loaded_settings: Dynaconf):
         )
 
     settings.API_PATH_TO_UI_PATH_MAP = settings.API_PATH_UI_PATH_MAP
+
+    settings.DISPATCHERD_DEFAULT_SETTINGS = {
+        "version": 2,
+        "service": {
+            "process_manager_cls": "ForkServerManager",
+            "process_manager_kwargs": {
+                "preload_modules": ["aap_eda.core.dispatcherd_pre_fork"],
+            },
+        },
+        "brokers": {
+            "pg_notify": {
+                "config": {
+                    # TODO: we might want to use a different connection
+                    "conninfo": settings.PG_NOTIFY_DSN_SERVER,
+                },
+                "sync_connection_factory": (
+                    "ansible_base.lib.utils.db."
+                    "psycopg_connection_from_django"
+                ),
+                # Channels are only valid if this is a general worker
+                "channels": [settings.DISPATCHERD_DEFAULT_CHANNEL],
+                "default_publish_channel": settings.DISPATCHERD_DEFAULT_CHANNEL,  # noqa: E501
+            }
+        },
+        "producers": {},  # producers are set by the workers
+        "publish": {"default_broker": "pg_notify"},
+    }
+
+    settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS = {
+        **settings.DISPATCHERD_DEFAULT_SETTINGS,
+        "producers": {
+            "ScheduledProducer": {
+                "task_schedule": settings.DISPATCHERD_SCHEDULE_TASKS,
+            },
+            "OnStartProducer": {
+                "task_list": settings.DISPATCHERD_STARTUP_TASKS,
+            },
+        },
+    }
+
+    settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS = {
+        **settings.DISPATCHERD_DEFAULT_SETTINGS,
+        "brokers": {
+            "pg_notify": {
+                **settings.DISPATCHERD_DEFAULT_SETTINGS["brokers"][
+                    "pg_notify"
+                ],
+                "channels": [
+                    utils.sanitize_postgres_identifier(
+                        settings.RULEBOOK_QUEUE_NAME,
+                    )
+                ],
+            },
+        },
+    }
 
     data = {
         key: settings[key]
