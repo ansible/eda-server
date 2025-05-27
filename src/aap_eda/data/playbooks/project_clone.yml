@@ -16,11 +16,11 @@
   tasks:
     - name: Clone or pull a project using git
       block:
-        - name: Clone or pull a project using gitt
+        - name: Clone or pull a project using git
           ansible.builtin.git:
             dest: "{{ project_path | quote }}"
             repo: "{{ scm_url }}"
-            version: "{{ scm_branch | default(omit) | quote }}"
+            version: "{{ omit if scm_branch is undefined else scm_branch|quote  }}"
             refspec: "{{ scm_refspec | default(omit) }}"
             key_file: "{{ key_file | default(omit) }}"
             accept_hostkey: true
