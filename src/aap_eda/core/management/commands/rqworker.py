@@ -41,29 +41,33 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options) -> None:
         if features.DISPATCHERD:
-            if "worker_class" not in options:
-                self.style.ERROR("Missing required argument: --worker-class")
-                raise SystemExit(1)
-
-            # Use rqworker expected args to determine worker type
-            if "ActivationWorker" in options["worker_class"]:
-                dispatcherd_setup(
-                    settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS,
-                )
-
-            elif "DefaultWorker" in options["worker_class"]:
-                dispatcherd_setup(settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS)
-            else:
-                self.style.ERROR(
-                    "Invalid worker class. "
-                    "Please use either ActivationWorker or DefaultWorker."
-                )
-                raise SystemExit(1)
-
-            logger.info("Starting worker with dispatcherd.")
-            run_dispatcherd_service()
-            return None
+            return self._handle_dispatcherd(*args, **options)
 
         # run rqworker command if dispatcherd is not enabled
         logger.info("Starting worker with rqworker.")
         return rqworker.Command.handle(self, *args, **options)
+
+    def _handle_dispatcherd(self, *args, **options) -> None:
+        """Handle dispatcherd service."""
+        if "worker_class" not in options:
+            self.style.ERROR("Missing required argument: --worker-class")
+            raise SystemExit(1)
+
+        # Use rqworker expected args to determine worker type
+        if "ActivationWorker" in options["worker_class"]:
+            dispatcherd_setup(
+                settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS,
+            )
+
+        elif "DefaultWorker" in options["worker_class"]:
+            dispatcherd_setup(settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS)
+        else:
+            self.style.ERROR(
+                "Invalid worker class. "
+                "Please use either ActivationWorker or DefaultWorker."
+            )
+            raise SystemExit(1)
+
+        logger.info("Starting worker with dispatcherd.")
+        run_dispatcherd_service()
+        return None
