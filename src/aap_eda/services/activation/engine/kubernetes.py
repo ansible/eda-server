@@ -199,9 +199,6 @@ class Engine(ContainerEngine):
         self._delete_services(log_handler)
         self._delete_job(log_handler)
 
-        self._wait_for_pod_to_be_deleted(container_id, log_handler)
-        log_handler.write(f"Job {container_id} is cleaned up.", flush=True)
-
     def update_logs(self, container_id: str, log_handler: LogHandler) -> None:
         try:
             pod = self._get_job_pod(container_id)
@@ -460,7 +457,7 @@ class Engine(ContainerEngine):
             job_result = self.client.batch_api.create_namespaced_job(
                 namespace=self.namespace, body=job_spec
             )
-            LOGGER.info(f"Submitted Job template: {self.job_name},")
+            LOGGER.info(f"Submitted Job template: {self.job_name}")
         except ApiException as e:
             LOGGER.error(f"API Exception {e}")
             raise ContainerStartError(str(e)) from e
@@ -475,26 +472,65 @@ class Engine(ContainerEngine):
                 timeout_seconds=0,
             )
 
-            if activation_job.items and activation_job.items[0].metadata:
-                activation_job_name = activation_job.items[0].metadata.name
-                result = self.client.batch_api.delete_namespaced_job(
-                    name=activation_job_name,
-                    namespace=self.namespace,
-                    propagation_policy="Background",
-                )
-
-                if result.status == "Failure":
-                    raise ContainerCleanupError(f"{result}")
-            else:
+            if not (activation_job.items and activation_job.items[0].metadata):
                 LOGGER.info(f"Job for {self.job_name} has been removed")
-                log_handler.write(
-                    f"Job for {self.job_name} has been removed.", True
-                )
+                return
+
+            activation_job_name = activation_job.items[0].metadata.name
+            self._delete_job_resource(activation_job_name, log_handler)
 
         except ApiException as e:
             raise ContainerCleanupError(
                 f"Stop of {self.job_name} Failed: \n {e}"
             ) from e
+
+    def _delete_job_resource(
+        self, job_name: str, log_handler: LogHandler
+    ) -> None:
+        result = self.client.batch_api.delete_namespaced_job(
+            name=job_name,
+            namespace=self.namespace,
+            propagation_policy="Background",
+        )
+
+        if result.status == "Failure":
+            raise ContainerCleanupError(f"{result}")
+
+        watcher = watch.Watch()
+        try:
+            for event in watcher.stream(
+                self.client.core_api.list_namespaced_pod,
+                namespace=self.namespace,
+                label_selector=f"job-name={self.job_name}",
+                timeout_seconds=POD_DELETE_TIMEOUT,
+            ):
+                if event["type"] == "DELETED":
+                    log_handler.write(
+                        f"Pod '{self.job_name}' is deleted.",
+                        flush=True,
+                    )
+                    break
+
+            log_handler.write(
+                f"Job {self.job_name} is cleaned up.",
+                flush=True,
+            )
+        except ApiException as e:
+            if e.status == status.HTTP_404_NOT_FOUND:
+                message = (
+                    f"Pod '{self.job_name}' not found (404), "
+                    "assuming it's already deleted."
+                )
+                log_handler.write(message, flush=True)
+                return
+            log_handler.write(
+                f"Error while waiting for deletion: {e}", flush=True
+            )
+            raise ContainerCleanupError(
+                f"Error during cleanup: {str(e)}"
+            ) from e
+        finally:
+            watcher.stop()
 
     def _wait_for_pod_to_start(self, log_handler: LogHandler) -> None:
         watcher = watch.Watch()
@@ -527,50 +563,6 @@ class Engine(ContainerEngine):
         except ApiException as e:
             raise ContainerStartError(
                 f"Pod {self.pod_name} failed with error {e}"
-            ) from e
-
-        finally:
-            watcher.stop()
-
-    def _wait_for_pod_to_be_deleted(
-        self, pod_name: str, log_handler: LogHandler
-    ) -> None:
-        log_handler.write(
-            f"Waiting for pod '{pod_name}' to be deleted...",
-            flush=True,
-        )
-        watcher = watch.Watch()
-        try:
-            for event in watcher.stream(
-                self.client.core_api.list_namespaced_pod,
-                namespace=self.namespace,
-                label_selector=f"job-name={self.job_name}",
-                timeout_seconds=POD_DELETE_TIMEOUT,
-            ):
-                LOGGER.debug(f"Received event: {event}")
-                pod_name = event["object"].metadata.name
-                pod_phase = event["object"].status.phase
-                LOGGER.debug(f"Pod {pod_name} - {pod_phase}")
-
-                if event["type"] == "DELETED":
-                    # Pod successfully deleted
-                    log_handler.write(
-                        f"Pod '{pod_name}' has been deleted.", flush=True
-                    )
-                    break
-        except ApiException as e:
-            if e.status == status.HTTP_404_NOT_FOUND:
-                message = (
-                    f"Pod '{pod_name}' not found (404), "
-                    "assuming it's already deleted."
-                )
-                log_handler.write(message, flush=True)
-                return
-            log_handler.write(
-                f"Error while waiting for deletion: {e}", flush=True
-            )
-            raise ContainerCleanupError(
-                f"Error during cleanup: {str(e)}"
             ) from e
 
         finally:
