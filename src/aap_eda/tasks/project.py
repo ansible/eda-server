@@ -48,7 +48,7 @@ def import_project(project_id: int) -> tp.Optional[str]:
 
         # rq
         job_data = import_project_rq(project_id)
-        return job_data.id
+        return job_data
 
 
 def import_project_dispatcherd(project_id: int) -> str:
@@ -62,9 +62,9 @@ def import_project_dispatcherd(project_id: int) -> str:
 
 
 @tasking.redis_connect_retry()
-def import_project_rq(project_id: int) -> tasking.Job:
+def import_project_rq(project_id: int) -> str:
     queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
-    return queue.enqueue(_import_project, project_id=project_id)
+    return queue.enqueue(_import_project, project_id=project_id).id
 
 
 def _import_project(project_id: int):
@@ -98,7 +98,7 @@ def sync_project(project_id: int) -> tp.Optional[str]:
             return sync_project_dispatcherd(project_id)
         # rq
         job_data = sync_project_rq(project_id)
-        return job_data.id
+        return job_data
 
 
 def sync_project_dispatcherd(project_id: int) -> str:
@@ -112,9 +112,9 @@ def sync_project_dispatcherd(project_id: int) -> str:
 
 
 @tasking.redis_connect_retry()
-def sync_project_rq(project_id: int):
+def sync_project_rq(project_id: int) -> str:
     queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
-    return queue.enqueue(_sync_project, project_id=project_id)
+    return queue.enqueue(_sync_project, project_id=project_id).id
 
 
 def _sync_project(project_id: int):
