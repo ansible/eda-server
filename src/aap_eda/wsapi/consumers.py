@@ -22,14 +22,12 @@ from aap_eda.core.exceptions import (
     DuplicateFileTemplateKeyError,
     InvalidEnvKeyError,
 )
-from aap_eda.core.models.activation import ActivationStatus
 from aap_eda.core.utils.credentials import (
     add_default_values_to_user_inputs,
     get_secret_fields,
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
 from aap_eda.middleware.request_log_middleware import assign_log_tracking_id
-from aap_eda.tasks import orchestrator
 
 from .messages import (
     ActionMessage,
@@ -209,9 +207,6 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                 message.stats["ruleSetName"]
             ] = message.stats
             activation.save(update_fields=["ruleset_stats"])
-
-            if activation.status == ActivationStatus.STARTING:
-                orchestrator.monitor_rulebook_processes.delay()
         else:
             logger.warning(
                 f"Activation instance {message.activation_id} is not present."

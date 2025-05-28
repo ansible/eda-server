@@ -14,11 +14,17 @@
 
 """Wrapper for rqworker command."""
 
+import logging
+
+from dispatcherd import run_service as run_dispatcherd_service
+from dispatcherd.config import setup as dispatcherd_setup
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django_rq.management.commands import rqworker
 
 from aap_eda.settings import features
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -35,12 +41,33 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options) -> None:
         if features.DISPATCHERD:
-            self.stderr.write(
-                self.style.ERROR(
-                    "DISPATCHERD feature not implemented yet. "
-                    f"Please disable {settings.DISPATCHERD_FEATURE_FLAG_NAME} "
-                    "in your settings.",
-                )
+            return self._handle_dispatcherd(*args, **options)
+
+        # run rqworker command if dispatcherd is not enabled
+        logger.info("Starting worker with rqworker.")
+        return rqworker.Command.handle(self, *args, **options)
+
+    def _handle_dispatcherd(self, *args, **options) -> None:
+        """Handle dispatcherd service."""
+        if "worker_class" not in options:
+            self.style.ERROR("Missing required argument: --worker-class")
+            raise SystemExit(1)
+
+        # Use rqworker expected args to determine worker type
+        if "ActivationWorker" in options["worker_class"]:
+            dispatcherd_setup(
+                settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS,
+            )
+
+        elif "DefaultWorker" in options["worker_class"]:
+            dispatcherd_setup(settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS)
+        else:
+            self.style.ERROR(
+                "Invalid worker class. "
+                "Please use either ActivationWorker or DefaultWorker."
             )
             raise SystemExit(1)
-        return rqworker.Command.handle(self, *args, **options)
+
+        logger.info("Starting worker with dispatcherd.")
+        run_dispatcherd_service()
+        return None

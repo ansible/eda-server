@@ -15,7 +15,6 @@
 import logging
 import os
 
-import rq
 from dateutil import parser
 from django.conf import settings
 from podman import PodmanClient
@@ -24,6 +23,7 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus
+from aap_eda.settings import features
 from aap_eda.utils import str_to_bool
 
 from . import exceptions, messages
@@ -76,6 +76,23 @@ class Engine(ContainerEngine):
         except APIError as e:
             LOGGER.error(f"Failed to initialize podman engine: f{e}")
             raise exceptions.ContainerEngineInitError(str(e))
+
+        self.JobTimeoutException = self._get_job_timeout_exception()
+
+    def _get_job_timeout_exception(self):
+        """Get the exception class based on the dispatcherd feature flag.
+
+        This can not be done at the module level, because the feature flag
+        state cannot be checked before the app registry is ready.
+        """
+        if features.DISPATCHERD:
+            from dispatcherd.worker.task import (
+                DispatcherCancel as JobTimeoutException,
+            )
+        else:
+            from rq.timeouts import JobTimeoutException
+
+        return JobTimeoutException
 
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         try:
@@ -381,7 +398,7 @@ class Engine(ContainerEngine):
                 raise exceptions.ContainerImagePullError(msg)
             LOGGER.error(f"Failed to pull image {request.image_url}: {e}")
             raise exceptions.ContainerStartError(str(e))
-        except rq.timeouts.JobTimeoutException as e:
+        except self.JobTimeoutException as e:
             msg = f"Timeout: {e}"
             LOGGER.error(msg)
             log_handler.write(msg, True)

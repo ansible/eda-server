@@ -47,7 +47,7 @@ cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.3.7", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.5.8", extras = [
     "channel-auth",
     "rbac",
     "redis-client",
@@ -70,6 +70,8 @@ validators = "^0.34.0"
 django-flags = "^5.0.13"
 insights-analytics-collector = "^0.3.2"
 distro = "^1.9.0"
+dispatcherd = { version = "v2025.05.19", extras = ["pg_notify"] }
+
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"

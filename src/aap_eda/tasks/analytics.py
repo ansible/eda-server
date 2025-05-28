@@ -14,12 +14,12 @@
 
 import logging
 
-import django_rq
 from ansible_base.lib.utils.db import advisory_lock
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
 from aap_eda.settings import features
+from aap_eda.utils import sanitize_postgres_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,6 @@ logger = logging.getLogger(__name__)
 ANALYTICS_SCHEDULE_JOB_ID = "gather_analytics"
 ANALYTICS_JOB_ID = "job_gather_analytics"
 ANALYTICS_TASKS_QUEUE = "default"
-
-# Wrap the django_rq job decorator so its processing is within our retry
-# code.
-job = tasking.redis_connect_retry()(django_rq.job)
 
 
 def schedule_gather_analytics(
@@ -60,10 +56,29 @@ def schedule_gather_analytics(
         )
 
 
-@job(ANALYTICS_TASKS_QUEUE)
 def reschedule_gather_analytics(
     queue_name: str = ANALYTICS_TASKS_QUEUE,
 ) -> None:
+    """Reschedule the gather analytics job.
+
+    Proxy for reschedule_gather_analytics_rq and
+    reschedule_gather_analytics_dispatcherd.
+    """
+    if features.DISPATCHERD:
+        return reschedule_gather_analytics_dispatcherd(queue_name)
+    return reschedule_gather_analytics_rq(queue_name)
+
+
+def reschedule_gather_analytics_rq(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    schedule_gather_analytics(queue_name, cancel=True)
+
+
+def reschedule_gather_analytics_dispatcherd(
+    queue_name: str = ANALYTICS_TASKS_QUEUE,
+) -> None:
+    queue_name = sanitize_postgres_identifier(queue_name)
     schedule_gather_analytics(queue_name, cancel=True)
 
 

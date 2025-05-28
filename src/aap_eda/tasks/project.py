@@ -13,31 +13,58 @@
 #  limitations under the License.
 
 import logging
+import typing as tp
 
 import django_rq
 from ansible_base.lib.utils.db import advisory_lock
+from dispatcherd.publish import submit_task
 from django.conf import settings
 
+from aap_eda import utils
 from aap_eda.core import models, tasking
 from aap_eda.services.project import ProjectImportError, ProjectImportService
+from aap_eda.settings import features
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
 
 # Wrap the django_rq job decorator so its processing is within our retry
 # code.
-job = tasking.redis_connect_retry()(django_rq.job)
 
 
-@job(PROJECT_TASKS_QUEUE)
-def import_project(project_id: int):
+def import_project(project_id: int) -> tp.Optional[str]:
+    """Import project async task.
+
+    Proxy for import_project_dispatcherd and import_project_rq.
+    """
     with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
                 f"Another task already importing project {project_id}, exiting"
             )
-            return
-        _import_project(project_id)
+            return None
+        if features.DISPATCHERD:
+            return import_project_dispatcherd(project_id)
+
+        # rq
+        job_data = import_project_rq(project_id)
+        return job_data
+
+
+def import_project_dispatcherd(project_id: int) -> str:
+    queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
+    job_data, queue = submit_task(
+        _import_project,
+        queue=queue_name,
+        args=(project_id,),
+    )
+    return job_data["uuid"]
+
+
+@tasking.redis_connect_retry()
+def import_project_rq(project_id: int) -> str:
+    queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
+    return queue.enqueue(_import_project, project_id=project_id).id
 
 
 def _import_project(project_id: int):
@@ -56,15 +83,38 @@ def _import_project(project_id: int):
     logger.info(f"Task complete: Import project ( project_id={project.id} )")
 
 
-@job(PROJECT_TASKS_QUEUE)
-def sync_project(project_id: int):
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+def sync_project(project_id: int) -> tp.Optional[str]:
+    """Sync project async task.
+
+    Proxy for sync_project_dispatcherd and sync_project_rq.
+    """
+    with advisory_lock(f"sync_project_{project_id}", wait=False) as acquired:
         if not acquired:
             logger.debug(
                 f"Another task already syncing project {project_id}, exiting"
             )
-            return
-        _sync_project(project_id)
+            return None
+        if features.DISPATCHERD:
+            return sync_project_dispatcherd(project_id)
+        # rq
+        job_data = sync_project_rq(project_id)
+        return job_data
+
+
+def sync_project_dispatcherd(project_id: int) -> str:
+    queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
+    job_data, queue = submit_task(
+        _sync_project,
+        queue=queue_name,
+        args=(project_id,),
+    )
+    return job_data["uuid"]
+
+
+@tasking.redis_connect_retry()
+def sync_project_rq(project_id: int) -> str:
+    queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
+    return queue.enqueue(_sync_project, project_id=project_id).id
 
 
 def _sync_project(project_id: int):

@@ -135,15 +135,14 @@ class ProjectViewSet(
                     request.user, serializer.instance
                 )
 
-                job = tasks.import_project.delay(project_id=project.id)
+                job_id = tasks.import_project(project.id)
         except redis.ConnectionError:
             return RedisDependencyMixin.redis_unavailable_response()
 
-        # Atomically update `import_task_id` field only.
         models.Project.objects.filter(pk=project.id).update(
-            import_task_id=job.id
+            import_task_id=job_id
         )
-        project.import_task_id = job.id
+        project.import_task_id = job_id
         serializer = self.get_serializer(project)
         headers = self.get_success_headers(serializer.data)
         logger.info(
@@ -271,16 +270,22 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
+        # check if redis is available
         self.redis_is_available()
 
         try:
-            job = tasks.sync_project.delay(project_id=project.id)
+            job_id = tasks.sync_project(project.id)
         except redis.ConnectionError:
             return RedisDependencyMixin.redis_unavailable_response()
 
         project.import_state = models.Project.ImportState.PENDING
-        project.import_task_id = job.id
-        project.import_error = None
+
+        # job_id can be none if there is already a task running.
+        # this is unlikely since we check the state above
+        # but safety first
+        if job_id:
+            project.import_task_id = job_id
+
         project.save()
 
         logger.info(
