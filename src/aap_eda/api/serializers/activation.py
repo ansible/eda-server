@@ -573,6 +573,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "rulebook_rulesets": activation.rulebook_rulesets,
             "git_hash": activation.rulebook.project.git_hash,
             "project": activation.rulebook.project,
+            "log_tracking_id": str(uuid.uuid4()),
         }
         if activation.eda_system_vault_credential:
             inputs = yaml.safe_load(

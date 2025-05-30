@@ -1260,6 +1260,7 @@ def test_copy_activation(
     activation = models.Activation.objects.filter(id=data["id"]).first()
     assert activation.name == "another_name"
     assert activation.is_enabled is False
+    assert activation.log_tracking_id is not None
 
 
 @pytest.mark.django_db
