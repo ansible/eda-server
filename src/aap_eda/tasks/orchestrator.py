@@ -168,6 +168,8 @@ def _run_request(
             )
         elif request.request == ActivationRequest.STOP:
             manager.stop()
+        elif request.request == ActivationRequest.DISABLE:
+            manager.stop(disable=True)
         elif request.request == ActivationRequest.RESTART:
             manager.restart()
         elif request.request == ActivationRequest.DELETE:
@@ -506,14 +508,23 @@ def stop_rulebook_process(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
     request_id: str = "",
+    disable: bool = False,
 ) -> None:
     """Create a request to stop the activation with the given id."""
-    requests_queue.push(
-        process_parent_type,
-        process_parent_id,
-        ActivationRequest.STOP,
-        request_id,
-    )
+    if disable:
+        requests_queue.push(
+            process_parent_type,
+            process_parent_id,
+            ActivationRequest.DISABLE,
+            request_id,
+        )
+    else:
+        requests_queue.push(
+            process_parent_type,
+            process_parent_id,
+            ActivationRequest.STOP,
+            request_id,
+        )
 
 
 def delete_rulebook_process(

@@ -104,6 +104,7 @@ def _arbitrate(
 
         if (
             request.request == ActivationRequest.STOP
+            or request.request == ActivationRequest.DISABLE
             or request.request == ActivationRequest.DELETE
         ):
             while qualified_requests:
