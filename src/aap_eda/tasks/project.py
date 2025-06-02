@@ -185,3 +185,44 @@ def _monitor_project_tasks(queue_name: str) -> None:
         project.save(update_fields=["import_task_id", "modified_at"])
 
     logger.info("Task complete: Monitor project tasks")
+
+
+def trigger_project_sync_or_import(
+    project: models.Project, update_fields: tp.List[str]
+) -> None:
+    """Sync or reimport a project.
+
+    Decide whether to trigger an import or sync task for a project
+    based on updated fields.
+    """
+    retrigger_fields = {"scm_branch", "scm_refspec", "url"}
+
+    if not retrigger_fields.intersection(update_fields):
+        logger.debug(
+            f"No SCM-related fields changed for project {project.id},"
+            " skipping import/sync."
+        )
+        return
+
+    # if git_hash is set, the project has been successfully imported at
+    # least once and can be synced.
+    #
+    # if it's none, it's an existing project that was never succesfully
+    # imported or it's in failure, and we should do a clean import
+    job_id = (
+        sync_project(project.id)
+        if project.git_hash
+        else import_project(project.id)
+    )
+
+    # job_id can be none if there is already a task running
+    if job_id:
+        project.import_task_id = job_id
+        project.import_state = models.Project.ImportState.PENDING
+        project.save(
+            update_fields=["import_state", "import_task_id", "modified_at"]
+        )
+
+        logger.info(
+            f"Triggered import/sync task {job_id}" f" for project {project.id}"
+        )
