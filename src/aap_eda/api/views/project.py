@@ -199,7 +199,8 @@ class ProjectViewSet(
                 None,
                 description="Update failed with integrity checking.",
             ),
-        },
+        }
+        | RedisDependencyMixin.redis_unavailable_response(),
     )
     def partial_update(self, request, pk):
         project = self.get_object()
@@ -233,6 +234,34 @@ class ProjectViewSet(
                 project.organization,
             )
         )
+
+        if {"scm_branch", "scm_refspec", "url"}.intersection(
+            update_fields
+        ) and (
+            project.import_state
+            not in [
+                models.Project.ImportState.PENDING,
+                models.Project.ImportState.RUNNING,
+            ]
+        ):
+            # check if redis is available
+            self.redis_is_available()
+
+            try:
+                job_id = tasks.sync_project(project.id)
+            except redis.ConnectionError:
+                return RedisDependencyMixin.redis_unavailable_response()
+
+            project.import_state = models.Project.ImportState.PENDING
+            if job_id:
+                project.import_task_id = job_id
+
+            logger.info(
+                f"Triggered import/sync task {job_id}"
+                f" for project {project.id}"
+            )
+
+            project.save()
 
         return Response(serializers.ProjectSerializer(project).data)
 
