@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import signal
 from unittest import mock
 
 import pytest
@@ -67,13 +68,16 @@ def test_rqscheduler_command_feature_flag_disabled(
 @mock.patch(
     "aap_eda.core.management.commands.scheduler.features.DISPATCHERD", True
 )
-@mock.patch.object(rqscheduler.Command, "handle", return_value=None)
+@mock.patch("time.sleep")
 def test_rqscheduler_command_feature_flag_enabled(
-    mock_rqscheduler_handle,
+    mock_sleep,
     capsys,
 ):
-    with pytest.raises(SystemExit) as exc_info:
-        call_command("scheduler")
-    assert exc_info.value.code == 1
+    def fake_sleep(_):
+        signal.raise_signal(signal.SIGTERM)
+
+    mock_sleep.side_effect = fake_sleep
+    call_command("scheduler")
     captured = capsys.readouterr()
-    assert "This command is not supported" in captured.err
+    assert "This command is not required" in captured.out
+    assert "Exiting noop mode." in captured.out

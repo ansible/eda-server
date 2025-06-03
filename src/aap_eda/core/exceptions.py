@@ -43,3 +43,7 @@ class DuplicateEnvKeyError(Exception):
 
 class InvalidEnvKeyError(Exception):
     pass
+
+
+class GracefulExit(Exception):
+    pass

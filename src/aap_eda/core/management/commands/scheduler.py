@@ -70,6 +70,8 @@ For a complete list of parameters refer to the
 https://github.com/rq/rq-scheduler/blob/master/README.rst
 """
 import logging
+import signal
+import time
 import typing
 from datetime import datetime
 
@@ -79,6 +81,7 @@ from django.conf import settings
 from django_rq.management.commands import rqscheduler
 
 from aap_eda.core import tasking
+from aap_eda.core.exceptions import GracefulExit
 from aap_eda.settings import features
 from aap_eda.utils.logging import startup_logging
 
@@ -167,15 +170,27 @@ class Command(rqscheduler.Command):
 
     def handle(self, *args, **options) -> None:
         if features.DISPATCHERD:
-            self.stderr.write(
-                self.style.ERROR(
-                    "This command is not supported when "
-                    f"{settings.DISPATCHERD_FEATURE_FLAG_NAME} is enabled. "
-                    "Please disable the feature flag in your settings "
-                    "or update your deployment.",
-                )
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{settings.DISPATCHERD_FEATURE_FLAG_NAME} flag "
+                    "is enabled. This command is not required in this setup. "
+                    "You may update your deployment configuration to omit "
+                    "this process. \nRunning in background (noop mode)...",
+                ),
             )
-            raise SystemExit(1)
+
+            def handle_exit(signum, frame):
+                raise GracefulExit()
+
+            signal.signal(signal.SIGTERM, handle_exit)
+            signal.signal(signal.SIGINT, handle_exit)
+
+            try:
+                while True:
+                    time.sleep(60)
+            except GracefulExit:
+                self.stdout.write(self.style.NOTICE("Exiting noop mode."))
+                return
 
         # interval can be set through the command line
         # but we want to manage it through settings
