@@ -37,6 +37,7 @@ from tests.integration.utils import ThreadSafeList
     ],
 )
 @pytest.mark.django_db
+@pytest.mark.multithreaded
 def test_job_uniqueness(module_data):
     call_log = []
     lock = Lock()

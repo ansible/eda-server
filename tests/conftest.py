@@ -26,6 +26,21 @@ from aap_eda.settings import redis as redis_settings
 
 
 #################################################################
+# run tests setup
+#################################################################
+def pytest_runtest_setup(item):
+    marker_expr = item.config.getoption("-m")
+
+    if "multithreaded" in item.keywords and (
+        not marker_expr or "multithreaded" not in marker_expr
+    ):
+        pytest.skip(
+            "Skipped multithreaded test "
+            "(not explicitly selected via `-m multithreaded`)"
+        )
+
+
+#################################################################
 # Log capture factory
 #################################################################
 @pytest.fixture
