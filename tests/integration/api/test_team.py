@@ -79,8 +79,9 @@ def test_list_teams_filter_by_ansible_id(
     result = response.data["results"][0]
     assert_team_data(result, new_team)
 
+    fake_ansible_id = "918b16e3-82b9-4487-8e23-df0ff50afee8"
     response = admin_client.get(
-        f"{api_url_v1}/teams/?resource__ansible_id=non-existent-org"
+        f"{api_url_v1}/teams/?resource__ansible_id={fake_ansible_id}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0

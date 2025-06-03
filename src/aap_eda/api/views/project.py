@@ -18,7 +18,6 @@ from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
 from django.forms import model_to_dict
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -29,10 +28,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from aap_eda import tasks
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import RedisDependencyMixin, ResponseSerializerMixin
 
@@ -69,6 +69,7 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
                 description="Return a list of projects.",
             ),
         },
+        parameters=generate_query_params(serializers.ProjectSerializer()),
     ),
     destroy=extend_schema(
         description="Delete a project by id",
@@ -90,8 +91,6 @@ class ProjectViewSet(
 ):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = filters.ProjectFilter
 
     rbac_action = None
 
