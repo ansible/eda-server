@@ -100,12 +100,6 @@ class ActivationManager(StatusManager):
         self.db_instance.save(update_fields=["failure_count", "modified_at"])
 
     @run_with_lock
-    def _reset_is_enabled(self):
-        """Reset the is_enabled of the activation."""
-        self.db_instance.is_enabled = False
-        self.db_instance.save(update_fields=["is_enabled", "modified_at"])
-
-    @run_with_lock
     def _increase_restart_count(self):
         """Increase the restart count of the activation."""
         self.db_instance.restart_count += 1
@@ -336,8 +330,15 @@ class ActivationManager(StatusManager):
         if latest_instance.status != status:
             return False
 
-        if container_status is not None:
-            return container_status.status == status
+        if latest_instance.status == status and (
+            container_status is not None and container_status.status == status
+        ):
+            return True
+
+        if latest_instance.status == status and (
+            container_status is not None and container_status.status != status
+        ):
+            return False
 
         if (
             status != ActivationStatus.RUNNING
@@ -695,7 +696,7 @@ class ActivationManager(StatusManager):
         if is_restart:
             self._increase_restart_count()
 
-    def stop(self, disable: bool = False):
+    def stop(self):
         """User requested stop."""
         LOGGER.info(
             "Stop operation requested for activation "
@@ -716,8 +717,6 @@ class ActivationManager(StatusManager):
             if self._is_already_stopped():
                 msg = f"Activation {self.db_instance.id} is already stopped."
                 LOGGER.info(msg)
-                if disable:
-                    self._reset_is_enabled()
                 return
         except exceptions.ActivationInstanceNotFound:
             LOGGER.error(
@@ -728,10 +727,6 @@ class ActivationManager(StatusManager):
             return
 
         try:
-            if self.db_instance.status != ActivationStatus.ERROR:
-                self.set_status(ActivationStatus.STOPPING)
-            if disable:
-                self._reset_is_enabled()
             self._stop_instance()
 
         except engine_exceptions.ContainerEngineError as exc:

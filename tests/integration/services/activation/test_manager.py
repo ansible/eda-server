@@ -477,25 +477,11 @@ def test_stop_deleted_activation(
     assert "does not exist" in eda_caplog.text
 
 
-@pytest.mark.parametrize(
-    ("end_status", "expected"),
-    [
-        (enums.ActivationStatus.ERROR, True),
-        (enums.ActivationStatus.STOPPED, True),
-        (enums.ActivationStatus.FAILED, True),
-        (enums.ActivationStatus.COMPLETED, True),
-        (enums.ActivationStatus.PENDING, False),
-        (enums.ActivationStatus.STARTING, False),
-        (enums.ActivationStatus.RUNNING, False),
-    ],
-)
 @pytest.mark.django_db
 def test_stop_already_stopped(
     activation_with_instance: models.Activation,
     container_engine_mock: MagicMock,
     eda_caplog: LogCaptureFixture,
-    end_status: enums.ActivationStatus,
-    expected: bool,
 ):
     """Test stop verb when activation is stopped."""
     activation_manager = ActivationManager(
@@ -503,17 +489,18 @@ def test_stop_already_stopped(
         db_instance=activation_with_instance,
     )
 
-    activation_with_instance.status = end_status
-    activation_with_instance.latest_instance.status = end_status
+    activation_with_instance.status = enums.ActivationStatus.STOPPED
+    activation_with_instance.latest_instance.status = (
+        enums.ActivationStatus.STOPPED
+    )
     activation_with_instance.latest_instance.save(
         update_fields=["status"],
     )
     activation_with_instance.save(update_fields=["status"])
 
-    activation_manager.stop(disable=True)
+    activation_manager.stop()
     assert "Stopping" in eda_caplog.text
-    stopped = "already stopped" in eda_caplog.text
-    assert stopped == expected
+    assert "already stopped" in eda_caplog.text
     assert not container_engine_mock.cleanup.called
 
 
@@ -548,25 +535,23 @@ def test_stop_running(
     running_activation.status = before_status
     running_activation.status_message = before_msg
     running_activation.save(update_fields=["status", "status_message"])
-    running_activation.latest_instance.status = before_status
-    running_activation.latest_instance.save(update_fields=["status"])
     activation_manager = ActivationManager(
         container_engine=container_engine_mock,
         db_instance=running_activation,
     )
-    container_engine_mock.get_status.return_value = None
 
     activation_manager.stop()
     assert "Stopping" in eda_caplog.text
+    assert "Cleanup operation requested" in eda_caplog.text
+    assert "Activation stopped." in eda_caplog.text
     assert running_activation.status == after_status
-    assert running_activation.latest_instance.status == after_status
+    assert (
+        running_activation.latest_instance.status
+        == enums.ActivationStatus.STOPPED
+    )
+    assert running_activation.latest_instance.activation_pod_id is None
     assert running_activation.status_message == after_msg
-
-    if before_status == enums.ActivationStatus.RUNNING:
-        assert "Cleanup operation requested" in eda_caplog.text
-        assert "Activation stopped." in eda_caplog.text
-        assert running_activation.latest_instance.activation_pod_id is None
-        assert container_engine_mock.cleanup.called
+    assert container_engine_mock.cleanup.called
 
 
 @pytest.mark.django_db
@@ -678,6 +663,75 @@ def test_stop_stopped_pod_running(
         == enums.ActivationStatus.STOPPED
     )
     assert running_activation.latest_instance.activation_pod_id is None
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "expected_status", "expected_message"),
+    [
+        (
+            enums.ActivationStatus.COMPLETED,
+            enums.ActivationStatus.COMPLETED,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.ERROR,
+            enums.ActivationStatus.ERROR,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.FAILED,
+            enums.ActivationStatus.FAILED,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.STOPPED,
+            enums.ActivationStatus.STOPPED,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.STOPPING,
+            enums.ActivationStatus.STOPPED,
+            "Activation stopped.",
+        ),
+        (
+            enums.ActivationStatus.PENDING,
+            enums.ActivationStatus.STOPPED,
+            "Activation stopped.",
+        ),
+        (
+            enums.ActivationStatus.UNRESPONSIVE,
+            enums.ActivationStatus.STOPPED,
+            "Activation stopped.",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_stop_with_different_statuses(
+    activation_with_instance: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+    initial_status: enums.ActivationStatus,
+    expected_status: enums.ActivationStatus,
+    expected_message: str,
+):
+    """Test stop with different initial statuses."""
+    # Setup initial state
+    activation_with_instance.status = initial_status
+    activation_with_instance.save(update_fields=["status"])
+    activation_with_instance.latest_instance.status = initial_status
+    activation_with_instance.latest_instance.save(update_fields=["status"])
+
+    activation_manager = ActivationManager(
+        activation_with_instance, container_engine_mock
+    )
+
+    # Execute
+    activation_manager.stop()
+
+    # Assert final state
+    activation_with_instance.refresh_from_db()
+    assert activation_with_instance.status == expected_status
+    assert expected_message in eda_caplog.text
 
 
 @pytest.mark.django_db

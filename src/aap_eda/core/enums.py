@@ -123,7 +123,6 @@ class ActivationRequest(DjangoStrEnum):
     STOP = "stop"
     RESTART = "restart"
     DELETE = "delete"
-    DISABLE = "disable"
     AUTO_START = "auto_start"
 
 

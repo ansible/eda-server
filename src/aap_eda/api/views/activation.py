@@ -444,11 +444,20 @@ class ActivationViewSet(
             # Redis must be available in order to perform the delete.
             self.redis_is_available()
 
+            if activation.status in [
+                ActivationStatus.STARTING,
+                ActivationStatus.RUNNING,
+            ]:
+                activation.status = ActivationStatus.STOPPING
+
+            activation.is_enabled = False
+            activation.save(
+                update_fields=["is_enabled", "status", "modified_at"]
+            )
             stop_rulebook_process(
                 process_parent_type=ProcessParentType.ACTIVATION,
                 process_parent_id=activation.id,
                 request_id=request.headers.get("x-request-id"),
-                disable=True,
             )
 
         logger.info(
