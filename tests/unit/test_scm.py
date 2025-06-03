@@ -11,13 +11,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import importlib
 import tempfile
 from unittest import mock
 
 import pytest
 
 from aap_eda.core import models
-from aap_eda.services.project.scm import ScmError, ScmRepository
+from aap_eda.services.project import scm
 
 
 @pytest.fixture
@@ -33,11 +34,40 @@ def credential(
     return credential
 
 
+@pytest.fixture
+def reload_scm():
+    yield
+    importlib.reload(scm)
+
+
+@pytest.mark.parametrize(
+    "executables,cmd",
+    [
+        ("git", "git"),
+        (["gpg", "gpg2"], "gpg"),
+        ("ansible-runner", "ansible-runner"),
+        ("ssh-keygen", "ssh-keygen"),
+    ],
+)
+def test_import_module(reload_scm, executables: str | list[str], cmd: str):
+    def my_side_effect(*args, **kwargs):
+        if args[0] in executables:
+            return None
+        return "OK"
+
+    with mock.patch(
+        "aap_eda.services.project.scm.shutil.which", side_effect=my_side_effect
+    ):
+        with pytest.raises(Exception) as exc_info:
+            importlib.reload(scm)
+        assert f"Cannot find {cmd} executable" in str(exc_info.value)
+
+
 @pytest.mark.django_db
 def test_git_clone(credential: models.EdaCredential):
     executor = mock.MagicMock()
     with tempfile.TemporaryDirectory() as dest_path:
-        repository = ScmRepository.clone(
+        repository = scm.ScmRepository.clone(
             "https://git.example.com/repo.git",
             dest_path,
             credential=credential,
@@ -62,7 +92,7 @@ def test_git_clone(credential: models.EdaCredential):
                 "HTTPS_PROXY": "myproxy.com",
             },
         )
-        assert isinstance(repository, ScmRepository)
+        assert isinstance(repository, scm.ScmRepository)
         assert repository.root == dest_path
 
 
@@ -73,16 +103,16 @@ def test_git_clone_leak_password(
     executor = mock.MagicMock()
 
     def raise_error(**kwargs):
-        raise ScmError(
+        raise scm.ScmError(
             "fatal: Unable to access "
             "'https://me:supersecret@git.example.com/repo.git'"
         )
 
     executor.side_effect = raise_error
 
-    with pytest.raises(ScmError) as exc_info:
+    with pytest.raises(scm.ScmError) as exc_info:
         with tempfile.TemporaryDirectory() as dest_path:
-            ScmRepository.clone(
+            scm.ScmRepository.clone(
                 "https://git.example.com/repo.git",
                 dest_path,
                 credential=credential,
@@ -95,7 +125,7 @@ def test_git_clone_leak_password(
 def test_git_clone_without_ssl_verification():
     executor = mock.MagicMock()
     with tempfile.TemporaryDirectory() as dest_path:
-        ScmRepository.clone(
+        scm.ScmRepository.clone(
             "https://adam:secret@git.example.com/repo.git",
             dest_path,
             verify_ssl=False,
@@ -118,13 +148,13 @@ def test_git_clone_empty_project(
     executor = mock.MagicMock()
 
     def raise_error(**kwargs):
-        raise ScmError("Project folder is empty.")
+        raise scm.ScmError("Project folder is empty.")
 
     executor.side_effect = raise_error
 
-    with pytest.raises(ScmError) as exc_info:
+    with pytest.raises(scm.ScmError) as exc_info:
         with tempfile.TemporaryDirectory() as dest_path:
-            ScmRepository.clone(
+            scm.ScmRepository.clone(
                 "https://git.example.com/repo.git",
                 dest_path,
                 credential=credential,
@@ -138,7 +168,7 @@ def test_git_rev_parse_head():
     executor.return_value = "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
 
     with tempfile.TemporaryDirectory() as dest_path:
-        repository = ScmRepository.clone(
+        repository = scm.ScmRepository.clone(
             "https://git.example.com/repo.git",
             dest_path,
             _executor=executor,
@@ -187,4 +217,37 @@ def test_git_rev_parse_head():
     ],
 )
 def test_build_url(url_params):
-    assert ScmRepository.build_url(*url_params[0]) == url_params[1]
+    assert scm.ScmRepository.build_url(*url_params[0]) == url_params[1]
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("git@git.ex-ample.com:user/repo.git", True),
+        ("http://git.example.com/repo.git/sub/r2.git", True),  # /NOSONAR
+        ("https://git.example.com/repo", True),
+        ("ssh://git.example.com/repo.git/", True),
+        ("git://git.example.com/repo.git", True),
+        ("git+ssh://git.example.com/repo.git", True),
+        ("git@git.example.com:user/{{lookup}}.git", False),
+        ("http://{{lookup}}/repo.git", False),  # /NOSONAR
+        ("{{lookup}}//git.example.com/repo.git", False),
+        ("ssh://git.example.com/re^po.git", False),
+    ],
+)
+def test_is_git_url_valid(url: str, expected: bool):
+    assert scm.is_git_url_valid(url) is expected
+
+
+@pytest.mark.parametrize(
+    "ref,is_branch,expected",
+    [
+        ("refs/heads/branch1", False, True),
+        ("@{-1}", True, False),
+        ("branch1", True, True),
+        ("{{lookup('branch1')}}", True, False),
+        ("{{lookup('branch1')}}", False, False),
+    ],
+)
+def test_is_refspec_valid(ref: str, is_branch: bool, expected: bool):
+    assert scm.is_refspec_valid(ref, is_branch) is expected
