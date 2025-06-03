@@ -30,6 +30,9 @@ class User(AbstractUser):
     Refer to https://docs.djangoproject.com/en/4.1/topics/auth/customizing/#substituting-a-custom-user-model
     """  # noqa: E501
 
+    # this blocks dab rest_filters attempting to filter over password
+    PASSWORD_FIELDS = ["password"]
+
     modified_at = models.DateTimeField(auto_now=True, null=False)
     is_service_account = models.BooleanField(default=False)
     resource = AnsibleResourceField(primary_key_field="id")
@@ -46,6 +49,8 @@ class User(AbstractUser):
 
 
 class AwxToken(models.Model):
+    PASSWORD_FIELDS = ["token"]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
     name = models.TextField(null=False, blank=False)
     description = models.TextField(null=False, blank=True, default="")

@@ -19,7 +19,6 @@ from ansible_base.rbac.models import RoleDefinition
 from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -30,7 +29,7 @@ from rest_framework import exceptions, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
@@ -42,6 +41,7 @@ from aap_eda.tasks.orchestrator import (
     stop_rulebook_process,
 )
 from aap_eda.utils import str_to_bool
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import RedisDependencyMixin
 
@@ -56,8 +56,6 @@ class ActivationViewSet(
     RedisDependencyMixin,
 ):
     queryset = models.Activation.objects.all()
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.ActivationFilter
 
     rbac_action = None
 
@@ -274,6 +272,9 @@ class ActivationViewSet(
                 description="Return a list of Activations.",
             ),
         },
+        parameters=generate_query_params(
+            serializers.ActivationListSerializer()
+        ),
     )
     def list(self, request):
         activations = self.filter_queryset(self.get_queryset())
@@ -309,12 +310,12 @@ class ActivationViewSet(
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this rulebook.",  # noqa: E501
             )
-        ],
+        ]
+        + generate_query_params(serializers.ActivationInstanceSerializer()),
     )
     @action(
         detail=False,
         queryset=models.RulebookProcess.objects.order_by("id"),
-        filterset_class=filters.ActivationInstanceFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/instances",
     )
@@ -625,6 +626,9 @@ class ActivationViewSet(
                 serializers.ActivationInstanceSerializer
             ),
         },
+        parameters=generate_query_params(
+            serializers.ActivationInstanceSerializer()
+        ),
     ),
 )
 class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -632,8 +636,6 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
         "rulebookprocessqueue",
     )
     serializer_class = serializers.ActivationInstanceSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.ActivationInstanceFilter
     rbac_action = None
 
     def filter_queryset(self, queryset):
@@ -658,12 +660,12 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this Activation Instance.",  # noqa: E501
             )
-        ],
+        ]
+        + generate_query_params(serializers.ActivationInstanceLogSerializer()),
     )
     @action(
         detail=False,
         queryset=models.RulebookProcessLog.objects.order_by("id"),
-        filterset_class=filters.ActivationInstanceLogFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/logs",
     )

@@ -91,8 +91,9 @@ def test_list_organizations_filter_by_ansible_id(
     result = response.data["results"][0]
     assert_organization_data(result, new_organization)
 
+    fake_ansible_id = "918b16e3-82b9-4487-8e23-df0ff50afee8"
     response = superuser_client.get(
-        f"{api_url_v1}/organizations/?resource__ansible_id=non-existent-org"
+        f"{api_url_v1}/organizations/?resource__ansible_id={fake_ansible_id}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 0

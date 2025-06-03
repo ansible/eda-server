@@ -13,16 +13,16 @@
 #  limitations under the License.
 
 from django.conf import settings
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
+    OpenApiParameter,
     OpenApiResponse,
+    OpenApiTypes,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api.filters import TeamFilter
 from aap_eda.api.serializers import (
     TeamCreateSerializer,
     TeamDetailSerializer,
@@ -30,6 +30,7 @@ from aap_eda.api.serializers import (
     TeamUpdateSerializer,
 )
 from aap_eda.core import models
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import (
     CreateModelMixin,
@@ -47,6 +48,14 @@ from .mixins import (
                 description="Return a list of teams.",
             ),
         },
+        parameters=[
+            OpenApiParameter(
+                "resource__ansible_id",
+                type=OpenApiTypes.UUID,
+                description="Filter by resource__ansible_id",
+            ),
+        ]
+        + generate_query_params(TeamSerializer()),
     ),
     create=extend_schema(
         exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
@@ -95,8 +104,6 @@ class TeamViewSet(
     SharedResourceViewMixin,
 ):
     queryset = models.Team.objects.order_by("id")
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = TeamFilter
 
     def filter_queryset(self, queryset):
         return super().filter_queryset(
