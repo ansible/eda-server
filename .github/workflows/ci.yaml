@@ -40,7 +40,7 @@ jobs:
         run: poetry run isort --check .
 
       - name: Lint with ruff
-        run: poetry run ruff --show-source .
+        run: poetry run ruff check .
 
       - name: Lint with flake8
         run: poetry run flake8 . --count --show-source --statistics

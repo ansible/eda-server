@@ -120,6 +120,8 @@ line_length = 79
 
 [tool.ruff]
 line-length = 79
+
+[tool.ruff.lint]
 select = [
     "E",
     "F",
@@ -130,7 +132,8 @@ extend-ignore = [
     "D1", #  Missing docstrings errors
 ]
 
-[tool.ruff.per-file-ignores]
+
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "src/aap_eda/core/migrations/*" = ["E501"]
 "tests/**/*.py" = [
@@ -140,8 +143,8 @@ extend-ignore = [
     "D",      # Docstrings are not required in tests
 ]
 
-[tool.ruff.flake8-tidy-imports]
+[tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "parents"
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "pep257"

@@ -28,27 +28,18 @@ from aap_eda.settings import features
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
 
-# Wrap the django_rq job decorator so its processing is within our retry
-# code.
-
 
 def import_project(project_id: int) -> tp.Optional[str]:
     """Import project async task.
 
     Proxy for import_project_dispatcherd and import_project_rq.
     """
-    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
-        if not acquired:
-            logger.debug(
-                f"Another task already importing project {project_id}, exiting"
-            )
-            return None
-        if features.DISPATCHERD:
-            return import_project_dispatcherd(project_id)
+    if features.DISPATCHERD:
+        return import_project_dispatcherd(project_id)
 
-        # rq
-        job_data = import_project_rq(project_id)
-        return job_data
+    # rq
+    job_data = import_project_rq(project_id)
+    return job_data
 
 
 def import_project_dispatcherd(project_id: int) -> str:
@@ -68,6 +59,17 @@ def import_project_rq(project_id: int) -> str:
 
 
 def _import_project(project_id: int):
+    """Wrap _import_project_no_lock with advisory lock."""
+    with advisory_lock(f"import_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already importing project {project_id}, exiting"
+            )
+            return
+        _import_project_no_lock(project_id)
+
+
+def _import_project_no_lock(project_id: int):
     """Import project without lock.
 
     This function is intended to be run by the tasking system inside the lock.
@@ -88,17 +90,11 @@ def sync_project(project_id: int) -> tp.Optional[str]:
 
     Proxy for sync_project_dispatcherd and sync_project_rq.
     """
-    with advisory_lock(f"sync_project_{project_id}", wait=False) as acquired:
-        if not acquired:
-            logger.debug(
-                f"Another task already syncing project {project_id}, exiting"
-            )
-            return None
-        if features.DISPATCHERD:
-            return sync_project_dispatcherd(project_id)
-        # rq
-        job_data = sync_project_rq(project_id)
-        return job_data
+    if features.DISPATCHERD:
+        return sync_project_dispatcherd(project_id)
+    # rq
+    job_data = sync_project_rq(project_id)
+    return job_data
 
 
 def sync_project_dispatcherd(project_id: int) -> str:
@@ -118,6 +114,21 @@ def sync_project_rq(project_id: int) -> str:
 
 
 def _sync_project(project_id: int):
+    """Wrap _sync_project_no_lock with advisory lock."""
+    with advisory_lock(f"sync_project_{project_id}", wait=False) as acquired:
+        if not acquired:
+            logger.debug(
+                f"Another task already syncing project {project_id}, exiting"
+            )
+            return
+        _sync_project_no_lock(project_id)
+
+
+def _sync_project_no_lock(project_id: int):
+    """Sync project without lock.
+
+    This function is intended to be run by the tasking system inside the lock.
+    """
     logger.info(f"Task started: Sync project ( {project_id=} )")
 
     project = models.Project.objects.get(pk=project_id)
