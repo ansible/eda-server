@@ -444,7 +444,12 @@ class ActivationViewSet(
             # Redis must be available in order to perform the delete.
             self.redis_is_available()
 
-            activation.status = ActivationStatus.STOPPING
+            if activation.status in [
+                ActivationStatus.STARTING,
+                ActivationStatus.RUNNING,
+            ]:
+                activation.status = ActivationStatus.STOPPING
+
             activation.is_enabled = False
             activation.save(
                 update_fields=["is_enabled", "status", "modified_at"]

@@ -665,6 +665,75 @@ def test_stop_stopped_pod_running(
     assert running_activation.latest_instance.activation_pod_id is None
 
 
+@pytest.mark.parametrize(
+    ("initial_status", "expected_status", "expected_message"),
+    [
+        (
+            enums.ActivationStatus.COMPLETED,
+            enums.ActivationStatus.COMPLETED,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.ERROR,
+            enums.ActivationStatus.ERROR,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.FAILED,
+            enums.ActivationStatus.FAILED,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.STOPPED,
+            enums.ActivationStatus.STOPPED,
+            "is already stopped.",
+        ),
+        (
+            enums.ActivationStatus.STOPPING,
+            enums.ActivationStatus.STOPPED,
+            "Activation stopped.",
+        ),
+        (
+            enums.ActivationStatus.PENDING,
+            enums.ActivationStatus.STOPPED,
+            "Activation stopped.",
+        ),
+        (
+            enums.ActivationStatus.UNRESPONSIVE,
+            enums.ActivationStatus.STOPPED,
+            "Activation stopped.",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_stop_with_different_statuses(
+    activation_with_instance: models.Activation,
+    container_engine_mock: MagicMock,
+    eda_caplog: LogCaptureFixture,
+    initial_status: enums.ActivationStatus,
+    expected_status: enums.ActivationStatus,
+    expected_message: str,
+):
+    """Test stop with different initial statuses."""
+    # Setup initial state
+    activation_with_instance.status = initial_status
+    activation_with_instance.save(update_fields=["status"])
+    activation_with_instance.latest_instance.status = initial_status
+    activation_with_instance.latest_instance.save(update_fields=["status"])
+
+    activation_manager = ActivationManager(
+        activation_with_instance, container_engine_mock
+    )
+
+    # Execute
+    activation_manager.stop()
+
+    # Assert final state
+    activation_with_instance.refresh_from_db()
+    assert activation_with_instance.status == expected_status
+    assert expected_message in eda_caplog.text
+
+
 @pytest.mark.django_db
 def test_delete_already_deleted(
     activation_with_instance: models.Activation,
