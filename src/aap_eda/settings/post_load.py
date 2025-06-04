@@ -388,19 +388,19 @@ def _set_resource_server(settings: Dynaconf) -> None:
 
 def _enforce_types(settings: Dynaconf) -> None:
     for key, key_type in get_type_hints(defaults).items():
-        if key_type == defaults.StrToList:
+        if key_type is defaults.StrToList:
             settings[key] = _get_list_from_str(settings, key)
-        elif key_type == bool:
+        elif key_type is bool:
             settings[key] = get_boolean(settings, key)
-        elif key_type == int:
+        elif key_type is int:
             settings[key] = _get_int(settings, key)
-        elif key_type == defaults.UrlSlash:
+        elif key_type is defaults.UrlSlash:
             settings[key] = _get_url_end_slash(settings, key)
         elif not isinstance(settings[key], key_type):
             raise ImproperlyConfigured(
                 f"{key} setting must be a {key_type.__name__}"
             )
-        elif key_type == str or key_type == Optional[str]:
+        elif key_type is str or key_type is Optional[str]:
             settings[key] = _get_stripped_str(settings, key)
 
 

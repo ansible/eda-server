@@ -102,7 +102,7 @@ tasks:
   lint:ruff:
     desc: "Check code with `ruff`."
     cmds:
-      - poetry run ruff -- {{.CLI_ARGS | default "."}}
+      - poetry run ruff check -- {{.CLI_ARGS | default "."}}
 
   lint:flake8:
     desc: "Check code with `flake8`."

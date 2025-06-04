@@ -64,7 +64,7 @@ def test_application_setting_bad_type():
         settings_registry.get_setting_type(
             "_GATEWAY_ANALYTICS_SETTING_SYNC_TIME"
         )
-        == int
+        is int
     )
     with pytest.raises(InvalidValueError):
         application_settings._GATEWAY_ANALYTICS_SETTING_SYNC_TIME = "bad_type"
