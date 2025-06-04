@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Create a Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         if: steps.lock-changed.outputs.lock-changed == 'true'
         with:
           # TODO: uses eda-ci pat token, replace with a bot.
