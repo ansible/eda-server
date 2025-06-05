@@ -464,8 +464,9 @@ def test_create_activation_without_extra_vars_single_credential(
     assert response.status_code == status.HTTP_201_CREATED
     assert response.data["extra_var"]
     extra_var = yaml.safe_load(response.data["extra_var"])
-    assert extra_var["sasl_username"] == "adam"
-    assert extra_var["sasl_password"] == "secret"
+    # Check that the extra_var not contains the credential inputs
+    assert extra_var.get("sasl_username") is None
+    assert extra_var.get("sasl_password") is None
 
 
 @pytest.mark.django_db
@@ -550,8 +551,8 @@ def test_create_activation_with_extra_vars_user_credential(
     assert response.data["extra_var"]
     original_extra_var = yaml.safe_load(EXTRA_VAR)
     extra_var = yaml.safe_load(response.data["extra_var"])
-    assert extra_var["sasl_username"] == "adam"
-    assert extra_var["sasl_password"] == "secret"
+    assert extra_var.get("sasl_username") is None
+    assert extra_var.get("sasl_password") is None
     for key, value in original_extra_var.items():
         assert value == extra_var[key]
 
@@ -638,10 +639,10 @@ def test_create_activation_with_extra_vars_mix_credential(
     assert response.data["extra_var"]
     original_extra_var = yaml.safe_load(EXTRA_VAR)
     extra_var = yaml.safe_load(response.data["extra_var"])
-    assert extra_var["sasl_username"] == "adam"
-    assert extra_var["sasl_password"] == "secret"
-    assert extra_var["custom_username"] == "fred"
-    assert extra_var["custom_password"] == "password"
+    assert extra_var.get("sasl_username") is None
+    assert extra_var.get("sasl_password") is None
+    assert extra_var.get("custom_username") is None
+    assert extra_var.get("custom_password") is None
     for key, value in original_extra_var.items():
         assert value == extra_var[key]
 
@@ -972,10 +973,7 @@ def test_update_activation_credentials(
         f"{api_url_v1}/activations/", data=test_activation
     )
     assert response.data["eda_credentials"][0]["id"] == eda_credential1["id"]
-    assert (
-        response.data["extra_var"]
-        == "MY_VAR1: foo\nMY_VAR2: 100\nUSER_VAR: custom\n"
-    )
+    assert response.data["extra_var"] == "USER_VAR: custom\n"
 
     credential_type2_inputs = {
         "fields": [
@@ -1005,7 +1003,7 @@ def test_update_activation_credentials(
         data={"eda_credentials": [eda_credential2["id"]]},
     )
     assert response.data["eda_credentials"][0]["id"] == eda_credential2["id"]
-    assert response.data["extra_var"] == "MY_VAR3: foo3\nUSER_VAR: custom\n"
+    assert response.data["extra_var"] == "USER_VAR: custom\n"
 
     response = admin_client.patch(
         f"{api_url_v1}/activations/{response.data['id']}/",
@@ -1014,7 +1012,7 @@ def test_update_activation_credentials(
             "extra_var": "MY_VAR3: foo3\nUSER_VAR: custom\n",
         },
     )
-    assert response.data["extra_var"] == "MY_VAR3: foo3\nUSER_VAR: custom\n"
+    assert response.data["extra_var"] == "USER_VAR: custom\n"
 
     response = admin_client.patch(
         f"{api_url_v1}/activations/{response.data['id']}/",
