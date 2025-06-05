@@ -79,6 +79,7 @@ tasks:
           $ task test -- tests/integration/api/test_activation.py::test_retrieve_activation
     cmds:
       - "{{.PYTEST_CMD}} {{.CLI_ARGS}}"
+      - "{{.PYTEST_CMD}} -m multithreaded {{.CLI_ARGS}}"
 
   lint:
     desc: "Run all linters."

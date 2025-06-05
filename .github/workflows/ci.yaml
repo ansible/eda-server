@@ -98,10 +98,26 @@ jobs:
       - name: Check migrations are up to date
         run: poetry run /usr/bin/env aap-eda-manage makemigrations --dry-run --check
 
-      - name: Run tests
+      - name: Run default tests
         run: |
-          poetry run python -m pytest -vv --cov=./ --cov-report=xml --junit-xml=eda-server-test-results.xml
+          poetry run python -m pytest -vv \
+            --cov=./ \
+            --cov-report=xml \
+            --junit-xml=eda-server-default.xml
           echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+      - name: Run multithreaded tests
+        run: |
+          poetry run python -m pytest -vv \
+            --cov=./ \
+            --cov-append \
+            --junit-xml=eda-server-multithreaded.xml \
+            -m "multithreaded"
+
+      - name: Merge test results
+        run: |
+          pip install junitparser
+          junitparser merge eda-server-default.xml eda-server-multithreaded.xml eda-server-test-results.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
