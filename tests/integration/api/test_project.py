@@ -188,7 +188,7 @@ def test_create_or_update_project_with_right_signature_credential(
             "eda_credential_id": credential.id,
             "signature_validation_credential_id": default_gpg_credential.id,
             "scm_branch": "main",
-            "scm_refspec": "ref1",
+            "scm_refspec": "path/to/ref1",
             "organization_id": default_organization.id,
         }
 
@@ -205,7 +205,7 @@ def test_create_or_update_project_with_right_signature_credential(
             "eda_credential_id": credential.id,
             "signature_validation_credential_id": default_gpg_credential.id,
             "scm_branch": "main",
-            "scm_refspec": "ref1",
+            "scm_refspec": "path/to/ref1",
             "verify_ssl": True,
             "proxy": "http://user:$encrypted$@myproxy.com",
         }
@@ -338,7 +338,7 @@ def test_create_or_update_project_with_right_eda_credential(
             "eda_credential_id": default_scm_credential.id,
             "signature_validation_credential_id": credential.id,
             "scm_branch": "main",
-            "scm_refspec": "ref1",
+            "scm_refspec": "path/to/ref1",
             "organization_id": default_organization.id,
         }
 
@@ -355,7 +355,7 @@ def test_create_or_update_project_with_right_eda_credential(
             "eda_credential_id": default_scm_credential.id,
             "signature_validation_credential_id": credential.id,
             "scm_branch": "main",
-            "scm_refspec": "ref1",
+            "scm_refspec": "path/to/ref1",
             "verify_ssl": True,
             "proxy": "http://user:$encrypted$@myproxy.com",
         }
@@ -463,7 +463,7 @@ def test_create_project_redis_unavailable(
         "eda_credential_id": default_scm_credential.id,
         "signature_validation_credential_id": credential.id,
         "scm_branch": "main",
-        "scm_refspec": "ref1",
+        "scm_refspec": "path/to/ref1",
         "organization_id": default_organization.id,
     }
 
@@ -504,6 +504,31 @@ def test_create_project_wrong_ids(admin_client: APIClient):
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "id 3000001 does not exist" in str(response.json())
+
+
+@pytest.mark.django_db
+def test_create_project_with_invalid_git_parameters(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    body = {
+        "name": "test-project-01",
+        "url": "https://git.{{example}}.com/acme/project-01",
+        "scm_branch": "bad branch",
+        "scm_refspec": "path",
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/projects/",
+        data=body,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    error = str(response.json())
+    assert "Invalid source control URL" in error
+    assert "Invalid branch/tag/commit" in error
+    assert "Invalid refspec" in error
 
 
 @pytest.mark.django_db
@@ -710,6 +735,20 @@ def test_update_project_with_400(
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "id 3000001 does not exist" in str(response.json())
 
+    data = {
+        "url": "https://git.{{example}}.com/acme/project-01",
+        "scm_branch": "bad branch",
+        "scm_refspec": "path",
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/", data=data
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    error = str(response.json())
+    assert "Invalid source control URL" in error
+    assert "Invalid branch/tag/commit" in error
+    assert "Invalid refspec" in error
+
 
 @pytest.mark.django_db
 def test_partial_update_project(
@@ -729,7 +768,7 @@ def test_partial_update_project(
         "eda_credential_id": default_scm_credential.id,
         "signature_validation_credential_id": default_gpg_credential.id,
         "scm_branch": "main",
-        "scm_refspec": "ref1",
+        "scm_refspec": "path/to/ref1",
         "verify_ssl": True,
         "proxy": "http://user:$encrypted$@myproxy.com",
     }
@@ -846,7 +885,7 @@ def test_project_by_fields(
         "url": "https://git.example.com/acme/project-01",
         "eda_credential_id": default_scm_credential.id,
         "scm_branch": "main",
-        "scm_refspec": "ref1",
+        "scm_refspec": "path/to/ref1",
         "organization_id": default_organization.id,
     }
 

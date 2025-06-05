@@ -71,6 +71,11 @@ if RUNNER_COMMAND is None:
     raise ExecutableNotFoundError("Cannot find ansible-runner executable")
 
 
+GIT_COMMAND = shutil.which("git")
+if GIT_COMMAND is None:
+    raise ExecutableNotFoundError("Cannot find git executable")
+
+
 class ScmRepository:
     """Represents a SCM repository."""
 
@@ -322,3 +327,35 @@ class GitAnsibleRunnerExecutor:
                     raise ScmAuthenticationError(err_msg)
                 raise ScmError(f"{self.ERROR_PREFIX} {err_msg}")
             raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")
+
+
+URL_REGEX = re.compile(
+    r"^((git|ssh|http(s)?)|git\+ssh|(git@[\w\.-]+))(:(//)?)"
+    r"([\w\.@\:/\-~]+)(\.git)?(/)?$"
+)
+
+
+def is_git_url_valid(url: str) -> bool:
+    if not URL_REGEX.match(url):
+        logger.error(f"Invalid SCM URL {url}")
+        return False
+    return True
+
+
+def is_refspec_valid(refspec: str, is_branch: bool) -> bool:
+    if is_branch:
+        args = [GIT_COMMAND, "check-ref-format", "--branch", refspec]
+    else:
+        args = [GIT_COMMAND, "check-ref-format", refspec]
+    with tempfile.TemporaryDirectory(prefix="EDA_REFSPEC") as home_dir:
+        result = subprocess.run(args, cwd=home_dir)
+        if result.returncode != 0:
+            logger.error(
+                f"git check-ref-format {refspec} failed with exit code "
+                f"{result.returncode}"
+            )
+            return False
+        if is_branch and all(arg in refspec for arg in ["{{", "}}", "lookup"]):
+            logger.error(f"branch {refspec} is invalid")
+            return False
+        return True

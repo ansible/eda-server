@@ -103,6 +103,27 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
         allow_null=True,
         validators=[validators.check_credential_types_for_gpg],
     )
+    url = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        allow_null=False,
+        help_text="Source control repository URL.",
+        validators=[validators.check_if_scm_url_valid],
+    )
+    scm_branch = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="Specific branch, tag or commit to checkout.",
+        validators=[validators.check_if_branch_valid],
+    )
+    scm_refspec = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text="For git projects, an additional refspec to fetch.",
+        validators=[validators.check_if_refspec_valid],
+    )
 
     class Meta:
         model = models.Project
@@ -177,12 +198,18 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_blank=True,
         allow_null=True,
         help_text="Specific branch, tag or commit to checkout.",
+        validators=[
+            validators.check_if_branch_valid,
+        ],
     )
     scm_refspec = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
         help_text="For git projects, an additional refspec to fetch.",
+        validators=[
+            validators.check_if_refspec_valid,
+        ],
     )
     proxy = serializers.CharField(
         required=False,
@@ -195,6 +222,9 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_blank=True,
         allow_null=True,
         help_text="Source control repository URL.",
+        validators=[
+            validators.check_if_scm_url_valid,
+        ],
     )
 
     class Meta:
