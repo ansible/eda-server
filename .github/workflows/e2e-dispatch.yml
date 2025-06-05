@@ -45,7 +45,7 @@ jobs:
             }}
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.QUAY_USER }}
@@ -75,7 +75,7 @@ jobs:
           token: ${{ secrets.EDA_QA_GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -141,7 +141,7 @@ jobs:
             }}
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.QUAY_USER }}
@@ -157,7 +157,7 @@ jobs:
           token: ${{ secrets.EDA_QA_GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
