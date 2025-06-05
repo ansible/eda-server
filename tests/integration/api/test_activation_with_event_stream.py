@@ -881,8 +881,7 @@ def test_update_activation_with_everything(
     assert_updated_event_stream_mapping(
         response, ["ansible.eda.range"], "[]", ""
     )
-    assert response.data["extra_var"] != extra_var
-    assert response.data["extra_var"] in extra_var
+    assert response.data["extra_var"] == extra_var
 
 
 @pytest.mark.django_db

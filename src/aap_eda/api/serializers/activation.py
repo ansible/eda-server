@@ -378,7 +378,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
             for credential in activation.eda_credentials.filter(managed=False)
         ]
         extra_var = (
-            replace_vault_data(activation.extra_var)
+            replace_vault_data(
+                _get_user_extra_vars(activation, activation.extra_var)
+            )
             if activation.extra_var
             else None
         )
@@ -761,7 +763,9 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, activation):
         extra_var = (
-            replace_vault_data(activation.extra_var)
+            replace_vault_data(
+                _get_user_extra_vars(activation, activation.extra_var)
+            )
             if activation.extra_var
             else None
         )
@@ -956,7 +960,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             for credential in activation.eda_credentials.filter(managed=False)
         ]
         extra_var = (
-            replace_vault_data(activation.extra_var)
+            replace_vault_data(
+                _get_user_extra_vars(activation, activation.extra_var)
+            )
             if activation.extra_var
             else None
         )
