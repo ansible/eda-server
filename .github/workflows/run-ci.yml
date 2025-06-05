@@ -1,0 +1,12 @@
+name: Run CI
+
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+  merge_group:
+    branches: [ 'main' ]
+
+jobs:
+  run-ci:
+    uses: ./.github/workflows/ci.yaml
