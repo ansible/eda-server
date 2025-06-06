@@ -33,6 +33,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
+from aap_eda.tasks.project import trigger_project_sync_or_import
 
 from .mixins import RedisDependencyMixin, ResponseSerializerMixin
 
@@ -232,6 +233,10 @@ class ProjectViewSet(
                 project.id,
                 project.organization,
             )
+        )
+
+        trigger_project_sync_or_import(
+            project=project, update_fields=update_fields
         )
 
         return Response(serializers.ProjectSerializer(project).data)
