@@ -11,7 +11,6 @@ runs:
       run: pipx install poetry
 
     - name: Set up Python
-      shell: bash
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
@@ -61,6 +60,7 @@ runs:
 
     - name: Upload jUnit test results (APDE CI)
       if: github.repository == 'ansible/eda-server' && github.ref == 'refs/heads/main'
+      shell: bash
       run: >-
         poetry run http --check-status --ignore-stdin
         --auth "${{ env.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ env.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
