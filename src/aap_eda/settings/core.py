@@ -19,24 +19,9 @@
 DISPATCHERD_FEATURE_FLAG_NAME = "FEATURE_DISPATCHERD_ENABLED"
 ANALYTICS_FEATURE_FLAG_NAME = "FEATURE_EDA_ANALYTICS_ENABLED"
 
-FLAGS = {
-    ANALYTICS_FEATURE_FLAG_NAME: [
-        {
-            "condition": "boolean",
-            "value": False,
-        },
-    ],
-    DISPATCHERD_FEATURE_FLAG_NAME: [
-        {
-            "condition": "boolean",
-            "value": False,
-        },
-    ],
-}
 
 INSTALLED_APPS = [
     "daphne",
-    "flags",
     # Django apps
     "django.contrib.auth",
     "django.contrib.contenttypes",
