@@ -13,7 +13,6 @@
 #  limitations under the License.
 import logging
 
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -23,10 +22,11 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 from aap_eda.core.utils import logging_utils
 from aap_eda.utils import str_to_bool
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import (
     CreateModelMixin,
@@ -82,6 +82,9 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
                 description="Return a list of decision environment.",
             ),
         },
+        parameters=generate_query_params(
+            serializers.DecisionEnvironmentSerializer()
+        ),
     ),
     create=extend_schema(
         description="Create a new decision environment.",
@@ -113,8 +116,6 @@ class DecisionEnvironmentViewSet(
     viewsets.GenericViewSet,
 ):
     queryset = models.DecisionEnvironment.objects.order_by("id")
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.DecisionEnvironmentFilter
 
     def filter_queryset(self, queryset):
         return super().filter_queryset(
