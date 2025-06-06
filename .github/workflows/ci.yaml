@@ -1,13 +1,14 @@
-# Reusable GitHub Actions workflow for CI
-# intended to be called by other workflows
-
 name: CI
 
 env:
   POETRY_NO_INTERACTION: 1
 
 on:
-  workflow_call:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+  merge_group:
+    branches: [ 'main' ]
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
