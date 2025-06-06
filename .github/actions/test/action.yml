@@ -1,0 +1,71 @@
+name: test
+inputs:
+  python-version:
+    description: python version to use
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install poetry
+      shell: bash
+      run: pipx install poetry
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: 'poetry'
+
+    - name: Install package
+      shell: bash
+      run: poetry install -E all --only main,test
+
+    - name: Check migrations are up to date
+      shell: bash
+      run: poetry run /usr/bin/env aap-eda-manage makemigrations --dry-run --check
+
+    - name: Run default tests
+      shell: bash
+      run: |
+        poetry run python -m pytest -vv \
+          --cov=./ \
+          --cov-report=xml \
+          --junit-xml=eda-server-default.xml
+        echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+    - name: Run multithreaded tests
+      shell: bash
+      run: |
+        poetry run python -m pytest -vv \
+          --cov=./ \
+          --cov-append \
+          --junit-xml=eda-server-multithreaded.xml \
+          -m "multithreaded"
+
+    - name: Merge test results
+      shell: bash
+      run: |
+        pip install junitparser
+        junitparser merge eda-server-default.xml eda-server-multithreaded.xml eda-server-test-results.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        env_vars: OS,PYTHON
+        fail_ci_if_error: false
+        files: ./coverage.xml
+        flags: "unit-int-tests-${{ inputs.python-version }}"
+        name: codecov-umbrella
+        verbose: true
+
+    - name: Upload jUnit test results (APDE CI)
+      if: github.repository == 'ansible/eda-server' && github.ref == 'refs/heads/main'
+      shell: bash
+      run: >-
+        poetry run http --check-status --ignore-stdin
+        --auth "${{ env.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}:${{ env.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}"
+        -f POST "${{ env.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}/api/results/upload/"
+        xunit_xml@eda-server-test-results.xml
+        component_name=eda
+        git_commit_sha=${{ env.GIT_SHA }}
+        git_repository_url="https://github.com/${{ github.repository }}"
