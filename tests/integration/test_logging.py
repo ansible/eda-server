@@ -3,6 +3,7 @@ import subprocess
 import time
 
 import pytest
+from django.conf import settings
 
 from aap_eda import asgi, wsgi
 
@@ -19,10 +20,7 @@ def test_http_startup_logging(caplog_factory, module):
     importlib.reload(module)
 
     assert "Starting eda-server" in caplog.text
-
-    # hardcoded value to not depends on settings
-    # and be able to handle unexpected lookups
-    assert "HOST: localhost" in caplog.text
+    assert f"HOST: {settings.DB_HOST}" in caplog.text
 
 
 def test_worker_startup_logs():
