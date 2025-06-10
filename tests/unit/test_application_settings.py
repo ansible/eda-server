@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import time
+import datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -124,7 +124,20 @@ def test_read_remote_setting(eda_caplog):
         },
     ]
 
-    with patch("aap_eda.analytics.utils.requests.get") as mock_get:
+    now = datetime.datetime(2025, 1, 1, 0, 0)
+    now_effect = [
+        now,
+        now + datetime.timedelta(milliseconds=100),
+        now + datetime.timedelta(milliseconds=200),
+        now + datetime.timedelta(milliseconds=300),
+        now + datetime.timedelta(milliseconds=1400),
+        now + datetime.timedelta(milliseconds=1500),
+    ]
+
+    with (
+        patch("django.utils.timezone.now", side_effect=now_effect),
+        patch("aap_eda.analytics.utils.requests.get") as mock_get,
+    ):
         mock_get.return_value = mock_resp
         assert application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL == 500
         assert application_settings.REDHAT_USERNAME == "foo"
@@ -132,7 +145,6 @@ def test_read_remote_setting(eda_caplog):
         assert application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL == 500
         assert application_settings.REDHAT_USERNAME == "foo"
 
-        time.sleep(1)
         # repeat after interval
         assert (
             application_settings.AUTOMATION_ANALYTICS_GATHER_INTERVAL == 1000
