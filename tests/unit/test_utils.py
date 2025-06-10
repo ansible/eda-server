@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import tempfile
 from importlib.metadata import PackageNotFoundError, version
 from unittest.mock import patch
 
@@ -21,6 +22,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
 from rest_framework import serializers
 
+from aap_eda.core.utils import safe_yaml
 from aap_eda.core.utils.strings import extract_variables
 from aap_eda.utils import (
     get_package_version,
@@ -213,3 +215,43 @@ def test_identifier_with_invalid_first_character_raises():
     too_long = "1" + "a" * 62
     with pytest.raises(ValueError, match="invalid first character"):
         sanitize_postgres_identifier(too_long)
+
+
+TEST_YAML_DATA = {
+    "dict": {"a": "b", "c": "d"},
+    "list": ["a", "b", "c"],
+    "tuple": ("a", "b", "c"),
+    "set": {"a", "b", "c"},
+    "num": 300,
+}
+
+
+TEST_YAML_OUTPUT = """dict:
+  a: !unsafe 'b'
+  c: !unsafe 'd'
+list:
+- !unsafe 'a'
+- !unsafe 'b'
+- !unsafe 'c'
+num: 300
+set: !!set
+  !unsafe 'a': null
+  !unsafe 'b': null
+  !unsafe 'c': null
+tuple:
+- !unsafe 'a'
+- !unsafe 'b'
+- !unsafe 'c'
+"""
+
+
+def test_dump_safe_yaml():
+    with tempfile.NamedTemporaryFile() as f:
+        safe_yaml.dump(f.name, TEST_YAML_DATA)
+        with open(f.name) as f:
+            assert f.read() == TEST_YAML_OUTPUT
+
+
+def test_dump_safe_yaml_invalid_type():
+    with pytest.raises(TypeError, match="Data must be a dictionary"):
+        safe_yaml.dump("test", "test")

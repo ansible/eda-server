@@ -245,7 +245,7 @@ def test_is_git_url_valid(url: str, expected: bool):
         ("refs/heads/branch1", False, True),
         ("@{-1}", True, False),
         ("branch1", True, True),
-        ("{{lookup('branch1')}}", True, False),
+        ("{{lookup('branch1')}}", True, True),
         ("{{lookup('branch1')}}", False, False),
     ],
 )
