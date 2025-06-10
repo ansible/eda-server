@@ -29,7 +29,7 @@ import ansible_runner
 
 from aap_eda.core.models import EdaCredential
 from aap_eda.core.types import StrPath
-from aap_eda.core.utils.credentials import inputs_from_store
+from aap_eda.core.utils import credentials, safe_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,9 @@ class ScmRepository:
         gpg_key_file = None
         gpg_home_dir = None
         if credential:
-            inputs = inputs_from_store(credential.inputs.get_secret_value())
+            inputs = credentials.inputs_from_store(
+                credential.inputs.get_secret_value()
+            )
             secret = inputs.get("password", "")
             key_data = inputs.get("ssh_key_data", "")
 
@@ -171,7 +173,7 @@ class ScmRepository:
                 key_password = inputs.get("ssh_key_unlock")
 
         if gpg_credential:
-            gpg_inputs = inputs_from_store(
+            gpg_inputs = credentials.inputs_from_store(
                 gpg_credential.inputs.get_secret_value()
             )
             gpg_key = gpg_inputs.get("gpg_public_key")
@@ -295,12 +297,15 @@ class GitAnsibleRunnerExecutor:
         env_vars: dict,
     ):
         with tempfile.TemporaryDirectory(prefix="EDA_RUNNER") as data_dir:
+            env_dir = os.path.join(data_dir, "env")
+            os.makedirs(env_dir)
+            safe_yaml.dump(os.path.join(env_dir, "extravars"), extra_vars)
+
             outputs = io.StringIO()
             with contextlib.redirect_stdout(outputs):
                 runner = ansible_runner.run(
                     private_data_dir=data_dir,
                     playbook=PLAYBOOK,
-                    extravars=extra_vars,
                     envvars=env_vars,
                 )
 
@@ -354,8 +359,5 @@ def is_refspec_valid(refspec: str, is_branch: bool) -> bool:
                 f"git check-ref-format {refspec} failed with exit code "
                 f"{result.returncode}"
             )
-            return False
-        if is_branch and all(arg in refspec for arg in ["{{", "}}", "lookup"]):
-            logger.error(f"branch {refspec} is invalid")
             return False
         return True
