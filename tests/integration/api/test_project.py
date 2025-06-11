@@ -839,10 +839,55 @@ def test_partial_update_project_url(
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["url"] == new_url
+    assert response.json()["import_state"] == "pending"
 
     new_project.refresh_from_db()
     assert new_project.url == new_url
     assert new_project.url != original_url
+
+
+@pytest.mark.django_db
+def test_partial_update_project_scm_branch(
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    original_scm_branch = new_project.scm_branch
+    new_scm_branch = "dev"
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{new_project.id}/",
+        data={"scm_branch": new_scm_branch},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["scm_branch"] == new_scm_branch
+    assert response.json()["import_state"] == "pending"
+
+    new_project.refresh_from_db()
+    assert new_project.scm_branch == new_scm_branch
+    assert new_project.scm_branch != original_scm_branch
+
+
+@pytest.mark.django_db
+def test_partial_update_project_scm_refspec(
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    original_scm_refspec = new_project.scm_refspec
+    new_scm_refspec = "path/to/testref"
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{new_project.id}/",
+        data={"scm_refspec": new_scm_refspec},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["scm_refspec"] == new_scm_refspec
+    assert response.json()["import_state"] == "pending"
+
+    new_project.refresh_from_db()
+    assert new_project.scm_refspec == new_scm_refspec
+    assert new_project.scm_refspec != original_scm_refspec
 
 
 @pytest.mark.django_db
