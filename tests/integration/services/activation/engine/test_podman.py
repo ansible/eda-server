@@ -48,6 +48,7 @@ from aap_eda.services.activation.engine.podman import (
 from aap_eda.settings.default import (  # noqa: N811
     DYNACONF as orig_dynaconf_settings,
 )
+from aap_eda.utils.podman import parse_repository
 
 from .utils import InitData, get_ansible_rulebook_cmdline, get_request
 
@@ -262,16 +263,33 @@ def test_engine_start_with_none_image_url(
         engine.start(request, log_handler)
 
 
+@pytest.mark.parametrize(
+    "image_url",
+    [
+        "quay.io/ansible/ansible-rulebook",
+        "quay.io:5004/ansible/ansible-rulebook",
+        "quay.io:5004/ansible/ansible-rulebook:main",
+        "quay.io/ansible/ansible-rulebook@sha256:756dd6a40b62975ea10d83a577ed6b1cddd545de17d9fb56b3d4e80e166826df",  # noqa: E501
+        "quay.io:5004/ansible/ansible-rulebook@sha256:756dd6a40b62975ea10d83a577ed6b1cddd545de17d9fb56b3d4e80e166826df",  # noqa: E501
+        "quay.io:443/ansible/ansible-rulebook@sha512:756dd6a40b62975ea10d83a577ed6b1cddd545de17d9fb56b3d4e80e166826df",  # noqa: E501
+        "quay.io/ansible/ansible-rulebook:42@sha256:756dd6a40b62975ea10d83a577ed6b1cddd545de17d9fb56b3d4e80e166826df",  # noqa: E501
+    ],
+)
 @pytest.mark.django_db
 def test_engine_start_with_credential(
     init_podman_data,
     podman_engine,
     default_organization: models.Organization,
+    image_url,
 ):
     engine = podman_engine
     log_handler = DBLogger(init_podman_data.activation_instance.id)
     request = get_request(
-        init_podman_data, "me", default_organization, mounts=[{"/dev": "/opt"}]
+        init_podman_data,
+        "me",
+        default_organization,
+        image_url,
+        mounts=[{"/dev": "/opt"}],
     )
     credential = Credential(
         username="me",
@@ -283,8 +301,10 @@ def test_engine_start_with_credential(
 
     engine.start(request, log_handler)
 
+    image_repo, image_tag = parse_repository(request.image_url)
     engine.client.images.pull.assert_called_once_with(
-        request.image_url,
+        repository=image_repo,
+        tag=image_tag,
         tls_verify=bool(credential.ssl_verify),
         auth_config={
             "username": credential.username,
