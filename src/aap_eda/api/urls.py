@@ -50,6 +50,7 @@ router.register(
 )
 router.register("credential-types", views.CredentialTypeViewSet)
 router.register("eda-credentials", views.EdaCredentialViewSet)
+router.register("credential-input-sources", views.CredentialInputSourceViewSet)
 router.register("decision-environments", views.DecisionEnvironmentViewSet)
 router.register("organizations", views.OrganizationViewSet)
 router.register("teams", views.TeamViewSet)

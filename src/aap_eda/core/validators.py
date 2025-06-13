@@ -25,6 +25,8 @@ from rest_framework import serializers
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import (
     check_reserved_keys_in_extra_vars,
+    field_exists,
+    validate_inputs,
     validate_registry_host_name,
     validate_schema,
 )
@@ -244,6 +246,16 @@ def check_if_credential_type_exists(credential_type_id: int) -> int:
             f"CredentialType with id {credential_type_id} does not exist"
         )
     return credential_type_id
+
+
+def check_if_eda_credential_exists(credential_id: int) -> int:
+    try:
+        models.EdaCredential.objects.get(pk=credential_id)
+    except models.EdaCredential.DoesNotExist:
+        raise serializers.ValidationError(
+            f"EdaCredential with id {credential_id} does not exist"
+        )
+    return credential_id
 
 
 def check_if_credential_name_used(name: str) -> str:
@@ -486,3 +498,26 @@ def check_if_refspec_valid(refspec: str) -> str:
     if not is_refspec_valid(refspec, is_branch=False):
         raise serializers.ValidationError("Invalid refspec")
     return refspec
+
+
+def check_credential_test_data(
+    credential_type: models.CredentialType, inputs: dict, metadata: dict
+):
+    errors = validate_inputs(
+        credential_type, credential_type.inputs, inputs, "fields"
+    )
+    if bool(errors):
+        raise serializers.ValidationError(errors)
+
+    errors = validate_inputs(
+        credential_type, credential_type.inputs, metadata, "metadata"
+    )
+    if bool(errors):
+        raise serializers.ValidationError(errors)
+
+
+def check_if_field_exists(schema: dict, name: str):
+    if not field_exists(schema, name):
+        raise serializers.ValidationError(
+            f"Field : {name} missing in source credential"
+        )
