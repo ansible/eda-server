@@ -47,3 +47,11 @@ class InvalidEnvKeyError(Exception):
 
 class GracefulExit(Exception):
     pass
+
+
+class GatewayAPIError(Exception):
+    pass
+
+
+class MissingCredentials(Exception):
+    pass
