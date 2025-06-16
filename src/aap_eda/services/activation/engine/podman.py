@@ -25,6 +25,7 @@ from podman.errors.exceptions import APIError, NotFound
 from aap_eda.core.enums import ActivationStatus
 from aap_eda.settings import features
 from aap_eda.utils import str_to_bool
+from aap_eda.utils.podman import parse_repository
 
 from . import exceptions, messages
 from .common import (
@@ -379,7 +380,12 @@ class Engine(ContainerEngine):
                     "username": request.credential.username,
                     "password": request.credential.secret,
                 }
-            image = self.client.images.pull(request.image_url, **kwargs)
+
+            image_repository, image_tag = parse_repository(request.image_url)
+
+            image = self.client.images.pull(
+                repository=image_repository, tag=image_tag, **kwargs
+            )
 
             LOGGER.info("Downloaded image")
             return image
