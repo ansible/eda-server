@@ -46,11 +46,12 @@ def get_request(
     data: InitData,
     username: str,
     default_organization: models.Organization,
+    image_url: str = "quay.io/ansible/ansible-rulebook:main",
     **kwargs,
 ):
     return ContainerRequest(
         name="test-request",
-        image_url="quay.io/ansible/ansible-rulebook:main",
+        image_url=image_url,
         rulebook_process_id=data.activation_instance.id,
         process_parent_id=data.activation.id,
         cmdline=get_ansible_rulebook_cmdline(data),
