@@ -19,7 +19,6 @@ from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
 from django.forms import model_to_dict
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiResponse,
     extend_schema,
@@ -28,9 +27,10 @@ from drf_spectacular.utils import (
 from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 
-from aap_eda.api import filters, serializers
+from aap_eda.api import serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import (
     CreateModelMixin,
@@ -59,6 +59,9 @@ logger = logging.getLogger(__name__)
                 description="Return a list of credential types.",
             ),
         },
+        parameters=generate_query_params(
+            serializers.CredentialTypeSerializer()
+        ),
     ),
 )
 class CredentialTypeViewSet(
@@ -73,8 +76,6 @@ class CredentialTypeViewSet(
     permission_classes = (AuthenticatedReadAdminChange,)
     queryset = models.CredentialType.objects.all()
     serializer_class = serializers.CredentialTypeSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.CredentialTypeFilter
     ordering_fields = ["name"]
     rbac_resource_type = ResourceType.CREDENTIAL_TYPE
     rbac_action = None
