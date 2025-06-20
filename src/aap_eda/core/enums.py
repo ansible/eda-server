@@ -110,6 +110,7 @@ class DefaultCredentialType(DjangoStrEnum):
     CYBERARK_CENTRAL = "CyberArk Central Credential Provider Lookup"
     CYBERARK_CONJUR = "CyberArk Conjur Secrets Manager Lookup"
     MSFT_AZURE_VAULT = "Microsoft Azure Key Vault"
+    GITHUB_APP = "GitHub App Installation Access Token Lookup"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
