@@ -548,7 +548,7 @@ def test_get_credential_from_store(mock_credentials):
     ) as mock_get_creds:
         mock_get_creds.return_value = mock_credentials
         with mock.patch(
-            "aap_eda.analytics.utils.inputs_from_store"
+            "aap_eda.analytics.utils.get_resolved_secrets"
         ) as mock_inputs:
             mock_inputs.return_value = {"client_id": "test_id"}
 
@@ -691,12 +691,12 @@ def test_get_analytics_interval_invalid_fallback():
 def test_get_analytics_interval_if_exists(cred_kind, expected):
     mock_cred_type = mock.MagicMock(spec=models.CredentialType)
     mock_cred_type.kind = cred_kind
-
     mock_credential = mock.MagicMock(spec=models.EdaCredential)
     mock_credential.credential_type = mock_cred_type
     mock_credential.inputs.get_secret_value.return_value = (
         "gather_interval: 300"
     )
+    mock_credential.id = "900"
 
     with mock.patch(
         "aap_eda.analytics.utils.get_auth_mode", return_value="analytics"
