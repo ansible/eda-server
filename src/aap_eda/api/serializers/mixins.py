@@ -13,8 +13,10 @@
 #  limitations under the License.
 
 from django.conf import settings
+from rest_framework import serializers
 
 from aap_eda.api import exceptions as api_exc
+from aap_eda.core import validators
 
 
 class SharedResourceSerializerMixin:
@@ -35,3 +37,15 @@ class SharedResourceSerializerMixin:
             raise api_exc.Forbidden(
                 f"{action} should be done through the platform ingress"
             )
+
+
+class OrganizationIdFieldMixin(serializers.Serializer):
+    organization_id = serializers.IntegerField(
+        required=True,
+        allow_null=False,
+        validators=[validators.check_if_organization_exists],
+        error_messages={
+            "null": "Organization is needed",
+            "required": "Organization is required",
+        },
+    )

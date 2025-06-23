@@ -42,14 +42,11 @@ NOT_ACCEPTABLE_TYPES_FOR_ACTIVATION = [
 ]
 
 
-def check_if_rulebook_exists(rulebook_id: int) -> int:
-    try:
-        models.Rulebook.objects.get(pk=rulebook_id)
-    except models.Rulebook.DoesNotExist:
+def check_if_rulebook_exists(rulebook_id: int) -> None:
+    if not models.Rulebook.objects.filter(pk=rulebook_id).exists():
         raise serializers.ValidationError(
             f"Rulebook with id {rulebook_id} does not exist"
         )
-    return rulebook_id
 
 
 def check_if_de_exists(decision_environment_id: int) -> int:
@@ -238,14 +235,13 @@ def check_single_aap_credential(
     return eda_credential_ids
 
 
-def check_if_credential_type_exists(credential_type_id: int) -> int:
-    try:
-        models.CredentialType.objects.get(pk=credential_type_id)
-    except models.CredentialType.DoesNotExist:
+def check_if_credential_type_exists(credential_type_id: int) -> None:
+    if not models.CredentialType.objects.filter(
+        pk=credential_type_id
+    ).exists():
         raise serializers.ValidationError(
             f"CredentialType with id {credential_type_id} does not exist"
         )
-    return credential_type_id
 
 
 def check_if_credential_name_used(name: str) -> str:
@@ -259,33 +255,17 @@ def check_if_credential_name_used(name: str) -> str:
 
 
 def check_if_organization_exists(organization_id: int) -> int:
-    try:
-        models.Organization.objects.get(pk=organization_id)
-    except models.Organization.DoesNotExist:
+    if not models.Organization.objects.filter(pk=organization_id).exists():
         raise serializers.ValidationError(
             f"Organization with id {organization_id} does not exist"
         )
-    return organization_id
 
 
-def check_if_extra_var_exists(extra_var_id: int) -> int:
-    try:
-        models.ExtraVar.objects.get(pk=extra_var_id)
-    except models.ExtraVar.DoesNotExist:
-        raise serializers.ValidationError(
-            f"ExtraVar with id {extra_var_id} does not exist"
-        )
-    return extra_var_id
-
-
-def check_if_awx_token_exists(awx_token_id: int) -> int:
-    try:
-        models.AwxToken.objects.get(pk=awx_token_id)
-    except models.AwxToken.DoesNotExist:
+def check_if_awx_token_exists(awx_token_id: int) -> None:
+    if not models.AwxToken.objects.filter(pk=awx_token_id).exists():
         raise serializers.ValidationError(
             f"AwxToken with id {awx_token_id} does not exist"
         )
-    return awx_token_id
 
 
 def check_rulesets_require_token(
@@ -433,18 +413,6 @@ def _validate_event_stream_settings(auth_type: str):
                 "Please check with your site administrator."
             )
         )
-
-
-def check_if_event_streams_exists(event_stream_ids: list[int]) -> list[int]:
-    """Check a event stream exists."""
-    for event_stream_id in event_stream_ids:
-        try:
-            models.EventStream.objects.get(pk=event_stream_id)
-        except models.EventStream.DoesNotExist as exc:
-            raise serializers.ValidationError(
-                f"EventStream with id {event_stream_id} does not exist"
-            ) from exc
-    return event_stream_ids
 
 
 def check_credential_types_for_event_stream(eda_credential_id: int) -> int:

@@ -14,8 +14,9 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
+from aap_eda.api.serializers.mixins import OrganizationIdFieldMixin
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
-from aap_eda.core import models, validators
+from aap_eda.core import models
 
 from .fields.ansible_resource import AnsibleResourceFieldSerializer
 from .mixins import SharedResourceSerializerMixin
@@ -40,16 +41,10 @@ class TeamSerializer(serializers.ModelSerializer):
 
 
 class TeamCreateSerializer(
+    OrganizationIdFieldMixin,
     serializers.ModelSerializer,
     SharedResourceSerializerMixin,
 ):
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={"null": "Organization is needed"},
-    )
-
     class Meta:
         model = models.Team
         fields = [
