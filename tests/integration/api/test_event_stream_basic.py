@@ -13,6 +13,7 @@
 #  limitations under the License.
 import base64
 import secrets
+from unittest import mock
 from urllib.parse import urlencode
 
 import pytest
@@ -20,6 +21,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.core.exceptions import CredentialPluginError
 from tests.integration.api.test_event_stream import (
     create_event_stream,
     create_event_stream_credential,
@@ -98,15 +100,36 @@ def test_post_event_stream_with_basic_auth(
 
 
 @pytest.mark.parametrize(
-    ("content_type", "status"),
+    ("content_type", "status", "data_bytes", "exception"),
     [
-        ("application/json", status.HTTP_400_BAD_REQUEST),
-        ("application/x-www-form-urlencoded", status.HTTP_400_BAD_REQUEST),
+        (
+            "application/json",
+            status.HTTP_400_BAD_REQUEST,
+            '{"a": 1,'.encode(),
+            None,
+        ),
+        (
+            "application/x-www-form-urlencoded",
+            status.HTTP_400_BAD_REQUEST,
+            '{"a": 1,'.encode(),
+            None,
+        ),
+        (
+            "application/json",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            '{"a": 1}'.encode(),
+            CredentialPluginError("kaboom"),
+        ),
     ],
 )
 @pytest.mark.django_db
 def test_post_event_stream_with_basic_auth_bad_encoding(
-    admin_client: APIClient, preseed_credential_types, content_type, status
+    admin_client: APIClient,
+    preseed_credential_types,
+    content_type,
+    status,
+    data_bytes,
+    exception,
 ):
     secret = secrets.token_hex(32)
     username = "fred"
@@ -131,15 +154,28 @@ def test_post_event_stream_with_basic_auth_bad_encoding(
     user_pass = f"{username}:{secret}"
 
     auth_value = f"Basic {base64.b64encode(user_pass.encode()).decode()}"
-    data_bytes = '{"a": 1,'.encode()
     headers = {
         "Authorization": auth_value,
         "Content-Type": content_type,
     }
-    response = admin_client.post(
-        event_stream_post_url(event_stream.uuid),
-        headers=headers,
-        data=data_bytes,
-        content_type=content_type,
-    )
+
+    if exception:
+        with mock.patch(
+            "aap_eda.api.views.external_event_stream.get_resolved_secrets"
+        ) as mocked:
+            mocked.side_effect = exception
+            response = admin_client.post(
+                event_stream_post_url(event_stream.uuid),
+                headers=headers,
+                data=data_bytes,
+                content_type=content_type,
+            )
+    else:
+        response = admin_client.post(
+            event_stream_post_url(event_stream.uuid),
+            headers=headers,
+            data=data_bytes,
+            content_type=content_type,
+        )
+
     assert response.status_code == status
