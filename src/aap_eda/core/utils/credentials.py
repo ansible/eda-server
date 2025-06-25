@@ -29,12 +29,16 @@ from rest_framework import serializers
 from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.core import enums
 from aap_eda.core.utils.crypto.base import SecretValue
+from aap_eda.core.utils.external_sms import get_external_secrets
 
 if typing.TYPE_CHECKING:
     from aap_eda.core import models
 
+import logging
+
 from aap_eda.core.utils.awx import validate_ssh_private_key
 
+LOGGER = logging.getLogger(__name__)
 ENCRYPTED_STRING = "$encrypted$"
 EDA_PREFIX = "EDA_"
 SUPPORTED_KEYS_IN_INJECTORS = {"env", "extra_vars", "file"}
@@ -57,8 +61,10 @@ class InjectorDuplicateKey(Exception):
     pass
 
 
-def inputs_to_display(schema: dict, inputs: str) -> dict:
-    secret_fields = get_secret_fields(schema)
+def inputs_to_display(
+    schema: dict, inputs: str, section: str = "fields"
+) -> dict:
+    secret_fields = get_secret_fields(schema, section)
     decoded_inputs = inputs_from_store(inputs)
     result = {}
 
@@ -72,10 +78,10 @@ def inputs_to_display(schema: dict, inputs: str) -> dict:
     return result
 
 
-def get_secret_fields(schema: dict) -> list[str]:
+def get_secret_fields(schema: dict, section: str = "fields") -> list[str]:
     return [
         field["id"]
-        for field in schema.get("fields", [])
+        for field in schema.get(section, [])
         if "secret" in field and bool(field["secret"])
     ]
 
@@ -105,6 +111,7 @@ def validate_inputs(
     credential_type: "models.CredentialType",
     schema: dict,
     inputs: dict,
+    section: str = "fields",
 ) -> dict:
     """Validate user inputs against credential schema.
 
@@ -118,20 +125,35 @@ def validate_inputs(
     Return an empty dict if no error.
     """
     errors = {}
-    required_fields = schema.get("required", [])
+    required_fields = set(schema.get("required", []))
 
     schema_fields = schema.get("fields", [])
     schema_keys = {field["id"] for field in schema_fields}
-    invalid_keys = inputs.keys() - schema_keys
+
+    metadata_fields = schema.get("metadata", [])
+    metadata_keys = {field["id"] for field in metadata_fields}
+
+    if section == "fields":
+        section_keys = schema_keys
+        section_fields = schema_fields
+        if required_fields:
+            required_fields = required_fields - metadata_keys
+    else:
+        section_keys = metadata_keys
+        section_fields = metadata_fields
+        if required_fields:
+            required_fields = required_fields - schema_keys
+
+    invalid_keys = inputs.keys() - section_keys
     if bool(invalid_keys):
         errors["inputs"] = (
             f"Input keys {invalid_keys} are not defined "
-            f"in the schema. Allowed keys are: {schema_keys}"
+            f"in the schema. Allowed keys are: {section_keys}"
         )
 
         return errors
 
-    for data in schema_fields:
+    for data in section_fields:
         field = data["id"]
         required = field in required_fields
         default = data.get("default")
@@ -215,6 +237,7 @@ def validate_schema(schema: dict) -> list[str]:
         errors.append("'fields' must be a list")
     else:
         id_fields = _get_id_fields(schema)
+        metadata_fields = _get_id_fields(schema, "metadata")
         duplicates = []
         uniqs = []
         for id in id_fields:
@@ -269,7 +292,10 @@ def validate_schema(schema: dict) -> list[str]:
             errors.append("required must be a list of strings")
         else:
             for field_id in required_fields:
-                if field_id not in id_fields:
+                if (
+                    field_id not in id_fields
+                    and field_id not in metadata_fields
+                ):
                     errors.append(f"required field {field_id} does not exist")
 
     return errors
@@ -350,8 +376,15 @@ def _validate_registry_host_name(host: str) -> list[str]:
     return errors
 
 
-def _get_id_fields(schema: dict) -> list[str]:
-    fields = schema.get("fields", [])
+def field_exists(schema: dict, name: str, section: str = "fields") -> bool:
+    for field in schema.get(section, []):
+        if field.get("id") == name:
+            return True
+    return False
+
+
+def _get_id_fields(schema: dict, section: str = "fields") -> list[str]:
+    fields = schema.get(section, [])
 
     return [field.get("id") for field in fields if field.get("id")]
 
@@ -566,8 +599,10 @@ def _add_file_template_keys(context: dict, files: dict):
             context["eda"] = {"filename": {parts[1]: ""}}
 
 
-def add_default_values_to_user_inputs(schema: dict, inputs: dict) -> dict:
-    for field in schema.get("fields", []):
+def add_default_values_to_user_inputs(
+    schema: dict, inputs: dict, section: str = "fields"
+) -> dict:
+    for field in schema.get(section, []):
         key = field.get("id")
         field_type = field.get("type", "string")
         default_value = field.get("default")
@@ -579,3 +614,13 @@ def add_default_values_to_user_inputs(schema: dict, inputs: dict) -> dict:
                 inputs[key] = default_value or False
 
     return inputs
+
+
+def get_resolved_secrets(obj: "models.EdaCredential") -> dict:
+    external_secrets = get_external_secrets(obj.id)
+
+    result = yaml.safe_load(obj.inputs.get_secret_value())
+
+    for key, value in external_secrets.items():
+        result[key] = value
+    return result
