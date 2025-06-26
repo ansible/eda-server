@@ -15,7 +15,6 @@
 from .activation import ActivationInstanceViewSet, ActivationViewSet
 from .auth import SessionLoginView, SessionLogoutView, TokenRefreshView
 from .config import ConfigView
-from .credential_input_source import CredentialInputSourceViewSet
 from .credential_type import CredentialTypeViewSet
 from .decision_environment import DecisionEnvironmentViewSet
 from .eda_credential import EdaCredentialViewSet
@@ -47,7 +46,6 @@ __all__ = (
     # credential
     "CredentialTypeViewSet",
     "EdaCredentialViewSet",
-    "CredentialInputSourceViewSet",
     # decision_environment
     "DecisionEnvironmentViewSet",
     # organizations

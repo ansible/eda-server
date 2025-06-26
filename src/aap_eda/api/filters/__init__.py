@@ -17,7 +17,6 @@ from .activation import (
     ActivationInstanceFilter,
     ActivationInstanceLogFilter,
 )
-from .credential_input_source import CredentialInputSourceFilter
 from .credential_type import CredentialTypeFilter
 from .decision_environment import DecisionEnvironmentFilter
 from .eda_credential import EdaCredentialFilter
@@ -36,7 +35,6 @@ __all__ = (
     # credential type
     "CredentialTypeFilter",
     "EdaCredentialFilter",
-    "CredentialInputSourceFilter",
     # decision_environment
     "DecisionEnvironmentFilter",
     # activation instance
