@@ -151,7 +151,9 @@ class ScmRepository:
         gpg_key_file = None
         gpg_home_dir = None
         if credential:
-            inputs = credentials.get_resolved_secrets(credential)
+            inputs = credentials.inputs_from_store(
+                credential.inputs.get_secret_value()
+            )
             secret = inputs.get("password", "")
             key_data = inputs.get("ssh_key_data", "")
 
@@ -171,7 +173,9 @@ class ScmRepository:
                 key_password = inputs.get("ssh_key_unlock")
 
         if gpg_credential:
-            gpg_inputs = credentials.get_resolved_secrets(gpg_credential)
+            gpg_inputs = credentials.inputs_from_store(
+                gpg_credential.inputs.get_secret_value()
+            )
             gpg_key = gpg_inputs.get("gpg_public_key")
             gpg_key_file = tempfile.NamedTemporaryFile("w+t")
             gpg_key_file.write(gpg_key)

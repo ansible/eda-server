@@ -26,13 +26,11 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import mixins, status, viewsets
-from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import Action, ResourceType
-from aap_eda.core.utils.credential_plugins import run_plugin
+from aap_eda.core.enums import ResourceType
 
 from .mixins import (
     CreateModelMixin,
@@ -207,46 +205,3 @@ class CredentialTypeViewSet(
 
         self.perform_destroy(credential_type)
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @extend_schema(
-        request=serializers.CredentialTypeTestSerializer,
-        responses={
-            status.HTTP_202_ACCEPTED: OpenApiResponse(
-                None,
-                description="Test Successful.",
-            ),
-            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                None,
-                description="Test failed.",
-            ),
-        },
-        description="Run a test on External Credential",
-    )
-    @action(
-        methods=["post"],
-        detail=True,
-        rbac_action=Action.TEST,
-    )
-    def test(self, request, pk):
-        try:
-            credential_type = models.CredentialType.objects.get(pk=pk)
-        except models.CredentialType.DoesNotExist:
-            raise api_exc.NotFound(
-                f"Credential Type with ID={pk} does not exist."
-            )
-
-        serializer = serializers.CredentialTypeTestSerializer(
-            data=request.data, instance=credential_type
-        )
-        serializer.is_valid(raise_exception=True)
-        try:
-            run_plugin(
-                credential_type.namespace,
-                serializer.validated_data["inputs"],
-                serializer.validated_data["metadata"],
-            )
-        except Exception as err:
-            logger.error("Plugin call failed %s", err)
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={})
-
-        return Response(status=status.HTTP_202_ACCEPTED, data={})

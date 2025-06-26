@@ -53,7 +53,7 @@ RUN ${PYTHON_BIN} -m pip install --user "poetry==${POETRY_VERSION}" \
 WORKDIR $SOURCES_DIR
 
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
-COPY poetry.toml pyproject.toml poetry.lock $SOURCES_DIR/
+COPY pyproject.toml poetry.lock $SOURCES_DIR/
 RUN poetry install -E all --no-root --no-cache \
     && ${PYTHON_BIN} -m pip install gunicorn
 COPY . $SOURCES_DIR/

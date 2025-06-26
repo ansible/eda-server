@@ -11,9 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-import secrets
 from typing import Any, Dict
-from unittest import mock
 
 import pytest
 import yaml
@@ -24,7 +22,6 @@ from aap_eda.api.constants import EDA_SERVER_VAULT_LABEL
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import enums, models
 from aap_eda.core.enums import DefaultCredentialType
-from aap_eda.core.exceptions import CredentialPluginError
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.core.utils.crypto.base import SecretValue
 from tests.integration.constants import api_url_v1
@@ -1023,39 +1020,3 @@ def test_update_activation_credentials(
     )
     assert len(response.data["eda_credentials"]) == 0
     assert response.data["extra_var"] == "USER_VAR: custom\n"
-
-
-@pytest.mark.django_db
-def test_create_activation_with_sms_failure(
-    admin_client: APIClient,
-    default_decision_environment: models.DecisionEnvironment,
-    default_rulebook: models.Rulebook,
-    default_organization: models.Organization,
-    preseed_credential_types,
-    user_credential_type: models.CredentialType,
-):
-    test_activation = {
-        "name": "test_activation",
-        "decision_environment_id": default_decision_environment.id,
-        "rulebook_id": default_rulebook.id,
-        "organization_id": default_organization.id,
-    }
-    eda_credential = models.EdaCredential.objects.create(
-        name="credential-1",
-        inputs={
-            "sasl_username": "adam",
-            "sasl_password": secrets.token_hex(16),
-        },
-        credential_type_id=user_credential_type.id,
-        organization=default_organization,
-    )
-    test_activation["eda_credentials"] = [eda_credential.id]
-    with mock.patch(
-        "aap_eda.api.serializers.activation.get_resolved_secrets"
-    ) as mocked:
-        mocked.side_effect = CredentialPluginError("kaboom")
-
-        response = admin_client.post(
-            f"{api_url_v1}/activations/", data=test_activation
-        )
-        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE

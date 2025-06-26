@@ -79,28 +79,3 @@ class CredentialTypeRefSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.CredentialType
         fields = ["id", "name", "namespace", "kind"]
-
-
-class CredentialTypeTestSerializer(serializers.ModelSerializer):
-    inputs = serializers.JSONField(
-        required=True,
-        help_text="Inputs of the credential type for test",
-    )
-    metadata = serializers.JSONField(
-        required=False,
-        help_text="Metadata of the credential type for testing",
-    )
-
-    def validate(self, data):
-        metadata = data.get("metadata")
-        inputs = data.get("inputs")
-
-        validators.check_credential_test_data(self.instance, inputs, metadata)
-        return data
-
-    class Meta:
-        model = models.CredentialType
-        fields = [
-            "inputs",
-            "metadata",
-        ]

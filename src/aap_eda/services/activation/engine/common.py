@@ -24,7 +24,7 @@ from pydantic import BaseModel, validator
 
 import aap_eda.services.activation.engine.exceptions as exceptions
 from aap_eda.core.enums import ActivationStatus
-from aap_eda.core.utils.credentials import get_resolved_secrets
+from aap_eda.core.utils.credentials import inputs_from_store
 from aap_eda.services.auth import create_jwt_token
 
 from .ports import find_ports
@@ -229,7 +229,7 @@ class ContainerableMixin:
         """Return a decrypted Credential or None for the implementer."""
         credential = self.decision_environment.eda_credential
         if credential:
-            inputs = get_resolved_secrets(credential)
+            inputs = inputs_from_store(credential.inputs.get_secret_value())
             return Credential(
                 username=inputs["username"],
                 secret=inputs["password"],
