@@ -47,11 +47,3 @@ class InvalidEnvKeyError(Exception):
 
 class GracefulExit(Exception):
     pass
-
-
-class CredentialPluginError(Exception):
-    pass
-
-
-class UnknownPluginTypeError(Exception):
-    pass

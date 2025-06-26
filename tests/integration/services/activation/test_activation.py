@@ -45,25 +45,6 @@ def activation_no_instance(
 
 
 @pytest.fixture
-def activation_no_instance_with_de_credential(
-    default_user: models.User,
-    default_decision_environment_with_credential: models.DecisionEnvironment,
-    default_rulebook: models.Rulebook,
-    default_organization: models.Organization,
-) -> models.Activation:
-    """Return an activation with outassociated RulebookProcess."""
-    return models.Activation.objects.create(
-        name="test-activation",
-        user=default_user,
-        decision_environment=default_decision_environment_with_credential,
-        rulebook=default_rulebook,
-        # rulebook_rulesets is populated by the serializer
-        rulebook_rulesets=default_rulebook.rulesets,
-        organization=default_organization,
-    )
-
-
-@pytest.fixture
 def activation(
     default_organization: models.Organization,
     activation_no_instance,
@@ -78,33 +59,11 @@ def activation(
     return activation_no_instance
 
 
-@pytest.fixture
-def activation_with_de_credential(
-    default_organization: models.Organization,
-    activation_no_instance_with_de_credential,
-) -> models.Activation:
-    """Return an activation with associated RulebookProcess."""
-    models.RulebookProcess.objects.create(
-        name="activation-instance-1",
-        activation=activation_no_instance_with_de_credential,
-        git_hash=PROJECT_GIT_HASH,
-        organization=default_organization,
-    )
-    return activation_no_instance_with_de_credential
-
-
 @pytest.mark.django_db
 def test_container_request_no_credential(activation):
     """Test container params when no credential exists."""
     request = activation.get_container_request()
     assert request.credential is None
-
-
-@pytest.mark.django_db
-def test_container_request_with_credential(activation_with_de_credential):
-    """Test container params when DE credential exists."""
-    request = activation_with_de_credential.get_container_request()
-    assert request.credential.username == "dummy-user"
 
 
 @pytest.mark.django_db

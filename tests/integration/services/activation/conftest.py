@@ -15,59 +15,18 @@
 
 import pytest
 
-from aap_eda.core import enums, models
-from aap_eda.core.utils.credentials import inputs_to_store
-
-
-@pytest.fixture
-def default_de_credential(
-    default_organization: models.Organization, preseed_credential_types
-) -> models.EdaCredential:
-    """Return a default Container Registry Credential"""
-    registry_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.REGISTRY
-    )
-    obj = models.EdaCredential.objects.create(
-        name="default-de-credential",
-        description="Default DE Credential",
-        credential_type=registry_credential_type,
-        inputs=inputs_to_store(
-            {
-                "username": "dummy-user",
-                "password": "dummy-password",
-                "host": "quay.io",
-                "verify_ssl": False,
-            }
-        ),
-        organization=default_organization,
-    )
-    obj.refresh_from_db()
-    return obj
+from aap_eda.core import models
 
 
 @pytest.fixture
 def default_decision_environment(
-    default_organization: models.Organization,
+    default_organization,
 ) -> models.DecisionEnvironment:
     """Return a default decision environment."""
     return models.DecisionEnvironment.objects.create(
         name="test-decision-environment",
         image_url="localhost:14000/test-image-url",
         organization=default_organization,
-    )
-
-
-@pytest.fixture
-def default_decision_environment_with_credential(
-    default_organization: models.Organization,
-    default_de_credential: models.EdaCredential,
-) -> models.DecisionEnvironment:
-    """Return a default decision environment with credential."""
-    return models.DecisionEnvironment.objects.create(
-        name="test-decision-environment-with-credential",
-        image_url="localhost:14000/test-image-url",
-        organization=default_organization,
-        eda_credential=default_de_credential,
     )
 
 

@@ -15,7 +15,6 @@
 from ansible_base.rbac import permission_registry
 
 from .activation import Activation
-from .credential_input_source import CredentialInputSource
 from .credential_type import CredentialType
 from .decision_environment import DecisionEnvironment
 from .eda_credential import EdaCredential
@@ -57,7 +56,6 @@ __all__ = [
     "Rulebook",
     "User",
     "AwxToken",
-    "CredentialInputSource",
     "CredentialType",
     "EdaCredential",
     "DecisionEnvironment",
@@ -71,7 +69,6 @@ __all__ = [
 permission_registry.register(
     Activation,
     EdaCredential,
-    CredentialInputSource,
     DecisionEnvironment,
     Project,
     Organization,
