@@ -126,7 +126,7 @@ def test_list_activation_instance_logs_filter(
     filter_log = "log-1"
     response = admin_client.get(
         f"{api_url_v1}/activation-instances/{instance.id}"
-        f"/logs/?log={filter_log}"
+        f"/logs/?log__contains={filter_log}"
     )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1

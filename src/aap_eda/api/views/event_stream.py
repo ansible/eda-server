@@ -18,7 +18,6 @@ from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
 from django.forms import model_to_dict
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -28,10 +27,11 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import ResourceType
 from aap_eda.core.utils import logging_utils
+from aap_eda.utils.openapi import generate_query_params
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,6 @@ class EventStreamViewSet(
     mixins.DestroyModelMixin,
 ):
     queryset = models.EventStream.objects.order_by("-created_at")
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.EventStreamFilter
     rbac_resource_type = ResourceType.EVENT_STREAM
 
     def get_serializer_class(self):
@@ -132,6 +130,9 @@ class EventStreamViewSet(
                 description="Return a list of eventstreams.",
             ),
         },
+        parameters=generate_query_params(
+            serializers.EventStreamOutSerializer()
+        ),
     )
     def list(self, request, *args, **kwargs):
         event_streams = models.EventStream.objects.all()
@@ -271,12 +272,12 @@ class EventStreamViewSet(
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this event stream.",  # noqa: E501
             )
-        ],
+        ]
+        + generate_query_params(serializers.ActivationListSerializer()),
     )
     @action(
         detail=False,
         queryset=models.Activation.objects.order_by("id"),
-        filterset_class=filters.ActivationFilter,
         url_path="(?P<id>[^/.]+)/activations",
     )
     def activations(self, request, id):

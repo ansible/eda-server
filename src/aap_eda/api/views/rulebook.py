@@ -15,7 +15,6 @@
 import yaml
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
@@ -26,7 +25,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.exceptions import ParseError
@@ -52,6 +51,7 @@ from aap_eda.utils.openapi import generate_query_params
                 description="Return a list of rulebooks.",
             ),
         },
+        parameters=generate_query_params(serializers.RulebookSerializer()),
     ),
 )
 class RulebookViewSet(
@@ -59,8 +59,6 @@ class RulebookViewSet(
 ):
     queryset = models.Rulebook.objects.order_by("id")
     serializer_class = serializers.RulebookSerializer
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.RulebookFilter
 
     rbac_action = None
 
