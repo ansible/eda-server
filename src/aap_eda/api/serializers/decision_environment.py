@@ -16,6 +16,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
+from aap_eda.api.serializers.mixins import OrganizationIdFieldMixin
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
@@ -54,15 +55,11 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
         return result
 
 
-class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
+class DecisionEnvironmentCreateSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     """Serializer for creating the DecisionEnvironment."""
 
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={"null": "Organization is needed"},
-    )
     eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
