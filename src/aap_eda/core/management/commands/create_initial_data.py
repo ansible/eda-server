@@ -17,12 +17,12 @@ import os
 
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
+from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
-from django.apps import apps
 
 from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models

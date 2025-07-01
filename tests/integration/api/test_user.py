@@ -15,9 +15,8 @@ import secrets
 from typing import Any, Dict
 
 import pytest
-from ansible_base.rbac.models import DABPermission, RoleDefinition
 from ansible_base.rbac import permission_registry
-from django.contrib.contenttypes.models import ContentType
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import APIClient

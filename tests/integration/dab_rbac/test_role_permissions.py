@@ -13,8 +13,8 @@
 #  limitations under the License.
 
 import pytest
-from ansible_base.rbac.models import RoleDefinition, RoleUserAssignment
 from ansible_base.rbac import permission_registry
+from ansible_base.rbac.models import RoleDefinition, RoleUserAssignment
 from rest_framework.reverse import reverse
 
 from aap_eda.core import models

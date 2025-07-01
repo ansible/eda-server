@@ -19,8 +19,8 @@ from unittest import mock
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
-from ansible_base.rbac.models import DABPermission, RoleDefinition
 from ansible_base.rbac import permission_registry
+from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.test import override_settings
