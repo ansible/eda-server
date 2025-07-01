@@ -13,7 +13,7 @@
 #  limitations under the License.
 import pytest
 from ansible_base.rbac.models import DABPermission, RoleDefinition
-from django.contrib.contenttypes.models import ContentType
+from django.apps import apps
 from django.db.models import ForeignKey
 from django.forms.models import model_to_dict
 from rest_framework.test import APIClient
@@ -91,6 +91,14 @@ def give_obj_perm():
         this creates a role definition with that permission
         then it gives the specified user to the specified object
         """
+
+        try:
+            # DAB RBAC migrated to a custom type model, try to use that here
+            ContentType = apps.get_model('dab_rbac', 'DABContentType')
+        except LookupError:
+            # Fallback for older version of DAB, which just used ContentType
+            ContentType = apps.get_model('contenttypes', 'ContentType')
+
         ct = ContentType.objects.get_for_model(obj)
         rd, _ = RoleDefinition.objects.get_or_create(
             name=f"{obj._meta.model_name}-{action}", content_type=ct

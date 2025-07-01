@@ -660,14 +660,14 @@ files = [
 
 [[package]]
 name = "django"
-version = "4.2.16"
+version = "4.2.23"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "Django-4.2.16-py3-none-any.whl", hash = "sha256:1ddc333a16fc139fd253035a1606bb24261951bbc3a6ca256717fa06cc41a898"},
-    {file = "Django-4.2.16.tar.gz", hash = "sha256:6f1616c2786c408ce86ab7e10f792b8f15742f7b7b7460243929cb371e7f1dad"},
+    {file = "django-4.2.23-py3-none-any.whl", hash = "sha256:dafbfaf52c2f289bd65f4ab935791cb4fb9a198f2a5ba9faf35d7338a77e9803"},
+    {file = "django-4.2.23.tar.gz", hash = "sha256:42fdeaba6e6449d88d4f66de47871015097dc6f1b87910db00a91946295cfae4"},
 ]
 
 [package.dependencies]
@@ -681,7 +681,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.5.8"
+version = "25.6.30.0.dev664+g52d345c"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -693,7 +693,7 @@ develop = false
 asgiref = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
-Django = ">=4.2.16,<4.3.0"
+Django = ">=4.2.21,<4.3.0"
 django-crum = "*"
 django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
@@ -707,9 +707,9 @@ sqlparse = ">=0.5.2"
 urllib3 = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 
 [package.extras]
-all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
+all = ["asgiref", "channels", "cryptography", "django-auth-ldap", "django-flags", "django-oauth-toolkit (<2.4.0)", "django-redis", "drf-spectacular", "ldap-filter", "pyjwt", "pyjwt", "pyrad", "pytest", "pytest-django", "python-ldap", "python3-saml", "redis", "requests", "requests", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "urllib3", "xmlsec (==1.3.13)"]
 api-documentation = ["drf-spectacular"]
-authentication = ["django-auth-ldap", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
+authentication = ["django-auth-ldap", "ldap-filter", "pyrad", "python-ldap", "python3-saml", "social-auth-app-django (==5.4.1)", "social-auth-core (<=4.5.4)", "tabulate", "tacacs_plus", "xmlsec (==1.3.13)"]
 channel-auth = ["channels"]
 feature-flags = ["django-flags"]
 jwt-consumer = ["pyjwt", "requests"]
@@ -720,9 +720,9 @@ testing = ["cryptography", "pytest", "pytest-django"]
 
 [package.source]
 type = "git"
-url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2025.5.8"
-resolved_reference = "a46ebe5efa8eea15d5943301d866f204e82f6af4"
+url = "https://github.com/alancoding/django-ansible-base.git"
+reference = "remote_rbac"
+resolved_reference = "52d345ca42cc0d81a2e7969e5793c72345edf990"
 
 [[package]]
 name = "django-crum"
@@ -3024,4 +3024,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "407ebe011c6024e245c6f1a50fda29dcdcca9b8429e3e007e74eaac7d5135b68"
+content-hash = "59936f9018b018ae79f57ae1db7833dbffc0815692226708b7e170f6e0fa4116"
