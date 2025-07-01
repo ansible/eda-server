@@ -1291,6 +1291,7 @@ class Command(BaseCommand):
         self._remove_deprecated_credential_kinds()
         enable_redis_prefix()
 
+    @property
     def content_type_model(self):
         try:
             # DAB RBAC migrated to a custom type model, try to use that here
