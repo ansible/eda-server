@@ -14,7 +14,7 @@
 
 import pytest
 from ansible_base.rbac.models import RoleDefinition, RoleUserAssignment
-from django.contrib.contenttypes.models import ContentType
+from ansible_base.rbac import permission_registry
 from rest_framework.reverse import reverse
 
 from aap_eda.core import models
@@ -24,7 +24,7 @@ from aap_eda.core import models
 def view_activation_rd():
     return RoleDefinition.objects.create_from_permissions(
         name="view_act",
-        content_type=ContentType.objects.get_for_model(models.Activation),
+        content_type=permission_registry.content_type_model.objects.get_for_model(models.Activation),
         permissions=["view_activation"],
     )
 
