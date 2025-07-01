@@ -92,7 +92,9 @@ def admin_user(default_organization, admin_info):
     )
     admin_role = RoleDefinition.objects.create(
         name="Test Admin",
-        content_type=permission_registry.content_type_model.objects.get_for_model(default_organization),
+        content_type=permission_registry.content_type_model.objects.get_for_model(
+            default_organization
+        ),
     )
     admin_role.permissions.add(*DABPermission.objects.all())
     admin_role.give_permission(user, default_organization)

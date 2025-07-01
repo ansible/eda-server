@@ -71,7 +71,9 @@ def test_add_permissions(
         )
         add_rd = RoleDefinition.objects.create(
             name=f"add-{model._meta.model_name}",
-            content_type=permission_registry.content_type_model.objects.get_for_model(parent_obj),
+            content_type=permission_registry.content_type_model.objects.get_for_model(
+                parent_obj
+            ),
         )
         add_rd.permissions.add(
             DABPermission.objects.get(codename=f"add_{model._meta.model_name}")

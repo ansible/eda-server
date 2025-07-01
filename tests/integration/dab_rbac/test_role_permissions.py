@@ -24,7 +24,9 @@ from aap_eda.core import models
 def view_activation_rd():
     return RoleDefinition.objects.create_from_permissions(
         name="view_act",
-        content_type=permission_registry.content_type_model.objects.get_for_model(models.Activation),
+        content_type=permission_registry.content_type_model.objects.get_for_model(
+            models.Activation
+        ),
         permissions=["view_activation"],
     )
 
