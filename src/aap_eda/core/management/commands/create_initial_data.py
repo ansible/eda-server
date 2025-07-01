@@ -18,11 +18,11 @@ import os
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Q
+from django.apps import apps
 
 from aap_eda.conf import settings_registry
 from aap_eda.core import enums, models
@@ -1291,6 +1291,14 @@ class Command(BaseCommand):
         self._remove_deprecated_credential_kinds()
         enable_redis_prefix()
 
+    def content_type_model(self):
+        try:
+            # DAB RBAC migrated to a custom type model, try to use that here
+            return apps.get_model("dab_rbac", "DABContentType")
+        except LookupError:
+            # Fallback for older version of DAB, which just used ContentType
+            return apps.get_model("contenttypes", "ContentType")
+
     def _remove_deprecated_credential_kinds(self):
         """Remove old credential types which are deprecated."""
         for credential_type in models.CredentialType.objects.filter(
@@ -1356,7 +1364,7 @@ class Command(BaseCommand):
             return f.read()
 
     def _create_org_roles(self):
-        org_ct = ContentType.objects.get(model="organization")
+        org_ct = self.content_type_model.objects.get(model="organization")
         created = updated = 0
         for role_data in ORG_ROLES:
             data = {
@@ -1426,7 +1434,7 @@ class Command(BaseCommand):
 
     def _create_obj_roles(self):
         for cls in permission_registry.all_registered_models:
-            ct = ContentType.objects.get_for_model(cls)
+            ct = self.content_type_model.objects.get_for_model(cls)
             parent_model = permission_registry.get_parent_model(cls)
             # ignore if the model is organization, covered by org roles
             # or child model, inherits permissions from parent model
@@ -1441,7 +1449,9 @@ class Command(BaseCommand):
             child_models = permission_registry.get_child_models(cls)
             child_names = []
             for _, child_model in child_models:
-                child_ct = ContentType.objects.get_for_model(child_model)
+                child_ct = self.content_type_model.objects.get_for_model(
+                    child_model
+                )
                 permissions.extend(
                     self._create_permissions_for_content_type(child_ct)
                 )
@@ -1500,7 +1510,7 @@ class Command(BaseCommand):
                     name=f"Organization {cls._meta.verbose_name.title()} Admin",  # noqa: E501
                     defaults={
                         "description": f"Has all permissions to {cls._meta.verbose_name}s within an organization",  # noqa: E501
-                        "content_type": ContentType.objects.get(
+                        "content_type": self.content_type_model.objects.get(
                             model="organization"
                         ),
                         "managed": True,
