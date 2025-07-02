@@ -217,6 +217,11 @@ ANSIBLE_BASE_SERVICE_PREFIX = "eda"
 ANSIBLE_BASE_TEAM_MODEL = "core.Team"
 ANSIBLE_BASE_ORGANIZATION_MODEL = "core.Organization"
 
+# ---------------------------------------------------------
+# DJANGO ANSIBLE BASE REST FILTERS SETTINGS
+# ---------------------------------------------------------
+ANSIBLE_BASE_REST_FILTERS_RESERVED_NAMES = "@merge force,refs"
+
 # Organization and object roles will come from create_initial_data
 ANSIBLE_BASE_ROLE_PRECREATE = {}
 
