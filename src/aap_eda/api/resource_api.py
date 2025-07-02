@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+from ansible_base.feature_flags.models import AAPFlag
 from ansible_base.resource_registry.registry import (
     ParentResource,
     ResourceConfig,
@@ -19,6 +19,7 @@ from ansible_base.resource_registry.registry import (
     SharedResource,
 )
 from ansible_base.resource_registry.shared_types import (
+    FeatureFlagType,
     OrganizationType,
     TeamType,
     UserType,
@@ -50,6 +51,12 @@ RESOURCE_LIST = (
         models.Organization,
         shared_resource=SharedResource(
             serializer=OrganizationType, is_provider=False
+        ),
+    ),
+    ResourceConfig(
+        AAPFlag,
+        shared_resource=SharedResource(
+            serializer=FeatureFlagType, is_provider=False
         ),
     ),
 )
