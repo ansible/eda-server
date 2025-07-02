@@ -70,7 +70,7 @@ def test_add_permissions(
         )
         add_rd = RoleDefinition.objects.create(
             name=f"add-{model._meta.model_name}",
-            content_type=permission_registry.content_type_model.objects.get_for_model(
+            content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
                 parent_obj
             ),
         )

@@ -49,7 +49,7 @@ def org_admin_rd():
             "view_organization",
             "delete_organization",
         ],
-        content_type=permission_registry.content_type_model.objects.get_for_model(
+        content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
             models.Organization
         ),
         managed=True,  # custom roles can not include these permissions
@@ -64,7 +64,7 @@ def org_member_rd():
             "member_organization",
             "view_organization",
         ],
-        content_type=permission_registry.content_type_model.objects.get_for_model(
+        content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
             models.Organization
         ),
         managed=True,
@@ -588,7 +588,7 @@ def test_resources_remain_after_user_delete(
     # Give default user permission to create resources
     admin_role = RoleDefinition.objects.create(
         name="Elevated User",
-        content_type=permission_registry.content_type_model.objects.get_for_model(
+        content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
             default_organization
         ),
     )

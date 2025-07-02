@@ -94,12 +94,12 @@ def give_obj_perm():
 
         try:
             # DAB RBAC migrated to a custom type model, try to use that here
-            ContentType = apps.get_model("dab_rbac", "DABContentType")
+            ct_model = apps.get_model("dab_rbac", "DABContentType")
         except LookupError:
             # Fallback for older version of DAB, which just used ContentType
-            ContentType = apps.get_model("contenttypes", "ContentType")
+            ct_model = apps.get_model("contenttypes", "ContentType")
 
-        ct = ContentType.objects.get_for_model(obj)
+        ct = ct_model.objects.get_for_model(obj)
         rd, _ = RoleDefinition.objects.get_or_create(
             name=f"{obj._meta.model_name}-{action}", content_type=ct
         )
