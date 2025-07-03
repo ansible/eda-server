@@ -178,6 +178,28 @@ def _run_request(
 def queue_dispatch(
     process_parent_type: ProcessParentType,
     process_parent_id: int,
+    request_type: Optional[ActivationRequest] = None,
+    request_id: str = "",
+) -> None:  # pragma: no cover
+    job_id = _manage_process_job_id(process_parent_type, process_parent_id)
+    with advisory_lock(job_id, wait=False) as acquired:
+        if not acquired:
+            LOGGER.debug(
+                f"queue_dispatch({job_id}) already being ran, "
+                f"not dispatching request {request_type}",
+            )
+            return
+        queue_dispatch_no_lock(
+            process_parent_type,
+            process_parent_id,
+            request_type,
+            request_id,
+        )
+
+
+def queue_dispatch_no_lock(
+    process_parent_type: ProcessParentType,
+    process_parent_id: int,
     request_type: Optional[ActivationRequest],
     request_id: str = "",
 ):
@@ -208,14 +230,6 @@ def queue_dispatch(
 
     assign_request_id(request_id)
     assign_log_tracking_id(process_parent.log_tracking_id)
-
-    with advisory_lock(job_id, wait=False) as acquired:
-        if not acquired:
-            LOGGER.debug(
-                f"_manage({job_id}) already being ran, "
-                f"not dispatching request {request_type}",
-            )
-            return
 
     LOGGER.info(
         f"Dispatching request {request_type} for {process_parent_type} "
@@ -549,7 +563,10 @@ def monitor_rulebook_processes_no_lock() -> None:
     """
     # run pending user requests
     for request in requests_queue.list_requests():
-        queue_dispatch(
+        tasking.unique_enqueue(
+            "default",
+            "queue_dispatch_" + str(request.process_parent_id),
+            queue_dispatch,
             request.process_parent_type,
             request.process_parent_id,
             request.request,
@@ -564,12 +581,12 @@ def monitor_rulebook_processes_no_lock() -> None:
             ActivationStatus.WORKERS_OFFLINE,
         ]
     ):
-        process_parent_type = str(process.parent_type)
-        process_parent_id = process.activation_id
-
-        queue_dispatch(
-            process_parent_type,
-            process_parent_id,
+        tasking.unique_enqueue(
+            "default",
+            "queue_dispatch_" + str(process.activation_id),
+            queue_dispatch,
+            str(process.parent_type),
+            process.activation_id,
             None,
             str(uuid.uuid4()),
         )
