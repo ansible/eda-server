@@ -41,6 +41,7 @@ def get_detail_url(obj, skip_if_not_found=False):
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_add_permissions(
+    use_local_resource_setting,
     request,
     model,
     cls_factory,
@@ -163,7 +164,13 @@ def test_view_permissions(
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_change_permissions(
-    model, cls_factory, default_user, user_client, give_obj_perm, request
+    use_local_resource_setting,
+    model,
+    cls_factory,
+    default_user,
+    user_client,
+    give_obj_perm,
+    request,
 ):
     model_name = cls_factory.get_model_name(model)
     obj = cls_factory.get_fixture_object(request, model_name)
@@ -205,7 +212,13 @@ def test_change_permissions(
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_delete_permissions(
-    model, cls_factory, default_user, user_client, give_obj_perm, request
+    use_local_resource_setting,
+    model,
+    cls_factory,
+    default_user,
+    user_client,
+    give_obj_perm,
+    request,
 ):
     model_name = cls_factory.get_model_name(model)
     obj = cls_factory.get_fixture_object(request, model_name)
