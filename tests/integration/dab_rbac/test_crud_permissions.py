@@ -15,7 +15,6 @@
 import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
-from django.contrib.contenttypes.models import ContentType
 from django.test import override_settings
 from django.urls.exceptions import NoReverseMatch
 from rest_framework.reverse import reverse
@@ -71,7 +70,9 @@ def test_add_permissions(
         )
         add_rd = RoleDefinition.objects.create(
             name=f"add-{model._meta.model_name}",
-            content_type=ContentType.objects.get_for_model(parent_obj),
+            content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
+                parent_obj
+            ),
         )
         add_rd.permissions.add(
             DABPermission.objects.get(codename=f"add_{model._meta.model_name}")

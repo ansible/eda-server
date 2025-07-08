@@ -22,6 +22,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandParser
 from django_rq.management.commands import rqworker
 
+from aap_eda import utils
 from aap_eda.settings import features
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,27 @@ class Command(BaseCommand):
 
         # Use rqworker expected args to determine worker type
         if "ActivationWorker" in options["worker_class"]:
+            # dispatcherd worker settings can not be initialized as settings
+            # because the queue name sanitization must happen
+            # after the settings are loaded, we can not check the feature flag
+            # before the settings are loaded.
+            dispatcher_worker_settings = {
+                **settings.DISPATCHERD_DEFAULT_SETTINGS,
+                "brokers": {
+                    "pg_notify": {
+                        **settings.DISPATCHERD_DEFAULT_SETTINGS["brokers"][
+                            "pg_notify"
+                        ],
+                        "channels": [
+                            utils.sanitize_postgres_identifier(
+                                settings.RULEBOOK_QUEUE_NAME,
+                            )
+                        ],
+                    },
+                },
+            }
             dispatcherd_setup(
-                settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS,
+                dispatcher_worker_settings,
             )
 
         elif "DefaultWorker" in options["worker_class"]:

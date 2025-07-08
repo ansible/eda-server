@@ -530,22 +530,6 @@ def post_loading(loaded_settings: Dynaconf):
         },
     }
 
-    settings.DISPATCHERD_ACTIVATION_WORKER_SETTINGS = {
-        **settings.DISPATCHERD_DEFAULT_SETTINGS,
-        "brokers": {
-            "pg_notify": {
-                **settings.DISPATCHERD_DEFAULT_SETTINGS["brokers"][
-                    "pg_notify"
-                ],
-                "channels": [
-                    utils.sanitize_postgres_identifier(
-                        settings.RULEBOOK_QUEUE_NAME,
-                    )
-                ],
-            },
-        },
-    }
-
     data = {
         key: settings[key]
         for key in settings
