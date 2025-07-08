@@ -15,8 +15,8 @@ import secrets
 from typing import Any, Dict
 
 import pytest
+from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
-from django.contrib.contenttypes.models import ContentType
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import APIClient
@@ -49,7 +49,9 @@ def org_admin_rd():
             "view_organization",
             "delete_organization",
         ],
-        content_type=ContentType.objects.get_for_model(models.Organization),
+        content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
+            models.Organization
+        ),
         managed=True,  # custom roles can not include these permissions
     )
 
@@ -62,7 +64,9 @@ def org_member_rd():
             "member_organization",
             "view_organization",
         ],
-        content_type=ContentType.objects.get_for_model(models.Organization),
+        content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
+            models.Organization
+        ),
         managed=True,
     )
 
@@ -584,7 +588,9 @@ def test_resources_remain_after_user_delete(
     # Give default user permission to create resources
     admin_role = RoleDefinition.objects.create(
         name="Elevated User",
-        content_type=ContentType.objects.get_for_model(default_organization),
+        content_type=permission_registry.content_type_model.objects.get_for_model(  # noqa: E501
+            default_organization
+        ),
     )
     admin_role.permissions.add(*DABPermission.objects.all())
     admin_role.give_permission(default_user, default_organization)
