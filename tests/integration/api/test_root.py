@@ -94,6 +94,8 @@ from tests.integration.constants import api_url_v1
 def test_v1_root(admin_client, request, expected_slugs, use_shared_resource):
     if use_shared_resource:
         request.getfixturevalue("use_shared_resource_setting")
+    else:
+        request.getfixturevalue("use_local_resource_setting")
     response = admin_client.get(f"{api_url_v1}/")
     assert response.status_code == 200
     assert len(response.data) == len(expected_slugs)

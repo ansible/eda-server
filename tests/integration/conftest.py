@@ -816,6 +816,12 @@ def use_shared_resource_setting():
         yield
 
 
+@pytest.fixture
+def use_local_resource_setting():
+    with override_settings(ALLOW_LOCAL_RESOURCE_MANAGEMENT=True):
+        yield
+
+
 # fixture for a running redis server
 @pytest.fixture
 def default_credential_type() -> models.CredentialType:
