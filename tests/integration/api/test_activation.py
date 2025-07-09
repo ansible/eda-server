@@ -373,7 +373,7 @@ def test_list_activations_filter_name(
     activations = [default_activation, new_activation]
 
     response = admin_client.get(
-        f"{api_url_v1}/activations/?name={filter_name}"
+        f"{api_url_v1}/activations/?name__contains={filter_name}"
     )
     assert response.status_code == status.HTTP_200_OK
     response_data = response.data["results"]
@@ -868,7 +868,7 @@ def test_list_activation_instances_filter_name(
 ):
     instances = default_activation_instances
 
-    filter_name = "instance-1"
+    filter_name = default_activation_instances[0].name
     response = admin_client.get(
         f"{api_url_v1}/activations/{default_activation.id}"
         f"/instances/?name={filter_name}"
