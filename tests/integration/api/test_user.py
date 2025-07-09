@@ -103,7 +103,11 @@ def test_retrieve_current_user_unauthenticated(base_client: APIClient):
 
 
 @pytest.mark.django_db
-def test_update_current_user(admin_client: APIClient, admin_user: models.User):
+def test_update_current_user(
+    use_local_resource_setting,
+    admin_client: APIClient,
+    admin_user: models.User,
+):
     response = admin_client.patch(
         f"{api_url_v1}/users/me/",
         data={
@@ -135,7 +139,9 @@ def test_update_current_user_forbidden(
 
 @pytest.mark.django_db
 def test_update_current_user_password(
-    admin_client: APIClient, admin_user: models.User
+    use_local_resource_setting,
+    admin_client: APIClient,
+    admin_user: models.User,
 ):
     response = admin_client.patch(
         f"{api_url_v1}/users/me/",
@@ -151,6 +157,7 @@ def test_update_current_user_password(
 
 @pytest.mark.django_db
 def test_update_current_user_username_fail(
+    use_local_resource_setting,
     admin_client: APIClient,
     admin_user: models.User,
     admin_info: dict,
@@ -171,7 +178,7 @@ def test_update_current_user_username_fail(
 
 
 @pytest.mark.django_db
-def test_create_user(admin_client: APIClient):
+def test_create_user(use_local_resource_setting, admin_client: APIClient):
     create_user_data = {
         "username": "test.user",
         "first_name": "Test",
@@ -205,7 +212,6 @@ def test_create_user_forbidden(
 
 @pytest.mark.django_db
 def test_update_is_superuser_field(
-    use_shared_resource_setting,
     superuser_client: APIClient,
     new_user: models.User,
 ):
@@ -223,7 +229,6 @@ def test_update_is_superuser_field(
 
 @pytest.mark.django_db
 def test_update_superuser_field_as_non_superuser(
-    use_shared_resource_setting,
     admin_client: APIClient,
     new_user: models.User,
 ):
@@ -240,6 +245,7 @@ def test_update_superuser_field_as_non_superuser(
 
 @pytest.mark.django_db
 def test_create_superuser(
+    use_local_resource_setting,
     superuser_client: APIClient,
     user_api_client: APIClient,
     org_admin_rd,
@@ -277,7 +283,9 @@ def test_create_superuser(
 
 
 @pytest.mark.django_db
-def test_modify_superuser_as_superuser(superuser_client: APIClient):
+def test_modify_superuser_as_superuser(
+    use_local_resource_setting, superuser_client: APIClient
+):
     other_user = models.User.objects.create(username="other-user")
     assert other_user.is_superuser is False  # sanity
     url = reverse("user-detail", kwargs={"pk": other_user.pk})
@@ -288,6 +296,7 @@ def test_modify_superuser_as_superuser(superuser_client: APIClient):
 
 @pytest.mark.django_db
 def test_modify_superuser_as_org_admin(
+    use_local_resource_setting,
     user_api_client: APIClient,
     org_admin_rd,
     org_member_rd,
@@ -322,7 +331,7 @@ def test_modify_superuser_as_org_admin(
 
 @pytest.mark.django_db
 def test_organization_admin_can_create_user(
-    default_user, user_api_client, org_admin_rd
+    use_local_resource_setting, default_user, user_api_client, org_admin_rd
 ):
     create_user_data = {
         "username": "test.user",
@@ -431,6 +440,7 @@ def test_list_users_filter_superuser(
 
 @pytest.mark.django_db
 def test_partial_update_user(
+    use_local_resource_setting,
     admin_client: APIClient,
     admin_user: models.User,
 ):
@@ -472,6 +482,7 @@ def test_partial_update_user_forbidden(
 
 @pytest.mark.django_db
 def test_delete_user(
+    use_local_resource_setting,
     superuser_client: APIClient,
     default_user: models.User,
 ):
@@ -578,6 +589,7 @@ def test_list_users_filter_by_ansible_id(
 
 @pytest.mark.django_db
 def test_resources_remain_after_user_delete(
+    use_local_resource_setting,
     base_client: APIClient,
     admin_user: models.User,
     default_user: models.User,

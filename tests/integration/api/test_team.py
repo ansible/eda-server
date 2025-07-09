@@ -88,6 +88,7 @@ def test_list_teams_filter_by_ansible_id(
 
 @pytest.mark.django_db
 def test_create_team(
+    use_local_resource_setting,
     default_organization: models.Organization,
     admin_client: APIClient,
 ):
@@ -123,7 +124,6 @@ def test_create_team_forbidden(
 
 @pytest.mark.django_db
 def test_create_team_unique_name_constraint(
-    use_shared_resource_setting,
     default_organization: models.Organization,
     default_team: models.Team,
     admin_client: APIClient,
@@ -155,6 +155,7 @@ def test_retrieve_team_not_exist(admin_client: APIClient):
 
 @pytest.mark.django_db
 def test_partial_update_team(
+    use_local_resource_setting,
     default_team: models.Team,
     admin_client: APIClient,
 ):
@@ -183,7 +184,9 @@ def test_partial_update_team_forbidden(
 
 @pytest.mark.django_db
 def test_delete_team_success(
-    default_team: models.Team, admin_client: APIClient
+    use_local_resource_setting,
+    default_team: models.Team,
+    admin_client: APIClient,
 ):
     response = admin_client.delete(f"{api_url_v1}/teams/{default_team.id}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -202,7 +205,9 @@ def test_delete_team_forbidden(
 
 
 @pytest.mark.django_db
-def test_delete_team_not_exist(admin_client: APIClient):
+def test_delete_team_not_exist(
+    use_local_resource_setting, admin_client: APIClient
+):
     response = admin_client.delete(f"{api_url_v1}/teams/100/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 

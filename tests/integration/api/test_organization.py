@@ -100,6 +100,7 @@ def test_list_organizations_filter_by_ansible_id(
 
 @pytest.mark.django_db
 def test_create_organization(
+    use_local_resource_setting,
     base_client: APIClient,
     super_user: models.User,
 ):
@@ -152,6 +153,7 @@ def test_retrieve_organization_not_exist(admin_client: APIClient):
 
 @pytest.mark.django_db
 def test_partial_update_organization_success(
+    use_local_resource_setting,
     new_organization: models.Organization,
     superuser_client: APIClient,
 ):
@@ -180,6 +182,7 @@ def test_partial_update_organization_forbidden(
 
 @pytest.mark.django_db
 def test_partial_update_default_organization_exception(
+    use_local_resource_setting,
     default_organization: models.Organization,
     superuser_client: APIClient,
 ):
@@ -197,7 +200,9 @@ def test_partial_update_default_organization_exception(
 
 @pytest.mark.django_db
 def test_delete_organization_success(
-    new_organization: models.Organization, superuser_client: APIClient
+    use_local_resource_setting,
+    new_organization: models.Organization,
+    superuser_client: APIClient,
 ):
     response = superuser_client.delete(
         f"{api_url_v1}/organizations/{new_organization.id}/"
@@ -212,7 +217,9 @@ def test_delete_organization_success(
 
 @pytest.mark.django_db
 def test_delete_organization_conflict(
-    default_organization: models.Organization, admin_client: APIClient
+    use_local_resource_setting,
+    default_organization: models.Organization,
+    admin_client: APIClient,
 ):
     response = admin_client.delete(
         f"{api_url_v1}/organizations/{default_organization.id}/"
@@ -233,7 +240,9 @@ def test_delete_organization_forbidden(
 
 
 @pytest.mark.django_db
-def test_delete_organization_not_exist(admin_client: APIClient):
+def test_delete_organization_not_exist(
+    use_local_resource_setting, admin_client: APIClient
+):
     response = admin_client.delete(f"{api_url_v1}/organizations/100/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 

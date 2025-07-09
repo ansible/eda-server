@@ -259,3 +259,8 @@ def test_types(mock_settings, name, value, expected):
     else:
         post_loading(mock_settings)
         assert mock_settings[name] == expected
+
+
+def test_allow_local_resource_management(mock_settings):
+    # default is False
+    assert mock_settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT is False

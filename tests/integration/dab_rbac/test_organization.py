@@ -73,7 +73,12 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
 def test_create_with_custom_org(
-    cls_factory, model, superuser_client, request, new_organization
+    use_local_resource_setting,
+    cls_factory,
+    model,
+    superuser_client,
+    request,
+    new_organization,
 ):
     model_name = cls_factory.get_model_name(model)
     model_obj = cls_factory.get_fixture_object(request, model_name)

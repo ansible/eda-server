@@ -220,8 +220,12 @@ ANSIBLE_RULEBOOK_FLUSH_AFTER: int = 100
 ANSIBLE_BASE_JWT_VALIDATE_CERT: bool = False
 ANSIBLE_BASE_JWT_KEY: str = "https://localhost"
 
+# Default Not allow local resource management.
+# Ignore what is set in DAB.
+# Can be changed via ENV
+ALLOW_LOCAL_RESOURCE_MANAGEMENT: bool = False
+
 # These settings have defaults in DAB
-# ALLOW_LOCAL_RESOURCE_MANAGEMENT
 # RESOURCE_SERVICE_PATH
 # RESOURCE_SERVER_SYNC_ENABLED
 # ENABLE_SERVICE_BACKED_SSO

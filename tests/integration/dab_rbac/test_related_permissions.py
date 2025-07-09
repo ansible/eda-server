@@ -20,6 +20,7 @@ from rest_framework.reverse import reverse
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
 def test_related_organization_edit_access_control(
+    use_local_resource_setting,
     cls_factory,
     default_user,
     user_client,
