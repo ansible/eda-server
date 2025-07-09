@@ -53,5 +53,5 @@ class GatewayAPIError(Exception):
     pass
 
 
-class MissingCredentials(Exception):
+class MissingCredentialsError(Exception):
     pass

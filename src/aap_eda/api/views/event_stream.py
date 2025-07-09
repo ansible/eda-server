@@ -31,7 +31,7 @@ from rest_framework.response import Response
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import EventStreamAuthType, ResourceType
-from aap_eda.core.exceptions import GatewayAPIError, MissingCredentials
+from aap_eda.core.exceptions import GatewayAPIError, MissingCredentialsError
 from aap_eda.core.utils import logging_utils
 from aap_eda.services.sync_certs import SyncCertificates
 
@@ -327,5 +327,5 @@ class EventStreamViewSet(
                     obj.delete(event_stream.id)
                 else:
                     obj.update()
-            except (GatewayAPIError, MissingCredentials) as ex:
-                logger.error("Could not %s certificates %s", action, str(ex))
+            except (GatewayAPIError, MissingCredentialsError) as ex:
+                logger.error("Could not %s certificates: %s", action, str(ex))
