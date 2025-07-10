@@ -53,6 +53,7 @@ class ResourceType(DjangoStrEnum):
     ORGANIZATION = "organization"
     TEAM = "team"
     EVENT_STREAM = "event_stream"
+    CREDENTIAL_INPUT_SOURCE = "credential_input_source"
 
 
 class Action(DjangoStrEnum):
@@ -64,6 +65,7 @@ class Action(DjangoStrEnum):
     DISABLE = "disable"
     RESTART = "restart"
     SYNC = "sync"
+    TEST = "test"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"
@@ -99,6 +101,16 @@ class DefaultCredentialType(DjangoStrEnum):
     AAP = "Red Hat Ansible Automation Platform"
     GPG = "GPG Public Key"
     POSTGRES = "Postgres"
+    HASHICORP_LOOKUP = "HashiCorp Vault Secret Lookup"
+    HASHICORP_SSH = "HashiCorp Vault Signed SSH"
+    AWS_SECRETS_LOOKUP = "AWS Secrets Manager lookup"
+    CENTRIFY_VAULT_LOOKUP = "Centrify Vault Credential Provider Lookup"
+    THYCOTIC_DSV = "Thycotic DevOps Secrets Vault"
+    THYCOTIC_SECRET_SERVER = "Thycotic Secret Server"
+    CYBERARK_CENTRAL = "CyberArk Central Credential Provider Lookup"
+    CYBERARK_CONJUR = "CyberArk Conjur Secrets Manager Lookup"
+    MSFT_AZURE_VAULT = "Microsoft Azure Key Vault"
+    GITHUB_APP = "GitHub App Installation Access Token Lookup"
 
 
 # TODO: rename to "RulebookProcessStatus" or "ParentProcessStatus"

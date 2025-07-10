@@ -1,0 +1,4 @@
+[installer]
+# This is related to https://github.com/DelineaXPM/python-tss-sdk/issues/72
+# these packages get corrupted at times when installed in parallel.
+parallel = false

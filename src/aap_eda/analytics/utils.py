@@ -26,7 +26,7 @@ from requests.auth import AuthBase, HTTPBasicAuth
 from aap_eda.conf import application_settings
 from aap_eda.conf.registry import ANALYTICS_GATHER_INTERVAL
 from aap_eda.core import enums, models
-from aap_eda.core.utils.credentials import inputs_from_store
+from aap_eda.core.utils.credentials import get_resolved_secrets
 
 logger = logging.getLogger("aap_eda.analytics")
 
@@ -225,7 +225,7 @@ def generate_token() -> ServiceToken:
 def _get_credential_value(field: str, *setting_envs: Tuple[Any, str]) -> str:
     credentials = _get_analytics_credentials()
     for credential in credentials:
-        inputs = inputs_from_store(credential.inputs.get_secret_value())
+        inputs = get_resolved_secrets(credential)
         if value := inputs.get(field):
             return value
 
@@ -314,7 +314,7 @@ def get_analytics_interval() -> int:
 def get_analytics_interval_if_exist(credential: models.EdaCredential) -> int:
     if credential.credential_type.kind != get_auth_mode():
         return 0
-    inputs = inputs_from_store(credential.inputs.get_secret_value())
+    inputs = get_resolved_secrets(credential)
     return inputs.get("gather_interval", 0)
 
 
