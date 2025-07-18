@@ -58,9 +58,22 @@ def test_create_all_roles():
         if obj_name == "team":
             assert "team member" in role_names
             assert "team admin" in role_names
+        elif obj_name == "project":
+            # Project roles should have EDA prefix
+            assert "eda project admin" in role_names
+            assert "eda project use" in role_names
         else:
             assert f"{obj_name} admin" in role_names
             assert f"{obj_name} use" in role_names
+
+    # Also check for organization-level project role
+    project_org_roles = [
+        rd.name.lower()
+        for rd in RoleDefinition.objects.filter(
+            name__icontains="organization"
+        ).filter(name__icontains="project")
+    ]
+    assert "eda organization project admin" in project_org_roles
 
 
 @pytest.mark.django_db

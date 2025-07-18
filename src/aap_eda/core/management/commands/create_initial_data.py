@@ -1461,8 +1461,12 @@ class Command(BaseCommand):
                 desc += f" and its child resources - {', '.join(child_names)}"  # noqa: E501
 
             # create resource admin role
+            admin_role_name = f"{cls._meta.verbose_name.title()} Admin"
+            if cls._meta.model_name == "project":
+                admin_role_name = f"EDA {admin_role_name}"
+
             role, created = RoleDefinition.objects.update_or_create(
-                name=f"{cls._meta.verbose_name.title()} Admin",
+                name=admin_role_name,
                 defaults={
                     "description": desc,
                     "content_type": ct,
@@ -1480,11 +1484,15 @@ class Command(BaseCommand):
             # ignore team model as it makes no sense to have Use role for it
             # and should be managed by Admin users only
             if cls._meta.model_name != "team":
+                use_role_name = f"{cls._meta.verbose_name.title()} Use"
+                if cls._meta.model_name == "project":
+                    use_role_name = f"EDA {use_role_name}"
+
                 (
                     use_role,
                     use_role_created,
                 ) = RoleDefinition.objects.update_or_create(
-                    name=f"{cls._meta.verbose_name.title()} Use",
+                    name=use_role_name,
                     defaults={
                         "description": f"Has use permissions to a single {cls._meta.verbose_name}",  # noqa: E501
                         "content_type": ct,
@@ -1504,11 +1512,17 @@ class Command(BaseCommand):
                     )
 
                 # create org-level admin roles for each resource type
+                org_role_name = (
+                    f"Organization {cls._meta.verbose_name.title()} Admin"
+                )
+                if cls._meta.model_name == "project":
+                    org_role_name = f"EDA {org_role_name}"
+
                 (
                     org_role,
                     org_role_created,
                 ) = RoleDefinition.objects.update_or_create(
-                    name=f"Organization {cls._meta.verbose_name.title()} Admin",  # noqa: E501
+                    name=org_role_name,
                     defaults={
                         "description": f"Has all permissions to {cls._meta.verbose_name}s within an organization",  # noqa: E501
                         "content_type": self.content_type_model.objects.get(
