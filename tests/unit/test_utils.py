@@ -133,7 +133,7 @@ class SampleModelSerializer(serializers.ModelSerializer):
                     name="id",
                     description="Filter by id",
                     required=False,
-                    type=OpenApiTypes.NUMBER,
+                    type=OpenApiTypes.INT,
                 ),
                 OpenApiParameter(
                     name="name",
@@ -145,7 +145,7 @@ class SampleModelSerializer(serializers.ModelSerializer):
                     name="age",
                     description="Filter by age",
                     required=False,
-                    type=OpenApiTypes.NUMBER,
+                    type=OpenApiTypes.INT,
                 ),
                 OpenApiParameter(
                     name="created_at",
@@ -163,7 +163,7 @@ class SampleModelSerializer(serializers.ModelSerializer):
                     name="another_model_id",
                     description="Filter by another_model_id",
                     required=False,
-                    type=OpenApiTypes.STR,
+                    type=OpenApiTypes.INT,
                 ),
             ],
         ),

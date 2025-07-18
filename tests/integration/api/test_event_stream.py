@@ -62,7 +62,9 @@ def test_list_event_streams_filter_name(
     default_event_streams: List[models.EventStream],
     default_vault_credential,
 ):
-    response = admin_client.get(f"{api_url_v1}/event-streams/?name=another")
+    response = admin_client.get(
+        f"{api_url_v1}/event-streams/?name__contains=another"
+    )
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["results"]) == 1
     assert response.data["results"][0]["name"].startswith("another")

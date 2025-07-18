@@ -13,10 +13,10 @@
 #  limitations under the License.
 
 from django.conf import settings
-from django_filters import rest_framework as defaultfilters
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiResponse,
+    OpenApiTypes,
     extend_schema,
     extend_schema_view,
 )
@@ -24,9 +24,10 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from aap_eda.api import exceptions as api_exc, filters, serializers
+from aap_eda.api import exceptions as api_exc, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
+from aap_eda.utils.openapi import generate_query_params
 
 from .mixins import PartialUpdateOnlyModelMixin, SharedResourceViewMixin
 
@@ -40,6 +41,14 @@ from .mixins import PartialUpdateOnlyModelMixin, SharedResourceViewMixin
                 description="Return a list of organizations.",
             ),
         },
+        parameters=[
+            OpenApiParameter(
+                "resource__ansible_id",
+                type=OpenApiTypes.UUID,
+                description="Filter by resource__ansible_id",
+            ),
+        ]
+        + generate_query_params(serializers.OrganizationSerializer()),
     ),
     create=extend_schema(
         exclude=not settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT,
@@ -80,8 +89,6 @@ class OrganizationViewSet(
     SharedResourceViewMixin,
 ):
     queryset = models.Organization.objects.order_by("id")
-    filter_backends = (defaultfilters.DjangoFilterBackend,)
-    filterset_class = filters.OrganizationFilter
     rbac_action = None
 
     def filter_queryset(self, queryset):
@@ -135,13 +142,13 @@ class OrganizationViewSet(
                 location=OpenApiParameter.PATH,
                 description="A unique integer value identifying this organization.",  # noqa: E501
             )
-        ],
+        ]
+        + generate_query_params(serializers.TeamSerializer()),
     )
     @action(
         detail=False,
         methods=["get"],
         queryset=models.Team.objects.order_by("id"),
-        filterset_class=filters.OrganizationTeamFilter,
         rbac_action=Action.READ,
         url_path="(?P<id>[^/.]+)/teams",
     )
