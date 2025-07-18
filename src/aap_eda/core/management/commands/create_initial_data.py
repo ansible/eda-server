@@ -48,6 +48,10 @@ AUTH_TYPE_LABEL = "Event Stream Authentication Type"
 SIGNATURE_ENCODING_LABEL = "Signature Encoding"
 HTTP_HEADER_LABEL = "HTTP Header Key"
 DEPRECATED_CREDENTIAL_KINDS = ["mtls"]
+LABEL_PATH_TO_AUTH = "Path to Auth"
+LABEL_CLIENT_CERTIFICATE = "Client Certificate"
+LABEL_CLIENT_SECRET = "Client Secret"
+LABEL_CLIENT_ID = "Client ID"
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
 ORG_ROLES = [
@@ -67,6 +71,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": CRUD,
             "eda_credential": CRUD,
+            "credential_input_source": CRUD,
             "event_stream": CRUD,
         },
     },
@@ -93,6 +98,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["add", "view", "change"],
             "eda_credential": ["add", "view", "change"],
+            "credential_input_source": ["add", "view", "change"],
             "event_stream": ["add", "view", "change"],
         },
     },
@@ -120,6 +126,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["add", "view", "change"],
             "eda_credential": ["add", "view", "change"],
+            "credential_input_source": ["add", "view", "change"],
             "event_stream": ["add", "view", "change"],
         },
     },
@@ -140,6 +147,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
+            "credential_input_source": ["view"],
             "event_stream": ["view"],
         },
     },
@@ -158,6 +166,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
+            "credential_input_source": ["view"],
             "event_stream": ["view"],
         },
     },
@@ -176,6 +185,7 @@ ORG_ROLES = [
             "rulebook": ["view"],
             "decision_environment": ["view"],
             "eda_credential": ["view"],
+            "credential_input_source": ["view"],
             "event_stream": ["view"],
         },
     },
@@ -517,16 +527,16 @@ EVENT_STREAM_OAUTH2_INPUTS = {
         },
         {
             "id": "client_id",
-            "label": "Client ID",
+            "label": LABEL_CLIENT_ID,
             "type": "string",
-            "help_text": ("The Client ID from the Authorization Server."),
+            "help_text": "The Client ID from the Authorization Server.",
         },
         {
             "id": "client_secret",
-            "label": "Client Secret",
+            "label": LABEL_CLIENT_SECRET,
             "type": "string",
             "secret": True,
-            "help_text": ("The Client Secret from the Authorization Server."),
+            "help_text": "The Client Secret from the Authorization Server.",
         },
         {
             "id": "introspection_url",
@@ -950,16 +960,16 @@ ANALYTICS_CREDENTIAL_OAUTH_INPUTS = {
         },
         {
             "id": "client_id",
-            "label": "Client ID",
+            "label": LABEL_CLIENT_ID,
             "type": "string",
-            "help_text": ("The Client ID from the Authorization Server."),
+            "help_text": "The Client ID from the Authorization Server.",
         },
         {
             "id": "client_secret",
-            "label": "Client Secret",
+            "label": LABEL_CLIENT_SECRET,
             "type": "string",
             "secret": True,
-            "help_text": ("The Client Secret from the Authorization Server."),
+            "help_text": "The Client Secret from the Authorization Server.",
         },
         {
             "id": "gather_interval",
@@ -1041,6 +1051,716 @@ POSTGRES_CREDENTIAL_INJECTORS = {
         "template.postgres_sslkey": "{{ postgres_sslkey }}",
     },
 }
+
+HASHICORP_SHARED_FIELDS = [
+    {
+        "id": "url",
+        "label": "Server URL",
+        "type": "string",
+        "format": "url",
+        "help_text": "The URL to the HashiCorp Vault",
+    },
+    {
+        "id": "token",
+        "label": "Token",
+        "type": "string",
+        "secret": True,
+        "help_text": (
+            "The access token used to authenticate to the Vault server"
+        ),
+    },
+    {
+        "id": "cacert",
+        "label": "CA Certificate",
+        "type": "string",
+        "multiline": True,
+        "help_text": (
+            "The CA certificate used to verify the SSL "
+            "certificate of the Vault server"
+        ),
+    },
+    {
+        "id": "role_id",
+        "label": "AppRole role_id",
+        "type": "string",
+        "multiline": False,
+        "help_text": "The Role ID for AppRole Authentication",
+    },
+    {
+        "id": "secret_id",
+        "label": "AppRole secret_id",
+        "type": "string",
+        "multiline": False,
+        "secret": True,
+        "help_text": "The Secret ID for AppRole Authentication",
+    },
+    {
+        "id": "client_cert_public",
+        "label": LABEL_CLIENT_CERTIFICATE,
+        "type": "string",
+        "multiline": True,
+        "help_text": (
+            "The PEM-encoded client certificate used for TLS "
+            "client authentication. This should include the "
+            "certificate and any intermediate certififcates."
+        ),
+    },
+    {
+        "id": "client_cert_private",
+        "label": "Client Certificate Key",
+        "type": "string",
+        "multiline": True,
+        "secret": True,
+        "help_text": (
+            "The certificate private key used for TLS "
+            "client authentication."
+        ),
+    },
+    {
+        "id": "client_cert_role",
+        "label": "TLS Authentication Role",
+        "type": "string",
+        "multiline": False,
+        "help_text": (
+            "The role configured in Hashicorp Vault for TLS "
+            "client authentication. If not provided, Hashicorp "
+            "Vault may assign roles based on the certificate used."
+        ),
+    },
+    {
+        "id": "namespace",
+        "label": "Namespace name (Vault Enterprise only)",
+        "type": "string",
+        "multiline": False,
+        "help_text": (
+            "Name of the namespace to use when authenticate "
+            "and retrieve secrets"
+        ),
+    },
+    {
+        "id": "kubernetes_role",
+        "label": "Kubernetes role",
+        "type": "string",
+        "multiline": False,
+        "help_text": (
+            "The Role for Kubernetes Authentication. This is the "
+            "named role, configured in Vault server, for AWX pod "
+            "auth policies. see "
+            "https://www.vaultproject.io/docs/auth/"
+            "kubernetes#configuration"
+        ),
+    },
+    {
+        "id": "username",
+        "label": "Username",
+        "type": "string",
+        "secret": False,
+        "help_text": "Username for user authentication.",
+    },
+    {
+        "id": "password",
+        "label": "Password",
+        "type": "string",
+        "secret": True,
+        "help_text": "Password for user authentication.",
+    },
+    {
+        "id": "default_auth_path",
+        "label": LABEL_PATH_TO_AUTH,
+        "type": "string",
+        "multiline": False,
+        "default": "approle",
+        "help_text": (
+            "The Authentication path to use if one isn't "
+            "provided in the metadata when linking to an "
+            "input field. Defaults to 'approle'"
+        ),
+    },
+]
+
+HASHICORP_LOOKUP_EXTRA_FIELDS = [
+    {
+        "id": "api_version",
+        "label": "API Version",
+        "type": "string",
+        "choices": ["v1", "v2"],
+        "help_text": (
+            "API v1 is for static key/value lookups.  API v2 is for versioned "
+            "key/value lookups."
+        ),
+        "default": "v1",
+    }
+]
+
+HASHICORP_VAULT_SECRET_LOOKUP_INPUTS = {
+    "fields": HASHICORP_SHARED_FIELDS + HASHICORP_LOOKUP_EXTRA_FIELDS,
+    "metadata": [
+        {
+            "id": "secret_backend",
+            "label": "Name of Secret Backend",
+            "type": "string",
+            "help_text": (
+                "The name of the kv secret backend (if left empty, "
+                "the first segment of the secret path will be used)."
+            ),
+        },
+        {
+            "id": "secret_path",
+            "label": "Path to Secret",
+            "type": "string",
+            "help_text": (
+                "The path to the secret stored in the secret backend "
+                "e.g, /some/secret/. It is recommended that you use "
+                "the secret backend field to identify the storage "
+                "backend and to use this field for locating a specific "
+                "secret within that store. However, if you prefer to "
+                "fully identify both the secret backend and one of its "
+                "secrets using only this field, join their locations "
+                "into a single path without any additional separators, "
+                "e.g, /location/of/backend/some/secret."
+            ),
+        },
+        {
+            "id": "auth_path",
+            "label": LABEL_PATH_TO_AUTH,
+            "type": "string",
+            "multiline": False,
+            "help_text": (
+                "The path where the Authentication method is "
+                "mounted e.g, approle"
+            ),
+        },
+        {
+            "id": "secret_key",
+            "label": "Key Name",
+            "type": "string",
+            "help_text": "The name of the key to look up in the secret.",
+        },
+        {
+            "id": "secret_version",
+            "label": "Secret Version (v2 only)",
+            "type": "string",
+            "help_text": (
+                "Used to specify a specific secret version (if left "
+                "empty, the latest version will be used)."
+            ),
+        },
+    ],
+    "required": ["url", "secret_path", "api_version", "secret_key"],
+}
+
+AWS_SECRETS_MANAGER_LOOKUP_INPUTS = {
+    "fields": [
+        {"id": "aws_access_key", "label": "AWS Access Key", "type": "string"},
+        {
+            "id": "aws_secret_key",
+            "label": "AWS Secret Key",
+            "type": "string",
+            "secret": True,
+        },
+    ],
+    "metadata": [
+        {
+            "id": "region_name",
+            "label": "AWS Secrets Manager Region",
+            "type": "string",
+            "help_text": "Region which the secrets manager is located",
+        },
+        {"id": "secret_name", "label": "AWS Secret Name", "type": "string"},
+    ],
+    "required": [
+        "aws_access_key",
+        "aws_secret_key",
+        "region_name",
+        "secret_name",
+    ],
+}
+
+
+CENTRIFY_VAULT_CREDENTIAL_PROVIDER_LOOKUP_INPUTS = {
+    "fields": [
+        {
+            "id": "url",
+            "label": "Centrify Tenant URL",
+            "type": "string",
+            "help_text": "Centrify Tenant URL",
+            "format": "url",
+        },
+        {
+            "id": "client_id",
+            "label": "Centrify API User",
+            "type": "string",
+            "help_text": (
+                "Centrify API User, having necessary "
+                "permissions as mentioned in support doc"
+            ),
+        },
+        {
+            "id": "client_password",
+            "label": "Centrify API Password",
+            "type": "string",
+            "help_text": (
+                "Password of Centrify API User with necessary permissions"
+            ),
+            "secret": True,
+        },
+        {
+            "id": "oauth_application_id",
+            "label": "OAuth2 Application ID",
+            "type": "string",
+            "help_text": (
+                "Application ID of the configured "
+                "OAuth2 Client (defaults to 'awx')"
+            ),
+            "default": "awx",
+        },
+        {
+            "id": "oauth_scope",
+            "label": "OAuth2 Scope",
+            "type": "string",
+            "help_text": (
+                "Scope of the configured OAuth2 Client (defaults to 'awx')"
+            ),
+            "default": "awx",
+        },
+    ],
+    "metadata": [
+        {
+            "id": "account-name",
+            "label": "Account Name",
+            "type": "string",
+            "help_text": (
+                "Local system account or Domain account "
+                "name enrolled in Centrify Vault. eg. "
+                "(root or DOMAIN/Administrator)"
+            ),
+        },
+        {
+            "id": "system-name",
+            "label": "System Name",
+            "type": "string",
+            "help_text": "Machine Name enrolled with in Centrify Portal",
+        },
+    ],
+    "required": [
+        "url",
+        "account-name",
+        "system-name",
+        "client_id",
+        "client_password",
+    ],
+}
+
+
+HASHICORP_VAULT_SIGNED_SSH_INPUTS = {
+    "fields": HASHICORP_SHARED_FIELDS,
+    "metadata": [
+        {
+            "id": "public_key",
+            "label": "Unsigned Public Key",
+            "type": "string",
+            "multiline": True,
+        },
+        {
+            "id": "secret_path",
+            "label": "Path to Secret",
+            "type": "string",
+            "help_text": (
+                "The path to the secret stored in the secret backend "
+                "e.g, /some/secret/. It is recommended that you use "
+                "the secret backend field to identify the storage backend "
+                "and to use this field for locating a specific secret "
+                "within that store. However, if you prefer to fully identify "
+                "both the secret backend and one of its secrets using only "
+                "this field, join their locations into a single path without "
+                "any additional separators, "
+                "e.g, /location/of/backend/some/secret."
+            ),
+        },
+        {
+            "id": "auth_path",
+            "label": LABEL_PATH_TO_AUTH,
+            "type": "string",
+            "multiline": False,
+            "help_text": (
+                "The path where the Authentication method is "
+                "mounted e.g, approle"
+            ),
+        },
+        {
+            "id": "role",
+            "label": "Role Name",
+            "type": "string",
+            "help_text": "The name of the role used to sign.",
+        },
+        {
+            "id": "valid_principals",
+            "label": "Valid Principals",
+            "type": "string",
+            "help_text": (
+                "Valid principals (either usernames or hostnames) that the "
+                "certificate should be signed for."
+            ),
+        },
+    ],
+    "required": ["url", "secret_path", "public_key", "role"],
+}
+
+THYCOTIC_DEVOPS_SECRETS_VAULT_INPUTS = {
+    "fields": [
+        {
+            "id": "tenant",
+            "label": "Tenant",
+            "help_text": (
+                'The tenant e.g. "ex" when the URL '
+                "is https://ex.secretsvaultcloud.com"
+            ),
+            "type": "string",
+        },
+        {
+            "id": "tld",
+            "label": "Top-level Domain (TLD)",
+            "help_text": (
+                'The TLD of the tenant e.g. "com" when the '
+                "URL is https://ex.secretsvaultcloud.com"
+            ),
+            "choices": ["ca", "com", "com.au", "eu"],
+            "default": "com",
+        },
+        {"id": "client_id", "label": LABEL_CLIENT_ID, "type": "string"},
+        {
+            "id": "client_secret",
+            "label": LABEL_CLIENT_SECRET,
+            "type": "string",
+            "secret": True,
+        },
+    ],
+    "metadata": [
+        {
+            "id": "path",
+            "label": "Secret Path",
+            "type": "string",
+            "help_text": "The secret path e.g. /test/secret1",
+        },
+        {
+            "id": "secret_field",
+            "label": "Secret Field",
+            "help_text": "The field to extract from the secret",
+            "type": "string",
+        },
+        {
+            "id": "secret_decoding",
+            "label": "Should the secret be base64 decoded?",
+            "help_text": (
+                "Specify whether the secret should be base64 decoded, "
+                "typically used for storing files, such as SSH keys"
+            ),
+            "choices": ["No Decoding", "Decode Base64"],
+            "type": "string",
+            "default": "No Decoding",
+        },
+    ],
+    "required": [
+        "tenant",
+        "client_id",
+        "client_secret",
+        "path",
+        "secret_field",
+        "secret_decoding",
+    ],
+}
+
+THYCOTIC_SECRET_SERVER_INPUTS = {
+    "fields": [
+        {
+            "id": "server_url",
+            "label": "Secret Server URL",
+            "help_text": (
+                "The Base URL of Secret Server e.g. "
+                "https://myserver/SecretServer or "
+                "https://mytenant.secretservercloud.com"
+            ),
+            "type": "string",
+        },
+        {
+            "id": "username",
+            "label": "Username",
+            "help_text": "The (Application) user username",
+            "type": "string",
+        },
+        {
+            "id": "domain",
+            "label": "Domain",
+            "help_text": "The (Application) user domain",
+            "type": "string",
+        },
+        {
+            "id": "password",
+            "label": "Password",
+            "help_text": "The corresponding password",
+            "type": "string",
+            "secret": True,
+        },
+    ],
+    "metadata": [
+        {
+            "id": "secret_id",
+            "label": "Secret ID",
+            "help_text": "The integer ID of the secret",
+            "type": "string",
+        },
+        {
+            "id": "secret_field",
+            "label": "Secret Field",
+            "help_text": "The field to extract from the secret",
+            "type": "string",
+        },
+    ],
+    "required": [
+        "server_url",
+        "username",
+        "password",
+        "secret_id",
+        "secret_field",
+    ],
+}
+
+CYBERARK_CENTRAL_CREDENTIAL_PROVIDER_LOOKUP_INPUTS = {
+    "fields": [
+        {
+            "id": "url",
+            "label": "CyberArk CCP URL",
+            "type": "string",
+            "format": "url",
+        },
+        {
+            "id": "webservice_id",
+            "label": "Web Service ID",
+            "type": "string",
+            "help_text": (
+                "The CCP Web Service ID. Leave "
+                "blank to default to AIMWebService."
+            ),
+        },
+        {
+            "id": "app_id",
+            "label": "Application ID",
+            "type": "string",
+            "secret": True,
+        },
+        {
+            "id": "client_key",
+            "label": "Client Key",
+            "type": "string",
+            "secret": True,
+            "multiline": True,
+        },
+        {
+            "id": "client_cert",
+            "label": LABEL_CLIENT_CERTIFICATE,
+            "type": "string",
+            "secret": True,
+            "multiline": True,
+        },
+        {
+            "id": "verify",
+            "label": "Verify SSL Certificates",
+            "type": "boolean",
+            "default": True,
+        },
+    ],
+    "metadata": [
+        {
+            "id": "object_query",
+            "label": "Object Query",
+            "type": "string",
+            "help_text": (
+                "Lookup query for the object. Ex: "
+                "Safe=TestSafe;Object=testAccountName123"
+            ),
+        },
+        {
+            "id": "object_query_format",
+            "label": "Object Query Format",
+            "type": "string",
+            "default": "Exact",
+            "choices": ["Exact", "Regexp"],
+        },
+        {
+            "id": "object_property",
+            "label": "Object Property",
+            "type": "string",
+            "help_text": (
+                "The property of the object to return. Available "
+                "properties: Username, Password and Address."
+            ),
+        },
+        {
+            "id": "reason",
+            "label": "Reason",
+            "type": "string",
+            "help_text": (
+                "Object request reason. This is only needed if it "
+                "is required by the object's policy."
+            ),
+        },
+    ],
+    "required": ["url", "app_id", "object_query"],
+}
+
+CYBERARK_CONJUR_SECRETS_MANAGER_LOOKUP_INPUTS = {
+    "fields": [
+        {
+            "id": "url",
+            "label": "Conjur URL",
+            "type": "string",
+            "format": "url",
+        },
+        {
+            "id": "api_key",
+            "label": "API Key",
+            "type": "string",
+            "secret": True,
+        },
+        {"id": "account", "label": "Account", "type": "string"},
+        {"id": "username", "label": "Username", "type": "string"},
+        {
+            "id": "cacert",
+            "label": "Public Key Certificate",
+            "type": "string",
+            "multiline": True,
+        },
+    ],
+    "metadata": [
+        {
+            "id": "secret_path",
+            "label": "Secret Identifier",
+            "type": "string",
+            "help_text": (
+                "The identifier for the secret e.g., /some/identifier"
+            ),
+        },
+        {
+            "id": "secret_version",
+            "label": "Secret Version",
+            "type": "string",
+            "help_text": (
+                "Used to specify a specific secret version (if left empty, "
+                "the latest version will be used)."
+            ),
+        },
+    ],
+    "required": ["url", "api_key", "account", "username"],
+}
+
+MICROSOFT_AZURE_KEY_VAULT_INPUTS = {
+    "fields": [
+        {
+            "id": "url",
+            "label": "Vault URL (DNS Name)",
+            "type": "string",
+            "format": "url",
+        },
+        {"id": "client", "label": LABEL_CLIENT_ID, "type": "string"},
+        {
+            "id": "secret",
+            "label": LABEL_CLIENT_SECRET,
+            "type": "string",
+            "secret": True,
+        },
+        {"id": "tenant", "label": "Tenant ID", "type": "string"},
+        {
+            "id": "cloud_name",
+            "label": "Cloud Environment",
+            "help_text": "Specify which azure cloud environment to use.",
+            "choices": [
+                "AzureCloud",
+                "AzureGermanCloud",
+                "AzureChinaCloud",
+                "AzureUSGovernment",
+            ],
+            "default": "AzureCloud",
+        },
+    ],
+    "metadata": [
+        {
+            "id": "secret_field",
+            "label": "Secret Name",
+            "type": "string",
+            "help_text": "The name of the secret to look up.",
+        },
+        {
+            "id": "secret_version",
+            "label": "Secret Version",
+            "type": "string",
+            "help_text": (
+                "Used to specify a specific secret version "
+                "(if left empty, the latest version will be used)."
+            ),
+        },
+    ],
+    "required": ["url", "secret_field"],
+}
+
+GITHUB_APP_INPUTS = {
+    "fields": [
+        {
+            "id": "github_api_url",
+            "label": "GitHub API endpoint URL",
+            "type": "string",
+            "help_text": (
+                "Specify the GitHub API URL here. In the case of an "
+                "Enterprise: https://gh.your.org/api/v3 (self-hosted) "
+                "or https://api.SUBDOMAIN.ghe.com (cloud)"
+            ),
+            "default": "https://api.github.com",
+        },
+        {
+            "id": "app_or_client_id",
+            "label": "GitHub App ID",
+            "type": "string",
+            "help_text": (
+                "The GitHub App ID created by the GitHub Admin. Example "
+                "App ID: 1121547 found on https://github.com/settings/apps/ "
+                "required for creating a JWT token for authentication."
+            ),
+        },
+        {
+            "id": "install_id",
+            "label": "GitHub App Installation ID",
+            "type": "string",
+            "help_text": (
+                "The Installation ID from the GitHub App installation "
+                "generated by the GitHub Admin. Example: 59980338 "
+                "extracted from the installation link "
+                "https://github.com/settings/installations/59980338 "
+                "required for creating a limited GitHub app token."
+            ),
+        },
+        {
+            "id": "private_rsa_key",
+            "label": "RSA Private Key",
+            "type": "string",
+            "format": "ssh_private_key",
+            "secret": True,
+            "multiline": True,
+            "help_text": (
+                "Paste the contents of the PEM file that the GitHub Admin "
+                "provided to you with the app and installation IDs."
+            ),
+        },
+    ],
+    "metadata": [
+        {
+            "id": "description",
+            "label": "Description (Optional)",
+            "type": "string",
+            "help_text": "To be removed after UI is updated",
+        }
+    ],
+    "required": ["app_or_client_id", "install_id", "private_rsa_key"],
+}
+
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
@@ -1243,6 +1963,86 @@ CREDENTIAL_TYPES = [
         "description": (
             "Credential for analytics that use for authentication."
         ),
+    },
+    {
+        "name": enums.DefaultCredentialType.HASHICORP_LOOKUP,
+        "namespace": "hashivault_kv",
+        "inputs": HASHICORP_VAULT_SECRET_LOOKUP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.HASHICORP_SSH,
+        "namespace": "hashivault_ssh",
+        "inputs": HASHICORP_VAULT_SIGNED_SSH_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.AWS_SECRETS_LOOKUP,
+        "namespace": "aws_secretsmanager_credential",
+        "inputs": AWS_SECRETS_MANAGER_LOOKUP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.CENTRIFY_VAULT_LOOKUP,
+        "namespace": "centrify_vault_kv",
+        "inputs": CENTRIFY_VAULT_CREDENTIAL_PROVIDER_LOOKUP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.THYCOTIC_DSV,
+        "namespace": "thycotic_dsv",
+        "inputs": THYCOTIC_DEVOPS_SECRETS_VAULT_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.THYCOTIC_SECRET_SERVER,
+        "namespace": "thycotic_tss",
+        "inputs": THYCOTIC_SECRET_SERVER_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.CYBERARK_CENTRAL,
+        "namespace": "aim",
+        "inputs": CYBERARK_CENTRAL_CREDENTIAL_PROVIDER_LOOKUP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.CYBERARK_CONJUR,
+        "namespace": "conjur",
+        "inputs": CYBERARK_CONJUR_SECRETS_MANAGER_LOOKUP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.MSFT_AZURE_VAULT,
+        "namespace": "azure_kv",
+        "inputs": MICROSOFT_AZURE_KEY_VAULT_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.GITHUB_APP,
+        "namespace": "github_app",
+        "inputs": GITHUB_APP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
     },
 ]
 

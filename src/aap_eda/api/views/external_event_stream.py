@@ -40,8 +40,9 @@ from aap_eda.api.event_stream_authentication import (
     TokenAuthentication,
 )
 from aap_eda.core.enums import Action, EventStreamAuthType, ResourceType
-from aap_eda.core.exceptions import PGNotifyError
+from aap_eda.core.exceptions import CredentialPluginError, PGNotifyError
 from aap_eda.core.models import EventStream
+from aap_eda.core.utils.credentials import get_resolved_secrets
 from aap_eda.services.pg_notify import PGNotify
 
 logger = logging.getLogger(__name__)
@@ -227,9 +228,13 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
 
         logger.debug("Headers %s", request.headers)
         logger.debug("Body %s", request.body)
-        inputs = yaml.safe_load(
-            self.event_stream.eda_credential.inputs.get_secret_value()
-        )
+
+        try:
+            inputs = get_resolved_secrets(self.event_stream.eda_credential)
+        except CredentialPluginError as err:
+            logger.warning("Error fetching external secrets %s", str(err))
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         if inputs["http_header_key"] not in request.headers:
             message = f"{inputs['http_header_key']} header is missing"
             logger.error(message)

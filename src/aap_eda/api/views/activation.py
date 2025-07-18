@@ -86,6 +86,9 @@ class ActivationViewSet(
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
                 description="Invalid data to create activation."
             ),
+            status.HTTP_503_SERVICE_UNAVAILABLE: OpenApiResponse(
+                description="Dependent service issues"
+            ),
         }
         | RedisDependencyMixin.redis_unavailable_response(),
     )
