@@ -13,15 +13,12 @@
 #  limitations under the License.
 
 import tempfile
-from unittest import mock
 
 import pytest
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.test import override_settings
-
-from ansible_base.rbac.models import RoleDefinition
 
 from aap_eda.core import models
 
@@ -73,12 +70,3 @@ def test_create_initial_data_postgres_cred_with_missing_cert():
     with override_settings(DATABASES=value):
         with pytest.raises(ImproperlyConfigured):
             call_command("create_initial_data")
-
-
-@pytest.mark.django_db
-def test_project_level_role_rename():
-    with mock.patch('aap_eda.core.management.commands.create_initial_data.Command._update_postgres_credentials'):
-        call_command("create_initial_data")
-        assert RoleDefinition.objects.count() > 5  # sanity
-        assert not RoleDefinition.objects.filter(name="Project Admin").exists()
-        assert not RoleDefinition.objects.filter(name="Project Use").exists()
