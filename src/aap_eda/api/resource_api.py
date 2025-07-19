@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# RBAC models
+from ansible_base.rbac.models import RoleDefinition
 from ansible_base.resource_registry.registry import (
     ParentResource,
     ResourceConfig,
@@ -20,13 +22,10 @@ from ansible_base.resource_registry.registry import (
 )
 from ansible_base.resource_registry.shared_types import (
     OrganizationType,
+    RoleDefinitionType,
     TeamType,
     UserType,
 )
-
-# RBAC models
-from ansible_base.rbac.models import RoleDefinition
-from ansible_base.resource_registry.shared_types import RoleDefinitionType
 
 from aap_eda.core import models
 
