@@ -64,7 +64,13 @@ class ModelFactory:
                     # some fields are taken with id, like organization_id
                     post_data[f"{key}_id"] = value
         # update name since it might conflict with existing fixture name
-        post_data["name"] += "-rbac"
+        if "name" in obj_data.keys():
+            post_data["name"] += "-rbac"
+        if (
+            "input_field_name" in obj_data.keys()
+            and model_obj._meta.model == models.CredentialInputSource
+        ):
+            post_data["input_field_name"] = "username"
         # handle special constraints for models
         if model_obj._meta.model == models.EdaCredential:
             post_data["inputs"] = inputs_to_display(
