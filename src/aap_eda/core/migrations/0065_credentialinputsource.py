@@ -11,6 +11,10 @@ class Migration(migrations.Migration):
     dependencies = [
         ("core", "0064_rename_project_roles"),
     ]
+    # The DAB RBAC app makes substantial model changes which by change-ordering comes after this
+    # not including run_before might sometimes work but this enforces a more strict and stable order
+    # for both applying migrations forwards and backwards
+    run_before = [("dab_rbac", "0004_remote_permissions_additions")]
 
     operations = [
         migrations.CreateModel(
