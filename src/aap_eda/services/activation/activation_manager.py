@@ -196,8 +196,6 @@ class ActivationManager(StatusManager):
             "Creating a new activation instance for "
             f"activation: {self.db_instance.id}",
         )
-        if not self.check_new_process_allowed():
-            raise exceptions.MaxRunningProcessesError
         self._create_activation_instance()
 
         self.db_instance.refresh_from_db()
@@ -1074,24 +1072,3 @@ class ActivationManager(StatusManager):
             )
             LOGGER.error(msg, exc_info=settings.DEBUG)
             raise exceptions.ActivationManagerError(msg)
-
-    def check_new_process_allowed(self) -> bool:
-        """Check if a new process is allowed."""
-        if settings.MAX_RUNNING_ACTIVATIONS < 0:
-            return True
-
-        queue_name = self._get_queue_name()
-        running_processes_count = models.RulebookProcess.objects.filter(
-            status__in=[ActivationStatus.RUNNING, ActivationStatus.STARTING],
-            rulebookprocessqueue__queue_name=queue_name,
-        ).count()
-
-        if running_processes_count >= settings.MAX_RUNNING_ACTIVATIONS:
-            msg = (
-                "No capacity to start a new rulebook process. "
-                f"{self.db_instance_type} {self.db_instance.id} is postponed"
-            )
-            LOGGER.info(msg)
-            self.set_status(ActivationStatus.PENDING, msg)
-            return False
-        return True

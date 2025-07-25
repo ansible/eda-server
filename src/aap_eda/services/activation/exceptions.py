@@ -21,10 +21,6 @@ class ActivationManagerError(Exception):
     """Base class for exceptions for the ActivationManager."""
 
 
-class MaxRunningProcessesError(ActivationManagerError):
-    """Exception raised when the maximum number processes is reached."""
-
-
 class ActivationStartError(ActivationManagerError):
     """Exception raised when an activation fails to start."""
 

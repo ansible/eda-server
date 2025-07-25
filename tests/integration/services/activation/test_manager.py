@@ -844,26 +844,6 @@ def test_delete_with_exception(
 
 
 @pytest.mark.django_db
-def test_start_max_running_activations(
-    basic_activation: models.Activation,
-    new_activation_with_instance: models.Activation,
-    settings: SettingsWrapper,
-    eda_caplog: LogCaptureFixture,
-    container_engine_mock: MagicMock,
-    preseed_credential_types,
-):
-    """Test start verb when max running activations is reached."""
-    apply_settings(settings, MAX_RUNNING_ACTIVATIONS=1)
-    apply_settings(settings, RULEBOOK_QUEUE_NAME="queue_name_test")
-    activation_manager = ActivationManager(
-        basic_activation, container_engine_mock
-    )
-    with pytest.raises(exceptions.MaxRunningProcessesError):
-        activation_manager.start()
-    assert "No capacity to start a new rulebook process" in eda_caplog.text
-
-
-@pytest.mark.django_db
 def test_init_status_manager_with_activation(basic_activation):
     status_manager = StatusManager(basic_activation)
     assert status_manager.db_instance == basic_activation

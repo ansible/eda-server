@@ -205,9 +205,6 @@ ACTIVATION_RESTART_SECONDS_ON_COMPLETE: int = 0
 ACTIVATION_RESTART_SECONDS_ON_FAILURE: int = 60
 ACTIVATION_MAX_RESTARTS_ON_FAILURE: int = 5
 
-# -1 means no limit
-MAX_RUNNING_ACTIVATIONS: int = 5
-
 # ---------------------------------------------------------
 # RULEBOOK ENGINE LOG LEVEL
 # ---------------------------------------------------------
