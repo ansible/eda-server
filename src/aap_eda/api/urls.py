@@ -14,6 +14,7 @@
 from ansible_base.lib.dynamic_config.dynamic_urls import (
     api_version_urls as dab_urls,
 )
+from ansible_base.rbac.service_api.urls import rbac_service_urls
 from ansible_base.resource_registry.urls import (
     urlpatterns as resource_api_urls,
 )
@@ -110,6 +111,7 @@ eda_v1_urls = [
 dab_urls = [
     path("", include(dab_urls)),
     path("", include(resource_api_urls)),
+    path("", include(rbac_service_urls)),
 ]
 
 v1_urls = eda_v1_urls + dab_urls
