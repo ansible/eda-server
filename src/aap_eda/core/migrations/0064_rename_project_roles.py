@@ -65,7 +65,7 @@ def rename_project_roles_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0063_remove_decisionenvironment_credential_and_more"),
-        ("dab_rbac", "0007_remote_permissions_cleanup"),
+        ("dab_rbac", "0008_remote_permissions_cleanup"),
     ]
 
     operations = [
