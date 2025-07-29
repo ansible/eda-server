@@ -924,7 +924,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "25.7.21.0.dev768+g58a1b55"
+version = "2025.7.29"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
