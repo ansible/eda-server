@@ -81,7 +81,7 @@ class EventStream(BaseOrgModel, UniqueNamedModel, PrimordialModel):
         null=True,
         help_text="The user who created the webhook",
     )
-    uuid = models.UUIDField(default=uuid.uuid4)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
     events_received = models.BigIntegerField(

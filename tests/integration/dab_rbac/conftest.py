@@ -80,6 +80,11 @@ class ModelFactory:
         elif model_obj._meta.model == models.Activation:
             related_objs = list(model_obj.eda_credentials.all().values())
             post_data["eda_credentials"] = [obj["id"] for obj in related_objs]
+        # handle EventStream uuid field - let serializer generate new UUID
+        elif model_obj._meta.model == models.EventStream:
+            # Remove uuid from post_data to avoid uniqueness conflicts
+            # The serializer will generate a new UUID automatically
+            post_data.pop("uuid", None)
         return post_data
 
 
