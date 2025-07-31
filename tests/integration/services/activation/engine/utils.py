@@ -16,6 +16,7 @@
 from dataclasses import dataclass
 
 from aap_eda.core import models
+from aap_eda.core.enums import ImagePullPolicy
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerRequest,
@@ -65,5 +66,6 @@ def get_request(
         mem_limit="8G",
         env_vars={"a": 1},
         extra_args={"b": 2},
+        pull_policy=ImagePullPolicy.ALWAYS.value,
         **kwargs,
     )

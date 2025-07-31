@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from enum import Enum
 
 
@@ -136,6 +138,35 @@ class ActivationRequest(DjangoStrEnum):
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+
+
+class ImagePullPolicy(DjangoStrEnum):
+    """Image pull policy for decision environments."""
+
+    ALWAYS = "always"
+    NEVER = "never"
+    MISSING = "missing"
+
+    @classmethod
+    def choices_with_descriptions(cls):
+        """Return choices with human-readable descriptions."""
+        return [
+            (cls.ALWAYS.value, "Always pull container before running."),
+            (
+                cls.MISSING.value,
+                "Only pull the image if not present before running.",
+            ),
+            (cls.NEVER.value, "Never pull container before running."),
+        ]
+
+    def to_k8s(self) -> str:
+        """Convert to Kubernetes-compatible format."""
+        mapping = {
+            self.ALWAYS: "Always",
+            self.NEVER: "Never",
+            self.MISSING: "IfNotPresent",
+        }
+        return mapping.get(self, "Always")
 
 
 class ProcessParentType(DjangoStrEnum):

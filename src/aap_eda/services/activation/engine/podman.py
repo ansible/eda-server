@@ -22,7 +22,7 @@ from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, ImagePullPolicy
 from aap_eda.settings import features
 from aap_eda.utils import str_to_bool
 from aap_eda.utils.podman import parse_repository
@@ -137,16 +137,45 @@ class Engine(ContainerEngine):
             return False
         return True
 
+    # TODO: The issue https://github.com/containers/podman-py/issues/564 was
+    #       opened. When it is resolved, this method can be removed.
+    def _handle_pull_policy(
+        self, request: ContainerRequest, log_handler: LogHandler
+    ) -> None:
+        """Handle image pull policy logic."""
+        image_existed = self._image_exists(request.image_url)
+
+        if request.pull_policy == ImagePullPolicy.ALWAYS:
+            LOGGER.info(
+                f"Image pulled due to pull policy [{request.pull_policy}]."
+            )
+            self._pull_image(request, log_handler)
+        elif (
+            request.pull_policy == ImagePullPolicy.MISSING
+            and not image_existed
+        ):
+            LOGGER.info(
+                f"Image pulled due to pull policy [{request.pull_policy}] "
+                f"and missing image."
+            )
+            self._pull_image(request, log_handler)
+        elif (
+            request.pull_policy == ImagePullPolicy.NEVER and not image_existed
+        ):
+            error_message = (
+                f"Image {request.image_url} not found and pull policy is Never"
+            )
+            LOGGER.error(error_message)
+            log_handler.write(error_message, flush=True)
+            raise exceptions.ContainerImagePullError(error_message)
+
     def start(self, request: ContainerRequest, log_handler: LogHandler) -> str:
         if not request.image_url:
             raise exceptions.ContainerStartError("Missing image url")
 
         try:
             LOGGER.info(f"Image URL is {request.image_url}")
-            if request.pull_policy == "Always" or not self._image_exists(
-                request.image_url,
-            ):
-                self._pull_image(request, log_handler)
+            self._handle_pull_policy(request, log_handler)
 
             log_handler.write("Starting Container", True)
             command = request.cmdline.command_and_args()

@@ -16,6 +16,7 @@
 import pytest
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerableInvalidError,
@@ -160,3 +161,72 @@ def test_log_level_param_activation(activation, value, expected):
     activation.save(update_fields=["log_level"])
     request = activation.get_container_request()
     assert request.cmdline.log_level == expected
+
+
+@pytest.mark.parametrize(
+    "pull_policy,expected",
+    [
+        ("always", "always"),
+        ("never", "never"),
+        ("missing", "missing"),
+    ],
+)
+@pytest.mark.django_db
+def test_container_request_pull_policy(
+    default_user: models.User,
+    default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
+    pull_policy,
+    expected,
+):
+    """Test that pull_policy is correctly set in ContainerRequest."""
+    # Create DE with specific pull policy
+    de = models.DecisionEnvironment.objects.create(
+        name="test-de",
+        description="Test DE",
+        image_url="quay.io/test:latest",
+        organization=default_organization,
+        pull_policy=pull_policy,
+    )
+
+    # Create activation with the DE
+    activation = models.Activation.objects.create(
+        name="test-activation",
+        user=default_user,
+        decision_environment=de,
+        rulebook=default_rulebook,
+        rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
+    )
+
+    # Create rulebook process instance
+    models.RulebookProcess.objects.create(
+        name="test-process",
+        activation=activation,
+        organization=default_organization,
+        log_read_at=None,
+        status=ActivationStatus.RUNNING,
+    )
+
+    # Get container request and verify pull policy
+    request = activation.get_container_request()
+    assert request.pull_policy == expected
+
+
+@pytest.mark.django_db
+def test_container_request_default_pull_policy_from_model(
+    default_activation: models.Activation,
+    default_organization: models.Organization,
+):
+    """Test that DecisionEnvironment uses model default pull_policy."""
+    models.RulebookProcess.objects.create(
+        name="test-process",
+        activation=default_activation,
+        organization=default_organization,
+        log_read_at=None,
+        status=ActivationStatus.RUNNING,
+    )
+
+    request = default_activation.get_container_request()
+    # Should use the model's default value
+    assert request.pull_policy == "always"  # ImagePullPolicy.ALWAYS.value
