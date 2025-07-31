@@ -2340,6 +2340,19 @@ class Command(BaseCommand):
                         content_type=ct, codename__startswith="add_"
                     )
                 )
+                # Add organization view permission for organization-level admin roles,  # noqa: E501
+                org_ct = self.content_type_model.objects.get(
+                    model="organization"
+                )
+                org_view_permission = DABPermission.objects.filter(
+                    content_type=org_ct, codename="view_organization"
+                ).first()
+                if (
+                    org_view_permission
+                    and org_view_permission not in permissions
+                ):
+                    permissions.append(org_view_permission)
+
                 org_role.permissions.set(permissions)
                 if org_role_created:
                     self.stdout.write(

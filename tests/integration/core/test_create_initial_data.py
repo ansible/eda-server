@@ -98,3 +98,16 @@ def test_remove_extra_permission():
     assert perm in auditor_role.permissions.all()
     Command().handle()
     assert perm not in auditor_role.permissions.all()
+
+
+@pytest.mark.django_db
+def test_org_level_admins_have_view_org_permission():
+    assert RoleDefinition.objects.count() == 0
+    Command().handle()
+    org_admin_role = RoleDefinition.objects.get(
+        name="EDA Organization Project Admin"
+    )
+    assert any(
+        perm.codename == "view_organization"
+        for perm in org_admin_role.permissions.all()
+    )
