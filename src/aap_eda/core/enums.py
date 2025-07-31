@@ -138,6 +138,14 @@ class ActivationRequest(DjangoStrEnum):
     AUTO_START = "auto_start"
 
 
+class ImagePullPolicy(DjangoStrEnum):
+    """Image pull policy for decision environments."""
+
+    ALWAYS = "Always"
+    NEVER = "Never"
+    IF_NOT_PRESENT = "IfNotPresent"
+
+
 class ProcessParentType(DjangoStrEnum):
     """Types of parent objects for a rulebook process."""
 

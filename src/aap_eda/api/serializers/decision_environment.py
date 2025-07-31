@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
@@ -19,6 +20,11 @@ from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
+from aap_eda.core.enums import ImagePullPolicy
+from aap_eda.core.utils.decision_environment import (
+    convert_pull_policy_from_frontend,
+    convert_pull_policy_to_frontend,
+)
 
 
 class DecisionEnvironmentSerializer(serializers.ModelSerializer):
@@ -38,6 +44,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "pull_policy",
             "created_by",
             "modified_by",
             *read_only_fields,
@@ -51,6 +58,11 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
         result["modified_by"] = BasicUserSerializer(
             decision_environment.modified_by
         ).data
+        # Convert pull policy to frontend-friendly string
+        if result.get("pull_policy"):
+            result["pull_policy"] = convert_pull_policy_to_frontend(
+                result["pull_policy"]
+            )
         return result
 
 
@@ -70,6 +82,26 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             validators.check_credential_registry_username_password,
         ],
     )
+    pull_policy = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        default=settings.DEFAULT_PULL_POLICY,
+    )
+
+    def validate_pull_policy(self, value):
+        """Normalize pull policy input and validate."""
+        if value:
+            normalized = convert_pull_policy_from_frontend(value)
+            if normalized not in ImagePullPolicy.values():
+                valid_options = ["always", "never", "missing"] + list(
+                    ImagePullPolicy.values()
+                )
+                raise serializers.ValidationError(
+                    f"Invalid pull policy '{value}'. "
+                    f"Valid options: {valid_options}"
+                )
+            return normalized
+        return value
 
     def validate(self, data):
         eda_credential_id = data.get("eda_credential_id")
@@ -86,6 +118,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "pull_policy",
         ]
 
 
@@ -108,6 +141,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "image_url",
             "organization",
             "eda_credential",
+            "pull_policy",
             "created_at",
             "modified_at",
             "created_by",
@@ -143,6 +177,10 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "organization": organization,
             "eda_credential": eda_credential,
         }
+        pull_policy = (
+            decision_environment.pull_policy or settings.DEFAULT_PULL_POLICY
+        )
+        result["pull_policy"] = convert_pull_policy_to_frontend(pull_policy)
         return result
 
 
@@ -151,5 +189,21 @@ class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.DecisionEnvironment
-        fields = ["id", "name", "description", "image_url", "organization_id"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "image_url",
+            "pull_policy",
+            "organization_id",
+        ]
         read_only_fields = ["id"]
+
+    def to_representation(self, decision_environment):
+        result = super().to_representation(decision_environment)
+        # Convert pull policy to frontend-friendly string
+        if result.get("pull_policy"):
+            result["pull_policy"] = convert_pull_policy_to_frontend(
+                result["pull_policy"]
+            )
+        return result
