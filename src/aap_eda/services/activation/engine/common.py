@@ -155,6 +155,11 @@ class ContainerableMixin:
         """Return ContainerRequest used for creation."""
         self.validate()
 
+        pull_policy = (
+            self.decision_environment.pull_policy
+            or settings.DEFAULT_PULL_POLICY
+        )
+
         return ContainerRequest(
             credential=self._get_image_credential(),
             name=self._get_container_name(),
@@ -169,6 +174,7 @@ class ContainerableMixin:
             cmdline=self._build_cmdline(),
             k8s_service_name=self.k8s_service_name,
             log_tracking_id=self.log_tracking_id,
+            pull_policy=pull_policy,
         )
 
     def get_restart_policy(self) -> str:

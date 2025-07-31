@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from django.conf import settings
 from rest_framework import serializers
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
@@ -19,6 +20,7 @@ from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
+from aap_eda.core.enums import ImagePullPolicy
 
 
 class DecisionEnvironmentSerializer(serializers.ModelSerializer):
@@ -38,6 +40,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "pull_policy",
             "created_by",
             "modified_by",
             *read_only_fields,
@@ -70,6 +73,12 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             validators.check_credential_registry_username_password,
         ],
     )
+    pull_policy = serializers.ChoiceField(
+        choices=ImagePullPolicy.choices(),
+        required=False,
+        allow_blank=False,
+        default=settings.DEFAULT_PULL_POLICY,
+    )
 
     def validate(self, data):
         eda_credential_id = data.get("eda_credential_id")
@@ -86,6 +95,7 @@ class DecisionEnvironmentCreateSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "pull_policy",
         ]
 
 
@@ -108,6 +118,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "image_url",
             "organization",
             "eda_credential",
+            "pull_policy",
             "created_at",
             "modified_at",
             "created_by",
@@ -143,6 +154,9 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "organization": organization,
             "eda_credential": eda_credential,
         }
+        result["pull_policy"] = (
+            decision_environment.pull_policy or settings.DEFAULT_PULL_POLICY
+        )
         return result
 
 
@@ -151,5 +165,12 @@ class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.DecisionEnvironment
-        fields = ["id", "name", "description", "image_url", "organization_id"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "image_url",
+            "pull_policy",
+            "organization_id",
+        ]
         read_only_fields = ["id"]

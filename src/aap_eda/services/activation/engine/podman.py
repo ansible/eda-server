@@ -22,7 +22,7 @@ from podman.domain.images import Image
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, ImagePullPolicy
 from aap_eda.settings import features
 from aap_eda.utils import str_to_bool
 from aap_eda.utils.podman import parse_repository
@@ -143,9 +143,15 @@ class Engine(ContainerEngine):
 
         try:
             LOGGER.info(f"Image URL is {request.image_url}")
-            if request.pull_policy == "Always" or not self._image_exists(
-                request.image_url,
+            image_existed = self._image_exists(request.image_url)
+            if (
+                request.pull_policy == ImagePullPolicy.ALWAYS
+                or not image_existed
             ):
+                LOGGER.info(
+                    f"Image pulled due to pull policy [{request.pull_policy}]"
+                    f" or missing image [{not image_existed}]."
+                )
                 self._pull_image(request, log_handler)
 
             log_handler.write("Starting Container", True)
