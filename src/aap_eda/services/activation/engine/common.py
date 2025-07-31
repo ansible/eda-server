@@ -169,6 +169,7 @@ class ContainerableMixin:
             cmdline=self._build_cmdline(),
             k8s_service_name=self.k8s_service_name,
             log_tracking_id=self.log_tracking_id,
+            pull_policy=self.decision_environment.pull_policy,
         )
 
     def get_restart_policy(self) -> str:
