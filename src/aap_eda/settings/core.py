@@ -152,7 +152,7 @@ DEFAULT_REDIS_DB = 0
 # ---------------------------------------------------------
 # DISPATCHERD SETTINGS
 # ---------------------------------------------------------
-
+DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 3
 DISPATCHERD_DEFAULT_CHANNEL = "default"
 
 DISPATCHERD_STARTUP_TASKS = {
