@@ -13,6 +13,7 @@
 #  limitations under the License.
 import hmac
 import secrets
+import uuid
 from typing import List
 
 import pytest
@@ -351,6 +352,143 @@ def test_event_stream_by_fields(
         event_stream.refresh_from_db()
         assert event_stream.created_by == admin_user
         assert event_stream.modified_by == super_user
+
+
+@pytest.mark.django_db
+def test_create_event_stream_with_custom_uuid(
+    admin_client: APIClient,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
+):
+    custom_uuid = uuid.uuid4()
+    data_in = {
+        "name": "test_event_stream_custom_uuid",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+        "uuid": str(custom_uuid),
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+    assert event_stream.name == "test_event_stream_custom_uuid"
+    assert event_stream.uuid == custom_uuid
+
+
+@pytest.mark.django_db
+def test_create_event_stream_without_uuid_generates_one(
+    admin_client: APIClient,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
+):
+    data_in = {
+        "name": "test_event_stream_auto_uuid",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+    assert event_stream.name == "test_event_stream_auto_uuid"
+    assert event_stream.uuid is not None
+    assert isinstance(event_stream.uuid, uuid.UUID)
+
+
+@pytest.mark.django_db
+def test_create_event_stream_with_duplicate_uuid_fails(
+    admin_client: APIClient,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
+):
+    custom_uuid = uuid.uuid4()
+    data_in_1 = {
+        "name": "test_event_stream_1",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+        "uuid": str(custom_uuid),
+    }
+    # Create first event stream with custom UUID
+    create_event_stream(admin_client, data_in_1)
+
+    # Try to create second event stream with same UUID
+    data_in_2 = {
+        "name": "test_event_stream_2",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+        "uuid": str(custom_uuid),
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/event-streams/", data=data_in_2
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Event stream with this UUID already exists" in str(
+            response.data
+        )
+
+
+@pytest.mark.django_db
+def test_update_event_stream_uuid_same_uuid_allowed(
+    admin_client: APIClient,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
+):
+    custom_uuid = uuid.uuid4()
+    data_in = {
+        "name": "test_event_stream",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+        "uuid": str(custom_uuid),
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+
+    # Update with same UUID should work (no change)
+    update_data = {
+        "name": "updated_name",
+        "uuid": str(custom_uuid),
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/event-streams/{event_stream.id}/",
+        data=update_data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["name"] == "updated_name"
+    assert response.data["uuid"] == str(custom_uuid)
+
+
+@pytest.mark.django_db
+def test_update_event_stream_uuid_change_allowed(
+    admin_client: APIClient,
+    default_hmac_credential: models.EdaCredential,
+    default_organization: models.Organization,
+):
+    original_uuid = uuid.uuid4()
+    data_in = {
+        "name": "test_event_stream",
+        "event_stream_type": default_hmac_credential.credential_type.kind,
+        "eda_credential_id": default_hmac_credential.id,
+        "organization_id": default_organization.id,
+        "uuid": str(original_uuid),
+    }
+    event_stream = create_event_stream(admin_client, data_in)
+
+    # Update with different UUID should work
+    new_uuid = uuid.uuid4()
+    update_data = {
+        "name": "updated_name",
+        "uuid": str(new_uuid),
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/event-streams/{event_stream.id}/",
+        data=update_data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["name"] == "updated_name"
+    assert response.data["uuid"] == str(new_uuid)
 
 
 def create_event_stream_credential(
