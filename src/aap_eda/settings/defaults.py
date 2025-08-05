@@ -239,6 +239,7 @@ RESOURCE_SERVER__SECRET_KEY: Optional[str] = ""
 RESOURCE_SERVER__VALIDATE_HTTPS: bool = False
 RESOURCE_JWT_USER_ID: Optional[str] = None
 
+# The preload data scrip is used instead of the DAB managed role creator
 ANSIBLE_BASE_MANAGED_ROLE_REGISTRY: dict = {}
 
 ACTIVATION_DB_HOST: str = "host.containers.internal"

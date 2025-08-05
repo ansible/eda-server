@@ -17,6 +17,7 @@ import os
 
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
+from ansible_base.resource_registry.signals.handlers import no_reverse_sync
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -2083,13 +2084,16 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        settings_registry.persist_registry_data()
-        self._preload_credential_types()
-        self._update_postgres_credentials()
-        self._create_org_roles()
-        self._create_obj_roles()
-        self._remove_deprecated_credential_kinds()
-        enable_redis_prefix()
+        # roles are migrated to resource later in upgrade process,
+        # this command should only create resources locally
+        with no_reverse_sync():
+            settings_registry.persist_registry_data()
+            self._preload_credential_types()
+            self._update_postgres_credentials()
+            self._create_org_roles()
+            self._create_obj_roles()
+            self._remove_deprecated_credential_kinds()
+            enable_redis_prefix()
 
     @property
     def content_type_model(self):
@@ -2336,6 +2340,19 @@ class Command(BaseCommand):
                         content_type=ct, codename__startswith="add_"
                     )
                 )
+                # Add organization view permission for organization-level admin roles,  # noqa: E501
+                org_ct = self.content_type_model.objects.get(
+                    model="organization"
+                )
+                org_view_permission = DABPermission.objects.filter(
+                    content_type=org_ct, codename="view_organization"
+                ).first()
+                if (
+                    org_view_permission
+                    and org_view_permission not in permissions
+                ):
+                    permissions.append(org_view_permission)
+
                 org_role.permissions.set(permissions)
                 if org_role_created:
                     self.stdout.write(

@@ -47,7 +47,7 @@ cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.7.1", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.7.29", extras = [
     "channel-auth",
     "rbac",
     "redis-client",

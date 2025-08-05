@@ -11,6 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import uuid
 from typing import Optional
 from urllib.parse import urljoin
 
@@ -41,6 +42,22 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         ],
         error_messages={"null": "EdaCredential is needed"},
     )
+    uuid = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_uuid(self, value):
+        if value is None:
+            return uuid.uuid4()
+
+        # Check uniqueness for provided UUID
+        queryset = models.EventStream.objects.filter(uuid=value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "Event stream with this UUID already exists."
+            )
+        return value
 
     def validate(self, data):
         eda_credential_id = data.get("eda_credential_id")
@@ -74,6 +91,7 @@ class EventStreamInSerializer(serializers.ModelSerializer):
             "additional_data_headers",
             "eda_credential_id",
             "organization_id",
+            "uuid",
         ]
 
 
@@ -109,6 +127,7 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             "organization",
             "eda_credential",
             "event_stream_type",
+            "uuid",
             "created_by",
             "modified_by",
             *read_only_fields,
