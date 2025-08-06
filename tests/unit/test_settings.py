@@ -249,6 +249,7 @@ def test_duplicated_worker_queue(mock_settings):
         ("PODMAN_EXTRA_ARGS", "opt=val", ImproperlyConfigured),
         ("RESOURCE_JWT_USER_ID", " eda ", "eda"),
         ("RESOURCE_JWT_USER_ID", ["eda"], ImproperlyConfigured),
+        ("MQ_TLS", True, True),
     ],
 )
 def test_types(mock_settings, name, value, expected):
@@ -259,6 +260,36 @@ def test_types(mock_settings, name, value, expected):
     else:
         post_loading(mock_settings)
         assert mock_settings[name] == expected
+
+
+def test_optional_type_exception_msg(mock_settings):
+    """Test exception message when an optional type error occurs."""
+    mock_settings["MQ_TLS"] = "true"
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="MQ_TLS setting must be a bool or None",
+    ):
+        post_loading(mock_settings)
+
+
+def test_single_type_exception_msg(mock_settings):
+    """Test exception message when a single type error occurs."""
+    mock_settings["DEFAULT_PULL_POLICY"] = False
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="DEFAULT_PULL_POLICY setting must be a str",
+    ):
+        post_loading(mock_settings)
+
+
+def test_union_type_exception_msg(mock_settings):
+    """Test exception message when a union type error occurs."""
+    mock_settings["WEBSOCKET_SSL_VERIFY"] = 123
+    with pytest.raises(
+        ImproperlyConfigured,
+        match="WEBSOCKET_SSL_VERIFY setting must be a bool or str",
+    ):
+        post_loading(mock_settings)
 
 
 def test_allow_local_resource_management(mock_settings):
