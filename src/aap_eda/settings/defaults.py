@@ -158,7 +158,7 @@ MQ_USER_PASSWORD: Optional[str] = None
 MQ_CLIENT_CACERT_PATH: Optional[str] = None
 MQ_CLIENT_CERT_PATH: Optional[str] = None
 MQ_CLIENT_KEY_PATH: Optional[str] = None
-MQ_TLS: Optional[str] = None
+MQ_TLS: Optional[bool] = None
 MQ_DB: int = core.DEFAULT_REDIS_DB
 
 # The HA cluster hosts is a string of <host>:<port>[,<host>:port>]+
