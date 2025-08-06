@@ -411,13 +411,13 @@ def _validate_type(key: str, value, key_type) -> None:
     origin = get_origin(key_type)
     is_union = origin is Union
     if hasattr(types, "UnionType"):
-        is_union = is_union or origin is types.UnionType
+        is_union = is_union or origin is types.UnionType  # noqa: E721
 
     if is_union:
         args = get_args(key_type)
         if not isinstance(value, args):
             type_names = " or ".join(
-                t.__name__ if t is not type(None) else "None" for t in args
+                t.__name__ if not isinstance(None, t) else "None" for t in args
             )
             raise ImproperlyConfigured(f"{key} setting must be a {type_names}")
     elif origin is not None:
