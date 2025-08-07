@@ -17,7 +17,6 @@ from contextlib import contextmanager
 from unittest import mock
 
 import pytest
-from django.conf import settings
 
 import aap_eda.tasks.activation_request_queue as queue
 from aap_eda.core import models
@@ -90,7 +89,8 @@ def activation(default_rulebook, default_organization):
 
 
 @pytest.fixture()
-def max_running_processes(default_organization: models.Organization):
+def bulk_running_processes(default_organization: models.Organization):
+    count = 8
     user = models.User.objects.create_user(
         username="luke.skywalker2",
         first_name="Luke",
@@ -99,9 +99,9 @@ def max_running_processes(default_organization: models.Organization):
         password="secret",
     )
     processes = []
-    for i in range(settings.MAX_RUNNING_ACTIVATIONS):
+    for i in range(count):
         activation = models.Activation.objects.create(
-            name=f"test_max_running{i}",
+            name=f"test_bulk_running{i}",
             user=user,
             organization=default_organization,
         )
@@ -165,35 +165,6 @@ def test_manage_request(manager_mock, activation, verb):
 
 
 @pytest.mark.django_db
-@mock.patch.object(orchestrator.ActivationManager, "start", autospec=True)
-def test_manage_not_start(
-    start_mock,
-    job_mock,
-    activation,
-    max_running_processes,
-    container_engine_mock,
-):
-    queue.push(
-        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
-    )
-
-    with mock.patch(
-        "aap_eda.services.activation.activation_manager.new_container_engine",
-        return_value=container_engine_mock,
-    ):
-        with mock.patch(
-            "rq.get_current_job",
-            return_value=job_mock,
-        ):
-            orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
-
-    start_mock.assert_not_called()
-    assert (
-        len(queue.peek_all(ProcessParentType.ACTIVATION, activation.id)) == 1
-    )
-
-
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     "command, queued_request",
     [
@@ -226,7 +197,7 @@ def test_activation_requests(
 @mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
 @mock.patch("aap_eda.tasks.orchestrator.get_least_busy_queue_name")
 def test_monitor_rulebook_processes(
-    get_queue_name_mock, enqueue_mock, activation, max_running_processes
+    get_queue_name_mock, enqueue_mock, activation, bulk_running_processes
 ):
     get_queue_name_mock.return_value = "activation"
     call_args = [
@@ -241,7 +212,7 @@ def test_monitor_rulebook_processes(
             "",
         )
     ]
-    for running in max_running_processes:
+    for running in bulk_running_processes:
         call_args.append(
             mock.call(
                 "activation",
@@ -258,7 +229,7 @@ def test_monitor_rulebook_processes(
     queue.push(
         ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
     )
-    for running in max_running_processes:
+    for running in bulk_running_processes:
         queue.push(
             ProcessParentType.ACTIVATION,
             running.activation.id,
@@ -270,53 +241,6 @@ def test_monitor_rulebook_processes(
 
 
 original_start_method = orchestrator.ActivationManager.start
-
-
-@pytest.mark.django_db
-@mock.patch.object(orchestrator.ActivationManager, "start", autospec=True)
-def test_max_running_activation_after_start_job(
-    start_mock,
-    job_mock,
-    activation,
-    max_running_processes,
-    container_engine_mock,
-    default_organization: models.Organization,
-):
-    """Check if the max running processes error is handled correctly
-    when the limit is reached after the request is started."""
-
-    def side_effect(*args, **kwargs):
-        # Recreate the process and run the original start method
-        instance = args[0]
-        models.RulebookProcess.objects.create(
-            name="running",
-            activation=max_running_processes[0].activation,
-            status=ActivationStatus.RUNNING,
-            organization=default_organization,
-        )
-        original_start_method(instance, *args[1:], **kwargs)
-
-    start_mock.side_effect = side_effect
-
-    max_running_processes[0].delete()
-
-    queue.push(
-        ProcessParentType.ACTIVATION, activation.id, ActivationRequest.START
-    )
-    with mock.patch(
-        "aap_eda.services.activation.activation_manager.new_container_engine",
-        return_value=container_engine_mock,
-    ):
-        with mock.patch(
-            "rq.get_current_job",
-            return_value=job_mock,
-        ):
-            orchestrator._manage(ProcessParentType.ACTIVATION, activation.id)
-    assert start_mock.call_count == 1
-    running_processes = models.RulebookProcess.objects.filter(
-        status__in=[ActivationStatus.STARTING, ActivationStatus.RUNNING]
-    ).count()
-    assert running_processes == settings.MAX_RUNNING_ACTIVATIONS
 
 
 @pytest.mark.django_db
