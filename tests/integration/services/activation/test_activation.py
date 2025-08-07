@@ -14,8 +14,10 @@
 """Activation Containerable Interface tests."""
 
 import pytest
+from django.conf import settings
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
 from aap_eda.services.activation.engine.common import (
     AnsibleRulebookCmdLine,
     ContainerableInvalidError,
@@ -160,3 +162,92 @@ def test_log_level_param_activation(activation, value, expected):
     activation.save(update_fields=["log_level"])
     request = activation.get_container_request()
     assert request.cmdline.log_level == expected
+
+
+@pytest.mark.parametrize(
+    "pull_policy,expected",
+    [
+        ("Always", "Always"),
+        ("Never", "Never"),
+        ("IfNotPresent", "IfNotPresent"),
+        ("", "Always"),  # Empty string should use DEFAULT_PULL_POLICY
+        (None, "Always"),  # None should use DEFAULT_PULL_POLICY
+    ],
+)
+@pytest.mark.django_db
+def test_container_request_pull_policy(
+    default_user: models.User,
+    default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
+    pull_policy,
+    expected,
+):
+    """Test that pull_policy is correctly set in ContainerRequest."""
+    # Create DE with specific pull policy
+    de = models.DecisionEnvironment.objects.create(
+        name="test-de",
+        description="Test DE",
+        image_url="quay.io/test:latest",
+        organization=default_organization,
+        pull_policy=pull_policy or "",
+    )
+
+    # Create activation with the DE
+    activation = models.Activation.objects.create(
+        name="test-activation",
+        user=default_user,
+        decision_environment=de,
+        rulebook=default_rulebook,
+        rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
+    )
+
+    # Create rulebook process instance
+    models.RulebookProcess.objects.create(
+        name="test-process",
+        activation=activation,
+        organization=default_organization,
+        log_read_at=None,
+        status=ActivationStatus.RUNNING,
+    )
+
+    # Get container request and verify pull policy
+    request = activation.get_container_request()
+    assert request.pull_policy == expected
+
+
+@pytest.mark.django_db
+def test_container_request_default_pull_policy_fallback(
+    default_user: models.User,
+    default_rulebook: models.Rulebook,
+    default_organization: models.Organization,
+):
+    """Test that empty pull_policy uses DEFAULT_PULL_POLICY setting."""
+    # Create DE without pull policy
+    de = models.DecisionEnvironment.objects.create(
+        name="test-de-no-policy",
+        description="Test DE",
+        image_url="quay.io/test:latest",
+        organization=default_organization,
+        pull_policy="",  # Empty string
+    )
+
+    activation = models.Activation.objects.create(
+        name="test-activation",
+        user=default_user,
+        decision_environment=de,
+        rulebook=default_rulebook,
+        rulebook_rulesets=default_rulebook.rulesets,
+        organization=default_organization,
+    )
+
+    models.RulebookProcess.objects.create(
+        name="test-process",
+        activation=activation,
+        organization=default_organization,
+        log_read_at=None,
+        status=ActivationStatus.RUNNING,
+    )
+
+    request = activation.get_container_request()
+    assert request.pull_policy == settings.DEFAULT_PULL_POLICY
