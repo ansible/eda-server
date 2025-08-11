@@ -59,7 +59,6 @@ from tests.integration.constants import api_url_v1
                 "/role_team_assignments/",
                 "/role_metadata/",
                 "/service-index/metadata/",
-                "/service-index/validate-local-account/",
                 "/service-index/resources/",
                 "/service-index/resource-types/",
                 "/service-index/role-types/",
