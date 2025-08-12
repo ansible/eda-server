@@ -471,7 +471,9 @@ def check_rulebook_queue_health_dispatcherd(queue_name: str) -> bool:
     ctl = get_control_from_settings(
         default_publish_channel=utils.sanitize_postgres_identifier(queue_name)
     )
-    alive = ctl.control_with_reply("alive")
+    alive = ctl.control_with_reply(
+        "alive", timeout=settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT
+    )
     if not alive:
         LOGGER.warning(
             f"Worker queue {queue_name} was found to not be healthy"
