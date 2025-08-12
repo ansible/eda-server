@@ -108,7 +108,6 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
         allow_blank=False,
         allow_null=False,
         help_text="Source control repository URL.",
-        validators=[validators.check_if_scm_url_valid],
     )
     scm_branch = serializers.CharField(
         required=False,
@@ -222,9 +221,6 @@ class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
         allow_blank=True,
         allow_null=True,
         help_text="Source control repository URL.",
-        validators=[
-            validators.check_if_scm_url_valid,
-        ],
     )
 
     class Meta:

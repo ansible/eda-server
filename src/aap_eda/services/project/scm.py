@@ -330,19 +330,6 @@ class GitAnsibleRunnerExecutor:
             raise ScmError(f"{self.ERROR_PREFIX} {outputs.getvalue().strip()}")
 
 
-URL_REGEX = re.compile(
-    r"^((git|ssh|http(s)?)|git\+ssh|(git@[\w\.-]+))(:(//)?)"
-    r"([\w\.@\:/\-~]+)(\.git)?(/)?$"
-)
-
-
-def is_git_url_valid(url: str) -> bool:
-    if not URL_REGEX.match(url):
-        logger.error(f"Invalid SCM URL {url}")
-        return False
-    return True
-
-
 def is_refspec_valid(refspec: str, is_branch: bool) -> bool:
     if is_branch:
         args = [GIT_COMMAND, "check-ref-format", "--branch", refspec]

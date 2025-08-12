@@ -513,7 +513,7 @@ def test_create_project_with_invalid_git_parameters(
 ):
     body = {
         "name": "test-project-01",
-        "url": "https://git.{{example}}.com/acme/project-01",
+        "url": "https://git.example.com/acme/project-01",
         "scm_branch": "bad branch",
         "scm_refspec": "path",
         "organization_id": default_organization.id,
@@ -526,7 +526,6 @@ def test_create_project_with_invalid_git_parameters(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     error = str(response.json())
-    assert "Invalid source control URL" in error
     assert "Invalid branch/tag/commit" in error
     assert "Invalid refspec" in error
 
@@ -736,7 +735,7 @@ def test_update_project_with_400(
         assert "id 3000001 does not exist" in str(response.json())
 
     data = {
-        "url": "https://git.{{example}}.com/acme/project-01",
+        "url": "https://git.example.com/acme/project-01",
         "scm_branch": "bad branch",
         "scm_refspec": "path",
     }
@@ -745,7 +744,6 @@ def test_update_project_with_400(
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     error = str(response.json())
-    assert "Invalid source control URL" in error
     assert "Invalid branch/tag/commit" in error
     assert "Invalid refspec" in error
 

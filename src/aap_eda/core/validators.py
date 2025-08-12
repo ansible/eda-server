@@ -31,7 +31,7 @@ from aap_eda.core.utils.credentials import (
     validate_schema,
 )
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
-from aap_eda.services.project.scm import is_git_url_valid, is_refspec_valid
+from aap_eda.services.project.scm import is_refspec_valid
 
 logger = logging.getLogger(__name__)
 
@@ -470,12 +470,6 @@ def check_if_activation_name_used(name: str) -> str:
             f"Activation with name {name} already exists"
         )
     return name
-
-
-def check_if_scm_url_valid(url: str) -> str:
-    if not is_git_url_valid(url):
-        raise serializers.ValidationError("Invalid source control URL")
-    return url
 
 
 def check_if_branch_valid(branch: str) -> str:
