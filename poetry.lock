@@ -1084,18 +1084,6 @@ files = [
 django = ">=3.0"
 
 [[package]]
-name = "docutils"
-version = "0.20.1"
-description = "Docutils -- Python Documentation Utilities"
-optional = false
-python-versions = ">=3.7"
-groups = ["main"]
-files = [
-    {file = "docutils-0.20.1-py3-none-any.whl", hash = "sha256:96f387a2c5562db4476f09f13bbab2192e764cac08ebbf3a34a95d9b1e4a59d6"},
-    {file = "docutils-0.20.1.tar.gz", hash = "sha256:f08a4e276c3a1583a86dce3e34aba3fe04d02bba2dd51ed16106244e8a923e3b"},
-]
-
-[[package]]
 name = "drf-spectacular"
 version = "0.26.5"
 description = "Sane and flexible OpenAPI 3 schema generation for Django REST framework"
@@ -2672,24 +2660,25 @@ pytest = ">=3.2.5"
 
 [[package]]
 name = "python-daemon"
-version = "3.0.1"
+version = "3.1.2"
 description = "Library to implement a well-behaved Unix daemon process."
 optional = false
-python-versions = ">=3"
+python-versions = ">=3.7"
 groups = ["main"]
 files = [
-    {file = "python-daemon-3.0.1.tar.gz", hash = "sha256:6c57452372f7eaff40934a1c03ad1826bf5e793558e87fef49131e6464b4dae5"},
-    {file = "python_daemon-3.0.1-py3-none-any.whl", hash = "sha256:42bb848a3260a027fa71ad47ecd959e471327cb34da5965962edd5926229f341"},
+    {file = "python_daemon-3.1.2-py3-none-any.whl", hash = "sha256:b906833cef63502994ad48e2eab213259ed9bb18d54fa8774dcba2ff7864cec6"},
+    {file = "python_daemon-3.1.2.tar.gz", hash = "sha256:f7b04335adc473de877f5117e26d5f1142f4c9f7cd765408f0877757be5afbf4"},
 ]
 
 [package.dependencies]
-docutils = "*"
 lockfile = ">=0.10"
-setuptools = ">=62.4.0"
 
 [package.extras]
-devel = ["coverage", "docutils", "isort", "testscenarios (>=0.4)", "testtools", "twine"]
-test = ["coverage", "docutils", "testscenarios (>=0.4)", "testtools"]
+build = ["build", "changelog-chug", "docutils", "python-daemon[doc]", "wheel"]
+devel = ["python-daemon[dist,test]"]
+dist = ["python-daemon[build]", "twine"]
+static-analysis = ["isort (>=5.13,<6.0)", "pip-check", "pycodestyle (>=2.12,<3.0)", "pydocstyle (>=6.3,<7.0)", "pyupgrade (>=3.17,<4.0)"]
+test = ["coverage", "python-daemon[build,static-analysis]", "testscenarios (>=0.4)", "testtools"]
 
 [[package]]
 name = "python-dateutil"
