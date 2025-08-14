@@ -38,7 +38,6 @@ from aap_eda.middleware.request_log_middleware import (
     assign_log_tracking_id,
     assign_request_id,
 )
-from aap_eda.services.activation import exceptions
 from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
@@ -155,11 +154,6 @@ def _run_request(
     )
     start_commands = [ActivationRequest.START, ActivationRequest.AUTO_START]
     manager = ActivationManager(process_parent)
-    if (
-        request.request in start_commands
-        and not manager.check_new_process_allowed()
-    ):
-        return False
 
     try:
         if request.request in start_commands:
@@ -172,8 +166,6 @@ def _run_request(
             manager.restart()
         elif request.request == ActivationRequest.DELETE:
             manager.delete()
-    except exceptions.MaxRunningProcessesError:
-        return False
     except Exception as e:
         LOGGER.error(
             f"Failed to process request {request.request} for "
@@ -479,7 +471,9 @@ def check_rulebook_queue_health_dispatcherd(queue_name: str) -> bool:
     ctl = get_control_from_settings(
         default_publish_channel=utils.sanitize_postgres_identifier(queue_name)
     )
-    alive = ctl.control_with_reply("alive")
+    alive = ctl.control_with_reply(
+        "alive", timeout=settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT
+    )
     if not alive:
         LOGGER.warning(
             f"Worker queue {queue_name} was found to not be healthy"
