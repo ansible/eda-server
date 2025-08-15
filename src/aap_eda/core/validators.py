@@ -16,6 +16,7 @@ import logging
 import re
 import typing as tp
 import urllib
+from urllib.parse import urlparse
 
 import yaml
 from django.conf import settings
@@ -31,7 +32,7 @@ from aap_eda.core.utils.credentials import (
     validate_schema,
 )
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
-from aap_eda.services.project.scm import is_git_url_valid, is_refspec_valid
+from aap_eda.services.project.scm import is_refspec_valid
 
 logger = logging.getLogger(__name__)
 
@@ -472,9 +473,113 @@ def check_if_activation_name_used(name: str) -> str:
     return name
 
 
+def _check_dangerous_characters(url: str) -> tuple[bool, str]:
+    """Check for dangerous characters that could enable command injection."""
+    dangerous_chars = ["^", "|", "{", "}", ";", "`"]
+
+    for char in dangerous_chars:
+        if char in url:
+            return False, f"Contains invalid character '{char}'"
+
+    return True, ""
+
+
+def _validate_ssh_format(url: str) -> tuple[bool, str]:
+    """Validate SSH format: git@host:path."""
+    # Pattern: git@hostname:path
+    # Allow hostnames with dots, hyphens, alphanumeric characters
+    # Also allow IPv6 addresses in brackets: git@[2001:db8::1]:path
+    # Path can contain various characters including slashes, dots, hyphens,
+    # underscores, percent encoding
+    ssh_pattern = re.compile(
+        r"^git@(\[[\da-fA-F:]+\]|[\w\.-]+):[\w\.@/\-~%]+$"
+    )
+
+    if not ssh_pattern.match(url):
+        return False, "Invalid SSH format"
+
+    # Additional IPv6 validation for bracketed addresses
+    if "[" in url and "]" in url:
+        # Extract the bracketed content
+        start = url.find("[")
+        end = url.find("]")
+        if start != -1 and end != -1 and start < end:
+            ipv6_part = url[start + 1 : end]
+            # Basic IPv6 validation: check for obviously invalid patterns
+            if (
+                not ipv6_part or ipv6_part.count("::") > 1  # Empty brackets
+            ):  # Multiple double colons
+                return False, "Invalid IPv6 format in SSH URL"
+
+    return _check_dangerous_characters(url)
+
+
+def _validate_scheme_based_url(parsed, url: str) -> tuple[bool, str]:
+    """Validate git://, ssh://, and git+ssh:// protocol URLs."""
+    if not parsed.netloc:
+        return False, "Missing hostname"
+
+    if not parsed.path:
+        return False, "Missing path"
+
+    # Check for valid hostname format - basic validation
+    # More comprehensive validation could be added if needed
+    hostname = parsed.netloc.split("@")[-1].split(":")[0]  # Remove auth/port
+    if not hostname or ".." in hostname or " " in hostname:
+        return False, "Invalid hostname format"
+
+    return _check_dangerous_characters(url)
+
+
 def check_if_scm_url_valid(url: str) -> str:
-    if not is_git_url_valid(url):
-        raise serializers.ValidationError("Invalid source control URL")
+    """
+    Validate Git URL formats and raise ValidationError if invalid.
+
+    Supports:
+    - HTTP/HTTPS: http(s)://example.com/repo.git
+    - SSH: git@example.com:user/repo.git
+    - Git protocol: git://example.com/repo.git
+    - SSH protocol: ssh://example.com/repo.git
+    - Git+SSH: git+ssh://example.com/repo.git
+
+    Args:
+        url: The Git URL to validate
+
+    Returns:
+        str: The original URL if valid
+
+    Raises:
+        ValidationError: If the URL is invalid
+    """
+    # Handle SSH format without protocol: git@host:path
+    if url.startswith("git@"):
+        is_valid, error_message = _validate_ssh_format(url)
+        if not is_valid:
+            raise serializers.ValidationError(
+                f"Invalid source control URL: {error_message}"
+            )
+        return url
+
+    # Parse URL with scheme
+    try:
+        parsed = urlparse(url)
+    except Exception as e:
+        raise serializers.ValidationError(
+            f"Invalid source control URL: Failed to parse URL: {e}"
+        )
+
+    scheme = parsed.scheme.lower()
+
+    if scheme not in ("http", "https", "git", "ssh", "git+ssh"):
+        raise serializers.ValidationError(
+            f"Invalid source control URL: Unsupported scheme '{scheme}'"
+        )
+
+    is_valid, error_message = _validate_scheme_based_url(parsed, url)
+    if not is_valid:
+        raise serializers.ValidationError(
+            f"Invalid source control URL: {error_message}"
+        )
     return url
 
 
