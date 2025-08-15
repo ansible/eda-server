@@ -11,7 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Optional, get_type_hints
+import types
+from typing import Optional, Union, get_args, get_origin, get_type_hints
 
 from django.core.exceptions import ImproperlyConfigured
 from dynaconf import Dynaconf
@@ -397,11 +398,35 @@ def _enforce_types(settings: Dynaconf) -> None:
         elif key_type is defaults.UrlSlash:
             settings[key] = _get_url_end_slash(settings, key)
         elif not isinstance(settings[key], key_type):
-            raise ImproperlyConfigured(
-                f"{key} setting must be a {key_type.__name__}"
-            )
+            _validate_type(key, settings[key], key_type)
         elif key_type is str or key_type is Optional[str]:
             settings[key] = _get_stripped_str(settings, key)
+
+
+def _validate_type(key: str, value, key_type) -> None:
+    """Validate that a value matches the expected type.
+
+    Raises ImproperlyConfigured if the value does not match the type.
+    """
+    origin = get_origin(key_type)
+    is_union = origin is Union
+    if hasattr(types, "UnionType"):
+        is_union = is_union or origin is types.UnionType  # noqa: E721
+
+    if is_union:
+        args = get_args(key_type)
+        if not isinstance(value, args):
+            type_names = " or ".join(
+                t.__name__ if not isinstance(None, t) else "None" for t in args
+            )
+            raise ImproperlyConfigured(f"{key} setting must be a {type_names}")
+    elif origin is not None:
+        if not isinstance(value, origin):
+            raise ImproperlyConfigured(f"{key} setting must be a {key_type}")
+    elif not isinstance(value, key_type):
+        raise ImproperlyConfigured(
+            f"{key} setting must be a {key_type.__name__}"
+        )
 
 
 def post_loading(loaded_settings: Dynaconf):
