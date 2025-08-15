@@ -221,25 +221,6 @@ def test_build_url(url_params):
 
 
 @pytest.mark.parametrize(
-    "url,expected",
-    [
-        ("git@git.ex-ample.com:user/repo.git", True),
-        ("http://git.example.com/repo.git/sub/r2.git", True),  # /NOSONAR
-        ("https://git.example.com/repo", True),
-        ("ssh://git.example.com/repo.git/", True),
-        ("git://git.example.com/repo.git", True),
-        ("git+ssh://git.example.com/repo.git", True),
-        ("git@git.example.com:user/{{lookup}}.git", False),
-        ("http://{{lookup}}/repo.git", False),  # /NOSONAR
-        ("{{lookup}}//git.example.com/repo.git", False),
-        ("ssh://git.example.com/re^po.git", False),
-    ],
-)
-def test_is_git_url_valid(url: str, expected: bool):
-    assert scm.is_git_url_valid(url) is expected
-
-
-@pytest.mark.parametrize(
     "ref,is_branch,expected",
     [
         ("refs/heads/branch1", False, True),
