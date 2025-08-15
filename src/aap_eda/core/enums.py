@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 from enum import Enum
 
 
@@ -136,6 +138,55 @@ class ActivationRequest(DjangoStrEnum):
     RESTART = "restart"
     DELETE = "delete"
     AUTO_START = "auto_start"
+
+
+class ImagePullPolicy(DjangoStrEnum):
+    """Image pull policy for decision environments."""
+
+    ALWAYS = "Always"
+    NEVER = "Never"
+    IF_NOT_PRESENT = "IfNotPresent"
+
+    def to_k8s(self) -> str:
+        """Convert to Kubernetes-compatible format."""
+        return self.value
+
+    # For future use when podman 5.6 is released
+    def to_podman(self) -> str:
+        """Convert to Podman-compatible format."""
+        mapping = {
+            self.ALWAYS: "always",
+            self.NEVER: "never",
+            self.IF_NOT_PRESENT: "missing",
+        }
+        return mapping.get(self, "always")
+
+    @classmethod
+    def from_user_input(cls, value: str) -> ImagePullPolicy:
+        """Parse user input with case-insensitive matching and aliases."""
+        if not value:
+            return cls.ALWAYS
+
+        value_lower = value.lower().strip()
+        mapping = {
+            "always": cls.ALWAYS,
+            "never": cls.NEVER,
+            "missing": cls.IF_NOT_PRESENT,
+            # Also accept internal values (for backward compatibility)
+            cls.ALWAYS.lower(): cls.ALWAYS,
+            cls.NEVER.lower(): cls.NEVER,
+            cls.IF_NOT_PRESENT.lower(): cls.IF_NOT_PRESENT,
+        }
+        return mapping.get(value_lower, cls.ALWAYS)
+
+    def to_display(self) -> str:
+        """Convert to user-friendly display format."""
+        display_mapping = {
+            self.ALWAYS: "always",
+            self.NEVER: "never",
+            self.IF_NOT_PRESENT: "missing",
+        }
+        return display_mapping.get(self, "always")
 
 
 class ProcessParentType(DjangoStrEnum):

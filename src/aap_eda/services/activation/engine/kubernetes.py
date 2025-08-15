@@ -24,7 +24,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
 from rest_framework import status
 
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, ImagePullPolicy
 from aap_eda.services.activation.engine.exceptions import (
     ContainerCleanupError,
     ContainerEngineError,
@@ -292,10 +292,12 @@ class Engine(ContainerEngine):
                 k8sclient.V1ContainerPort(container_port=port)
                 for port in self._get_ports(request.ports)
             ]
+        # Convert pull policy string to enum and then to k8s format
+        pull_policy_enum = ImagePullPolicy.from_user_input(request.pull_policy)
         container = k8sclient.V1Container(
             image=request.image_url,
             name=request.name,
-            image_pull_policy=request.pull_policy,
+            image_pull_policy=pull_policy_enum.to_k8s(),
             env=[k8sclient.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
             args=request.cmdline.get_args(),
             ports=ports,
