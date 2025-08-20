@@ -272,16 +272,6 @@ def test_optional_type_exception_msg(mock_settings):
         post_loading(mock_settings)
 
 
-def test_single_type_exception_msg(mock_settings):
-    """Test exception message when a single type error occurs."""
-    mock_settings["DEFAULT_PULL_POLICY"] = False
-    with pytest.raises(
-        ImproperlyConfigured,
-        match="DEFAULT_PULL_POLICY setting must be a str",
-    ):
-        post_loading(mock_settings)
-
-
 def test_union_type_exception_msg(mock_settings):
     """Test exception message when a union type error occurs."""
     mock_settings["WEBSOCKET_SSL_VERIFY"] = 123

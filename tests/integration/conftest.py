@@ -189,6 +189,7 @@ def default_decision_environment(
         name="default_decision_environment",
         image_url="quay.io/ansible/ansible-rulebook:latest",
         description="Default DE",
+        pull_policy=enums.ImagePullPolicy.ALWAYS,
         eda_credential=default_registry_credential,
         organization=default_organization,
     )

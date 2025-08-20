@@ -14,6 +14,8 @@
 
 from django.db import models
 
+from aap_eda.core.enums import ImagePullPolicy
+
 from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 __all__ = ("DecisionEnvironment",)
@@ -39,6 +41,13 @@ class DecisionEnvironment(BaseOrgModel, UniqueNamedModel, PrimordialModel):
         null=True,
         default=None,
         on_delete=models.SET_NULL,
+    )
+    pull_policy = models.CharField(
+        max_length=16,
+        choices=ImagePullPolicy.choices_with_descriptions(),
+        blank=False,
+        default=ImagePullPolicy.ALWAYS,
+        help_text="Pull policy for the image before running",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)
