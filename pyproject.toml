@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "aap-eda"
-version = "0.2.0"
+version = "1.2.0"
 description = ""
 readme = "README.md"
 authors = [
@@ -47,7 +47,7 @@ cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.8.18", extras = [
+django-ansible-base = { git = "git@github.com:ansible-automation-platform/django-ansible-base.git", tag = "2.5.20250827", extras = [
     "channel-auth",
     "rbac",
     "redis-client",
