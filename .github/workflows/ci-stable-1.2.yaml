@@ -1,0 +1,77 @@
+name: CI-stable-1.2
+
+env:
+  POETRY_NO_INTERACTION: 1
+
+on:
+  push:
+    branches: [ 'stable-1.2' ]
+  pull_request:
+    branches: [ 'stable-1.2' ]
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: lint
+        uses: ./.github/actions/lint
+
+  test:
+    runs-on: ubuntu-latest
+    permissions: read-all
+    strategy:
+      matrix:
+        python-version:
+          - "3.11"
+    env:
+      EDA_SECRET_KEY: 'test'
+      EDA_DB_PASSWORD: 'secret'
+      PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+      PDE_ORG_RESULTS_UPLOAD_PASSWORD: ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+      PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
+    services:
+      postgres:
+        image: 'quay.io/sclorg/postgresql-15-c9s:latest'
+        env:
+          POSTGRESQL_USER: eda
+          POSTGRESQL_PASSWORD: ${{ env.EDA_DB_PASSWORD }}
+          POSTGRESQL_ADMIN_PASSWORD: ${{ env.EDA_DB_PASSWORD }}
+          POSTGRESQL_DATABASE: eda
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - '5432:5432'
+      redis: # Add this section for Redis
+        image: 'quay.io/fedora/redis-6:latest'
+        ports:
+          - '6379:6379'
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure Git access to private org repos
+        env:
+          # WARNING: This token is temporary, valid until 2026-05-01
+          GITHUB_TOKEN: ${{ secrets.AAP_ORG_FG_ANSIBLE_CICD_BOT_ACTIONS_REPO_READ }}
+        run: |
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: test
+        uses: ./.github/actions/test
+        with:
+          python-version: ${{ matrix.python-version }}
