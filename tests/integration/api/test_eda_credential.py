@@ -1459,6 +1459,11 @@ def test_create_external_credential_type(
             status.HTTP_400_BAD_REQUEST,
             True,
         ),
+        (
+            None,
+            status.HTTP_400_BAD_REQUEST,
+            True,
+        ),
     ],
 )
 @pytest.mark.django_db
@@ -1466,7 +1471,7 @@ def test_create_external_credential_test(
     admin_client: APIClient,
     default_organization: models.Organization,
     preseed_credential_types,
-    metadata: dict,
+    metadata: Optional[dict],
     status_code: int,
     raise_exception: bool,
 ):
@@ -1496,9 +1501,12 @@ def test_create_external_credential_test(
             "aap_eda.api.views.eda_credential.run_plugin",
             side_effect=Exception("kaboom"),
         ):
+            data = {}
+            if metadata:
+                data["metadata"] = metadata
             response = admin_client.post(
                 f"{api_url_v1}/eda-credentials/{obj['id']}/test/",
-                data={"metadata": metadata},
+                data=data,
             )
             assert response.status_code == status_code
     else:
