@@ -146,7 +146,6 @@ PODMAN_MEM_LIMIT: Optional[str] = "200m"
 PODMAN_ENV_VARS: Optional[dict] = {}
 PODMAN_MOUNTS: Optional[list] = []
 PODMAN_EXTRA_ARGS: Optional[dict] = {}
-DEFAULT_PULL_POLICY: str = "Always"
 CONTAINER_NAME_PREFIX: str = "eda"
 
 RQ_REDIS_PREFIX: str = "eda-rq"

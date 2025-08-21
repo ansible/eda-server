@@ -24,6 +24,7 @@ from aap_eda.core.exceptions import (
 )
 from aap_eda.core.utils.credentials import (
     add_default_values_to_user_inputs,
+    get_resolved_secrets,
     get_secret_fields,
 )
 from aap_eda.core.utils.strings import extract_variables, substitute_variables
@@ -323,9 +324,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
                     )
                 )
                 if credentials:
-                    inputs = yaml.safe_load(
-                        credentials[0].inputs.get_secret_value()
-                    )
+                    inputs = get_resolved_secrets(credentials[0])
 
             url = self._get_url(message, inputs)
             audit_action = models.AuditAction.objects.create(
@@ -436,9 +435,8 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             for eda_credential in activation.eda_credentials.all():
                 if eda_credential.credential_type.id == aap_credential_type.id:
-                    inputs = yaml.safe_load(
-                        eda_credential.inputs.get_secret_value()
-                    )
+                    inputs = get_resolved_secrets(eda_credential)
+
                     return ControllerInfo(
                         url=inputs["host"],
                         token=inputs.get("oauth_token", ""),
@@ -470,7 +468,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         for credential in activation.eda_credentials.filter(
             credential_type_id=vault_credential_type.id
         ).union(vault):
-            inputs = yaml.safe_load(credential.inputs.get_secret_value())
+            inputs = get_resolved_secrets(credential)
 
             vault_passwords.append(
                 VaultPassword(
@@ -526,7 +524,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         file_template_names = []
         file_messages = []
         for eda_credential in activation.eda_credentials.all():
-            inputs = yaml.safe_load(eda_credential.inputs.get_secret_value())
+            inputs = get_resolved_secrets(eda_credential)
             injectors = eda_credential.credential_type.injectors
             binary_fields = []
             for field in eda_credential.credential_type.inputs.get(
@@ -569,9 +567,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
                 schema_inputs = eda_credential.credential_type.inputs
                 secret_fields = get_secret_fields(schema_inputs)
-                user_inputs = yaml.safe_load(
-                    eda_credential.inputs.get_secret_value()
-                )
+                user_inputs = get_resolved_secrets(eda_credential)
 
                 add_default_values_to_user_inputs(schema_inputs, user_inputs)
 
@@ -626,8 +622,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         activation: models.Activation,
     ) -> [tp.Optional[str], tp.Optional[str]]:
         if activation.eda_system_vault_credential:
-            vault_inputs = activation.eda_system_vault_credential.inputs
-            vault_inputs = yaml.safe_load(vault_inputs.get_secret_value())
+            vault_inputs = get_resolved_secrets(
+                activation.eda_system_vault_credential
+            )
             return vault_inputs["vault_password"], vault_inputs["vault_id"]
         return None, None
 

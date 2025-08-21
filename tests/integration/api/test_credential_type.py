@@ -911,6 +911,31 @@ def test_create_credential_type_with_duplicates(
             True,
             None,
         ),
+        (
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": "token123",
+            },
+            None,
+            status.HTTP_400_BAD_REQUEST,
+            True,
+            None,
+        ),
+        (
+            None,
+            {"secret_path": "secret/foo", "secret_key": "bar"},
+            status.HTTP_400_BAD_REQUEST,
+            True,
+            None,
+        ),
+        (
+            None,
+            None,
+            status.HTTP_400_BAD_REQUEST,
+            True,
+            None,
+        ),
     ],
 )
 def test_credential_type_test(
@@ -927,10 +952,11 @@ def test_credential_type_test(
         name=enums.DefaultCredentialType.HASHICORP_LOOKUP
     )
 
-    data_in = {
-        "inputs": inputs,
-        "metadata": metadata,
-    }
+    data_in = {}
+    if inputs:
+        data_in["inputs"] = inputs
+    if metadata:
+        data_in["metadata"] = metadata
     if credential_type_id:
         url = f"{api_url_v1}/credential-types/{credential_type_id}/test/"
     else:

@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.core.enums import ImagePullPolicy
 from aap_eda.core.utils.credentials import inputs_to_store
 from tests.integration.constants import api_url_v1
 
@@ -80,6 +81,7 @@ def test_create_decision_environment(
         "name": "de1",
         "description": "desc here",
         "image_url": "registry.com/img1:tag1",
+        "pull_policy": ImagePullPolicy.ALWAYS,
         "organization_id": default_organization.id,
         "eda_credential_id": credential.id,
     }
@@ -94,7 +96,8 @@ def test_create_decision_environment(
         result.pop("modified_at")
         created_by = result.pop("created_by")
         modified_by = result.pop("modified_by")
-        assert result == {"id": id_, **data_in}
+        expected_result = {"id": id_, **data_in}
+        assert result == expected_result
         assert models.DecisionEnvironment.objects.filter(pk=id_).exists()
         assert created_by["username"] == admin_info["username"]
         assert modified_by["username"] == admin_info["username"]
@@ -790,6 +793,7 @@ def assert_de_base_data(
     assert response["modified_at"] == expected.modified_at.strftime(
         DATETIME_FORMAT
     )
+    assert response["pull_policy"] == expected.pull_policy
 
 
 def assert_de_fk_data(
@@ -831,3 +835,105 @@ def assert_de_related_data(response: Dict[str, Any], expected: models.Project):
         )
     else:
         assert not response["organization"]
+
+
+# PULL POLICY TESTS
+# ------------------------------
+
+
+@pytest.mark.parametrize(
+    ("pull_policy", "expected_status"),
+    [
+        ("always", status.HTTP_201_CREATED),
+        ("never", status.HTTP_201_CREATED),
+        ("missing", status.HTTP_201_CREATED),
+        (None, status.HTTP_201_CREATED),
+        ("", status.HTTP_400_BAD_REQUEST),
+        ("InvalidPolicy", status.HTTP_400_BAD_REQUEST),
+    ],
+)
+@pytest.mark.django_db
+def test_create_decision_environment_with_pull_policy(
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    pull_policy,
+    expected_status,
+):
+    data_in = {
+        "name": "de_with_pull_policy",
+        "description": "Test DE with pull policy",
+        "image_url": "quay.io/test/image:latest",
+        "organization_id": default_organization.id,
+    }
+    if pull_policy is not None:
+        data_in["pull_policy"] = pull_policy
+
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == expected_status
+
+    if expected_status == status.HTTP_201_CREATED:
+        de_id = response.data["id"]
+        de = models.DecisionEnvironment.objects.get(id=de_id)
+        # Check the stored value (normalized to lowercase)
+        if pull_policy:
+            expected_policy = pull_policy
+        else:
+            expected_policy = ImagePullPolicy.ALWAYS.value
+
+        assert de.pull_policy == expected_policy
+        assert response.data["pull_policy"] == expected_policy
+    else:
+        error_message = str(response.data["pull_policy"])
+        assert (
+            "is not a valid choice" in error_message
+            or "Invalid pull policy" in error_message
+            or "may not be blank" in error_message
+        )
+
+
+@pytest.mark.parametrize(
+    ("initial_policy", "update_policy", "expected_status"),
+    [
+        ("always", "never", status.HTTP_200_OK),
+        ("never", "missing", status.HTTP_200_OK),
+        ("missing", "always", status.HTTP_200_OK),
+        ("always", "missing", status.HTTP_200_OK),
+        ("always", "InvalidPolicy", status.HTTP_400_BAD_REQUEST),
+    ],
+)
+@pytest.mark.django_db
+def test_patch_decision_environment_pull_policy(
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    initial_policy,
+    update_policy,
+    expected_status,
+):
+    de = models.DecisionEnvironment.objects.create(
+        name="DE for update",
+        description="Test",
+        image_url="quay.io/test:latest",
+        organization=default_organization,
+        pull_policy=initial_policy,
+    )
+
+    data = {"pull_policy": update_policy}
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/{de.id}/",
+        data=data,
+    )
+    assert response.status_code == expected_status
+
+    if expected_status == status.HTTP_200_OK:
+        de.refresh_from_db()
+        assert de.pull_policy == update_policy
+        assert response.data["pull_policy"] == update_policy
+    else:
+        error_message = str(response.data["pull_policy"])
+        assert (
+            "is not a valid choice" in error_message
+            or "Invalid pull policy" in error_message
+            or "may not be blank" in error_message
+        )

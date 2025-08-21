@@ -114,9 +114,9 @@ class ContainerRequest(BaseModel):
     cmdline: AnsibleRulebookCmdLine
     rulebook_process_id: int
     process_parent_id: int
+    pull_policy: str
     credential: tp.Optional[Credential] = None
     ports: tp.Optional[list[tuple]] = None
-    pull_policy: str = settings.DEFAULT_PULL_POLICY  # Always by default
     mem_limit: tp.Optional[str] = None
     mounts: tp.Optional[list[dict]] = None
     env_vars: tp.Optional[dict] = None
@@ -169,6 +169,7 @@ class ContainerableMixin:
             cmdline=self._build_cmdline(),
             k8s_service_name=self.k8s_service_name,
             log_tracking_id=self.log_tracking_id,
+            pull_policy=self.decision_environment.pull_policy,
         )
 
     def get_restart_policy(self) -> str:

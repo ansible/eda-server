@@ -170,29 +170,60 @@ def _monitor_project_tasks(queue_name: str) -> None:
     queue = django_rq.get_queue(queue_name)
 
     # Filter projects that doesn't have any related job
-    pending_projects = models.Project.objects.filter(
-        import_state=models.Project.ImportState.PENDING
+    unfinished_projects = models.Project.objects.filter(
+        import_state__in=[
+            models.Project.ImportState.PENDING,
+            models.Project.ImportState.RUNNING,
+        ]
     )
     missing_projects = []
-    for project in pending_projects:
+    failed_projects = []
+    for project in unfinished_projects:
         job = queue.fetch_job(str(project.import_task_id))
-        if job is None:
+        if (
+            project.import_state == models.Project.ImportState.PENDING
+            and job is None
+        ):
             missing_projects.append(project)
+        elif project.import_state == models.Project.ImportState.RUNNING and (
+            job is None or job.is_failed
+        ):
+            failed_projects.append(project)
 
-    # Sync or import missing projects
-    # based on the git_hash field
     for project in missing_projects:
+        # Sync or import missing projects based on the git_hash field
         logger.info(
             "monitor_project_tasks: "
             f"Project {project.name} is missing a job"
             " in the queue. Adding it back."
         )
         if project.git_hash:
-            job = sync_project.delay(project.id)
+            job_id = sync_project(project.id)
         else:
-            job = import_project.delay(project.id)
+            job_id = import_project(project.id)
 
-        project.import_task_id = job.id
+        project.import_task_id = job_id
         project.save(update_fields=["import_task_id", "modified_at"])
+
+    for project in failed_projects:
+        # Change state to FAILED if the project is in RUNNING state
+        logger.info(
+            "monitor_project_tasks: "
+            f"Project {project.name} was in running state but is no longer "
+            "running. Marking as failed."
+        )
+        project.import_task_id = None
+        project.import_state = models.Project.ImportState.FAILED
+        project.import_error = (
+            "Project was in running state but is no longer running"
+        )
+        project.save(
+            update_fields=[
+                "import_task_id",
+                "import_state",
+                "import_error",
+                "modified_at",
+            ]
+        )
 
     logger.info("Task complete: Monitor project tasks")

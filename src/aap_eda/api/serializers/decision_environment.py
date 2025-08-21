@@ -39,6 +39,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "pull_policy",
             "created_by",
             "modified_by",
             *read_only_fields,
@@ -52,6 +53,7 @@ class DecisionEnvironmentSerializer(serializers.ModelSerializer):
         result["modified_by"] = BasicUserSerializer(
             decision_environment.modified_by
         ).data
+
         return result
 
 
@@ -83,6 +85,7 @@ class DecisionEnvironmentCreateSerializer(
             "image_url",
             "organization_id",
             "eda_credential_id",
+            "pull_policy",
         ]
 
 
@@ -105,6 +108,7 @@ class DecisionEnvironmentReadSerializer(serializers.ModelSerializer):
             "image_url",
             "organization",
             "eda_credential",
+            "pull_policy",
             "created_at",
             "modified_at",
             "created_by",
@@ -148,5 +152,16 @@ class DecisionEnvironmentRefSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.DecisionEnvironment
-        fields = ["id", "name", "description", "image_url", "organization_id"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "image_url",
+            "pull_policy",
+            "organization_id",
+        ]
         read_only_fields = ["id"]
+
+    def to_representation(self, decision_environment):
+        result = super().to_representation(decision_environment)
+        return result

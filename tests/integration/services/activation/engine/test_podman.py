@@ -23,7 +23,7 @@ from podman.errors.exceptions import APIError, NotFound, Response
 from rq.timeouts import JobTimeoutException
 
 from aap_eda.core import models
-from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.enums import ActivationStatus, ImagePullPolicy
 from aap_eda.services.activation.db_log_handler import DBLogger
 from aap_eda.services.activation.engine import messages
 from aap_eda.services.activation.engine.common import (
@@ -498,6 +498,244 @@ def test_engine_start_with_never_pull_policy_request(
     engine.start(request, log_handler)
 
     engine.client.containers.run.assert_called_once()
+
+
+def get_request_with_pull_policy(
+    data: InitData,
+    default_organization: models.Organization,
+    pull_policy: str,
+):
+    """Helper to create ContainerRequest with specific pull policy."""
+    return ContainerRequest(
+        name="test-request",
+        image_url="quay.io/ansible/ansible-rulebook:main",
+        rulebook_process_id=data.activation_instance.id,
+        process_parent_id=data.activation.id,
+        cmdline=get_ansible_rulebook_cmdline(data),
+        pull_policy=pull_policy,
+    )
+
+
+@pytest.mark.parametrize(
+    "pull_policy,image_exists,should_pull,should_fail",
+    [
+        (ImagePullPolicy.ALWAYS, True, True, False),
+        (ImagePullPolicy.ALWAYS, False, True, False),
+        (ImagePullPolicy.NEVER, True, False, False),
+        (ImagePullPolicy.NEVER, False, False, True),
+        (ImagePullPolicy.MISSING, True, False, False),
+        (ImagePullPolicy.MISSING, False, True, False),
+    ],
+)
+@pytest.mark.django_db
+def test_engine_pull_policy_behavior(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+    pull_policy,
+    image_exists,
+    should_pull,
+    should_fail,
+):
+    """Test that pull policy correctly controls image pulling behavior."""
+    engine = podman_engine
+    request = get_request_with_pull_policy(
+        init_podman_data, default_organization, pull_policy
+    )
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    # Mock image existence
+    engine._image_exists = mock.Mock(return_value=image_exists)
+
+    if should_fail:
+        # Test that NEVER policy with missing image raises an error
+        with pytest.raises(
+            ContainerImagePullError, match="not found and pull policy is Never"
+        ):
+            engine.start(request, log_handler)
+        engine.client.images.pull.assert_not_called()
+        engine.client.containers.run.assert_not_called()
+    else:
+        engine.start(request, log_handler)
+
+        if should_pull:
+            engine.client.images.pull.assert_called_once()
+        else:
+            engine.client.images.pull.assert_not_called()
+
+        engine.client.containers.run.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_engine_always_pull_policy_with_credential(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    """Test Always pull policy works with credentials."""
+    engine = podman_engine
+    request = get_request_with_pull_policy(
+        init_podman_data, default_organization, ImagePullPolicy.ALWAYS
+    )
+    credential = Credential(
+        username="test-user",
+        secret="test-secret",
+        ssl_verify=True,
+        organization=default_organization,
+    )
+    request.credential = credential
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    engine.start(request, log_handler)
+
+    # Should pull image with credentials
+    from aap_eda.utils.podman import parse_repository
+
+    image_repo, image_tag = parse_repository(request.image_url)
+    engine.client.images.pull.assert_called_once_with(
+        repository=image_repo,
+        tag=image_tag,
+        tls_verify=bool(credential.ssl_verify),
+        auth_config={
+            "username": credential.username,
+            "password": credential.secret,
+        },
+    )
+
+
+@pytest.mark.django_db
+def test_engine_never_pull_policy_image_not_found(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    """Test Never pull policy behavior when image doesn't exist.
+    Should raise an error when image is missing and policy is Never.
+    """
+    engine = podman_engine
+    request = get_request_with_pull_policy(
+        init_podman_data, default_organization, ImagePullPolicy.NEVER
+    )
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    # Mock image doesn't exist
+    engine._image_exists = mock.Mock(return_value=False)
+
+    # Should raise error with Never policy and missing image
+    with pytest.raises(
+        ContainerImagePullError, match="not found and pull policy is Never"
+    ):
+        engine.start(request, log_handler)
+
+    engine.client.images.pull.assert_not_called()
+    engine.client.containers.run.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_engine_if_not_present_pull_policy_missing_image(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    """Test IfNotPresent pull policy pulls when image is missing."""
+    engine = podman_engine
+    request = get_request_with_pull_policy(
+        init_podman_data, default_organization, ImagePullPolicy.MISSING
+    )
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    # Mock image doesn't exist
+    engine._image_exists = mock.Mock(return_value=False)
+
+    engine.start(request, log_handler)
+
+    # Should pull the image since it doesn't exist
+    engine.client.images.pull.assert_called_once()
+    engine.client.containers.run.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_engine_if_not_present_pull_policy_existing_image(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    """Test IfNotPresent pull policy skips pull when image exists."""
+    engine = podman_engine
+    request = get_request_with_pull_policy(
+        init_podman_data, default_organization, ImagePullPolicy.MISSING
+    )
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    # Mock image exists
+    engine._image_exists = mock.Mock(return_value=True)
+
+    engine.start(request, log_handler)
+
+    # Should not pull the image since it exists
+    engine.client.images.pull.assert_not_called()
+    engine.client.containers.run.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_engine_pull_policy_image_exists_check(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    """Test that _image_exists method is called correctly for IfNotPresent."""
+    engine = podman_engine
+    request = get_request_with_pull_policy(
+        init_podman_data, default_organization, ImagePullPolicy.MISSING
+    )
+    log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+    # Mock _image_exists to track calls
+    engine._image_exists = mock.Mock(return_value=True)
+
+    engine.start(request, log_handler)
+
+    # Should check if image exists
+    engine._image_exists.assert_called_once_with(request.image_url)
+
+
+@pytest.mark.django_db
+def test_engine_pull_policy_enum_values_work(
+    init_podman_data,
+    podman_engine,
+    default_organization: models.Organization,
+):
+    """Test that ImagePullPolicy enum values work correctly in engine."""
+    engine = podman_engine
+
+    # Test each enum value
+    for policy in [
+        ImagePullPolicy.ALWAYS,
+        ImagePullPolicy.NEVER,
+        ImagePullPolicy.MISSING,
+    ]:
+        request = get_request_with_pull_policy(
+            init_podman_data, default_organization, policy
+        )
+        log_handler = DBLogger(init_podman_data.activation_instance.id)
+
+        # Reset mocks
+        engine.client.reset_mock()
+        engine._image_exists = mock.Mock(return_value=True)
+
+        engine.start(request, log_handler)
+
+        # Should always run container regardless of pull policy
+        engine.client.containers.run.assert_called_once()
+
+        # Verify pull behavior based on policy
+        if policy == ImagePullPolicy.ALWAYS:
+            engine.client.images.pull.assert_called_once()
+        elif policy == ImagePullPolicy.NEVER:
+            engine.client.images.pull.assert_not_called()
+        elif policy == ImagePullPolicy.MISSING:
+            # Image exists, so no pull
+            engine.client.images.pull.assert_not_called()
 
 
 @pytest.mark.django_db
