@@ -18,6 +18,7 @@ from rest_framework import serializers
 
 from aap_eda.api.serializers.credential_type import CredentialTypeRefSerializer
 from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
+from aap_eda.api.serializers.mixins import OrganizationIdFieldMixin
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models, validators
@@ -129,7 +130,9 @@ class EdaCredentialCopySerializer(serializers.ModelSerializer):
         ]
 
 
-class EdaCredentialCreateSerializer(serializers.ModelSerializer):
+class EdaCredentialCreateSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     credential_type_id = serializers.IntegerField(
         required=True,
         allow_null=False,
@@ -139,16 +142,6 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
             "required": "Credential Type is required",
         },
     )
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={
-            "null": "Organization is needed",
-            "required": "Organization is required",
-        },
-    )
-
     inputs = serializers.JSONField()
 
     def validate(self, data):
@@ -190,13 +183,9 @@ class EdaCredentialCreateSerializer(serializers.ModelSerializer):
         ]
 
 
-class EdaCredentialUpdateSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={"null": "Organization is needed"},
-    )
+class EdaCredentialUpdateSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     inputs = serializers.JSONField()
 
     def validate(self, data):
