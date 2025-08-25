@@ -43,6 +43,23 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         error_messages={"null": "EdaCredential is needed"},
     )
     uuid = serializers.UUIDField(required=False, allow_null=True)
+    test_mode = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "Enable test mode for the event stream. When true, events are "
+            "captured for testing but not forwarded to activations. "
+            "Mutually exclusive with forward_events."
+        ),
+    )
+    forward_events = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "Whether to forward events to activations (inverse of "
+            "test_mode). When true, events are forwarded normally. When "
+            "false, events are captured for testing only. Mutually "
+            "exclusive with test_mode."
+        ),
+    )
 
     def validate_uuid(self, value):
         if value is None:
@@ -60,6 +77,22 @@ class EventStreamInSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
+        # Handle forward_events and test_mode mutual exclusivity
+        forward_events = data.get("forward_events")
+        test_mode = data.get("test_mode")
+
+        if forward_events is not None and test_mode is not None:
+            raise serializers.ValidationError(
+                "forward_events and test_mode are mutually exclusive. "
+                "Use only one."
+            )
+
+        # Convert forward_events to test_mode
+        if forward_events is not None:
+            data["test_mode"] = not forward_events
+            # Remove forward_events as it's not a model field
+            del data["forward_events"]
+
         eda_credential_id = data.get("eda_credential_id")
 
         credential = (
@@ -88,6 +121,7 @@ class EventStreamInSerializer(serializers.ModelSerializer):
             "name",
             "owner",
             "test_mode",
+            "forward_events",
             "additional_data_headers",
             "eda_credential_id",
             "organization_id",
@@ -104,6 +138,19 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
+    test_mode = serializers.BooleanField(
+        help_text=(
+            "Enable test mode for the event stream. When true, events are "
+            "captured for testing but not forwarded to activations."
+        )
+    )
+    forward_events = serializers.SerializerMethodField(
+        help_text=(
+            "Whether to forward events to activations (inverse of "
+            "test_mode). When true, events are forwarded normally. When "
+            "false, events are captured for testing only."
+        )
+    )
 
     class Meta:
         model = models.EventStream
@@ -123,6 +170,7 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "test_mode",
+            "forward_events",
             "additional_data_headers",
             "organization",
             "eda_credential",
@@ -155,6 +203,10 @@ class EventStreamOutSerializer(serializers.ModelSerializer):
             if obj.organization
             else None
         )
+
+    def get_forward_events(self, obj) -> bool:
+        """Get forward_events as the inverse of test_mode."""
+        return not obj.test_mode
 
     def to_representation(self, instance):
         result = super().to_representation(instance)
