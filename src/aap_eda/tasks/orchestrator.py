@@ -194,6 +194,7 @@ def queue_dispatch(
             process_parent_id,
             request_type,
             request_id,
+            job_id,
         )
 
 
@@ -202,6 +203,7 @@ def queue_dispatch_no_lock(
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
     request_id: str = "",
+    job_id: str = "",
 ):
     """Dispatch the request to the right queue.
 
@@ -211,8 +213,6 @@ def queue_dispatch_no_lock(
     checks the health of the queue before dispatching the request.
     Handles workers offline and unhealthy queues.
     """
-    job_id = _manage_process_job_id(process_parent_type, process_parent_id)
-
     # TODO: add "monitor" type to ActivationRequestQueue
     if request_type is None:
         request_type = "Monitor"
