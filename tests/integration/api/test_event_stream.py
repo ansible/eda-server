@@ -518,80 +518,84 @@ def test_update_event_stream_uuid_change_allowed(
     assert response.data["uuid"] == str(new_uuid)
 
 
+@pytest.mark.parametrize(
+    ("forward_events", "expected_test_mode", "name_suffix"),
+    [
+        (True, False, "true"),
+        (False, True, "false"),
+    ],
+)
 @pytest.mark.django_db
-def test_create_event_stream_with_forward_events_true(
+def test_create_event_stream_with_forward_events(
     admin_client: APIClient,
     default_hmac_credential: models.EdaCredential,
     default_organization: models.Organization,
+    forward_events: bool,
+    expected_test_mode: bool,
+    name_suffix: str,
 ):
-    """Test forward_events=True sets test_mode=False."""
+    """Test forward_events setting controls test_mode value."""
     data_in = {
-        "name": "test_event_stream_forward_events_true",
+        "name": f"test_event_stream_forward_events_{name_suffix}",
         "event_stream_type": default_hmac_credential.credential_type.kind,
         "eda_credential_id": default_hmac_credential.id,
         "organization_id": default_organization.id,
-        "forward_events": True,
+        "forward_events": forward_events,
     }
     event_stream = create_event_stream(admin_client, data_in)
-    assert event_stream.name == "test_event_stream_forward_events_true"
-    assert event_stream.test_mode is False
+    assert (
+        event_stream.name == f"test_event_stream_forward_events_{name_suffix}"
+    )
+    assert event_stream.test_mode is expected_test_mode
 
     response = admin_client.get(
         f"{api_url_v1}/event-streams/{event_stream.id}/"
     )
     assert response.status_code == status.HTTP_200_OK
-    assert response.data["test_mode"] is False
-    assert response.data["forward_events"] is True
+    assert response.data["test_mode"] is expected_test_mode
+    assert response.data["forward_events"] is forward_events
 
 
+@pytest.mark.parametrize(
+    "http_method",
+    [
+        "POST",
+        "PATCH",
+    ],
+)
 @pytest.mark.django_db
-def test_create_event_stream_with_forward_events_false(
+def test_event_stream_forward_events_test_mode_mutual_exclusivity(
     admin_client: APIClient,
     default_hmac_credential: models.EdaCredential,
     default_organization: models.Organization,
+    default_event_stream: models.EventStream,
+    http_method: str,
 ):
-    """Test forward_events=False sets test_mode=True."""
-    data_in = {
-        "name": "test_event_stream_forward_events_false",
-        "event_stream_type": default_hmac_credential.credential_type.kind,
-        "eda_credential_id": default_hmac_credential.id,
-        "organization_id": default_organization.id,
-        "forward_events": False,
-    }
-    event_stream = create_event_stream(admin_client, data_in)
-    assert event_stream.name == "test_event_stream_forward_events_false"
-    assert event_stream.test_mode is True
+    """Test forward_events and test_mode are mutually exclusive."""
+    if http_method == "POST":
+        data_in = {
+            "name": "test_event_stream_mutual_exclusivity",
+            "event_stream_type": default_hmac_credential.credential_type.kind,
+            "eda_credential_id": default_hmac_credential.id,
+            "organization_id": default_organization.id,
+            "forward_events": True,
+            "test_mode": False,
+        }
+        url = f"{api_url_v1}/event-streams/"
+        client_method = admin_client.post
+    else:  # PATCH
+        data_in = {
+            "forward_events": True,
+            "test_mode": False,
+        }
+        url = f"{api_url_v1}/event-streams/{default_event_stream.id}/"
+        client_method = admin_client.patch
 
-    response = admin_client.get(
-        f"{api_url_v1}/event-streams/{event_stream.id}/"
-    )
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["test_mode"] is True
-    assert response.data["forward_events"] is False
-
-
-@pytest.mark.django_db
-def test_create_event_stream_forward_events_test_mode_mutual_exclusivity(
-    admin_client: APIClient,
-    default_hmac_credential: models.EdaCredential,
-    default_organization: models.Organization,
-):
-    """Test forward_events and test_mode are mutually exclusive in POST."""
-    data_in = {
-        "name": "test_event_stream_mutual_exclusivity",
-        "event_stream_type": default_hmac_credential.credential_type.kind,
-        "eda_credential_id": default_hmac_credential.id,
-        "organization_id": default_organization.id,
-        "forward_events": True,
-        "test_mode": False,  # Both provided - should cause validation error
-    }
     with override_settings(
         EVENT_STREAM_BASE_URL="https://www.example.com/",
         EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
     ):
-        response = admin_client.post(
-            f"{api_url_v1}/event-streams/", data=data_in
-        )
+        response = client_method(url, data=data_in)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "forward_events and test_mode are mutually exclusive" in str(
             response.data
@@ -636,26 +640,6 @@ def test_update_event_stream_with_forward_events(
     assert default_event_stream.test_mode is False
     assert response.data["test_mode"] is False
     assert response.data["forward_events"] is True
-
-
-@pytest.mark.django_db
-def test_update_event_stream_forward_events_test_mode_mutual_exclusivity(
-    admin_client: APIClient,
-    default_event_stream: models.EventStream,
-):
-    """Test forward_events and test_mode are mutually exclusive in PATCH."""
-    data_in = {
-        "forward_events": True,
-        "test_mode": False,
-    }
-    response = admin_client.patch(
-        f"{api_url_v1}/event-streams/{default_event_stream.id}/",
-        data=data_in,
-    )
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "forward_events and test_mode are mutually exclusive" in str(
-        response.data
-    )
 
 
 def create_event_stream_credential(
