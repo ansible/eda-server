@@ -1,13 +1,13 @@
-name: CI-stable-1.2
+name: CI-stable-2.6
 
 env:
   POETRY_NO_INTERACTION: 1
 
 on:
   push:
-    branches: [ 'stable-1.2' ]
+    branches: [ 'stable-2.6' ]
   pull_request:
-    branches: [ 'stable-1.2' ]
+    branches: [ 'stable-2.6' ]
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
