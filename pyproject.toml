@@ -47,8 +47,8 @@ cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 rq-scheduler = "^0.10"
-# TODO (alex): Move to a 2.6 branch/tag when available
-django-ansible-base = { git = "git@github.com:ansible-automation-platform/django-ansible-base.git", branch = "devel", extras = [
+# TODO (alex): Move to a 2.6 tag when available
+django-ansible-base = { git = "git@github.com:ansible-automation-platform/django-ansible-base.git", branch = "stable-2.6", extras = [
     "channel-auth",
     "rbac",
     "redis-client",

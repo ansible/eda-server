@@ -960,8 +960,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "ssh://git@github.com/ansible-automation-platform/django-ansible-base.git"
-reference = "devel"
-resolved_reference = "d60e4bee38d113d94993da2b6afe73429575c14f"
+reference = "stable-2.6"
+resolved_reference = "c44d1949888acbcc66f7c25cd659806f5b74682b"
 
 [[package]]
 name = "django-crum"
@@ -3536,4 +3536,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "50d2c0f05ede3f67d7d0e464d98d92977701ba1b9d9ad7c91145fcb2e6ccf415"
+content-hash = "ca6105364cdbb8c97279f7bb87304b11d877610c3a0d64de2295cfa5808f67f3"
