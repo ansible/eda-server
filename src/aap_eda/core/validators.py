@@ -598,9 +598,9 @@ def check_if_refspec_valid(refspec: str) -> str:
 def check_credential_test_data(
     credential_type: models.CredentialType, inputs: dict, metadata: dict
 ):
-    if not inputs or not metadata:
+    if not inputs:
         raise serializers.ValidationError(
-            "In test mode both inputs and metadata have to be provided"
+            "In test mode inputs have to be provided"
         )
 
     errors = validate_inputs(
