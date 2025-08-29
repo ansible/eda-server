@@ -318,7 +318,7 @@ class EdaCredentialTestSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, attrs):
-        metadata = attrs.get("metadata")
+        metadata = attrs.get("metadata", {})
         inputs = inputs_from_store(self.instance.inputs.get_secret_value())
 
         validators.check_credential_test_data(

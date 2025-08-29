@@ -1442,27 +1442,80 @@ def test_create_external_credential_type(
 
 
 @pytest.mark.parametrize(
-    ("metadata", "status_code", "raise_exception"),
+    (
+        "credential_type_name",
+        "inputs",
+        "metadata",
+        "status_code",
+        "raise_exception",
+    ),
     [
         (
+            enums.DefaultCredentialType.HASHICORP_LOOKUP,
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": secrets.token_hex(32),
+            },
             {"secret_path": "secret/foo", "secret_key": "bar"},
             status.HTTP_202_ACCEPTED,
             False,
         ),
         (
+            enums.DefaultCredentialType.HASHICORP_LOOKUP,
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": secrets.token_hex(32),
+            },
             {"secret_key": "bar"},
             status.HTTP_400_BAD_REQUEST,
             False,
         ),
         (
+            enums.DefaultCredentialType.HASHICORP_LOOKUP,
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": secrets.token_hex(32),
+            },
+            {},
+            status.HTTP_400_BAD_REQUEST,
+            False,
+        ),
+        (
+            enums.DefaultCredentialType.HASHICORP_LOOKUP,
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": secrets.token_hex(32),
+            },
             {"secret_path": "secret/foo", "secret_key": "bar"},
             status.HTTP_400_BAD_REQUEST,
             True,
         ),
         (
+            enums.DefaultCredentialType.HASHICORP_LOOKUP,
+            {
+                "url": "https://www.example.com",
+                "api_version": "v2",
+                "token": secrets.token_hex(32),
+            },
             None,
             status.HTTP_400_BAD_REQUEST,
             True,
+        ),
+        (
+            enums.DefaultCredentialType.GITHUB_APP,
+            {
+                "app_or_client_id": "1111111",
+                "github_api_url": "https://api.github.com",
+                "install_id": "11111111",
+                "private_rsa_key": DUMMY_SSH_KEY,
+            },
+            {},
+            status.HTTP_202_ACCEPTED,
+            False,
         ),
     ],
 )
@@ -1471,22 +1524,20 @@ def test_create_external_credential_test(
     admin_client: APIClient,
     default_organization: models.Organization,
     preseed_credential_types,
+    credential_type_name: str,
+    inputs: dict,
     metadata: Optional[dict],
     status_code: int,
     raise_exception: bool,
 ):
-    hashi_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    credential_type = models.CredentialType.objects.get(
+        name=credential_type_name
     )
 
     data_in = {
         "name": "eda-credential",
-        "inputs": {
-            "url": "https://www.example.com",
-            "api_version": "v2",
-            "token": secrets.token_hex(32),
-        },
-        "credential_type_id": hashi_type.id,
+        "inputs": inputs,
+        "credential_type_id": credential_type.id,
         "organization_id": default_organization.id,
     }
 
