@@ -19,6 +19,7 @@ from rest_framework.validators import UniqueValidator
 
 from aap_eda.api.serializers.eda_credential import EdaCredentialRefSerializer
 from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
+from aap_eda.api.serializers.mixins import OrganizationIdFieldMixin
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import models, validators
@@ -81,16 +82,9 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
         return result
 
 
-class ProjectCreateRequestSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={
-            "null": "Organization is needed",
-            "required": "Organization is required",
-        },
-    )
+class ProjectCreateRequestSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     eda_credential_id = serializers.IntegerField(
         required=False,
         allow_null=True,
@@ -142,16 +136,9 @@ class ProjectCreateRequestSerializer(serializers.ModelSerializer):
         ]
 
 
-class ProjectUpdateRequestSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={
-            "null": "Organization is needed",
-            "required": "Organization is required",
-        },
-    )
+class ProjectUpdateRequestSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     name = serializers.CharField(
         required=False,
         allow_blank=False,
