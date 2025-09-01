@@ -35,6 +35,7 @@ from aap_eda.api.serializers.eda_credential import EdaCredentialSerializer
 from aap_eda.api.serializers.event_stream import EventStreamOutSerializer
 from aap_eda.api.serializers.fields.basic_user import BasicUserFieldSerializer
 from aap_eda.api.serializers.fields.yaml import YAMLSerializerField
+from aap_eda.api.serializers.mixins import OrganizationIdFieldMixin
 from aap_eda.api.serializers.organization import OrganizationRefSerializer
 from aap_eda.api.serializers.project import (
     ANSIBLE_VAULT_STRING,
@@ -429,7 +430,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
         }
 
 
-class ActivationCreateSerializer(serializers.ModelSerializer):
+class ActivationCreateSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     """Serializer for creating the Activation."""
 
     class Meta:
@@ -452,15 +455,6 @@ class ActivationCreateSerializer(serializers.ModelSerializer):
             "skip_audit_events",
         ]
 
-    organization_id = serializers.IntegerField(
-        required=True,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={
-            "null": "Organization is needed",
-            "required": "Organization is required",
-        },
-    )
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists],
         error_messages={
@@ -597,7 +591,9 @@ class ActivationCopySerializer(serializers.ModelSerializer):
         return super().create(copied_data)
 
 
-class ActivationUpdateSerializer(serializers.ModelSerializer):
+class ActivationUpdateSerializer(
+    OrganizationIdFieldMixin, serializers.ModelSerializer
+):
     """Serializer for updating the Activation."""
 
     class Meta:
@@ -620,12 +616,6 @@ class ActivationUpdateSerializer(serializers.ModelSerializer):
             "skip_audit_events",
         ]
 
-    organization_id = serializers.IntegerField(
-        required=False,
-        allow_null=False,
-        validators=[validators.check_if_organization_exists],
-        error_messages={"null": "Organization is needed"},
-    )
     rulebook_id = serializers.IntegerField(
         validators=[validators.check_if_rulebook_exists],
         error_messages={"null": "Rulebook is needed"},

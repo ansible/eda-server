@@ -92,7 +92,7 @@ class CredentialTypeTestSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        metadata = data.get("metadata")
+        metadata = data.get("metadata", {})
         inputs = data.get("inputs")
 
         validators.check_credential_test_data(self.instance, inputs, metadata)

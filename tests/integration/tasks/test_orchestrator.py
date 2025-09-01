@@ -13,6 +13,8 @@
 #  limitations under the License.
 
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from unittest import mock
 
@@ -202,26 +204,24 @@ def test_monitor_rulebook_processes(
     get_queue_name_mock.return_value = "activation"
     call_args = [
         mock.call(
-            "activation",
-            orchestrator._manage_process_job_id(
-                ProcessParentType.ACTIVATION, activation.id
-            ),
-            orchestrator._manage,
+            "default",
+            "queue_dispatch_" + str(activation.id),
+            orchestrator.queue_dispatch,
             ProcessParentType.ACTIVATION,
             activation.id,
+            ActivationRequest.START,
             "",
         )
     ]
     for running in bulk_running_processes:
         call_args.append(
             mock.call(
-                "activation",
-                orchestrator._manage_process_job_id(
-                    ProcessParentType.ACTIVATION, running.activation.id
-                ),
-                orchestrator._manage,
+                "default",
+                "queue_dispatch_" + str(running.activation.id),
+                orchestrator.queue_dispatch,
                 ProcessParentType.ACTIVATION,
                 running.activation.id,
+                ActivationRequest.START,
                 "",
             )
         )
@@ -236,6 +236,21 @@ def test_monitor_rulebook_processes(
             ActivationRequest.START,
         )
     orchestrator.monitor_rulebook_processes()
+
+    # Also expect calls for running processes
+    # (these will have None as request type)
+    for running in bulk_running_processes:
+        call_args.append(
+            mock.call(
+                "default",
+                "queue_dispatch_" + str(running.activation.id),
+                orchestrator.queue_dispatch,
+                str(running.parent_type),
+                running.activation.id,
+                None,
+                mock.ANY,  # UUID string
+            )
+        )
 
     enqueue_mock.assert_has_calls(call_args, any_order=True)
 
@@ -268,6 +283,45 @@ def test_dispatch_existing_rq_jobs(enqueue_mock, activation, eda_caplog):
         )
 
         enqueue_mock.assert_not_called()
-        assert f"_manage({job_id}) already being ran, " in eda_caplog.text
+        assert (
+            f"queue_dispatch({job_id}) already being ran, " in eda_caplog.text
+        )
         activation.refresh_from_db()
         assert activation.status == ActivationStatus.STOPPED
+
+
+@pytest.mark.django_db
+def test_queue_dispatch_advisory_lock(activation, eda_caplog):
+    """Test that queue_dispatch advisory lock prevents duplicate execution."""
+    execution_count = 0
+
+    def mock_queue_dispatch_no_lock(*args, **kwargs):
+        nonlocal execution_count
+        execution_count += 1
+        time.sleep(1.0)
+        return True
+
+    def concurrent_dispatch():
+        """Function to run queue_dispatch concurrently."""
+        with mock.patch(
+            "aap_eda.tasks.orchestrator.queue_dispatch_no_lock",
+            side_effect=mock_queue_dispatch_no_lock,
+        ):
+            orchestrator.queue_dispatch(
+                ProcessParentType.ACTIVATION,
+                activation.id,
+                ActivationRequest.START,
+                "test-request",
+            )
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(concurrent_dispatch) for _ in range(3)]
+        for future in futures:
+            future.result()
+
+    assert execution_count == 1, f"Expected 1 execution, got {execution_count}"
+
+    assert (
+        "queue_dispatch" in eda_caplog.text
+        and "already being ran" in eda_caplog.text
+    )
