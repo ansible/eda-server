@@ -20,14 +20,14 @@ requests = ">=2.0.0,<3"
 
 [[package]]
 name = "ansible-runner"
-version = "2.3.6"
+version = "2.4.1"
 description = "\"Consistent Ansible Python API and CLI with container and process isolation runtime capabilities\""
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "ansible-runner-2.3.6.tar.gz", hash = "sha256:b2174a12dcad2dc2f342ea82876898f568a0b66c53568600bf80577158fcba1c"},
-    {file = "ansible_runner-2.3.6-py3-none-any.whl", hash = "sha256:4f153d9c3000a61b82d7253ca292849e3ad2c5d68dfff4377a6b98c4e6ff6c3e"},
+    {file = "ansible_runner-2.4.1-py3-none-any.whl", hash = "sha256:ef4efe906414f6e9a4c2e41d131fabc3bfe952f16edded7bdc06d597b05f0eb6"},
+    {file = "ansible_runner-2.4.1.tar.gz", hash = "sha256:11d717da4dd8d93d56703a4a98e5f2154026a7ed1b46d9930902b8298dc67d09"},
 ]
 
 [package.dependencies]
@@ -35,7 +35,6 @@ packaging = "*"
 pexpect = ">=4.5"
 python-daemon = "*"
 pyyaml = "*"
-six = "*"
 
 [[package]]
 name = "appnope"
@@ -920,7 +919,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.8.11"
+version = "2025.8.25.0.dev65+gc44d19498"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.9"
@@ -3536,4 +3535,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "64c7eafed1521fdf041fc1df6cceee85cae70894f9f74a752fb7786f16ea3675"
+content-hash = "a4a6fd0cbb32366e53202b3d214220048a533ae480fca11cd95d2197e8499d71"
