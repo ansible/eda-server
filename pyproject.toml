@@ -59,7 +59,7 @@ django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.gi
 jinja2 = ">=3.1.3,<3.2"
 django-split-settings = "^1.2.0"
 pexpect = "^4.9.0"
-ansible-runner = ">=2.3"
+ansible-runner = ">=2.4"
 python-gnupg = "^0.5.2"
 # indirectly needed by twisted, this version avoids issues with newer versions of setuptools:
 # https://github.com/crossbario/autobahn-python/pull/1632
