@@ -460,7 +460,15 @@ def post_loading(loaded_settings: Dynaconf):
     )
     settings.REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
     settings.REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
-    settings.REDIS_TLS = settings.get("MQ_TLS", None)
+
+    # Handle MQ_TLS setting - convert string values to boolean
+    mq_tls = settings.get("MQ_TLS", None)
+    if mq_tls is not None and isinstance(mq_tls, str):
+        converted_tls = utils.str_to_bool(mq_tls)
+        settings.MQ_TLS = converted_tls
+        settings.REDIS_TLS = converted_tls
+    else:
+        settings.REDIS_TLS = mq_tls
     settings.REDIS_DB = settings.get("MQ_DB", settings.DEFAULT_REDIS_DB)
     settings.REDIS_HA_CLUSTER_HOSTS = settings.get(
         "MQ_REDIS_HA_CLUSTER_HOSTS", ""
