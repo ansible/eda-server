@@ -250,6 +250,17 @@ def test_duplicated_worker_queue(mock_settings):
         ("RESOURCE_JWT_USER_ID", " eda ", "eda"),
         ("RESOURCE_JWT_USER_ID", ["eda"], ImproperlyConfigured),
         ("MQ_TLS", True, True),
+        ("MQ_TLS", False, False),
+        ("MQ_TLS", None, None),
+        ("MQ_TLS", "true", True),
+        ("MQ_TLS", "True", True),
+        ("MQ_TLS", "false", False),
+        ("MQ_TLS", "False", False),
+        ("MQ_TLS", "yes", True),
+        ("MQ_TLS", "no", False),
+        ("MQ_TLS", "1", True),
+        ("MQ_TLS", "0", False),
+        ("MQ_TLS", "", False),
     ],
 )
 def test_types(mock_settings, name, value, expected):
@@ -264,10 +275,10 @@ def test_types(mock_settings, name, value, expected):
 
 def test_optional_type_exception_msg(mock_settings):
     """Test exception message when an optional type error occurs."""
-    mock_settings["MQ_TLS"] = "true"
+    mock_settings["MQ_TLS"] = 123  # Use invalid type instead of string
     with pytest.raises(
         ImproperlyConfigured,
-        match="MQ_TLS setting must be a bool or None",
+        match="MQ_TLS setting must be a bool or str or None",
     ):
         post_loading(mock_settings)
 
@@ -285,3 +296,46 @@ def test_union_type_exception_msg(mock_settings):
 def test_allow_local_resource_management(mock_settings):
     # default is False
     assert mock_settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT is False
+
+
+@pytest.mark.parametrize(
+    ("mq_tls_value", "expected_redis_tls", "expected_ssl_param"),
+    [
+        # Boolean values
+        (True, True, True),
+        (False, False, False),
+        (
+            None,
+            None,
+            False,
+        ),  # None should result in SSL=False (fallback logic)
+        # String values that should be converted to True
+        ("true", True, True),
+        ("True", True, True),
+        ("yes", True, True),
+        ("Yes", True, True),
+        ("1", True, True),
+        # String values that should be converted to False
+        ("false", False, False),
+        ("False", False, False),
+        ("no", False, False),
+        ("No", False, False),
+        ("0", False, False),
+        ("", False, False),
+        ("anything", False, False),
+    ],
+)
+def test_mq_tls_conversion_and_redis_ssl(
+    mock_settings, mq_tls_value, expected_redis_tls, expected_ssl_param
+):
+    """Test MQ_TLS setting conversion to REDIS_TLS and SSL parameter."""
+    mock_settings.MQ_TLS = mq_tls_value
+
+    post_loading(mock_settings)
+
+    # Check that MQ_TLS was properly converted to REDIS_TLS
+    assert mock_settings.REDIS_TLS == expected_redis_tls
+
+    # Check that the Redis queue configuration uses the correct SSL parameter
+    queues = get_rq_queues(mock_settings)
+    assert queues["default"]["SSL"] == expected_ssl_param
