@@ -65,7 +65,7 @@ Redis queue settings:
 *   - Takes precedence over host and port
 * MQ_HOST - Redis queue hostname (default: "127.0.0.1")
 * MQ_PORT - Redis queue port (default: 6379)
-* MQ_TLS - Force TLS on when True (default: None)
+* MQ_TLS - Force TLS on when True or "yes" (default: None)
 * MQ_DB - Redis queue database (default: 0)
 * MQ_USER - Redis user (default: None)
 * MQ_USER_PASSWORD - Redis user passed (default: None)
@@ -157,7 +157,7 @@ MQ_USER_PASSWORD: Optional[str] = None
 MQ_CLIENT_CACERT_PATH: Optional[str] = None
 MQ_CLIENT_CERT_PATH: Optional[str] = None
 MQ_CLIENT_KEY_PATH: Optional[str] = None
-MQ_TLS: Optional[bool] = None
+MQ_TLS: Optional[Union[bool, str]] = None
 MQ_DB: int = core.DEFAULT_REDIS_DB
 
 # The HA cluster hosts is a string of <host>:<port>[,<host>:port>]+
