@@ -80,16 +80,124 @@ def test_post_event_stream_with_token(
     assert response.status_code == auth_status
 
 
+BASE_HEADERS = {
+    "X-Gitlab-Event-Uuid": "c2675c66-7e6e-4fe2-9ac3-288534ef34b9",
+    "X-Gitlab-Instance": "https://gitlab.com",
+    "X-Gitlab-Token": secrets.token_hex(32),
+    "X-Gitlab-Uuid": "b697868f-3b59-4a1f-985d-47f79e2b05ff",
+    "X-Gitlab-Event": "Push Hook",
+    "X-Envoy-abc": "abc",
+    "X-Trusted-Proxy": "gobbledegook",
+}
+
+
+@pytest.mark.parametrize(
+    (
+        "signature_header_name",
+        "additional_data_headers",
+        "headers",
+        "required_header_keys",
+        "keys_should_not_exist",
+        "redacted",
+        "key_remap",
+    ),
+    [
+        (
+            "X-Gitlab-Token",
+            "x-gitlab-event, x-gitlab-event-uuid , x-gitlab-uuid",
+            BASE_HEADERS,
+            ["X-Gitlab-Event", "X-Gitlab-Event-Uuid", "X-Gitlab-Uuid"],
+            [
+                "X-Trusted-Proxy",
+                "X-Envoy-abc",
+                "X-Gitlab-Instance",
+                "X-Gitlab-Token",
+            ],
+            True,
+            {
+                "X-Gitlab-Event": "x-gitlab-event",
+                "X-Gitlab-Event-Uuid": "x-gitlab-event-uuid",
+                "X-Gitlab-Uuid": "x-gitlab-uuid",
+            },
+        ),
+        (
+            "X-Gitlab-Token",
+            "X-Gitlab-Event, X-Gitlab-Event-Uuid , X-Gitlab-Uuid",
+            BASE_HEADERS,
+            ["X-Gitlab-Event", "X-Gitlab-Event-Uuid", "X-Gitlab-Uuid"],
+            [
+                "X-Envoy-abc",
+                "X-Trusted-Proxy",
+                "X-Gitlab-Instance",
+                "X-Gitlab-Token",
+            ],
+            True,
+            {},
+        ),
+        (
+            "X-Gitlab-Token",
+            " X-Gitlab-Event ",
+            BASE_HEADERS,
+            ["X-Gitlab-Event"],
+            [
+                "X-Envoy-abc",
+                "X-Gitlab-Event-Uuid",
+                "X-Gitlab-Uuid",
+                "X-Gitlab-Token",
+                "X-Gitlab-Instance",
+                "X-Trusted-Proxy",
+            ],
+            True,
+            {},
+        ),
+        (
+            "X-Gitlab-Token",
+            " X-Gitlab-Token ",
+            BASE_HEADERS,
+            ["X-Gitlab-Token"],
+            [
+                "X-Envoy-abc",
+                "X-Gitlab-Event-Uuid",
+                "X-Gitlab-Uuid",
+                "X-Gitlab-Instance",
+                "X-Gitlab-Event",
+                "X-Trusted-Proxy",
+            ],
+            False,
+            {},
+        ),
+        (
+            "X-Gitlab-Token",
+            "*",
+            BASE_HEADERS,
+            [
+                "X-Gitlab-Event",
+                "X-Gitlab-Event-Uuid",
+                "X-Gitlab-Instance",
+                "X-Gitlab-Uuid",
+                "X-Gitlab-Token",
+            ],
+            ["X-Envoy-abc", "X-Trusted-Proxy"],
+            True,
+            {},
+        ),
+    ],
+)
 @pytest.mark.django_db
 def test_post_event_stream_with_test_mode_extra_headers(
     admin_client: APIClient,
     preseed_credential_types,
+    signature_header_name,
+    additional_data_headers,
+    headers,
+    required_header_keys,
+    keys_should_not_exist,
+    redacted,
+    key_remap,
 ):
-    secret = secrets.token_hex(32)
-    signature_header_name = "X-Gitlab-Token"
     inputs = {
         "auth_type": "token",
-        "token": secret,
+        "token": headers[signature_header_name],
         "http_header_key": signature_header_name,
     }
 
@@ -97,9 +205,6 @@ def test_post_event_stream_with_test_mode_extra_headers(
         admin_client, enums.EventStreamCredentialType.TOKEN.value, inputs
     )
 
-    additional_data_headers = (
-        "X-Gitlab-Event,X-Gitlab-Event-Uuid,X-Gitlab-Uuid"
-    )
     data_in = {
         "name": "test-es-1",
         "eda_credential_id": obj["id"],
@@ -110,14 +215,6 @@ def test_post_event_stream_with_test_mode_extra_headers(
     }
     event_stream = create_event_stream(admin_client, data_in)
     data = {"a": 1, "b": 2}
-    headers = {
-        "X-Gitlab-Event-Uuid": "c2675c66-7e6e-4fe2-9ac3-288534ef34b9",
-        "X-Gitlab-Instance": "https://gitlab.com",
-        signature_header_name: secret,
-        "X-Gitlab-Uuid": "b697868f-3b59-4a1f-985d-47f79e2b05ff",
-        "X-Gitlab-Event": "Push Hook",
-    }
-
     response = admin_client.post(
         event_stream_post_url(event_stream.uuid),
         headers=headers,
@@ -129,15 +226,18 @@ def test_post_event_stream_with_test_mode_extra_headers(
     test_data = yaml.safe_load(event_stream.test_content)
     assert test_data["a"] == 1
     assert test_data["b"] == 2
+
     test_headers = yaml.safe_load(event_stream.test_headers)
-    assert (
-        test_headers["X-Gitlab-Event-Uuid"]
-        == "c2675c66-7e6e-4fe2-9ac3-288534ef34b9"
-    )
-    assert (
-        test_headers["X-Gitlab-Uuid"] == "b697868f-3b59-4a1f-985d-47f79e2b05ff"
-    )
-    assert test_headers["X-Gitlab-Event"] == "Push Hook"
+
+    for key in required_header_keys:
+        if key == signature_header_name and redacted:
+            assert test_headers[key] == "Redacted"
+        else:
+            assert test_headers[key_remap.get(key, key)] == headers[key]
+
+    for key in keys_should_not_exist:
+        assert key not in test_headers
+
     assert event_stream.test_content_type == "application/json"
     assert event_stream.events_received == 1
     assert event_stream.last_event_received_at is not None
