@@ -16,6 +16,7 @@
 import datetime
 import logging
 import urllib.parse
+from typing import Any
 
 import yaml
 from django.conf import settings
@@ -46,6 +47,8 @@ from aap_eda.core.utils.credentials import get_resolved_secrets
 from aap_eda.services.pg_notify import PGNotify
 
 logger = logging.getLogger(__name__)
+UNSAFE_HEADER_KEYS = {"X-Trusted-Proxy", "X-Forwarded-For", "X-Real-IP"}
+REDACTED_STRING = "********"
 
 
 class ExternalEventStreamViewSet(viewsets.GenericViewSet):
@@ -107,20 +110,34 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
                 raise ParseError(message) from exc
         return data
 
-    def _create_payload(
-        self, headers: HttpHeaders, data: dict, header_key: str, endpoint: str
-    ) -> dict:
+    def _redacted_headers(
+        self, headers: HttpHeaders, header_key: str
+    ) -> dict[str, Any]:
         event_headers = {}
         if self.event_stream.additional_data_headers:
-            for key in self.event_stream.additional_data_headers.split(","):
-                value = headers.get(key)
-                if value:
-                    event_headers[key] = value
-        else:
-            event_headers = dict(headers)
-            if header_key in event_headers:
-                event_headers.pop(header_key)
+            if self.event_stream.additional_data_headers == "*":
+                event_headers = dict(headers)
+                if header_key in event_headers:
+                    event_headers[header_key] = REDACTED_STRING
+                event_headers = {
+                    key: value
+                    for key, value in event_headers.items()
+                    if not key.startswith("X-Envoy")
+                    and key not in UNSAFE_HEADER_KEYS
+                }
+            else:
+                for key in self.event_stream.additional_data_headers.split(
+                    ","
+                ):
+                    key = key.strip()
+                    value = headers.get(key)
+                    if value:
+                        event_headers[key] = value
+        return event_headers
 
+    def _create_payload(
+        self, event_headers: dict, data: dict, endpoint: str
+    ) -> dict:
         return {
             "payload": data,
             "meta": {
@@ -226,7 +243,6 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         except (EventStream.DoesNotExist, ValidationError) as exc:
             raise ParseError("bad uuid specified") from exc
 
-        logger.debug("Headers %s", request.headers)
         logger.debug("Body %s", request.body)
 
         try:
@@ -235,13 +251,17 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             logger.warning("Error fetching external secrets %s", str(err))
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        event_headers = self._redacted_headers(
+            request.headers, inputs["http_header_key"]
+        )
+
         if inputs["http_header_key"] not in request.headers:
             message = f"{inputs['http_header_key']} header is missing"
             logger.error(message)
             if self.event_stream.test_mode:
                 self._update_test_data(
                     error_message=message,
-                    headers=yaml.dump(dict(request.headers)),
+                    headers=yaml.dump(event_headers),
                 )
             raise ParseError(message)
 
@@ -260,9 +280,8 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
         logger.debug("Data: %s", data)
 
         payload = self._create_payload(
-            request.headers,
+            event_headers,
             data,
-            inputs["http_header_key"],
             request.get_full_path(),
         )
         self._update_stats()
@@ -270,7 +289,7 @@ class ExternalEventStreamViewSet(viewsets.GenericViewSet):
             self._update_test_data(
                 content=yaml.dump(body),
                 content_type=request.headers.get("Content-Type", "unknown"),
-                headers=yaml.dump(dict(request.headers)),
+                headers=yaml.dump(event_headers),
             )
         else:
             try:

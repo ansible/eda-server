@@ -19,6 +19,10 @@ import yaml
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from aap_eda.api.views.external_event_stream import (
+    REDACTED_STRING,
+    UNSAFE_HEADER_KEYS,
+)
 from aap_eda.core import enums
 from tests.integration.api.test_event_stream import (
     create_event_stream,
@@ -80,47 +84,160 @@ def test_post_event_stream_with_token(
     assert response.status_code == auth_status
 
 
+BASE_HEADERS = {
+    "X-Gitlab-Event-Uuid": "c2675c66-7e6e-4fe2-9ac3-288534ef34b9",
+    "X-Gitlab-Instance": "https://gitlab.com",
+    "X-Gitlab-Token": secrets.token_hex(32),
+    "X-Gitlab-Uuid": "b697868f-3b59-4a1f-985d-47f79e2b05ff",
+    "X-Gitlab-Event": "Push Hook",
+    "X-Envoy-abc": "abc",
+    "X-Trusted-Proxy": "gobbledegook",
+    "X-Forwarded-For": "fred",
+    "X-Real-IP": "barney",
+}
+
+
+@pytest.mark.parametrize(
+    ("test_args"),
+    [
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": (
+                    "x-gitlab-event, x-gitlab-event-uuid , x-gitlab-uuid"
+                ),
+                "headers": BASE_HEADERS,
+                "required_header_keys": [
+                    "X-Gitlab-Event",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                ],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Envoy-abc",
+                    "X-Gitlab-Instance",
+                    "X-Gitlab-Token",
+                ],
+                "redacted": True,
+                "key_remap": {
+                    "X-Gitlab-Event": "x-gitlab-event",
+                    "X-Gitlab-Event-Uuid": "x-gitlab-event-uuid",
+                    "X-Gitlab-Uuid": "x-gitlab-uuid",
+                },
+                "test_name": "lowercase data headers with extra spaces",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": (
+                    "X-Gitlab-Event, X-Gitlab-Event-Uuid, X-Gitlab-Uuid"
+                ),
+                "headers": BASE_HEADERS,
+                "required_header_keys": [
+                    "X-Gitlab-Event",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                ],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Envoy-abc",
+                    "X-Gitlab-Instance",
+                    "X-Gitlab-Token",
+                ],
+                "redacted": True,
+                "key_remap": {},
+                "test_name": "data headers with extra spaces",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": " X-Gitlab-Event ",
+                "headers": BASE_HEADERS,
+                "required_header_keys": ["X-Gitlab-Event"],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                    "X-Gitlab-Token",
+                    "X-Gitlab-Instance",
+                ],
+                "redacted": True,
+                "key_remap": {},
+                "test_name": "single data headers with surrounding spaces",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": " X-Gitlab-Token ",
+                "headers": BASE_HEADERS,
+                "required_header_keys": ["X-Gitlab-Token"],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + [
+                    "X-Envoy-abc",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Uuid",
+                    "X-Gitlab-Instance",
+                    "X-Gitlab-Event",
+                ],
+                "redacted": False,
+                "key_remap": {},
+                "test_name": "single data header with exposed auth_header",
+            }
+        ),
+        (
+            {
+                "auth_header": "X-Gitlab-Token",
+                "additional_data_headers": "*",
+                "headers": BASE_HEADERS,
+                "required_header_keys": [
+                    "X-Gitlab-Event",
+                    "X-Gitlab-Event-Uuid",
+                    "X-Gitlab-Instance",
+                    "X-Gitlab-Uuid",
+                    "X-Gitlab-Token",
+                ],
+                "keys_should_not_exist": list(UNSAFE_HEADER_KEYS)
+                + ["X-Envoy-abc"],
+                "redacted": True,
+                "key_remap": {},
+                "test_name": "wild card data header",
+            }
+        ),
+    ],
+)
 @pytest.mark.django_db
 def test_post_event_stream_with_test_mode_extra_headers(
     admin_client: APIClient,
     preseed_credential_types,
+    test_args,
 ):
-    secret = secrets.token_hex(32)
-    signature_header_name = "X-Gitlab-Token"
+    auth_header = test_args["auth_header"]
     inputs = {
         "auth_type": "token",
-        "token": secret,
-        "http_header_key": signature_header_name,
+        "token": test_args["headers"][auth_header],
+        "http_header_key": auth_header,
     }
 
     obj = create_event_stream_credential(
         admin_client, enums.EventStreamCredentialType.TOKEN.value, inputs
     )
 
-    additional_data_headers = (
-        "X-Gitlab-Event,X-Gitlab-Event-Uuid,X-Gitlab-Uuid"
-    )
     data_in = {
         "name": "test-es-1",
         "eda_credential_id": obj["id"],
         "event_stream_type": obj["credential_type"]["kind"],
         "organization_id": get_default_test_org().id,
         "test_mode": True,
-        "additional_data_headers": additional_data_headers,
+        "additional_data_headers": test_args["additional_data_headers"],
     }
     event_stream = create_event_stream(admin_client, data_in)
     data = {"a": 1, "b": 2}
-    headers = {
-        "X-Gitlab-Event-Uuid": "c2675c66-7e6e-4fe2-9ac3-288534ef34b9",
-        "X-Gitlab-Instance": "https://gitlab.com",
-        signature_header_name: secret,
-        "X-Gitlab-Uuid": "b697868f-3b59-4a1f-985d-47f79e2b05ff",
-        "X-Gitlab-Event": "Push Hook",
-    }
-
     response = admin_client.post(
         event_stream_post_url(event_stream.uuid),
-        headers=headers,
+        headers=test_args["headers"],
         data=data,
     )
     assert response.status_code == status.HTTP_200_OK
@@ -129,15 +246,21 @@ def test_post_event_stream_with_test_mode_extra_headers(
     test_data = yaml.safe_load(event_stream.test_content)
     assert test_data["a"] == 1
     assert test_data["b"] == 2
+
     test_headers = yaml.safe_load(event_stream.test_headers)
-    assert (
-        test_headers["X-Gitlab-Event-Uuid"]
-        == "c2675c66-7e6e-4fe2-9ac3-288534ef34b9"
-    )
-    assert (
-        test_headers["X-Gitlab-Uuid"] == "b697868f-3b59-4a1f-985d-47f79e2b05ff"
-    )
-    assert test_headers["X-Gitlab-Event"] == "Push Hook"
+
+    for key in test_args["required_header_keys"]:
+        if key == auth_header and test_args["redacted"]:
+            assert test_headers[key] == REDACTED_STRING
+        else:
+            assert (
+                test_headers[test_args["key_remap"].get(key, key)]
+                == test_args["headers"][key]
+            )
+
+    for key in test_args["keys_should_not_exist"]:
+        assert key not in test_headers
+
     assert event_stream.test_content_type == "application/json"
     assert event_stream.events_received == 1
     assert event_stream.last_event_received_at is not None
