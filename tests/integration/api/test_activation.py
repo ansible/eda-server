@@ -837,6 +837,70 @@ def test_disable_activation_redis_unavailable(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("force_disable", "expected_response"),
+    [
+        (
+            "true",
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            "false",
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+)
+@patch("aap_eda.api.serializers.activation.settings.DEPLOYMENT_TYPE", "podman")
+def test_disable_activation_workers_offline(
+    force_disable,
+    expected_response,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    default_activation.status = enums.ActivationStatus.WORKERS_OFFLINE
+    default_activation.save(update_fields=["status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{default_activation.id}/disable/"
+        f"?force={force_disable}"
+    )
+    assert response.status_code == expected_response
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("force_delete", "expected_response"),
+    [
+        (
+            "true",
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            "false",
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+)
+@patch("aap_eda.api.serializers.activation.settings.DEPLOYMENT_TYPE", "podman")
+def test_delete_activation_workers_offline(
+    force_delete,
+    expected_response,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    default_activation.status = enums.ActivationStatus.WORKERS_OFFLINE
+    default_activation.save(update_fields=["status"])
+
+    response = admin_client.delete(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+        f"?force={force_delete}"
+    )
+    assert response.status_code == expected_response
+
+
+@pytest.mark.django_db
 def test_list_activation_instances(
     default_activation: models.Activation,
     default_activation_instances: List[models.RulebookProcess],
