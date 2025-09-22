@@ -15,6 +15,7 @@ import logging
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
+from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
@@ -660,7 +661,8 @@ class ActivationViewSet(
                 is False
         """
         if (
-            activation.status == ActivationStatus.WORKERS_OFFLINE
+            settings.DEPLOYMENT_TYPE == "podman"
+            and activation.status == ActivationStatus.WORKERS_OFFLINE
             and not force_flag
         ):
             raise api_exc.Conflict(
