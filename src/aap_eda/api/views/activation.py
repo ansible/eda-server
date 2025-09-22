@@ -15,7 +15,6 @@ import logging
 
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
-from django.conf import settings
 from django.db import transaction
 from django.forms import model_to_dict
 from django_filters import rest_framework as defaultfilters
@@ -207,16 +206,29 @@ class ActivationViewSet(
                 None,
                 description="The Activation has been deleted.",
             ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None,
+                description="Activation blocked while Workers offline.",
+            ),
         },
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force delete after worker node offline",
+                required=False,
+                type=bool,
+            )
+        ],
     )
     def destroy(self, request, *args, **kwargs):
         activation = self.get_object()
+        force_delete = str_to_bool(
+            request.query_params.get("force", "false"),
+        )
 
-        if activation.status == ActivationStatus.WORKERS_OFFLINE:
-            raise api_exc.Conflict(
-                f"An Activation in state '{activation.status}' cannot be "
-                "deleted.",
-            )
+        self._check_workers_offline_with_force(
+            activation, force_delete, "Deleted"
+        )
 
         audit_log = logging_utils.generate_simple_audit_log(
             "Delete",
@@ -438,7 +450,19 @@ class ActivationViewSet(
                 None,
                 description="Activation has been disabled.",
             ),
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None,
+                description="Activation blocked while Workers offline.",
+            ),
         },
+        parameters=[
+            OpenApiParameter(
+                name="force",
+                description="Force disable after worker node offline",
+                required=False,
+                type=bool,
+            )
+        ],
         extensions={
             "x-ai-description": (
                 "Disable an activation by ID. "
@@ -451,6 +475,13 @@ class ActivationViewSet(
         activation = self.get_object()
 
         self._check_deleting(activation)
+        force_disable = str_to_bool(
+            request.query_params.get("force", "false"),
+        )
+
+        self._check_workers_offline_with_force(
+            activation, force_disable, "Disabled"
+        )
 
         if activation.is_enabled:
             # With dispatcherd migration, Redis is no longer required
@@ -516,19 +547,9 @@ class ActivationViewSet(
             request.query_params.get("force", "false"),
         )
 
-        if (
-            settings.DEPLOYMENT_TYPE == "podman"
-            and activation.status == ActivationStatus.WORKERS_OFFLINE
-            and not force_restart
-        ):
-            # block the restart and return an error
-            raise api_exc.Conflict(
-                "An activation with an activation_status of 'Workers offline' "
-                "cannot be Restarted because this will leave an orphaned "
-                "container running on one of the 'activation-worker-node's. "
-                "If you want to force a restart, please add the "
-                "/?force=true query param."
-            )
+        self._check_workers_offline_with_force(
+            activation, force_restart, "Restarted"
+        )
         if not activation.is_enabled:
             raise api_exc.Forbidden(
                 detail="Activation is disabled and cannot be run."
@@ -620,6 +641,34 @@ class ActivationViewSet(
         if activation.status == ActivationStatus.DELETING:
             raise exceptions.APIException(
                 detail="Object is being deleted", code=409
+            )
+
+    def _check_workers_offline_with_force(
+        self, activation, force_flag, operation_name
+    ):
+        """
+        Check if activation is in WORKERS_OFFLINE status and handle force flag.
+
+        Args:
+            activation: The activation object to check
+            force_flag: Boolean indicating if force operation is requested
+            operation_name: String name of the operation
+                (e.g., "Restarted", "Disabled", "Deleted")
+
+        Raises:
+            api_exc.Conflict: If activation is WORKERS_OFFLINE and force flag
+                is False
+        """
+        if (
+            activation.status == ActivationStatus.WORKERS_OFFLINE
+            and not force_flag
+        ):
+            raise api_exc.Conflict(
+                f"An activation with an activation_status of "
+                f"'Workers offline' cannot be {operation_name} because this "
+                f"may leave an orphaned container running. "
+                f"If you want to force a {operation_name.lower()}, please "
+                f"add the /?force=true query param."
             )
 
 
