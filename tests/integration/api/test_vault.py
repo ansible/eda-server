@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import pytest
+import re
 
 from aap_eda.api.vault import (
     AnsibleVaultDecryptionFailed,
@@ -21,9 +22,8 @@ from aap_eda.api.vault import (
 )
 
 PASSWORD = "secret"
-RE_ERROR_MSG = (
-    r"! Decryption failed (no vault secrets were found that could decrypt)*"
-)
+CORE = r"Decryption failed \(no vault secrets were found that could decrypt\)"
+RE_ERROR_MSG = re.compile(CORE, re.IGNORECASE | re.DOTALL)
 label = "EDA"
 
 
