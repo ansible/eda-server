@@ -204,6 +204,7 @@ class EdaCredentialViewSet(
             setattr(eda_credential, key, value)
 
         with transaction.atomic():
+            eda_credential._request = request
             eda_credential.save()
             check_related_permissions(
                 request.user,
