@@ -169,9 +169,9 @@ def validate_inputs(
         else:
             if not isinstance(user_input, str) and not isinstance(user_input, bool):
                 msg = (
-                    f"Input fields must be a boolean or string value."
-                    f"\tOffending field: {field}"
-                    f"\tValue type provided: {type(user_input).__name__}"
+                    f"Input fields must have a boolean or string value. "
+                    f"The value provided in the '{field}' field is of " 
+                    f"type {type(user_input).__name__}."
                 )
 
                 errors[display_field] = [msg]
