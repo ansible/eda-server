@@ -87,7 +87,7 @@ systemctl --user enable --now podman.socket
 On Linux and macOS, Poetry can be installed with the official installer:
 
 ```shell
-curl -sSL https://install.python-poetry.org | python3.11 -
+curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 Alternatively, you can install it with manually with `pip` or `pipx`:
