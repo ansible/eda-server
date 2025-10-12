@@ -331,6 +331,12 @@ def test_validate_inputs(aap_credential_type):
                 "secret": False,
                 "default": True,
             },
+            {
+                "id": "port",
+                "label": "Port",
+                "type": "string",
+                "help_text": "Port number.",
+            },
         ],
         "required": ["host"],
     }
@@ -381,6 +387,12 @@ def test_validate_inputs(aap_credential_type):
     errors = validate_inputs(aap_credential_type, schema, bad_choices_inputs)
     assert [*errors.values()][0][0].startswith("Must be one of the choices")
 
+    bad_string_inputs = {
+        "host": "localhost",
+        "port": 400,
+    }
+    errors = validate_inputs(aap_credential_type, schema, bad_string_inputs)
+    assert [*errors.values()][0][0].startswith("Input fields must have a boolean or string value")
 
 def test_validate_injectors():
     inputs = {
