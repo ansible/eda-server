@@ -69,3 +69,13 @@ jobs:
         uses: ./.github/actions/test
         with:
           python-version: ${{ matrix.python-version }}
+
+      # Upload coverage artifact for SonarCloud (only from Python 3.12)
+      - name: Upload coverage artifact
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.xml
+            eda-server-test-results.xml
