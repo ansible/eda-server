@@ -48,7 +48,7 @@ AVAILABLE_ALGORITHMS = sorted(hashlib.algorithms_available)
 AUTH_TYPE_LABEL = "Event Stream Authentication Type"
 SIGNATURE_ENCODING_LABEL = "Signature Encoding"
 HTTP_HEADER_LABEL = "HTTP Header Key"
-DEPRECATED_CREDENTIAL_KINDS = ["mtls"]
+DEPRECATED_CREDENTIAL_KINDS = []
 LABEL_PATH_TO_AUTH = "Path to Auth"
 LABEL_CLIENT_CERTIFICATE = "Client Certificate"
 LABEL_CLIENT_SECRET = "Client Secret"
@@ -1762,6 +1762,55 @@ GITHUB_APP_INPUTS = {
     "required": ["app_or_client_id", "install_id", "private_rsa_key"],
 }
 
+EVENT_STREAM_MTLS_INPUTS = {
+    "fields": [
+        {
+            "id": "auth_type",
+            "label": AUTH_TYPE_LABEL,
+            "type": "string",
+            "default": "mtls",
+            "hidden": True,
+        },
+        {
+            "id": "certificate",
+            "label": "Certificate",
+            "type": "string",
+            "multiline": True,
+            "format": "pem_certificate",
+            "help_text": (
+                "The Certificate collection in PEM format. You can have "
+                "multiple certificates in this field separated by "
+                "-----BEGIN CERTIFICATE----- "
+                "and ending in -----END CERTIFICATE-----"
+                "If a certificate is provided it will be transferred "
+                "to the Gateway, otherwise its assumed that the Gateway "
+                "already has the CA certificates in place to validate "
+                "the incoming client certificate."
+            ),
+        },
+        {
+            "id": "subject",
+            "label": "Certificate Subject",
+            "type": "string",
+            "help_text": (
+                "The Subject from Certificate compliant with RFC 2253."
+                "This is optional and can be used to check the subject "
+                "defined in the certificate. It can contains regular "
+                "expression to match indivisual attributes in the subject "
+                "name. E.g., CN=[agent1,agent2].example.com,ST=[NJ|NY]"
+            ),
+        },
+        {
+            "id": "http_header_key",
+            "label": HTTP_HEADER_LABEL,
+            "type": "string",
+            "default": "Subject",
+            "hidden": True,
+        },
+    ],
+    "required": ["auth_type", "http_header_key"],
+}
+
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
@@ -2044,6 +2093,21 @@ CREDENTIAL_TYPES = [
         "kind": "external",
         "injectors": {},
         "managed": True,
+    },
+    {
+        "name": enums.EventStreamCredentialType.MTLS,
+        "namespace": "event_stream",
+        "kind": "mtls",
+        "inputs": EVENT_STREAM_MTLS_INPUTS,
+        "injectors": {},
+        "managed": True,
+        "description": (
+            "Credential for Event Streams that use mutual TLS. "
+            "If CA Certificates are defined in the UI it will "
+            "be transferred to the Gateway proxy for validation "
+            "of incoming requests. We can optionally validate the "
+            "Subject defined in the inbound Certificate."
+        ),
     },
 ]
 

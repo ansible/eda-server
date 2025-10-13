@@ -55,3 +55,11 @@ class CredentialPluginError(Exception):
 
 class UnknownPluginTypeError(Exception):
     pass
+
+
+class GatewayAPIError(Exception):
+    pass
+
+
+class MissingCredentials(Exception):
+    pass
