@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidKeyError(Exception):
-    ...
+    pass
 
 
 class InvalidValueError(Exception):
-    ...
+    pass
 
 
 @dataclass

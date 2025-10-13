@@ -204,9 +204,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             instance.save(update_fields=["updated_at"])
 
             activation = instance.get_parent()
-            activation.ruleset_stats[
-                message.stats["ruleSetName"]
-            ] = message.stats
+            activation.ruleset_stats[message.stats["ruleSetName"]] = (
+                message.stats
+            )
             activation.save(update_fields=["ruleset_stats"])
         else:
             logger.warning(

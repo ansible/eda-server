@@ -435,9 +435,12 @@ def setup_queue_health():
             "aap_eda.tasks.orchestrator.settings", settings_mock
         ),
     }
-    with patches["get_queue"], patches["datetime"], patches[
-        "timedelta"
-    ], patches["settings"]:
+    with (
+        patches["get_queue"],
+        patches["datetime"],
+        patches["timedelta"],
+        patches["settings"],
+    ):
         yield (
             queue_name,
             queue_mock,
@@ -509,13 +512,17 @@ def test_manage_monitor_called_with_no_requests(
     mock_requests_queue.peek_all.return_value = []
     manager_mock = mock.Mock()
 
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.ActivationManager"
-    ) as mock_manager, mock.patch(
-        "aap_eda.tasks.orchestrator.assign_request_id"
-    ) as mock_assign_req, mock.patch(
-        "aap_eda.tasks.orchestrator.assign_log_tracking_id"
-    ) as mock_assign_log:
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.assign_request_id"
+        ) as mock_assign_req,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.assign_log_tracking_id"
+        ) as mock_assign_log,
+    ):
         mock_manager.return_value = manager_mock
         _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
 

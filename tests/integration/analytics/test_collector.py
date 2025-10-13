@@ -105,11 +105,15 @@ def test_shipping_disabled_logs_warning(
     insights_tracking_state,
     expected,
 ):
-    with patch(
-        "aap_eda.analytics.utils.get_insights_tracking_state",
-        return_value=insights_tracking_state,
-    ), patch(
-        "aap_eda.analytics.collector.features.ANALYTICS", feature_flag_state
+    with (
+        patch(
+            "aap_eda.analytics.utils.get_insights_tracking_state",
+            return_value=insights_tracking_state,
+        ),
+        patch(
+            "aap_eda.analytics.collector.features.ANALYTICS",
+            feature_flag_state,
+        ),
     ):
         assert collector._is_shipping_configured() is expected
 

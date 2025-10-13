@@ -43,13 +43,19 @@ def generate_query_params(serializer: Serializer) -> list[OpenApiParameter]:
                     type=(
                         OpenApiTypes.STR
                         if isinstance(field, models.CharField)
-                        else OpenApiTypes.NUMBER
-                        if isinstance(field, models.IntegerField)
-                        else OpenApiTypes.DATETIME
-                        if isinstance(field, models.DateField)
-                        else OpenApiTypes.BOOL
-                        if isinstance(field, models.BooleanField)
-                        else OpenApiTypes.STR
+                        else (
+                            OpenApiTypes.NUMBER
+                            if isinstance(field, models.IntegerField)
+                            else (
+                                OpenApiTypes.DATETIME
+                                if isinstance(field, models.DateField)
+                                else (
+                                    OpenApiTypes.BOOL
+                                    if isinstance(field, models.BooleanField)
+                                    else OpenApiTypes.STR
+                                )
+                            )
+                        )
                     ),
                 )
             )

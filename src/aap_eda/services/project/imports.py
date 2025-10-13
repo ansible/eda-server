@@ -55,7 +55,7 @@ class MalformedError(Exception):
 
 
 def _project_import_wrapper(
-    func: Callable[[ProjectImportService, models.Project], None]
+    func: Callable[[ProjectImportService, models.Project], None],
 ):
     @wraps(func)
     def wrapper(self: ProjectImportService, project: models.Project):

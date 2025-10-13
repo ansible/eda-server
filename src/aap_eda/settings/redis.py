@@ -70,9 +70,9 @@ def rq_redis_client_instantiation_parameters():
         params["socket_keepalive"] = settings.MQ_SOCKET_KEEP_ALIVE
         params["socket_connect_timeout"] = settings.MQ_SOCKET_CONNECT_TIMEOUT
         params["socket_timeout"] = settings.MQ_SOCKET_TIMEOUT
-        params[
-            "cluster_error_retry_attempts"
-        ] = settings.MQ_CLUSTER_ERROR_RETRY_ATTEMPTS
+        params["cluster_error_retry_attempts"] = (
+            settings.MQ_CLUSTER_ERROR_RETRY_ATTEMPTS
+        )
 
         from redis.backoff import ConstantBackoff
         from redis.retry import Retry

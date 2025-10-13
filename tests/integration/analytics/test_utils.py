@@ -61,15 +61,12 @@ def basic_request():
 
 @pytest.fixture
 def mock_oidc_config():
-    with mock.patch(
-        "aap_eda.analytics.utils.get_oidc_token_url"
-    ) as mock_url, mock.patch(
-        "aap_eda.analytics.utils.get_client_id"
-    ) as mock_id, mock.patch(
-        "aap_eda.analytics.utils.get_client_secret"
-    ) as mock_secret, mock.patch(
-        "aap_eda.analytics.utils.get_cert_path"
-    ) as mock_cert:
+    with (
+        mock.patch("aap_eda.analytics.utils.get_oidc_token_url") as mock_url,
+        mock.patch("aap_eda.analytics.utils.get_client_id") as mock_id,
+        mock.patch("aap_eda.analytics.utils.get_client_secret") as mock_secret,
+        mock.patch("aap_eda.analytics.utils.get_cert_path") as mock_cert,
+    ):
         mock_url.return_value = "https://oidc.example.com/token"
         mock_id.return_value = "test_client"
         mock_secret.return_value = "test_secret"
@@ -244,14 +241,16 @@ def test_yaml_error_handling():
     oauth_token: [invalid yaml
     """
 
-    with mock.patch(
-        "aap_eda.analytics.utils.models.CredentialType.objects.get"
-    ), mock.patch(
-        "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
-        return_value=[mock_credential],
-    ), mock.patch(
-        "aap_eda.analytics.utils.logger.error"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.models.CredentialType.objects.get"
+        ),
+        mock.patch(
+            "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
+            return_value=[mock_credential],
+        ),
+        mock.patch("aap_eda.analytics.utils.logger.error") as mock_logger,
+    ):
         result = collect_controllers_info()
         assert result == {}
         args, _ = mock_logger.call_args
@@ -278,14 +277,16 @@ def test_key_error_handling(error_input, error_msg):
     mock_credential.id = 1
     mock_credential.inputs.get_secret_value.return_value = error_input
 
-    with mock.patch(
-        "aap_eda.analytics.utils.models.CredentialType.objects.get"
-    ), mock.patch(
-        "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
-        return_value=[mock_credential],
-    ), mock.patch(
-        "aap_eda.analytics.utils.logger.error"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.models.CredentialType.objects.get"
+        ),
+        mock.patch(
+            "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
+            return_value=[mock_credential],
+        ),
+        mock.patch("aap_eda.analytics.utils.logger.error") as mock_logger,
+    ):
         result = collect_controllers_info()
         assert result == {}
         if error_msg.startswith("Unexpected error"):
@@ -313,16 +314,21 @@ def test_request_exceptions(exception_cls, log_level):
         }
     )
 
-    with mock.patch(
-        "aap_eda.analytics.utils.models.CredentialType.objects.get"
-    ), mock.patch(
-        "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
-        return_value=[mock_credential],
-    ), mock.patch(
-        "aap_eda.analytics.utils.requests.get", side_effect=exception_cls
-    ), mock.patch(
-        f"aap_eda.analytics.utils.logger.{log_level}"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.models.CredentialType.objects.get"
+        ),
+        mock.patch(
+            "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
+            return_value=[mock_credential],
+        ),
+        mock.patch(
+            "aap_eda.analytics.utils.requests.get", side_effect=exception_cls
+        ),
+        mock.patch(
+            f"aap_eda.analytics.utils.logger.{log_level}"
+        ) as mock_logger,
+    ):
         result = collect_controllers_info()
         assert result == {}
         if log_level == "warning":
@@ -358,16 +364,17 @@ def test_mixed_success_and_failure():
         }
     )
 
-    with mock.patch(
-        "aap_eda.analytics.utils.models.CredentialType.objects.get"
-    ), mock.patch(
-        "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
-        return_value=[good_cred, bad_cred],
-    ), mock.patch(
-        "aap_eda.analytics.utils.requests.get"
-    ) as mock_get, mock.patch(
-        "aap_eda.analytics.utils.logger.error"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.models.CredentialType.objects.get"
+        ),
+        mock.patch(
+            "aap_eda.analytics.utils.models.EdaCredential.objects.filter",
+            return_value=[good_cred, bad_cred],
+        ),
+        mock.patch("aap_eda.analytics.utils.requests.get") as mock_get,
+        mock.patch("aap_eda.analytics.utils.logger.error") as mock_logger,
+    ):
         mock_response = mock.MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"install_uuid": "good_uuid"}
@@ -430,12 +437,14 @@ def test_generate_token_success(mock_oidc_config):
 
 
 def test_missing_oidc_configuration():
-    with mock.patch(
-        "aap_eda.analytics.utils.get_oidc_token_url", return_value=None
-    ), mock.patch(
-        "aap_eda.analytics.utils.get_client_id", return_value=None
-    ), mock.patch(
-        "aap_eda.analytics.utils.get_client_secret", return_value=None
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.get_oidc_token_url", return_value=None
+        ),
+        mock.patch("aap_eda.analytics.utils.get_client_id", return_value=None),
+        mock.patch(
+            "aap_eda.analytics.utils.get_client_secret", return_value=None
+        ),
     ):
         with pytest.raises(ValueError) as exc_info:
             generate_token()
@@ -714,11 +723,12 @@ def test_validate_credential_with_existing_credentials():
 
 @pytest.mark.django_db
 def test_validate_credential_with_settings_credentials():
-    with mock.patch(
-        "aap_eda.analytics.utils._get_analytics_credentials"
-    ) as mock_creds, mock.patch(
-        "aap_eda.analytics.utils.settings"
-    ) as mock_settings:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils._get_analytics_credentials"
+        ) as mock_creds,
+        mock.patch("aap_eda.analytics.utils.settings") as mock_settings,
+    ):
         data = "pass"
         mock_creds.return_value.exists.return_value = False
         mock_settings.REDHAT_USERNAME = "user"
@@ -743,15 +753,16 @@ def test_validate_credential_error_handling():
         SUBSCRIPTIONS_PASSWORD=None,
     )
 
-    with mock.patch(
-        "aap_eda.analytics.utils._get_analytics_credentials"
-    ) as mock_creds, mock.patch(
-        "aap_eda.analytics.utils.settings", mock_django_settings
-    ), mock.patch(
-        "aap_eda.analytics.utils.application_settings", mock_app_settings
-    ), mock.patch(
-        "aap_eda.analytics.utils.logger.error"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils._get_analytics_credentials"
+        ) as mock_creds,
+        mock.patch("aap_eda.analytics.utils.settings", mock_django_settings),
+        mock.patch(
+            "aap_eda.analytics.utils.application_settings", mock_app_settings
+        ),
+        mock.patch("aap_eda.analytics.utils.logger.error") as mock_logger,
+    ):
         mock_creds.return_value.exists.return_value = False
 
         with pytest.raises(MissingUserPasswordError) as exc_info:
@@ -771,13 +782,18 @@ def test_get_analytics_credentials():
     mock_credential = mock.MagicMock(spec=models.EdaCredential)
     mock_credential.credential_type = mock_cred_type
 
-    with mock.patch(
-        "aap_eda.analytics.utils.get_auth_mode", return_value="test_auth_mode"
-    ), mock.patch.object(
-        models.CredentialType.objects, "filter"
-    ) as mock_type_filter, mock.patch.object(
-        models.EdaCredential.objects, "filter"
-    ) as mock_cred_filter:
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.get_auth_mode",
+            return_value="test_auth_mode",
+        ),
+        mock.patch.object(
+            models.CredentialType.objects, "filter"
+        ) as mock_type_filter,
+        mock.patch.object(
+            models.EdaCredential.objects, "filter"
+        ) as mock_cred_filter,
+    ):
         mock_type_filter.return_value = [mock_cred_type]
         mock_cred_filter.return_value = [mock_credential]
 

@@ -1272,11 +1272,12 @@ def test_singleton_credential_validation():
     mock_cred_type = MagicMock()
     mock_cred_type.name = enums.SINGLETON_CREDENTIAL_TYPES[0]
 
-    with patch.object(
-        models.CredentialType, "objects"
-    ) as mock_cred_type_manager, patch.object(
-        models.EdaCredential.objects, "filter"
-    ) as mock_filter:
+    with (
+        patch.object(
+            models.CredentialType, "objects"
+        ) as mock_cred_type_manager,
+        patch.object(models.EdaCredential.objects, "filter") as mock_filter,
+    ):
         mock_cred_type_manager.get.return_value = mock_cred_type
         mock_filter.return_value.exists.return_value = True
 
@@ -1300,11 +1301,12 @@ def test_non_singleton_credential_allows_multiple():
     mock_cred_type = MagicMock()
     mock_cred_type.name = "git_repo"
 
-    with patch.object(
-        models.CredentialType, "objects"
-    ) as mock_cred_type_manager, patch.object(
-        models.EdaCredential.objects, "filter"
-    ) as mock_filter:
+    with (
+        patch.object(
+            models.CredentialType, "objects"
+        ) as mock_cred_type_manager,
+        patch.object(models.EdaCredential.objects, "filter") as mock_filter,
+    ):
         mock_cred_type_manager.get.return_value = mock_cred_type
         mock_filter.return_value.exists.return_value = True
 

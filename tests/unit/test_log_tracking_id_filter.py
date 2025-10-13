@@ -29,11 +29,14 @@ def mock_record():
 
 
 def test_filter_with_values(log_filter, mock_record):
-    with mock.patch(
-        "aap_eda.utils.log_tracking_id_filter.get_log_tracking_id"
-    ) as mock_tracking, mock.patch(
-        "aap_eda.utils.log_tracking_id_filter.get_request_id"
-    ) as mock_request:
+    with (
+        mock.patch(
+            "aap_eda.utils.log_tracking_id_filter.get_log_tracking_id"
+        ) as mock_tracking,
+        mock.patch(
+            "aap_eda.utils.log_tracking_id_filter.get_request_id"
+        ) as mock_request,
+    ):
         mock_tracking.return_value = "test_tracking_id"
         mock_request.return_value = "test_request_id"
 

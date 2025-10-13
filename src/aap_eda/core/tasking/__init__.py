@@ -1,4 +1,5 @@
 """Tools for running background tasks."""
+
 from __future__ import annotations
 
 import functools
@@ -277,12 +278,10 @@ enable_redis_prefix()
 
 class SerializerProtocol(typing.Protocol):
     @staticmethod
-    def dumps(obj: typing.Any) -> bytes:
-        ...
+    def dumps(obj: typing.Any) -> bytes: ...
 
     @staticmethod
-    def loads(data: bytes) -> typing.Any:
-        ...
+    def loads(data: bytes) -> typing.Any: ...
 
 
 class Queue(django_rq.queues.Queue):

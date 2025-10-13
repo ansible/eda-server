@@ -392,7 +392,10 @@ def test_validate_inputs(aap_credential_type):
         "port": 400,
     }
     errors = validate_inputs(aap_credential_type, schema, bad_string_inputs)
-    assert [*errors.values()][0][0].startswith("Input fields must have a boolean or string value")
+    assert [*errors.values()][0][0].startswith(
+        "Input fields must have a boolean or string value"
+    )
+
 
 def test_validate_injectors():
     inputs = {

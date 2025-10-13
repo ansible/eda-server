@@ -531,12 +531,12 @@ class ActivationCreateSerializer(
             )
 
         if vault_data.password_used:
-            validated_data[
-                "eda_system_vault_credential"
-            ] = _create_system_eda_credential(
-                vault_data.password,
-                _get_vault_credential_type(),
-                validated_data.get("organization_id"),
+            validated_data["eda_system_vault_credential"] = (
+                _create_system_eda_credential(
+                    vault_data.password,
+                    _get_vault_credential_type(),
+                    validated_data.get("organization_id"),
+                )
             )
 
         return super().create(validated_data)
@@ -580,12 +580,12 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             inputs = yaml.safe_load(
                 activation.eda_system_vault_credential.inputs.get_secret_value()  # noqa E501
             )
-            copied_data[
-                "eda_system_vault_credential"
-            ] = _create_system_eda_credential(
-                inputs["vault_password"],
-                _get_vault_credential_type(),
-                activation.organization.id,
+            copied_data["eda_system_vault_credential"] = (
+                _create_system_eda_credential(
+                    inputs["vault_password"],
+                    _get_vault_credential_type(),
+                    activation.organization.id,
+                )
             )
 
         return super().create(copied_data)
@@ -701,9 +701,9 @@ class ActivationUpdateSerializer(
         if yaml.safe_load(self.validated_data.get("source_mappings", "")):
             if not rulebook_id:
                 # load the original ruleset
-                self.validated_data[
-                    "rulebook_rulesets"
-                ] = activation.rulebook.rulesets
+                self.validated_data["rulebook_rulesets"] = (
+                    activation.rulebook.rulesets
+                )
 
             _update_event_streams_and_credential(self.validated_data)
         else:
@@ -718,14 +718,14 @@ class ActivationUpdateSerializer(
             )
 
         if vault_data.password_used and not system_vault_credential:
-            self.validated_data[
-                "eda_system_vault_credential"
-            ] = _create_system_eda_credential(
-                vault_data.password,
-                _get_vault_credential_type(),
-                self.validated_data.get(
-                    "organization_id", activation.organization.id
-                ),
+            self.validated_data["eda_system_vault_credential"] = (
+                _create_system_eda_credential(
+                    vault_data.password,
+                    _get_vault_credential_type(),
+                    self.validated_data.get(
+                        "organization_id", activation.organization.id
+                    ),
+                )
             )
 
     def update(

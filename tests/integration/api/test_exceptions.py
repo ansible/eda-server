@@ -33,9 +33,10 @@ def test_trigger_fallback_handler():
     exc = ValueError("Test error")
     context = {"view": mock.MagicMock()}
 
-    with mock.patch(
-        "rest_framework.views.exception_handler"
-    ) as mock_handler, mock.patch.dict(settings.__dict__, {"DEBUG": False}):
+    with (
+        mock.patch("rest_framework.views.exception_handler") as mock_handler,
+        mock.patch.dict(settings.__dict__, {"DEBUG": False}),
+    ):
         mock_handler.return_value = None
         log_mock = mock.Mock()
 

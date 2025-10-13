@@ -49,15 +49,19 @@ def test_gather_analytics_invalid_settings(
     tracking_state,
     expected,
 ):
-    with mock.patch(
-        "aap_eda.analytics.utils.get_insights_tracking_state",
-        return_value=tracking_state,
-    ), mock.patch(
-        "aap_eda.analytics.utils.get_analytics_url",
-        return_value=analytics_url,
-    ), mock.patch(
-        "aap_eda.analytics.collector.application_settings",
-        new=analytics_settings,
+    with (
+        mock.patch(
+            "aap_eda.analytics.utils.get_insights_tracking_state",
+            return_value=tracking_state,
+        ),
+        mock.patch(
+            "aap_eda.analytics.utils.get_analytics_url",
+            return_value=analytics_url,
+        ),
+        mock.patch(
+            "aap_eda.analytics.collector.application_settings",
+            new=analytics_settings,
+        ),
     ):
         analytics_settings.AUTOMATION_ANALYTICS_URL = analytics_url
 
@@ -172,12 +176,18 @@ def test_gather_analytics_command(
 def test_gather_analytics_command_by_ff_state(
     analytics_settings, caplog_factory, feature_flag_state, expected
 ):
-    with mock.patch(
-        "aap_eda.analytics.collector.application_settings",
-        new=analytics_settings,
-    ), mock.patch(
-        "aap_eda.core.management.commands.gather_analytics.features.ANALYTICS",
-        feature_flag_state,
+    with (
+        mock.patch(
+            "aap_eda.analytics.collector.application_settings",
+            new=analytics_settings,
+        ),
+        mock.patch(
+            (
+                "aap_eda.core.management.commands"
+                ".gather_analytics.features.ANALYTICS"
+            ),
+            feature_flag_state,
+        ),
     ):
         analytics_settings.INSIGHTS_TRACKING_STATE = True
         out = StringIO()

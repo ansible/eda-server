@@ -34,11 +34,12 @@ def analytics_settings():
 
 
 def test_auto_gather_analytics():
-    with mock.patch(
-        "aap_eda.tasks.analytics.gather_analytics"
-    ) as mock_gather, mock.patch(
-        "aap_eda.tasks.analytics.schedule_gather_analytics"
-    ) as mock_schdule:
+    with (
+        mock.patch("aap_eda.tasks.analytics.gather_analytics") as mock_gather,
+        mock.patch(
+            "aap_eda.tasks.analytics.schedule_gather_analytics"
+        ) as mock_schdule,
+    ):
         analytics.auto_gather_analytics()
         mock_gather.assert_called_once()
         mock_schdule.assert_called_once()
@@ -49,14 +50,15 @@ def test_schedule_gather_analytics_success():
     test_interval = 3600
     test_queue = "test_queue"
 
-    with mock.patch(
-        "aap_eda.tasks.analytics.utils.get_analytics_interval"
-    ) as mock_interval, mock.patch(
-        "aap_eda.tasks.analytics.tasking.enqueue_delay"
-    ) as mock_enqueue, mock.patch(
-        "aap_eda.tasks.analytics.logger.info"
-    ) as mock_logger, mock.patch(
-        "aap_eda.tasks.analytics.features.ANALYTICS", True
+    with (
+        mock.patch(
+            "aap_eda.tasks.analytics.utils.get_analytics_interval"
+        ) as mock_interval,
+        mock.patch(
+            "aap_eda.tasks.analytics.tasking.enqueue_delay"
+        ) as mock_enqueue,
+        mock.patch("aap_eda.tasks.analytics.logger.info") as mock_logger,
+        mock.patch("aap_eda.tasks.analytics.features.ANALYTICS", True),
     ):
         mock_interval.return_value = test_interval
 
@@ -76,12 +78,14 @@ def test_schedule_gather_analytics_success():
 
 @pytest.mark.django_db
 def test_schedule_gather_analytics_with_default_queue():
-    with mock.patch(
-        "aap_eda.tasks.analytics.utils.get_analytics_interval"
-    ) as mock_interval, mock.patch(
-        "aap_eda.tasks.analytics.tasking.enqueue_delay"
-    ) as mock_enqueue, mock.patch(
-        "aap_eda.tasks.analytics.features.ANALYTICS", True
+    with (
+        mock.patch(
+            "aap_eda.tasks.analytics.utils.get_analytics_interval"
+        ) as mock_interval,
+        mock.patch(
+            "aap_eda.tasks.analytics.tasking.enqueue_delay"
+        ) as mock_enqueue,
+        mock.patch("aap_eda.tasks.analytics.features.ANALYTICS", True),
     ):
         mock_interval.return_value = 300
         analytics.schedule_gather_analytics()
@@ -96,13 +100,15 @@ def test_schedule_gather_analytics_with_default_queue():
 
 @pytest.mark.django_db
 def test_schedule_gather_analytics_error_handling():
-    with mock.patch(
-        "aap_eda.tasks.analytics.utils.get_analytics_interval",
-        return_value=5,
-    ), mock.patch(
-        "aap_eda.tasks.analytics.tasking.enqueue_delay"
-    ) as mock_enqueue, mock.patch(
-        "aap_eda.tasks.analytics.features.ANALYTICS", True
+    with (
+        mock.patch(
+            "aap_eda.tasks.analytics.utils.get_analytics_interval",
+            return_value=5,
+        ),
+        mock.patch(
+            "aap_eda.tasks.analytics.tasking.enqueue_delay"
+        ) as mock_enqueue,
+        mock.patch("aap_eda.tasks.analytics.features.ANALYTICS", True),
     ):
         mock_enqueue.side_effect = RuntimeError("Queue connection failed")
 
@@ -114,14 +120,17 @@ def test_schedule_gather_analytics_error_handling():
 
 @pytest.mark.django_db
 def test_reschedule_gather_analytics():
-    with mock.patch(
-        "aap_eda.tasks.analytics.utils.get_analytics_interval"
-    ) as mock_interval, mock.patch(
-        "aap_eda.tasks.analytics.tasking.enqueue_delay"
-    ) as mock_enqueue, mock.patch(
-        "aap_eda.tasks.analytics.tasking.queue_cancel_job"
-    ) as mock_cancel_job, mock.patch(
-        "aap_eda.tasks.analytics.features.ANALYTICS", True
+    with (
+        mock.patch(
+            "aap_eda.tasks.analytics.utils.get_analytics_interval"
+        ) as mock_interval,
+        mock.patch(
+            "aap_eda.tasks.analytics.tasking.enqueue_delay"
+        ) as mock_enqueue,
+        mock.patch(
+            "aap_eda.tasks.analytics.tasking.queue_cancel_job"
+        ) as mock_cancel_job,
+        mock.patch("aap_eda.tasks.analytics.features.ANALYTICS", True),
     ):
         mock_interval.return_value = 300
         analytics.reschedule_gather_analytics()
@@ -147,13 +156,13 @@ def test_reschedule_gather_analytics():
     ids=["tracking_enabled", "tracking_disabled"],
 )
 def test_gather_analytics(tracking_state, expected_logs):
-    with mock.patch(
-        "aap_eda.tasks.analytics.utils.get_insights_tracking_state"
-    ) as mock_tracking, mock.patch(
-        "aap_eda.tasks.analytics.collector.gather"
-    ) as mock_gather, mock.patch(
-        "aap_eda.tasks.analytics.logger.info"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.tasks.analytics.utils.get_insights_tracking_state"
+        ) as mock_tracking,
+        mock.patch("aap_eda.tasks.analytics.collector.gather") as mock_gather,
+        mock.patch("aap_eda.tasks.analytics.logger.info") as mock_logger,
+    ):
         mock_tracking.return_value = tracking_state
         mock_gather.return_value = (
             ["file1.tgz", "file2.tgz"] if tracking_state else []
@@ -166,13 +175,15 @@ def test_gather_analytics(tracking_state, expected_logs):
 
 
 def test_gather_analytics_no_files():
-    with mock.patch(
-        "aap_eda.tasks.analytics.utils.get_insights_tracking_state",
-        return_value=True,
-    ), mock.patch(
-        "aap_eda.tasks.analytics.collector.gather", return_value=[]
-    ), mock.patch(
-        "aap_eda.tasks.analytics.logger.info"
-    ) as mock_logger:
+    with (
+        mock.patch(
+            "aap_eda.tasks.analytics.utils.get_insights_tracking_state",
+            return_value=True,
+        ),
+        mock.patch(
+            "aap_eda.tasks.analytics.collector.gather", return_value=[]
+        ),
+        mock.patch("aap_eda.tasks.analytics.logger.info") as mock_logger,
+    ):
         analytics._gather_analytics()
         mock_logger.assert_any_call("No analytics collected")

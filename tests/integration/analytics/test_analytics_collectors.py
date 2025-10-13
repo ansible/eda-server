@@ -514,12 +514,15 @@ def test_empty_audit_event_returns_empty():
     mock_audit_event_query = MagicMock(spec=QuerySet)
     mock_audit_event_query.values.return_value.exists.return_value = False
 
-    with patch(
-        "aap_eda.analytics.analytics_collectors._get_audit_action_qs",
-        return_value=MagicMock(exists=lambda: True),
-    ), patch(
-        "aap_eda.analytics.analytics_collectors._get_audit_event_query",
-        return_value=mock_audit_event_query,
+    with (
+        patch(
+            "aap_eda.analytics.analytics_collectors._get_audit_action_qs",
+            return_value=MagicMock(exists=lambda: True),
+        ),
+        patch(
+            "aap_eda.analytics.analytics_collectors._get_audit_event_query",
+            return_value=mock_audit_event_query,
+        ),
     ):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = collectors.audit_events_table(

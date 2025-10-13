@@ -60,9 +60,14 @@ def test_status_view_redis_failure():
 def test_status_view_both_failures():
     client = APIClient()
     client.force_authenticate(user=None)
-    with patch(
-        "aap_eda.core.views.StatusView._check_database", return_value=False
-    ), patch("aap_eda.core.views.StatusView._check_redis", return_value=False):
+    with (
+        patch(
+            "aap_eda.core.views.StatusView._check_database", return_value=False
+        ),
+        patch(
+            "aap_eda.core.views.StatusView._check_redis", return_value=False
+        ),
+    ):
         response = client.get(f"{api_url_v1}/status/")
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.data == {

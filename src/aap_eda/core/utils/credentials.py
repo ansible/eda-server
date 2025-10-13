@@ -167,10 +167,12 @@ def validate_inputs(
                 errors[display_field] = ["Cannot be blank"]
                 continue
         else:
-            if not isinstance(user_input, str) and not isinstance(user_input, bool):
+            if not isinstance(user_input, str) and not isinstance(
+                user_input, bool
+            ):
                 msg = (
                     f"Input fields must have a boolean or string value. "
-                    f"The value provided in the '{field}' field is of " 
+                    f"The value provided in the '{field}' field is of "
                     f"type {type(user_input).__name__}."
                 )
 
