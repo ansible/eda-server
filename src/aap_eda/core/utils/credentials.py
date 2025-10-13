@@ -15,11 +15,16 @@
 import re
 import tempfile
 import typing
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 import gnupg
 import jinja2
 import validators
 import yaml
+from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.x509.oid import NameOID
 from django.core.exceptions import ValidationError
 from django.forms import model_to_dict
 from django.utils.translation import gettext_lazy as _
@@ -211,6 +216,16 @@ def validate_inputs(
             result = _validate_gpg_public_key(user_input)
             if bool(result):
                 errors[display_field] = result
+
+        # Special validation for mTLS certificate and subject
+        if credential_type.name == enums.EventStreamCredentialType.MTLS:
+            # Also validate subject format if provided
+            if field == "subject" and user_input:
+                subject_errors = _validate_certificate_subject_format(
+                    user_input
+                )
+                if bool(subject_errors):
+                    errors["inputs.subject"] = subject_errors
 
         if data.get("type") == "boolean":
             if user_input and not isinstance(user_input, bool):
@@ -457,6 +472,9 @@ def _validate_format(
     elif data_type == "ssh_private_key":
         return _validate_ssh_key(schema, data, inputs)
 
+    elif data_type == "pem_certificate":
+        return _validate_pem_certificate(data)
+
     return errors
 
 
@@ -557,7 +575,7 @@ def _validate_file_template_key(key: str, key_names: list[str]) -> None:
                 )
 
 
-def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
+def check_reserved_keys_in_extra_vars(data: dict[str, Any]) -> None:
     for key in data.keys():
         if key in RESERVED_EXTRA_VAR_KEYS:
             raise ValidationError(
@@ -570,6 +588,40 @@ def check_reserved_keys_in_extra_vars(data: dict[str, any]) -> None:
                     "reserved": ", ".join(sorted((RESERVED_EXTRA_VAR_KEYS))),
                 }
             )
+
+
+def _validate_pem_certificate(cert_data: str) -> list[str]:
+    """Validate PEM certificate format and content.
+
+    Args:
+        cert_data: Certificate data in PEM format
+
+    Returns:
+        List of error messages, empty if valid
+    """
+    errors = []
+
+    if not cert_data or not cert_data.strip():
+        errors.append("Certificate data cannot be empty")
+        return errors
+
+    certs = []
+    try:
+        # Try to load as single certificate first
+        certs = x509.load_pem_x509_certificates(cert_data.encode("utf-8"))
+    except (ValueError, UnsupportedAlgorithm) as e:
+        errors.append(f"Invalid PEM certificate format: {str(e)}")
+
+    # Validate certificate is not expired
+    for cert in certs:
+        now = datetime.now(timezone.utc)
+
+        if now > cert.not_valid_after_utc:
+            errors.append(
+                f"Certificate has expired: {cert.not_valid_after_utc}"
+            )
+
+    return errors
 
 
 def build_copy_post_data(
@@ -600,7 +652,7 @@ def build_copy_post_data(
     return post_data
 
 
-def _add_file_template_keys(context: dict, files: dict):
+def _add_file_template_keys(context: dict, files: dict) -> None:
     for key in files.keys():
         parts = key.split(".")
         # case key == "template"
@@ -644,3 +696,242 @@ def get_resolved_secrets(obj: "models.EdaCredential") -> dict:
     for key, value in external_secrets.items():
         result[key] = value
     return result
+
+
+# X.509 Subject Matching Functions
+
+
+def _validate_certificate_subject_format(subject_string: str) -> list[str]:
+    """Validate certificate subject format using X.509 standard parsing.
+
+    Args:
+        subject_string: Subject DN string (example: "CN=example.com,O=Test")
+
+    Returns:
+        List of error messages, empty if valid
+    """
+    if not subject_string or not subject_string.strip():
+        return []  # Empty subject is allowed
+
+    errors = []
+
+    try:
+        # Normalize whitespace using shared logic
+        normalized_subject = _normalize_x509_dn_whitespace(subject_string)
+
+        # Parse using X.509 standard library
+        parsed_name = x509.Name.from_rfc4514_string(normalized_subject)
+
+        # Additional validations using parsed X.509 Name
+        errors.extend(_validate_x509_name_constraints(parsed_name))
+
+    except ValueError as e:
+        errors.append(f"Invalid X.509 DN format: {str(e) or subject_string}")
+    except Exception as e:
+        errors.append(f"Failed to parse subject DN: {str(e)}")
+
+    return errors
+
+
+def _validate_x509_name_constraints(parsed_name: Any) -> list[str]:
+    """Validate X.509 Name object constraints.
+
+    Args:
+        parsed_name: Parsed X.509 Name object
+
+    Returns:
+        List of error messages, empty if valid
+    """
+    errors = []
+
+    # Check for duplicate attributes (except DC which can be repeated)
+    attr_counts = {}
+    for attr in parsed_name:
+        oid_name = (
+            attr.oid._name if hasattr(attr.oid, "_name") else str(attr.oid)
+        )
+
+        # Allow multiple DC (Domain Component) attributes
+        if attr.oid == NameOID.DOMAIN_COMPONENT:
+            continue
+
+        attr_counts[oid_name] = attr_counts.get(oid_name, 0) + 1
+
+    duplicates = [name for name, count in attr_counts.items() if count > 1]
+    if duplicates:
+        errors.append(f"Duplicate attributes not allowed: {duplicates}")
+
+    # Validate country code length
+    for attr in parsed_name:
+        if attr.oid == NameOID.COUNTRY_NAME and len(attr.value) != 2:
+            errors.append(f"Country code must be 2 characters: '{attr.value}'")
+
+    return errors
+
+
+def validate_x509_subject_match(expected: str, actual: str) -> bool:
+    """Validate that actual X.509 subject matches expected subject pattern.
+
+    Uses X.509 standard-compliant DN parsing for attribute-level matching.
+    Supports regex patterns and is order-independent per X.509 standards.
+
+    Args:
+        expected: Expected subject pattern (may contain regex patterns)
+        actual: Actual subject from certificate
+
+    Returns:
+        bool: True if actual matches expected pattern, False otherwise
+    """
+    if not expected or not actual:
+        return False
+
+    # Normalize whitespace in DN strings
+    expected = _normalize_x509_dn_whitespace(expected)
+    actual = _normalize_x509_dn_whitespace(actual)
+
+    # Parse actual DN into X.509 Name object
+    try:
+        actual_name = x509.Name.from_rfc4514_string(actual)
+    except ValueError as e:
+        LOGGER.error(f"Invalid actual DN format: '{actual}': {e}")
+        return False
+
+    # Parse expected DN manually to handle regex patterns
+    expected_attrs = _parse_dn_with_regex_patterns(expected)
+    if not expected_attrs:
+        LOGGER.error(f"Failed to parse expected DN: '{expected}'")
+        return False
+
+    # Check each expected attribute against actual certificate
+    for attr_name, pattern_value in expected_attrs:
+        # Convert attribute name to OID
+        attr_oid = _get_oid_from_name(attr_name)
+        if not attr_oid:
+            LOGGER.error(f"Unknown attribute name: '{attr_name}'")
+            return False
+
+        actual_attrs = actual_name.get_attributes_for_oid(attr_oid)
+        if not actual_attrs:
+            LOGGER.error(
+                f"Required attribute {attr_name} not found in actual subject"
+            )
+            return False
+
+        # Check if any actual attribute matches the expected pattern
+        if not _match_regex_pattern_against_attrs(pattern_value, actual_attrs):
+            return False
+
+    return True
+
+
+def _normalize_x509_dn_whitespace(dn: str) -> str:
+    """Normalize whitespace in DN string components.
+
+    Args:
+        dn: Distinguished Name string
+
+    Returns:
+        str: DN with normalized whitespace
+    """
+    if not dn:
+        return dn
+
+    # Split by comma and normalize each component
+    components = []
+    for component in dn.split(","):
+        component = component.strip()
+        if "=" in component:
+            attr, value = component.split("=", 1)
+            attr = attr.strip()
+            value = value.strip()
+            components.append(f"{attr}={value}")
+        else:
+            components.append(component)
+
+    return ",".join(components)
+
+
+def _parse_dn_with_regex_patterns(dn: str) -> list[tuple[str, str]]:
+    """Parse DN string that may contain regex patterns in attribute values.
+
+    Args:
+        dn: Distinguished Name string with potential regex patterns
+
+    Returns:
+        List of (attribute_name, pattern_value) tuples
+    """
+    if not dn:
+        return []
+
+    attrs = []
+    # Split by comma, but be careful of commas inside quoted values
+    components = dn.split(",")
+
+    for component in components:
+        component = component.strip()
+        if "=" not in component:
+            continue
+
+        attr_name, value = component.split("=", 1)
+        attr_name = attr_name.strip().upper()
+        value = value.strip()
+
+        attrs.append((attr_name, value))
+
+    return attrs
+
+
+def _get_oid_from_name(attr_name: str) -> Optional[Any]:
+    """Convert attribute name to OID.
+
+    Args:
+        attr_name: Attribute name (e.g., 'CN', 'O', 'OU')
+
+    Returns:
+        OID object or None if unknown
+    """
+    name_to_oid = {
+        "CN": NameOID.COMMON_NAME,
+        "COMMONNAME": NameOID.COMMON_NAME,
+        "O": NameOID.ORGANIZATION_NAME,
+        "ORGANIZATIONNAME": NameOID.ORGANIZATION_NAME,
+        "OU": NameOID.ORGANIZATIONAL_UNIT_NAME,
+        "ORGANIZATIONALUNITNAME": NameOID.ORGANIZATIONAL_UNIT_NAME,
+        "C": NameOID.COUNTRY_NAME,
+        "COUNTRYNAME": NameOID.COUNTRY_NAME,
+        "L": NameOID.LOCALITY_NAME,
+        "LOCALITYNAME": NameOID.LOCALITY_NAME,
+        "ST": NameOID.STATE_OR_PROVINCE_NAME,
+        "STATEORPROVINCENAME": NameOID.STATE_OR_PROVINCE_NAME,
+        "STREET": NameOID.STREET_ADDRESS,
+        "STREETADDRESS": NameOID.STREET_ADDRESS,
+        "DC": NameOID.DOMAIN_COMPONENT,
+        "DOMAINCOMPONENT": NameOID.DOMAIN_COMPONENT,
+        "EMAIL": NameOID.EMAIL_ADDRESS,
+        "EMAILADDRESS": NameOID.EMAIL_ADDRESS,
+    }
+
+    return name_to_oid.get(attr_name.upper())
+
+
+def _match_regex_pattern_against_attrs(
+    pattern: str, actual_attrs: list[Any]
+) -> bool:
+    """Match regex pattern against list of actual attributes.
+
+    Args:
+        pattern: Regex pattern string
+        actual_attrs: List of actual X.509 attributes
+
+    Returns:
+        bool: True if pattern matches any actual attribute
+    """
+    try:
+        regex_pattern = f"^{pattern}$"
+        return any(
+            re.match(regex_pattern, attr.value, re.IGNORECASE)
+            for attr in actual_attrs
+        )
+    except re.error as e:
+        LOGGER.error(f"Invalid regex pattern '{pattern}': {e}")
+        return False

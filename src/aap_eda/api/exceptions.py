@@ -35,6 +35,8 @@ __all__ = (
     "Conflict",
     "Unprocessable",
     "PermissionDenied",
+    "GatewayAPIError",
+    "MissingCredentialsError",
     "api_fallback_handler",
 )
 
@@ -124,4 +126,21 @@ class ExternalSMSError(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     default_detail = (
         "External SMS Error: not able to fetch secrets from external SMS"
+    )
+
+
+class GatewayAPIError(APIException):
+    status_code = status.HTTP_502_BAD_GATEWAY
+    default_code = "gateway_api_error"
+    default_detail = _(
+        "Gateway API Error: Unable to communicate with the Gateway service"
+    )
+
+
+class MissingCredentialsError(APIException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "missing_credentials"
+    default_detail = _(
+        "Missing Credentials: Required credentials are not available "
+        "for Gateway operations"
     )
