@@ -4,6 +4,14 @@
 
 [![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ansible_eda-server)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=coverage)](https://sonarcloud.io/summary/overall?id=ansible_eda-server)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=vulnerabilities)](https://sonarcloud.io/project/issues?impactSoftwareQualities=SECURITY&issueStatuses=OPEN%2CCONFIRMED&id=ansible_eda-server)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=security_rating)](https://sonarcloud.io/component_measures?metric=security_rating&id=ansible_eda-server)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=bugs)](https://sonarcloud.io/component_measures?metric=bugs&view=list&id=ansible_eda-server)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=code_smells)](https://sonarcloud.io/component_measures?metric=new_code_smells&view=list&id=ansible_eda-server)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=sqale_rating)](https://sonarcloud.io/component_measures?id=ansible_eda-server&metric=sqale_rating&view=list)
+
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-blue)
 
