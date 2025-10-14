@@ -167,9 +167,20 @@ def validate_inputs(
                 errors[display_field] = ["Cannot be blank"]
                 continue
         else:
-            if required and len(user_input.strip()) == 0:
-                errors[display_field] = ["Cannot be blank"]
-                continue
+            if not isinstance(user_input, str) and not isinstance(
+                user_input, bool
+            ):
+                msg = (
+                    f"Input fields must have a boolean or string value. "
+                    f"The value provided in the '{field}' field is of "
+                    f"type {type(user_input).__name__}."
+                )
+
+                errors[display_field] = [msg]
+            else:
+                if required and len(user_input.strip()) == 0:
+                    errors[display_field] = ["Cannot be blank"]
+                    continue
 
         if data.get("format") and user_input:
             result = _validate_format(
