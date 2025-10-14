@@ -177,6 +177,7 @@ def validate_inputs(
                 )
 
                 errors[display_field] = [msg]
+                continue
             else:
                 if required and len(user_input.strip()) == 0:
                     errors[display_field] = ["Cannot be blank"]
