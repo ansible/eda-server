@@ -167,9 +167,21 @@ def validate_inputs(
                 errors[display_field] = ["Cannot be blank"]
                 continue
         else:
-            if required and len(user_input.strip()) == 0:
-                errors[display_field] = ["Cannot be blank"]
+            if not isinstance(user_input, str) and not isinstance(
+                user_input, bool
+            ):
+                msg = (
+                    f"Input fields must have a boolean or string value. "
+                    f"The value provided in the '{field}' field is of "
+                    f"type {type(user_input).__name__}."
+                )
+
+                errors[display_field] = [msg]
                 continue
+            else:
+                if required and len(user_input.strip()) == 0:
+                    errors[display_field] = ["Cannot be blank"]
+                    continue
 
         if data.get("format") and user_input:
             result = _validate_format(
@@ -285,6 +297,14 @@ def validate_schema(schema: dict) -> list[str]:
                 value = field.get(option)
                 if value is not None and not isinstance(value, str):
                     errors.append(f"{option} must be a string")
+
+            default_value = field.get("default")
+            if default_value is not None:
+                if not isinstance(default_value, (str, bool)):
+                    errors.append(
+                        f"default for field '{field.get('id')}' "
+                        "must be a string or boolean"
+                    )
 
     required_fields = schema.get("required")
     if required_fields:

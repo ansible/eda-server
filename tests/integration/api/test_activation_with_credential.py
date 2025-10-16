@@ -816,14 +816,14 @@ def test_create_activation_with_conflict_env_vars(
         _create_credential(
             admin_client,
             "credential-1",
-            {"var1": "foo", "var2": 100},
+            {"var1": "foo", "var2": "100"},
             credential_type.id,
             default_organization.id,
         ),
         _create_credential(
             admin_client,
             "credential-2",
-            {"var1": "bar", "var2": 200},
+            {"var1": "bar", "var2": "200"},
             credential_type.id,
             default_organization.id,
         ),
@@ -957,7 +957,7 @@ def test_update_activation_credentials(
     eda_credential1 = _create_credential(
         admin_client,
         "credential-1",
-        {"var1": "foo", "var2": 100},
+        {"var1": "foo", "var2": "100"},
         credential_type1.id,
         default_organization.id,
     )
