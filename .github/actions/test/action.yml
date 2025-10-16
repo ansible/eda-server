@@ -33,6 +33,12 @@ runs:
           --junit-xml=eda-server-default.xml
         echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
+        # Add PR metadata to coverage.xml for SonarCloud
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          sed -i.bak '1s/^/<!-- PR '"$PR_NUMBER"' -->\n/' coverage.xml
+        fi
+
     - name: Run multithreaded tests
       shell: bash
       run: |
