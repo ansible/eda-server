@@ -30,8 +30,13 @@ from rest_framework.response import Response
 
 from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
-from aap_eda.core.enums import ResourceType
+from aap_eda.core.enums import EventStreamAuthType, ResourceType
+from aap_eda.core.exceptions import (
+    GatewayAPIError as CoreGatewayAPIError,
+    MissingCredentials as CoreMissingCredentials,
+)
 from aap_eda.core.utils import logging_utils
+from aap_eda.services.sync_certs import SyncCertificates
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +104,13 @@ class EventStreamViewSet(
         responses={
             status.HTTP_204_NO_CONTENT: OpenApiResponse(
                 None, description="Delete successful."
-            )
+            ),
+            status.HTTP_400_BAD_REQUEST: OpenApiResponse(
+                description="Missing credentials for certificate deletion."
+            ),
+            status.HTTP_502_BAD_GATEWAY: OpenApiResponse(
+                description="Gateway API error during certificate deletion."
+            ),
         },
     )
     def destroy(self, request, *args, **kwargs):
@@ -110,6 +121,7 @@ class EventStreamViewSet(
                 f"Event stream '{event_stream.name}' is being referenced by "
                 f"{ref_count} activation(s) and cannot be deleted"
             )
+        self._sync_certificates(event_stream, "destroy")
         self.perform_destroy(event_stream)
 
         logger.info(
@@ -160,7 +172,10 @@ class EventStreamViewSet(
                 description="Return the new event stream.",
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                description="Invalid data to create event stream."
+                description="Invalid data or missing credentials."
+            ),
+            status.HTTP_502_BAD_GATEWAY: OpenApiResponse(
+                description="Gateway API error during certificate sync."
             ),
         },
     )
@@ -182,6 +197,7 @@ class EventStreamViewSet(
             RoleDefinition.objects.give_creator_permissions(
                 request.user, serializer.instance
             )
+            self._sync_certificates(response, "create")
 
         logger.info(
             logging_utils.generate_simple_audit_log(
@@ -206,12 +222,17 @@ class EventStreamViewSet(
                 description="Update successful, return the new event stream.",
             ),
             status.HTTP_400_BAD_REQUEST: OpenApiResponse(
-                description="Unable to update event stream."
+                description="Update failed or missing credentials."
+            ),
+            status.HTTP_502_BAD_GATEWAY: OpenApiResponse(
+                description="Gateway API error during certificate sync."
             ),
         },
     )
     def partial_update(self, request, *args, **kwargs):
         event_stream = self.get_object()
+        new_eda_credential_id = request.data.get("eda_credential_id")
+
         old_data = model_to_dict(event_stream)
         context = {"request": request}
         serializer = serializers.EventStreamInSerializer(
@@ -233,6 +254,13 @@ class EventStreamViewSet(
             setattr(event_stream, key, value)
 
         with transaction.atomic():
+            # Check if we need to destroy old certificates before saving
+            if (
+                new_eda_credential_id
+                and event_stream.eda_credential.id != new_eda_credential_id
+            ):
+                self._sync_certificates(event_stream, "destroy")
+
             event_stream.save()
             check_related_permissions(
                 request.user,
@@ -240,6 +268,9 @@ class EventStreamViewSet(
                 old_data,
                 model_to_dict(event_stream),
             )
+
+            if new_eda_credential_id:
+                self._sync_certificates(event_stream, "update")
 
         logger.info(
             logging_utils.generate_simple_audit_log(
@@ -307,3 +338,35 @@ class EventStreamViewSet(
             )
         )
         return self.get_paginated_response(serializer.data)
+
+    def _sync_certificates(
+        self,
+        event_stream: models.EventStream,
+        action: str,
+    ) -> None:
+        if (
+            event_stream.eda_credential.credential_type.kind
+            == EventStreamAuthType.MTLS
+        ):
+            try:
+                obj = SyncCertificates(event_stream.eda_credential.id)
+                if action == "destroy":
+                    obj.delete(event_stream.id)
+                else:
+                    obj.update()
+            except CoreGatewayAPIError as ex:
+                logger.error("Could not %s certificates: %s", action, str(ex))
+                raise api_exc.GatewayAPIError(
+                    detail=f"Gateway API error during certificate {action}: "
+                    f"{str(ex)}"
+                )
+            except CoreMissingCredentials as ex:
+                logger.error(
+                    "Missing credentials for certificate %s: %s",
+                    action,
+                    str(ex),
+                )
+                raise api_exc.MissingCredentialsError(
+                    detail=f"Missing credentials for certificate {action}: "
+                    f"{str(ex)}"
+                )
