@@ -4,6 +4,9 @@
 
 [![GitHub Workflow Status](https://github.com/ansible/eda-server/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/ansible/eda-server/actions/workflows/ci.yaml?query=branch%3Amain)
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ansible_eda-server)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ansible_eda-server&metric=coverage)](https://sonarcloud.io/summary/overall?id=ansible_eda-server)
+
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-blue)
 
