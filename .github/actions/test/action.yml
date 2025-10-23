@@ -49,13 +49,22 @@ runs:
         pip install junitparser
         junitparser merge eda-server-default.xml eda-server-multithreaded.xml eda-server-test-results.xml
 
+    # Verify coverage.xml exists and has content
+    - name: Verify coverage.xml
+      if: inputs.python-version == '3.11'
+      shell: bash
+      run: |
+        pwd
+        ls -lh coverage.xml
+        head -3 coverage.xml
+
     # Upload coverage artifact to Github for SonarCloud (only from Python 3.11)
     - name: Upload coverage as artifact
       if: inputs.python-version == '3.11'
-      uses: actions/upload-artifact@v4      
+      uses: actions/upload-artifact@v4
       with:
         name: coverage
-        path: coverage.xml
+        path: ./coverage.xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
