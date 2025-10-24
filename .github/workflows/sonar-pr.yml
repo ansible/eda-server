@@ -29,11 +29,12 @@ permissions:
   actions: read         # Download coverage artifacts from CI workflow
   pull-requests: read   # Get PR files and metadata
 jobs:
-  sonar:
+  sonar-pr-analysis:
     name: Upload to SonarCloud
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && 
+      github.repository == 'ansible/eda-server' &&
+      github.event.workflow_run.conclusion == 'success' && 
       github.event.workflow_run.event == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -47,37 +48,36 @@ jobs:
           run_id: ${{ github.event.workflow_run.id }}
           name: coverage
 
-      # Set PR number and event information from workflow_run
-      - name: Set PR number and event type
+      - name: Set PR metadata
         env:
           WORKFLOW_COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
           WORKFLOW_REPO_NAME: ${{ github.event.repository.full_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
         run: |
           # Extract PR number directly from workflow_run context
           PR_NUM='${{ github.event.workflow_run.pull_requests[0].number }}'
-          
-          # Validate it's a valid number
-          if [[ "$PR_NUM" =~ ^[0-9]+$ ]] && [[ "$PR_NUM" != "0" ]] && [[ -n "$PR_NUM" ]]; then
+
+          # Validate PR number and fetch metadata with error handling
+          if [[ -n "$PR_NUM" ]] && [[ "$PR_NUM" =~ ^[0-9]+$ ]] && \
+             PR_DATA=$(gh api "repos/$WORKFLOW_REPO_NAME/pulls/$PR_NUM" 2>&1) && \
+             PR_BASE=$(echo "$PR_DATA" | jq -r '.base.ref') && \
+             PR_HEAD=$(echo "$PR_DATA" | jq -r '.head.ref') && \
+             [[ "$PR_BASE" != "null" ]] && [[ "$PR_HEAD" != "null" ]]; then
+            # Success - all validation passed
             echo "PR_NUMBER=$PR_NUM" >> $GITHUB_ENV
+            echo "PR_BASE=${PR_BASE}" >> $GITHUB_ENV
+            echo "PR_HEAD=${PR_HEAD}" >> $GITHUB_ENV
           else
-            echo "⚠️ No valid PR number in workflow_run context, setting to 0"
+            # Any validation step failed - skip PR analysis
+            echo "⚠️ Failed to get valid PR metadata, skipping analysis"
             echo "PR_NUMBER=0" >> $GITHUB_ENV
           fi
-          
+
+          # Set common environment variables
           echo "EVENT_TYPE=pull_request" >> $GITHUB_ENV
           echo "COMMIT_SHA=${WORKFLOW_COMMIT_SHA}" >> $GITHUB_ENV
           echo "REPO_NAME=${WORKFLOW_REPO_NAME}" >> $GITHUB_ENV
-
-      - name: Get PR info
-        if: github.event.workflow_run.event == 'pull_request' && env.PR_NUMBER != '0'
-        uses: octokit/request-action@dad4362715b7fb2ddedf9772c8670824af564f0d # v2.4.0
-        id: pr_info
-        with:
-          route: GET /repos/{repo}/pulls/{number}
-          repo: ${{ env.REPO_NAME }}
-          number: ${{ env.PR_NUMBER }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Print SonarCloud Analysis Decision Summary
         id: print_summary
@@ -133,33 +133,10 @@ jobs:
               echo "├── Python Changes: ✅ Found ($python_count files)"
               echo "└── Result: ✅ Proceed - \"Running SonarCloud analysis\""
             fi
-          else
-            # For push events, always proceed
-            echo "├── CI Event: ✅ Push"
-            echo "├── Backport Label: ➖ N/A (Push event)"
-            echo "├── Python Changes: ➖ N/A (Full codebase scan)"
-            echo "└── Result: ✅ Proceed - \"Running SonarCloud analysis\""
           fi
 
-      - name: Check if analysis should proceed
-        id: check_proceed
-        run: |
-          # This step only runs if we got past the summary step
-          # which means all conditions are met for analysis
-          echo "proceed=true" >> $GITHUB_OUTPUT
-          echo "✅ All conditions met - proceeding with SonarCloud analysis"
-
-      - name: Set PR info into env
-        if: steps.check_proceed.outputs.proceed == 'true' && github.event.workflow_run.event == 'pull_request' && env.PR_NUMBER != '0' && steps.pr_info.outputs.data != ''
-        env:
-          PR_BASE_REF: ${{ fromJson(steps.pr_info.outputs.data).base.ref }}
-          PR_HEAD_REF: ${{ fromJson(steps.pr_info.outputs.data).head.ref }}
-        run: |
-          echo "PR_BASE=${PR_BASE_REF}" >> $GITHUB_ENV
-          echo "PR_HEAD=${PR_HEAD_REF}" >> $GITHUB_ENV
-
       - name: Get changed Python files for Sonar
-        if: steps.check_proceed.outputs.proceed == 'true' && github.event.workflow_run.event == 'pull_request' && env.PR_NUMBER != '0'
+        if: env.PR_NUMBER != '0'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_NAME_VAR: ${{ env.REPO_NAME }}
@@ -192,7 +169,7 @@ jobs:
           fi
 
       - name: Add base branch (for PRs)
-        if: steps.check_proceed.outputs.proceed == 'true' && github.event.workflow_run.event == 'pull_request' && env.PR_NUMBER != '0'
+        if: env.PR_NUMBER != '0'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER_VAR: ${{ env.PR_NUMBER }}
@@ -200,31 +177,15 @@ jobs:
           gh pr checkout "${PR_NUMBER_VAR}"
 
       - name: SonarCloud Scan (Pull Request)
-        if: steps.check_proceed.outputs.proceed == 'true' && github.event.workflow_run.event == 'pull_request' && env.PR_NUMBER != '0'
+        if: env.PR_NUMBER != '0'
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_SCM_REVISION: ${{ env.COMMIT_SHA }}
-          SONAR_PR_KEY: ${{ env.PR_NUMBER }}
-          SONAR_PR_BRANCH: ${{ env.PR_HEAD }}
-          SONAR_PR_BASE: ${{ env.PR_BASE }}
-          SONAR_INCLUSIONS_ARG: ${{ env.SONAR_INCLUSIONS && format('-Dsonar.inclusions={0}', env.SONAR_INCLUSIONS) || '' }}
         with:
           args: >
-            -Dsonar.scm.revision=${SONAR_SCM_REVISION}
-            -Dsonar.pullrequest.key=${SONAR_PR_KEY}
-            -Dsonar.pullrequest.branch=${SONAR_PR_BRANCH}
-            -Dsonar.pullrequest.base=${SONAR_PR_BASE}
-            ${SONAR_INCLUSIONS_ARG}
-
-      - name: SonarCloud Scan (Push)
-        if: steps.check_proceed.outputs.proceed == 'true' && github.event.workflow_run.event == 'push'
-        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_SCM_REVISION: ${{ env.COMMIT_SHA }}
-        with:
-          args: >
-            -Dsonar.scm.revision=${SONAR_SCM_REVISION}
+            -Dsonar.scm.revision=${{ env.COMMIT_SHA }}
+            -Dsonar.pullrequest.key=${{ env.PR_NUMBER }}
+            -Dsonar.pullrequest.branch=${{ env.PR_HEAD }}
+            -Dsonar.pullrequest.base=${{ env.PR_BASE }}
+            ${{ env.SONAR_INCLUSIONS && format('-Dsonar.inclusions={0}', env.SONAR_INCLUSIONS) || '' }}
