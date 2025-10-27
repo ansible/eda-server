@@ -30,7 +30,7 @@ permissions:
   pull-requests: read   # Get PR files and metadata
 jobs:
   sonar-pr-analysis:
-    name: Upload to SonarCloud
+    name: SonarCloud PR Analysis
     runs-on: ubuntu-latest
     if: |
       github.repository == 'ansible/eda-server' &&
@@ -48,7 +48,7 @@ jobs:
           run_id: ${{ github.event.workflow_run.id }}
           name: coverage
 
-      - name: Set PR metadata
+      - name: Set PR metadata and Print SonarCloud Analysis Decision Summary
         env:
           WORKFLOW_COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
           WORKFLOW_REPO_NAME: ${{ github.event.repository.full_name }}
@@ -57,82 +57,75 @@ jobs:
         run: |
           # Extract PR number directly from workflow_run context
           PR_NUM='${{ github.event.workflow_run.pull_requests[0].number }}'
-
-          # Validate PR number and fetch metadata with error handling
-          if [[ -n "$PR_NUM" ]] && [[ "$PR_NUM" =~ ^[0-9]+$ ]] && \
-             PR_DATA=$(gh api "repos/$WORKFLOW_REPO_NAME/pulls/$PR_NUM" 2>&1) && \
-             PR_BASE=$(echo "$PR_DATA" | jq -r '.base.ref') && \
-             PR_HEAD=$(echo "$PR_DATA" | jq -r '.head.ref') && \
-             [[ "$PR_BASE" != "null" ]] && [[ "$PR_HEAD" != "null" ]]; then
-            # Success - all validation passed
+            
+          # Check if PR number is valid
+          if [[ -n "$PR_NUM" ]] && [[ "$PR_NUM" =~ ^[0-9]+$ ]]; then
+              # Valid PR number found
+            echo "├── PR Number: ✅ ${PR_NUM}"
             echo "PR_NUMBER=$PR_NUM" >> $GITHUB_ENV
-            echo "PR_BASE=${PR_BASE}" >> $GITHUB_ENV
-            echo "PR_HEAD=${PR_HEAD}" >> $GITHUB_ENV
           else
-            # Any validation step failed - skip PR analysis
-            echo "⚠️ Failed to get valid PR metadata, skipping analysis"
-            echo "PR_NUMBER=0" >> $GITHUB_ENV
+            echo "├── PR Number: ❌ Invalid (not found in workflow_run context)"
+            echo "└── Result: ⏭️ Skip - \"No valid PR number available\""
+            exit 0
           fi
 
-          # Set common environment variables
-          echo "EVENT_TYPE=pull_request" >> $GITHUB_ENV
-          echo "COMMIT_SHA=${WORKFLOW_COMMIT_SHA}" >> $GITHUB_ENV
-          echo "REPO_NAME=${WORKFLOW_REPO_NAME}" >> $GITHUB_ENV
+          # Get PR metadata from GitHub API
+          PR_DATA=$(gh api "repos/$WORKFLOW_REPO_NAME/pulls/$PR_NUM")
+          PR_BASE=$(echo "$PR_DATA" | jq -r '.base.ref')
+          PR_HEAD=$(echo "$PR_DATA" | jq -r '.head.ref')
 
-      - name: Print SonarCloud Analysis Decision Summary
-        id: print_summary
+          if [[ "$PR_BASE" != "null" ]] && [[ "$PR_HEAD" != "null" ]]; then
+            echo "PR_BASE=$PR_BASE" >> $GITHUB_ENV
+            echo "PR_HEAD=$PR_HEAD" >> $GITHUB_ENV
+
+          # Print summary
+          echo "🔍 SonarCloud Analysis Decision Summary"
+          echo "========================================"
+          echo "├── CI Event: ✅ Pull Request"
+          echo "├── PR Number: #$PR_NUMBER"
+          echo "├── Base Branch: $PR_BASE"
+          echo "├── Head Branch: $PR_HEAD"
+          echo "├── Repo: $WORKFLOW_REPO_NAME"
+
+          # Export to GitHub env for later steps
+          echo "COMMIT_SHA=$WORKFLOW_COMMIT_SHA" >> $GITHUB_ENV
+          echo "REPO_NAME=$WORKFLOW_REPO_NAME" >> $GITHUB_ENV
+          echo "EVENT_TYPE=pull_request" >> $GITHUB_ENV
+
+      - name: Prepare files for SonarCloud Analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_TYPE_VAR: ${{ env.EVENT_TYPE }}
           PR_NUMBER_VAR: ${{ env.PR_NUMBER }}
           REPO_NAME_VAR: ${{ env.REPO_NAME }}
         run: |
-          echo "🔍 SonarCloud Analysis Decision Summary"
-          echo "========================================"
+          # Check Python changes for PRs
+          if ! files=$(gh api "repos/${REPO_NAME_VAR}/pulls/${PR_NUMBER_VAR}/files" --jq '.[].filename' 2>/dev/null); then
+            echo "❌ Failed to fetch PR files from GitHub API"
+            echo "This could be due to rate limiting, network issues, or permissions"
+            exit 1
+          fi
 
-          # Check CI Event type
-          if [ "${EVENT_TYPE_VAR}" = "pull_request" ]; then
-            echo "├── CI Event: ✅ Pull Request"
+          # Validate filenames to prevent command injection
+          # Allow safe characters: alphanumeric, dash, underscore, dot, forward slash, spaces, parentheses
+          validated_files=$(echo "$files" | grep -E '^[a-zA-Z0-9/_. ()-]+$' || true)
+          if [ "$files" != "$validated_files" ]; then
+            echo "⚠️ Warning: Some filenames contained invalid characters and were filtered out"
+          fi
+          files="$validated_files"
 
-            # Check if PR number is valid
-            if [ "${PR_NUMBER_VAR}" = "0" ]; then
-              echo "├── PR Number: ❌ Invalid (not found in workflow_run context)"
-              echo "└── Result: ⏭️ Skip - \"No valid PR number available\""
-              exit 0
-            fi
+          # Get file extensions for summary
+          extensions=$(echo "$files" | sed 's/.*\.//' | sort | uniq | tr '\n' ',' | sed 's/,$//')
 
-            # Valid PR number found
-            echo "├── PR Number: ✅ ${PR_NUMBER_VAR}"
-
-            # Check Python changes for PRs
-            if ! files=$(gh api "repos/${REPO_NAME_VAR}/pulls/${PR_NUMBER_VAR}/files" --jq '.[].filename' 2>/dev/null); then
-              echo "❌ Failed to fetch PR files from GitHub API"
-              echo "This could be due to rate limiting, network issues, or permissions"
-              exit 1
-            fi
-
-            # Validate filenames to prevent command injection
-            # Allow safe characters: alphanumeric, dash, underscore, dot, forward slash, spaces, parentheses
-            validated_files=$(echo "$files" | grep -E '^[a-zA-Z0-9/_. ()-]+$' || true)
-            if [ "$files" != "$validated_files" ]; then
-              echo "⚠️ Warning: Some filenames contained invalid characters and were filtered out"
-            fi
-            files="$validated_files"
-
-            # Get file extensions for summary
-            extensions=$(echo "$files" | sed 's/.*\.//' | sort | uniq | tr '\n' ',' | sed 's/,$//')
-
-            # Check if any Python files were changed
-            python_files=$(echo "$files" | grep '\.py$' || true)
-            if [ -z "$python_files" ]; then
-              echo "├── Python Changes: ❌ None (.$extensions only)"
-              echo "└── Result: ⏭️ Skip - \"No Python code changes detected\""
-              exit 0
-            else
-              python_count=$(echo "$python_files" | wc -l)
-              echo "├── Python Changes: ✅ Found ($python_count files)"
-              echo "└── Result: ✅ Proceed - \"Running SonarCloud analysis\""
-            fi
+          # Check if any Python files were changed
+          python_files=$(echo "$files" | grep '\.py$' || true)
+          if [ -z "$python_files" ]; then
+            echo "├── Python Changes: ❌ None (.$extensions only)"
+            echo "└── Result: ⏭️ Skip - \"No Python code changes detected\""
+            exit 0
+          else
+            python_count=$(echo "$python_files" | wc -l)
+            echo "├── Python Changes: ✅ Found ($python_count files)"
+            echo "└── Result: ✅ Proceed - \"Running SonarCloud analysis\""
           fi
 
       - name: Get changed Python files for Sonar
@@ -181,7 +174,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets[format('{0}', vars.SONAR_TOKEN_SECRET_NAME)] }}
         with:
           args: >
             -Dsonar.scm.revision=${{ env.COMMIT_SHA }}
