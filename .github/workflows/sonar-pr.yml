@@ -64,7 +64,7 @@ jobs:
             echo "├── PR Number: ✅ ${PR_NUM}"
             echo "PR_NUMBER=$PR_NUM" >> $GITHUB_ENV
           else
-            echo "├── PR Number: ❌ Invalid (not found in workflow_run context)"
+            echo "├── PR Number: ${PR_NUM} - ❌ Invalid (not found in workflow_run context)"
             echo "└── Result: ⏭️ Skip - \"No valid PR number available\""
             exit 0
           fi
