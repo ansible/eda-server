@@ -77,6 +77,7 @@ jobs:
           if [[ "$PR_BASE" != "null" ]] && [[ "$PR_HEAD" != "null" ]]; then
             echo "PR_BASE=$PR_BASE" >> $GITHUB_ENV
             echo "PR_HEAD=$PR_HEAD" >> $GITHUB_ENV
+          fi
 
           # Print summary
           echo "🔍 SonarCloud Analysis Decision Summary"
