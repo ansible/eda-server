@@ -52,23 +52,28 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
         run: |
-          # Extract PR number directly from workflow_run context
-          PR_NUM='${{ github.event.workflow_run.pull_requests[0].number }}'
+          # Extract PR number from coverage.xml file
+          if [ -f coverage.xml ] && [ -s coverage.xml ]; then
+            PR_NUMBER=$(grep -m 1 '<!-- PR' coverage.xml | awk '{print $3}' || echo "")
+          else
+            echo "❌ Coverage.xml file not found or empty."
+            PR_NUMBER="0"
+          fi
             
           # Check if PR number is valid
-          if [[ -n "$PR_NUM" ]] && [[ "$PR_NUM" =~ ^[0-9]+$ ]]; then
+          if [[ -n "$PR_NUMBER" ]] && [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
               # Valid PR number found
-            echo "├── PR Number: ✅ ${PR_NUM}"
-            echo "PR_NUMBER=$PR_NUM" >> $GITHUB_ENV
+            echo "├── PR Number: ✅ ${PR_NUMBER}"
+            echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
           else
-            echo "├── PR Number: ${PR_NUM} - ❌ Invalid (not found in workflow_run context)"
+            echo "├── PR Number: ${PR_NUMBER} - ❌ Invalid (not found in coverage.xml file)"
             echo "├── Result: ⏭️ Skip - \"No valid PR number available\""
             echo "├── This job requires a PR number to run PR analysis."
             exit 1
           fi
 
           # Get PR metadata from GitHub API
-          PR_DATA=$(gh api "repos/$WORKFLOW_REPO_NAME/pulls/$PR_NUM")
+          PR_DATA=$(gh api "repos/$WORKFLOW_REPO_NAME/pulls/$PR_NUMBER")
           PR_BASE=$(echo "$PR_DATA" | jq -r '.base.ref')
           PR_HEAD=$(echo "$PR_DATA" | jq -r '.head.ref')
 
