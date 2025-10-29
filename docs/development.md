@@ -399,4 +399,4 @@ task format:black
 ```
 
 You can now access the api at <https://localhost:8443/api/eda/v1/docs> with the default credentials `admin`/`testpass`.
-You can also access the standalone UI at <http://localhost:8443/>.
+You can also access the standalone UI at <https://localhost:8443/>.
