@@ -81,7 +81,7 @@ jobs:
           echo "🔍 SonarCloud PR Analysis Decision Summary"
           echo "========================================"
           echo "├── CI Event: ✅ Pull Request"
-          echo "├── PR Number: #$PR_NUMBER"
+          echo "├── PR Number: #$PR_NUM"
           echo "├── Base Branch: $PR_BASE"
           echo "├── Head Branch: $PR_HEAD"
           echo "├── Repo: $WORKFLOW_REPO_NAME"
