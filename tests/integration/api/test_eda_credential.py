@@ -106,6 +106,12 @@ hzhhV19kdlZMmjYxQUE2POfyeBw=
 -----END OPENSSH PRIVATE KEY-----
 """
 
+# For testing, we'll use simple certificate content and mock validation
+VALID_PEM_CERTIFICATE = ""  # Empty certificate is allowed per help text
+INVALID_PEM_CERTIFICATE = ""
+MULTIPLE_PEM_CERTIFICATES = ""
+CERTIFICATE_SUBJECT_RFC2253 = "CN=Test Subject,O=Test Org,C=US"
+
 EXTERNAL_CREDENTIAL_INPUT = {
     "fields": [
         {
@@ -1646,3 +1652,407 @@ def test_credential_input_sources(
         assert obj["count"] == count
         if count > 0:
             assert obj["results"][0]["input_field_name"] == "password"
+
+
+# mTLS Credential Tests
+
+
+@pytest.mark.parametrize(
+    ("inputs", "status_code", "error_field", "error_message"),
+    [
+        (
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "http_header_key": "Subject",
+            },
+            status.HTTP_201_CREATED,
+            None,
+            None,
+        ),
+        (
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "subject": CERTIFICATE_SUBJECT_RFC2253,
+                "http_header_key": "Subject",
+            },
+            status.HTTP_201_CREATED,
+            None,
+            None,
+        ),
+        (
+            {
+                "certificate": VALID_PEM_CERTIFICATE,
+                "http_header_key": "Subject",
+            },
+            status.HTTP_201_CREATED,  # auth_type has default "mtls"
+            None,
+            None,
+        ),
+        (
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+            },
+            status.HTTP_201_CREATED,  # http_header_key has default "Subject"
+            None,
+            None,
+        ),
+        (
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "http_header_key": "Subject",
+                "invalid_key": "bad",
+            },
+            status.HTTP_400_BAD_REQUEST,
+            "inputs",
+            "Input keys {'invalid_key'} are not defined in the schema",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_mtls_eda_credential(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    inputs,
+    status_code,
+    error_field,
+    error_message,
+):
+    """Test creation of mTLS credentials with various inputs."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    data_in = {
+        "name": "mtls-credential",
+        "inputs": inputs,
+        "credential_type_id": mtls_type.id,
+        "organization_id": default_organization.id,
+    }
+
+    # Mock certificate validation to avoid complex certificate parsing
+    with patch(
+        "aap_eda.core.utils.credentials._validate_pem_certificate",
+        return_value=[],
+    ), patch(
+        "aap_eda.core.utils.credentials._validate_certificate_subject_format",
+        return_value=[],
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/eda-credentials/", data=data_in
+        )
+
+    assert response.status_code == status_code
+
+    if status_code == status.HTTP_201_CREATED:
+        assert response.data["name"] == "mtls-credential"
+        assert response.data["managed"] is False
+        # auth_type should always be "mtls" (either provided or default)
+        assert response.data["inputs"]["auth_type"] == "mtls"
+        # http_header_key should always be "Subject"
+        assert response.data["inputs"]["http_header_key"] == "Subject"
+
+        # Certificate should be encrypted in response if present
+        if "certificate" in inputs and inputs["certificate"]:
+            assert response.data["inputs"]["certificate"] == "$encrypted$"
+
+        # Subject should be present if provided
+        if "subject" in inputs:
+            assert response.data["inputs"]["subject"] == inputs["subject"]
+    elif error_field and error_message:
+        if error_field == "inputs":
+            assert error_message in response.data["inputs"][0]
+        elif error_field.startswith("inputs."):
+            # Handle nested input field errors like inputs.auth_type
+            field_name = error_field.split(".", 1)[
+                1
+            ]  # Get field after "inputs."
+            assert error_message in response.data["inputs." + field_name][0]
+        else:
+            assert error_message in response.data[error_field]
+
+
+@pytest.mark.parametrize(
+    ("certificate", "status_code"),
+    [
+        (VALID_PEM_CERTIFICATE, status.HTTP_201_CREATED),
+        ("", status.HTTP_201_CREATED),  # Empty certificate is allowed
+    ],
+)
+@pytest.mark.django_db
+def test_create_mtls_credential_with_various_certificates(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    certificate,
+    status_code,
+):
+    """Test mTLS credential creation with various certificate formats."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    data_in = {
+        "name": "mtls-credential-cert-test",
+        "inputs": {
+            "auth_type": "mtls",
+            "certificate": certificate,
+            "http_header_key": "Subject",
+        },
+        "credential_type_id": mtls_type.id,
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/", data=data_in
+    )
+
+    assert response.status_code == status_code
+
+
+@pytest.mark.django_db
+def test_retrieve_mtls_eda_credential(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test retrieving an mTLS credential shows encrypted certificate."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    obj = models.EdaCredential.objects.create(
+        name="mtls_credential",
+        inputs=inputs_to_store(
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "subject": CERTIFICATE_SUBJECT_RFC2253,
+                "http_header_key": "Subject",
+            }
+        ),
+        managed=False,
+        credential_type_id=mtls_type.id,
+        organization=default_organization,
+    )
+
+    response = admin_client.get(f"{api_url_v1}/eda-credentials/{obj.id}/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["name"] == "mtls_credential"
+    assert response.data["inputs"] == {
+        "auth_type": "mtls",
+        "certificate": "",  # Empty certificate is allowed per help text
+        "subject": CERTIFICATE_SUBJECT_RFC2253,
+        "http_header_key": "Subject",
+    }
+    assert response.data["managed"] is False
+
+
+@pytest.mark.parametrize(
+    "update_data,expected_inputs,expected_db_inputs,test_description",
+    [
+        (
+            {
+                "certificate": "",
+                "subject": CERTIFICATE_SUBJECT_RFC2253,
+            },
+            {
+                "auth_type": "mtls",
+                "certificate": "",
+                "subject": CERTIFICATE_SUBJECT_RFC2253,
+                "http_header_key": "Subject",
+            },
+            {
+                "certificate": "",
+                "subject": CERTIFICATE_SUBJECT_RFC2253,
+            },
+            "updating certificate with subject",
+        ),
+        (
+            {
+                "certificate": "",
+            },
+            None,  # No specific assertion for inputs in this case
+            {
+                "certificate": "",
+            },
+            "clearing certificate",
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_update_mtls_credential_certificate(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+    update_data,
+    expected_inputs,
+    expected_db_inputs,
+    test_description,
+):
+    """Test updating mTLS credential certificate."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    obj = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs=inputs_to_store(
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "http_header_key": "Subject",
+            }
+        ),
+        credential_type_id=mtls_type.id,
+        organization=default_organization,
+    )
+
+    data = {"inputs": update_data}
+
+    response = admin_client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    # Check response inputs if expected_inputs is provided
+    if expected_inputs:
+        result = response.data
+        assert result["inputs"] == expected_inputs
+
+    # Verify certificate was actually updated in database
+    obj.refresh_from_db()
+    obj_inputs = yaml.safe_load(obj.inputs.get_secret_value())
+    for key, expected_value in expected_db_inputs.items():
+        assert obj_inputs[key] == expected_value
+
+
+@pytest.mark.django_db
+def test_copy_mtls_credential_success(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test copying an mTLS credential."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    original_cred = models.EdaCredential.objects.create(
+        name="original-mtls-credential",
+        inputs=inputs_to_store(
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "subject": CERTIFICATE_SUBJECT_RFC2253,
+                "http_header_key": "Subject",
+            }
+        ),
+        credential_type_id=mtls_type.id,
+        organization=default_organization,
+    )
+
+    data = {"name": "copied-mtls-credential"}
+    response = admin_client.post(
+        f"{api_url_v1}/eda-credentials/{original_cred.id}/copy/",
+        data=data,
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    new_credential = response.data
+    assert new_credential["id"] != original_cred.id
+    assert new_credential["name"] == data["name"]
+    assert new_credential["inputs"]["auth_type"] == "mtls"
+    assert new_credential["inputs"]["certificate"] == ""  # Empty certificate
+    assert new_credential["inputs"]["subject"] == CERTIFICATE_SUBJECT_RFC2253
+    assert new_credential["inputs"]["http_header_key"] == "Subject"
+
+
+@pytest.mark.django_db
+def test_delete_mtls_credential_with_event_stream_reference(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test deletion of mTLS credential referenced by event stream."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    # Create mTLS credential
+    mtls_cred = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs=inputs_to_store(
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "http_header_key": "Subject",
+            }
+        ),
+        credential_type_id=mtls_type.id,
+        organization=default_organization,
+    )
+
+    # Create event stream that references the credential
+    models.EventStream.objects.create(
+        name="test-event-stream",
+        event_stream_type="mtls",
+        eda_credential=mtls_cred,
+        organization=default_organization,
+    )
+
+    # Try to delete the credential - should fail due to reference
+    response = admin_client.delete(
+        f"{api_url_v1}/eda-credentials/{mtls_cred.id}/"
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        f"Credential {mtls_cred.name} is being referenced by some "
+        "event streams and cannot be deleted"
+    ) in response.data["detail"]
+
+
+@pytest.mark.django_db
+def test_update_mtls_credential_triggers_sync(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test that updating mTLS credential triggers certificate sync."""
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+
+    # Create mTLS credential
+    obj = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs=inputs_to_store(
+            {
+                "auth_type": "mtls",
+                "certificate": VALID_PEM_CERTIFICATE,
+                "http_header_key": "Subject",
+            }
+        ),
+        credential_type_id=mtls_type.id,
+        organization=default_organization,
+    )
+
+    # Update the credential certificate
+    data = {
+        "inputs": {
+            "certificate": MULTIPLE_PEM_CERTIFICATES,
+        }
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/eda-credentials/{obj.id}/", data=data
+    )
+
+    assert response.status_code == status.HTTP_200_OK

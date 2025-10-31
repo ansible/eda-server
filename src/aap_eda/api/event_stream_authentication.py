@@ -32,6 +32,7 @@ from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 
 from aap_eda.core.enums import SignatureEncodingType
+from aap_eda.core.utils.credentials import validate_x509_subject_match
 
 logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 30
@@ -110,10 +111,28 @@ class MTLSAuthentication(EventStreamAuthentication):
 
     def authenticate(self, _body=None):
         """Handle mTLS authentication."""
-        if self.subject and self.subject != self.value:
-            message = f"Subject Name mismatch : {self.value}"
+        if self.subject and not self.validate_subject(
+            self.subject, self.value
+        ):
+            message = f"Subject: {self.value} does not match {self.subject}"
             logger.warning(message)
             raise AuthenticationFailed(message)
+
+    def validate_subject(self, expected: str, actual: str) -> bool:
+        """Validate that actual subject matches expected subject pattern.
+
+        Uses shared X.509 standard-compliant DN parsing for attribute-level
+        matching. Supports wildcards and is order-independent per X.509
+        standards.
+
+        Args:
+            expected: Official subject pattern (may contain * wildcards)
+            actual: Input subject from user
+
+        Returns:
+            bool: True if actual matches expected pattern, False otherwise
+        """
+        return validate_x509_subject_match(expected, actual)
 
 
 @dataclass
