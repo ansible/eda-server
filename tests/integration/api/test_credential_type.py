@@ -322,6 +322,74 @@ def test_create_credential_type_with_schema_validate_errors(
     assert error_message in str(response.data[error_key])
 
 
+VALID_DEFAULT_SCHEMA = {
+    "fields": [
+        {
+            "id": "host",
+            "label": "Authentication URL",
+            "type": "string",
+            "default": "quay.io",
+        },
+        {
+            "id": "verify_ssl",
+            "label": "Verify SSL",
+            "type": "boolean",
+            "default": True,
+        },
+    ]
+}
+
+INVALID_DEFAULT_SCHEMA = {
+    "fields": [
+        {
+            "id": "host",
+            "label": "Authentication URL",
+            "type": "string",
+            "default": 123,
+        },
+        {
+            "id": "verify_ssl",
+            "label": "Verify SSL",
+            "type": "boolean",
+            "default": "yes",
+        },
+    ]
+}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "schema,expected_status",
+    [
+        (VALID_DEFAULT_SCHEMA, status.HTTP_201_CREATED),
+        (INVALID_DEFAULT_SCHEMA, status.HTTP_400_BAD_REQUEST),
+    ],
+)
+def test_validate_default_values_in_credential_type(
+    superuser_client, schema, expected_status
+):
+    """Ensure 'default' key only accepts string or boolean values."""
+
+    data_in = {
+        "name": f"credential_type_test_{expected_status}",
+        "description": "Testing default field type validation",
+        "inputs": schema,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=data_in
+    )
+
+    assert response.status_code == expected_status
+
+    if expected_status == status.HTTP_400_BAD_REQUEST:
+        # Check the error message for clarity
+        assert any(
+            "default" in str(msg).lower() for msg in response.data.values()
+        ), f"Expected 'default' validation error, got: {response.data}"
+
+
 @pytest.mark.django_db
 def test_retrieve_credential_type(user_client: APIClient):
     obj = models.CredentialType.objects.create(

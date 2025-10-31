@@ -15,6 +15,7 @@ import hmac
 import secrets
 import uuid
 from typing import List
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -24,6 +25,10 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
+from aap_eda.core.exceptions import (
+    GatewayAPIError as CoreGatewayAPIError,
+    MissingCredentials as CoreMissingCredentials,
+)
 from tests.integration.constants import api_url_v1
 
 
@@ -541,3 +546,464 @@ def get_default_test_org() -> models.Organization:
         name=settings.DEFAULT_ORGANIZATION_NAME,
         description="The default organization",
     )[0]
+
+
+# Gateway Exception Integration Tests
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_create_event_stream_gateway_api_error(
+    mock_sync_update,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test event stream creation with Gateway API error."""
+    # Setup mTLS credential
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Mock Gateway API error
+    mock_sync_update.side_effect = CoreGatewayAPIError(
+        "Gateway connection timeout"
+    )
+
+    data_in = {
+        "name": "test-stream",
+        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/event-streams/", data=data_in
+        )
+
+    # Verify proper error response
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert (
+        "Gateway API error during certificate create"
+        in response.data["detail"]
+    )
+    assert "Gateway connection timeout" in response.data["detail"]
+
+    # Verify event stream was not created
+    assert models.EventStream.objects.filter(name="test-stream").count() == 0
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_create_event_stream_missing_credentials_error(
+    mock_sync_update,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test event stream creation with missing credentials error."""
+    # Setup mTLS credential
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Mock missing credentials error
+    mock_sync_update.side_effect = CoreMissingCredentials(
+        "Required credentials not found"
+    )
+
+    data_in = {
+        "name": "test-stream",
+        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/event-streams/", data=data_in
+        )
+
+    # Verify proper error response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Missing credentials for certificate create" in response.data["detail"]
+    )
+    assert "Required credentials not found" in response.data["detail"]
+
+    # Verify event stream was not created
+    assert models.EventStream.objects.filter(name="test-stream").count() == 0
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.delete")
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_update_event_stream_gateway_api_error(
+    mock_sync_update,
+    mock_sync_delete,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test event stream update with Gateway API error."""
+    # Setup mTLS credentials
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential1 = models.EdaCredential.objects.create(
+        name="mtls-credential-1",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+    credential2 = models.EdaCredential.objects.create(
+        name="mtls-credential-2",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Create event stream first
+    event_stream = models.EventStream.objects.create(
+        name="test-stream",
+        eda_credential=credential1,
+        organization=default_organization,
+    )
+
+    # Mock Gateway API error on update
+    mock_sync_update.side_effect = CoreGatewayAPIError(
+        "Gateway API unavailable"
+    )
+
+    # Change credential to trigger certificate sync
+    update_data = {"eda_credential_id": credential2.id}
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.patch(
+            f"{api_url_v1}/event-streams/{event_stream.id}/",
+            data=update_data,
+        )
+
+    # Verify proper error response
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert (
+        "Gateway API error during certificate update"
+        in response.data["detail"]
+    )
+    assert "Gateway API unavailable" in response.data["detail"]
+
+    # Verify event stream credential was not updated
+    event_stream.refresh_from_db()
+    assert event_stream.eda_credential.id == credential1.id
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.delete")
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_update_event_stream_missing_credentials_error(
+    mock_sync_update,
+    mock_sync_delete,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test event stream update with missing credentials error."""
+    # Setup mTLS credentials
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential1 = models.EdaCredential.objects.create(
+        name="mtls-credential-1",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+    credential2 = models.EdaCredential.objects.create(
+        name="mtls-credential-2",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Create event stream first
+    event_stream = models.EventStream.objects.create(
+        name="test-stream",
+        eda_credential=credential1,
+        organization=default_organization,
+    )
+
+    # Mock missing credentials error on update
+    mock_sync_update.side_effect = CoreMissingCredentials(
+        "Credentials expired"
+    )
+
+    # Change credential to trigger certificate sync
+    update_data = {"eda_credential_id": credential2.id}
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.patch(
+            f"{api_url_v1}/event-streams/{event_stream.id}/",
+            data=update_data,
+        )
+
+    # Verify proper error response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Missing credentials for certificate update" in response.data["detail"]
+    )
+    assert "Credentials expired" in response.data["detail"]
+
+    # Verify event stream credential was not updated
+    event_stream.refresh_from_db()
+    assert event_stream.eda_credential.id == credential1.id
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.delete")
+def test_delete_event_stream_gateway_api_error(
+    mock_sync_delete,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test event stream deletion with Gateway API error."""
+    # Setup mTLS credential
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Create event stream
+    event_stream = models.EventStream.objects.create(
+        name="test-stream",
+        eda_credential=credential,
+        organization=default_organization,
+    )
+
+    # Mock Gateway API error on delete
+    mock_sync_delete.side_effect = CoreGatewayAPIError("Gateway service down")
+
+    response = admin_client.delete(
+        f"{api_url_v1}/event-streams/{event_stream.id}/"
+    )
+
+    # Verify proper error response
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+    assert (
+        "Gateway API error during certificate destroy"
+        in response.data["detail"]
+    )
+    assert "Gateway service down" in response.data["detail"]
+
+    # Verify event stream still exists
+    assert models.EventStream.objects.filter(id=event_stream.id).exists()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.delete")
+def test_delete_event_stream_missing_credentials_error(
+    mock_sync_delete,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test event stream deletion with missing credentials error."""
+    # Setup mTLS credential
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Create event stream
+    event_stream = models.EventStream.objects.create(
+        name="test-stream",
+        eda_credential=credential,
+        organization=default_organization,
+    )
+
+    # Mock missing credentials error on delete
+    mock_sync_delete.side_effect = CoreMissingCredentials(
+        "Authentication failed"
+    )
+
+    response = admin_client.delete(
+        f"{api_url_v1}/event-streams/{event_stream.id}/"
+    )
+
+    # Verify proper error response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        "Missing credentials for certificate destroy"
+        in response.data["detail"]
+    )
+    assert "Authentication failed" in response.data["detail"]
+
+    # Verify event stream still exists
+    assert models.EventStream.objects.filter(id=event_stream.id).exists()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_create_non_mtls_event_stream_no_exception_handling(
+    mock_sync_update,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test that non-mTLS event streams don't trigger certificate sync."""
+    # Setup HMAC credential (non-mTLS event stream type)
+    hmac_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.HMAC
+    )
+    credential = models.EdaCredential.objects.create(
+        name="hmac-credential",
+        inputs={
+            "auth_type": "hmac",
+            "secret": "shared-secret",
+            "http_header_key": "Authorization",
+        },
+        credential_type=hmac_type,
+        organization=default_organization,
+    )
+
+    data_in = {
+        "name": "test-stream",
+        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/event-streams/", data=data_in
+        )
+
+    # Verify successful creation
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "test-stream"
+
+    # Verify sync was not called for non-mTLS credential
+    mock_sync_update.assert_not_called()
+
+    # Verify event stream was created
+    assert models.EventStream.objects.filter(name="test-stream").exists()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.services.sync_certs.SyncCertificates.update")
+def test_create_event_stream_sync_success(
+    mock_sync_update,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test successful event stream creation with mTLS certificate sync."""
+    # Setup mTLS credential
+    mtls_type = models.CredentialType.objects.get(
+        name=enums.EventStreamCredentialType.MTLS
+    )
+    credential = models.EdaCredential.objects.create(
+        name="mtls-credential",
+        inputs={
+            "auth_type": "mtls",
+            "certificate": "",
+            "http_header_key": "Subject",
+        },
+        credential_type=mtls_type,
+        organization=default_organization,
+    )
+
+    # Mock successful sync
+    mock_sync_update.return_value = None
+
+    data_in = {
+        "name": "test-stream",
+        "eda_credential_id": credential.id,
+        "organization_id": default_organization.id,
+    }
+
+    with override_settings(
+        EVENT_STREAM_BASE_URL="https://www.example.com/",
+        EVENT_STREAM_MTLS_BASE_URL="https://www.example.com/",
+    ):
+        response = admin_client.post(
+            f"{api_url_v1}/event-streams/", data=data_in
+        )
+
+    # Verify successful creation
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "test-stream"
+
+    # Verify sync was called
+    mock_sync_update.assert_called_once()
+
+    # Verify event stream was created
+    event_stream = models.EventStream.objects.get(name="test-stream")
+    assert event_stream.eda_credential == credential
