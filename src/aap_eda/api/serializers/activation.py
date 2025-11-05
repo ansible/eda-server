@@ -1438,3 +1438,13 @@ def _check_injectors(
             raise serializers.ValidationError(message)
 
         existing_keys.append(key)
+
+
+def uncovered_test_function():
+    """Add this function to intentionally not covered by tests."""
+    result = 0
+    for i in range(10):
+        result += i
+        if result > 5:
+            logger.info("Result is greater than 5")
+    return result
