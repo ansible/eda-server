@@ -91,6 +91,11 @@ class ActivationViewSet(
             ),
         }
         | RedisDependencyMixin.redis_unavailable_response(),
+        extensions={
+            "x-ai-description": (
+                "Create an activation. Returns the created activation."
+            )
+        },
     )
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -269,13 +274,19 @@ class ActivationViewSet(
         return Response(serializers.ActivationReadSerializer(activation).data)
 
     @extend_schema(
-        description="List all Activations",
+        description="List Activations",
         request=None,
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.ActivationListSerializer(many=True),
                 description="Return a list of Activations.",
             ),
+        },
+        extensions={
+            "x-ai-description": (
+                "List activations. Returns activation records. "
+                "Supports filtering and pagination."
+            )
         },
     )
     def list(self, request):
@@ -358,6 +369,12 @@ class ActivationViewSet(
                 description="Processing of enable is disallowed."
             ),
         },
+        extensions={
+            "x-ai-description": (
+                "Enable an activation by ID. "
+                "Starts the rulebook process if valid."
+            )
+        },
     )
     @action(methods=["post"], detail=True, rbac_action=Action.ENABLE)
     def enable(self, request, pk):
@@ -436,6 +453,12 @@ class ActivationViewSet(
             ),
         }
         | RedisDependencyMixin.redis_unavailable_response(),
+        extensions={
+            "x-ai-description": (
+                "Disable an activation by ID. "
+                "Stops the rulebook process if running."
+            )
+        },
     )
     @action(methods=["post"], detail=True, rbac_action=Action.DISABLE)
     def disable(self, request, pk):
@@ -627,11 +650,17 @@ class ActivationViewSet(
         },
     ),
     list=extend_schema(
-        description="List all the Activation Instances",
+        description="List Activation Instances",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.ActivationInstanceSerializer
             ),
+        },
+        extensions={
+            "x-ai-description": (
+                "List activation instances. Returns status, queue, and "
+                "start/end times. Supports filtering and pagination."
+            )
         },
     ),
 )
@@ -652,7 +681,7 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
         return super().filter_queryset(queryset)
 
     @extend_schema(
-        description="List all logs for the Activation Instance",
+        description="List Activation instance logs",
         request=None,
         responses={
             status.HTTP_200_OK: serializers.ActivationInstanceLogSerializer(
@@ -667,6 +696,13 @@ class ActivationInstanceViewSet(viewsets.ReadOnlyModelViewSet):
                 description="A unique integer value identifying this Activation Instance.",  # noqa: E501
             )
         ],
+        extensions={
+            "x-ai-description": (
+                "List logs for an activation instance by ID. "
+                "Returns log records with timestamps and levels. "
+                "Supports filtering and pagination."
+            )
+        },
     )
     @action(
         detail=False,

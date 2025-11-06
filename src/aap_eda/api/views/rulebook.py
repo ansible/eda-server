@@ -45,12 +45,18 @@ from aap_eda.utils.openapi import generate_query_params
         },
     ),
     list=extend_schema(
-        description="List all rulebooks",
+        description="List rulebooks",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.RulebookSerializer,
                 description="Return a list of rulebooks.",
             ),
+        },
+        extensions={
+            "x-ai-description": (
+                "List rulebooks. Returns rulebook records. "
+                "Supports filtering and pagination."
+            )
         },
     ),
 )
@@ -83,7 +89,7 @@ class RulebookViewSet(
         return JsonResponse(data)
 
     @extend_schema(
-        description="Source list of a rulebook by its id",
+        description="List rulebook sources",
         request=None,
         responses={
             status.HTTP_200_OK: serializers.SourceSerializer(many=True),
@@ -100,6 +106,12 @@ class RulebookViewSet(
                 description="A unique integer value identifying this rulebook.",  # noqa: E501
             )
         ],
+        extensions={
+            "x-ai-description": (
+                "List sources defined in a rulebook by ID. "
+                "Returns source information including name and rulebook hash."
+            )
+        },
     )
     @action(
         detail=False,
@@ -147,6 +159,12 @@ class RulebookViewSet(
             ),
         },
         parameters=generate_query_params(serializers.AuditRuleSerializer()),
+        extensions={
+            "x-ai-description": (
+                "List fired audit rules. Returns audit rule records. "
+                "Supports filtering and pagination."
+            )
+        },
     ),
 )
 class AuditRuleViewSet(

@@ -137,12 +137,18 @@ class EventStreamViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
-        description="List all eventstreams",
+        description="List event streams",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.EventStreamOutSerializer(many=True),
                 description="Return a list of eventstreams.",
             ),
+        },
+        extensions={
+            "x-ai-description": (
+                "List event streams. Returns event stream records. "
+                "Supports filtering and pagination."
+            )
         },
     )
     def list(self, request, *args, **kwargs):
@@ -177,6 +183,11 @@ class EventStreamViewSet(
             status.HTTP_502_BAD_GATEWAY: OpenApiResponse(
                 description="Gateway API error during certificate sync."
             ),
+        },
+        extensions={
+            "x-ai-description": (
+                "Create an event stream. Returns the created event stream."
+            )
         },
     )
     def create(self, request, *args, **kwargs):

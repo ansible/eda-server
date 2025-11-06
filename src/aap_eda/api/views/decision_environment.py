@@ -75,12 +75,19 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
 
 @extend_schema_view(
     list=extend_schema(
-        description="List all decision environments",
+        description="List decision environments",
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.DecisionEnvironmentSerializer,
                 description="Return a list of decision environment.",
             ),
+        },
+        extensions={
+            "x-ai-description": (
+                "List decision environments. "
+                "Returns decision environment records. "
+                "Supports filtering and pagination."
+            )
         },
     ),
     create=extend_schema(
@@ -92,6 +99,12 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
                 description="Return the new decision environment.",
             ),
         },
+        extensions={
+            "x-ai-description": (
+                "Create a decision environment. "
+                "Returns the created decision environment."
+            )
+        },
     ),
     partial_update=extend_schema(
         description="Partially update a decision environment",
@@ -100,6 +113,12 @@ class PartialUpdateOnlyDecisionEnvironmentMixin(PartialUpdateOnlyModelMixin):
             status.HTTP_200_OK: OpenApiResponse(
                 serializers.DecisionEnvironmentSerializer,
                 description="Update successful. Return an updated decision environment.",  # noqa: E501
+            )
+        },
+        extensions={
+            "x-ai-description": (
+                "Update a decision environment by ID. "
+                "Returns the updated decision environment."
             )
         },
     ),
