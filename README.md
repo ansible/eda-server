@@ -39,6 +39,33 @@ Contributing guide to find out how to get help and contact us.
 For more information about getting in touch, see the
 [Ansible communication guide](https://docs.ansible.com/ansible/devel/community/communication.html).
 
+## OpenAPI specification
+
+You can access the Event Driven Ansible OpenAPI specification from a
+running instance:
+
+- API docs (browser):
+  - http://$HOST:$PORT/api/eda/v1/docs/
+- OpenAPI JSON:
+  - http://$HOST:$PORT/api/eda/v1/openapi.json
+
+Download examples:
+
+```bash
+# Basic auth (JSON)
+curl -u admin:password \
+  "http://localhost:8000/api/eda/v1/openapi.json" -o eda.json
+
+# Token auth (JSON)
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/eda/v1/openapi.json" -o eda.json
+```
+
+Notes:
+- For HTTPS with self-signed certificates, add `-k` to curl for local testing.
+- The specification's `info.version` reflects the installed `aap-eda`
+  package version on the running instance, from `pyproject.toml`.
+
 ## Credits
 
 EDA-Controller is sponsored by [Red Hat, Inc](https://www.redhat.com).
