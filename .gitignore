@@ -32,3 +32,6 @@ test-results.xml
 
 # Dispatcherd development
 dispatcherd/
+
+# OpenAPI
+openapi.json
