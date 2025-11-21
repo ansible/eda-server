@@ -41,6 +41,8 @@ For more information about getting in touch, see the
 
 ## OpenAPI specification
 
+For a comprehensive guide (runtime, development, authentication, code samples, troubleshooting), see [docs/openapi-access.md](docs/openapi-access.md).
+
 You can access the Event Driven Ansible OpenAPI specification from a
 running instance:
 
@@ -48,7 +50,6 @@ running instance:
   - http://$HOST:$PORT/api/eda/v1/docs/
 - OpenAPI JSON:
   - http://$HOST:$PORT/api/eda/v1/openapi.json
-
 Download examples:
 
 ```bash
@@ -62,6 +63,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 ```
 
 Notes:
+- Endpoints may require authentication depending on your deployment.
 - For HTTPS with self-signed certificates, add `-k` to curl for local testing.
 - The specification's `info.version` reflects the installed `aap-eda`
   package version on the running instance, from `pyproject.toml`.

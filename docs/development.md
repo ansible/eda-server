@@ -333,6 +333,27 @@ With docker compose:
 task docker -- up -d eda-api
 ```
 
+### OpenAPI (development)
+
+See also: [openapi-access.md](./openapi-access.md) for detailed access, authentication, and tooling guidance.
+
+Runtime endpoints (default prefix `api/eda`):
+- JSON: `/api/eda/v1/openapi.json`
+- YAML: `/api/eda/v1/openapi.yaml`
+- Swagger UI: `/api/eda/v1/docs/`
+- Redoc: `/api/eda/v1/redoc/`
+
+Offline export (no server needed):
+```bash
+python src/aap_eda/manage.py spectacular --file openapi.yaml
+python src/aap_eda/manage.py spectacular --file openapi.json
+```
+
+Check schema version at runtime:
+```bash
+curl -s http://localhost:8000/api/eda/v1/openapi.json | jq -r .info.version
+```
+
 ### Running tests
 
 To run tests locally, you need to have a running instance of postgresql and redis.
