@@ -47,7 +47,7 @@ cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 rq-scheduler = "^0.10"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", tag = "2025.10.20", extras = [
+django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
     "channel-auth",
     "rbac",
     "redis-client",
@@ -85,6 +85,7 @@ awx-plugins-core = { version = "^0.0.1a10", extras = [
                               "credentials-thycotic-dsv",
                               "credentials-thycotic-tss"
                     ]}
+packaging = "^25.0"
 
 
 [tool.poetry.group.test.dependencies]

@@ -919,7 +919,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2025.10.20"
+version = "2025.11.24.0.dev6+g9db723788"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.10"
@@ -931,7 +931,7 @@ develop = false
 asgiref = {version = "*", optional = true, markers = "extra == \"resource-registry\""}
 channels = {version = "*", optional = true, markers = "extra == \"channel-auth\""}
 cryptography = "*"
-Django = ">=4.2.21,<6.0"
+Django = ">=4.2.26,<6.0"
 django-crum = "*"
 django-flags = {version = "*", optional = true, markers = "extra == \"feature-flags\""}
 django-redis = {version = "*", optional = true, markers = "extra == \"redis-client\""}
@@ -959,8 +959,8 @@ testing = ["cryptography", "pytest", "pytest-django"]
 [package.source]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
-reference = "2025.10.20"
-resolved_reference = "93579cf5d9e70c92c39bc60cb30060df852b3ddf"
+reference = "devel"
+resolved_reference = "9db7237883e071724eb927b4dc56966d0ec28106"
 
 [[package]]
 name = "django-crum"
@@ -1972,14 +1972,14 @@ signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
 
 [[package]]
 name = "packaging"
-version = "23.1"
+version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 groups = ["main", "lint", "test"]
 files = [
-    {file = "packaging-23.1-py3-none-any.whl", hash = "sha256:994793af429502c4ea2ebf6bf664629d07c1a9fe974af92966e4b8d2df7edc61"},
-    {file = "packaging-23.1.tar.gz", hash = "sha256:a392980d2b6cffa644431898be54b0045151319d1e7ec34f0cfed48767dd334f"},
+    {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
+    {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
 ]
 
 [[package]]
@@ -3535,4 +3535,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "ef5e901f52b89b4a7f06b98312d236cae464df5c44cd95c1d25f8973cd2dc263"
+content-hash = "d81fafb8cac4da61e983cce1e499820fe9a01a93ae1582b4fd4137ec6bd243d3"
