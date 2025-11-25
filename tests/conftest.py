@@ -15,6 +15,9 @@
 import logging
 
 import pytest
+from ansible_base.feature_flags.utils import (
+    create_initial_data as seed_feature_flags,
+)
 from django.conf import settings
 
 from aap_eda.core import enums, models
@@ -89,6 +92,11 @@ def aap_credential_type(preseed_credential_types):
     return models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.AAP
     )
+
+
+@pytest.fixture
+def preseed_feature_flags():
+    seed_feature_flags()
 
 
 #################################################################
