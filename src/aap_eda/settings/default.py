@@ -19,7 +19,6 @@ from ansible_base.lib.dynamic_config import (
     load_dab_settings,
     load_envvars,
     load_standard_settings_files,
-    toggle_feature_flags,
 )
 
 from .post_load import post_loading
@@ -51,14 +50,5 @@ load_envvars(DYNACONF)  # load envvars prefixed with EDA_
 DYNACONF.load_file("core.py")  # load internal non-overwritable settings
 post_loading(DYNACONF)
 load_dab_settings(DYNACONF)
-
-# toggle feature flags, considering flags coming from
-# /etc/ansible-automation-platform/*.yaml
-# and envvars like `EDA_FEATURE_FOO_ENABLED=true
-DYNACONF.update(
-    toggle_feature_flags(DYNACONF),
-    loader_identifier="settings:toggle_feature_flags",
-    merge=True,
-)
 
 export(__name__, DYNACONF)  # export back to django.conf.settings
