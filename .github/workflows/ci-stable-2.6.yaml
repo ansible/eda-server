@@ -30,6 +30,7 @@ jobs:
       matrix:
         python-version:
           - "3.11"
+          - "3.12"
     env:
       EDA_SECRET_KEY: 'test'
       EDA_DB_PASSWORD: 'secret'
