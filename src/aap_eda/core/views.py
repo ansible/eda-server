@@ -21,8 +21,6 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from aap_eda.core.tasking import is_redis_failed
-
 from .serializers import StatusResponseSerializer
 
 
@@ -51,10 +49,6 @@ class StatusView(APIView):
         except OperationalError:
             return False
 
-    @staticmethod
-    def _check_redis() -> bool:
-        return not is_redis_failed()
-
     @extend_schema(
         description="Get the current status of EDA.",
         responses={
@@ -71,9 +65,6 @@ class StatusView(APIView):
 
         if not self._check_database():
             errors.append("Database connection failed")
-
-        if not self._check_redis():
-            errors.append("Redis connection failed")
 
         if not errors:
             return Response({"status": STATUS_GOOD}, status=status.HTTP_200_OK)

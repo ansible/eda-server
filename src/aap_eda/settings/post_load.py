@@ -126,68 +126,6 @@ def _config_authentication_backends():
     return backends
 
 
-def _rq_common_parameters(settings: Dynaconf):
-    params = {
-        "DB": settings.REDIS_DB,
-        "USERNAME": settings.REDIS_USER,
-        "PASSWORD": settings.REDIS_USER_PASSWORD,
-    }
-    if settings.REDIS_UNIX_SOCKET_PATH:
-        params["UNIX_SOCKET_PATH"] = settings.REDIS_UNIX_SOCKET_PATH
-    else:
-        params |= {
-            "HOST": settings.REDIS_HOST,
-            "PORT": settings.REDIS_PORT,
-        }
-        if settings.REDIS_TLS:
-            params["SSL"] = True
-        else:
-            # TODO: Deprecate implicit setting based on cert path in favor of
-            #       MQ_TLS as the determinant.
-            if settings.REDIS_CLIENT_CERT_PATH and settings.REDIS_TLS is None:
-                params["SSL"] = True
-            else:
-                params["SSL"] = False
-    return params
-
-
-def _rq_redis_client_additional_parameters(settings: Dynaconf):
-    params = {}
-    if (
-        not settings.REDIS_UNIX_SOCKET_PATH
-    ) and settings.REDIS_CLIENT_CERT_PATH:
-        params |= {
-            "ssl_certfile": settings.REDIS_CLIENT_CERT_PATH,
-            "ssl_keyfile": settings.REDIS_CLIENT_KEY_PATH,
-            "ssl_ca_certs": settings.REDIS_CLIENT_CACERT_PATH,
-        }
-    return params
-
-
-def get_rq_queues(settings: Dynaconf) -> dict:
-    """Construct the RQ_QUEUES dictionary based on the settings."""
-    queues = {}
-
-    # Configure the default queue
-    queues["default"] = _rq_common_parameters(settings)
-    queues["default"]["DEFAULT_TIMEOUT"] = settings.DEFAULT_QUEUE_TIMEOUT
-    queues["default"][
-        "REDIS_CLIENT_KWARGS"
-    ] = _rq_redis_client_additional_parameters(settings)
-
-    # Configure the worker queues
-    for queue in settings.RULEBOOK_WORKER_QUEUES:
-        queues[queue] = _rq_common_parameters(settings)
-        queues[queue][
-            "DEFAULT_TIMEOUT"
-        ] = settings.DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-        queues[queue][
-            "REDIS_CLIENT_KWARGS"
-        ] = _rq_redis_client_additional_parameters(settings)
-
-    return queues
-
-
 # For backwards compatibility, from the old value "-v" to the new value "info"
 def get_rulebook_process_log_level(
     settings: Dynaconf,
@@ -376,15 +314,10 @@ def _set_resource_server(settings: Dynaconf) -> None:
         settings.RESOURCE_SERVER["URL"]
         and settings.RESOURCE_SERVER["SECRET_KEY"]
     ):
-        jobs = settings.RQ_PERIODIC_JOBS
-        jobs.append(
-            {
-                "func": "aap_eda.tasks.shared_resources.resync_shared_resources",  # noqa: E501
-                "interval": 900,
-                "id": "resync_shared_resources",
-            }
-        )
-        settings.RQ_PERIODIC_JOBS = jobs
+        # Add shared resource sync task to dispatcherd schedule
+        settings.DISPATCHERD_SCHEDULE_TASKS[
+            "aap_eda.tasks.shared_resources.resync_shared_resources"
+        ] = {"schedule": 900}
 
 
 def _enforce_types(settings: Dynaconf) -> None:
@@ -450,30 +383,6 @@ def post_loading(loaded_settings: Dynaconf):
     if settings.get("PODMAN_SOCKET_TIMEOUT", 0) == 0:
         settings.PODMAN_SOCKET_TIMEOUT = None
 
-    settings.REDIS_UNIX_SOCKET_PATH = settings.get("MQ_UNIX_SOCKET_PATH", None)
-    settings.REDIS_HOST = settings.get("MQ_HOST", "localhost")
-    settings.REDIS_PORT = settings.get("MQ_PORT", 6379)
-    settings.REDIS_USER = settings.get("MQ_USER", None)
-    settings.REDIS_USER_PASSWORD = settings.get("MQ_USER_PASSWORD", None)
-    settings.REDIS_CLIENT_CACERT_PATH = settings.get(
-        "MQ_CLIENT_CACERT_PATH", None
-    )
-    settings.REDIS_CLIENT_CERT_PATH = settings.get("MQ_CLIENT_CERT_PATH", None)
-    settings.REDIS_CLIENT_KEY_PATH = settings.get("MQ_CLIENT_KEY_PATH", None)
-
-    # Handle MQ_TLS setting - convert string values to boolean
-    mq_tls = settings.get("MQ_TLS", None)
-    if mq_tls is not None and isinstance(mq_tls, str):
-        converted_tls = utils.str_to_bool(mq_tls)
-        settings.MQ_TLS = converted_tls
-        settings.REDIS_TLS = converted_tls
-    else:
-        settings.REDIS_TLS = mq_tls
-    settings.REDIS_DB = settings.get("MQ_DB", settings.DEFAULT_REDIS_DB)
-    settings.REDIS_HA_CLUSTER_HOSTS = settings.get(
-        "MQ_REDIS_HA_CLUSTER_HOSTS", ""
-    )
-
     if len(set(settings.RULEBOOK_WORKER_QUEUES)) != len(
         settings.RULEBOOK_WORKER_QUEUES
     ):
@@ -484,9 +393,6 @@ def post_loading(loaded_settings: Dynaconf):
     # If the list is empty, use the default queue name for single node mode
     if not settings.RULEBOOK_WORKER_QUEUES:
         settings.RULEBOOK_WORKER_QUEUES = ["activation"]
-
-    settings.RQ_SCHEDULER_JOB_INTERVAL = settings.SCHEDULER_JOB_INTERVAL
-    settings.RQ_QUEUES = get_rq_queues(settings)
 
     # ---------------------------------------------------------
     # APPLICATION SETTINGS

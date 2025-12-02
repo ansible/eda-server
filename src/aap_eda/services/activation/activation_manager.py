@@ -14,6 +14,7 @@
 """Module for Activation Manager."""
 import contextlib
 import logging
+import os
 import typing as tp
 from datetime import timedelta
 
@@ -1060,7 +1061,11 @@ class ActivationManager(StatusManager):
         )
 
     def _get_queue_name(self) -> str:
-        return settings.RULEBOOK_QUEUE_NAME
+        # Read directly from environment to support multinode configuration
+        # where each worker has its own EDA_RULEBOOK_QUEUE_NAME value
+        return os.environ.get(
+            "EDA_RULEBOOK_QUEUE_NAME", settings.RULEBOOK_QUEUE_NAME
+        )
 
     def _get_container_request(self) -> ContainerRequest:
         try:

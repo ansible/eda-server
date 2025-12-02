@@ -16,11 +16,9 @@ from typing import Any, Dict
 from unittest import mock
 
 import pytest
-import redis
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from aap_eda.api import exceptions as api_exc
 from aap_eda.api.serializers.user import BasicUserSerializer
 from aap_eda.core import enums, models
 from aap_eda.core.utils.credentials import inputs_to_display, inputs_to_store
@@ -160,11 +158,7 @@ def test_retrieve_project_not_exist(admin_client: APIClient):
 )
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.import_project")
-@mock.patch(
-    "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
-)
 def test_create_or_update_project_with_right_signature_credential(
-    redis_available: mock.Mock,
     import_project_task: mock.Mock,
     admin_client: APIClient,
     new_project: models.Project,
@@ -309,11 +303,7 @@ def test_create_or_update_project_with_right_signature_credential(
 )
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.import_project")
-@mock.patch(
-    "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
-)
 def test_create_or_update_project_with_right_eda_credential(
-    redis_available: mock.Mock,
     import_project_task: mock.Mock,
     admin_client: APIClient,
     new_project: models.Project,
@@ -437,46 +427,6 @@ def test_create_project_name_conflict(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-@mock.patch("aap_eda.tasks.import_project")
-def test_create_project_redis_unavailable(
-    import_project_task: mock.Mock,
-    is_redis_failed: mock.Mock,
-    admin_client: APIClient,
-    default_scm_credential,
-    default_organization: models.Organization,
-    preseed_credential_types,
-):
-    def raise_connection_error(*args, **kwargs):
-        raise redis.ConnectionError("redis unavailable")
-
-    import_project_task.side_effect = raise_connection_error
-
-    credential = create_custom_credential(
-        credential_type=enums.DefaultCredentialType.GPG,
-        organization=default_organization,
-    )
-
-    body = {
-        "name": "ain't-no-redis",
-        "url": "https://git.example.com/acme/project-01",
-        "eda_credential_id": default_scm_credential.id,
-        "signature_validation_credential_id": credential.id,
-        "scm_branch": "main",
-        "scm_refspec": "path/to/ref1",
-        "organization_id": default_organization.id,
-    }
-
-    response = admin_client.post(
-        f"{api_url_v1}/projects/",
-        data=body,
-    )
-
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json() == {"detail": "Redis is required but unavailable."}
-
-
-@pytest.mark.django_db
 def test_create_project_wrong_ids(admin_client: APIClient):
     bodies = [
         {
@@ -531,45 +481,10 @@ def test_create_project_with_invalid_git_parameters(
     assert "Invalid refspec" in error
 
 
-@pytest.mark.django_db
-@mock.patch(
-    "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
-)
-def test_create_project_with_redis_is_available(
-    redis_available,
-    admin_client,
-    default_organization,
-    preseed_credential_types,
-):
-    credential_type = enums.DefaultCredentialType.SOURCE_CONTROL
-    credential = create_custom_credential(
-        credential_type=credential_type, organization=default_organization
-    )
-    message = "Redis is required but unavailable"
-
-    redis_available.side_effect = api_exc.Conflict(message)
-
-    response = admin_client.post(
-        f"{api_url_v1}/projects/",
-        data={
-            "name": "test-project-redis-down",
-            "url": "https://git.example.com/acme/project-01",
-            "eda_credential_id": credential.id,
-            "organization_id": default_organization.id,
-        },
-    )
-
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert message in response.data["detail"]
-
-
 # Test: Sync project
 # -------------------------------------
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.sync_project")
-@mock.patch(
-    "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
-)
 @pytest.mark.parametrize(
     "initial_state",
     [
@@ -578,7 +493,6 @@ def test_create_project_with_redis_is_available(
     ],
 )
 def test_sync_project(
-    redis_available: mock.Mock,
     sync_project_task: mock.Mock,
     admin_client: APIClient,
     initial_state: models.Project.ImportState,
@@ -645,48 +559,6 @@ def test_sync_project_not_exist(admin_client: APIClient):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.django_db
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-@mock.patch("aap_eda.tasks.sync_project")
-def test_sync_project_redis_unavailable(
-    sync_project_task: mock.Mock,
-    is_redis_failed: mock.Mock,
-    admin_client: APIClient,
-    default_project: models.Project,
-):
-    def raise_connection_error(*args, **kwargs):
-        raise redis.ConnectionError("redis unavailable")
-
-    sync_project_task.side_effect = raise_connection_error
-
-    response = admin_client.post(
-        f"{api_url_v1}/projects/{default_project.id}/sync/"
-    )
-
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json() == {"detail": "Redis is required but unavailable."}
-
-
-@pytest.mark.django_db
-@mock.patch(
-    "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
-)
-def test_sync_project_with_redis_is_available(
-    redis_available, admin_client, default_project
-):
-    message = "Redis is required but unavailable"
-    redis_available.side_effect = api_exc.Conflict(message)
-
-    response = admin_client.post(
-        f"{api_url_v1}/projects/{default_project.id}/sync/",
-    )
-
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert message in response.data["detail"]
-
-
-# Test: Partial update project
-# -------------------------------------
 @pytest.mark.django_db
 def test_update_project_not_found(
     default_project: models.Project, admin_client: APIClient
@@ -910,11 +782,7 @@ def test_delete_project_not_found(admin_client: APIClient):
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.import_project")
-@mock.patch(
-    "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
-)
 def test_project_by_fields(
-    redis_available: mock.Mock,
     import_project_task: mock.Mock,
     default_scm_credential: models.EdaCredential,
     default_organization: models.Organization,

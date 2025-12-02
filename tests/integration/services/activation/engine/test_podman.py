@@ -17,10 +17,10 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from dispatcherd.worker.task import DispatcherCancel as JobTimeoutException
 from podman import PodmanClient
 from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound, Response
-from rq.timeouts import JobTimeoutException
 
 from aap_eda.core import models
 from aap_eda.core.enums import ActivationStatus, ImagePullPolicy

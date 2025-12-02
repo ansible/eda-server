@@ -19,12 +19,10 @@ from django.conf import settings
 from flags.state import flag_enabled
 
 # Type hints for module attributes
-DISPATCHERD: bool
 ANALYTICS: bool
 
 # Mapping of feature names to their corresponding setting names
 _FEATURE_FLAGS: Dict[str, str] = {
-    "DISPATCHERD": "DISPATCHERD_FEATURE_FLAG_NAME",
     "ANALYTICS": "ANALYTICS_FEATURE_FLAG_NAME",
 }
 

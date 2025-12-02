@@ -13,19 +13,13 @@
 #  limitations under the License.
 
 import pytest
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from dynaconf import Dynaconf
 
 from aap_eda.core.enums import RulebookProcessLogLevel
 from aap_eda.settings import core, defaults
-from aap_eda.settings.defaults import (
-    DEFAULT_QUEUE_TIMEOUT,
-    DEFAULT_RULEBOOK_QUEUE_TIMEOUT,
-)
 from aap_eda.settings.post_load import (
     get_boolean,
-    get_rq_queues,
     get_rulebook_process_log_level,
     post_loading,
 )
@@ -33,24 +27,8 @@ from aap_eda.settings.post_load import (
 
 @pytest.fixture
 def mock_settings():
-    settings = Dynaconf(settings_files=[defaults.__file__, core.__file__])
-    settings.SECRET_KEY = "secret"
-    return settings
-
-
-@pytest.fixture
-def redis_settings(mock_settings):
-    mock_settings.REDIS_DB = core.DEFAULT_REDIS_DB
-    mock_settings.REDIS_USER = defaults.MQ_USER
-    mock_settings.REDIS_USER_PASSWORD = defaults.MQ_USER_PASSWORD
-    mock_settings.REDIS_UNIX_SOCKET_PATH = defaults.MQ_UNIX_SOCKET_PATH
-    mock_settings.REDIS_HOST = settings.MQ_HOST
-    mock_settings.REDIS_PORT = defaults.MQ_PORT
-    mock_settings.REDIS_TLS = defaults.MQ_TLS
-    mock_settings.REDIS_CLIENT_KEY_PATH = defaults.MQ_CLIENT_KEY_PATH
-    mock_settings.REDIS_CLIENT_CACERT_PATH = defaults.MQ_CLIENT_CACERT_PATH
-    mock_settings.REDIS_CLIENT_CERT_PATH = defaults.MQ_CLIENT_CERT_PATH
-    mock_settings.RULEBOOK_WORKER_QUEUES = ["activation"]
+    mock_settings = Dynaconf(settings_files=[defaults.__file__, core.__file__])
+    mock_settings.SECRET_KEY = "secret"
     return mock_settings
 
 
@@ -77,100 +55,6 @@ def test_rulebook_log_level_invalid(mock_settings):
     mock_settings.ANSIBLE_RULEBOOK_LOG_LEVEL = "invalid"
     with pytest.raises(ImproperlyConfigured):
         get_rulebook_process_log_level(mock_settings)
-
-
-def test_rq_queues_with_unix_socket_path(redis_settings):
-    redis_settings.REDIS_UNIX_SOCKET_PATH = "path/to/socket"
-    redis_settings.RULEBOOK_WORKER_QUEUES = ["activation-node1"]
-
-    queues = get_rq_queues(redis_settings)
-    assert "default" in queues
-    assert queues["default"]["UNIX_SOCKET_PATH"] == "path/to/socket"
-    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
-    assert "activation-node1" in queues
-    assert queues["activation-node1"]["UNIX_SOCKET_PATH"] == "path/to/socket"
-    assert (
-        queues["activation-node1"]["DEFAULT_TIMEOUT"]
-        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-    )
-    assert "activation" not in queues
-
-
-def test_rq_queues_default_configuration(redis_settings, redis_parameters):
-    # Get the host and port from the test redis parameters in case the
-    # test is being run using an external redis.
-    # We explicitly check for None as the parameters may exist with a value of
-    # None.
-    host = redis_parameters.get("host")
-    if host is None:
-        host = "localhost"
-    port = redis_parameters.get("port")
-    if port is None:
-        port = 6379
-
-    for key, val in redis_parameters.items():
-        redis_settings.set(key, val)
-    queues = get_rq_queues(redis_settings)
-    assert queues["default"]["HOST"] == host
-    assert queues["default"]["PORT"] == port
-    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
-    assert queues["activation"]["HOST"] == host
-    assert queues["activation"]["PORT"] == port
-    assert (
-        queues["activation"]["DEFAULT_TIMEOUT"]
-        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-    )
-
-
-def test_rq_queues_custom_host(redis_settings):
-    redis_settings.REDIS_HOST = "custom-host"
-    queues = get_rq_queues(redis_settings)
-
-    assert queues["default"]["HOST"] == "custom-host"
-    assert queues["default"]["PORT"] == 6379
-    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
-    assert queues["activation"]["HOST"] == "custom-host"
-    assert queues["activation"]["PORT"] == 6379
-    assert (
-        queues["activation"]["DEFAULT_TIMEOUT"]
-        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-    )
-
-
-def test_rq_queues_custom_host_multiple_queues(redis_settings):
-    redis_settings.RULEBOOK_WORKER_QUEUES = [
-        "activation-node1",
-        "activation-node2",
-    ]
-    redis_settings.REDIS_HOST = "custom-host"
-    redis_settings.REDIS_USER_PASSWORD = "password"
-    redis_settings.REDIS_CLIENT_CERT_PATH = "somepath"
-    queues = get_rq_queues(redis_settings)
-    assert queues["default"]["HOST"] == "custom-host"
-    assert queues["default"]["PORT"] == 6379
-    assert queues["default"]["DEFAULT_TIMEOUT"] == DEFAULT_QUEUE_TIMEOUT
-    assert queues["activation-node1"]["HOST"] == "custom-host"
-    assert queues["activation-node1"]["PORT"] == 6379
-    assert (
-        queues["activation-node1"]["DEFAULT_TIMEOUT"]
-        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-    )
-    assert queues["activation-node2"]["HOST"] == "custom-host"
-    assert queues["activation-node2"]["PORT"] == 6379
-    assert (
-        queues["activation-node2"]["DEFAULT_TIMEOUT"]
-        == DEFAULT_RULEBOOK_QUEUE_TIMEOUT
-    )
-    assert queues["default"]["PASSWORD"] == "password"
-    assert (
-        queues["default"]["REDIS_CLIENT_KWARGS"]["ssl_certfile"] == "somepath"
-    )
-    assert queues["activation-node1"]["PASSWORD"] == "password"
-    assert (
-        queues["activation-node1"]["REDIS_CLIENT_KWARGS"]["ssl_certfile"]
-        == "somepath"
-    )
-    assert "activation" not in queues
 
 
 @pytest.mark.parametrize(
@@ -207,12 +91,12 @@ def test_resource_server_sync(mock_settings):
         "VALIDATE_HTTPS": False,
     }
     post_loading(mock_settings)
-    sync_task = {
-        "func": "aap_eda.tasks.shared_resources.resync_shared_resources",  # noqa: E501
-        "interval": 900,
-        "id": "resync_shared_resources",
-    }
-    assert sync_task in mock_settings.RQ_PERIODIC_JOBS
+    # With dispatcherd, sync tasks are scheduled differently
+    task_func = "aap_eda.tasks.shared_resources.resync_shared_resources"
+    assert task_func in mock_settings.DISPATCHERD_SCHEDULE_TASKS
+    assert (
+        mock_settings.DISPATCHERD_SCHEDULE_TASKS[task_func]["schedule"] == 900
+    )
 
 
 def test_duplicated_worker_queue(mock_settings):
@@ -249,18 +133,6 @@ def test_duplicated_worker_queue(mock_settings):
         ("PODMAN_EXTRA_ARGS", "opt=val", ImproperlyConfigured),
         ("RESOURCE_JWT_USER_ID", " eda ", "eda"),
         ("RESOURCE_JWT_USER_ID", ["eda"], ImproperlyConfigured),
-        ("MQ_TLS", True, True),
-        ("MQ_TLS", False, False),
-        ("MQ_TLS", None, None),
-        ("MQ_TLS", "true", True),
-        ("MQ_TLS", "True", True),
-        ("MQ_TLS", "false", False),
-        ("MQ_TLS", "False", False),
-        ("MQ_TLS", "yes", True),
-        ("MQ_TLS", "no", False),
-        ("MQ_TLS", "1", True),
-        ("MQ_TLS", "0", False),
-        ("MQ_TLS", "", False),
     ],
 )
 def test_types(mock_settings, name, value, expected):
@@ -275,10 +147,12 @@ def test_types(mock_settings, name, value, expected):
 
 def test_optional_type_exception_msg(mock_settings):
     """Test exception message when an optional type error occurs."""
-    mock_settings["MQ_TLS"] = 123  # Use invalid type instead of string
+    mock_settings[
+        "WEBSOCKET_SSL_VERIFY"
+    ] = 123  # Use invalid type instead of string
     with pytest.raises(
         ImproperlyConfigured,
-        match="MQ_TLS setting must be a bool or str or None",
+        match="WEBSOCKET_SSL_VERIFY setting must be a bool or str",
     ):
         post_loading(mock_settings)
 
@@ -296,46 +170,3 @@ def test_union_type_exception_msg(mock_settings):
 def test_allow_local_resource_management(mock_settings):
     # default is False
     assert mock_settings.ALLOW_LOCAL_RESOURCE_MANAGEMENT is False
-
-
-@pytest.mark.parametrize(
-    ("mq_tls_value", "expected_redis_tls", "expected_ssl_param"),
-    [
-        # Boolean values
-        (True, True, True),
-        (False, False, False),
-        (
-            None,
-            None,
-            False,
-        ),  # None should result in SSL=False (fallback logic)
-        # String values that should be converted to True
-        ("true", True, True),
-        ("True", True, True),
-        ("yes", True, True),
-        ("Yes", True, True),
-        ("1", True, True),
-        # String values that should be converted to False
-        ("false", False, False),
-        ("False", False, False),
-        ("no", False, False),
-        ("No", False, False),
-        ("0", False, False),
-        ("", False, False),
-        ("anything", False, False),
-    ],
-)
-def test_mq_tls_conversion_and_redis_ssl(
-    mock_settings, mq_tls_value, expected_redis_tls, expected_ssl_param
-):
-    """Test MQ_TLS setting conversion to REDIS_TLS and SSL parameter."""
-    mock_settings.MQ_TLS = mq_tls_value
-
-    post_loading(mock_settings)
-
-    # Check that MQ_TLS was properly converted to REDIS_TLS
-    assert mock_settings.REDIS_TLS == expected_redis_tls
-
-    # Check that the Redis queue configuration uses the correct SSL parameter
-    queues = get_rq_queues(mock_settings)
-    assert queues["default"]["SSL"] == expected_ssl_param
