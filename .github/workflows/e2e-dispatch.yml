@@ -11,10 +11,6 @@ on:
         description: 'filter for pytest to be used after "-k" flag, default is empty'
         required: false
         default: ''
-      feature_dispatcherd_enabled:
-        description: 'enable feature dispatcherd, default is false'
-        required: false
-        default: 'False'
   pull_request_target:
     types:
       - labeled
@@ -56,7 +52,6 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: aap_eda.settings.default
           EDA_DEBUG: "false"
-          EDA_FEATURE_DISPATCHERD_ENABLED: ${{ github.event.inputs.feature_dispatcherd_enabled }}
         run: |
           docker compose -p eda -f tools/docker/docker-compose-dev.yaml build
           docker compose -p eda -f tools/docker/docker-compose-dev.yaml up -d
@@ -181,7 +176,6 @@ jobs:
           # multinode-upstream tests require a longer timeout
           # to allow for the time it takes to start the workers inside the tests
           EDAQA_DEFAULT_TIMEOUT: 120
-          EDA_FEATURE_DISPATCHERD_ENABLED: ${{ github.event.inputs.feature_dispatcherd_enabled }}
         run: |
           pytest -vv -s eda_qa/tests/whitebox/upstream --junit-xml=eda-qa-e2e-multinode-test-results.xml --reruns ${{ env.PYTEST_RETRIES }}
 

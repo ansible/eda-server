@@ -245,7 +245,7 @@ original_start_method = orchestrator.ActivationManager.start
 
 @pytest.mark.django_db
 @mock.patch("aap_eda.tasks.orchestrator.tasking.unique_enqueue")
-def test_dispatch_existing_rq_jobs(enqueue_mock, activation, eda_caplog):
+def test_dispatch_existing_jobs(enqueue_mock, activation, eda_caplog):
     """Test that the dispatch does not process the request if there is
     already a job currently running."""
     job_id = orchestrator._manage_process_job_id(

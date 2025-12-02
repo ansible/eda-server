@@ -16,10 +16,8 @@ import logging
 import random
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta
 from typing import Optional
 
-import django_rq
 from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.factories import get_control_from_settings
 from django.conf import settings
@@ -42,13 +40,10 @@ from aap_eda.services.activation.activation_manager import (
     ActivationManager,
     StatusManager,
 )
-from aap_eda.settings import features
 
 from .exceptions import UnknownProcessParentType
 
-# Wrap the django_rq job decorator so its processing is within our retry
-# code.
-job = tasking.redis_connect_retry()(django_rq.job)
+# Legacy job decorator - no longer needed with dispatcherd
 
 
 LOGGER = logging.getLogger(__name__)
@@ -425,41 +420,8 @@ def get_queue_name_by_parent_id(
 
 
 def check_rulebook_queue_health(queue_name: str) -> bool:
-    """Check for the state of the queue.
-
-    Proxy for rq and dispatcherd functions.
-    """
-    if features.DISPATCHERD:
-        return check_rulebook_queue_health_dispatcherd(queue_name)
-    return check_rulebook_queue_health_rq(queue_name)
-
-
-@tasking.redis_connect_retry()
-def check_rulebook_queue_health_rq(queue_name: str) -> bool:
-    """Check for the state of the queue in rq.
-
-    Returns True if the queue is healthy, False otherwise.
-    Clears the queue if all workers are dead to avoid stuck processes.
-    """
-    queue = django_rq.get_queue(queue_name)
-
-    all_workers_dead = True
-    for worker in tasking.Worker.all(queue=queue):
-        last_heartbeat = worker.last_heartbeat
-        if last_heartbeat is None:
-            continue
-        threshold = datetime.now() - timedelta(
-            seconds=settings.DEFAULT_WORKER_HEARTBEAT_TIMEOUT,
-        )
-        if last_heartbeat >= threshold:
-            all_workers_dead = False
-            break
-
-    if all_workers_dead:
-        queue.empty()
-        return False
-
-    return True
+    """Check for the state of the queue using dispatcherd."""
+    return check_rulebook_queue_health_dispatcherd(queue_name)
 
 
 def check_rulebook_queue_health_dispatcherd(queue_name: str) -> bool:

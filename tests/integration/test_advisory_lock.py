@@ -45,7 +45,7 @@ from tests.integration.utils import ThreadSafeList
     ids=[
         "gather_analytics",
         "monitor_rulebook_processes",
-        "monitor_project_tasks",  # only scheduled in RQ
+        "monitor_project_tasks",
         "_import_project",
         "_sync_project",
     ],
