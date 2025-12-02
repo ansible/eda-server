@@ -1,41 +1,31 @@
 import pytest
-from ansible_base.lib.dynamic_config import toggle_feature_flags
+from ansible_base.feature_flags.models import AAPFlag
+from ansible_base.feature_flags.utils import (
+    create_initial_data as seed_feature_flags,
+)
 from django.conf import settings
-from django.test import override_settings
-from flags.state import flag_state
+from flags.state import flag_state, get_flags
 from rest_framework import status
 
 from tests.integration.constants import api_url_v1
 
 
 @pytest.mark.django_db
-def test_feature_flags_list_endpoint(admin_client):
+def test_feature_flags_list_endpoint(admin_client, preseed_feature_flags):
     response = admin_client.get(f"{api_url_v1}/feature_flags_state/")
     assert response.status_code == status.HTTP_200_OK, response.data
     # Validates expected default feature flags
     # Modify each time a flag is added to default settings
-    assert len(response.data) == 2
+    assert len(response.data) == len(get_flags())
     assert response.data[settings.ANALYTICS_FEATURE_FLAG_NAME] is False
     assert response.data[settings.DISPATCHERD_FEATURE_FLAG_NAME] is False
 
 
-@override_settings(
-    FLAGS={
-        "FEATURE_SOME_PLATFORM_FLAG_ENABLED": [
-            {"condition": "boolean", "value": False},
-        ],
-    },
-    FEATURE_SOME_PLATFORM_FLAG_ENABLED=True,
-)
+@pytest.mark.parametrize("flag_value", [True, False])
 @pytest.mark.django_db
-def test_feature_flags_toggle():
-    settings_override = {
-        "FLAGS": settings.FLAGS,
-        "FEATURE_SOME_PLATFORM_FLAG_ENABLED": settings.FEATURE_SOME_PLATFORM_FLAG_ENABLED,  # noqa: E501
-    }
-    assert toggle_feature_flags(settings_override) == {
-        "FLAGS__FEATURE_SOME_PLATFORM_FLAG_ENABLED": [
-            {"condition": "boolean", "value": True},
-        ]
-    }
-    assert flag_state("FEATURE_SOME_PLATFORM_FLAG_ENABLED") is True
+def test_feature_flags_toggle(flag_value):
+    flag_name = "FEATURE_EDA_ANALYTICS_ENABLED"
+    setattr(settings, flag_name, flag_value)
+    AAPFlag.objects.all().delete()
+    seed_feature_flags()
+    assert flag_state(flag_name) is flag_value
