@@ -92,9 +92,6 @@ from tests.integration.constants import api_url_v1
                 "/organizations/",
                 "/teams/",
                 "/event-streams/",
-                "feature_flags/states/",
-                # To be removed after all components
-                # have migrated away from this endpoint
                 "/feature_flags_state/",
                 "/credential-input-sources/",
             ],

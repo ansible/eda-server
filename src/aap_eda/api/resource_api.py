@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ansible_base.feature_flags.models import AAPFlag
-
 # RBAC models
 from ansible_base.rbac.models import RoleDefinition
 from ansible_base.resource_registry.registry import (
@@ -23,7 +21,6 @@ from ansible_base.resource_registry.registry import (
     SharedResource,
 )
 from ansible_base.resource_registry.shared_types import (
-    FeatureFlagType,
     OrganizationType,
     RoleDefinitionType,
     TeamType,
@@ -62,12 +59,6 @@ RESOURCE_LIST = (
         RoleDefinition,
         shared_resource=SharedResource(
             serializer=RoleDefinitionType, is_provider=False
-        ),
-    ),
-    ResourceConfig(
-        AAPFlag,
-        shared_resource=SharedResource(
-            serializer=FeatureFlagType, is_provider=False
         ),
     ),
 )
