@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
+import threading
 import time
 import typing
 from datetime import datetime, timedelta
@@ -393,6 +395,7 @@ class Worker(rq.Worker):
             serializer=rq.serializers.JSONSerializer,
         )
         self.is_shutting_down = False
+        self.watchdog_started = False
 
     def _set_connection(
         self,
@@ -584,6 +587,53 @@ class ActivationWorker(Worker):
             serializer=rq.serializers.JSONSerializer,
             **kwargs,
         )
+
+    def dequeue_job_and_maintain_ttl(self, timeout: int):
+        """Override to add watchdog for stale connection detection.
+
+        For standalone Redis only: Starts a background thread that checks
+        if worker queues are properly registered in Redis. Check interval is
+        half of DEFAULT_WORKER_HEARTBEAT_TIMEOUT. If queues are empty (stale
+        connection), forces exit after 1.5x heartbeat timeout.
+
+        Disabled for Redis HA clusters (different failover behavior).
+        """
+        is_standalone = not settings.REDIS_HA_CLUSTER_HOSTS
+        if is_standalone and not self.watchdog_started:
+            heartbeat_timeout = core_settings.DEFAULT_WORKER_HEARTBEAT_TIMEOUT
+            check_interval = heartbeat_timeout / 2
+            max_failures = max(
+                int((heartbeat_timeout * 1.5) / check_interval), 2
+            )
+
+            def watchdog():
+                """Monitor worker registration and force exit if unhealthy."""
+                consecutive_failures = 0
+                while True:
+                    time.sleep(check_interval)
+                    try:
+                        queues_data = self.connection.hget(self.key, "queues")
+                        if not queues_data:
+                            raise redis.exceptions.ConnectionError(
+                                f"Worker {self.key} has no queues registered"
+                            )
+                        consecutive_failures = 0
+                    except redis.exceptions.ConnectionError:
+                        consecutive_failures += 1
+                        if consecutive_failures >= max_failures:
+                            logger.error(
+                                "Activation worker has no queues registered in"
+                                "Redis (stale connection). Forcing exit for a"
+                                "restart."
+                            )
+                            os._exit(1)
+
+            watchdog_thread = threading.Thread(
+                target=watchdog, daemon=True, name="activation-worker-watchdog"
+            )
+            watchdog_thread.start()
+            self.watchdog_started = True
+        return super().dequeue_job_and_maintain_ttl(timeout)
 
 
 def enqueue_delay(
