@@ -17,7 +17,6 @@ from unittest import mock
 from unittest.mock import patch
 
 import pytest
-import redis
 import yaml
 from django.conf import settings
 from rest_framework import status
@@ -167,35 +166,6 @@ def test_create_activation_bad_entity(admin_client: APIClient):
         data=test_activation,
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-
-@pytest.mark.parametrize(
-    "enabled",
-    [True, False],
-)
-@pytest.mark.django_db
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-def test_create_activation_redis_unavailable(
-    is_redis_failed: mock.Mock,
-    activation_payload: Dict[str, Any],
-    admin_awx_token: models.AwxToken,
-    default_rulebook: models.Rulebook,
-    admin_client: APIClient,
-    enabled: bool,
-    preseed_credential_types,
-):
-    activation_payload["is_enabled"] = enabled
-    response = admin_client.post(
-        f"{api_url_v1}/activations/", data=activation_payload
-    )
-
-    if not enabled:
-        assert response.status_code == status.HTTP_201_CREATED
-    else:
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert response.json() == {
-            "detail": "Redis is required but unavailable."
-        }
 
 
 @pytest.mark.parametrize(
@@ -550,28 +520,6 @@ def test_delete_activation(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-@mock.patch("aap_eda.api.views.activation.delete_rulebook_process")
-def test_delete_activation_redis_unavailable(
-    delete_rule_book_process: mock.Mock,
-    is_redis_failed: mock.Mock,
-    default_activation: models.Activation,
-    admin_client: APIClient,
-    preseed_credential_types,
-):
-    def raise_connection_error(*args, **kwargs):
-        raise redis.ConnectionError("redis unavailable")
-
-    delete_rule_book_process.side_effect = raise_connection_error
-
-    response = admin_client.delete(
-        f"{api_url_v1}/activations/{default_activation.id}/"
-    )
-    assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json() == {"detail": "Redis is required but unavailable."}
-
-
-@pytest.mark.django_db
 def test_restart_activation(
     default_activation: models.Activation,
     admin_client: APIClient,
@@ -648,38 +596,6 @@ def test_create_activation_with_missing_required_fields(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert error_message in response.data[missing_field]
-
-
-@pytest.mark.parametrize(
-    "enabled",
-    [True, False],
-)
-@pytest.mark.django_db
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-def test_restart_activation_redis_unavailable(
-    is_redis_failed: mock.Mock,
-    default_activation: models.Activation,
-    admin_client: APIClient,
-    enabled: bool,
-    preseed_credential_types,
-):
-    default_activation.is_enabled = enabled
-    default_activation.save(update_fields=["is_enabled"])
-
-    response = admin_client.post(
-        f"{api_url_v1}/activations/{default_activation.id}/restart/"
-    )
-
-    if not enabled:
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert response.json() == {
-            "detail": "Activation is disabled and cannot be run."
-        }
-    else:
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert response.json() == {
-            "detail": "Redis is required but unavailable."
-        }
 
 
 @pytest.mark.django_db
@@ -764,36 +680,6 @@ def test_enable_activation(
         )
 
 
-@pytest.mark.parametrize(
-    "enabled",
-    [True, False],
-)
-@pytest.mark.django_db
-@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-def test_enable_activation_redis_unavailable(
-    is_redis_failed: mock.Mock,
-    default_activation: models.Activation,
-    admin_client: APIClient,
-    enabled: bool,
-    preseed_credential_types,
-):
-    default_activation.is_enabled = enabled
-    default_activation.save(update_fields=["is_enabled"])
-
-    response = admin_client.post(
-        f"{api_url_v1}/activations/{default_activation.id}/enable/"
-    )
-
-    if enabled:
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-    else:
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert response.json() == {
-            "detail": "Redis is required but unavailable."
-        }
-
-
 @pytest.mark.django_db
 def test_disable_activation(
     default_activation: models.Activation,
@@ -805,35 +691,6 @@ def test_disable_activation(
     )
 
     assert response.status_code == status.HTTP_204_NO_CONTENT
-
-
-@pytest.mark.parametrize(
-    "enabled",
-    [True, False],
-)
-@pytest.mark.django_db
-@mock.patch("aap_eda.core.tasking.is_redis_failed", return_value=True)
-def test_disable_activation_redis_unavailable(
-    is_redis_failed: mock.Mock,
-    default_activation: models.Activation,
-    admin_client: APIClient,
-    enabled: bool,
-    preseed_credential_types,
-):
-    default_activation.is_enabled = enabled
-    default_activation.save(update_fields=["is_enabled"])
-
-    response = admin_client.post(
-        f"{api_url_v1}/activations/{default_activation.id}/disable/"
-    )
-
-    if not enabled:
-        assert response.status_code == status.HTTP_204_NO_CONTENT
-    else:
-        assert response.status_code == status.HTTP_409_CONFLICT
-        assert response.json() == {
-            "detail": "Redis is required but unavailable."
-        }
 
 
 @pytest.mark.django_db

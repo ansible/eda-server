@@ -13,7 +13,7 @@
 #  limitations under the License.
 import logging
 
-import redis
+# redis import removed - no longer required with dispatcherd migration
 from ansible_base.rbac.api.related import check_related_permissions
 from ansible_base.rbac.models import RoleDefinition
 from django.db import transaction
@@ -34,7 +34,7 @@ from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
 
-from .mixins import RedisDependencyMixin, ResponseSerializerMixin
+from .mixins import ResponseSerializerMixin
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,6 @@ class ProjectViewSet(
     DestroyProjectMixin,
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
-    RedisDependencyMixin,
 ):
     queryset = models.Project.objects.order_by("id")
     serializer_class = serializers.ProjectSerializer
@@ -108,8 +107,7 @@ class ProjectViewSet(
                 serializers.ProjectSerializer,
                 description="Return a created project.",
             )
-        }
-        | RedisDependencyMixin.redis_unavailable_response(),
+        },
     )
     def create(self, request):
         serializer = serializers.ProjectCreateRequestSerializer(
@@ -117,27 +115,20 @@ class ProjectViewSet(
         )
         serializer.is_valid(raise_exception=True)
 
-        # check if redis is available
-        self.redis_is_available()
+        # With dispatcherd migration, Redis is no longer required
+        with transaction.atomic():
+            project = serializer.save()
+            check_related_permissions(
+                request.user,
+                serializer.Meta.model,
+                {},
+                model_to_dict(serializer.instance),
+            )
+            RoleDefinition.objects.give_creator_permissions(
+                request.user, serializer.instance
+            )
 
-        # Catch Redis connection error and translate, as appropriate, to the
-        # Redis unavailable response.
-        try:
-            with transaction.atomic():
-                project = serializer.save()
-                check_related_permissions(
-                    request.user,
-                    serializer.Meta.model,
-                    {},
-                    model_to_dict(serializer.instance),
-                )
-                RoleDefinition.objects.give_creator_permissions(
-                    request.user, serializer.instance
-                )
-
-                job_id = tasks.import_project(project.id)
-        except redis.ConnectionError:
-            return RedisDependencyMixin.redis_unavailable_response()
+            job_id = tasks.import_project(project.id)
 
         models.Project.objects.filter(pk=project.id).update(
             import_task_id=job_id
@@ -199,8 +190,7 @@ class ProjectViewSet(
                 None,
                 description="Update failed with integrity checking.",
             ),
-        }
-        | RedisDependencyMixin.redis_unavailable_response(),
+        },
     )
     def partial_update(self, request, pk):
         project = self.get_object()
@@ -244,13 +234,9 @@ class ProjectViewSet(
                 models.Project.ImportState.RUNNING,
             ]
         ):
-            # check if redis is available
-            self.redis_is_available()
+            # With dispatcherd migration, Redis is no longer required
 
-            try:
-                job_id = tasks.sync_project(project.id)
-            except redis.ConnectionError:
-                return RedisDependencyMixin.redis_unavailable_response()
+            job_id = tasks.sync_project(project.id)
 
             project.import_state = models.Project.ImportState.PENDING
             if job_id:
@@ -266,8 +252,7 @@ class ProjectViewSet(
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
-        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer}
-        | RedisDependencyMixin.redis_unavailable_response(),
+        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer},
         request=None,
         description="Sync a project",
     )
@@ -299,13 +284,8 @@ class ProjectViewSet(
                 detail="Project import or sync is already running."
             )
 
-        # check if redis is available
-        self.redis_is_available()
-
-        try:
-            job_id = tasks.sync_project(project.id)
-        except redis.ConnectionError:
-            return RedisDependencyMixin.redis_unavailable_response()
+        # With dispatcherd migration, Redis is no longer required
+        job_id = tasks.sync_project(project.id)
 
         project.import_state = models.Project.ImportState.PENDING
 

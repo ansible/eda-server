@@ -16,6 +16,7 @@ import logging
 import os
 
 from dateutil import parser
+from dispatcherd.worker.task import DispatcherCancel
 from django.conf import settings
 from podman import PodmanClient
 from podman.domain.images import Image
@@ -23,7 +24,6 @@ from podman.errors import ContainerError, ImageNotFound
 from podman.errors.exceptions import APIError, NotFound
 
 from aap_eda.core.enums import ActivationStatus, ImagePullPolicy
-from aap_eda.settings import features
 from aap_eda.utils import str_to_bool
 from aap_eda.utils.podman import parse_repository
 
@@ -81,19 +81,15 @@ class Engine(ContainerEngine):
         self.JobTimeoutException = self._get_job_timeout_exception()
 
     def _get_job_timeout_exception(self):
-        """Get the exception class based on the dispatcherd feature flag.
+        """Get the timeout exception class for job cancellation.
 
-        This can not be done at the module level, because the feature flag
-        state cannot be checked before the app registry is ready.
+        Returns the DispatcherCancel exception used for handling job timeouts
+        in the dispatcherd-based task processing system.
+
+        Returns:
+            DispatcherCancel: Exception class for handling job timeout/cancel
         """
-        if features.DISPATCHERD:
-            from dispatcherd.worker.task import (
-                DispatcherCancel as JobTimeoutException,
-            )
-        else:
-            from rq.timeouts import JobTimeoutException
-
-        return JobTimeoutException
+        return DispatcherCancel
 
     def cleanup(self, container_id: str, log_handler: LogHandler) -> None:
         try:

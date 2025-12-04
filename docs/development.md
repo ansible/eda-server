@@ -211,7 +211,7 @@ ansible/eda-server              12146d8     51fb0c850b94   10 minutes ago   682M
 
 ### Running services
 
-AAP EDA requires some services, such as database and redis to be running. We recommend running such services
+AAP EDA requires some services, such as database to be running. We recommend running such services
 in a containerized environment (e.g. docker / podman / minikube etc.).
 
 You can start all minimal required containers by running:
@@ -254,7 +254,9 @@ environment variables:
 * `EDA_DB_PASSWORD` – Database user password (default: `secret`, only in development mode)
 * `EDA_DB_NAME` – Database name (default: `eda`)
 
-### TLS-enabled redis
+### TLS-enabled redis (Legacy)
+
+**Note: Redis is no longer required as EDA now uses dispatcherd (PostgreSQL-based) for task processing.**
 
 If you wish to run a development environment requiring TLS connections to redis it is a simple
 process...
@@ -356,7 +358,7 @@ curl -s http://localhost:8000/api/eda/v1/openapi.json | jq -r .info.version
 
 ### Running tests
 
-To run tests locally, you need to have a running instance of postgresql and redis.
+To run tests locally, you need to have a running instance of postgresql.
 
 Run all tests:
 

@@ -12,7 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import copy
 import uuid
 from typing import Any, Dict, List
 from unittest import mock
@@ -21,14 +20,12 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
-from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.test import override_settings
 from rest_framework.test import APIClient
 
 from aap_eda.core import enums, models
 from aap_eda.core.management.commands import create_initial_data
-from aap_eda.core.tasking import Queue, get_redis_client
 from aap_eda.core.utils.credentials import inputs_to_store
 from aap_eda.services.activation.engine.common import ContainerEngine
 
@@ -823,7 +820,6 @@ def use_local_resource_setting():
         yield
 
 
-# fixture for a running redis server
 @pytest.fixture
 def default_credential_type() -> models.CredentialType:
     """Return a default Credential Type."""
@@ -1085,37 +1081,41 @@ def create_managed_org_roles(create_initial_data_command):
 
 
 #################################################################
-# Redis
+# Task Queue Fixtures
 #################################################################
-# fixture for a running redis server
-@pytest.fixture
-def redis_external(redis_parameters):
-    client = get_redis_client(**redis_parameters)
-    yield client
-    client.flushdb()
+# Legacy fixtures for backward compatibility with existing tests
 
 
 @pytest.fixture
-def test_queue_name(redis_parameters):
-    # Use a separately named deep copy of the default queue to prevent
-    # cross-environment issues.  If not using a deep copy the same queue entry
-    # is used as value for the two queues and modifying via either affects the
-    # other.
-    # Using the eda-server default queue results in tasks run by tests to
-    # execute within eda-server context, if the eda-server default worker is
-    # running, rather than the test context.
-    settings.RQ_QUEUES["test-default"] = copy.deepcopy(
-        settings.RQ_QUEUES["default"]
-    )
-
-    # The redis parameters provide the DB to use.
-    settings.RQ_QUEUES["test-default"]["DB"] = redis_parameters["db"]
+def test_queue_name():
+    # Legacy fixture for backward compatibility with existing tests
+    # With dispatcherd, we no longer use Redis queues but keep the name for
+    # compatibility
     return "test-default"
 
 
 @pytest.fixture
-def default_queue(test_queue_name, redis_external) -> Queue:
-    return Queue(test_queue_name, connection=redis_external)
+def default_queue(test_queue_name):
+    # Legacy fixture for backward compatibility with existing tests
+    # With dispatcherd, we no longer use Queue objects
+    class MockQueue:
+        def __init__(self, name, connection=None):
+            self.name = name
+            self.connection = connection
+
+        def enqueue(self, func, *args, **kwargs):
+            # Mock job object
+            class MockJob:
+                def __init__(self, kwargs):
+                    self.kwargs = kwargs
+                    self.id = kwargs.get("job_id", "mock-job-id")
+
+                def set_status(self, status):
+                    pass
+
+            return MockJob(kwargs)
+
+    return MockQueue(test_queue_name, connection=None)
 
 
 @pytest.fixture

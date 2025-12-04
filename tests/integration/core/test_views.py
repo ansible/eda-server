@@ -39,33 +39,3 @@ def test_status_view_database_failure():
             "status": STATUS_FAILED,
             "message": "Database connection failed",
         }
-
-
-@pytest.mark.django_db
-def test_status_view_redis_failure():
-    client = APIClient()
-    client.force_authenticate(user=None)
-    with patch(
-        "aap_eda.core.views.StatusView._check_redis", return_value=False
-    ):
-        response = client.get(f"{api_url_v1}/status/")
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.data == {
-            "status": STATUS_FAILED,
-            "message": "Redis connection failed",
-        }
-
-
-@pytest.mark.django_db
-def test_status_view_both_failures():
-    client = APIClient()
-    client.force_authenticate(user=None)
-    with patch(
-        "aap_eda.core.views.StatusView._check_database", return_value=False
-    ), patch("aap_eda.core.views.StatusView._check_redis", return_value=False):
-        response = client.get(f"{api_url_v1}/status/")
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.data == {
-            "status": STATUS_FAILED,
-            "message": "Database connection failed; Redis connection failed",
-        }

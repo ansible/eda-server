@@ -110,9 +110,6 @@ class Engine(ContainerEngine):
             f"-{request.rulebook_process_id}"
         )
 
-        # Should we switch to new format
-        # self.job_name = f"activation-job-" #noqa: E800
-        # f"{request.id}-{uuid.uuid4()}" #noqa: E800
         try:
             log_handler.write("Creating Job")
             log_handler.write(f"Log tracking id: {request.log_tracking_id}")

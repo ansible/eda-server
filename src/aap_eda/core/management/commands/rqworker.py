@@ -11,83 +11,106 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+"""Legacy rqworker command (replaced by dispatcherd).
 
-"""Wrapper for rqworker command."""
+This command has been replaced by the dispatcherd command as part of the
+migration from Redis/RQ to PostgreSQL pg_notify for task processing.
 
+The new dispatcherd command provides the same functionality with improved
+reliability and reduced infrastructure dependencies.
+
+Migration path:
+    Old: python manage.py rqworker <queue_name>
+    New: python manage.py dispatcherd --worker-class <WorkerClass>
+
+Worker class mapping:
+    * Default queue -> DefaultWorker
+    * Activation queue -> ActivationWorker
+"""
 import logging
+import signal
+import time
 
-from dispatcherd import run_service as run_dispatcherd_service
-from dispatcherd.config import setup as dispatcherd_setup
-from django.conf import settings
-from django.core.management.base import BaseCommand, CommandParser
-from django_rq.management.commands import rqworker
+from django.core.management.base import BaseCommand
 
-from aap_eda import utils
-from aap_eda.settings import features
+from aap_eda.core.exceptions import GracefulExit
+from aap_eda.utils.logging import startup_logging
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    """Wrapper for rqworker command.
+    help = "Legacy rqworker command (replaced by dispatcherd)."
 
-    Switches between rqworker and dispatcherd commands based on
-    the dispatcherd feature flag.
-    """
-
-    args = rqworker.Command.args
-
-    def add_arguments(self, parser: CommandParser) -> None:
-        return rqworker.Command.add_arguments(self, parser)
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "queues",
+            nargs="*",
+            help=(
+                "Queue names (legacy parameter, "
+                "will be mapped to worker class)"
+            ),
+        )
+        parser.add_argument(
+            "--worker-class",
+            help="Worker class to use (legacy parameter)",
+        )
 
     def handle(self, *args, **options) -> None:
-        if features.DISPATCHERD:
-            return self._handle_dispatcherd(*args, **options)
+        startup_logging(logger)
 
-        # run rqworker command if dispatcherd is not enabled
-        logger.info("Starting worker with rqworker.")
-        return rqworker.Command.handle(self, *args, **options)
+        queues = options.get("queues", [])
+        worker_class = options.get("worker_class")
 
-    def _handle_dispatcherd(self, *args, **options) -> None:
-        """Handle dispatcherd service."""
-        if "worker_class" not in options:
-            self.style.ERROR("Missing required argument: --worker-class")
-            raise SystemExit(1)
-
-        # Use rqworker expected args to determine worker type
-        if "ActivationWorker" in options["worker_class"]:
-            # dispatcherd worker settings can not be initialized as settings
-            # because the queue name sanitization must happen
-            # after the settings are loaded, we can not check the feature flag
-            # before the settings are loaded.
-            dispatcher_worker_settings = {
-                **settings.DISPATCHERD_DEFAULT_SETTINGS,
-                "brokers": {
-                    "pg_notify": {
-                        **settings.DISPATCHERD_DEFAULT_SETTINGS["brokers"][
-                            "pg_notify"
-                        ],
-                        "channels": [
-                            utils.sanitize_postgres_identifier(
-                                settings.RULEBOOK_QUEUE_NAME,
-                            )
-                        ],
-                    },
-                },
-            }
-            dispatcherd_setup(
-                dispatcher_worker_settings,
+        # Determine the appropriate dispatcherd command
+        if queues:
+            queue_name = queues[0]  # Use first queue for mapping
+            if queue_name == "activation":
+                suggested_command = (
+                    "python manage.py dispatcherd "
+                    "--worker-class ActivationWorker"
+                )
+            else:
+                suggested_command = (
+                    "python manage.py dispatcherd "
+                    "--worker-class DefaultWorker"
+                )
+        elif worker_class:
+            suggested_command = (
+                f"python manage.py dispatcherd "
+                f"--worker-class {worker_class}"
             )
-
-        elif "DefaultWorker" in options["worker_class"]:
-            dispatcherd_setup(settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS)
         else:
-            self.style.ERROR(
-                "Invalid worker class. "
-                "Please use either ActivationWorker or DefaultWorker."
+            suggested_command = (
+                "python manage.py dispatcherd --worker-class DefaultWorker"
             )
-            raise SystemExit(1)
 
-        logger.info("Starting worker with dispatcherd.")
-        run_dispatcherd_service()
-        return None
+        self.stdout.write(
+            self.style.WARNING(
+                "The 'rqworker' command has been replaced by 'dispatcherd' as "
+                "part of the migration from Redis/RQ to PostgreSQL "
+                "pg_notify.\n\n"
+                f"Please update your deployment to use:\n  "
+                f"{suggested_command}\n\n"
+                "Benefits of dispatcherd:\n"
+                "  • Eliminates Redis dependency\n"
+                "  • Improved task reliability with PostgreSQL ACID "
+                "properties\n"
+                "  • Better resource utilization\n"
+                "  • Simplified deployment architecture\n\n"
+                "Running in compatibility mode (no-op)..."
+            ),
+        )
+
+        def handle_exit(signum, frame):
+            raise GracefulExit()
+
+        signal.signal(signal.SIGTERM, handle_exit)
+        signal.signal(signal.SIGINT, handle_exit)
+
+        try:
+            while True:
+                time.sleep(60)
+        except GracefulExit:
+            self.stdout.write(self.style.NOTICE("Exiting compatibility mode."))
+            return

@@ -59,21 +59,6 @@ Optionally you can define DATABASES as an object
 * DATABASES - A dict with django database settings
 
 
-Redis queue settings:
-
-* MQ_UNIX_SOCKET_PATH - Redis unix socket path (default: None)
-*   - Takes precedence over host and port
-* MQ_HOST - Redis queue hostname (default: "127.0.0.1")
-* MQ_PORT - Redis queue port (default: 6379)
-* MQ_TLS - Force TLS on when True or "yes" (default: None)
-* MQ_DB - Redis queue database (default: 0)
-* MQ_USER - Redis user (default: None)
-* MQ_USER_PASSWORD - Redis user passed (default: None)
-* MQ_CLIENT_CERT_PATH - Redis TLS client certificate path (default: None)
-*   - If MQ_UNIX_SOCKET_PATH is not set and MQ_CLIENT_CERT_PATH
-*     is set TLS with be used.
-* MQ_CLIENT_KEY_PATH - Redis TLS client key path (default: None)
-* MQ_CLIENT_CACERT_PATH - Redis TLS CA certificate path (default: None)
 
 
 Podman settings:
@@ -97,8 +82,6 @@ To configure a Resource Server for syncing of managed resources:
 """
 
 from typing import NewType, Optional, Union
-
-from aap_eda.settings import core
 
 StrToList = NewType("StrToList", Union[list, str])
 UrlSlash = NewType("UrlSlash", Optional[str])
@@ -148,29 +131,6 @@ PODMAN_MOUNTS: Optional[list] = []
 PODMAN_EXTRA_ARGS: Optional[dict] = {}
 CONTAINER_NAME_PREFIX: str = "eda"
 
-RQ_REDIS_PREFIX: str = "eda-rq"
-MQ_UNIX_SOCKET_PATH: Optional[str] = None
-MQ_HOST: str = "localhost"
-MQ_PORT: int = 6379
-MQ_USER: Optional[str] = None
-MQ_USER_PASSWORD: Optional[str] = None
-MQ_CLIENT_CACERT_PATH: Optional[str] = None
-MQ_CLIENT_CERT_PATH: Optional[str] = None
-MQ_CLIENT_KEY_PATH: Optional[str] = None
-MQ_TLS: Optional[Union[bool, str]] = None
-MQ_DB: int = core.DEFAULT_REDIS_DB
-
-# The HA cluster hosts is a string of <host>:<port>[,<host>:port>]+
-# and is exhaustive; i.e., not in addition to REDIS_HOST:REDIS_PORT.
-# EDA does not validate the content, but relies on DAB to do so.
-#
-# In establishing an HA Cluster Redis client connection DAB ignores
-# the host and port kwargs.
-MQ_REDIS_HA_CLUSTER_HOSTS: str = ""
-MQ_SOCKET_KEEP_ALIVE: bool = True
-MQ_SOCKET_CONNECT_TIMEOUT: int = 10
-MQ_SOCKET_TIMEOUT: int = 150
-MQ_CLUSTER_ERROR_RETRY_ATTEMPTS: int = 3
 
 # A list of queues to be used in multinode mode
 # If the list is empty, use the default singlenode queue name

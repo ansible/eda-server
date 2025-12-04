@@ -16,9 +16,16 @@
 
 # Defines feature flags, and their conditions.
 # See https://cfpb.github.io/django-flags/
-DISPATCHERD_FEATURE_FLAG_NAME = "FEATURE_DISPATCHERD_ENABLED"
 ANALYTICS_FEATURE_FLAG_NAME = "FEATURE_EDA_ANALYTICS_ENABLED"
 
+FLAGS = {
+    ANALYTICS_FEATURE_FLAG_NAME: [
+        {
+            "condition": "boolean",
+            "value": False,
+        },
+    ],
+}
 
 INSTALLED_APPS = [
     "daphne",
@@ -39,9 +46,6 @@ INSTALLED_APPS = [
     # Local apps
     "aap_eda.api",
     "aap_eda.core",
-    # rq_worker needs to be loaded after the core app
-    # to wrap the rq worker command
-    "django_rq",
 ]
 
 
@@ -132,7 +136,6 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "aap_eda.api.exceptions.api_fallback_handler",
 }
 
-DEFAULT_REDIS_DB = 0
 
 # ---------------------------------------------------------
 # DISPATCHERD SETTINGS
@@ -146,46 +149,9 @@ DISPATCHERD_STARTUP_TASKS = {
 
 DISPATCHERD_SCHEDULE_TASKS = {
     "aap_eda.tasks.orchestrator.monitor_rulebook_processes": {"schedule": 5},
-    # not migrated yet to dispatcher
-    #     "aap_eda.tasks.project._monitor_project_tasks": {"schedule": 30},
+    "aap_eda.tasks.project.monitor_project_tasks": {"schedule": 30},
 }
 
-# ---------------------------------------------------------
-# TASKING SETTINGS
-# ---------------------------------------------------------
-RQ = {
-    "JOB_CLASS": "aap_eda.core.tasking.Job",
-    "QUEUE_CLASS": "aap_eda.core.tasking.Queue",
-    "SCHEDULER_CLASS": "aap_eda.core.tasking.Scheduler",
-    "WORKER_CLASS": "aap_eda.core.tasking.Worker",
-}
-
-# Time window in seconds to consider a worker as dead
-DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
-DEFAULT_WORKER_TTL = 5
-
-RQ_STARTUP_JOBS = [
-    {
-        "func": "aap_eda.tasks.analytics.schedule_gather_analytics",
-        "job_id": "start_analytics_scheduler",
-    },
-]
-
-# Id of the scheduler job it's required when we have multiple instances of
-# the scheduler running to avoid duplicate jobs
-RQ_PERIODIC_JOBS = [
-    {
-        "func": ("aap_eda.tasks.orchestrator.monitor_rulebook_processes"),
-        "interval": 5,
-        "id": "monitor_rulebook_processes",
-    },
-    {
-        "func": "aap_eda.tasks.project.monitor_project_tasks",
-        "interval": 30,
-        "id": "monitor_project_tasks",
-    },
-]
-RQ_CRON_JOBS = []
 
 ANSIBLE_BASE_CUSTOM_VIEW_PARENT = "aap_eda.api.views.dab_base.BaseAPIView"
 

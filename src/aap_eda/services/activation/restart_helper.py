@@ -38,8 +38,7 @@ def system_cancel_restart_activation(
     """
     LOGGER.info(f"Cancelling auto-start for {process_parent_type} {id}")
 
-    # TODO: remove hardcoded queue name, for now both, dispatcherd and rqworker
-    # are using the same default queue name
+    # TODO: remove hardcoded queue name, dispatcherd uses default queue
     queue_cancel_job("default", auto_start_job_id(process_parent_type, id))
 
 

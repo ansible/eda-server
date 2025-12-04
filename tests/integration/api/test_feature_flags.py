@@ -11,14 +11,13 @@ from tests.integration.constants import api_url_v1
 
 
 @pytest.mark.django_db
-def test_feature_flags_list_endpoint(admin_client, preseed_feature_flags):
+def test_feature_flags_list_endpoint(admin_client):
     response = admin_client.get(f"{api_url_v1}/feature_flags_state/")
     assert response.status_code == status.HTTP_200_OK, response.data
     # Validates expected default feature flags
     # Modify each time a flag is added to default settings
     assert len(response.data) == len(get_flags())
     assert response.data[settings.ANALYTICS_FEATURE_FLAG_NAME] is False
-    assert response.data[settings.DISPATCHERD_FEATURE_FLAG_NAME] is False
 
 
 @pytest.mark.parametrize("flag_value", [True, False])

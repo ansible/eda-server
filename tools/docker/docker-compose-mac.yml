@@ -1,9 +1,7 @@
 x-environment:
   &common-env
   - EDA_DB_HOST=postgres
-  - EDA_MQ_HOST=${EDA_MQ_HOST:-redis}
-  - EDA_MQ_PORT=${EDA_MQ_PORT:-6379}
-  - EDA_MQ_REDIS_HA_CLUSTER_HOSTS=${EDA_MQ_REDIS_HA_CLUSTER_HOSTS:-}
+  # Redis environment variables removed - no longer required with dispatcherd migration
   - DJANGO_SETTINGS_MODULE=aap_eda.settings.default
   - EDA_DB_PASSWORD=secret
   - EDA_SECRET_KEY=secret
@@ -78,16 +76,7 @@ services:
       retries: 3
       start_period: 5s
 
-  redis:
-    image: ${EDA_REDIS_IMAGE:-mirror.gcr.io/library/redis}:${EDA_REDIS_VERSION:-6.2.14}
-    ports:
-      - '${EDA_REDIS_PORT:-6379}:6379'
-    healthcheck:
-      test: [ 'CMD', 'redis-cli', 'ping' ]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
+# Redis service removed - no longer required with dispatcherd migration
 
   eda-api:
     image: ${EDA_IMAGE:-quay.io/ansible/eda-server}:${EDA_IMAGE_VERSION:-main}
@@ -105,8 +94,6 @@ services:
     ports:
       - '${EDA_API_PORT:-8000}:8000'
     depends_on:
-      redis:
-        condition: service_healthy
       postgres:
         condition: service_healthy
     healthcheck:
@@ -146,8 +133,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.DefaultWorker
+        aap-eda-manage dispatcherd
+        --worker-class DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -168,8 +155,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
+        aap-eda-manage dispatcherd
+        --worker-class ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
