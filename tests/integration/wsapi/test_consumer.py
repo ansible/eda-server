@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 import uuid
@@ -778,19 +779,23 @@ def _prepare_activation_instance_with_credentials(
         organization=default_organization,
     )
 
-    decision_environment = models.DecisionEnvironment.objects.create(
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
         name="de_test_name_1",
-        image_url="de_test_image_url",
-        description="de_test_description",
         organization=default_organization,
+        defaults={
+            "image_url": "de_test_image_url",
+            "description": "de_test_description",
+        },
     )
 
-    user = models.User.objects.create_user(
+    user, _ = models.User.objects.get_or_create(
         username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
+        defaults={
+            "first_name": "Luke",
+            "last_name": "Skywalker",
+            "email": "luke.skywalker@example.com",
+            "password": "secret",
+        },
     )
     activation, _ = models.Activation.objects.get_or_create(
         name="test-activation",
@@ -831,30 +836,36 @@ def _prepare_activation_with_controller_info(
         organization=default_organization,
     )
 
-    decision_environment = models.DecisionEnvironment.objects.create(
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
         name="de_test_name_1",
-        image_url="de_test_image_url",
-        description="de_test_description",
         organization=default_organization,
+        defaults={
+            "image_url": "de_test_image_url",
+            "description": "de_test_description",
+        },
     )
 
-    user = models.User.objects.create_user(
+    user, _ = models.User.objects.get_or_create(
         username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
+        defaults={
+            "first_name": "Luke",
+            "last_name": "Skywalker",
+            "email": "luke.skywalker@example.com",
+            "password": "secret",
+        },
     )
     aap_credential_type = models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.AAP
     )
 
-    credential = models.EdaCredential.objects.create(
+    credential, _ = models.EdaCredential.objects.get_or_create(
         name="eda_credential",
-        inputs=inputs,
-        managed=False,
         credential_type=aap_credential_type,
         organization=default_organization,
+        defaults={
+            "inputs": inputs,
+            "managed": False,
+        },
     )
 
     system_credential = _prepare_system_vault_credential(default_organization)
@@ -897,22 +908,26 @@ def _prepare_db_data(
         organization=default_organization,
     )
 
-    user = models.User.objects.create_user(
+    user, _ = models.User.objects.get_or_create(
         username="luke.skywalker",
-        first_name="Luke",
-        last_name="Skywalker",
-        email="luke.skywalker@example.com",
-        password="secret",
+        defaults={
+            "first_name": "Luke",
+            "last_name": "Skywalker",
+            "email": "luke.skywalker@example.com",
+            "password": "secret",
+        },
     )
 
     token = models.AwxToken.objects.get_or_create(
         user=user, name="token", token="XXX"
     )
-    decision_environment = models.DecisionEnvironment.objects.create(
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
         name="de_test_name_1",
-        image_url="de_test_image_url",
-        description="de_test_description",
         organization=default_organization,
+        defaults={
+            "image_url": "de_test_image_url",
+            "description": "de_test_description",
+        },
     )
 
     activation, _ = models.Activation.objects.get_or_create(
@@ -955,22 +970,26 @@ def _prepare_activation_instance_without_extra_var(
         organization=default_organization,
     )
 
-    user = models.User.objects.create_user(
+    user, _ = models.User.objects.get_or_create(
         username="luke.skywalker2",
-        first_name="Luke",
-        last_name="Skywalker2",
-        email="luke.skywalker2@example.com",
-        password="secret",
+        defaults={
+            "first_name": "Luke",
+            "last_name": "Skywalker2",
+            "email": "luke.skywalker2@example.com",
+            "password": "secret",
+        },
     )
 
     token = models.AwxToken.objects.get_or_create(
         user=user, name="token", token="XXX"
     )
-    decision_environment = models.DecisionEnvironment.objects.create(
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
         name="de_test_name_2",
-        image_url="de_test_image_url",
-        description="de_test_description",
         organization=default_organization,
+        defaults={
+            "image_url": "de_test_image_url",
+            "description": "de_test_description",
+        },
     )
 
     activation = models.Activation.objects.create(
@@ -1010,19 +1029,23 @@ def _prepare_activation_instance_no_token(
         organization=default_organization,
     )
 
-    user = models.User.objects.create_user(
+    user, _ = models.User.objects.get_or_create(
         username="obiwan.kenobi",
-        first_name="ObiWan",
-        last_name="Kenobi",
-        email="obiwan@jedicouncil.com",
-        password="secret",
+        defaults={
+            "first_name": "ObiWan",
+            "last_name": "Kenobi",
+            "email": "obiwan@jedicouncil.com",
+            "password": "secret",
+        },
     )
 
-    decision_environment = models.DecisionEnvironment.objects.create(
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
         name="de_no_token",
-        image_url="de_test_image_url",
-        description="de_test_description",
         organization=default_organization,
+        defaults={
+            "image_url": "de_test_image_url",
+            "description": "de_test_description",
+        },
     )
 
     activation = models.Activation.objects.create(
@@ -1065,7 +1088,15 @@ async def ws_communicator() -> Generator[WebsocketCommunicator, None, None]:
     assert connected
 
     yield communicator
-    await communicator.disconnect()
+
+    # Handle CancelledError gracefully during fixture teardown
+    # This can occur in Django 5.x when the async task has already been
+    # cancelled before disconnect() is called
+    try:
+        await communicator.disconnect()
+    except asyncio.CancelledError:
+        # Task was already cancelled, nothing more to do
+        pass
 
 
 def create_action_payload(
