@@ -15,9 +15,6 @@
 import logging
 
 import pytest
-from ansible_base.feature_flags.utils import (
-    create_initial_data as seed_feature_flags,
-)
 from django.conf import settings
 
 from aap_eda.core import enums, models
@@ -25,7 +22,6 @@ from aap_eda.core.management.commands.create_initial_data import (
     CREDENTIAL_TYPES,
     populate_credential_types,
 )
-from aap_eda.settings import redis as redis_settings
 
 
 #################################################################
@@ -92,37 +88,3 @@ def aap_credential_type(preseed_credential_types):
     return models.CredentialType.objects.get(
         name=enums.DefaultCredentialType.AAP
     )
-
-
-@pytest.fixture
-def preseed_feature_flags():
-    seed_feature_flags()
-
-
-#################################################################
-# Redis
-#################################################################
-@pytest.fixture
-def redis_parameters() -> dict:
-    """Provide redis parameters based on settings values."""
-    params = redis_settings.rq_redis_client_instantiation_parameters()
-
-    # TODO: figure out the db oddity described here-in.
-    #
-    # There's an oddity with non-HA unit tests and the use of
-    # an alternate db.
-    #
-    # For pragmatism we've removed the code here which attempted
-    # to avoid conflicting with a deployed environment by using a
-    # different database from that of the settings.
-    #
-    #
-    # One constant is that DAB RedisCluster, which does not support
-    # alternate dbs passes the EDA unit tests (which are part of
-    # CI processing) and that by using only the 0 db
-    # the same unit tests pass for non-HA whereas using an alternate
-    # db as this code previously did results in non-HA unit tests
-    # failing.
-    #
-
-    return params

@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 import logging
-import sys
 
 from dispatcherd.config import setup as dispatcher_setup
 from django.apps import AppConfig
@@ -29,13 +28,6 @@ class CoreConfig(AppConfig):
     def ready(self):
         # make sure we apply DAB decorations in case they are not yet imported
         from aap_eda.api.views import dab_decorate  # noqa: F401
-
-        # Run the startup logging for rq worker
-        # WARNING: rqworker can run rq workers or dispatcherd workers
-        if "rqworker" in sys.argv:
-            from aap_eda.utils.logging import startup_logging
-
-            startup_logging(logger)
 
         # Enable default dispatcher config. Workers may override this
         dispatcher_setup(settings.DISPATCHERD_DEFAULT_SETTINGS)

@@ -1,3 +1,9 @@
+# DEPRECATED: This Docker Compose file is for Redis with TLS support
+# With the dispatcherd migration, Redis is no longer required for EDA
+# Use docker-compose-dev.yaml instead, which only requires PostgreSQL
+#
+# This file remains for legacy compatibility but should not be used for new development
+
 x-environment:
   &common-env
   - EDA_MODE=${EDA_MODE:-development}
@@ -207,8 +213,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.DefaultWorker
+        aap-eda-manage dispatcherd
+        --worker-class DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -224,8 +230,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage rqworker
-        --worker-class aap_eda.core.tasking.ActivationWorker
+        aap-eda-manage dispatcherd
+        --worker-class ActivationWorker
     environment: *common-env
     depends_on:
       eda-api:

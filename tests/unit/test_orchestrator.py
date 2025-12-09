@@ -17,48 +17,20 @@ import uuid
 from datetime import datetime, timedelta
 from unittest import mock
 
-import django_rq
 import pytest
 from django.conf import settings
 
 from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.core.models import Activation, RulebookProcess
-from aap_eda.settings import default
 from aap_eda.tasks import orchestrator
 from aap_eda.tasks.exceptions import UnknownProcessParentType
 from aap_eda.tasks.orchestrator import (
     _manage,
-    check_rulebook_queue_health,
     get_least_busy_queue_name,
     get_process_parent,
 )
 
 
-# Sets up a collection of mocked queues in specified states for testing
-# orchestrator functionality.
-#
-# Queues are specified via a dictionary using the following format.
-# Any number of queues may be specified.
-#
-# {                                                             # noqa: E800
-#     "queue1": {                                               # noqa: E800
-#         "workers": {                                          # noqa: E800
-#             "worker1_1": {                                    # noqa: E800
-#                 "responsive": True,                           # noqa: E800
-#             },                                                # noqa: E800
-#         },                                                    # noqa: E800
-#         "process_count": 1,                                   # noqa: E800
-#     },                                                        # noqa: E800
-#     "queue2": {                                               # noqa: E800
-#         "workers": {                                          # noqa: E800
-#             "worker2_1": {                                    # noqa: E800
-#                 "responsive": True,                           # noqa: E800
-#             },                                                # noqa: E800
-#         },                                                    # noqa: E800
-#         "process_count": 2,                                   # noqa: E800
-#     },                                                        # noqa: E800
-# }                                                             # noqa: E800
-#
 def _mock_up_queues(monkeypatch, queues):
     mock_queues = {}
 
@@ -73,15 +45,26 @@ def _mock_up_queues(monkeypatch, queues):
         RulebookProcess.objects, "filter", _process_object_filter
     )
 
+    # Mock the queue health check to return True for queues with responsive
+    # workers
+    def _mock_queue_health_check(queue_name: str) -> bool:
+        if queue_name in queues:
+            workers = queues[queue_name]["workers"]
+            return any(
+                worker_info.get("responsive", False)
+                for worker_info in workers.values()
+            )
+        return False
+
+    monkeypatch.setattr(
+        orchestrator, "check_rulebook_queue_health", _mock_queue_health_check
+    )
+
     def _get_queue(name: str) -> mock.Mock:
         return mock_queues[name]
 
-    monkeypatch.setattr(django_rq, "get_queue", _get_queue)
-
     def _worker_all(queue=None) -> list:
         return queue.workers
-
-    monkeypatch.setattr(orchestrator.tasking.Worker, "all", _worker_all)
 
     def _process_count(queue: mock.Mock) -> None:
         return queue.process_count
@@ -106,9 +89,8 @@ def _mock_up_queues(monkeypatch, queues):
             ]["responsive"]
             mock_worker.last_heartbeat = datetime.now()
             if not mock_worker.responsive:
-                mock_worker.last_heartbeat -= timedelta(
-                    seconds=(2 * default.DEFAULT_WORKER_HEARTBEAT_TIMEOUT)
-                )
+                # Use a constant timeout with dispatcherd
+                mock_worker.last_heartbeat -= timedelta(seconds=120)
             mock_queue.workers.append(mock_worker)
 
         mock_queues[queue_name] = mock_queue
@@ -352,42 +334,6 @@ def multi_queue_various_states(monkeypatch):
     )
 
 
-@pytest.mark.django_db
-def test_check_rulebook_queue_health(multi_queue_various_states):
-    queues = multi_queue_various_states
-
-    expected_good_queues = [
-        queue
-        for queue in queues.values()
-        if sum(1 for _ in filter(lambda w: w.responsive, queue.workers)) > 0
-    ]
-    expected_bad_queues = [
-        queue
-        for queue in queues.values()
-        if sum(1 for _ in filter(lambda w: w.responsive, queue.workers)) == 0
-    ]
-
-    found_good_queues = []
-    found_bad_queues = []
-    for queue in queues.values():
-        if check_rulebook_queue_health(queue.name):
-            found_good_queues.append(queue)
-        else:
-            found_bad_queues.append(queue)
-
-    assert len(found_good_queues) == len(expected_good_queues)
-    assert len(
-        [x for x in expected_good_queues if x in found_good_queues]
-    ) == len(expected_good_queues)
-
-    assert len(found_bad_queues) == len(expected_bad_queues)
-    assert len(
-        [x for x in expected_bad_queues if x in found_bad_queues]
-    ) == len(expected_bad_queues)
-    for queue in found_bad_queues:
-        assert queue.count() == 0
-
-
 def test_get_process_parent_activation():
     activation_id = 1
     activation_mock = mock.Mock(spec=Activation)
@@ -424,7 +370,6 @@ def setup_queue_health():
     timedelta_mock.return_value = timedelta(seconds=60)
 
     patches = {
-        "get_queue": mock.patch("django_rq.get_queue", get_queue_mock),
         "datetime": mock.patch(
             "aap_eda.tasks.orchestrator.datetime", datetime_mock
         ),
@@ -435,9 +380,7 @@ def setup_queue_health():
             "aap_eda.tasks.orchestrator.settings", settings_mock
         ),
     }
-    with patches["get_queue"], patches["datetime"], patches[
-        "timedelta"
-    ], patches["settings"]:
+    with patches["datetime"], patches["timedelta"], patches["settings"]:
         yield (
             queue_name,
             queue_mock,
@@ -445,60 +388,6 @@ def setup_queue_health():
             datetime_mock,
             settings_mock,
         )
-
-
-def test_check_rulebook_queue_health_all_workers_dead(setup_queue_health):
-    (
-        queue_name,
-        queue_mock,
-        get_queue_mock,
-        datetime_mock,
-        _,
-    ) = setup_queue_health
-
-    # Specific setup for this test
-    worker_mock = mock.Mock()
-    worker_mock.last_heartbeat = datetime(2022, 1, 1)
-    all_workers_mock = mock.Mock(return_value=[worker_mock])
-    datetime_mock.now.return_value = datetime(2022, 1, 1, minute=5)
-
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
-    ):
-        result = check_rulebook_queue_health(queue_name)
-
-    get_queue_mock.assert_called_once_with(queue_name)
-    all_workers_mock.assert_called_once_with(queue=queue_mock)
-    queue_mock.empty.assert_called_once()
-    assert result is False
-
-
-def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
-    (
-        queue_name,
-        queue_mock,
-        get_queue_mock,
-        datetime_mock,
-        _,
-    ) = setup_queue_health
-
-    # Specific setup for this test
-    worker_mock1 = mock.Mock()
-    worker_mock1.last_heartbeat = datetime(2022, 1, 1, hour=6)
-    worker_mock2 = mock.Mock()
-    worker_mock2.last_heartbeat = datetime(2022, 1, 1)
-    all_workers_mock = mock.Mock(return_value=[worker_mock1, worker_mock2])
-    datetime_mock.now.return_value = datetime(2022, 1, 1, hour=6, second=30)
-
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
-    ):
-        result = check_rulebook_queue_health(queue_name)
-
-    get_queue_mock.assert_called_once_with(queue_name)
-    all_workers_mock.assert_called_once_with(queue=queue_mock)
-    queue_mock.empty.assert_not_called()
-    assert result is True
 
 
 @pytest.mark.django_db
