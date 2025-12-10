@@ -15,13 +15,13 @@
 Django settings.
 
 For more information on this file, see
-https://docs.djangoproject.com/en/4.1/topics/settings/
+https://docs.djangoproject.com/en/5.2/topics/settings/
 
 For the full list of settings and their values, see
-https://docs.djangoproject.com/en/4.1/ref/settings/
+https://docs.djangoproject.com/en/5.2/ref/settings/
 
 Quick-start development settings - unsuitable for production
-See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
+See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 
 All settings can be overwritten via environment variables or setting files
@@ -92,7 +92,7 @@ ALLOWED_HOSTS: StrToList = []
 
 # A list or a comma separated string of allowed origins for CSRF protection
 # in the form of [scheme://]host[:port]. Supports wildcards.
-# More info: https://docs.djangoproject.com/en/4.2/ref/settings/#csrf-trusted-origins  # noqa: E501
+# More info: https://docs.djangoproject.com/en/5.2/ref/settings/#csrf-trusted-origins  # noqa: E501
 CSRF_TRUSTED_ORIGINS: StrToList = []
 
 # Session settings
@@ -108,7 +108,7 @@ JWT_REFRESH_TOKEN_LIFETIME_DAYS: int = 365
 FLAGS: dict = {}
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.1/howto/static-files/
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
 STATIC_URL: str = "static/"
 STATIC_ROOT: str = "/var/lib/eda/static"
 
