@@ -83,7 +83,7 @@ WSGI_APPLICATION = "aap_eda.wsgi.application"
 ASGI_APPLICATION = "aap_eda.asgi.application"
 
 # Password validation
-# https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
+# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -101,7 +101,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-# https://docs.djangoproject.com/en/4.1/topics/i18n/
+# https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
 
@@ -111,8 +111,12 @@ TIME_ZONE = "UTC"
 
 USE_TZ = True
 
+# URLField default scheme transition (Django 5.0+)
+# https://docs.djangoproject.com/en/5.0/releases/5.0/#forms
+FORMS_URLFIELD_ASSUME_HTTPS = True
+
 # Default primary key field type
-# https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
+# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "core.User"
