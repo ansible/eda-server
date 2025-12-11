@@ -28,12 +28,12 @@ Worker class mapping:
     * Activation queue -> ActivationWorker
 """
 import logging
-import signal
-import time
 
 from django.core.management.base import BaseCommand
 
-from aap_eda.core.exceptions import GracefulExit
+from aap_eda.core.management.commands.dispatcherd import (
+    Command as DispatcherdCommand,
+)
 from aap_eda.utils.logging import startup_logging
 
 logger = logging.getLogger(__name__)
@@ -62,25 +62,29 @@ class Command(BaseCommand):
         queues = options.get("queues", [])
         worker_class = options.get("worker_class")
 
-        # Determine the appropriate dispatcherd command
+        # Determine the appropriate worker class for dispatcherd
         if queues:
             queue_name = queues[0]  # Use first queue for mapping
             if queue_name == "activation":
+                mapped_worker_class = "ActivationWorker"
                 suggested_command = (
                     "python manage.py dispatcherd "
                     "--worker-class ActivationWorker"
                 )
             else:
+                mapped_worker_class = "DefaultWorker"
                 suggested_command = (
                     "python manage.py dispatcherd "
                     "--worker-class DefaultWorker"
                 )
         elif worker_class:
+            mapped_worker_class = worker_class
             suggested_command = (
                 f"python manage.py dispatcherd "
                 f"--worker-class {worker_class}"
             )
         else:
+            mapped_worker_class = "DefaultWorker"
             suggested_command = (
                 "python manage.py dispatcherd --worker-class DefaultWorker"
             )
@@ -98,19 +102,18 @@ class Command(BaseCommand):
                 "properties\n"
                 "  • Better resource utilization\n"
                 "  • Simplified deployment architecture\n\n"
-                "Running in compatibility mode (no-op)..."
+                "Forwarding to dispatcherd for backward compatibility..."
             ),
         )
 
-        def handle_exit(signum, frame):
-            raise GracefulExit()
+        # TODO: Fowarding call can be removed in future versions
+        # Forward the call to dispatcherd command
+        dispatcherd_options = {
+            **options,
+            "worker_class": mapped_worker_class,
+            "log_level": options.get("log_level", "INFO"),
+        }
 
-        signal.signal(signal.SIGTERM, handle_exit)
-        signal.signal(signal.SIGINT, handle_exit)
-
-        try:
-            while True:
-                time.sleep(60)
-        except GracefulExit:
-            self.stdout.write(self.style.NOTICE("Exiting compatibility mode."))
-            return
+        # Create and execute dispatcherd command
+        dispatcherd_command = DispatcherdCommand()
+        dispatcherd_command.handle(*args, **dispatcherd_options)
