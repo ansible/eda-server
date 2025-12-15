@@ -437,6 +437,12 @@ def post_loading(loaded_settings: Dynaconf):
             "process_manager_kwargs": {
                 "preload_modules": ["aap_eda.core.dispatcherd_pre_fork"],
             },
+            "min_workers": settings.get(
+                "DISPATCHERD_MIN_WORKERS", settings.DISPATCHERD_MIN_WORKERS
+            ),
+            "max_workers": settings.get(
+                "DISPATCHERD_MAX_WORKERS", settings.DISPATCHERD_MAX_WORKERS
+            ),
         },
         "brokers": {
             "pg_notify": {

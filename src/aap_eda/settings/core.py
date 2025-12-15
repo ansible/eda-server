@@ -140,8 +140,12 @@ REST_FRAMEWORK = {
 # ---------------------------------------------------------
 # DISPATCHERD SETTINGS
 # ---------------------------------------------------------
-DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 3
+DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 10
 DISPATCHERD_DEFAULT_CHANNEL = "default"
+
+# Worker pool configuration
+DISPATCHERD_MIN_WORKERS = 2
+DISPATCHERD_MAX_WORKERS = 8
 
 DISPATCHERD_STARTUP_TASKS = {
     "aap_eda.tasks.analytics.schedule_gather_analytics": {},
