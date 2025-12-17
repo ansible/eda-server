@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from unittest import mock
 
 import pytest
+from django.conf import settings
 
 import aap_eda.tasks.activation_request_queue as queue
 from aap_eda.core import models
@@ -210,6 +211,7 @@ def test_monitor_rulebook_processes(
             ProcessParentType.ACTIVATION,
             activation.id,
             "",
+            timeout=settings.DISPATCHERD_ACTIVATION_TASK_TIMEOUT,
         )
     ]
     for running in bulk_running_processes:
@@ -223,6 +225,7 @@ def test_monitor_rulebook_processes(
                 ProcessParentType.ACTIVATION,
                 running.activation.id,
                 "",
+                timeout=settings.DISPATCHERD_ACTIVATION_TASK_TIMEOUT,
             )
         )
 
