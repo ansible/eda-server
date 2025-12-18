@@ -1,5 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
+from contextlib import ExitStack
 from threading import Lock
 from unittest import mock
 
@@ -64,9 +65,24 @@ def test_job_uniqueness(module_data):
 
         importlib.reload(module)
 
-        with mock.patch(
-            f"{module_data['module_path']}.{module_data['fn_mock']}",
-        ) as fn_mock:
+        patches = [
+            mock.patch(
+                f"{module_data['module_path']}.{module_data['fn_mock']}",
+            ),
+        ]
+
+        # Add mock for get_insights_tracking_state for analytics tests
+        if module_data["fn_call"] == "gather_analytics":
+            patches.append(
+                mock.patch(
+                    "aap_eda.analytics.utils.get_insights_tracking_state",
+                    return_value=True,
+                )
+            )
+
+        with ExitStack() as stack:
+            mocks = [stack.enter_context(patch) for patch in patches]
+            fn_mock = mocks[0]
 
             def record_call(void=None):
                 time.sleep(1)
