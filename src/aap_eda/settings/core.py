@@ -18,14 +18,6 @@
 # See https://cfpb.github.io/django-flags/
 ANALYTICS_FEATURE_FLAG_NAME = "FEATURE_EDA_ANALYTICS_ENABLED"
 
-FLAGS = {
-    ANALYTICS_FEATURE_FLAG_NAME: [
-        {
-            "condition": "boolean",
-            "value": False,
-        },
-    ],
-}
 
 INSTALLED_APPS = [
     "daphne",

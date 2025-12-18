@@ -11,7 +11,7 @@ from tests.integration.constants import api_url_v1
 
 
 @pytest.mark.django_db
-def test_feature_flags_list_endpoint(admin_client):
+def test_feature_flags_list_endpoint(admin_client, preseed_feature_flags):
     response = admin_client.get(f"{api_url_v1}/feature_flags_state/")
     assert response.status_code == status.HTTP_200_OK, response.data
     # Validates expected default feature flags
@@ -25,6 +25,6 @@ def test_feature_flags_list_endpoint(admin_client):
 def test_feature_flags_toggle(flag_value):
     flag_name = "FEATURE_EDA_ANALYTICS_ENABLED"
     setattr(settings, flag_name, flag_value)
-    AAPFlag.objects.all().delete()
+    AAPFlag.objects.filter(name=flag_name).delete()
     seed_feature_flags()
     assert flag_state(flag_name) is flag_value
