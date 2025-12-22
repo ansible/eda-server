@@ -27,7 +27,7 @@ def test_worker_startup_logs():
     """
     Test that starting workers produce the expected startup message.
     """
-    command = ["aap-eda-manage", "dispatcherd", "--help"]
+    command = ["aap-eda-manage", "dispatcherctl", "--help"]
     timeout = 10
     process = subprocess.Popen(
         command,

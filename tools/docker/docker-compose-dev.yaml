@@ -163,8 +163,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherd
-        --worker-class DefaultWorker
+        aap-eda-manage dispatcherctl activate
+        --worker-type DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -179,8 +179,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherd
-        --worker-class DefaultWorker
+        aap-eda-manage dispatcherctl activate
+        --worker-type DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -198,8 +198,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherd
-        --worker-class ActivationWorker
+        aap-eda-manage dispatcherctl activate
+        --worker-type ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -217,8 +217,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherd
-        --worker-class ActivationWorker
+        aap-eda-manage dispatcherctl activate
+        --worker-type ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -236,8 +236,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherd
-        --worker-class ActivationWorker
+        aap-eda-manage dispatcherctl activate
+        --worker-type ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -255,8 +255,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherd
-        --worker-class ActivationWorker
+        aap-eda-manage dispatcherctl activate
+        --worker-type ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
