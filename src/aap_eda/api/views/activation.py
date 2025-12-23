@@ -143,6 +143,11 @@ class ActivationViewSet(
                 description="The activation is not allowed to be updated."
             ),
         },
+        extensions={
+            "x-ai-description": (
+                "Update an activation by ID. Returns the updated activation."
+            )
+        },
     )
     def partial_update(self, request, pk):
         activation = self.get_object()
