@@ -16,6 +16,7 @@
 from unittest import mock
 
 import pytest
+from django.conf import settings
 
 from aap_eda.tasks import analytics
 
@@ -71,6 +72,7 @@ def test_schedule_gather_analytics_success():
             analytics.ANALYTICS_SCHEDULE_JOB_ID,
             test_interval,
             analytics.auto_gather_analytics,
+            timeout=settings.DISPATCHERD_ANALYTICS_TASK_TIMEOUT,
         )
 
 
@@ -91,6 +93,7 @@ def test_schedule_gather_analytics_with_default_queue():
             analytics.ANALYTICS_SCHEDULE_JOB_ID,
             300,
             analytics.auto_gather_analytics,
+            timeout=settings.DISPATCHERD_ANALYTICS_TASK_TIMEOUT,
         )
 
 
@@ -135,6 +138,7 @@ def test_reschedule_gather_analytics():
             analytics.ANALYTICS_SCHEDULE_JOB_ID,
             300,
             analytics.auto_gather_analytics,
+            timeout=settings.DISPATCHERD_ANALYTICS_TASK_TIMEOUT,
         )
 
 

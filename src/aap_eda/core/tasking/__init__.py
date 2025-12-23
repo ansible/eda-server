@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def enqueue_delay(
-    queue_name: str, job_id: str, delay: int, *args, **kwargs
+    queue_name: str, job_id: str, delay: int, *args, timeout=None, **kwargs
 ) -> None:
     """Enqueue a job to run after specific seconds in dispatcherd."""
     fn = args[0]
@@ -31,6 +31,7 @@ def enqueue_delay(
         kwargs=kwargs,
         queue=utils.sanitize_postgres_identifier(queue_name),
         uuid=job_id,
+        timeout=timeout,
         processor_options=[Delayer.Params(delay=delay)],
     )
 
@@ -45,7 +46,9 @@ def queue_cancel_job(queue_name: str, job_id: str) -> None:
         logger.debug(f"No jobs running with id {job_id} to cancel")
 
 
-def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> None:
+def unique_enqueue(
+    queue_name: str, job_id: str, *args, timeout=None, **kwargs
+) -> None:
     """Enqueue a new job using dispatcherd.
 
     Note: Uniqueness is not guaranteed in dispatcherd, job is simply enqueued.
@@ -59,4 +62,5 @@ def unique_enqueue(queue_name: str, job_id: str, *args, **kwargs) -> None:
         kwargs=kwargs,
         queue=utils.sanitize_postgres_identifier(queue_name),
         uuid=job_id,
+        timeout=timeout,
     )
