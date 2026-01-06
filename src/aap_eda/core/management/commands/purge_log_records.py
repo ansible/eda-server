@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 from datetime import datetime
-from typing import Union
 
 from django.core.management.base import (
     BaseCommand,
@@ -31,8 +30,9 @@ class Command(BaseCommand):
 
     help = (
         "Purge log records from rulebook processes. "
-        "If activation ids or names are not specified, "
-        "all log records older than the cutoff date will be purged."
+        "Always purges ALL log records older than the cutoff date globally. "
+        "If activation ids or names are specified, detailed reporting is "
+        "provided for those activations and orphaned records."
     )
 
     def add_arguments(self, parser: CommandParser) -> None:
@@ -70,61 +70,78 @@ class Command(BaseCommand):
     def purge_log_records(
         self, ids: list[int], names: list[str], cutoff_timestamp: datetime
     ) -> None:
-        new_instance_logs = []
-        if not bool(ids) and not bool(names):
-            instances = models.RulebookProcess.objects.all()
-        else:
-            instances = models.RulebookProcess.objects.filter(
-                Q(activation__id__in=ids) | Q(activation__name__in=names),
-            )
+        # Global purge of all old logs (regardless of activation)
+        cutoff_ts = int(cutoff_timestamp.timestamp())
+        old_logs = models.RulebookProcessLog.objects.filter(
+            log_timestamp__lt=cutoff_ts
+        )
+        deleted_count = old_logs.count()
 
-        if not instances.exists():
+        if deleted_count == 0:
             self.stdout.write(
-                self.style.SUCCESS("No records has been found for purging.")
+                self.style.SUCCESS(
+                    f"No log records found older than "
+                    f"{cutoff_timestamp.strftime('%Y-%m-%d')}."
+                )
             )
             return
 
-        for instance in instances:
-            new_instance_logs.append(
-                self.clean_instance_logs(instance, cutoff_timestamp)
+        # Delete all old logs globally
+        old_logs.delete()
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Purged {deleted_count} log records older than "
+                f"{cutoff_timestamp.strftime('%Y-%m-%d')} globally."
+            )
+        )
+
+        # Create audit trail logs for reporting
+        audit_logs = []
+
+        if not bool(ids) and not bool(names):
+            # No filters: Create audit logs for all instances that might
+            # have been affected
+            instances = models.RulebookProcess.objects.all()
+        else:
+            # Filters provided: Create audit logs only for specified
+            # activations and orphaned records
+            instances = models.RulebookProcess.objects.filter(
+                Q(activation__id__in=ids)
+                | Q(activation__name__in=names)
+                | Q(activation__isnull=True),
             )
 
-        new_instance_logs = [
-            item for item in new_instance_logs if item is not None
-        ]
-        if len(new_instance_logs) > 0:
-            models.RulebookProcessLog.objects.bulk_create(new_instance_logs)
+            # Report on orphaned records for user visibility
+            orphaned_count = models.RulebookProcess.objects.filter(
+                activation__isnull=True
+            ).count()
+            if orphaned_count > 0:
+                self.stdout.write(
+                    f"Audit trail will include {orphaned_count} orphaned "
+                    f"RulebookProcess records (with NULL activation)."
+                )
 
-            self.stdout.write(
-                self.style.SUCCESS(
-                    "Log records older than "
-                    f"{cutoff_timestamp.strftime('%Y-%m-%d')} are purged."
+        # Create audit trail logs for instances
+        dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for instance in instances:
+            audit_logs.append(
+                models.RulebookProcessLog(
+                    log=(
+                        f"All log records older than "
+                        f"{cutoff_timestamp.strftime('%Y-%m-%d')} "
+                        f"were purged at {dt}."
+                    ),
+                    activation_instance_id=instance.id,
+                    log_timestamp=cutoff_ts,
                 )
             )
 
-    def clean_instance_logs(
-        self,
-        instance: models.RulebookProcess,
-        cutoff_timestamp: datetime,
-    ) -> Union[models.RulebookProcessLog, None]:
-        log_records = models.RulebookProcessLog.objects.filter(
-            activation_instance=instance,
-            log_timestamp__lt=int(cutoff_timestamp.timestamp()),
-        )
-        if not log_records.exists():
-            return
-
-        log_records.delete()
-        dt = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-        return models.RulebookProcessLog(
-            log=(
-                "All log records older than "
-                f"{cutoff_timestamp.strftime('%Y-%m-%d')} are purged at {dt}."
-            ),
-            activation_instance_id=instance.id,
-            log_timestamp=int(cutoff_timestamp.timestamp()),
-        )
+        if audit_logs:
+            models.RulebookProcessLog.objects.bulk_create(audit_logs)
+            self.stdout.write(
+                f"Created {len(audit_logs)} audit trail log entries."
+            )
 
     @transaction.atomic
     def handle(self, *args, **options):
