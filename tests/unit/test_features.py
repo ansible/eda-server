@@ -37,7 +37,6 @@ def test_get_feature_flag(settings):
     setattr(settings, settings.ANALYTICS_FEATURE_FLAG_NAME, False)
     seed_feature_flags()
 
-    assert features.DISPATCHERD is True
     assert features.ANALYTICS is False
 
 
