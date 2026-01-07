@@ -26,6 +26,6 @@ def test_feature_flags_list_endpoint(admin_client, preseed_feature_flags):
 def test_feature_flags_toggle(flag_value):
     flag_name = "FEATURE_EDA_ANALYTICS_ENABLED"
     setattr(settings, flag_name, flag_value)
-    AAPFlag.objects.all().delete()
+    AAPFlag.objects.filter(name=flag_name).delete()
     seed_feature_flags()
     assert flag_state(flag_name) is flag_value

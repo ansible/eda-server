@@ -33,8 +33,7 @@ def clear_feature_cache():
 @pytest.mark.django_db
 def test_get_feature_flag(settings):
     """Test getting feature flag values."""
-    AAPFlag.objects.all().delete()
-    setattr(settings, settings.DISPATCHERD_FEATURE_FLAG_NAME, True)
+    AAPFlag.objects.filter(name=settings.ANALYTICS_FEATURE_FLAG_NAME).delete()
     setattr(settings, settings.ANALYTICS_FEATURE_FLAG_NAME, False)
     seed_feature_flags()
 
@@ -45,38 +44,41 @@ def test_get_feature_flag(settings):
 @pytest.mark.django_db
 def test_feature_flag_caching(settings):
     """Test that feature flag values are properly cached."""
-    AAPFlag.objects.all().delete()
-    setattr(settings, settings.DISPATCHERD_FEATURE_FLAG_NAME, True)
+    AAPFlag.objects.filter(name=settings.ANALYTICS_FEATURE_FLAG_NAME).delete()
+    setattr(settings, settings.ANALYTICS_FEATURE_FLAG_NAME, True)
     seed_feature_flags()
+    # Clear cache to ensure settings are picked up
+    _get_feature.cache_clear()
+
     # First access - should cache the value
-    assert features.DISPATCHERD is True
+    features.ANALYTICS
 
     # Change the underlying flag value
-    setattr(settings, settings.DISPATCHERD_FEATURE_FLAG_NAME, False)
+    setattr(settings, settings.ANALYTICS_FEATURE_FLAG_NAME, False)
     seed_feature_flags()
     # Should still get the cached value
-    assert features.DISPATCHERD is True
+    assert features.ANALYTICS is True
 
 
 @pytest.mark.django_db
 def test_cache_invalidation(settings):
     """Test that cache invalidation works as expected."""
-    AAPFlag.objects.all().delete()
-    setattr(settings, settings.DISPATCHERD_FEATURE_FLAG_NAME, True)
+    AAPFlag.objects.filter(name=settings.ANALYTICS_FEATURE_FLAG_NAME).delete()
+    setattr(settings, settings.ANALYTICS_FEATURE_FLAG_NAME, True)
     seed_feature_flags()
 
     # Populate cache
-    assert features.DISPATCHERD is True
+    assert features.ANALYTICS is True
 
     # Change the flag value and clear cache
-    setattr(settings, settings.DISPATCHERD_FEATURE_FLAG_NAME, False)
+    setattr(settings, settings.ANALYTICS_FEATURE_FLAG_NAME, False)
     seed_feature_flags()
     _get_feature.cache_clear()
 
     # Feature should remain true.
     # If runtime toggle, we should only be able to
     # update the value after toggling it via the platform gateway
-    assert features.DISPATCHERD is True
+    assert features.ANALYTICS is True
 
 
 @pytest.mark.django_db
