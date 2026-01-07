@@ -11,19 +11,19 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-"""Legacy rqworker command (replaced by dispatcherctl).
+"""Legacy rqworker command (replaced by dispatcherd).
 
-This command has been replaced by the dispatcherctl command as part of the
+This command has been replaced by the dispatcherd command as part of the
 migration from Redis/RQ to PostgreSQL pg_notify for task processing.
 
-The new dispatcherctl command provides the same functionality with improved
+The new dispatcherd command provides the same functionality with improved
 reliability and reduced infrastructure dependencies.
 
 Migration path:
     Old: python manage.py rqworker <queue_name>
-    New: python manage.py dispatcherctl activate --worker-type <WorkerType>
+    New: python manage.py dispatcherd --worker-class <WorkerClass>
 
-Worker type mapping:
+Worker class mapping:
     * Default queue -> DefaultWorker
     * Activation queue -> ActivationWorker
 """
@@ -31,8 +31,8 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from aap_eda.core.management.commands.dispatcherctl import (
-    Command as DispatcherctlCommand,
+from aap_eda.core.management.commands.dispatcherd import (
+    Command as DispatcherdCommand,
 )
 from aap_eda.utils.logging import startup_logging
 
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Legacy rqworker command (replaced by dispatcherctl)."
+    help = "Legacy rqworker command (replaced by dispatcherd)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -68,36 +68,35 @@ class Command(BaseCommand):
             if queue_name == "activation":
                 mapped_worker_class = "ActivationWorker"
                 suggested_command = (
-                    "python manage.py dispatcherctl activate "
-                    "--worker-type ActivationWorker"
+                    "python manage.py dispatcherd "
+                    "--worker-class ActivationWorker"
                 )
             else:
                 mapped_worker_class = "DefaultWorker"
                 suggested_command = (
-                    "python manage.py dispatcherctl activate "
-                    "--worker-type DefaultWorker"
+                    "python manage.py dispatcherd "
+                    "--worker-class DefaultWorker"
                 )
         elif worker_class:
             mapped_worker_class = worker_class
             suggested_command = (
-                f"python manage.py dispatcherctl activate "
-                f"--worker-type {worker_class}"
+                f"python manage.py dispatcherd "
+                f"--worker-class {worker_class}"
             )
         else:
             mapped_worker_class = "DefaultWorker"
             suggested_command = (
-                "python manage.py dispatcherctl activate "
-                "--worker-type DefaultWorker"
+                "python manage.py dispatcherd --worker-class DefaultWorker"
             )
 
         self.stdout.write(
             self.style.WARNING(
-                "The 'rqworker' command has been replaced by 'dispatcherctl' "
+                "The 'rqworker' command has been replaced by 'dispatcherd' "
                 "as part of the migration from Redis/RQ to PostgreSQL "
                 "pg_notify.\n\n"
                 f"Please update your deployment to use: \n  "
                 f"{suggested_command}\n\n"
-                "Benefits of dispatcherctl:\n"
+                "Benefits of dispatcherd:\n"
                 "  • Eliminates Redis dependency\n"
                 "  • Improved task reliability with PostgreSQL ACID "
                 "properties\n"
@@ -108,12 +107,13 @@ class Command(BaseCommand):
         )
 
         # TODO: Forwarding call can be removed in future versions
-        # Forward the call to dispatcherctl command
-        dispatcherctl_options = {
-            "worker_type": mapped_worker_class,
-            "queue_name": None,  # Will use default for worker type
+        # Forward the call to dispatcherd command
+        dispatcherd_options = {
+            **options,
+            "worker_class": mapped_worker_class,
+            "log_level": options.get("log_level", "INFO"),
         }
 
-        # Create and execute dispatcherctl command with 'activate' subcommand
-        dispatcherctl_command = DispatcherctlCommand()
-        dispatcherctl_command.handle("activate", **dispatcherctl_options)
+        # Create and execute dispatcherd command directly
+        dispatcherd_command = DispatcherdCommand()
+        dispatcherd_command.handle(*args, **dispatcherd_options)

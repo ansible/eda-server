@@ -51,14 +51,14 @@ tasks:
     cmds:
       - task: manage
         vars:
-          CLI_ARGS: dispatcherctl activate --worker-type 'DefaultWorker'
+          CLI_ARGS: dispatcherd --worker-class 'DefaultWorker'
 
   run:worker:activation:
     desc: "Run activation worker locally"
     cmds:
       - task: manage
         vars:
-          CLI_ARGS: dispatcherctl activate --worker-type 'ActivationWorker'
+          CLI_ARGS: dispatcherd --worker-class 'ActivationWorker'
 
   manage:
     desc: "Run django management command"

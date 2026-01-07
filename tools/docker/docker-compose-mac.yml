@@ -133,8 +133,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherctl activate
-        --worker-type DefaultWorker
+        aap-eda-manage dispatcherd
+        --worker-class DefaultWorker
     depends_on:
       eda-api:
         condition: service_healthy
@@ -155,8 +155,8 @@ services:
       - /bin/bash
       - -c
       - >-
-        aap-eda-manage dispatcherctl activate
-        --worker-type ActivationWorker
+        aap-eda-manage dispatcherd
+        --worker-class ActivationWorker
     depends_on:
       eda-api:
         condition: service_healthy
