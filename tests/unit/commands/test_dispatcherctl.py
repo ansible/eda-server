@@ -12,34 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Tests for dispatcherctl management command."""
+"""Tests for dispatcherctl debug command."""
 
 from io import StringIO
 from unittest.mock import Mock, patch
 
 import pytest
-import yaml
-from dispatcherd.service import control_tasks
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import override_settings
 
-from aap_eda.core.management.commands.dispatcherctl import (
-    DEFAULT_OUTPUT_FORMAT,
-    Command,
-    format_output_yaml,
-)
-
-# Test utility functions
-
-
-def test_format_output_yaml():
-    """Test format_output_yaml function."""
-    data = {"key": "value", "number": 42}
-    result = format_output_yaml(data)
-    expected = yaml.dump(data, default_flow_style=False)
-    assert result == expected
-
+from aap_eda.core.management.commands.dispatcherctl import Command
 
 # Test Command class initialization
 
@@ -54,303 +36,85 @@ def test_command_init(mock_startup_logging):
 # Test argument parsing
 
 
+@patch(
+    "dispatcherd.service.control_tasks.__all__",
+    ["status", "running", "workers"],
+)
 def test_add_arguments_structure():
-    """Test that add_arguments creates proper subparser structure."""
-    command = Command()
-    parser = Mock()
-    subparsers_mock = Mock()
-    parser.add_subparsers.return_value = subparsers_mock
+    """Test add_arguments creates subparser structure with dynamic commands."""
+    with patch("dispatcherd.service.control_tasks.status"), patch(
+        "dispatcherd.service.control_tasks.running"
+    ), patch("dispatcherd.service.control_tasks.workers"):
+        command = Command()
+        parser = Mock()
+        subparsers_mock = Mock()
+        parser.add_subparsers.return_value = subparsers_mock
 
-    command.add_arguments(parser)
+        command.add_arguments(parser)
 
-    # Verify subparsers were created (flexible check since impl varies)
-    assert parser.add_subparsers.called, "add_subparsers should be called"
+        # Verify subparsers were created
+        assert parser.add_subparsers.called, "add_subparsers should be called"
 
-    # Verify activate subcommand was added (flexible check for activate call)
-    activate_calls = [
-        call_obj
-        for call_obj in subparsers_mock.add_parser.call_args_list
-        if len(call_obj[0]) > 0 and call_obj[0][0] == "activate"
-    ]
-    assert len(activate_calls) > 0, "Activate subcommand should be added"
-
-    # Verify debug commands were added (flexible check)
-    available_commands = list(control_tasks.__all__)
-    command_calls = [
-        call_obj
-        for call_obj in subparsers_mock.add_parser.call_args_list
-        if len(call_obj[0]) > 0 and call_obj[0][0] in available_commands
-    ]
-    assert len(command_calls) >= len(
-        available_commands
-    ), "All debug commands should be added"
+        # Verify dynamic commands were added
+        assert subparsers_mock.add_parser.call_count == 3
+        call_args_list = [
+            call.args[0] for call in subparsers_mock.add_parser.call_args_list
+        ]
+        assert "status" in call_args_list
+        assert "running" in call_args_list
+        assert "workers" in call_args_list
 
 
-# Test activate subcommand handling
+# Test debug command handling
 
 
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.run_dispatcherd_service"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_worker_subcommand_activation_worker(mock_setup, mock_run):
-    """Test handle_worker_subcommand with ActivationWorker."""
-    command = Command()
-
-    with override_settings(
-        DISPATCHERD_DEFAULT_SETTINGS={"brokers": {"pg_notify": {}}},
-        RULEBOOK_QUEUE_NAME="test_queue",
-    ):
-        with patch(
-            "aap_eda.utils.sanitize_postgres_identifier",
-            return_value="sanitized_queue",
-        ):
-            command.handle_worker_subcommand(
-                worker_type="ActivationWorker", verbosity=1
-            )
-
-    mock_setup.assert_called_once()
-    mock_run.assert_called_once()
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.run_dispatcherd_service"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_worker_subcommand_default_worker(mock_setup, mock_run):
-    """Test handle_worker_subcommand with DefaultWorker."""
-    command = Command()
-
-    with override_settings(
-        DISPATCHERD_DEFAULT_WORKER_SETTINGS={"test": "settings"}
-    ):
-        command.handle_worker_subcommand(
-            worker_type="DefaultWorker", verbosity=2
-        )
-
-    mock_setup.assert_called_once()
-    mock_run.assert_called_once()
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.run_dispatcherd_service"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_worker_subcommand_keyboard_interrupt(mock_setup, mock_run):
-    """Test handle_worker_subcommand handles KeyboardInterrupt."""
-    mock_run.side_effect = KeyboardInterrupt()
-
-    command = Command()
-    stdout = StringIO()
-    command.stdout = stdout
-    command.style = Mock()
-    command.style.WARNING = Mock(return_value="WARNING: Worker shutdown")
-    command.style.SUCCESS = Mock(
-        return_value="SUCCESS: Starting ActivationWorker"
-    )
-
-    # Should not raise exception
-    command.handle_worker_subcommand(
-        worker_type="ActivationWorker", log_level="INFO", verbosity=1
-    )
-
-    command.style.WARNING.assert_called()
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.run_dispatcherd_service"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_worker_subcommand_exception(mock_setup, mock_run):
-    """Test handle_worker_subcommand handles general exceptions."""
-    mock_run.side_effect = Exception("Test error")
-
-    command = Command()
-    stderr = StringIO()
-    command.stderr = stderr
-    command.style = Mock()
-    command.style.ERROR = Mock(return_value="ERROR: Failed to start")
-    command.style.SUCCESS = Mock(
-        return_value="SUCCESS: Starting ActivationWorker"
-    )
-
-    with pytest.raises(SystemExit):
-        command.handle_worker_subcommand(
-            worker_type="ActivationWorker", log_level="INFO", verbosity=1
-        )
-
-    command.style.ERROR.assert_called()
-
-
-# Test debug subcommand handling
-
-
+@patch("dispatcherd.service.control_tasks.__all__", ["status"])
 @patch(
     "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_debug_subcommand_success(mock_setup, mock_get_control):
-    """Test handle_debug_subcommand successful execution."""
-    # Setup mocks
+def test_handle_debug_command_success(mock_setup, mock_get_control):
+    """Test handle executes debug command successfully."""
+    # Mock the control interface
     mock_control = Mock()
     mock_control.control_with_reply.return_value = [
-        {"status": "running", "workers": 2}
+        {"status": "running", "workers": 1}
     ]
     mock_get_control.return_value = mock_control
 
     command = Command()
     stdout = StringIO()
     command.stdout = stdout
+    command.style = Mock()
 
-    command.handle_debug_subcommand(
-        command="status",
-        task=None,
-        uuid=None,
-        output_format="yaml",
-        expected_replies=1,
-    )
+    command.handle_debug_subcommand("status", expected_replies=1)
 
+    # Verify setup and control were called
     mock_setup.assert_called_once()
     mock_get_control.assert_called_once()
     mock_control.control_with_reply.assert_called_once_with(
-        command="status", data={}, expected_replies=1
-    )
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_debug_subcommand_with_filters(mock_setup, mock_get_control):
-    """Test handle_debug_subcommand with task and uuid filters."""
-    mock_control = Mock()
-    mock_control.control_with_reply.return_value = [{"filtered": "result"}]
-    mock_get_control.return_value = mock_control
-
-    command = Command()
-    stdout = StringIO()
-    command.stdout = stdout
-
-    command.handle_debug_subcommand(
-        command="workers",
-        task="test_task",
-        uuid="test-uuid-123",
+        command="status",
+        data={},
         expected_replies=1,
     )
 
-    mock_control.control_with_reply.assert_called_once_with(
-        command="workers",
-        data={"task": "test_task", "uuid": "test-uuid-123"},
-        expected_replies=1,
-    )
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_debug_subcommand_multiple_replies(
-    mock_setup, mock_get_control
-):
-    """Test handle_debug_subcommand with multiple replies."""
-    mock_control = Mock()
-    mock_control.control_with_reply.return_value = [
-        {"worker": 1, "status": "active"},
-        {"worker": 2, "status": "idle"},
-    ]
-    mock_get_control.return_value = mock_control
-
-    command = Command()
-    stdout = StringIO()
-    command.stdout = stdout
-
-    command.handle_debug_subcommand(command="workers", expected_replies=2)
-
+    # Verify output contains YAML data
     output = stdout.getvalue()
-    assert "reply-0" in output
-    assert "reply-1" in output
+    assert "status: running" in output
+    assert "workers: 1" in output
 
 
+@patch("dispatcherd.service.control_tasks.__all__", ["workers"])
 @patch(
     "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_debug_subcommand_insufficient_replies(
-    mock_setup, mock_get_control
-):
-    """Test handle_debug_subcommand with insufficient replies."""
-    mock_control = Mock()
-    mock_control.control_with_reply.return_value = [{"single": "reply"}]
-    mock_get_control.return_value = mock_control
-
-    command = Command()
-    stderr = StringIO()
-    command.stderr = stderr
-    command.style = Mock()
-    command.style.ERROR = Mock(
-        return_value="ERROR: Only 1 of 3 expected replies"
-    )
-
-    with pytest.raises(CommandError):
-        command.handle_debug_subcommand(command="status", expected_replies=3)
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_debug_subcommand_connection_error(
-    mock_setup, mock_get_control
-):
-    """Test handle_debug_subcommand with ConnectionError."""
-    mock_control = Mock()
-    mock_control.control_with_reply.side_effect = ConnectionError(
-        "Cannot connect"
-    )
-    mock_get_control.return_value = mock_control
-
-    command = Command()
-    stderr = StringIO()
-    command.stderr = stderr
-    command.style = Mock()
-    command.style.ERROR = Mock(return_value="ERROR: Cannot connect")
-
-    with pytest.raises(CommandError):
-        command.handle_debug_subcommand(command="status")
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_debug_subcommand_general_exception(
-    mock_setup, mock_get_control
-):
-    """Test handle_debug_subcommand with general exception."""
-    mock_setup.side_effect = Exception("Setup failed")
-
-    command = Command()
-    stderr = StringIO()
-    command.stderr = stderr
-    command.style = Mock()
-    command.style.ERROR = Mock(return_value="ERROR: Command failed")
-
-    with pytest.raises(CommandError):
-        command.handle_debug_subcommand(command="status")
-
-
-# Test set_log_level command
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_set_log_level_subcommand_success(mock_setup, mock_get_control):
-    """Test handle_debug_subcommand for set_log_level command."""
+def test_handle_debug_command_with_filters(mock_setup, mock_get_control):
+    """Test handle executes debug command with task and uuid filters."""
+    # Mock the control interface
     mock_control = Mock()
     mock_control.control_with_reply.return_value = [
-        {"logger": "dispatcherd", "level": "DEBUG", "previous_level": "INFO"}
+        {"workers": {"task-123": "running"}}
     ]
     mock_get_control.return_value = mock_control
 
@@ -359,241 +123,237 @@ def test_handle_set_log_level_subcommand_success(mock_setup, mock_get_control):
     command.stdout = stdout
 
     command.handle_debug_subcommand(
-        command="set_log_level",
-        command_log_level="INFO",
-        log_level="DEBUG",
-        output_format="yaml",
+        "workers", task="mytask", uuid="task-123", expected_replies=1
+    )
+
+    # Verify control was called with proper filters
+    mock_control.control_with_reply.assert_called_once_with(
+        command="workers",
+        data={"task": "mytask", "uuid": "task-123"},
         expected_replies=1,
     )
 
+
+@patch("dispatcherd.service.control_tasks.__all__", ["set_log_level"])
+@patch(
+    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+)
+@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
+def test_handle_set_log_level_command(mock_setup, mock_get_control):
+    """Test handle executes set_log_level command with required log level."""
+    # Mock the control interface
+    mock_control = Mock()
+    mock_control.control_with_reply.return_value = [
+        {"status": "log level set to DEBUG"}
+    ]
+    mock_get_control.return_value = mock_control
+
+    command = Command()
+    stdout = StringIO()
+    command.stdout = stdout
+
+    command.handle_debug_subcommand(
+        "set_log_level", log_level="DEBUG", expected_replies=1
+    )
+
+    # Verify control was called with log level data
     mock_control.control_with_reply.assert_called_once_with(
-        command="set_log_level", data={"level": "DEBUG"}, expected_replies=1
+        command="set_log_level",
+        data={"level": "DEBUG"},
+        expected_replies=1,
     )
 
 
+@patch("dispatcherd.service.control_tasks.__all__", ["set_log_level"])
+def test_handle_set_log_level_missing_level():
+    """Test set_log_level command fails when log level is not provided."""
+    command = Command()
+
+    with pytest.raises(CommandError) as excinfo:
+        command.handle_debug_subcommand("set_log_level", expected_replies=1)
+
+    assert "--log-level is required for set_log_level command" in str(
+        excinfo.value
+    )
+
+
+@patch("dispatcherd.service.control_tasks.__all__", ["status"])
+@patch(
+    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+)
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_handle_set_log_level_missing_level(mock_setup):
-    """Test handle_debug_subcommand for set_log_level without level."""
+def test_handle_debug_command_insufficient_replies(
+    mock_setup, mock_get_control
+):
+    """Test handle raises error when insufficient replies received."""
+    # Mock the control interface to return fewer replies than expected
+    mock_control = Mock()
+    mock_control.control_with_reply.return_value = []  # No replies
+    mock_get_control.return_value = mock_control
+
+    command = Command()
+
+    with pytest.raises(CommandError) as excinfo:
+        command.handle_debug_subcommand("status", expected_replies=1)
+
+    assert "dispatcherctl returned fewer replies than expected" in str(
+        excinfo.value
+    )
+
+
+@patch("dispatcherd.service.control_tasks.__all__", ["status"])
+@patch(
+    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+)
+@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
+def test_handle_debug_command_multiple_replies(mock_setup, mock_get_control):
+    """Test handle formats multiple replies correctly."""
+    # Mock the control interface to return multiple replies
+    mock_control = Mock()
+    mock_control.control_with_reply.return_value = [
+        {"node": "worker-1", "status": "running"},
+        {"node": "worker-2", "status": "stopped"},
+    ]
+    mock_get_control.return_value = mock_control
+
+    command = Command()
+    stdout = StringIO()
+    command.stdout = stdout
+
+    command.handle_debug_subcommand("status", expected_replies=2)
+
+    # Verify output contains formatted multiple replies
+    output = stdout.getvalue()
+    assert "reply-0:" in output
+    assert "reply-1:" in output
+    assert "worker-1" in output
+    assert "worker-2" in output
+
+
+@patch("dispatcherd.service.control_tasks.__all__", ["status"])
+@patch(
+    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+)
+@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
+def test_handle_debug_command_exception(mock_setup, mock_get_control):
+    """Test handle properly handles debug command exceptions."""
+    # Mock the control interface to raise an exception
+    mock_get_control.side_effect = Exception("Connection failed")
+
+    command = Command()
+
+    with pytest.raises(CommandError) as excinfo:
+        command.handle_debug_subcommand("status", expected_replies=1)
+
+    assert "Command failed: Connection failed" in str(excinfo.value)
+
+
+def test_handle_invalid_debug_command():
+    """Test handle raises error for invalid debug commands."""
+    with patch("dispatcherd.service.control_tasks.__all__", ["status"]):
+        command = Command()
+
+        with pytest.raises(CommandError) as excinfo:
+            command.handle_debug_subcommand(
+                "invalid_command", expected_replies=1
+            )
+
+        assert "Invalid debug command 'invalid_command'" in str(excinfo.value)
+        assert "Must be one of: status" in str(excinfo.value)
+
+
+@patch("dispatcherd.service.control_tasks.__all__", ["status", "workers"])
+def test_handle_unknown_command():
+    """Test handle with unknown debug command shows error message."""
     command = Command()
     stderr = StringIO()
     command.stderr = stderr
     command.style = Mock()
-    command.style.ERROR = Mock(return_value="ERROR: --log-level is required")
+    command.style.ERROR = Mock(return_value="ERROR: Unknown command")
 
     with pytest.raises(CommandError):
-        command.handle_debug_subcommand(
-            command="set_log_level",
-            command_log_level="INFO",
-            log_level=None,  # Missing level
-            output_format="yaml",
-            expected_replies=1,
-        )
+        command.handle(command="invalid_command")
+
+    command.style.ERROR.assert_called()
+    error_call = command.style.ERROR.call_args[0][0]
+    assert "Unknown debug command 'invalid_command'" in error_call
+    assert "status, workers" in error_call
 
 
-# Test main handle method
-
-
-def test_handle_activate_subcommand():
-    """Test handle routes to activate subcommand."""
+@patch(
+    "dispatcherd.service.control_tasks.__all__",
+    ["status", "workers", "running"],
+)
+def test_handle_no_subcommand():
+    """Test handle shows available commands when no subcommand provided."""
     command = Command()
-
-    with patch.object(command, "handle_worker_subcommand") as mock_handle:
-        command.handle(command="activate", worker_type="ActivationWorker")
-        mock_handle.assert_called_once()
-
-
-def test_handle_debug_subcommand():
-    """Test handle routes to debug subcommands."""
-    command = Command()
-
-    for cmd in list(control_tasks.__all__):
-        with patch.object(command, "handle_debug_subcommand") as mock_handle:
-            command.handle(command=cmd)
-            # command parameter is filtered out to avoid duplicate argument
-            mock_handle.assert_called_once_with(cmd)
-
-
-def test_handle_unknown_subcommand():
-    """Test handle with unknown subcommand."""
-    command = Command()
-    stderr = StringIO()
-    command.stderr = stderr
+    stdout = StringIO()
+    command.stdout = stdout
     command.style = Mock()
-    command.style.ERROR = Mock(return_value="ERROR: Unknown subcommand")
+    command.style.SUCCESS = Mock(return_value="Available commands")
 
-    with pytest.raises(CommandError):
-        command.handle(command="unknown")
+    command.handle(command=None)
+
+    command.style.SUCCESS.assert_called()
+    success_call = command.style.SUCCESS.call_args[0][0]
+    assert "Available debug commands: status, workers, running" in success_call
+    assert "aap-eda-manage dispatcherctl <command>" in success_call
+    assert (
+        "Note: Debug commands require a running dispatcher service"
+        in success_call
+    )
+
+
+@patch("dispatcherd.service.control_tasks.__all__", ["status"])
+@patch(
+    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+)
+@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
+def test_handle_integration(mock_setup, mock_get_control):
+    """Test full handle method integration with debug command routing."""
+    # Mock the control interface
+    mock_control = Mock()
+    mock_control.control_with_reply.return_value = [
+        {"status": "service active"}
+    ]
+    mock_get_control.return_value = mock_control
+
+    command = Command()
+    stdout = StringIO()
+    command.stdout = stdout
+
+    command.handle(command="status", expected_replies=1)
+
+    # Verify the full flow worked
+    mock_setup.assert_called_once()
+    mock_control.control_with_reply.assert_called_once()
+    assert "status: service active" in stdout.getvalue()
 
 
 # Integration tests using call_command
 
 
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.run_dispatcherd_service"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_call_command_activate_activation(mock_setup, mock_run):
-    """Test call_command integration for activate subcommand."""
-    with override_settings(
-        DISPATCHERD_DEFAULT_SETTINGS={"brokers": {"pg_notify": {}}},
-        RULEBOOK_QUEUE_NAME="test_queue",
-    ):
-        with patch("aap_eda.utils.sanitize_postgres_identifier"):
-            call_command(
-                "dispatcherctl",
-                "activate",
-                "--worker-type",
-                "ActivationWorker",
-            )
-
-    mock_setup.assert_called_once()
-    mock_run.assert_called_once()
-
-
+@patch("dispatcherd.service.control_tasks.__all__", ["status"])
 @patch(
     "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_call_command_debug_status(mock_setup, mock_get_control):
-    """Test call_command integration for debug status command."""
+def test_call_command_debug(mock_setup, mock_get_control):
+    """Test call_command integration for debug commands."""
+    # Mock the control interface
     mock_control = Mock()
-    mock_control.control_with_reply.return_value = [{"status": "ok"}]
+    mock_control.control_with_reply.return_value = [{"service": "running"}]
     mock_get_control.return_value = mock_control
 
-    # Capture stdout
-    stdout = StringIO()
-    call_command("dispatcherctl", "status", stdout=stdout)
+    # Should not raise exception
+    call_command("dispatcherctl", "status")
 
-    mock_setup.assert_called_once()
     mock_control.control_with_reply.assert_called_once()
 
-    # Should have YAML output
-    output = stdout.getvalue()
-    assert "status: ok" in output
 
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_call_command_debug_with_options(mock_setup, mock_get_control):
-    """Test call_command with debug options."""
-    mock_control = Mock()
-    mock_control.control_with_reply.return_value = [
-        {"result": "filtered"},
-        {"result": "filtered2"},
-    ]
-    mock_get_control.return_value = mock_control
-
-    stdout = StringIO()
-    call_command(
-        "dispatcherctl",
-        "workers",
-        "--task",
-        "test_task",
-        "--uuid",
-        "test-uuid",
-        "--expected-replies",
-        "2",
-        stdout=stdout,
-    )
-
-    mock_control.control_with_reply.assert_called_once_with(
-        command="workers",
-        data={"task": "test_task", "uuid": "test-uuid"},
-        expected_replies=2,
-    )
-
-    # Should have YAML output
-    output = stdout.getvalue()
-    parsed = yaml.safe_load(output)
-    assert parsed["reply-0"]["result"] == "filtered"
-    assert parsed["reply-1"]["result"] == "filtered2"
-
-
-@patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
-)
-@patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
-def test_call_command_set_log_level(mock_setup, mock_get_control):
-    """Test call_command integration for set_log_level command."""
-    mock_control = Mock()
-    mock_control.control_with_reply.return_value = [
-        {"logger": "dispatcherd", "level": "DEBUG", "previous_level": "INFO"}
-    ]
-    mock_get_control.return_value = mock_control
-
-    stdout = StringIO()
-    call_command(
-        "dispatcherctl",
-        "set_log_level",
-        "--log-level",
-        "DEBUG",
-        stdout=stdout,
-    )
-
-    mock_control.control_with_reply.assert_called_once_with(
-        command="set_log_level", data={"level": "DEBUG"}, expected_replies=1
-    )
-
-    # Should have YAML output
-    output = stdout.getvalue()
-    parsed = yaml.safe_load(output)
-    assert parsed["logger"] == "dispatcherd"
-    assert parsed["level"] == "DEBUG"
-    assert parsed["previous_level"] == "INFO"
-
-
-# Test constants and configuration
-
-
-def test_control_tasks_available():
-    """Test control_tasks.__all__ returns expected debug commands."""
-    commands = list(control_tasks.__all__)
-
-    # Verify it returns a list
-    assert isinstance(commands, list)
-
-    # Verify it contains essential commands (fallback or dynamic)
-    essential_commands = {"running", "workers", "status", "alive"}
-    assert essential_commands.issubset(set(commands))
-
-    # Verify all commands are strings
-    assert all(isinstance(cmd, str) for cmd in commands)
-
-
-def test_default_output_format_constant():
-    """Test DEFAULT_OUTPUT_FORMAT is yaml."""
-    assert DEFAULT_OUTPUT_FORMAT == "yaml"
-
-
-# Test error conditions and edge cases
-
-
-def test_format_output_none_data():
-    """Test format_output_yaml with None data."""
-    result = format_output_yaml(None)
-    assert result == "null\n...\n"
-
-
-@patch("aap_eda.core.management.commands.dispatcherctl.logger")
-def test_debug_command_logging_on_exception(mock_logger):
-    """Test that exceptions in debug commands are logged with exc_info."""
-    command = Command()
-    stderr = StringIO()
-    command.stderr = stderr
-    command.style = Mock()
-    command.style.ERROR = Mock(return_value="ERROR: Command failed")
-
-    with patch(
-        "aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup",
-        side_effect=Exception("Test error"),
-    ):
-        with pytest.raises(CommandError):
-            command.handle_debug_subcommand(command="status")
-
-    # Verify logger.error was called with exc_info=True and the specific error
-    mock_logger.error.assert_called_once_with(
-        "Unexpected dispatcherctl debug command error: Test error",
-        exc_info=True,
-    )
+@patch("dispatcherd.service.control_tasks.__all__", ["status", "workers"])
+def test_call_command_no_args():
+    """Test call_command with no arguments shows help."""
+    # Should not raise exception
+    call_command("dispatcherctl")
+    # Test passes if no exception is raised
