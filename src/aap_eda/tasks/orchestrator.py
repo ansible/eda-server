@@ -422,26 +422,25 @@ def get_queue_name_by_parent_id(
 
 def check_rulebook_queue_health(queue_name: str) -> bool:
     """Check for the state of the queue using dispatcherd."""
-    return check_rulebook_queue_health_dispatcherd(queue_name)
-
-
-def check_rulebook_queue_health_dispatcherd(queue_name: str) -> bool:
-    """Check for the state of the queue in dispatcherd.
-
-    Returns True if the queue is healthy, False otherwise.
-
-    """
-    ctl = get_control_from_settings(
-        default_publish_channel=utils.sanitize_postgres_identifier(queue_name)
-    )
-    alive = ctl.control_with_reply(
-        "alive", timeout=settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT
-    )
-    if not alive:
-        LOGGER.warning(
-            f"Worker queue {queue_name} was found to not be healthy"
+    try:
+        ctl = get_control_from_settings(
+            default_publish_channel=utils.sanitize_postgres_identifier(
+                queue_name
+            )
         )
-    return bool(alive)
+        alive = ctl.control_with_reply(
+            "alive", timeout=settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT
+        )
+        if not alive:
+            LOGGER.warning(
+                f"Worker queue {queue_name} was found to not be healthy"
+            )
+        return bool(alive)
+    except Exception as e:
+        LOGGER.error(
+            f"Health check failed for queue {queue_name}: {e}", exc_info=True
+        )
+        return False
 
 
 # Internal start/restart requests are sent by the manager in restart_helper.py

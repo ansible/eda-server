@@ -157,9 +157,11 @@ def test_retrieve_project_not_exist(admin_client: APIClient):
     ],
 )
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 @mock.patch("aap_eda.tasks.import_project")
 def test_create_or_update_project_with_right_signature_credential(
     import_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
     admin_client: APIClient,
     new_project: models.Project,
     preseed_credential_types,
@@ -171,6 +173,7 @@ def test_create_or_update_project_with_right_signature_credential(
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     import_project_task.return_value = job_id
+    mock_health_check.return_value = True
     credential = create_custom_credential(
         credential_type=credential_type, organization=default_organization
     )
@@ -302,9 +305,11 @@ def test_create_or_update_project_with_right_signature_credential(
     ],
 )
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 @mock.patch("aap_eda.tasks.import_project")
 def test_create_or_update_project_with_right_eda_credential(
     import_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
     admin_client: APIClient,
     new_project: models.Project,
     preseed_credential_types,
@@ -317,6 +322,7 @@ def test_create_or_update_project_with_right_eda_credential(
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     import_project_task.return_value = job_id
+    mock_health_check.return_value = True
     credential = create_custom_credential(
         credential_type=credential_type, organization=default_organization
     )
@@ -484,6 +490,7 @@ def test_create_project_with_invalid_git_parameters(
 # Test: Sync project
 # -------------------------------------
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 @mock.patch("aap_eda.tasks.sync_project")
 @pytest.mark.parametrize(
     "initial_state",
@@ -494,6 +501,7 @@ def test_create_project_with_invalid_git_parameters(
 )
 def test_sync_project(
     sync_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
     admin_client: APIClient,
     initial_state: models.Project.ImportState,
     default_project: models.Project,
@@ -503,6 +511,7 @@ def test_sync_project(
 
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     sync_project_task.return_value = job_id
+    mock_health_check.return_value = True
 
     response = admin_client.post(
         f"{api_url_v1}/projects/{default_project.id}/sync/"
@@ -521,6 +530,7 @@ def test_sync_project(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 @mock.patch("aap_eda.tasks.sync_project")
 @pytest.mark.parametrize(
     "initial_state",
@@ -531,6 +541,7 @@ def test_sync_project(
 )
 def test_sync_project_conflict_already_running(
     sync_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
     admin_client: APIClient,
     initial_state: models.Project.ImportState,
     default_project: models.Project,
@@ -538,6 +549,8 @@ def test_sync_project_conflict_already_running(
     default_project.import_state = initial_state
     default_project.import_task_id = None
     default_project.save(update_fields=["import_state", "import_task_id"])
+
+    mock_health_check.return_value = True
 
     response = admin_client.post(
         f"{api_url_v1}/projects/{default_project.id}/sync/"
@@ -554,7 +567,12 @@ def test_sync_project_conflict_already_running(
 
 
 @pytest.mark.django_db
-def test_sync_project_not_exist(admin_client: APIClient):
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_sync_project_not_exist(
+    mock_health_check: mock.Mock, admin_client: APIClient
+):
+    mock_health_check.return_value = True
+
     response = admin_client.post(f"{api_url_v1}/projects/42/sync/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -623,7 +641,9 @@ def test_update_project_with_400(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 def test_partial_update_project(
+    mock_health_check: mock.Mock,
     new_project: models.Project,
     default_scm_credential: models.EdaCredential,
     default_gpg_credential: models.EdaCredential,
@@ -632,6 +652,8 @@ def test_partial_update_project(
     assert new_project.eda_credential_id is None
     assert new_project.signature_validation_credential_id is None
     assert new_project.verify_ssl is False
+
+    mock_health_check.return_value = True
 
     new_org = models.Organization.objects.create(name="new org")
     new_data = {
@@ -697,10 +719,14 @@ def test_partial_update_project_bad_proxy(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 def test_partial_update_project_url(
+    mock_health_check: mock.Mock,
     new_project: models.Project,
     admin_client: APIClient,
 ):
+    mock_health_check.return_value = True
+
     original_url = new_project.url
     new_url = "https://git.example.com/foo-bar"
 
@@ -719,10 +745,14 @@ def test_partial_update_project_url(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 def test_partial_update_project_scm_branch(
+    mock_health_check: mock.Mock,
     new_project: models.Project,
     admin_client: APIClient,
 ):
+    mock_health_check.return_value = True
+
     original_scm_branch = new_project.scm_branch
     new_scm_branch = "dev"
 
@@ -741,10 +771,14 @@ def test_partial_update_project_scm_branch(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 def test_partial_update_project_scm_refspec(
+    mock_health_check: mock.Mock,
     new_project: models.Project,
     admin_client: APIClient,
 ):
+    mock_health_check.return_value = True
+
     original_scm_refspec = new_project.scm_refspec
     new_scm_refspec = "path/to/testref"
 
@@ -781,9 +815,11 @@ def test_delete_project_not_found(admin_client: APIClient):
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 @mock.patch("aap_eda.tasks.import_project")
 def test_project_by_fields(
     import_project_task: mock.Mock,
+    mock_health_check: mock.Mock,
     default_scm_credential: models.EdaCredential,
     default_organization: models.Organization,
     admin_user: models.User,
@@ -792,6 +828,7 @@ def test_project_by_fields(
 ):
     job_id = "3677eb4a-de4a-421a-a73b-411aa502484d"
     import_project_task.return_value = job_id
+    mock_health_check.return_value = True
 
     body = {
         "name": "test-project-01",
@@ -837,6 +874,238 @@ def test_project_by_fields(
     project.refresh_from_db()
     assert project.created_by == admin_user
     assert project.modified_by == super_user
+
+
+# Test: Project worker unavailable (503 exception validation)
+# -------------------------------------
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_operations_worker_unavailable(
+    mock_health_check: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+    default_organization: models.Organization,
+):
+    """Test project operations return HTTP 503 when workers are unavailable."""
+    # Mock health check to return False (workers unavailable)
+    mock_health_check.return_value = False
+
+    # Test project creation returns 503
+    create_body = {
+        "name": "test-project-worker-unavailable",
+        "url": "https://git.example.com/test/project",
+        "organization_id": default_organization.id,
+    }
+
+    create_response = admin_client.post(
+        f"{api_url_v1}/projects/",
+        data=create_body,
+    )
+    assert create_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert create_response.json()["detail"] == (
+        "Project workers are currently unavailable. Please try again later."
+    )
+
+    # Test project sync returns 503
+    sync_response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
+    assert sync_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert sync_response.json()["detail"] == (
+        "Project workers are currently unavailable. Please try again later."
+    )
+
+    # Test project update returns 503 (operations that trigger health check)
+    update_data = {
+        "url": "https://git.example.com/updated/repo",
+    }
+    update_response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/",
+        data=update_data,
+    )
+    assert update_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert update_response.json()["detail"] == (
+        "Project workers are currently unavailable. Please try again later."
+    )
+
+    # Verify health check was called for each operation
+    assert mock_health_check.call_count == 3
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.project.check_rulebook_queue_health")
+def test_project_create_health_check_exception(
+    mock_check_rulebook_health: mock.Mock,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test project creation when underlying health check raises exception."""
+    # Mock the underlying health check to raise an exception
+    # check_project_queue_health should handle this and return False
+    mock_check_rulebook_health.side_effect = RuntimeError(
+        "Dispatcherd connection error"
+    )
+
+    create_body = {
+        "name": "test-project-exception",
+        "url": "https://git.example.com/test/project",
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(
+        f"{api_url_v1}/projects/",
+        data=create_body,
+    )
+
+    # Should return 503 when health check encounters exception
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json()["detail"] == (
+        "Project workers are currently unavailable. Please try again later."
+    )
+
+    # Verify underlying health check was called
+    mock_check_rulebook_health.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.tasks.sync_project")
+def test_project_sync_health_check_before_import_state_check(
+    mock_sync_task: mock.Mock,
+    mock_health_check: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+):
+    """Test sync operation checks health before checking import state."""
+    # Set project to PENDING state (which normally would allow sync)
+    default_project.import_state = models.Project.ImportState.PENDING
+    default_project.save(update_fields=["import_state"])
+
+    # Health check returns False
+    mock_health_check.return_value = False
+
+    response = admin_client.post(
+        f"{api_url_v1}/projects/{default_project.id}/sync/"
+    )
+
+    # Should return 503 due to health check, not proceed to import state check
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+    # Sync task should not be called since health check failed
+    mock_sync_task.assert_not_called()
+    mock_health_check.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_partial_update_url_change_health_check(
+    mock_health_check: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+):
+    """Test partial update with URL change requires health check."""
+    mock_health_check.return_value = False
+
+    update_data = {
+        "url": "https://git.example.com/new-repo",
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/",
+        data=update_data,
+    )
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    mock_health_check.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_partial_update_branch_change_health_check(
+    mock_health_check: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+):
+    """Test partial update with branch change requires health check."""
+    mock_health_check.return_value = False
+
+    update_data = {
+        "scm_branch": "feature-branch",
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/",
+        data=update_data,
+    )
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    mock_health_check.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_name_only_update_no_health_check(
+    mock_health_check: mock.Mock,
+    admin_client: APIClient,
+    default_project: models.Project,
+):
+    """Test partial update with name change doesn't require health check."""
+    # Health checks are only performed for partial updates that change
+    # scm_branch, scm_refspec, or url fields
+    mock_health_check.return_value = False
+
+    update_data = {
+        "name": "new-project-name",
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/",
+        data=update_data,
+    )
+
+    # Name-only updates should succeed without health checks
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["name"] == "new-project-name"
+
+    # Health check should not be called for name-only updates
+    mock_health_check.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_multiple_concurrent_health_check_calls(
+    mock_health_check: mock.Mock,
+    admin_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test multiple concurrent API calls properly handle health checks."""
+    # Mock health check to return False for all calls
+    mock_health_check.return_value = False
+
+    # Create multiple project creation requests
+    create_bodies = [
+        {
+            "name": f"test-project-concurrent-{i}",
+            "url": f"https://git.example.com/test/project{i}",
+            "organization_id": default_organization.id,
+        }
+        for i in range(3)
+    ]
+
+    responses = []
+    for body in create_bodies:
+        response = admin_client.post(
+            f"{api_url_v1}/projects/",
+            data=body,
+        )
+        responses.append(response)
+
+    # All should return 503
+    for response in responses:
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+    # Health check should have been called once per request
+    assert mock_health_check.call_count == 3
 
 
 # Utils
