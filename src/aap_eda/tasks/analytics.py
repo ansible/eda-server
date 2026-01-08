@@ -15,6 +15,7 @@
 import logging
 
 from ansible_base.lib.utils.db import advisory_lock
+from django.conf import settings
 
 from aap_eda.analytics import collector, utils
 from aap_eda.core import tasking
@@ -53,6 +54,7 @@ def schedule_gather_analytics(
             ANALYTICS_SCHEDULE_JOB_ID,
             interval,
             auto_gather_analytics,
+            timeout=settings.DISPATCHERD_ANALYTICS_TASK_TIMEOUT,
         )
 
 

@@ -356,6 +356,7 @@ def queue_dispatch(
         process_parent_type,
         process_parent_id,
         request_id,
+        timeout=settings.DISPATCHERD_ACTIVATION_TASK_TIMEOUT,
     )
     LOGGER.info(
         f"_manage({job_id}) submitted to queue {queue_name} "

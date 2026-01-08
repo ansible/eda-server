@@ -33,6 +33,7 @@ def import_project(project_id: int) -> str:
         _import_project,
         queue=queue_name,
         args=(project_id,),
+        timeout=settings.DISPATCHERD_PROJECT_TASK_TIMEOUT,
     )
     return job_data["uuid"]
 
@@ -71,6 +72,7 @@ def sync_project(project_id: int) -> str:
         _sync_project,
         queue=queue_name,
         args=(project_id,),
+        timeout=settings.DISPATCHERD_PROJECT_TASK_TIMEOUT,
     )
     return job_data["uuid"]
 

@@ -139,6 +139,11 @@ REST_FRAMEWORK = {
 DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 10
 DISPATCHERD_DEFAULT_CHANNEL = "default"
 
+# Task timeout configuration in seconds
+DISPATCHERD_PROJECT_TASK_TIMEOUT = 300  # 5 minutes for project import/sync
+DISPATCHERD_ANALYTICS_TASK_TIMEOUT = 3600  # 1 hour for analytics gathering
+DISPATCHERD_ACTIVATION_TASK_TIMEOUT = 300  # 5 minutes for activation
+
 # Worker pool configuration
 DISPATCHERD_MIN_WORKERS = 2
 DISPATCHERD_MAX_WORKERS = 8
