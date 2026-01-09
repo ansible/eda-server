@@ -33,6 +33,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
+from aap_eda.tasks.project import check_project_queue_health
 
 from .mixins import ResponseSerializerMixin
 
@@ -106,7 +107,11 @@ class ProjectViewSet(
             status.HTTP_201_CREATED: OpenApiResponse(
                 serializers.ProjectSerializer,
                 description="Return a created project.",
-            )
+            ),
+            status.HTTP_503_SERVICE_UNAVAILABLE: OpenApiResponse(
+                None,
+                description="Project workers unavailable.",
+            ),
         },
     )
     def create(self, request):
@@ -114,6 +119,10 @@ class ProjectViewSet(
             data=request.data
         )
         serializer.is_valid(raise_exception=True)
+
+        # Check if project workers are available before proceeding
+        if not check_project_queue_health():
+            raise api_exc.ProjectWorkerUnavailable()
 
         # With dispatcherd migration, Redis is no longer required
         with transaction.atomic():
@@ -190,6 +199,10 @@ class ProjectViewSet(
                 None,
                 description="Update failed with integrity checking.",
             ),
+            status.HTTP_503_SERVICE_UNAVAILABLE: OpenApiResponse(
+                None,
+                description="Project workers unavailable.",
+            ),
         },
     )
     def partial_update(self, request, pk):
@@ -234,6 +247,10 @@ class ProjectViewSet(
                 models.Project.ImportState.RUNNING,
             ]
         ):
+            # Check if project workers are available before syncing
+            if not check_project_queue_health():
+                raise api_exc.ProjectWorkerUnavailable()
+
             # With dispatcherd migration, Redis is no longer required
 
             job_id = tasks.sync_project(project.id)
@@ -252,7 +269,17 @@ class ProjectViewSet(
         return Response(serializers.ProjectSerializer(project).data)
 
     @extend_schema(
-        responses={status.HTTP_202_ACCEPTED: serializers.ProjectSerializer},
+        responses={
+            status.HTTP_202_ACCEPTED: serializers.ProjectSerializer,
+            status.HTTP_409_CONFLICT: OpenApiResponse(
+                None,
+                description="Project import or sync is already running.",
+            ),
+            status.HTTP_503_SERVICE_UNAVAILABLE: OpenApiResponse(
+                None,
+                description="Project workers unavailable.",
+            ),
+        },
         request=None,
         description="Sync a project",
     )
@@ -263,6 +290,10 @@ class ProjectViewSet(
     )
     @transaction.atomic
     def sync(self, request, pk):
+        # Check if project workers are available before syncing
+        if not check_project_queue_health():
+            raise api_exc.ProjectWorkerUnavailable()
+
         # get only projects user has access to
         try:
             project = (
