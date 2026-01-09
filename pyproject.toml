@@ -81,7 +81,6 @@ awx-plugins-core = { version = "^0.0.1a10", extras = [
                               "credentials-thycotic-dsv",
                               "credentials-thycotic-tss"
                     ]}
-packaging = "^25.0"
 
 
 [tool.poetry.group.test.dependencies]
