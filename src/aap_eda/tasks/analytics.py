@@ -46,7 +46,7 @@ def schedule_gather_analytics(
             return
 
         if cancel:
-            logger.info("Cancel perviously scheduled analytics jobs")
+            logger.info("Cancel previously scheduled analytics jobs")
             tasking.queue_cancel_job(queue_name, ANALYTICS_SCHEDULE_JOB_ID)
 
         tasking.enqueue_delay(
@@ -61,13 +61,7 @@ def schedule_gather_analytics(
 def reschedule_gather_analytics(
     queue_name: str = ANALYTICS_TASKS_QUEUE,
 ) -> None:
-    """Reschedule the gather analytics job using dispatcherd."""
-    return reschedule_gather_analytics_dispatcherd(queue_name)
-
-
-def reschedule_gather_analytics_dispatcherd(
-    queue_name: str = ANALYTICS_TASKS_QUEUE,
-) -> None:
+    """Reschedule the gather analytics job."""
     queue_name = sanitize_postgres_identifier(queue_name)
     schedule_gather_analytics(queue_name, cancel=True)
 

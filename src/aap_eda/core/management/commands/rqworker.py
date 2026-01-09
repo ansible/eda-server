@@ -91,10 +91,10 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.WARNING(
-                "The 'rqworker' command has been replaced by 'dispatcherd' as "
-                "part of the migration from Redis/RQ to PostgreSQL "
+                "The 'rqworker' command has been replaced by 'dispatcherd' "
+                "as part of the migration from Redis/RQ to PostgreSQL "
                 "pg_notify.\n\n"
-                f"Please update your deployment to use:\n  "
+                f"Please update your deployment to use: \n  "
                 f"{suggested_command}\n\n"
                 "Benefits of dispatcherd:\n"
                 "  • Eliminates Redis dependency\n"
@@ -106,7 +106,7 @@ class Command(BaseCommand):
             ),
         )
 
-        # TODO: Fowarding call can be removed in future versions
+        # TODO: Forwarding call can be removed in future versions
         # Forward the call to dispatcherd command
         dispatcherd_options = {
             **options,
@@ -114,6 +114,6 @@ class Command(BaseCommand):
             "log_level": options.get("log_level", "INFO"),
         }
 
-        # Create and execute dispatcherd command
+        # Create and execute dispatcherd command directly
         dispatcherd_command = DispatcherdCommand()
         dispatcherd_command.handle(*args, **dispatcherd_options)

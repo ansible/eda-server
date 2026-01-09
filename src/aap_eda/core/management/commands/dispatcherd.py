@@ -47,35 +47,22 @@ class Command(BaseCommand):
             help="Type of worker to run (ActivationWorker or DefaultWorker)",
         )
 
-        parser.add_argument(
-            "--log-level",
-            choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-            default="INFO",
-            help="Logging level (default: INFO)",
-        )
-
     def handle(self, *args, **options) -> None:
         """Handle dispatcherd service."""
         worker_class = options.get("worker_class")
-        log_level = options.get("log_level", "INFO")
         verbosity = options.get("verbosity", 1)
-
-        # Set logging level
-        logging.getLogger().setLevel(getattr(logging, log_level))
-
-        # Display startup information based on verbosity
-        if verbosity >= 1:
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Starting {worker_class} with dispatcherd..."
-                )
-            )
 
         try:
             if worker_class == "ActivationWorker":
-                # dispatcherd worker settings can not be initialized as setting
-                # because the queue name sanitization must happen
-                # after the settings are loaded.
+                # ActivationWorker requires dynamic queue name configuration.
+                # The queue name must be sanitized to prevent SQL injection
+                # attacks and ensure PostgreSQL identifier compliance before
+                # being used in pg_notify channels. PostgreSQL identifiers have
+                # specific rules: they must be valid SQL identifiers,
+                # alphanumeric with underscores, and properly quoted if they
+                # contain special characters. We merge the sanitized channel
+                # into the default settings after base settings are loaded to
+                # ensure the queue name is safe for use.
                 dispatcher_worker_settings = {
                     **settings.DISPATCHERD_DEFAULT_SETTINGS,
                     "brokers": {
@@ -96,28 +83,29 @@ class Command(BaseCommand):
             elif worker_class == "DefaultWorker":
                 dispatcherd_setup(settings.DISPATCHERD_DEFAULT_WORKER_SETTINGS)
 
+            # Output startup message with verbosity control
+            if verbosity >= 1:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Starting {worker_class} with dispatcherd."
+                    )
+                )
+
             if verbosity >= 2:
                 self.stdout.write(
-                    "Worker configuration completed successfully."
+                    self.style.SUCCESS(f"Worker type: {worker_class}")
                 )
 
             logger.info(f"Starting {worker_class} with dispatcherd.")
             run_dispatcherd_service()
 
         except KeyboardInterrupt:
-            if verbosity >= 1:
-                self.stdout.write(
-                    self.style.WARNING("Worker shutdown requested by user.")
-                )
-            logger.info(f"{worker_class} shutdown requested.")
+            shutdown_msg = f"{worker_class} shutdown requested."
+            self.stdout.write(self.style.WARNING(shutdown_msg))
+            logger.info(shutdown_msg)
 
         except Exception as e:
             error_msg = f"Failed to start {worker_class}: {e}"
             self.stderr.write(self.style.ERROR(error_msg))
             logger.error(error_msg, exc_info=True)
             raise SystemExit(1)
-
-        if verbosity >= 1:
-            self.stdout.write(
-                self.style.SUCCESS(f"{worker_class} stopped gracefully.")
-            )
