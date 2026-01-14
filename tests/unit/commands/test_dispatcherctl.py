@@ -31,11 +31,13 @@ def test_command_init_calls_startup_logging(mock_startup_logging):
 
 
 @patch(
-    "aap_eda.core.management.commands.dispatcherctl._build_command_data_from_args"
+    "aap_eda.core.management.commands.dispatcherctl."
+    "_build_command_data_from_args"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
 @patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+    "aap_eda.core.management.commands.dispatcherctl."
+    "get_control_from_settings"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.yaml")
 def test_dispatcherctl_runs_control_with_generated_config(
@@ -71,11 +73,13 @@ def test_dispatcherctl_runs_control_with_generated_config(
 
 
 @patch(
-    "aap_eda.core.management.commands.dispatcherctl._build_command_data_from_args"
+    "aap_eda.core.management.commands.dispatcherctl."
+    "_build_command_data_from_args"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
 @patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+    "aap_eda.core.management.commands.dispatcherctl."
+    "get_control_from_settings"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.yaml")
 def test_dispatcherctl_raises_when_replies_missing(
@@ -117,11 +121,13 @@ def test_dispatcherctl_requires_command():
 
 
 @patch(
-    "aap_eda.core.management.commands.dispatcherctl._build_command_data_from_args"
+    "aap_eda.core.management.commands.dispatcherctl."
+    "_build_command_data_from_args"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.dispatcherd_setup")
 @patch(
-    "aap_eda.core.management.commands.dispatcherctl.get_control_from_settings"
+    "aap_eda.core.management.commands.dispatcherctl."
+    "get_control_from_settings"
 )
 @patch("aap_eda.core.management.commands.dispatcherctl.yaml")
 def test_argument_parsing_integration(
