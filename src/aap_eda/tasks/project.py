@@ -21,9 +21,23 @@ from django.conf import settings
 from aap_eda import utils
 from aap_eda.core import models
 from aap_eda.services.project import ProjectImportError, ProjectImportService
+from aap_eda.tasks.orchestrator import check_rulebook_queue_health
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
+
+
+def check_project_queue_health() -> bool:
+    """Check for the state of the project queue in dispatcherd.
+
+    Returns True if the project queue is healthy, False otherwise.
+    """
+    try:
+        queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)
+        return check_rulebook_queue_health(queue_name)
+    except Exception as e:
+        logger.error(f"Project queue health check failed: {e}", exc_info=True)
+        return False
 
 
 def import_project(project_id: int) -> str:

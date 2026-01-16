@@ -31,7 +31,9 @@ runs:
         poetry run python -m pytest -vv \
           --cov=./ \
           --cov-report=xml \
-          --junit-xml=eda-server-default.xml
+          --junit-xml=eda-server-default.xml \
+          -n auto \
+          --dist=loadfile
         echo "GIT_SHA=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
     - name: Run multithreaded tests
@@ -41,7 +43,9 @@ runs:
           --cov=./ \
           --cov-append \
           --junit-xml=eda-server-multithreaded.xml \
-          -m "multithreaded"
+          -m "multithreaded" \
+          -n auto \
+          --dist=loadfile
 
     - name: Merge test results
       shell: bash

@@ -37,6 +37,7 @@ __all__ = (
     "PermissionDenied",
     "GatewayAPIError",
     "MissingCredentialsError",
+    "ProjectWorkerUnavailable",
     "api_fallback_handler",
 )
 
@@ -126,6 +127,14 @@ class ExternalSMSError(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     default_detail = (
         "External SMS Error: not able to fetch secrets from external SMS"
+    )
+
+
+class ProjectWorkerUnavailable(APIException):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "project_worker_unavailable"
+    default_detail = (
+        "Project workers are currently unavailable. Please try again later."
     )
 
 

@@ -13,6 +13,8 @@
 #  limitations under the License.
 
 import logging
+import os
+from unittest import mock
 
 import pytest
 from ansible_base.feature_flags.utils import (
@@ -25,6 +27,24 @@ from aap_eda.core.management.commands.create_initial_data import (
     CREDENTIAL_TYPES,
     populate_credential_types,
 )
+
+
+#################################################################
+# Auto-mock project health checks in CI
+#################################################################
+@pytest.fixture(autouse=True)
+def auto_mock_project_health_checks():
+    """Automatically mock project health checks when
+    EDA_MOCK_PROJECT_HEALTH_CHECKS is set.
+    """
+    if os.getenv("EDA_MOCK_PROJECT_HEALTH_CHECKS") == "true":
+        with mock.patch(
+            "aap_eda.tasks.project.check_rulebook_queue_health",
+            return_value=True,
+        ):
+            yield
+    else:
+        yield
 
 
 #################################################################
