@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from unittest import mock
+
 import pytest
 from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist
@@ -51,8 +53,23 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
     except NoReverseMatch:
         pytest.skip("Not testing model for now")
 
-    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
-        response = admin_client.post(url, data=post_data, format="json")
+    # Mock health check for Project model to avoid 503 errors
+    if model._meta.model_name == "project":
+        with mock.patch(
+            "aap_eda.api.views.project.check_project_queue_health",
+            return_value=True,
+        ):
+            with override_settings(
+                EVENT_STREAM_BASE_URL="https://www.example.com/"
+            ):
+                response = admin_client.post(
+                    url, data=post_data, format="json"
+                )
+    else:
+        with override_settings(
+            EVENT_STREAM_BASE_URL="https://www.example.com/"
+        ):
+            response = admin_client.post(url, data=post_data, format="json")
 
     if response.status_code == 405:
         pytest.skip("Not testing model not allowing creation for now")
@@ -92,8 +109,25 @@ def test_create_with_custom_org(
     except NoReverseMatch:
         pytest.skip("Not testing model with no list view for now")
 
-    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
-        response = superuser_client.post(url, data=post_data, format="json")
+    # Mock health check for Project model to avoid 503 errors
+    if model._meta.model_name == "project":
+        with mock.patch(
+            "aap_eda.api.views.project.check_project_queue_health",
+            return_value=True,
+        ):
+            with override_settings(
+                EVENT_STREAM_BASE_URL="https://www.example.com/"
+            ):
+                response = superuser_client.post(
+                    url, data=post_data, format="json"
+                )
+    else:
+        with override_settings(
+            EVENT_STREAM_BASE_URL="https://www.example.com/"
+        ):
+            response = superuser_client.post(
+                url, data=post_data, format="json"
+            )
 
     if response.status_code == 405:
         pytest.skip("Not testing model not allowing creation for now")

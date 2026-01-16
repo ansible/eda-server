@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from unittest import mock
+
 import pytest
 from rest_framework.reverse import reverse
 
@@ -43,12 +45,16 @@ def test_activation_actions(
 
 
 @pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
 def test_project_sync_action(
+    mock_health_check,
     default_project,
     default_user,
     user_client,
     give_obj_perm,
 ):
+    # Mock health check to return True so we can test permissions
+    mock_health_check.return_value = True
     url = reverse("project-sync", kwargs={"pk": default_project.pk})
 
     # assure GET is not enabled, so we do not have to permission check it

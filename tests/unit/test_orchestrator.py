@@ -398,16 +398,212 @@ def test_manage_monitor_called_with_no_requests(
     mock_requests_queue.peek_all.return_value = []
     manager_mock = mock.Mock()
 
-    with mock.patch(
-        "aap_eda.tasks.orchestrator.ActivationManager"
-    ) as mock_manager, mock.patch(
-        "aap_eda.tasks.orchestrator.assign_request_id"
-    ) as mock_assign_req, mock.patch(
-        "aap_eda.tasks.orchestrator.assign_log_tracking_id"
-    ) as mock_assign_log:
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.assign_request_id"
+        ) as mock_assign_req,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.assign_log_tracking_id"
+        ) as mock_assign_log,
+    ):
         mock_manager.return_value = manager_mock
         _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
 
     mock_assign_req.assert_called_once_with("x_request_id")
     mock_assign_log.assert_called_once_with(process_parent.log_tracking_id)
     manager_mock.monitor.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_connection_failure(mock_get_control):
+    """Test check_rulebook_queue_health when control settings fail."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    # Mock get_control_from_settings to raise an exception
+    mock_get_control.side_effect = ConnectionError(
+        "Failed to connect to dispatcherd"
+    )
+
+    # Health check should return False and not raise exception
+    result = check_rulebook_queue_health("test_queue")
+    assert result is False
+
+    # Verify get_control_from_settings was called
+    mock_get_control.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_control_reply_timeout(mock_get_control):
+    """Test check_rulebook_queue_health when control_with_reply times out."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    # Mock control to raise timeout exception
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.side_effect = TimeoutError(
+        "Health check timeout"
+    )
+    mock_get_control.return_value = mock_control
+
+    # Health check should return False and not raise exception
+    result = check_rulebook_queue_health("test_queue")
+    assert result is False
+
+    # Verify calls were made
+    mock_get_control.assert_called_once()
+    mock_control.control_with_reply.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_control_reply_failure(mock_get_control):
+    """Test check_rulebook_queue_health when control_with_reply fails."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    # Mock control to raise generic exception
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.side_effect = RuntimeError(
+        "Dispatcherd error"
+    )
+    mock_get_control.return_value = mock_control
+
+    # Health check should return False and not raise exception
+    result = check_rulebook_queue_health("test_queue")
+    assert result is False
+
+    # Verify calls were made
+    mock_get_control.assert_called_once()
+    mock_control.control_with_reply.assert_called_once()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.LOGGER")
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_logs_exceptions(
+    mock_get_control, mock_logger
+):
+    """Test check_rulebook_queue_health logs exceptions properly."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    # Mock get_control_from_settings to raise an exception
+    test_exception = ConnectionError("Test connection error")
+    mock_get_control.side_effect = test_exception
+
+    # Health check should return False
+    result = check_rulebook_queue_health("test_queue")
+    assert result is False
+
+    # Verify error was logged with exception info
+    mock_logger.error.assert_called_once()
+    log_call = mock_logger.error.call_args
+    assert "Health check failed for queue test_queue" in log_call[0][0]
+    assert log_call[1]["exc_info"] is True
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.settings")
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_timeout_setting(
+    mock_get_control, mock_settings
+):
+    """Test check_rulebook_queue_health uses correct timeout setting."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    # Mock settings with specific timeout
+    mock_settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 30
+
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = {"status": "alive"}
+    mock_get_control.return_value = mock_control
+
+    result = check_rulebook_queue_health("test_queue")
+    assert result is True
+
+    # Verify timeout was passed to control_with_reply
+    mock_control.control_with_reply.assert_called_once_with(
+        "alive", timeout=30
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.utils.sanitize_postgres_identifier")
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_queue_name_sanitization(
+    mock_get_control, mock_sanitize
+):
+    """Test check_rulebook_queue_health properly sanitizes queue names."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    # Mock sanitization
+    mock_sanitize.return_value = "sanitized_queue_name"
+
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = {"status": "alive"}
+    mock_get_control.return_value = mock_control
+
+    result = check_rulebook_queue_health("unsafe-queue-name")
+    assert result is True
+
+    # Verify queue name was sanitized before use
+    mock_sanitize.assert_called_once_with("unsafe-queue-name")
+    mock_get_control.assert_called_once_with(
+        default_publish_channel="sanitized_queue_name"
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_empty_response(mock_get_control):
+    """Test check_rulebook_queue_health handles empty/None responses."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = None  # Empty response
+    mock_get_control.return_value = mock_control
+
+    result = check_rulebook_queue_health("test_queue")
+    assert result is False  # None response should be treated as unhealthy
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_false_response(mock_get_control):
+    """Test check_rulebook_queue_health handles False responses."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = False  # Explicit False
+    mock_get_control.return_value = mock_control
+
+    result = check_rulebook_queue_health("test_queue")
+    assert result is False
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_various_truthy_responses(
+    mock_get_control,
+):
+    """Test check_rulebook_queue_health handles various truthy responses."""
+    from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+
+    mock_control = mock.Mock()
+    mock_get_control.return_value = mock_control
+
+    # Test various truthy responses
+    truthy_responses = [
+        {"status": "ok"},
+        {"workers": 1},
+        "alive",
+        1,
+        [1, 2, 3],
+    ]
+
+    for response in truthy_responses:
+        mock_control.control_with_reply.return_value = response
+        result = check_rulebook_queue_health("test_queue")
+        assert result is True, f"Expected True for response: {response}"

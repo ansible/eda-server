@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from unittest import mock
+
 import pytest
 from ansible_base.rbac import permission_registry
 from ansible_base.rbac.models import DABPermission, RoleDefinition
@@ -57,11 +59,31 @@ def test_add_permissions(
         pytest.skip("Model has no add permission")
 
     url = reverse(f"{get_basename(model)}-list")
-    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
-        prior_ct = model.objects.count()
-        response = user_client.post(url, data=post_data)
-        assert response.status_code == 403, response.data
-        assert model.objects.count() == prior_ct  # assure nothing was created
+    # Mock health check for Project model to avoid 503 errors
+    if model._meta.model_name == "project":
+        with mock.patch(
+            "aap_eda.api.views.project.check_project_queue_health",
+            return_value=True,
+        ):
+            with override_settings(
+                EVENT_STREAM_BASE_URL="https://www.example.com/"
+            ):
+                prior_ct = model.objects.count()
+                response = user_client.post(url, data=post_data)
+                assert response.status_code == 403, response.data
+                assert (
+                    model.objects.count() == prior_ct
+                )  # assure nothing was created
+    else:
+        with override_settings(
+            EVENT_STREAM_BASE_URL="https://www.example.com/"
+        ):
+            prior_ct = model.objects.count()
+            response = user_client.post(url, data=post_data)
+            assert response.status_code == 403, response.data
+            assert (
+                model.objects.count() == prior_ct
+            )  # assure nothing was created
 
     # Figure out the parent object if we can
     parent_field_name = permission_registry.get_parent_fd_name(model)
@@ -112,9 +134,23 @@ def test_add_permissions(
                     related_perm = "view"
                 give_obj_perm(default_user, related_obj, related_perm)
 
-    with override_settings(EVENT_STREAM_BASE_URL="https://www.example.com/"):
-        response = user_client.post(url, data=post_data, format="json")
-        assert response.status_code == 201, response.data
+    # Mock health check for Project model to avoid 503 errors
+    if model._meta.model_name == "project":
+        with mock.patch(
+            "aap_eda.api.views.project.check_project_queue_health",
+            return_value=True,
+        ):
+            with override_settings(
+                EVENT_STREAM_BASE_URL="https://www.example.com/"
+            ):
+                response = user_client.post(url, data=post_data, format="json")
+                assert response.status_code == 201, response.data
+    else:
+        with override_settings(
+            EVENT_STREAM_BASE_URL="https://www.example.com/"
+        ):
+            response = user_client.post(url, data=post_data, format="json")
+            assert response.status_code == 201, response.data
 
     if model.objects.count() == 1:
         obj = model.objects.first()
