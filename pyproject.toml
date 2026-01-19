@@ -82,6 +82,10 @@ awx-plugins-core = { version = "^0.0.1a10", extras = [
                               "credentials-thycotic-dsv",
                               "credentials-thycotic-tss"
                     ]}
+# transitive dependency needed by Daphne to resolve conflicts in Konflux build
+# adding here to be captured in the building of the 
+# `requirements-poetry-export.in` file
+constantly = ">=23.10.4,<24"
 
 
 [tool.poetry.group.test.dependencies]
