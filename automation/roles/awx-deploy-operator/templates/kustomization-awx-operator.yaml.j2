@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: {{ awx_namespace }}
+
+generatorOptions:
+  disableNameSuffixHash: {{ awx_operator.disableNameSuffixHash | default('false') }}
+
+secretGenerator:
+  - name: {{ awx_operator.secretName }}
+    literals:
+      - operator={{ awx_operator.operatorLiteral }}
+
+resources:
+  - {{ awx_operator.awxOperatorConfigURL }}
+
+images:
+  - name: {{ awx_operator.operatorImageName }}
+    newTag: {{ awx_operator.operatorImageTag }}

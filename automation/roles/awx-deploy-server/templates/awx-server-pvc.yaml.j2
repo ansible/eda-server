@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ awx_server.pvc_name }}
+  namespace: {{ awx_namespace }}
+spec:
+  accessModes:
+    - "{{ awx_server.access_modes }}"
+  resources:
+    requests:
+      storage: {{ awx_server.storage_request }}
+status: {}

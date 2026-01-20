@@ -1,0 +1,33 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: {{ awx_namespace }}
+ 
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+ - name: awx-secret-tls
+   files:
+    - tls.crt
+    - tls.key
+
+secretGenerator: 
+  - name: awx-database-configuration
+    type: Opaque
+    literals:
+      - host={{ awx_server_kustomization.awx_database_configuration_host }}
+      - port={{ awx_server_kustomization.awx_database_configuration_port }}
+      - database={{ awx_server_kustomization.awx_database_configuration_database }}
+      - username={{ awx_server_kustomization.awx_database_configuration_username }}
+      - password={{ awx_server_kustomization.awx_database_configuration_password }}
+      - type=managed
+ 
+  - name: awx-admin-password
+    type: Opaque
+    literals:
+      - password={{ awx_server_kustomization.awx_admin_password }}
+
+resources:
+  - awx-server-pvc.yaml
+  - awx-server.yaml
