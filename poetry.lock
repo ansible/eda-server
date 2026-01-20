@@ -645,14 +645,14 @@ markers = {dev = "sys_platform == \"win32\"", lint = "platform_system == \"Windo
 
 [[package]]
 name = "constantly"
-version = "15.1.0"
+version = "23.10.4"
 description = "Symbolic constants in Python"
 optional = false
-python-versions = "*"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "constantly-15.1.0-py2.py3-none-any.whl", hash = "sha256:dd2fa9d6b1a51a83f0d7dd76293d734046aa176e384bf6e33b7e44880eb37c5d"},
-    {file = "constantly-15.1.0.tar.gz", hash = "sha256:586372eb92059873e29eba4f9dec8381541b4d3834660707faf8ba59146dfc35"},
+    {file = "constantly-23.10.4-py3-none-any.whl", hash = "sha256:3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9"},
+    {file = "constantly-23.10.4.tar.gz", hash = "sha256:aa92b70a33e2ac0bb33cd745eb61776594dc48764b06c35e0efd050b7f1c7cbd"},
 ]
 
 [[package]]
@@ -933,7 +933,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "929364895a3cd31d37217ba9ae26dc1efd5aef02"
+resolved_reference = "edc8b5338e3e836993a0f6e096e43913a5c05955"
 
 [[package]]
 name = "django-crum"
