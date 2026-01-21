@@ -1,4 +1,5 @@
 """Tools for running background tasks."""
+
 from __future__ import annotations
 
 import logging
@@ -38,12 +39,18 @@ def enqueue_delay(
 
 def queue_cancel_job(queue_name: str, job_id: str) -> None:
     """Cancel a job in the queue using dispatcherd."""
-    ctl = get_control_from_settings(default_publish_channel=queue_name)
-    canceled_data = ctl.control_with_reply("cancel", data={"uuid": job_id})
-    if canceled_data:
-        logger.warning(f"Canceled jobs in flight: {canceled_data}")
-    else:
-        logger.debug(f"No jobs running with id {job_id} to cancel")
+    try:
+        ctl = get_control_from_settings(default_publish_channel=queue_name)
+        canceled_data = ctl.control_with_reply("cancel", data={"uuid": job_id})
+        if canceled_data:
+            logger.warning(f"Canceled jobs in flight: {canceled_data}")
+        else:
+            logger.debug(f"No jobs running with id {job_id} to cancel")
+    except Exception as e:
+        logger.error(
+            f"Failed to cancel job {job_id} in queue {queue_name}: {e}",
+            exc_info=True,
+        )
 
 
 def unique_enqueue(
