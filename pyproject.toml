@@ -39,14 +39,14 @@ djangorestframework = "3.15.*"
 drf-spectacular = ">=0.26.5,<0.27"
 channels = { version = "4.0.*", extras = ["daphne"] }
 psycopg-binary = { version = "*", optional = true }
-django-rq = "^2.8.0"
-rq = "^1.13.0"
+django-rq = "^3.2.2"
+rq = "^2.6.1"
 django-filter = ">23.2,<24"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=42,<43"
 kubernetes = "26.1.*"
 podman = "5.4.*"
-rq-scheduler = "^0.10"
+rq-scheduler = "^0.14.0"
 django-ansible-base = { git = "git@github.com:ansible-automation-platform/django-ansible-base.git", branch = "stable-2.6", extras = [
     "channel-auth",
     "rbac",

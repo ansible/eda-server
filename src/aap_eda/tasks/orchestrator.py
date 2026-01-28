@@ -16,7 +16,7 @@ import logging
 import random
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 
 import django_rq
@@ -24,6 +24,7 @@ from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.factories import get_control_from_settings
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 
 import aap_eda.tasks.activation_request_queue as requests_queue
 from aap_eda import utils
@@ -448,7 +449,7 @@ def check_rulebook_queue_health_rq(queue_name: str) -> bool:
         last_heartbeat = worker.last_heartbeat
         if last_heartbeat is None:
             continue
-        threshold = datetime.now() - timedelta(
+        threshold = timezone.now() - timedelta(
             seconds=settings.DEFAULT_WORKER_HEARTBEAT_TIMEOUT,
         )
         if last_heartbeat >= threshold:

@@ -69,6 +69,7 @@ Example::
 For a complete list of parameters refer to the
 https://github.com/rq/rq-scheduler/blob/master/README.rst
 """
+
 import logging
 import signal
 import time
@@ -79,6 +80,7 @@ import django_rq
 import rq_scheduler
 from django.conf import settings
 from django_rq.management.commands import rqscheduler
+from rq.exceptions import InvalidJobOperation
 
 from aap_eda.core import tasking
 from aap_eda.core.exceptions import GracefulExit
@@ -98,7 +100,27 @@ def delete_scheduled_jobs(scheduler: rq_scheduler.Scheduler) -> None:
     """Cancel any existing jobs in the scheduler when the app starts up."""
     for job in scheduler.get_jobs():
         logger.info("Deleting scheduled job: %s", job)
-        job.delete()
+        try:
+            job.delete()
+        except InvalidJobOperation as e:
+            # Handle jobs from older RQ versions that can't be deleted normally
+            logger.warning(
+                f"Could not delete job {job.id} using standard method "
+                f"(likely from older RQ version): {e}. "
+                f"Cleaning up manually from Redis."
+            )
+            try:
+                # Manually remove the job key from Redis
+                job.connection.delete(job.key)
+                # Remove from scheduler's scheduled jobs set
+                scheduler.connection.zrem(scheduler.scheduled_jobs_key, job.id)
+                logger.info(f"Successfully cleaned up job {job.id} manually")
+            except Exception as cleanup_error:
+                logger.error(
+                    f"Failed to manually clean up job {job.id}: {cleanup_error}"  # noqa E501
+                )
+        except Exception as e:
+            logger.error(f"Unexpected error deleting job {job.id}: {e}")
 
 
 def add_startup_jobs(scheduler: rq_scheduler.Scheduler) -> None:
