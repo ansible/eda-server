@@ -22,16 +22,13 @@ jobs:
       (github.repository == 'ansible/eda-server' && github.event_name == 'pull_request_target' &&
         contains(github.event.pull_request.labels.*.name, 'run-ui-e2e'))
     runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'pull_request_target' && 'protected' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: >-
-            ${{
-              github.event_name == 'pull_request_target' && github.event.pull_request.head.ref
-              || github.sha
-            }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
