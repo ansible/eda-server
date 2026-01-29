@@ -1115,6 +1115,12 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 def assert_project_data(data: Dict[str, Any], project: models.Project):
     for key, value in data.items():
+        # Skip computed/serializer-only fields that don't exist on the model
+        if key == "related":
+            continue
+        if key == "needs_update_on_launch":
+            continue
+
         project_value = getattr(project, key, None)
         if isinstance(project_value, datetime.datetime):
             project_value = project_value.strftime(DATETIME_FORMAT)
