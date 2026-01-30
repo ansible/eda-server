@@ -52,13 +52,15 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
         model = models.Project
         read_only_fields = [
             "id",
-            "url",
             "scm_type",
             "git_hash",
             "import_state",
             "import_error",
             "created_at",
             "modified_at",
+            "last_synced_at",
+            "created_by",
+            "modified_by",
         ]
         fields = [
             "name",
@@ -66,12 +68,13 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "organization_id",
             "eda_credential_id",
             "signature_validation_credential_id",
+            "url",
             "scm_branch",
             "scm_refspec",
+            "scm_update_on_launch",
+            "scm_update_cache_timeout",
             "verify_ssl",
             "proxy",
-            "created_by",
-            "modified_by",
             *read_only_fields,
         ]
 
@@ -118,6 +121,20 @@ class ProjectCreateRequestSerializer(
         help_text="For git projects, an additional refspec to fetch.",
         validators=[validators.check_if_refspec_valid],
     )
+    scm_update_on_launch = serializers.BooleanField(
+        required=False,
+        help_text="Each time a job runs using this project, update the "
+        "revision of the project prior to starting the job.",
+    )
+    scm_update_cache_timeout = serializers.IntegerField(
+        min_value=0,
+        required=False,
+        help_text="Time in seconds to consider a project to be current. "
+        "During job runs and callbacks the task system will evaluate "
+        "the timestamp of the latest project update. If it is older than "
+        "Cache Timeout, it is not considered current, and a new project "
+        "update will be performed.",
+    )
 
     class Meta:
         model = models.Project
@@ -133,6 +150,8 @@ class ProjectCreateRequestSerializer(
             "scm_type",
             "scm_branch",
             "scm_refspec",
+            "scm_update_on_launch",
+            "scm_update_cache_timeout",
         ]
 
 
@@ -198,6 +217,20 @@ class ProjectUpdateRequestSerializer(
             validators.check_if_refspec_valid,
         ],
     )
+    scm_update_on_launch = serializers.BooleanField(
+        required=False,
+        help_text="Each time a job runs using this project, "
+        "update the revision of the project prior to starting the job.",
+    )
+    scm_update_cache_timeout = serializers.IntegerField(
+        min_value=0,
+        required=False,
+        help_text="Time in seconds to consider a project to be current. "
+        "During job runs and callbacks the task system will evaluate the "
+        "timestamp of the latest project update. If it is older "
+        "than Cache Timeout, it is not considered current, "
+        "and a new project update will be performed.",
+    )
     proxy = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -224,6 +257,8 @@ class ProjectUpdateRequestSerializer(
             "signature_validation_credential_id",
             "scm_branch",
             "scm_refspec",
+            "scm_update_on_launch",
+            "scm_update_cache_timeout",
             "verify_ssl",
             "proxy",
             "url",
@@ -270,16 +305,17 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
         model = models.Project
         read_only_fields = [
             "id",
-            "url",
             "scm_type",
             "git_hash",
             "import_state",
             "import_error",
             "created_at",
             "modified_at",
+            "last_synced_at",
         ]
         fields = [
             "name",
+            "url",
             "description",
             "organization",
             "eda_credential",
@@ -287,6 +323,8 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "verify_ssl",
             "scm_branch",
             "scm_refspec",
+            "scm_update_on_launch",
+            "scm_update_cache_timeout",
             "proxy",
             "created_by",
             "modified_by",
@@ -321,6 +359,9 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "scm_type": project.scm_type,
             "scm_branch": project.scm_branch,
             "scm_refspec": project.scm_refspec,
+            "scm_update_on_launch": project.scm_update_on_launch,
+            "scm_update_cache_timeout": project.scm_update_cache_timeout,
+            "last_synced_at": project.last_synced_at,
             "git_hash": project.git_hash,
             "verify_ssl": project.verify_ssl,
             "organization": organization,
@@ -336,6 +377,8 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
 
 
 class ProjectRefSerializer(serializers.ModelSerializer):
+    needs_update_on_launch = serializers.SerializerMethodField()
+
     class Meta:
         model = models.Project
         fields = [
@@ -346,8 +389,12 @@ class ProjectRefSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "organization_id",
+            "needs_update_on_launch",
         ]
         read_only_fields = ["id"]
+
+    def get_needs_update_on_launch(self, project):
+        return project.needs_update_on_launch
 
 
 def get_proxy_for_display(proxy: str) -> str:
@@ -359,7 +406,7 @@ def get_proxy_for_display(proxy: str) -> str:
     cred, domain = result.netloc.split("@")
     if ":" in cred:
         user, _ = cred.split(":")
-        domain = f"{user}:{ENCRYPTED_STRING}@{domain}"
+        domain = "{}:{}@{}".format(user, ENCRYPTED_STRING, domain)
     else:
         domain = f"{ENCRYPTED_STRING}@{domain}"
 

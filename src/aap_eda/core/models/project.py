@@ -25,12 +25,14 @@
 #  limitations under the License.
 
 from django.db import models
+from django.utils import timezone
 
 from aap_eda.core.utils.crypto.fields import EncryptedTextField
 
 from .base import BaseOrgModel, PrimordialModel, UniqueNamedModel
 
 PROJECT_ARCHIVE_DIR = "projects/"
+DEFAULT_ENABLED = False
 
 
 class Project(BaseOrgModel, UniqueNamedModel, PrimordialModel):
@@ -84,6 +86,9 @@ class Project(BaseOrgModel, UniqueNamedModel, PrimordialModel):
     )
     scm_branch = models.TextField(blank=True, default="")
     scm_refspec = models.TextField(blank=True, default="")
+    scm_update_on_launch = models.BooleanField(default=DEFAULT_ENABLED)
+    scm_update_cache_timeout = models.PositiveIntegerField(default=0)
+    last_synced_at = models.DateTimeField(auto_now=True, null=False)
 
     # credential (keys) used to validate content signature
     signature_validation_credential = models.ForeignKey(
@@ -94,6 +99,20 @@ class Project(BaseOrgModel, UniqueNamedModel, PrimordialModel):
         default=None,
         on_delete=models.SET_NULL,
     )
+
+    @property
+    def needs_update_on_launch(self):
+        if not self.scm_update_on_launch:
+            return False
+        if self.scm_update_cache_timeout == 0:
+            return True
+
+        if not self.last_synced_at:
+            return True
+        time_since_last_sync = (
+            timezone.now() - self.last_synced_at
+        ).total_seconds()
+        return time_since_last_sync > self.scm_update_cache_timeout
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.id}, name={self.name})>"
