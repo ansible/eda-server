@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 from rest_framework.reverse import reverse
@@ -20,7 +21,12 @@ from rest_framework.reverse import reverse
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("action", ["enable", "restart", "disable"])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_activation_actions(
+    mock_health_check,
     default_activation,
     default_user,
     user_client,
@@ -45,7 +51,7 @@ def test_activation_actions(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_action(
     mock_health_check,
     default_project,

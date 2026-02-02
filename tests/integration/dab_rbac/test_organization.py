@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 from django.apps import apps
@@ -39,7 +40,13 @@ ORG_MODELS = [
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
-def test_create_with_default_org(cls_factory, model, admin_client, request):
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_with_default_org(
+    mock_health_check, cls_factory, model, admin_client, request
+):
     model_name = cls_factory.get_model_name(model)
     model_obj = cls_factory.get_fixture_object(request, model_name)
     post_data = cls_factory.get_post_data(model_obj)
@@ -56,7 +63,7 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
     # Mock health check for Project model to avoid 503 errors
     if model._meta.model_name == "project":
         with mock.patch(
-            "aap_eda.api.views.project.check_project_queue_health",
+            "aap_eda.api.views.project.check_default_worker_health",
             return_value=True,
         ):
             with override_settings(
@@ -89,7 +96,12 @@ def test_create_with_default_org(cls_factory, model, admin_client, request):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", ORG_MODELS)
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_with_custom_org(
+    mock_health_check,
     use_local_resource_setting,
     cls_factory,
     model,
@@ -112,7 +124,7 @@ def test_create_with_custom_org(
     # Mock health check for Project model to avoid 503 errors
     if model._meta.model_name == "project":
         with mock.patch(
-            "aap_eda.api.views.project.check_project_queue_health",
+            "aap_eda.api.views.project.check_default_worker_health",
             return_value=True,
         ):
             with override_settings(

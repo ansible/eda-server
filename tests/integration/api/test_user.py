@@ -13,6 +13,7 @@
 #  limitations under the License.
 import secrets
 from typing import Any, Dict
+from unittest.mock import patch
 
 import pytest
 from ansible_base.rbac import permission_registry
@@ -588,7 +589,12 @@ def test_list_users_filter_by_ansible_id(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_resources_remain_after_user_delete(
+    mock_health_check,
     use_local_resource_setting,
     base_client: APIClient,
     admin_user: models.User,
