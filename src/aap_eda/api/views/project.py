@@ -33,7 +33,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.core import models
 from aap_eda.core.enums import Action
 from aap_eda.core.utils import logging_utils
-from aap_eda.tasks.project import check_project_queue_health
+from aap_eda.tasks.project import check_default_worker_health
 
 from .mixins import ResponseSerializerMixin
 
@@ -121,8 +121,8 @@ class ProjectViewSet(
         serializer.is_valid(raise_exception=True)
 
         # Check if project workers are available before proceeding
-        if not check_project_queue_health():
-            raise api_exc.ProjectWorkerUnavailable()
+        if not check_default_worker_health():
+            raise api_exc.WorkerUnavailable(worker_type="default")
 
         # With dispatcherd migration, Redis is no longer required
         with transaction.atomic():
@@ -248,8 +248,8 @@ class ProjectViewSet(
             ]
         ):
             # Check if project workers are available before syncing
-            if not check_project_queue_health():
-                raise api_exc.ProjectWorkerUnavailable()
+            if not check_default_worker_health():
+                raise api_exc.WorkerUnavailable(worker_type="default")
 
             # With dispatcherd migration, Redis is no longer required
 
@@ -290,8 +290,8 @@ class ProjectViewSet(
     )
     def sync(self, request, pk):
         # Check if project workers are available before syncing
-        if not check_project_queue_health():
-            raise api_exc.ProjectWorkerUnavailable()
+        if not check_default_worker_health():
+            raise api_exc.WorkerUnavailable(worker_type="default")
 
         # get only projects user has access to
         with transaction.atomic():

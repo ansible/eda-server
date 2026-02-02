@@ -12,10 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
-
 from ansible_base.lib.constants import STATUS_FAILED, STATUS_GOOD
-from django.conf import settings
 from django.db import connection
 from django.db.utils import OperationalError
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -24,8 +21,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from aap_eda.tasks.orchestrator import check_rulebook_queue_health
-from aap_eda.tasks.project import check_project_queue_health
+from aap_eda.core.health import check_dispatcherd_workers_health
 
 from .serializers import StatusResponseSerializer
 
@@ -55,31 +51,6 @@ class StatusView(APIView):
         except OperationalError:
             return False
 
-    @staticmethod
-    def _check_dispatcherd():
-        """Check dispatcherd worker health for core task processing."""
-        try:
-            # Check project workers (default queue)
-            if not check_project_queue_health():
-                return False
-
-            # Check activation workers (sample one rulebook queue)
-            rulebook_queues = getattr(settings, "RULEBOOK_WORKER_QUEUES", [])
-            if rulebook_queues:
-                # Check first configured rulebook queue as
-                # representative sample
-                return check_rulebook_queue_health(rulebook_queues[0])
-
-            # If no rulebook queues configured, only project workers matter
-            return True
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error(
-                f"Health check failed for dispatcherd workers: {e}",
-                exc_info=True,
-            )
-            return False
-
     @extend_schema(
         description="Get the current status of EDA.",
         responses={
@@ -97,7 +68,7 @@ class StatusView(APIView):
         if not self._check_database():
             errors.append("Database connection failed")
 
-        if not self._check_dispatcherd():
+        if not check_dispatcherd_workers_health():
             errors.append("Dispatcherd workers unavailable")
 
         if not errors:

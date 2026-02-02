@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from aap_eda.tasks.project import (
-    check_project_queue_health,
+    check_default_worker_health,
     monitor_project_tasks,
 )
 
@@ -71,33 +71,33 @@ def test_monitor_project_tasks_scheduled():
 
 
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_success(mock_check_rulebook_health):
-    """Test check_project_queue_health returns True when queue is healthy."""
+def test_check_default_worker_health_success(mock_check_rulebook_health):
+    """Test check_default_worker_health returns True when queue is healthy."""
     mock_check_rulebook_health.return_value = True
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is True
     mock_check_rulebook_health.assert_called_once_with("default")
 
 
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_failure(mock_check_rulebook_health):
-    """Test check_project_queue_health returns False when queue unhealthy."""
+def test_check_default_worker_health_failure(mock_check_rulebook_health):
+    """Test check_default_worker_health returns False when queue unhealthy."""
     mock_check_rulebook_health.return_value = False
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is False
     mock_check_rulebook_health.assert_called_once_with("default")
 
 
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_exception(mock_check_rulebook_health):
-    """Test check_project_queue_health returns False when exception occurs."""
+def test_check_default_worker_health_exception(mock_check_rulebook_health):
+    """Test check_default_worker_health returns False when exception occurs."""
     mock_check_rulebook_health.side_effect = Exception("Connection timeout")
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is False
     mock_check_rulebook_health.assert_called_once_with("default")
@@ -105,14 +105,14 @@ def test_check_project_queue_health_exception(mock_check_rulebook_health):
 
 @patch("aap_eda.tasks.project.logger")
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_logs_exceptions(
+def test_check_default_worker_health_logs_exceptions(
     mock_check_rulebook_health, mock_logger
 ):
-    """Test check_project_queue_health logs exceptions properly."""
+    """Test check_default_worker_health logs exceptions properly."""
     test_exception = RuntimeError("Dispatcherd connection error")
     mock_check_rulebook_health.side_effect = test_exception
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is False
     mock_check_rulebook_health.assert_called_once_with("default")
@@ -125,28 +125,28 @@ def test_check_project_queue_health_logs_exceptions(
 
 
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_connection_error(
+def test_check_default_worker_health_connection_error(
     mock_check_rulebook_health,
 ):
-    """Test check_project_queue_health handles connection errors."""
+    """Test check_default_worker_health handles connection errors."""
     mock_check_rulebook_health.side_effect = ConnectionError(
         "Failed to connect"
     )
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is False
     mock_check_rulebook_health.assert_called_once_with("default")
 
 
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_timeout_error(mock_check_rulebook_health):
-    """Test check_project_queue_health handles timeout errors."""
+def test_check_default_worker_health_timeout_error(mock_check_rulebook_health):
+    """Test check_default_worker_health handles timeout errors."""
     mock_check_rulebook_health.side_effect = TimeoutError(
         "Health check timeout"
     )
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is False
     mock_check_rulebook_health.assert_called_once_with("default")
@@ -154,14 +154,14 @@ def test_check_project_queue_health_timeout_error(mock_check_rulebook_health):
 
 @patch("aap_eda.tasks.project.utils.sanitize_postgres_identifier")
 @patch("aap_eda.tasks.project.check_rulebook_queue_health")
-def test_check_project_queue_health_sanitizes_queue_name(
+def test_check_default_worker_health_sanitizes_queue_name(
     mock_check_rulebook_health, mock_sanitize
 ):
-    """Test check_project_queue_health sanitizes the queue name."""
+    """Test check_default_worker_health sanitizes the queue name."""
     mock_sanitize.return_value = "sanitized_default"
     mock_check_rulebook_health.return_value = True
 
-    result = check_project_queue_health()
+    result = check_default_worker_health()
 
     assert result is True
     mock_sanitize.assert_called_once_with("default")

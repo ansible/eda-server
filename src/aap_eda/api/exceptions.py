@@ -37,7 +37,7 @@ __all__ = (
     "PermissionDenied",
     "GatewayAPIError",
     "MissingCredentialsError",
-    "ProjectWorkerUnavailable",
+    "WorkerUnavailable",
     "api_fallback_handler",
 )
 
@@ -130,12 +130,20 @@ class ExternalSMSError(APIException):
     )
 
 
-class ProjectWorkerUnavailable(APIException):
+class WorkerUnavailable(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    default_code = "project_worker_unavailable"
+    default_code = "worker_unavailable"
     default_detail = (
-        "Project workers are currently unavailable. Please try again later."
+        "Workers are currently unavailable. Please try again later."
     )
+
+    def __init__(self, detail=None, code=None, worker_type=None):
+        if detail is None and worker_type:
+            detail = (
+                f"{worker_type.title()} workers are currently unavailable. "
+                "Please try again later."
+            )
+        super().__init__(detail, code)
 
 
 class GatewayAPIError(APIException):

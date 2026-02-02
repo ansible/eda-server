@@ -16,6 +16,7 @@
 
 import secrets
 import uuid
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -310,7 +311,12 @@ def create_activation(fks: dict):
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_event_stream(
+    mock_health_check,
     admin_client: APIClient,
     preseed_credential_types,
     create_initial_data_command,
@@ -703,7 +709,12 @@ event_stream_src_test_data = [
     event_stream_src_test_data,
 )
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_bad_src_activation_with_event_stream(
+    mock_health_check,
     admin_client: APIClient,
     preseed_credential_types,
     create_initial_data_command,
