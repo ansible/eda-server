@@ -136,7 +136,7 @@ REST_FRAMEWORK = {
 # ---------------------------------------------------------
 # DISPATCHERD SETTINGS
 # ---------------------------------------------------------
-DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 10
+DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT = 3
 DISPATCHERD_DEFAULT_CHANNEL = "default"
 
 # Task timeout configuration in seconds

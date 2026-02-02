@@ -33,6 +33,7 @@ from aap_eda.api import exceptions as api_exc, filters, serializers
 from aap_eda.api.serializers.activation import is_activation_valid
 from aap_eda.core import models
 from aap_eda.core.enums import Action, ActivationStatus, ProcessParentType
+from aap_eda.core.health import check_dispatcherd_workers_health
 from aap_eda.core.utils import logging_utils
 from aap_eda.tasks.orchestrator import (
     delete_rulebook_process,
@@ -97,6 +98,13 @@ class ActivationViewSet(
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Check if activation workers are available for enabled activations
+        is_enabled = serializer.validated_data.get(
+            "is_enabled", models.activation.DEFAULT_ENABLED
+        )
+        if is_enabled:
+            check_dispatcherd_workers_health(raise_exceptions=True)
 
         with transaction.atomic():
             response = serializer.create(serializer.validated_data)
@@ -239,7 +247,11 @@ class ActivationViewSet(
             activation.organization,
         )
 
-        # With dispatcherd migration, Redis is no longer required
+        # Check if activation workers are available before deleting
+        # (unless force is true)
+        if not force_delete:
+            check_dispatcherd_workers_health(raise_exceptions=True)
+
         with transaction.atomic():
             activation.status = ActivationStatus.DELETING
             activation.save(update_fields=["status"])
@@ -409,7 +421,8 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # With dispatcherd migration, Redis is no longer required
+        # Check if activation workers are available before enabling
+        check_dispatcherd_workers_health(raise_exceptions=True)
 
         logger.info(f"Now enabling {activation.name} ...")
 
@@ -485,7 +498,10 @@ class ActivationViewSet(
         )
 
         if activation.is_enabled:
-            # With dispatcherd migration, Redis is no longer required
+            # Check if activation workers are available before disabling
+            # (unless force=true to allow operation with unhealthy workers)
+            if not force_disable:
+                check_dispatcherd_workers_health(raise_exceptions=True)
 
             if activation.status in [
                 ActivationStatus.STARTING,
@@ -556,7 +572,10 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
-        # With dispatcherd migration, Redis is no longer required
+        # Check if activation workers are available before restarting
+        # (unless force is true)
+        if not force_restart:
+            check_dispatcherd_workers_health(raise_exceptions=True)
 
         valid, error = is_activation_valid(activation)
         if not valid:

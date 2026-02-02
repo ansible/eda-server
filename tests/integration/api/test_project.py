@@ -157,7 +157,7 @@ def test_retrieve_project_not_exist(admin_client: APIClient):
     ],
 )
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 @mock.patch("aap_eda.tasks.import_project")
 def test_create_or_update_project_with_right_signature_credential(
     import_project_task: mock.Mock,
@@ -305,7 +305,7 @@ def test_create_or_update_project_with_right_signature_credential(
     ],
 )
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 @mock.patch("aap_eda.tasks.import_project")
 def test_create_or_update_project_with_right_eda_credential(
     import_project_task: mock.Mock,
@@ -490,7 +490,7 @@ def test_create_project_with_invalid_git_parameters(
 # Test: Sync project
 # -------------------------------------
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 @mock.patch("aap_eda.tasks.sync_project")
 @pytest.mark.parametrize(
     "initial_state",
@@ -530,7 +530,7 @@ def test_sync_project(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 @mock.patch("aap_eda.tasks.sync_project")
 @pytest.mark.parametrize(
     "initial_state",
@@ -567,7 +567,7 @@ def test_sync_project_conflict_already_running(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_sync_project_not_exist(
     mock_health_check: mock.Mock, admin_client: APIClient
 ):
@@ -641,7 +641,7 @@ def test_update_project_with_400(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_partial_update_project(
     mock_health_check: mock.Mock,
     new_project: models.Project,
@@ -719,7 +719,7 @@ def test_partial_update_project_bad_proxy(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_partial_update_project_url(
     mock_health_check: mock.Mock,
     new_project: models.Project,
@@ -745,7 +745,7 @@ def test_partial_update_project_url(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_partial_update_project_scm_branch(
     mock_health_check: mock.Mock,
     new_project: models.Project,
@@ -771,7 +771,7 @@ def test_partial_update_project_scm_branch(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_partial_update_project_scm_refspec(
     mock_health_check: mock.Mock,
     new_project: models.Project,
@@ -815,7 +815,7 @@ def test_delete_project_not_found(admin_client: APIClient):
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 @mock.patch("aap_eda.tasks.import_project")
 def test_project_by_fields(
     import_project_task: mock.Mock,
@@ -879,7 +879,7 @@ def test_project_by_fields(
 # Test: Project worker unavailable (503 exception validation)
 # -------------------------------------
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_operations_worker_unavailable(
     mock_health_check: mock.Mock,
     admin_client: APIClient,
@@ -903,7 +903,7 @@ def test_project_operations_worker_unavailable(
     )
     assert create_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert create_response.json()["detail"] == (
-        "Project workers are currently unavailable. Please try again later."
+        "Default workers are currently unavailable. Please try again later."
     )
 
     # Test project sync returns 503
@@ -912,7 +912,7 @@ def test_project_operations_worker_unavailable(
     )
     assert sync_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert sync_response.json()["detail"] == (
-        "Project workers are currently unavailable. Please try again later."
+        "Default workers are currently unavailable. Please try again later."
     )
 
     # Test project update returns 503 (operations that trigger health check)
@@ -925,7 +925,7 @@ def test_project_operations_worker_unavailable(
     )
     assert update_response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert update_response.json()["detail"] == (
-        "Project workers are currently unavailable. Please try again later."
+        "Default workers are currently unavailable. Please try again later."
     )
 
     # Verify health check was called for each operation
@@ -941,7 +941,7 @@ def test_project_create_health_check_exception(
 ):
     """Test project creation when underlying health check raises exception."""
     # Mock the underlying health check to raise an exception
-    # check_project_queue_health should handle this and return False
+    # check_default_worker_health should handle this and return False
     mock_check_rulebook_health.side_effect = RuntimeError(
         "Dispatcherd connection error"
     )
@@ -960,7 +960,7 @@ def test_project_create_health_check_exception(
     # Should return 503 when health check encounters exception
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
     assert response.json()["detail"] == (
-        "Project workers are currently unavailable. Please try again later."
+        "Default workers are currently unavailable. Please try again later."
     )
 
     # Verify underlying health check was called
@@ -968,7 +968,7 @@ def test_project_create_health_check_exception(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 @mock.patch("aap_eda.tasks.sync_project")
 def test_project_sync_health_check_before_import_state_check(
     mock_sync_task: mock.Mock,
@@ -997,7 +997,7 @@ def test_project_sync_health_check_before_import_state_check(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_partial_update_url_change_health_check(
     mock_health_check: mock.Mock,
     admin_client: APIClient,
@@ -1020,7 +1020,7 @@ def test_project_partial_update_url_change_health_check(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_partial_update_branch_change_health_check(
     mock_health_check: mock.Mock,
     admin_client: APIClient,
@@ -1043,7 +1043,7 @@ def test_project_partial_update_branch_change_health_check(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_name_only_update_no_health_check(
     mock_health_check: mock.Mock,
     admin_client: APIClient,
@@ -1072,7 +1072,7 @@ def test_project_name_only_update_no_health_check(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_multiple_concurrent_health_check_calls(
     mock_health_check: mock.Mock,
     admin_client: APIClient,
@@ -1086,7 +1086,7 @@ def test_multiple_concurrent_health_check_calls(
     create_bodies = [
         {
             "name": f"test-project-concurrent-{i}",
-            "url": f"https://git.example.com/test/project{i}",
+            "url": f"https://git.example.com/test/project{i}",  # noqa E231
             "organization_id": default_organization.id,
         }
         for i in range(3)

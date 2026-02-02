@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 from ansible_base.rbac import permission_registry
@@ -42,7 +43,12 @@ def get_detail_url(obj, skip_if_not_found=False):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_add_permissions(
+    mock_health_check,
     use_local_resource_setting,
     request,
     model,
@@ -62,7 +68,7 @@ def test_add_permissions(
     # Mock health check for Project model to avoid 503 errors
     if model._meta.model_name == "project":
         with mock.patch(
-            "aap_eda.api.views.project.check_project_queue_health",
+            "aap_eda.api.views.project.check_default_worker_health",
             return_value=True,
         ):
             with override_settings(
@@ -137,7 +143,7 @@ def test_add_permissions(
     # Mock health check for Project model to avoid 503 errors
     if model._meta.model_name == "project":
         with mock.patch(
-            "aap_eda.api.views.project.check_project_queue_health",
+            "aap_eda.api.views.project.check_default_worker_health",
             return_value=True,
         ):
             with override_settings(
@@ -247,7 +253,12 @@ def test_change_permissions(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("model", permission_registry.all_registered_models)
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_delete_permissions(
+    mock_health_check,
     use_local_resource_setting,
     model,
     cls_factory,

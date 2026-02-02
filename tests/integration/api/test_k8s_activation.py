@@ -14,6 +14,8 @@
 
 # TODO(doston): this entire test module needs to be updated to use fixtures
 
+from unittest.mock import patch
+
 import pytest
 from django.conf import settings
 from rest_framework import status
@@ -127,7 +129,12 @@ def use_k8s_setting(settings):
         ),
     ],
 )
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_k8s_activation_with_service_name(
+    mock_health_check,
     admin_client: APIClient,
     preseed_credential_types,
     activation_name,
@@ -176,7 +183,12 @@ def test_create_k8s_activation_with_service_name(
     "activation_name",
     ["valid-activation-name", "invalid_activation_name"],
 )
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_podman_activation(
+    mock_health_check,
     admin_client: APIClient,
     preseed_credential_types,
     activation_name,
@@ -200,7 +212,12 @@ def test_create_podman_activation(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_get_activations_with_service_name(
+    mock_health_check,
     admin_client: APIClient,
     preseed_credential_types,
 ):

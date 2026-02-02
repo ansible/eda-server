@@ -433,7 +433,7 @@ def check_rulebook_queue_health(queue_name: str) -> bool:
         )
         if not alive:
             LOGGER.warning(
-                f"Worker queue {queue_name} was found to not be healthy"
+                f"Worker queue [{queue_name}] was found to not be healthy"
             )
         return bool(alive)
     except Exception as e:
