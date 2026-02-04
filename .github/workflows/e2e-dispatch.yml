@@ -11,10 +11,8 @@ on:
         description: 'filter for pytest to be used after "-k" flag, default is empty'
         required: false
         default: ''
-  pull_request_target:
-    types:
-      - labeled
-      - synchronize
+  issue_comment:
+    types: [created]
 
 env:
   EDA_QA_PATH: "./eda-qa"
@@ -23,19 +21,116 @@ env:
   PYTEST_RETRIES: 2
 
 jobs:
-  api-e2e-tests:
+  check-trigger:
     if: >
-      (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
-      (github.repository == 'ansible/eda-server' && github.event_name == 'pull_request_target' &&
-        contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+      github.repository == 'ansible/eda-server' &&
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/run-e2e'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'pull_request_target' && 'protected' || '' }}
+    outputs:
+      pr_sha: ${{ steps.pr-info.outputs.sha }}
+      pr_repo: ${{ steps.pr-info.outputs.repo }}
+      pr_number: ${{ steps.pr-info.outputs.number }}
+      deployment_id: ${{ steps.create-deployment.outputs.deployment_id }}
     steps:
+      - name: Check if commenter has write access
+        id: check-permission
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.payload.comment.user.login
+            });
+            const allowed = ['admin', 'write'].includes(permission.permission);
+            if (!allowed) {
+              core.setFailed(`User ${context.payload.comment.user.login} does not have write access`);
+            }
+            console.log(`User ${context.payload.comment.user.login} has ${permission.permission} permission`);
+
+      - name: Get PR info
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            core.setOutput('sha', pr.data.head.sha);
+            core.setOutput('repo', pr.data.head.repo.full_name);
+            core.setOutput('number', context.issue.number);
+            console.log(`PR #${context.issue.number} head SHA: ${pr.data.head.sha}`);
+            console.log(`PR head repo: ${pr.data.head.repo.full_name}`);
+
+      - name: Create deployment
+        id: create-deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const deployment = await github.rest.repos.createDeployment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/pull/${{ steps.pr-info.outputs.number }}/head',
+                environment: 'e2e-tests',
+                auto_merge: false,
+                required_contexts: [],
+                description: 'E2E Tests for PR #${{ steps.pr-info.outputs.number }} @ ${{ steps.pr-info.outputs.sha }}'
+              });
+
+              if (deployment.data && deployment.data.id) {
+                core.setOutput('deployment_id', deployment.data.id);
+
+                await github.rest.repos.createDeploymentStatus({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  deployment_id: deployment.data.id,
+                  state: 'pending',
+                  description: 'Waiting for approval',
+                  log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+                });
+                console.log(`Created deployment ${deployment.data.id}`);
+              } else {
+                core.warning('Deployment was not created - response had no ID');
+                core.setOutput('deployment_id', '');
+              }
+            } catch (error) {
+              core.warning(`Failed to create deployment: ${error.message}`);
+              core.setOutput('deployment_id', '');
+            }
+
+  api-e2e-tests:
+    needs: check-trigger
+    if: >
+      always() &&
+      (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
+      (needs.check-trigger.result == 'success')
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'issue_comment' && 'protected' || '' }}
+    steps:
+      - name: Update deployment to in_progress
+        if: github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: '${{ needs.check-trigger.outputs.deployment_id }}',
+              state: 'in_progress',
+              description: 'Running E2E tests',
+              log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          repository: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_repo || github.repository }}
+          ref: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_sha || github.sha }}
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -115,19 +210,34 @@ jobs:
         run: |
           docker compose -p eda -f docker-compose-dev.yaml logs
 
+      - name: Update deployment status
+        if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: '${{ needs.check-trigger.outputs.deployment_id }}',
+              state: state,
+              log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
   api-e2e-multinode-tests:
+    needs: check-trigger
     if: >
+      always() &&
       (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
-      (github.repository == 'ansible/eda-server' && github.event_name == 'pull_request_target' &&
-        contains(github.event.pull_request.labels.*.name, 'run-e2e'))
+      (needs.check-trigger.result == 'success')
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'pull_request_target' && 'protected' || '' }}
+    environment: ${{ github.event_name == 'issue_comment' && 'protected' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          repository: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_repo || github.repository }}
+          ref: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_sha || github.sha }}
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -189,3 +299,17 @@ jobs:
           component_name=eda
           git_commit_sha=${{ env.GIT_SHA }}
           git_repository_url="https://github.com/${{ github.repository }}"
+
+      - name: Update deployment status
+        if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: '${{ needs.check-trigger.outputs.deployment_id }}',
+              state: state,
+              log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
