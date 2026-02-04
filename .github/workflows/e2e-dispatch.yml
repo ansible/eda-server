@@ -14,7 +14,6 @@ on:
   pull_request_target:
     types:
       - labeled
-      - synchronize
 
 env:
   EDA_QA_PATH: "./eda-qa"
