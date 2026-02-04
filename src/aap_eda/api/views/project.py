@@ -181,7 +181,11 @@ class ProjectViewSet(
             )
         )
 
-        return Response(serializers.ProjectReadSerializer(project).data)
+        return Response(
+            serializers.ProjectReadSerializer(
+                project, context={"request": request}
+            ).data
+        )
 
     @extend_schema(
         description="Partial update of a project",
