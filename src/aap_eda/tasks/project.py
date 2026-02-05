@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
 
 
-def check_project_queue_health() -> bool:
-    """Check for the state of the project queue in dispatcherd.
+def check_default_worker_health() -> bool:
+    """Check for the state of the default worker queue in dispatcherd.
 
-    Returns True if the project queue is healthy, False otherwise.
+    Returns True if the default worker queue is healthy, False otherwise.
     """
     try:
         queue_name = utils.sanitize_postgres_identifier(PROJECT_TASKS_QUEUE)

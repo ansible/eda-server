@@ -39,7 +39,12 @@ def converted_extra_var(var: str) -> str:
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation(
+    mock_health_check,
     admin_awx_token: models.AwxToken,
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
@@ -80,7 +85,12 @@ def test_create_activation(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_blank_text(
+    mock_health_check,
     admin_awx_token: models.AwxToken,
     activation_payload_blank_text: Dict[str, Any],
     default_rulebook: models.Rulebook,
@@ -258,7 +268,12 @@ def test_create_activation_with_bad_extra_var(
     ],
 )
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_valid_extra_var(
+    mock_health_check,
     activation_payload: Dict[str, Any],
     admin_awx_token: models.AwxToken,
     admin_client: APIClient,
@@ -276,7 +291,12 @@ def test_create_activation_with_valid_extra_var(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_vault_extra_var(
+    mock_health_check,
     activation_payload: Dict[str, Any],
     admin_awx_token: models.AwxToken,
     admin_client: APIClient,
@@ -503,7 +523,12 @@ def test_retrieve_activation_not_exist(admin_client: APIClient):
         ),
     ],
 )
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_delete_activation(
+    mock_health_check,
     activation_status: enums.ActivationStatus,
     expected_response: int,
     default_activation: models.Activation,
@@ -520,7 +545,12 @@ def test_delete_activation(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_restart_activation(
+    mock_health_check,
     default_activation: models.Activation,
     admin_client: APIClient,
     preseed_credential_types,
@@ -600,7 +630,12 @@ def test_create_activation_with_missing_required_fields(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("action", [enums.Action.RESTART, enums.Action.ENABLE])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_restart_activation_without_de(
+    mock_health_check,
     default_activation: models.Activation,
     default_decision_environment: models.DecisionEnvironment,
     admin_client: APIClient,
@@ -633,7 +668,12 @@ def test_restart_activation_without_de(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_enable_activation(
+    mock_health_check,
     default_activation: models.Activation,
     admin_client: APIClient,
     preseed_credential_types,
@@ -681,7 +721,12 @@ def test_enable_activation(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_disable_activation(
+    mock_health_check,
     default_activation: models.Activation,
     admin_client: APIClient,
     preseed_credential_types,
@@ -915,8 +960,15 @@ def test_is_activation_valid(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_no_token_no_required(
-    activation_payload, admin_client: APIClient, preseed_credential_types
+    mock_health_check,
+    activation_payload,
+    admin_client: APIClient,
+    preseed_credential_types,
 ):
     """Test that an activation can be created without a token if the
     rulebook does not require one."""
@@ -978,7 +1030,12 @@ class IsUUID:
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_restart_activation_with_required_token_deleted(
+    mock_health_check,
     admin_client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     admin_awx_token: models.AwxToken,
@@ -1016,7 +1073,12 @@ def test_restart_activation_with_required_token_deleted(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_awx_token(
+    mock_health_check,
     admin_client: APIClient,
     rulebook_with_job_template: models.Rulebook,
     admin_awx_token: models.AwxToken,
@@ -1036,7 +1098,12 @@ def test_create_activation_with_awx_token(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_skip_audit_events(
+    mock_health_check,
     admin_awx_token: models.AwxToken,
     activation_payload_skip_audit_events: Dict[str, Any],
     default_rulebook: models.Rulebook,
@@ -1053,7 +1120,12 @@ def test_create_activation_with_skip_audit_events(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_activation_by_fields(
+    mock_health_check,
     activation_payload: Dict[str, Any],
     admin_user: models.User,
     super_user: models.User,
@@ -1083,7 +1155,12 @@ def test_activation_by_fields(
 
 @pytest.mark.django_db
 @patch("aap_eda.api.serializers.activation.settings.DEPLOYMENT_TYPE", "k8s")
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_update_activation(
+    mock_health_check,
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
     admin_client: APIClient,
@@ -1138,7 +1215,12 @@ def test_update_activation_invalid_body(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_update_enabled_activation(
+    mock_health_check,
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
     admin_client: APIClient,
@@ -1161,7 +1243,12 @@ def test_update_enabled_activation(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_copy_activation(
+    mock_health_check,
     activation_payload: Dict[str, Any],
     default_rulebook: models.Rulebook,
     admin_client: APIClient,

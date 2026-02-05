@@ -14,6 +14,7 @@
 import secrets
 from typing import Any, Dict
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -217,7 +218,12 @@ def test_is_activation_valid_with_run_job_template_and_no_token_no_credential(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_is_activation_valid_with_updated_credential(
+    mock_health_check,
     default_activation: models.Activation,
     default_organization: models.Organization,
     user_credential_type: models.CredentialType,
@@ -274,7 +280,12 @@ def test_is_activation_valid_with_updated_credential(
     ],
 )
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_eda_credentials(
+    mock_health_check,
     admin_client: APIClient,
     activation_payload: Dict[str, Any],
     kafka_credential_type: models.CredentialType,
@@ -434,7 +445,12 @@ def test_create_activation_with_conflict_credentials(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_without_extra_vars_single_credential(
+    mock_health_check,
     admin_client: APIClient,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
@@ -520,7 +536,12 @@ def test_create_activation_without_extra_vars_duplicate_credentials(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_extra_vars_user_credential(
+    mock_health_check,
     admin_client: APIClient,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
@@ -561,7 +582,12 @@ def test_create_activation_with_extra_vars_user_credential(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_extra_vars_vault_aap_credential(
+    mock_health_check,
     admin_client: APIClient,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
@@ -594,7 +620,12 @@ def test_create_activation_with_extra_vars_vault_aap_credential(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_extra_vars_mix_credential(
+    mock_health_check,
     admin_client: APIClient,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
@@ -891,7 +922,12 @@ def _create_credential(
         ),
     ],
 )
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
 def test_create_activation_with_empty_credential(
+    mock_health_check,
     admin_client: APIClient,
     default_decision_environment: models.DecisionEnvironment,
     default_rulebook: models.Rulebook,
