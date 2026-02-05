@@ -27,7 +27,7 @@ class User(AbstractUser):
     This model behaves identically to the default user model,
     but you’ll be able to customize it in the future if the need arises.
 
-    Refer to https://docs.djangoproject.com/en/4.1/topics/auth/customizing/#substituting-a-custom-user-model
+    Refer to https://docs.djangoproject.com/en/5.2/topics/auth/customizing/#substituting-a-custom-user-model
     """  # noqa: E501
 
     modified_at = models.DateTimeField(auto_now=True, null=False)

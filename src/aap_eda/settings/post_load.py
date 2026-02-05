@@ -86,7 +86,7 @@ def _get_url_end_slash(settings: Dynaconf, name: str) -> str:
 
 
 # Database
-# https://docs.djangoproject.com/en/4.1/ref/settings/#databases
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 
 def _get_databases_settings(settings: Dynaconf) -> dict:
