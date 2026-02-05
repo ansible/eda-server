@@ -23,6 +23,8 @@ RUN DNF=dnf \
     ${PYTHON_BIN}-pip \
     libpq-devel \
     libffi-devel \
+    git \
+    openssh-clients \
     gcc \
     gettext \
     git-core \
@@ -45,17 +47,45 @@ ENV POETRY_VERSION="2.*" \
     PATH="/app/.local/bin:$PATH" \
     HOME="/app"
 
+# Setup SSH for non-root user
+RUN mkdir -p /app/.ssh && touch /app/.ssh/known_hosts && \
+    ssh-keyscan github.com >> /app/.ssh/known_hosts
+
 # Install poetry, create virtual environment
 RUN ${PYTHON_BIN} -m pip install --user "poetry==${POETRY_VERSION}" \
     && ${PYTHON_BIN} -m venv "$VIRTUAL_ENV" \
-    && poetry config virtualenvs.create false
+    && poetry config virtualenvs.create false \
+    && poetry config system-git-client true
 
 WORKDIR $SOURCES_DIR
 
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
+
 COPY poetry.toml pyproject.toml poetry.lock $SOURCES_DIR/
-RUN poetry install -E all --no-root --no-cache \
-    && ${PYTHON_BIN} -m pip install gunicorn
+
+# Use SSH key to access private git repositories (if provided)
+USER 0
+RUN --mount=type=secret,id=git_ssh_key,target=/tmp/git_ssh_key,required=false \
+    mkdir -p /app/.ssh && \
+    if [ -f /tmp/git_ssh_key ]; then \
+        cp /tmp/git_ssh_key /app/.ssh/github_key && \
+        chmod 600 /app/.ssh/github_key && \
+        chown ${USER_ID}:0 /app/.ssh/github_key; \
+    fi && \
+    chown -R ${USER_ID}:0 $SOURCES_DIR
+
+USER "$USER_ID"
+RUN if [ -f /app/.ssh/github_key ]; then \
+        export GIT_SSH_COMMAND="ssh -i /app/.ssh/github_key -o StrictHostKeyChecking=accept-new" && \
+        echo "Testing SSH connection to GitHub..." && \
+        ssh -i /app/.ssh/github_key -o StrictHostKeyChecking=accept-new -T git@github.com || echo "SSH test completed (exit code expected)" && \
+        poetry install -E all --no-root --no-cache && \
+        ${PYTHON_BIN} -m pip install gunicorn && \
+        rm -f /app/.ssh/github_key; \
+    else \
+        poetry install -E all --no-root --no-cache && \
+        ${PYTHON_BIN} -m pip install gunicorn; \
+    fi
 COPY . $SOURCES_DIR/
 RUN poetry install -E all --only-root
 RUN pip install ansible-core==${ANSIBLE_CORE_VER}
