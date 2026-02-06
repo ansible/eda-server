@@ -274,3 +274,181 @@ def test_dispatch_existing_jobs(enqueue_mock, activation, eda_caplog):
         assert f"_manage({job_id}) already being ran, " in eda_caplog.text
         activation.refresh_from_db()
         assert activation.status == ActivationStatus.STOPPED
+
+
+#################################################################
+# Health Check Tests - New coverage for check_rulebook_queue_health
+#################################################################
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_success(mock_get_control, eda_caplog):
+    """Test successful health check returns True."""
+    queue_name = "test_queue"
+
+    # Mock healthy response
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = {"status": "alive"}
+    mock_get_control.return_value = mock_control
+
+    result = orchestrator.check_rulebook_queue_health(queue_name)
+
+    assert result is True
+    mock_get_control.assert_called_once()
+    mock_control.control_with_reply.assert_called_once_with(
+        "alive", timeout=settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_unhealthy(mock_get_control, eda_caplog):
+    """Test unhealthy queue response logs warning and returns False."""
+    queue_name = "test_queue"
+
+    # Mock unhealthy response (None or falsy)
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = None
+    mock_get_control.return_value = mock_control
+
+    result = orchestrator.check_rulebook_queue_health(queue_name)
+
+    assert result is False
+    assert (
+        f"Worker queue {queue_name} was found to not be healthy"
+        in eda_caplog.text
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_connection_failure(
+    mock_get_control, eda_caplog
+):
+    """Test connection failure is handled gracefully."""
+    queue_name = "test_queue"
+
+    # Mock connection failure
+    mock_get_control.side_effect = ConnectionError(
+        "Failed to connect to dispatcherd"
+    )
+
+    result = orchestrator.check_rulebook_queue_health(queue_name)
+
+    assert result is False
+    assert f"Health check failed for queue {queue_name}" in eda_caplog.text
+    assert "Failed to connect to dispatcherd" in eda_caplog.text
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_timeout(mock_get_control, eda_caplog):
+    """Test timeout during health check is handled."""
+    queue_name = "test_queue"
+
+    # Mock timeout
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.side_effect = TimeoutError(
+        "Health check timeout"
+    )
+    mock_get_control.return_value = mock_control
+
+    result = orchestrator.check_rulebook_queue_health(queue_name)
+
+    assert result is False
+    assert f"Health check failed for queue {queue_name}" in eda_caplog.text
+    assert "Health check timeout" in eda_caplog.text
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_invalid_response(
+    mock_get_control, eda_caplog
+):
+    """Test invalid response format is handled."""
+    queue_name = "test_queue"
+
+    # Mock invalid response format
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.side_effect = ValueError(
+        "Invalid response format"
+    )
+    mock_get_control.return_value = mock_control
+
+    result = orchestrator.check_rulebook_queue_health(queue_name)
+
+    assert result is False
+    assert f"Health check failed for queue {queue_name}" in eda_caplog.text
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+@mock.patch("aap_eda.utils.sanitize_postgres_identifier")
+def test_check_rulebook_queue_health_queue_name_sanitization(
+    mock_sanitize, mock_get_control
+):
+    """Test that queue name is sanitized for PostgreSQL safety."""
+    dangerous_queue_name = "queue'; DROP TABLE test; --"
+    sanitized_name = "safe_queue"
+
+    mock_sanitize.return_value = sanitized_name
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = {"status": "alive"}
+    mock_get_control.return_value = mock_control
+
+    result = orchestrator.check_rulebook_queue_health(dangerous_queue_name)
+
+    # Verify sanitization was called
+    mock_sanitize.assert_called_once_with(dangerous_queue_name)
+
+    # Verify sanitized name was used in control setup
+    mock_get_control.assert_called_once_with(
+        default_publish_channel=sanitized_name
+    )
+
+    assert result is True
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_with_timeout_setting(mock_get_control):
+    """Test that health check uses correct timeout setting."""
+    queue_name = "test_queue"
+
+    mock_control = mock.Mock()
+    mock_control.control_with_reply.return_value = {"status": "alive"}
+    mock_get_control.return_value = mock_control
+
+    orchestrator.check_rulebook_queue_health(queue_name)
+
+    # Verify timeout setting is used
+    mock_control.control_with_reply.assert_called_once_with(
+        "alive", timeout=settings.DISPATCHERD_QUEUE_HEALTHCHECK_TIMEOUT
+    )
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.tasks.orchestrator.get_control_from_settings")
+def test_check_rulebook_queue_health_falsy_response_types(
+    mock_get_control, eda_caplog
+):
+    """Test various falsy response values are handled correctly."""
+    queue_name = "test_queue"
+    mock_control = mock.Mock()
+    mock_get_control.return_value = mock_control
+
+    # Test different falsy values
+    falsy_values = [None, False, 0, "", [], {}]
+
+    for falsy_value in falsy_values:
+        eda_caplog.clear()
+        mock_control.control_with_reply.return_value = falsy_value
+
+        result = orchestrator.check_rulebook_queue_health(queue_name)
+
+        assert result is False
+        assert (
+            f"Worker queue {queue_name} was found to not be healthy"
+            in eda_caplog.text
+        )
