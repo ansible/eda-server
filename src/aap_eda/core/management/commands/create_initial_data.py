@@ -879,33 +879,39 @@ POSTGRES_CREDENTIAL_INPUTS = {
         {
             "id": "postgres_db_host",
             "label": "Postgres DB Host",
+            "type": "string",
             "help_text": "Postgres DB Server",
         },
         {
             "id": "postgres_db_port",
             "label": "Postgres DB Port",
+            "type": "string",
             "help_text": "Postgres DB Port",
             "default": "5432",
         },
         {
             "id": "postgres_db_name",
             "label": "Postgres DB Name",
+            "type": "string",
             "help_text": "Postgres Database name",
         },
         {
             "id": "postgres_db_user",
             "label": "Postgres DB User",
+            "type": "string",
             "help_text": "Postgres Database user",
         },
         {
             "id": "postgres_db_password",
             "label": "Postgres DB Password",
+            "type": "string",
             "help_text": "Postgres Database password",
             "secret": True,
         },
         {
             "id": "postgres_sslmode",
             "label": "Postgres SSL Mode",
+            "type": "string",
             "help_text": "Postgres SSL Mode",
             "choices": [
                 "disable",
@@ -920,6 +926,7 @@ POSTGRES_CREDENTIAL_INPUTS = {
         {
             "id": "postgres_sslcert",
             "label": "Postgres SSL Certificate",
+            "type": "string",
             "help_text": "Postgres SSL Certificate",
             "multiline": True,
             "default": "",
@@ -927,6 +934,7 @@ POSTGRES_CREDENTIAL_INPUTS = {
         {
             "id": "postgres_sslkey",
             "label": "Postgres SSL Key",
+            "type": "string",
             "help_text": "Postgres SSL Key",
             "multiline": True,
             "secret": True,
@@ -935,6 +943,7 @@ POSTGRES_CREDENTIAL_INPUTS = {
         {
             "id": "postgres_sslpassword",
             "label": "Postgres SSL Password",
+            "type": "string",
             "help_text": "Postgres SSL Password for key",
             "secret": True,
             "default": "",
@@ -942,6 +951,7 @@ POSTGRES_CREDENTIAL_INPUTS = {
         {
             "id": "postgres_sslrootcert",
             "label": "Postgres SSL Root Certificate",
+            "type": "string",
             "help_text": "Postgres SSL Root Certificate",
             "multiline": True,
             "default": "",
@@ -2156,6 +2166,7 @@ class Command(BaseCommand):
             self._create_org_roles()
             self._create_obj_roles()
             self._remove_deprecated_credential_kinds()
+            self._fix_postgres_credential_type_inputs()
 
     @property
     def content_type_model(self):
@@ -2179,6 +2190,20 @@ class Command(BaseCommand):
                 f"New credential type {credential_type.name} is added."
             )
 
+    def _fix_postgres_credential_type_inputs(self):
+        """Fix the inputs of the Postgres credential type.
+        
+        Ensure the 'type' field is set to string for all
+        fields in the Postgres credential type inputs.
+        """
+        credential_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.POSTGRES
+        )
+        for field in credential_type.inputs.get("fields", []):
+            if "type" not in field:
+                field["type"] = "string"
+        credential_type.save(update_fields=["inputs"])
+
     def _update_postgres_credentials(self):
         cred_type = models.CredentialType.objects.get(
             name=enums.DefaultCredentialType.POSTGRES
@@ -2188,8 +2213,8 @@ class Command(BaseCommand):
             "postgres_db_host": settings.ACTIVATION_DB_HOST,
             "postgres_db_port": settings.DATABASES["default"]["PORT"],
             "postgres_db_name": settings.DATABASES["default"]["NAME"],
-            "postgres_db_user": settings.DATABASES["default"]["USER"],
-            "postgres_db_password": settings.DATABASES["default"]["PASSWORD"],
+            "postgres_db_user": settings.EVENT_STREAM_PG_USER or settings.DATABASES["default"]["USER"],
+            "postgres_db_password": settings.EVENT_STREAM_DB_PASSWORD or settings.DATABASES["default"]["PASSWORD"],
             "postgres_sslmode": _db_options.get("sslmode", "allow"),
             "postgres_sslcert": "",
             "postgres_sslkey": "",

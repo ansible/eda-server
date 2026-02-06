@@ -213,6 +213,10 @@ EVENT_STREAM_BASE_URL: UrlSlash = None
 EVENT_STREAM_MTLS_BASE_URL: UrlSlash = None
 MAX_PG_NOTIFY_MESSAGE_SIZE: int = 6144
 
+# Database credentials for the event streams user
+EVENT_STREAM_PG_USER: Optional[str] = None
+EVENT_STREAM_DB_PASSWORD: Optional[str] = None
+
 # --------------------------------------------------------
 # METRICS COLLECTIONS:
 # --------------------------------------------------------
