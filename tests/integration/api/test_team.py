@@ -213,6 +213,25 @@ def test_delete_team_not_exist(
 
 
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+DATETIME_FORMAT_NO_MICROSECONDS = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def assert_datetime_equal(actual: str, expected_dt):
+    """
+    Compare datetime strings, handling both formats with and without
+    microseconds. Python's isoformat() omits microseconds when zero.
+    """
+    expected_with_microseconds = expected_dt.strftime(DATETIME_FORMAT)
+    expected_without_microseconds = expected_dt.strftime(
+        DATETIME_FORMAT_NO_MICROSECONDS
+    )
+    assert actual in (
+        expected_with_microseconds,
+        expected_without_microseconds,
+    ), (
+        f"Expected {actual} to match either "
+        f"{expected_with_microseconds} or {expected_without_microseconds}"
+    )
 
 
 def assert_team_data(response: Dict[str, Any], expected: models.Team):
@@ -233,12 +252,12 @@ def assert_team_data(response: Dict[str, Any], expected: models.Team):
         "ansible_id": expected.resource.ansible_id,
         "resource_type": expected.resource.resource_type,
     }
-    assert response["created"] == expected.created.strftime(DATETIME_FORMAT)
+    assert_datetime_equal(response["created"], expected.created)
     if expected.created_by:
         assert response["created_by"] == expected.created_by.id
     else:
         assert response["created_by"] == expected.created_by
-    assert response["modified"] == expected.modified.strftime(DATETIME_FORMAT)
+    assert_datetime_equal(response["modified"], expected.modified)
     if expected.modified_by:
         assert response["modified_by"] == expected.modified_by.id
     else:
