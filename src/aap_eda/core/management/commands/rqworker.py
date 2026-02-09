@@ -78,10 +78,17 @@ class Command(BaseCommand):
                     "--worker-class DefaultWorker"
                 )
         elif worker_class:
-            mapped_worker_class = worker_class
+            # Extract the class name from a full module path
+            # e.g., "aap_eda.core.tasking.ActivationWorker"
+            # -> "ActivationWorker"
+            class_name = worker_class.rsplit(".", 1)[-1]
+            if class_name in ("ActivationWorker", "DefaultWorker"):
+                mapped_worker_class = class_name
+            else:
+                mapped_worker_class = worker_class
             suggested_command = (
                 f"python manage.py dispatcherd "
-                f"--worker-class {worker_class}"
+                f"--worker-class {mapped_worker_class}"
             )
         else:
             mapped_worker_class = "DefaultWorker"
