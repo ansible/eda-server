@@ -316,7 +316,7 @@ def test_check_rulebook_queue_health_unhealthy(mock_get_control, eda_caplog):
 
     assert result is False
     assert (
-        f"Worker queue {queue_name} was found to not be healthy"
+        f"Worker queue [{queue_name}] was found to not be healthy"
         in eda_caplog.text
     )
 
@@ -449,6 +449,6 @@ def test_check_rulebook_queue_health_falsy_response_types(
 
         assert result is False
         assert (
-            f"Worker queue {queue_name} was found to not be healthy"
+            f"Worker queue [{queue_name}] was found to not be healthy"
             in eda_caplog.text
         )

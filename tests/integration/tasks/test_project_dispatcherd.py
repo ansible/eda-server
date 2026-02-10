@@ -34,7 +34,7 @@ def test_check_project_queue_health_success(mock_health_check):
     """Test successful project queue health check."""
     mock_health_check.return_value = True
 
-    result = project.check_project_queue_health()
+    result = project.check_default_worker_health()
 
     assert result is True
     mock_health_check.assert_called_once_with("default")
@@ -46,7 +46,7 @@ def test_check_project_queue_health_failure(mock_health_check):
     """Test failed project queue health check."""
     mock_health_check.return_value = False
 
-    result = project.check_project_queue_health()
+    result = project.check_default_worker_health()
 
     assert result is False
     mock_health_check.assert_called_once_with("default")
@@ -61,7 +61,7 @@ def test_check_project_queue_health_exception_handling(
     """Test exception handling in project queue health check."""
     mock_health_check.side_effect = ConnectionError("Connection failed")
 
-    result = project.check_project_queue_health()
+    result = project.check_default_worker_health()
 
     assert result is False
     mock_health_check.assert_called_once_with("default")
@@ -82,7 +82,7 @@ def test_check_project_queue_health_queue_sanitization(
     mock_sanitize.return_value = "sanitized_default"
     mock_health_check.return_value = True
 
-    result = project.check_project_queue_health()
+    result = project.check_default_worker_health()
 
     assert result is True
     mock_sanitize.assert_called_once_with(project.PROJECT_TASKS_QUEUE)
