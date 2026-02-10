@@ -16,6 +16,7 @@ from typing import Any, Dict
 from unittest import mock
 
 import pytest
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -1086,7 +1087,7 @@ def test_multiple_concurrent_health_check_calls(
     create_bodies = [
         {
             "name": f"test-project-concurrent-{i}",
-            "url": f"https://git.example.com/test/project{i}",
+            "url": f"https://git.example.com/test/project{i}",  # noqa: E231
             "organization_id": default_organization.id,
         }
         for i in range(3)
@@ -1106,6 +1107,305 @@ def test_multiple_concurrent_health_check_calls(
 
     # Health check should have been called once per request
     assert mock_health_check.call_count == 3
+
+
+# Test: Project Auto-Sync Configuration
+# -------------------------------------
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_default_values(
+    mock_health_check,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+):
+    """Test that new project sync fields have correct default values."""
+    mock_health_check.return_value = True
+
+    test_project = {
+        "name": "test-project-sync-defaults",
+        "url": "https://git.example.com/repo.git",
+        "organization_id": default_organization.id,
+    }
+
+    response = admin_client.post(f"{api_url_v1}/projects/", data=test_project)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    # Verify default values in response
+    data = response.json()
+    assert data["update_revision_on_launch"] is False
+    assert data["scm_update_cache_timeout"] == 0
+    assert data["last_synced_at"] is None
+
+    # Verify in database
+    project = models.Project.objects.get(id=data["id"])
+    assert project.update_revision_on_launch is False
+    assert project.scm_update_cache_timeout == 0
+    assert project.last_synced_at is None
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_fields_in_create_request(
+    mock_health_check,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+):
+    """Test that project sync fields can be set in create request."""
+    mock_health_check.return_value = True
+
+    test_project = {
+        "name": "test-project-sync-create",
+        "url": "https://git.example.com/repo.git",
+        "organization_id": default_organization.id,
+        "update_revision_on_launch": True,
+        "scm_update_cache_timeout": 300,
+    }
+
+    response = admin_client.post(f"{api_url_v1}/projects/", data=test_project)
+    assert response.status_code == status.HTTP_201_CREATED
+
+    data = response.json()
+    assert data["update_revision_on_launch"] is True
+    assert data["scm_update_cache_timeout"] == 300
+
+    # Verify in database
+    project = models.Project.objects.get(id=data["id"])
+    assert project.update_revision_on_launch is True
+    assert project.scm_update_cache_timeout == 300
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_fields_in_update_request(
+    mock_health_check, default_project: models.Project, admin_client: APIClient
+):
+    """Test that project sync fields can be updated via PATCH."""
+    mock_health_check.return_value = True
+
+    update_data = {
+        "update_revision_on_launch": True,
+        "scm_update_cache_timeout": 600,
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert data["update_revision_on_launch"] is True
+    assert data["scm_update_cache_timeout"] == 600
+
+    # Verify in database
+    default_project.refresh_from_db()
+    assert default_project.update_revision_on_launch is True
+    assert default_project.scm_update_cache_timeout == 600
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_cache_timeout_validation_create(
+    mock_health_check,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+):
+    """Test validation of negative cache timeout values in create request."""
+    mock_health_check.return_value = True
+
+    test_project = {
+        "name": "test-project-negative-cache",
+        "url": "https://git.example.com/repo.git",
+        "organization_id": default_organization.id,
+        "scm_update_cache_timeout": -1,  # Invalid negative value
+    }
+
+    response = admin_client.post(f"{api_url_v1}/projects/", data=test_project)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "scm_update_cache_timeout" in response.json()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_cache_timeout_validation_update(
+    mock_health_check, default_project: models.Project, admin_client: APIClient
+):
+    """Test validation of negative cache timeout values in update request."""
+    mock_health_check.return_value = True
+
+    update_data = {
+        "scm_update_cache_timeout": -5,  # Invalid negative value
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "scm_update_cache_timeout" in response.json()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_cache_timeout_max_validation_create(
+    mock_health_check,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+):
+    """Test validation of maximum cache timeout values in create request."""
+    mock_health_check.return_value = True
+
+    test_project = {
+        "name": "test-project-max-cache",
+        "url": "https://git.example.com/repo.git",
+        "organization_id": default_organization.id,
+        "scm_update_cache_timeout": 86401,  # Invalid: > 86400 (1 day)
+    }
+
+    response = admin_client.post(f"{api_url_v1}/projects/", data=test_project)
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "scm_update_cache_timeout" in response.json()
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_sync_cache_timeout_max_validation_update(
+    mock_health_check, default_project: models.Project, admin_client: APIClient
+):
+    """Test validation of maximum cache timeout values in update request."""
+    mock_health_check.return_value = True
+
+    update_data = {
+        "scm_update_cache_timeout": 100000,  # Invalid: > 86400 (1 day)
+    }
+
+    response = admin_client.patch(
+        f"{api_url_v1}/projects/{default_project.id}/", data=update_data
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "scm_update_cache_timeout" in response.json()
+
+
+@pytest.mark.django_db
+def test_project_needs_update_on_launch_property(
+    default_organization: models.Organization,
+):
+    """Test the needs_update_on_launch property logic."""
+    project = models.Project.objects.create(
+        name="test-project-needs-update",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+        git_hash="abc123",
+        update_revision_on_launch=False,  # Initially disabled
+        scm_update_cache_timeout=300,  # 5 minutes cache
+    )
+
+    # Test 1: When update_revision_on_launch is False, should return False
+    assert project.needs_update_on_launch is False
+
+    # Test 2: Enable update_revision_on_launch but no cache (timeout=0)
+    project.update_revision_on_launch = True
+    project.scm_update_cache_timeout = 0
+    assert project.needs_update_on_launch is True
+
+    # Test 3: With cache timeout but never synced, should return True
+    project.scm_update_cache_timeout = 300
+    project.last_synced_at = None
+    assert project.needs_update_on_launch is True
+
+    # Test 4: Recently synced within cache timeout, should return False
+    from django.utils import timezone
+
+    project.last_synced_at = timezone.now() - datetime.timedelta(
+        seconds=60
+    )  # 1 minute ago
+    assert project.needs_update_on_launch is False
+
+    # Test 5: Synced outside cache timeout, should return True
+    project.last_synced_at = timezone.now() - datetime.timedelta(
+        seconds=600
+    )  # 10 minutes ago
+    assert project.needs_update_on_launch is True
+
+
+@pytest.mark.django_db
+@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+def test_project_retrieve_includes_sync_fields(
+    mock_health_check, default_project: models.Project, admin_client: APIClient
+):
+    """Test that project retrieve includes all sync configuration fields."""
+    mock_health_check.return_value = True
+
+    # Update project with sync configuration
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 900
+    default_project.last_synced_at = timezone.now()
+    default_project.save()
+
+    response = admin_client.get(f"{api_url_v1}/projects/{default_project.id}/")
+    assert response.status_code == status.HTTP_200_OK
+
+    data = response.json()
+    assert "update_revision_on_launch" in data
+    assert "scm_update_cache_timeout" in data
+    assert "last_synced_at" in data
+
+    assert data["update_revision_on_launch"] is True
+    assert data["scm_update_cache_timeout"] == 900
+    assert data["last_synced_at"] is not None
+
+
+@pytest.mark.django_db
+def test_project_model_default_sync_values(
+    default_organization: models.Organization,
+):
+    """Test that sync fields have correct default values in model."""
+    project = models.Project.objects.create(
+        name="test-project-model-defaults",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+
+    assert project.update_revision_on_launch is False
+    assert project.scm_update_cache_timeout == 0
+    assert project.last_synced_at is None
+
+
+@pytest.mark.django_db
+def test_project_model_cache_timeout_constraint(
+    default_organization: models.Organization,
+):
+    """Test database constraint prevents negative cache timeout values."""
+    from django.db import IntegrityError, transaction
+
+    with pytest.raises(IntegrityError) as excinfo:
+        with transaction.atomic():
+            models.Project.objects.create(
+                name="test-project-negative-timeout",
+                url="https://git.example.com/repo.git",
+                organization=default_organization,
+                git_hash="abc123",
+                scm_update_cache_timeout=-1,  # Invalid negative value
+            )
+    assert "ck_cache_timeout_range" in str(excinfo.value)
+
+
+@pytest.mark.django_db
+def test_project_model_cache_timeout_max_constraint(
+    default_organization: models.Organization,
+):
+    """Test database constraint prevents cache timeout values > 86400."""
+    from django.db import IntegrityError, transaction
+
+    with pytest.raises(IntegrityError) as excinfo:
+        with transaction.atomic():
+            models.Project.objects.create(
+                name="test-project-max-timeout",
+                url="https://git.example.com/repo.git",
+                organization=default_organization,
+                git_hash="abc123",
+                scm_update_cache_timeout=86401,  # Invalid: > 86400 (1 day)
+            )
+    assert "ck_cache_timeout_range" in str(excinfo.value)
 
 
 # Utils
