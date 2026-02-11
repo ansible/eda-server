@@ -70,6 +70,9 @@ class ProjectSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "scm_refspec",
             "verify_ssl",
             "proxy",
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+            "last_synced_at",
             "created_by",
             "modified_by",
             *read_only_fields,
@@ -119,6 +122,22 @@ class ProjectCreateRequestSerializer(
         validators=[validators.check_if_refspec_valid],
     )
 
+    scm_update_cache_timeout = serializers.IntegerField(
+        required=False,
+        default=0,
+        min_value=0,
+        max_value=86400,  # Max 1 day
+        help_text=(
+            "Cache timeout in seconds for project updates "
+            "(0 = no cache, max 86400)"
+        ),
+    )
+    update_revision_on_launch = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Enable automatic project sync on activation launch",
+    )
+
     class Meta:
         model = models.Project
         fields = [
@@ -133,6 +152,8 @@ class ProjectCreateRequestSerializer(
             "scm_type",
             "scm_branch",
             "scm_refspec",
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
         ]
 
 
@@ -213,6 +234,19 @@ class ProjectUpdateRequestSerializer(
             validators.check_if_scm_url_valid,
         ],
     )
+    scm_update_cache_timeout = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=86400,  # Max 1 day
+        help_text=(
+            "Cache timeout in seconds for project updates "
+            "(0 = no cache, max 86400)"
+        ),
+    )
+    update_revision_on_launch = serializers.BooleanField(
+        required=False,
+        help_text="Enable automatic project sync on activation launch",
+    )
 
     class Meta:
         model = models.Project
@@ -227,6 +261,8 @@ class ProjectUpdateRequestSerializer(
             "verify_ssl",
             "proxy",
             "url",
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
         ]
 
     def validate(self, data):
@@ -288,6 +324,9 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "scm_branch",
             "scm_refspec",
             "proxy",
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+            "last_synced_at",
             "created_by",
             "modified_by",
             *read_only_fields,
@@ -326,6 +365,9 @@ class ProjectReadSerializer(serializers.ModelSerializer, ProxyFieldMixin):
             "organization": organization,
             "eda_credential": eda_credential,
             "signature_validation_credential": signature_validation_credential,
+            "update_revision_on_launch": project.update_revision_on_launch,
+            "scm_update_cache_timeout": project.scm_update_cache_timeout,
+            "last_synced_at": project.last_synced_at,
             "import_state": project.import_state,
             "import_error": project.import_error,
             "created_at": project.created_at,
