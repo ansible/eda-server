@@ -1,0 +1,167 @@
+---
+# Sync generated OpenAPI spec to ansible-automation-platform/aap-openapi-specs.
+# Called by CI workflows after spec generation via workflow_call.
+name: Sync OpenAPI Spec
+
+on:
+  workflow_call:
+    secrets:
+      OPENAPI_SPEC_SYNC_TOKEN:
+        required: true
+
+jobs:
+  sync:
+    name: Sync OpenAPI spec to central repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Map EDA branch to spec repo branch
+        id: branch_map
+        run: |
+          SOURCE_BRANCH="${{ github.ref_name }}"
+          case "$SOURCE_BRANCH" in
+            main)
+              SPEC_BRANCH="devel"
+              ;;
+            *)
+              # Default: use the same branch name
+              SPEC_BRANCH="$SOURCE_BRANCH"
+              ;;
+          esac
+          echo "spec_branch=$SPEC_BRANCH" >> $GITHUB_OUTPUT
+          echo "📌 EDA branch: $SOURCE_BRANCH → Spec repo branch: $SPEC_BRANCH"
+
+      - name: Download spec artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openapi-spec
+
+      - name: Verify spec file exists
+        run: |
+          if [ ! -f "openapi.json" ]; then
+            echo "❌ Spec artifact not found"
+            ls -la .
+            exit 1
+          fi
+          echo "✅ Found openapi.json ($(wc -c < openapi.json) bytes)"
+
+      - name: Checkout spec repo
+        id: checkout_spec_repo
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ansible-automation-platform/aap-openapi-specs
+          ref: ${{ steps.branch_map.outputs.spec_branch }}
+          path: spec-repo
+          token: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
+
+      - name: Fail if branch doesn't exist
+        if: steps.checkout_spec_repo.outcome == 'failure'
+        run: |
+          echo "##[error]❌ Branch '${{ steps.branch_map.outputs.spec_branch }}' does not exist in the central spec repository."
+          echo "##[error]EDA branch: ${{ github.ref_name }} → Spec repo branch: ${{ steps.branch_map.outputs.spec_branch }}"
+          echo "##[error]This branch must be created in the spec repo before specs can be synced."
+          exit 1
+
+      - name: Copy spec to repo
+        run: |
+          cp "./openapi.json" "spec-repo/eda.json"
+          echo "✅ Copied openapi.json → spec-repo/eda.json"
+
+      - name: Check for changes
+        id: check
+        working-directory: spec-repo
+        run: |
+          STATUS=$(git status --porcelain eda.json)
+          if [ -z "$STATUS" ]; then
+            echo "✅ No differences found — specs are identical"
+            echo "has_diff=false" >> $GITHUB_OUTPUT
+          else
+            echo "📝 Changes detected: $STATUS"
+            echo "has_diff=true" >> $GITHUB_OUTPUT
+            if echo "$STATUS" | grep -q "^??"; then
+              echo "is_new_file=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_new_file=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Create PR in spec repo
+        if: steps.check.outputs.has_diff == 'true'
+        working-directory: spec-repo
+        env:
+          GH_TOKEN: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
+          SPEC_BRANCH: ${{ steps.branch_map.outputs.spec_branch }}
+          SOURCE_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create branch for PR
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          BRANCH_NAME="update-EDA-${SPEC_BRANCH}-${SHORT_SHA}"
+          git checkout -b "$BRANCH_NAME"
+
+          # Add and commit changes
+          git add "eda.json"
+
+          if [ "${{ steps.check.outputs.is_new_file }}" == "true" ]; then
+            COMMIT_MSG="Add EDA OpenAPI spec for ${SPEC_BRANCH}"
+          else
+            COMMIT_MSG="Update EDA OpenAPI spec for ${SPEC_BRANCH}"
+          fi
+
+          git commit -m "$COMMIT_MSG
+
+          Synced from ${{ github.repository }}@${{ github.sha }}
+          Source branch: ${{ github.ref_name }}
+          Spec repo branch: ${SPEC_BRANCH}
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+
+          # Push branch
+          git push origin "$BRANCH_NAME"
+
+          # Create PR (commit message passed via env var to avoid script injection)
+          PR_TITLE="[${SPEC_BRANCH}] Update EDA spec from merged commit"
+          PR_BODY=$(cat <<EOF
+          ## Summary
+          Automated OpenAPI spec sync from component repository merge.
+
+          **Source:** ${{ github.repository }}@${{ github.sha }}
+          **Source Branch:** \`${{ github.ref_name }}\`
+          **Spec Repo Branch:** \`${SPEC_BRANCH}\`
+          **Component:** \`EDA\`
+          **Spec File:** \`eda.json\`
+
+          ## Changes
+          $(if [ "${{ steps.check.outputs.is_new_file }}" == "true" ]; then echo "- 🆕 New spec file created"; else echo "- 📝 Spec file updated with latest changes"; fi)
+
+          ## Source Commit
+          \`\`\`
+          ${SOURCE_COMMIT_MESSAGE}
+          \`\`\`
+
+          ---
+          🤖 This PR was automatically generated by the OpenAPI spec sync workflow.
+          EOF
+          )
+
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base "${SPEC_BRANCH}" \
+            --head "$BRANCH_NAME"
+
+          echo "✅ Created PR in spec repo"
+
+      - name: Report results
+        if: always()
+        run: |
+          if [ "${{ steps.check.outputs.has_diff }}" == "true" ]; then
+            echo "📝 Spec sync completed — PR created in spec repo"
+          else
+            echo "✅ Spec sync completed — no changes needed"
+          fi
+

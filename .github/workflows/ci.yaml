@@ -9,6 +9,7 @@ on:
   pull_request:
   merge_group:
     branches: [ 'main' ]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
@@ -32,6 +33,21 @@ jobs:
 
       - name: validate-openapi-spec
         uses: ./.github/actions/validate-openapi-spec
+
+      - name: Upload spec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: openapi.json
+
+  sync-openapi-spec:
+    needs: validate-openapi-spec
+    if: |
+      github.repository == 'ansible/eda-server' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/sync-openapi-spec.yml
+    secrets:
+      OPENAPI_SPEC_SYNC_TOKEN: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
 
   test:
     runs-on: ubuntu-latest
