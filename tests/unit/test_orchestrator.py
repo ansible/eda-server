@@ -20,6 +20,7 @@ from unittest import mock
 import django_rq
 import pytest
 from django.conf import settings
+from django.utils import timezone
 
 from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.core.models import Activation, RulebookProcess
@@ -104,7 +105,7 @@ def _mock_up_queues(monkeypatch, queues):
             mock_worker.responsive = queues[queue_name]["workers"][
                 worker_name
             ]["responsive"]
-            mock_worker.last_heartbeat = datetime.now()
+            mock_worker.last_heartbeat = timezone.now()
             if not mock_worker.responsive:
                 mock_worker.last_heartbeat -= timedelta(
                     seconds=(2 * default.DEFAULT_WORKER_HEARTBEAT_TIMEOUT)
@@ -419,14 +420,14 @@ def setup_queue_health():
     get_queue_mock = mock.Mock(return_value=queue_mock)
     settings_mock = mock.Mock()
     settings_mock.DEFAULT_WORKER_HEARTBEAT_TIMEOUT = 60
-    datetime_mock = mock.Mock()
+    timezone_mock = mock.Mock()
     timedelta_mock = mock.Mock()
     timedelta_mock.return_value = timedelta(seconds=60)
 
     patches = {
         "get_queue": mock.patch("django_rq.get_queue", get_queue_mock),
-        "datetime": mock.patch(
-            "aap_eda.tasks.orchestrator.datetime", datetime_mock
+        "timezone": mock.patch(
+            "aap_eda.tasks.orchestrator.timezone", timezone_mock
         ),
         "timedelta": mock.patch(
             "aap_eda.tasks.orchestrator.timedelta", timedelta_mock
@@ -435,14 +436,14 @@ def setup_queue_health():
             "aap_eda.tasks.orchestrator.settings", settings_mock
         ),
     }
-    with patches["get_queue"], patches["datetime"], patches[
+    with patches["get_queue"], patches["timezone"], patches[
         "timedelta"
     ], patches["settings"]:
         yield (
             queue_name,
             queue_mock,
             get_queue_mock,
-            datetime_mock,
+            timezone_mock,
             settings_mock,
         )
 
@@ -452,15 +453,17 @@ def test_check_rulebook_queue_health_all_workers_dead(setup_queue_health):
         queue_name,
         queue_mock,
         get_queue_mock,
-        datetime_mock,
+        timezone_mock,
         _,
     ) = setup_queue_health
 
     # Specific setup for this test
     worker_mock = mock.Mock()
-    worker_mock.last_heartbeat = datetime(2022, 1, 1)
+    worker_mock.last_heartbeat = timezone.make_aware(datetime(2022, 1, 1))
     all_workers_mock = mock.Mock(return_value=[worker_mock])
-    datetime_mock.now.return_value = datetime(2022, 1, 1, minute=5)
+    timezone_mock.now.return_value = timezone.make_aware(
+        datetime(2022, 1, 1, minute=5)
+    )
 
     with mock.patch(
         "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock
@@ -478,17 +481,21 @@ def test_check_rulebook_queue_health_some_workers_alive(setup_queue_health):
         queue_name,
         queue_mock,
         get_queue_mock,
-        datetime_mock,
+        timezone_mock,
         _,
     ) = setup_queue_health
 
     # Specific setup for this test
     worker_mock1 = mock.Mock()
-    worker_mock1.last_heartbeat = datetime(2022, 1, 1, hour=6)
+    worker_mock1.last_heartbeat = timezone.make_aware(
+        datetime(2022, 1, 1, hour=6)
+    )
     worker_mock2 = mock.Mock()
-    worker_mock2.last_heartbeat = datetime(2022, 1, 1)
+    worker_mock2.last_heartbeat = timezone.make_aware(datetime(2022, 1, 1))
     all_workers_mock = mock.Mock(return_value=[worker_mock1, worker_mock2])
-    datetime_mock.now.return_value = datetime(2022, 1, 1, hour=6, second=30)
+    timezone_mock.now.return_value = timezone.make_aware(
+        datetime(2022, 1, 1, hour=6, second=30)
+    )
 
     with mock.patch(
         "aap_eda.tasks.orchestrator.tasking.Worker.all", all_workers_mock

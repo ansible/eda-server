@@ -1,4 +1,5 @@
 """Tools for running background tasks."""
+
 from __future__ import annotations
 
 import functools
@@ -23,7 +24,11 @@ from dispatcherd.factories import get_control_from_settings
 from dispatcherd.processors.delayer import Delayer
 from dispatcherd.publish import submit_task
 from django.conf import settings
-from rq import results as rq_results
+from rq import (
+    executions as rq_executions,
+    group as rq_group,
+    results as rq_results,
+)
 
 from aap_eda import utils
 from aap_eda.settings import (
@@ -271,6 +276,22 @@ def enable_redis_prefix():
         property(property_registry_cleaning_key),
     )
 
+    # Group and Execution tracking (new in RQ 2.6).
+    rq_group.Group.REDIS_GROUP_KEY = f"{redis_prefix}:groups"
+
+    def execution_key_property(self):
+        return f"{redis_prefix}:execution:{self.composite_key}"
+
+    setattr(  # noqa: B010
+        rq_executions.Execution,
+        "key",
+        property(execution_key_property),
+    )
+
+    rq_executions.ExecutionRegistry.key_template = (
+        f"{redis_prefix}:executions:{{0}}"
+    )
+
 
 enable_redis_prefix()
 
@@ -483,6 +504,42 @@ class Worker(rq.Worker):
         self.is_shutting_down = True
         super().handle_warm_shutdown_request()
 
+    def heartbeat(
+        self,
+        timeout: typing.Optional[int] = None,
+        pipeline: typing.Optional[typing.Any] = None,
+    ) -> None:
+        """Override heartbeat to re-register worker if key expired.
+
+        This workaround handles the case where a worker's Redis key expires
+        (due to network issues) but the worker is still alive. When heartbeat
+        detects the key is missing, it automatically re-registers the worker.
+
+        See: https://github.com/rq/rq/issues/469
+        """
+        # Only check key existence if not using a pipeline
+        # (pipeline commands are queued, can't check return value immediately)
+        if pipeline is None:
+            try:
+                # Check if worker key exists in Redis
+                key_exists = self.connection.exists(self.key)
+                if not key_exists:
+                    # Key doesn't exist - worker registration was lost
+                    # Re-register the worker's birth
+                    logger.warning(
+                        f"Worker {self.name}: heartbeat detected missing key, "
+                        f"re-registering worker birth"
+                    )
+                    self.register_birth()
+                    # Re-set the worker state after re-registration
+                    self.set_state(self._state)
+            except redis.exceptions.ConnectionError:
+                # Redis is down - let parent's heartbeat handle it
+                pass
+
+        # Call parent's heartbeat to handle all normal heartbeat logic
+        super().heartbeat(timeout=timeout, pipeline=pipeline)
+
     # We are overriding the work function to utilize our own common
     # Redis connection looping.
     def work(
@@ -492,7 +549,9 @@ class Worker(rq.Worker):
         date_format: str = rq.defaults.DEFAULT_LOGGING_DATE_FORMAT,
         log_format: str = rq.defaults.DEFAULT_LOGGING_FORMAT,
         max_jobs: typing.Optional[int] = None,
+        max_idle_time: typing.Optional[int] = None,
         with_scheduler: bool = False,
+        dequeue_strategy: str = "default",
     ) -> bool:
         value = None
         while True:
@@ -504,7 +563,9 @@ class Worker(rq.Worker):
                 date_format,
                 log_format,
                 max_jobs,
+                max_idle_time,
                 with_scheduler,
+                dequeue_strategy,
             )
 
             # If there's a return value or the worker is shutting down
@@ -541,6 +602,11 @@ class DefaultWorker(Worker):
         if queue_class is None:
             queue_class = Queue
 
+        # Remove worker_ttl from kwargs to avoid conflict with
+        # default_worker_ttl. django-rq passes worker_ttl, but
+        # we use default_worker_ttl explicitly
+        kwargs.pop("worker_ttl", None)
+
         super().__init__(
             queues=queues,
             name=name,
@@ -573,6 +639,11 @@ class ActivationWorker(Worker):
         if queue_class is None:
             queue_class = Queue
         queue_name = settings.RULEBOOK_QUEUE_NAME
+
+        # Remove worker_ttl from kwargs to avoid conflict with
+        # default_worker_ttl. django-rq passes worker_ttl, but
+        # we use default_worker_ttl explicitly
+        kwargs.pop("worker_ttl", None)
 
         super().__init__(
             queues=[Queue(name=queue_name, connection=connection)],
