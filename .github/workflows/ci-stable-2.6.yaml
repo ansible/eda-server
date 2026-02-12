@@ -8,6 +8,7 @@ on:
     branches: [ 'stable-2.6' ]
   pull_request:
     branches: [ 'stable-2.6' ]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
@@ -76,3 +77,57 @@ jobs:
         uses: ./.github/actions/test
         with:
           python-version: ${{ matrix.python-version }}
+
+  generate-openapi-spec:
+    name: Generate OpenAPI spec
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Configure Git access to private org repos
+        env:
+          GITHUB_TOKEN: ${{ secrets.AAP_ORG_FG_ANSIBLE_CICD_BOT_ACTIONS_REPO_READ }}
+        run: |
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: Install dependencies
+        run: poetry install -E all --only main
+
+      - name: Generate OpenAPI specification
+        env:
+          EDA_SECRET_KEY: "insecure-dev-key-for-ci"
+        run: |
+          poetry run aap-eda-manage spectacular \
+            --file openapi.json \
+            --format openapi-json
+
+      - name: Verify spec file
+        run: |
+          if [ ! -f "openapi.json" ]; then
+            echo "❌ Spec file not found"
+            exit 1
+          fi
+          echo "✅ Generated openapi.json ($(wc -c < openapi.json) bytes)"
+
+      - name: Upload spec artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: openapi.json
+
+  sync-openapi-spec:
+    needs: generate-openapi-spec
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/sync-openapi-spec.yml
+    secrets:
+      OPENAPI_SPEC_SYNC_TOKEN: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
