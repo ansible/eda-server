@@ -210,6 +210,8 @@ def test_monitor_rulebook_processes(
             ProcessParentType.ACTIVATION,
             activation.id,
             "",
+            result_ttl=0,
+            failure_ttl=0,
         )
     ]
     for running in bulk_running_processes:
@@ -223,6 +225,8 @@ def test_monitor_rulebook_processes(
                 ProcessParentType.ACTIVATION,
                 running.activation.id,
                 "",
+                result_ttl=0,
+                failure_ttl=0,
             )
         )
 

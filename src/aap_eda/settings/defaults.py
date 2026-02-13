@@ -267,3 +267,9 @@ INSIGHTS_TRACKING_STATE: bool = False
 AUTOMATION_ANALYTICS_GATHER_INTERVAL: int = 14400
 REDHAT_USERNAME: str = ""
 REDHAT_PASSWORD: str = ""
+
+# ---------------------------------------------------------
+# RQ TTL Settings
+# ---------------------------------------------------------
+DEFAULT_RESULT_TTL = 0
+DEFAULT_FAILURE_TTL = 0
