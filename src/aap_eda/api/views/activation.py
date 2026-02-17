@@ -40,9 +40,8 @@ from aap_eda.tasks.orchestrator import (
     start_rulebook_process,
     stop_rulebook_process,
 )
+from aap_eda.tasks.project import sync_project
 from aap_eda.utils import str_to_bool
-
-# RedisDependencyMixin import removed - no longer required with dispatcherd
 
 logger = logging.getLogger(__name__)
 
@@ -239,10 +238,10 @@ class ActivationViewSet(
             activation.organization,
         )
 
-        # With dispatcherd migration, Redis is no longer required
         with transaction.atomic():
             activation.status = ActivationStatus.DELETING
-            activation.save(update_fields=["status"])
+            activation.awaiting_project_sync = False
+            activation.save(update_fields=["status", "awaiting_project_sync"])
             name = activation.name
 
             delete_rulebook_process(
@@ -409,7 +408,9 @@ class ActivationViewSet(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        # With dispatcherd migration, Redis is no longer required
+        sync_response = self._sync_project_if_needed(activation)
+        if sync_response:
+            return sync_response
 
         logger.info(f"Now enabling {activation.name} ...")
 
@@ -484,9 +485,11 @@ class ActivationViewSet(
             activation, force_disable, "Disabled"
         )
 
-        if activation.is_enabled:
-            # With dispatcherd migration, Redis is no longer required
+        if activation.awaiting_project_sync:
+            activation.awaiting_project_sync = False
+            activation.save(update_fields=["awaiting_project_sync"])
 
+        if activation.is_enabled:
             if activation.status in [
                 ActivationStatus.STARTING,
                 ActivationStatus.RUNNING,
@@ -528,7 +531,7 @@ class ActivationViewSet(
             ),
             status.HTTP_409_CONFLICT: OpenApiResponse(
                 None,
-                description="Activation blocked while Workers offline.",
+                description=("Activation blocked while Workers offline."),
             ),
         },
         parameters=[
@@ -556,8 +559,6 @@ class ActivationViewSet(
                 detail="Activation is disabled and cannot be run."
             )
 
-        # With dispatcherd migration, Redis is no longer required
-
         valid, error = is_activation_valid(activation)
         if not valid:
             stop_rulebook_process(
@@ -573,6 +574,10 @@ class ActivationViewSet(
             return Response(
                 {"errors": error}, status=status.HTTP_400_BAD_REQUEST
             )
+
+        sync_response = self._sync_project_if_needed(activation)
+        if sync_response:
+            return sync_response
 
         restart_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
@@ -636,6 +641,67 @@ class ActivationViewSet(
         return Response(
             serializers.ActivationReadSerializer(response).data,
             status=status.HTTP_201_CREATED,
+        )
+
+    def _sync_project_if_needed(
+        self, activation: models.Activation
+    ) -> Response | None:
+        """Check if project sync is needed before launch.
+
+        Sets awaiting_project_sync flag, updates status to PENDING,
+        and triggers sync if project is not already syncing.
+
+        Returns a 202 Response if sync was initiated, or None if
+        no sync is needed and the caller should proceed normally.
+        """
+        if not activation.needs_project_update_on_launch:
+            return None
+
+        activation.awaiting_project_sync = True
+        activation.status = ActivationStatus.PENDING
+        activation.status_message = "Waiting for project sync to complete"
+        activation.save(
+            update_fields=[
+                "awaiting_project_sync",
+                "status",
+                "status_message",
+            ]
+        )
+
+        # Only submit a new sync if one isn't already running.
+        # If a sync IS in progress, the flag is already set and
+        # the running sync will resume this activation on completion.
+        if activation.project.import_state not in [
+            models.Project.ImportState.PENDING,
+            models.Project.ImportState.RUNNING,
+        ]:
+            try:
+                sync_project(activation.project.id)
+            except Exception as e:
+                logger.error(
+                    f"Failed to start project sync for "
+                    f"'{activation.name}': {e}",
+                    exc_info=True,
+                )
+                activation.awaiting_project_sync = False
+                activation.status = ActivationStatus.ERROR
+                activation.status_message = (
+                    f"Failed to start project sync: {e}"
+                )
+                activation.save(
+                    update_fields=[
+                        "awaiting_project_sync",
+                        "status",
+                        "status_message",
+                    ]
+                )
+                return Response(
+                    {"errors": str(e)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
         )
 
     def _check_deleting(self, activation):

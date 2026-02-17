@@ -25,8 +25,13 @@ from django.utils import timezone
 
 from aap_eda import utils
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus, ProcessParentType
 from aap_eda.services.project import ProjectImportError, ProjectImportService
-from aap_eda.tasks.orchestrator import check_rulebook_queue_health
+from aap_eda.tasks.orchestrator import (
+    check_rulebook_queue_health,
+    restart_rulebook_process,
+    start_rulebook_process,
+)
 
 logger = logging.getLogger(__name__)
 PROJECT_TASKS_QUEUE = "default"
@@ -73,7 +78,7 @@ def _import_project_no_lock(project_id: int):
 
     This function is intended to be run by the tasking system inside the lock.
     """
-    logger.info(f"Task started: Import project ( {project_id=} )")
+    logger.info(f"Task started: Import project ({project_id=})")
 
     error_message = None
     try:
@@ -81,7 +86,7 @@ def _import_project_no_lock(project_id: int):
         if not project:
             logger.info(
                 f"Task complete: Import project "
-                f"( project_id={project_id} ) - project not found"
+                f"(project_id={project_id}) - project not found"
             )
             return
 
@@ -111,7 +116,7 @@ def _import_project_no_lock(project_id: int):
         if error_message:
             _handle_project_error_recovery(project_id, error_message)
 
-    logger.info(f"Task complete: Import project ( project_id={project_id} )")
+    logger.info(f"Task complete: Import project (project_id={project_id})")
 
 
 def sync_project(project_id: int) -> str:
@@ -140,9 +145,11 @@ def _sync_project(project_id: int):
 def _sync_project_no_lock(project_id: int):
     """Sync project without lock.
 
-    This function is intended to be run by the tasking system inside the lock.
+    This function is intended to be run by the tasking system
+    inside the lock. After sync completes, handles post-sync
+    activation operations (auto-restart and resume waiting).
     """
-    logger.info(f"Task started: Sync project ( {project_id=} )")
+    logger.info(f"Task started: Sync project ({project_id=})")
 
     error_message = None
     try:
@@ -150,7 +157,10 @@ def _sync_project_no_lock(project_id: int):
         if not project:
             logger.info(
                 f"Task complete: Sync project "
-                f"( project_id={project_id} ) - project not found"
+                f"(project_id={project_id}) - project not found"
+            )
+            _handle_sync_failure_activations(
+                project_id, "Project not found or deleted"
             )
             return
 
@@ -176,11 +186,295 @@ def _sync_project_no_lock(project_id: int):
             exc_info=True,
         )
         error_message = f"Unexpected error during sync: {str(e)}"
-    finally:
-        if error_message:
-            _handle_project_error_recovery(project_id, error_message)
 
-    logger.info(f"Task complete: Sync project ( project_id={project_id} )")
+    if error_message:
+        _handle_project_error_recovery(project_id, error_message)
+        _handle_sync_failure_activations(project_id, error_message)
+    else:
+        _handle_post_sync_activations(project)
+
+    logger.info(f"Task complete: Sync project (project_id={project_id})")
+
+
+def _handle_post_sync_activations(project: models.Project):
+    """Handle activation operations after a successful sync.
+
+    1. Auto-restart enabled activations with changed content
+    2. Resume activations waiting for project sync
+    """
+    try:
+        _auto_restart_activations(project)
+    except Exception as e:
+        logger.error(
+            f"Auto-restart failed for project {project.id}: {e}",
+            exc_info=True,
+        )
+
+    try:
+        _resume_waiting_activations(project)
+    except Exception as e:
+        logger.error(
+            f"Resume waiting activations failed for "
+            f"project {project.id}: {e}",
+            exc_info=True,
+        )
+
+
+def _auto_restart_activations(project: models.Project):
+    """Auto-restart enabled activations when rulebook content changes.
+
+    Excludes activations with awaiting_project_sync=True since
+    those will be handled by _resume_waiting_activations.
+    """
+    activations = models.Activation.objects.filter(
+        project=project,
+        is_enabled=True,
+        restart_on_project_update=True,
+        awaiting_project_sync=False,
+    )
+
+    restart_count = 0
+    checked_count = 0
+    for activation in activations:
+        checked_count += 1
+        try:
+            current_rulebook = models.Rulebook.objects.get(
+                id=activation.rulebook_id
+            )
+            current_sha256 = current_rulebook.rulesets_sha256
+            current_git_hash = project.git_hash
+
+            content_changed = (
+                activation.rulebook_rulesets_sha256 != current_sha256
+            )
+            hash_changed = activation.git_hash != current_git_hash
+
+            # Only auto-restart activations have their cached
+            # rulesets updated (filtered by query above).
+            if content_changed or hash_changed:
+                activation.rulebook_rulesets = current_rulebook.rulesets or ""
+                activation.rulebook_rulesets_sha256 = current_sha256
+                activation.git_hash = current_git_hash
+                activation.save(
+                    update_fields=[
+                        "rulebook_rulesets",
+                        "rulebook_rulesets_sha256",
+                        "git_hash",
+                    ]
+                )
+
+            if content_changed:
+                logger.info(
+                    f"Content changed for activation "
+                    f"'{activation.name}', "
+                    f"triggering auto-restart"
+                )
+                _restart_activation(activation)
+                restart_count += 1
+
+        except ObjectDoesNotExist:
+            logger.warning(
+                f"Rulebook for activation "
+                f"'{activation.name}' no longer exists"
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to check activation "
+                f"'{activation.name}' for "
+                f"auto-restart: {e}",
+                exc_info=True,
+            )
+
+    logger.info(
+        f"Auto-restart check complete: {restart_count} "
+        f"activations restarted out of "
+        f"{checked_count} checked"
+    )
+
+
+def _restart_activation(activation: models.Activation):
+    """Execute auto-restart for an activation."""
+    try:
+        restart_rulebook_process(
+            process_parent_type=ProcessParentType.ACTIVATION,
+            process_parent_id=activation.id,
+            request_id="",
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to restart activation "
+            f"'{activation.name}' after sync: {e}",
+            exc_info=True,
+        )
+        try:
+            activation.status = ActivationStatus.ERROR
+            activation.status_message = (
+                f"Auto-restart failed after project sync: {e}"
+            )
+            activation.save(update_fields=["status", "status_message"])
+        except Exception as save_err:
+            logger.error(
+                f"Failed to set error state for "
+                f"'{activation.name}': {save_err}",
+                exc_info=True,
+            )
+        return
+
+    try:
+        activation.restart_count += 1
+        activation.save(update_fields=["restart_count"])
+    except Exception as e:
+        logger.warning(
+            f"Restart succeeded for '{activation.name}' "
+            f"but failed to update restart_count: {e}",
+            exc_info=True,
+        )
+
+    logger.info(f"Auto-restarted activation '{activation.name}'")
+
+
+def _update_activation_content(
+    activation: models.Activation,
+    project: models.Project,
+):
+    """Update activation's cached rulebook content, hash, and git hash."""
+    try:
+        rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
+        activation.rulebook_rulesets = rulebook.rulesets or ""
+        activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
+    except ObjectDoesNotExist:
+        logger.warning(
+            f"Rulebook for activation "
+            f"'{activation.name}' not found, "
+            f"keeping existing rulesets"
+        )
+    activation.git_hash = project.git_hash
+
+
+def _resume_waiting_activations(project: models.Project):
+    """Resume activations waiting for project sync.
+
+    Updates cached rulebook content and git hash before
+    starting/restarting to ensure fresh content is used.
+    """
+    waiting = models.Activation.objects.filter(
+        project=project,
+        awaiting_project_sync=True,
+    )
+
+    for activation in waiting:
+        try:
+            # Update cached content from post-sync rulebook
+            _update_activation_content(activation, project)
+
+            activation.awaiting_project_sync = False
+            if not activation.is_enabled:
+                logger.info(
+                    f"Resuming enable for '{activation.name}' after sync"
+                )
+                activation.is_enabled = True
+                activation.failure_count = 0
+                activation.status = ActivationStatus.PENDING
+                activation.save(
+                    update_fields=[
+                        "awaiting_project_sync",
+                        "is_enabled",
+                        "failure_count",
+                        "status",
+                        "rulebook_rulesets",
+                        "rulebook_rulesets_sha256",
+                        "git_hash",
+                        "modified_at",
+                    ]
+                )
+                start_rulebook_process(
+                    process_parent_type=(ProcessParentType.ACTIVATION),
+                    process_parent_id=activation.id,
+                    request_id="",
+                )
+            else:
+                logger.info(
+                    f"Resuming restart for '{activation.name}' after sync"
+                )
+                activation.save(
+                    update_fields=[
+                        "awaiting_project_sync",
+                        "rulebook_rulesets",
+                        "rulebook_rulesets_sha256",
+                        "git_hash",
+                    ]
+                )
+                restart_rulebook_process(
+                    process_parent_type=(ProcessParentType.ACTIVATION),
+                    process_parent_id=activation.id,
+                    request_id="",
+                )
+        except Exception as e:
+            logger.error(
+                f"Failed to resume activation "
+                f"'{activation.name}' after sync: {e}",
+                exc_info=True,
+            )
+            try:
+                activation.status = ActivationStatus.ERROR
+                activation.status_message = (
+                    f"Failed to start after project sync: {e}"
+                )
+                activation.awaiting_project_sync = False
+                activation.save(
+                    update_fields=[
+                        "status",
+                        "status_message",
+                        "awaiting_project_sync",
+                    ]
+                )
+            except Exception as save_err:
+                logger.error(
+                    f"Failed to update activation status "
+                    f"after resume failure: {save_err}",
+                    exc_info=True,
+                )
+
+
+def _handle_sync_failure_activations(project_id: int, error_message: str):
+    """Handle waiting activations when sync fails."""
+    try:
+        waiting = models.Activation.objects.filter(
+            project_id=project_id,
+            awaiting_project_sync=True,
+        )
+        for activation in waiting:
+            try:
+                activation.status = ActivationStatus.ERROR
+                activation.status_message = (
+                    f"Project sync failed: {error_message}"
+                )
+                activation.awaiting_project_sync = False
+                activation.save(
+                    update_fields=[
+                        "status",
+                        "status_message",
+                        "awaiting_project_sync",
+                    ]
+                )
+                logger.info(
+                    f"Set activation '{activation.name}' "
+                    f"to ERROR after sync failure"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to update activation "
+                    f"'{activation.name}' after "
+                    f"sync failure: {e}",
+                    exc_info=True,
+                )
+    except Exception as e:
+        logger.error(
+            f"Failed to handle sync failure "
+            f"activations for project "
+            f"{project_id}: {e}",
+            exc_info=True,
+        )
 
 
 # Started by the scheduler, unique concurrent execution
@@ -227,6 +521,10 @@ def _monitor_project_tasks() -> None:
     else:
         logger.info("No stuck projects found")
 
+    orphaned = _recover_orphaned_awaiting_activations()
+    if orphaned > 0:
+        logger.warning(f"Recovered {orphaned} orphaned awaiting activation(s)")
+
     logger.info("Task complete: Monitor project tasks")
 
 
@@ -271,14 +569,78 @@ def _recover_stuck_projects(
                     logger.warning(f"Recovered stuck project {project.id}")
                     recovered += 1
         except ObjectDoesNotExist:
-            logger.warning(
-                f"Project {project.id} was deleted " "during recovery"
-            )
+            logger.warning(f"Project {project.id} was deleted during recovery")
         except DatabaseError as e:
             logger.error(
                 f"Failed to recover project {project.id}: {e}",
                 exc_info=True,
             )
+
+    return recovered
+
+
+def _recover_orphaned_awaiting_activations() -> int:
+    """Recover activations stuck with awaiting_project_sync=True.
+
+    Finds activations whose project is no longer syncing
+    (COMPLETED, FAILED, or deleted) and either resumes them
+    or sets them to ERROR. This is a safety net for races
+    where the sync task completes before the flag is set,
+    or where sync_project() submission fails silently.
+    """
+    stuck = models.Activation.objects.filter(
+        awaiting_project_sync=True,
+    ).select_related("project")
+
+    recovered = 0
+    resumed_projects = set()
+    for activation in stuck:
+        project = activation.project
+        # Project deleted or not syncing — activation is orphaned
+        if project is None or project.import_state not in [
+            models.Project.ImportState.PENDING,
+            models.Project.ImportState.RUNNING,
+        ]:
+            state_desc = "deleted" if project is None else project.import_state
+            logger.warning(
+                f"Found orphaned activation "
+                f"'{activation.name}' with "
+                f"awaiting_project_sync=True "
+                f"(project state: {state_desc})"
+            )
+            try:
+                if (
+                    project is not None
+                    and project.import_state
+                    == models.Project.ImportState.COMPLETED
+                    and project.id not in resumed_projects
+                ):
+                    # Project synced successfully — resume
+                    _resume_waiting_activations(project)
+                    resumed_projects.add(project.id)
+                else:
+                    # Project failed or deleted — set ERROR
+                    error_msg = (
+                        "Project sync did not complete. "
+                        "Recovered by monitoring system."
+                    )
+                    activation.status = ActivationStatus.ERROR
+                    activation.status_message = error_msg
+                    activation.awaiting_project_sync = False
+                    activation.save(
+                        update_fields=[
+                            "status",
+                            "status_message",
+                            "awaiting_project_sync",
+                        ]
+                    )
+                recovered += 1
+            except Exception as e:
+                logger.error(
+                    f"Failed to recover orphaned "
+                    f"activation '{activation.name}': {e}",
+                    exc_info=True,
+                )
 
     return recovered
 
