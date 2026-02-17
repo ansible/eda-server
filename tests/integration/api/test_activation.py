@@ -1304,9 +1304,13 @@ def test_copy_activation_invalid_body(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 @mock.patch("aap_eda.api.views.activation.sync_project")
 def test_enable_triggers_sync_when_project_needs_update(
     mock_sync,
+    mock_health,
     default_activation: models.Activation,
     default_project: models.Project,
     admin_client: APIClient,
@@ -1339,9 +1343,13 @@ def test_enable_triggers_sync_when_project_needs_update(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 @mock.patch("aap_eda.api.views.activation.sync_project")
 def test_enable_skips_sync_when_project_already_syncing(
     mock_sync,
+    mock_health,
     default_activation: models.Activation,
     default_project: models.Project,
     admin_client: APIClient,
@@ -1374,7 +1382,11 @@ def test_enable_skips_sync_when_project_already_syncing(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 def test_enable_proceeds_normally_without_sync(
+    mock_health,
     default_activation: models.Activation,
     default_project: models.Project,
     admin_client: APIClient,
@@ -1399,9 +1411,13 @@ def test_enable_proceeds_normally_without_sync(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 @mock.patch("aap_eda.api.views.activation.sync_project")
 def test_restart_triggers_sync_when_project_needs_update(
     mock_sync,
+    mock_health,
     default_activation: models.Activation,
     default_project: models.Project,
     admin_client: APIClient,
@@ -1433,9 +1449,13 @@ def test_restart_triggers_sync_when_project_needs_update(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 @mock.patch("aap_eda.api.views.activation.sync_project")
 def test_enable_sync_failure_resets_flag(
     mock_sync,
+    mock_health,
     default_activation: models.Activation,
     default_project: models.Project,
     admin_client: APIClient,
@@ -1467,9 +1487,13 @@ def test_enable_sync_failure_resets_flag(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 @mock.patch("aap_eda.api.views.activation.sync_project")
 def test_disable_clears_awaiting_project_sync(
     mock_sync,
+    mock_health,
     default_activation: models.Activation,
     default_project: models.Project,
     admin_client: APIClient,
@@ -1510,7 +1534,11 @@ def test_disable_clears_awaiting_project_sync(
 
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
 def test_destroy_clears_awaiting_project_sync(
+    mock_health,
     default_activation: models.Activation,
     admin_client: APIClient,
     preseed_credential_types,
