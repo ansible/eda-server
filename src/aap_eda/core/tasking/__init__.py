@@ -210,7 +210,8 @@ class Scheduler(rq_scheduler.Scheduler):
 
 
 def enable_redis_prefix():
-    redis_prefix = settings.RQ_REDIS_PREFIX
+    # Add hash tags and escape for use in format() templates
+    redis_prefix = "{{" + settings.RQ_REDIS_PREFIX + "}}"
 
     # Job.
     rq.job.Job.redis_job_namespace_prefix = f"{redis_prefix}:job:"
@@ -754,8 +755,8 @@ def enqueue_delay_rq(
     scheduler = django_rq.get_scheduler(name=queue_name)
     return scheduler.enqueue_at(
         datetime.utcnow() + timedelta(seconds=delay),
-        job_id=job_id,
         *args,
+        job_id=job_id,
         **kwargs,
     )
 
