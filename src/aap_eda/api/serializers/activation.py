@@ -990,6 +990,28 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             else ""
         )
 
+        warnings = []
+        if activation.source_mappings:
+            if not activation.rulebook:
+                warnings.append(
+                    "The rulebook associated with this activation "
+                    "no longer exists. Source mappings may be "
+                    "invalid."
+                )
+            elif (
+                activation.rulebook_rulesets_sha256
+                and activation.rulebook.rulesets_sha256
+                and (
+                    activation.rulebook_rulesets_sha256
+                    != activation.rulebook.rulesets_sha256
+                )
+            ):
+                warnings.append(
+                    "Rulebook content has changed since event "
+                    "stream sources were mapped. Please update "
+                    "source mappings."
+                )
+
         return {
             "id": activation.id,
             "name": activation.name,
@@ -1026,6 +1048,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "k8s_service_name": activation.k8s_service_name,
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
+            "warnings": warnings,
             "skip_audit_events": activation.skip_audit_events,
             "log_tracking_id": activation.log_tracking_id,
             "created_by": BasicUserSerializer(activation.created_by).data,

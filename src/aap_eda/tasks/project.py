@@ -225,6 +225,8 @@ def _auto_restart_activations(project: models.Project):
 
     Excludes activations with awaiting_project_sync=True since
     those will be handled by _resume_waiting_activations.
+    Skips activations with source_mappings when content changes,
+    as those require manual source mapping updates.
     """
     activations = models.Activation.objects.filter(
         project=project,
@@ -248,6 +250,14 @@ def _auto_restart_activations(project: models.Project):
                 activation.rulebook_rulesets_sha256 != current_sha256
             )
             hash_changed = activation.git_hash != current_git_hash
+
+            if content_changed and activation.source_mappings:
+                logger.warning(
+                    f"Skipping auto-restart for activation "
+                    f"'{activation.name}' - has event stream "
+                    f"source mappings that need manual update"
+                )
+                continue
 
             # Only auto-restart activations have their cached
             # rulesets updated (filtered by query above).
