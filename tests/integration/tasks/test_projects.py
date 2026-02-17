@@ -40,7 +40,6 @@ from aap_eda.tasks.project import (
     _sync_project_no_lock,
     _update_activation_content,
     check_default_worker_health,
-    check_project_queue_health,
     monitor_project_tasks,
 )
 

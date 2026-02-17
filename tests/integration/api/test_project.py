@@ -1112,7 +1112,7 @@ def test_multiple_concurrent_health_check_calls(
 # Test: Project Auto-Sync Configuration
 # -------------------------------------
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_default_values(
     mock_health_check,
     default_organization: models.Organization,
@@ -1144,7 +1144,7 @@ def test_project_sync_default_values(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_fields_in_create_request(
     mock_health_check,
     default_organization: models.Organization,
@@ -1175,7 +1175,7 @@ def test_project_sync_fields_in_create_request(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_fields_in_update_request(
     mock_health_check, default_project: models.Project, admin_client: APIClient
 ):
@@ -1203,7 +1203,7 @@ def test_project_sync_fields_in_update_request(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_cache_timeout_validation_create(
     mock_health_check,
     default_organization: models.Organization,
@@ -1225,7 +1225,7 @@ def test_project_sync_cache_timeout_validation_create(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_cache_timeout_validation_update(
     mock_health_check, default_project: models.Project, admin_client: APIClient
 ):
@@ -1244,7 +1244,7 @@ def test_project_sync_cache_timeout_validation_update(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_cache_timeout_max_validation_create(
     mock_health_check,
     default_organization: models.Organization,
@@ -1266,7 +1266,7 @@ def test_project_sync_cache_timeout_max_validation_create(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_sync_cache_timeout_max_validation_update(
     mock_health_check, default_project: models.Project, admin_client: APIClient
 ):
@@ -1327,7 +1327,7 @@ def test_project_needs_update_on_launch_property(
 
 
 @pytest.mark.django_db
-@mock.patch("aap_eda.api.views.project.check_project_queue_health")
+@mock.patch("aap_eda.api.views.project.check_default_worker_health")
 def test_project_retrieve_includes_sync_fields(
     mock_health_check, default_project: models.Project, admin_client: APIClient
 ):
