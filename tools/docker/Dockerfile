@@ -47,9 +47,13 @@ ENV POETRY_VERSION="2.*" \
     PATH="/app/.local/bin:$PATH" \
     HOME="/app"
 
+USER "$USER_ID"
+
 # Setup SSH for non-root user
-RUN mkdir -p /app/.ssh && touch /app/.ssh/known_hosts && \
-    ssh-keyscan github.com >> /app/.ssh/known_hosts
+RUN mkdir -p /app/.ssh \
+    && ssh-keyscan github.com >> /app/.ssh/known_hosts \
+    && chmod 700 /app/.ssh \
+    && chmod 644 /app/.ssh/known_hosts
 
 # Install poetry, create virtual environment
 RUN ${PYTHON_BIN} -m pip install --user "poetry==${POETRY_VERSION}" \
