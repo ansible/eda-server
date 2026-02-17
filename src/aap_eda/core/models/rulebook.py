@@ -41,6 +41,11 @@ class Rulebook(BaseOrgModel):
     # TODO: should the content of this field be validated?
     # https://issues.redhat.com/browse/AAP-19202
     rulesets = models.TextField(null=False, default="")
+    rulesets_sha256 = models.CharField(
+        max_length=64,
+        default="",
+        help_text="SHA256 hash of rulesets content",
+    )
     project = models.ForeignKey("Project", on_delete=models.CASCADE, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=False)
     modified_at = models.DateTimeField(auto_now=True, null=False)

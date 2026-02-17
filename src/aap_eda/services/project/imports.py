@@ -27,6 +27,7 @@ from django.core import exceptions
 
 from aap_eda.core import models
 from aap_eda.core.types import StrPath
+from aap_eda.core.utils.rulebook import get_rulebook_hash
 from aap_eda.services.project.scm import ScmRepository
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,7 @@ class ProjectImportService:
             project=project,
             name=rulebook_info.relpath,
             rulesets=rulebook_info.raw_content,
+            rulesets_sha256=get_rulebook_hash(rulebook_info.raw_content),
             organization=project.organization,
         )
         return rulebook
@@ -194,15 +196,25 @@ class ProjectImportService:
         rulebook_info: RulebookInfo,
         git_hash: str,
     ):
-        if rulebook.rulesets == rulebook_info.raw_content:
+        new_sha256 = get_rulebook_hash(rulebook_info.raw_content)
+        if rulebook.rulesets_sha256 == new_sha256:
             models.Activation.objects.filter(rulebook=rulebook).update(
-                git_hash=git_hash,
+                git_hash=git_hash
             )
             return
         rulebook.rulesets = rulebook_info.raw_content
-        rulebook.save()
-        models.Activation.objects.filter(rulebook=rulebook).update(
+        rulebook.rulesets_sha256 = new_sha256
+        rulebook.save(update_fields=["rulesets", "rulesets_sha256"])
+        # Update activations without auto-restart. Those with
+        # restart_on_project_update=True are handled by
+        # _auto_restart_activations which needs to detect
+        # the change via SHA256 comparison.
+        models.Activation.objects.filter(
+            rulebook=rulebook,
+            restart_on_project_update=False,
+        ).update(
             rulebook_rulesets=rulebook.rulesets,
+            rulebook_rulesets_sha256=new_sha256,
             git_hash=git_hash,
         )
 

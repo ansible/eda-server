@@ -1294,3 +1294,231 @@ def test_copy_activation_invalid_body(
         f"{api_url_v1}/activations/{a_id}/copy/", data={"name": name}
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# ------------------------------------------------------------------
+# Project sync dependency tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_enable_triggers_sync_when_project_needs_update(
+    mock_sync,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable triggers sync when project needs update on launch."""
+    mock_sync.return_value = "task-uuid"
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is True
+    assert default_activation.status == enums.ActivationStatus.PENDING
+    mock_sync.assert_called_once_with(default_project.id)
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_enable_skips_sync_when_project_already_syncing(
+    mock_sync,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable sets flag but skips sync_project when already running."""
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.import_state = models.Project.ImportState.RUNNING
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+            "import_state",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is True
+    mock_sync.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+def test_enable_proceeds_normally_without_sync(
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable returns 204 when project doesn't need sync."""
+    default_project.update_revision_on_launch = False
+    default_project.save(update_fields=["update_revision_on_launch"])
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is False
+    assert default_activation.is_enabled is True
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_restart_triggers_sync_when_project_needs_update(
+    mock_sync,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Restart triggers sync when project needs update."""
+    mock_sync.return_value = "task-uuid"
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = True
+    default_activation.status = enums.ActivationStatus.RUNNING
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/restart/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is True
+    mock_sync.assert_called_once_with(default_project.id)
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_enable_sync_failure_resets_flag(
+    mock_sync,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable resets flag and returns error when sync_project throws."""
+    mock_sync.side_effect = RuntimeError("dispatcherd down")
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is False
+    assert default_activation.status == (enums.ActivationStatus.ERROR)
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_disable_clears_awaiting_project_sync(
+    mock_sync,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Disable clears awaiting_project_sync flag."""
+    mock_sync.return_value = "task-uuid"
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    # Set is_enabled so disable logic runs
+    default_activation.refresh_from_db()
+    default_activation.is_enabled = True
+    default_activation.save(update_fields=["is_enabled"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/disable/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is False
+    assert default_activation.is_enabled is False
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+def test_destroy_clears_awaiting_project_sync(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Destroy clears awaiting_project_sync flag."""
+    default_activation.awaiting_project_sync = True
+    default_activation.save(update_fields=["awaiting_project_sync"])
+
+    response = admin_client.delete(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
