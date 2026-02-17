@@ -49,6 +49,19 @@ load_standard_settings_files(
 load_envvars(DYNACONF)  # load envvars prefixed with EDA_
 DYNACONF.load_file("core.py")  # load internal non-overwritable settings
 post_loading(DYNACONF)
+
+# When deployed as part of AAP (RESOURCE_SERVER__URL is set), restrict
+# authentication to JWT-only.  WebsocketJWTAuthentication is retained
+# because rulebook workers connect back via websocket with HS256 JWT.
+if DYNACONF.get("RESOURCE_SERVER__URL", None):
+    DYNACONF.set(
+        "REST_FRAMEWORK__DEFAULT_AUTHENTICATION_CLASSES",
+        [
+            "ansible_base.jwt_consumer.eda.auth.EDAJWTAuthentication",
+            "aap_eda.api.authentication.WebsocketJWTAuthentication",
+        ],
+    )
+
 load_dab_settings(DYNACONF)
 
 export(__name__, DYNACONF)  # export back to django.conf.settings
