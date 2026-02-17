@@ -28,6 +28,7 @@ from aap_eda.api.serializers.activation import (
 )
 from aap_eda.api.serializers.project import ENCRYPTED_STRING
 from aap_eda.core import enums, models
+from aap_eda.core.utils.rulebook import get_rulebook_hash
 from tests.integration.constants import api_url_v1
 
 PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
@@ -1522,3 +1523,146 @@ def test_destroy_clears_awaiting_project_sync(
         f"{api_url_v1}/activations/" f"{default_activation.id}/"
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.django_db
+def test_activation_detail_shows_warning_on_rulebook_drift(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Warnings show when rulebook SHA256 drifts from activation."""
+    old_hash = get_rulebook_hash("old-content")
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = old_hash
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    # Simulate rulebook drift by updating the rulebook's SHA
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = get_rulebook_hash("new-content")
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["warnings"]) == 1
+    assert "source mappings" in response.data["warnings"][0]
+
+
+@pytest.mark.django_db
+def test_activation_detail_no_warning_when_hashes_match(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """No warnings when activation and rulebook SHA256 match."""
+    matching_hash = get_rulebook_hash("same-content")
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = matching_hash
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = matching_hash
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["warnings"] == []
+
+
+@pytest.mark.django_db
+def test_activation_detail_no_warning_without_source_mappings(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """No warnings when activation has no source_mappings."""
+    default_activation.source_mappings = ""
+    default_activation.rulebook_rulesets_sha256 = get_rulebook_hash(
+        "old-content"
+    )
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = get_rulebook_hash("new-content")
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["warnings"] == []
+
+
+@pytest.mark.django_db
+def test_list_activations_does_not_include_warnings(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """List endpoint does not include warnings field."""
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = get_rulebook_hash(
+        "old-content"
+    )
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = get_rulebook_hash("new-content")
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(f"{api_url_v1}/activations/")
+    assert response.status_code == status.HTTP_200_OK
+    for result in response.data["results"]:
+        assert "warnings" not in result
+
+
+@pytest.mark.django_db
+def test_activation_detail_warning_on_deleted_rulebook(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Warning when rulebook is deleted but source_mappings exist."""
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = get_rulebook_hash(
+        "old-content"
+    )
+    default_activation.rulebook = None
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+            "rulebook",
+        ]
+    )
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["warnings"]) == 1
+    assert "no longer exists" in response.data["warnings"][0]

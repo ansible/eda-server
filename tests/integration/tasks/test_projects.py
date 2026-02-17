@@ -937,6 +937,134 @@ def test_auto_restart_activations_content_changed(
 
 @pytest.mark.django_db
 @patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_skips_activation_with_source_mappings(
+    mock_restart,
+    default_organization,
+):
+    """Auto-restart skips activations with source_mappings."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="source-mapped-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    _auto_restart_activations(project)
+
+    activation.refresh_from_db()
+    # Content and SHA256 should remain frozen
+    assert activation.rulebook_rulesets == "old-content"
+    assert activation.rulebook_rulesets_sha256 == get_rulebook_hash(
+        "old-content"
+    )
+    assert activation.git_hash == "old-hash"
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_works_without_source_mappings(
+    mock_restart,
+    default_organization,
+):
+    """Auto-restart still works for activations without source_mappings."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="no-source-mapping-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+    )
+
+    _auto_restart_activations(project)
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.git_hash == "abc123"
+    mock_restart.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_mixed_source_mappings_activations(
+    mock_restart,
+    default_organization,
+):
+    """Skip only applies to source_mappings activation in loop."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    mapped = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="mapped-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+    unmapped = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="unmapped-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+    )
+
+    _auto_restart_activations(project)
+
+    mapped.refresh_from_db()
+    assert mapped.rulebook_rulesets == "old-content"
+    assert mapped.git_hash == "old-hash"
+
+    unmapped.refresh_from_db()
+    assert unmapped.rulebook_rulesets == "new-content"
+    assert unmapped.git_hash == "abc123"
+
+    mock_restart.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
 def test_auto_restart_skips_unchanged_content(
     mock_restart,
     default_organization,
@@ -1317,6 +1445,45 @@ def test_auto_restart_hash_only_change_no_restart(
     activation.refresh_from_db()
     assert activation.git_hash == "new-hash"
     assert activation.rulebook_rulesets == "same-content"
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_hash_only_change_updates_source_mappings_activation(
+    mock_restart,
+    default_organization,
+):
+    """Hash-only change updates metadata for source_mappings activation."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="hash-only-mapped",
+        restart_on_project_update=True,
+        rulebook_rulesets="same-content",
+        git_hash="old-hash",
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    _auto_restart_activations(project)
+
+    activation.refresh_from_db()
+    # git_hash should be updated (hash-only, no content change)
+    assert activation.git_hash == "new-hash"
+    assert activation.rulebook_rulesets == "same-content"
+    # No restart for hash-only change
     mock_restart.assert_not_called()
 
 
