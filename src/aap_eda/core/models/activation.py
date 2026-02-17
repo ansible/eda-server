@@ -58,6 +58,17 @@ class Activation(
     )
     is_enabled = models.BooleanField(default=DEFAULT_ENABLED)
     git_hash = models.TextField(null=False, default="")
+    restart_on_project_update = models.BooleanField(
+        default=False,
+        help_text="Auto-restart when rulebook changes after project sync",
+    )
+    awaiting_project_sync = models.BooleanField(
+        default=False,
+        help_text=(
+            "Activation is waiting for project "
+            "sync to complete before launch"
+        ),
+    )
     # TODO(alex) Since local activations are no longer supported
     # this field should be mandatory.
     decision_environment = models.ForeignKey(
@@ -91,6 +102,14 @@ class Activation(
     rulebook_rulesets = models.TextField(
         null=False,
         help_text="Content of the last referenced rulebook",
+    )
+    # Hash of the original rulebook rulesets content (before
+    # event stream source swapping). Used for change detection
+    # against the upstream rulebook, not the stored content.
+    rulebook_rulesets_sha256 = models.CharField(
+        max_length=64,
+        default="",
+        help_text="SHA256 hash of original rulebook content",
     )
     ruleset_stats = models.JSONField(default=dict)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
@@ -161,3 +180,10 @@ class Activation(
     def _get_skip_audit_events(self) -> bool:
         """Activation can optionally skip audit events."""
         return self.skip_audit_events
+
+    @property
+    def needs_project_update_on_launch(self) -> bool:
+        """Check if activation requires project update on launch."""
+        if not self.project:
+            return False
+        return self.project.needs_update_on_launch

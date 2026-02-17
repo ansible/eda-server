@@ -23,13 +23,22 @@ from django.db import DatabaseError
 from django.utils import timezone
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.utils.rulebook import get_rulebook_hash
 from aap_eda.services.project import ProjectImportError
 from aap_eda.tasks.project import (
+    _auto_restart_activations,
     _get_project_safely,
+    _handle_post_sync_activations,
     _handle_project_error_recovery,
+    _handle_sync_failure_activations,
     _import_project_no_lock,
     _monitor_project_tasks,
+    _recover_orphaned_awaiting_activations,
+    _restart_activation,
+    _resume_waiting_activations,
     _sync_project_no_lock,
+    _update_activation_content,
     check_default_worker_health,
     check_project_queue_health,
     monitor_project_tasks,
@@ -409,11 +418,16 @@ def test_import_project_no_lock_database_error(
 
 
 @pytest.mark.django_db
+@patch("aap_eda.tasks.project._handle_post_sync_activations")
 @patch("aap_eda.tasks.project._get_project_safely")
 @patch("aap_eda.tasks.project.ProjectImportService")
 @patch("aap_eda.tasks.project.logger")
 def test_sync_project_no_lock_success(
-    mock_logger, mock_service, mock_get_project, default_organization
+    mock_logger,
+    mock_service,
+    mock_get_project,
+    mock_post_sync,
+    default_organization,
 ):
     """Test _sync_project_no_lock handles successful sync."""
     project = models.Project.objects.create(
@@ -431,6 +445,7 @@ def test_sync_project_no_lock_success(
     mock_sync_service.sync_project.assert_called_once_with(project)
     project.refresh_from_db()
     assert project.last_synced_at is not None
+    mock_post_sync.assert_called_once_with(project)
 
 
 @pytest.mark.django_db
@@ -589,21 +604,27 @@ def test_import_project_no_lock_unexpected_exception(
 
 
 @pytest.mark.django_db
+@patch("aap_eda.tasks.project._handle_sync_failure_activations")
 @patch("aap_eda.tasks.project._get_project_safely")
 @patch("aap_eda.tasks.project.logger")
-def test_sync_project_no_lock_project_not_found(mock_logger, mock_get_project):
+def test_sync_project_no_lock_project_not_found(
+    mock_logger, mock_get_project, mock_failure_handler
+):
     """Test _sync_project_no_lock handles missing project."""
     mock_get_project.return_value = None
 
     _sync_project_no_lock(999)
 
     mock_get_project.assert_called_once_with(999)
-    assert mock_logger.info.call_count == 2
-    complete_call = mock_logger.info.call_args_list[1]
-    assert "project not found" in complete_call[0][0]
+    info_messages = [c[0][0] for c in mock_logger.info.call_args_list]
+    assert any("project not found" in m for m in info_messages)
+    mock_failure_handler.assert_called_once_with(
+        999, "Project not found or deleted"
+    )
 
 
 @pytest.mark.django_db
+@patch("aap_eda.tasks.project._handle_sync_failure_activations")
 @patch("aap_eda.tasks.project._get_project_safely")
 @patch("aap_eda.tasks.project.ProjectImportService")
 @patch("aap_eda.tasks.project._handle_project_error_recovery")
@@ -613,6 +634,7 @@ def test_sync_project_no_lock_project_import_error(
     mock_recovery,
     mock_service,
     mock_get_project,
+    mock_failure_handler,
     default_organization,
 ):
     """Test _sync_project_no_lock handles ProjectImportError."""
@@ -636,9 +658,13 @@ def test_sync_project_no_lock_project_import_error(
     mock_recovery.assert_called_once_with(
         project.id, "Sync failed: Sync failed"
     )
+    mock_failure_handler.assert_called_once_with(
+        project.id, "Sync failed: Sync failed"
+    )
 
 
 @pytest.mark.django_db
+@patch("aap_eda.tasks.project._handle_sync_failure_activations")
 @patch("aap_eda.tasks.project._get_project_safely")
 @patch("aap_eda.tasks.project.ProjectImportService")
 @patch("aap_eda.tasks.project._handle_project_error_recovery")
@@ -648,6 +674,7 @@ def test_sync_project_no_lock_database_error(
     mock_recovery,
     mock_service,
     mock_get_project,
+    mock_failure_handler,
     default_organization,
 ):
     """Test _sync_project_no_lock handles database errors."""
@@ -666,11 +693,15 @@ def test_sync_project_no_lock_database_error(
     mock_recovery.assert_called_once_with(
         project.id, "Database error during sync"
     )
+    mock_failure_handler.assert_called_once_with(
+        project.id, "Database error during sync"
+    )
     mock_logger.error.assert_called_once()
     assert mock_logger.error.call_args[1]["exc_info"] is True
 
 
 @pytest.mark.django_db
+@patch("aap_eda.tasks.project._handle_sync_failure_activations")
 @patch("aap_eda.tasks.project._get_project_safely")
 @patch("aap_eda.tasks.project.ProjectImportService")
 @patch("aap_eda.tasks.project._handle_project_error_recovery")
@@ -680,6 +711,7 @@ def test_sync_project_no_lock_unexpected_exception(
     mock_recovery,
     mock_service,
     mock_get_project,
+    mock_failure_handler,
     default_organization,
 ):
     """Test _sync_project_no_lock handles unexpected exceptions."""
@@ -698,6 +730,10 @@ def test_sync_project_no_lock_unexpected_exception(
     _sync_project_no_lock(project.id)
 
     mock_recovery.assert_called_once_with(
+        project.id,
+        "Unexpected error during sync: Something broke",
+    )
+    mock_failure_handler.assert_called_once_with(
         project.id,
         "Unexpected error during sync: Something broke",
     )
@@ -825,3 +861,863 @@ def test_handle_project_error_recovery_database_error(
     assert "Failed to reset project" in log_call[0][0]
     assert "project may be stuck" in log_call[0][0]
     assert log_call[1]["exc_info"] is True
+
+
+# ------------------------------------------------------------------
+# Post-sync activation handling tests
+# ------------------------------------------------------------------
+
+
+def _create_test_rulebook(project, organization, **kwargs):
+    """Helper to create a Rulebook with SHA256 auto-computed."""
+    defaults = {
+        "name": "test-rulebook",
+        "rulesets": "",
+        "project": project,
+        "organization": organization,
+    }
+    defaults.update(kwargs)
+    defaults["rulesets_sha256"] = get_rulebook_hash(defaults["rulesets"])
+    return models.Rulebook.objects.create(**defaults)
+
+
+def _create_test_activation(project, organization, rulebook, **kwargs):
+    """Helper to create test activations with defaults."""
+    rulesets = kwargs.get("rulebook_rulesets", rulebook.rulesets or "")
+    defaults = {
+        "name": f"test-activation-{project.id}",
+        "project": project,
+        "organization": organization,
+        "rulebook": rulebook,
+        "rulebook_name": rulebook.name,
+        "rulebook_rulesets": rulesets,
+        "rulebook_rulesets_sha256": get_rulebook_hash(rulesets),
+        "is_enabled": True,
+        "status": ActivationStatus.RUNNING,
+    }
+    defaults.update(kwargs)
+    return models.Activation.objects.create(**defaults)
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_activations_content_changed(
+    mock_restart,
+    default_organization,
+):
+    """Test auto-restart triggers when rulebook content changes."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="auto-restart-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+    )
+
+    _auto_restart_activations(project)
+
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.git_hash == "abc123"
+    mock_restart.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_skips_unchanged_content(
+    mock_restart,
+    default_organization,
+):
+    """Test auto-restart skips when content unchanged."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="same-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="no-restart-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="same-content",
+        git_hash="same-hash",
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.start_rulebook_process")
+def test_resume_waiting_activations_enable(
+    mock_start,
+    default_organization,
+):
+    """Test resume enables disabled activations waiting for sync."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="waiting-activation",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.STOPPED,
+    )
+
+    _resume_waiting_activations(project)
+
+    activation.refresh_from_db()
+    assert activation.is_enabled is True
+    assert activation.awaiting_project_sync is False
+    assert activation.status == ActivationStatus.PENDING
+    mock_start.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_resume_waiting_activations_restart(
+    mock_restart,
+    default_organization,
+):
+    """Test resume restarts enabled activations waiting for sync."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="restart-waiting",
+        is_enabled=True,
+        awaiting_project_sync=True,
+    )
+
+    _resume_waiting_activations(project)
+
+    activation.refresh_from_db()
+    assert activation.awaiting_project_sync is False
+    mock_restart.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_handle_sync_failure_sets_error(
+    default_organization,
+):
+    """Test sync failure sets ERROR on waiting activations."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="failing-activation",
+        awaiting_project_sync=True,
+    )
+
+    _handle_sync_failure_activations(project.id, "Sync failed: error")
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert "Sync failed" in activation.status_message
+    assert activation.awaiting_project_sync is False
+
+
+@pytest.mark.django_db
+def test_handle_sync_failure_ignores_non_waiting(
+    default_organization,
+):
+    """Test sync failure ignores activations not awaiting sync."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="not-waiting",
+        awaiting_project_sync=False,
+    )
+
+    _handle_sync_failure_activations(project.id, "Sync failed")
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.RUNNING
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_excludes_awaiting_sync(
+    mock_restart,
+    default_organization,
+):
+    """Auto-restart skips activations awaiting sync."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="both-flags",
+        restart_on_project_update=True,
+        awaiting_project_sync=True,
+        rulebook_rulesets="old-content",
+        git_hash="old-hash",
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project._handle_sync_failure_activations")
+@patch("aap_eda.tasks.project._get_project_safely")
+@patch("aap_eda.tasks.project.logger")
+def test_sync_project_no_lock_deleted_project_cleans_up(
+    mock_logger,
+    mock_get_project,
+    mock_failure_handler,
+):
+    """Deleted project clears waiting activations."""
+    mock_get_project.return_value = None
+
+    _sync_project_no_lock(999)
+
+    mock_failure_handler.assert_called_once_with(
+        999, "Project not found or deleted"
+    )
+
+
+@pytest.mark.django_db
+def test_recover_orphaned_awaiting_completed_project(
+    default_organization,
+):
+    """Recovery resumes activations when project completed."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        import_state=models.Project.ImportState.COMPLETED,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="orphaned-completed",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.PENDING,
+    )
+
+    with patch(
+        "aap_eda.tasks.project._resume_waiting_activations"
+    ) as mock_resume:
+        recovered = _recover_orphaned_awaiting_activations()
+
+    assert recovered == 1
+    mock_resume.assert_called_once_with(project)
+
+
+@pytest.mark.django_db
+def test_recover_orphaned_awaiting_failed_project(
+    default_organization,
+):
+    """Recovery sets ERROR when project failed."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        import_state=models.Project.ImportState.FAILED,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="orphaned-failed",
+        awaiting_project_sync=True,
+    )
+
+    recovered = _recover_orphaned_awaiting_activations()
+
+    assert recovered == 1
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert activation.awaiting_project_sync is False
+    assert "monitoring system" in activation.status_message
+
+
+@pytest.mark.django_db
+def test_recover_orphaned_skips_actively_syncing(
+    default_organization,
+):
+    """Recovery skips activations whose project is still syncing."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        import_state=models.Project.ImportState.RUNNING,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="still-syncing",
+        awaiting_project_sync=True,
+    )
+
+    recovered = _recover_orphaned_awaiting_activations()
+
+    assert recovered == 0
+
+
+# ------------------------------------------------------------------
+# Additional coverage: error paths and edge cases
+# ------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_restart_activation_failure_sets_error(
+    mock_restart,
+    default_organization,
+):
+    """Failed restart sets activation to ERROR status."""
+    mock_restart.side_effect = RuntimeError("worker down")
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="failing-restart",
+    )
+
+    _restart_activation(activation)
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert "Auto-restart failed" in activation.status_message
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_hash_only_change_no_restart(
+    mock_restart,
+    default_organization,
+):
+    """Hash-only change updates metadata but does not restart."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="hash-only",
+        restart_on_project_update=True,
+        rulebook_rulesets="same-content",
+        git_hash="old-hash",
+    )
+
+    _auto_restart_activations(project)
+
+    activation.refresh_from_db()
+    assert activation.git_hash == "new-hash"
+    assert activation.rulebook_rulesets == "same-content"
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.start_rulebook_process")
+def test_resume_multiple_activations_same_project(
+    mock_start,
+    default_organization,
+):
+    """Resume handles multiple waiting activations for one project."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    act1 = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="waiting-1",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.PENDING,
+    )
+    act2 = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="waiting-2",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.PENDING,
+    )
+
+    _resume_waiting_activations(project)
+
+    act1.refresh_from_db()
+    act2.refresh_from_db()
+    assert act1.is_enabled is True
+    assert act1.awaiting_project_sync is False
+    assert act2.is_enabled is True
+    assert act2.awaiting_project_sync is False
+    assert mock_start.call_count == 2
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.start_rulebook_process")
+def test_resume_start_failure_sets_error(
+    mock_start,
+    default_organization,
+):
+    """Resume sets ERROR when start_rulebook_process throws."""
+    mock_start.side_effect = RuntimeError("queue full")
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="resume-fails",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.PENDING,
+    )
+
+    _resume_waiting_activations(project)
+
+    activation.refresh_from_db()
+    assert activation.status == ActivationStatus.ERROR
+    assert activation.awaiting_project_sync is False
+    assert "Failed to start" in activation.status_message
+
+
+# ------------------------------------------------------------------
+# Coverage: error handling paths
+# ------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_needs_project_update_on_launch_no_project(
+    default_organization,
+):
+    """Property returns False when activation has no project."""
+    rulebook = _create_test_rulebook(
+        None, default_organization, rulesets="content"
+    )
+    activation = models.Activation.objects.create(
+        name="no-project",
+        rulebook=rulebook,
+        rulebook_name=rulebook.name,
+        rulebook_rulesets="content",
+        organization=default_organization,
+        project=None,
+    )
+    assert activation.needs_project_update_on_launch is False
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project._resume_waiting_activations")
+@patch("aap_eda.tasks.project._auto_restart_activations")
+def test_post_sync_isolates_auto_restart_failure(
+    mock_auto_restart,
+    mock_resume,
+    default_organization,
+):
+    """Resume still runs when auto-restart throws."""
+    mock_auto_restart.side_effect = RuntimeError("boom")
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+
+    _handle_post_sync_activations(project)
+
+    mock_auto_restart.assert_called_once()
+    mock_resume.assert_called_once_with(project)
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project._resume_waiting_activations")
+@patch("aap_eda.tasks.project._auto_restart_activations")
+def test_post_sync_handles_resume_failure(
+    mock_auto_restart,
+    mock_resume,
+    default_organization,
+):
+    """Post-sync logs error when resume throws."""
+    mock_resume.side_effect = RuntimeError("db down")
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+
+    _handle_post_sync_activations(project)
+
+    mock_auto_restart.assert_called_once()
+    mock_resume.assert_called_once()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_rulebook_deleted(
+    mock_restart,
+    default_organization,
+):
+    """Auto-restart handles deleted rulebook gracefully."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc",
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="content"
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="deleted-rb",
+        restart_on_project_update=True,
+    )
+    # Delete the rulebook after creating activation
+    rulebook.delete()
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_generic_exception(
+    mock_restart,
+    default_organization,
+):
+    """Auto-restart handles generic exception per activation."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc",
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="new"
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="error-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="old",
+    )
+    # Make Rulebook.objects.get raise unexpected error
+    with patch(
+        "aap_eda.tasks.project.models.Rulebook.objects.get",
+        side_effect=RuntimeError("unexpected"),
+    ):
+        _auto_restart_activations(project)
+
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_restart_activation_save_error_after_failure(
+    mock_restart,
+    default_organization,
+):
+    """Secondary save failure in _restart_activation is logged."""
+    mock_restart.side_effect = RuntimeError("worker down")
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="content"
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="double-fail",
+    )
+
+    with patch.object(
+        type(activation),
+        "save",
+        side_effect=RuntimeError("save failed"),
+    ):
+        _restart_activation(activation)
+
+    # Should not raise despite double failure
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_restart_activation_count_save_failure(
+    mock_restart,
+    default_organization,
+):
+    """Restart count save failure doesn't set ERROR."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="content"
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="count-fail",
+    )
+
+    original_save = activation.save
+
+    call_count = 0
+
+    def fail_on_second_save(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count > 1:
+            raise RuntimeError("count save failed")
+        original_save(**kwargs)
+
+    with patch.object(
+        type(activation), "save", side_effect=fail_on_second_save
+    ):
+        _restart_activation(activation)
+
+    # Restart succeeded, count save failed but no ERROR
+    mock_restart.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_update_activation_content_rulebook_deleted(
+    default_organization,
+):
+    """Content update handles deleted rulebook."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="content"
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="deleted-rb-resume",
+    )
+    rulebook.delete()
+
+    _update_activation_content(activation, project)
+
+    # git_hash updated, rulesets kept as-is
+    assert activation.git_hash == "new-hash"
+    assert activation.rulebook_rulesets == "content"
+
+
+@pytest.mark.django_db
+def test_handle_sync_failure_per_activation_error(
+    default_organization,
+):
+    """Sync failure handles per-activation save error."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="content"
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="save-error",
+        awaiting_project_sync=True,
+    )
+
+    with patch(
+        "aap_eda.tasks.project.models.Activation.objects.filter"
+    ) as mock_filter:
+        mock_qs = Mock()
+        mock_filter.return_value = mock_qs
+        mock_act = Mock()
+        mock_act.name = "save-error"
+        mock_act.save.side_effect = RuntimeError("save err")
+        mock_qs.__iter__ = Mock(return_value=iter([mock_act]))
+
+        _handle_sync_failure_activations(project.id, "sync failed")
+
+    # Should not raise
+
+
+@pytest.mark.django_db
+def test_handle_sync_failure_top_level_error(
+    default_organization,
+):
+    """Sync failure handles top-level query error."""
+    with patch(
+        "aap_eda.tasks.project.models.Activation.objects.filter",
+        side_effect=RuntimeError("db error"),
+    ):
+        _handle_sync_failure_activations(999, "sync failed")
+
+    # Should not raise
+
+
+@pytest.mark.django_db
+def test_recover_orphaned_exception_handling(
+    default_organization,
+):
+    """Recovery handles exception during activation fix."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        import_state=models.Project.ImportState.FAILED,
+    )
+    rulebook = _create_test_rulebook(
+        project, default_organization, rulesets="content"
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="recover-error",
+        awaiting_project_sync=True,
+    )
+
+    with patch.object(
+        models.Activation, "save", side_effect=RuntimeError("err")
+    ):
+        recovered = _recover_orphaned_awaiting_activations()
+
+    assert recovered == 0
+    activation.refresh_from_db()
+    # Still stuck because save failed
+    assert activation.awaiting_project_sync is True
