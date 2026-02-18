@@ -210,36 +210,40 @@ class Scheduler(rq_scheduler.Scheduler):
 
 
 def enable_redis_prefix():
-    # Add hash tags and escape for use in format() templates
-    redis_prefix = "{{" + settings.RQ_REDIS_PREFIX + "}}"
+    # Add hash tags for Redis Cluster mode to ensure all keys route to same slot.
+    # Single braces for direct string concatenation (worker, queue, etc.).
+    redis_prefix = "{" + settings.RQ_REDIS_PREFIX + "}"
+    # Double braces (escaped) for templates that call .format() later.
+    redis_prefix_escaped = "{{" + settings.RQ_REDIS_PREFIX + "}}"
 
     # Job.
     rq.job.Job.redis_job_namespace_prefix = f"{redis_prefix}:job:"
 
-    rq.registry.BaseRegistry.key_template = f"{redis_prefix}:registry:{0}"
+    # Registry templates use .format() so need escaped braces.
+    rq.registry.BaseRegistry.key_template = f"{redis_prefix_escaped}:registry:{{0}}"
     rq.registry.CanceledJobRegistry.key_template = (
-        f"{redis_prefix}:canceled:{0}"
+        f"{redis_prefix_escaped}:canceled:{{0}}"
     )
     rq.registry.DeferredJobRegistry.key_template = (
-        f"{redis_prefix}:deferred:{0}"
+        f"{redis_prefix_escaped}:deferred:{{0}}"
     )
-    rq.registry.FailedJobRegistry.key_template = f"{redis_prefix}:failed:{0}"
+    rq.registry.FailedJobRegistry.key_template = f"{redis_prefix_escaped}:failed:{{0}}"
     rq.registry.FinishedJobRegistry.key_template = (
-        f"{redis_prefix}:finished:{0}"
+        f"{redis_prefix_escaped}:finished:{{0}}"
     )
-    rq.registry.StartedJobRegistry.key_template = f"{redis_prefix}:wip:{0}"
+    rq.registry.StartedJobRegistry.key_template = f"{redis_prefix_escaped}:wip:{{0}}"
     rq.registry.ScheduledJobRegistry.key_template = (
-        f"{redis_prefix}:scheduled:{0}"
+        f"{redis_prefix_escaped}:scheduled:{{0}}"
     )
 
-    # PubSub.
+    # PubSub template uses % formatting, not .format(), so use single braces.
     rq.command.PUBSUB_CHANNEL_TEMPLATE = f"{redis_prefix}:pubsub:%s"
 
-    # Queue.
+    # Queue - direct concatenation, use single braces.
     rq.queue.Queue.redis_queue_namespace_prefix = f"{redis_prefix}:queue:"
     rq.queue.Queue.redis_queues_keys = f"{redis_prefix}:queues"
 
-    # Worker.
+    # Worker - direct concatenation, use single braces.
     # Although PUBSUB_CHANNEL_TEMPLATE is defined in rq.command (and we've
     # overridden it there for any new uses) rq.worker, which we've already
     # imported, imports it so we need to override that value as well.
@@ -250,7 +254,7 @@ def enable_redis_prefix():
     rq.worker_registration.WORKERS_BY_QUEUE_KEY = f"{redis_prefix}:workers:%s"
     rq.suspension.WORKERS_SUSPENDED = f"{redis_prefix}:suspended"
 
-    # Scheduler.
+    # Scheduler - direct concatenation, use single braces.
     Scheduler.redis_scheduler_namespace_prefix = (
         f"{redis_prefix}:scheduler_instance:"
     )
@@ -258,6 +262,7 @@ def enable_redis_prefix():
     Scheduler.scheduler_lock_key = f"{redis_prefix}:scheduler_lock"
     Scheduler.scheduled_jobs_key = f"{redis_prefix}:scheduler:scheduled_jobs"
 
+    # Results - direct concatenation, use single braces.
     def eda_get_key(job_id):
         return f"{redis_prefix}:results:{job_id}"
 
@@ -289,8 +294,9 @@ def enable_redis_prefix():
         property(execution_key_property),
     )
 
+    # ExecutionRegistry template uses .format() so needs escaped braces.
     rq_executions.ExecutionRegistry.key_template = (
-        f"{redis_prefix}:executions:{{0}}"
+        f"{redis_prefix_escaped}:executions:{{0}}"
     )
 
 
