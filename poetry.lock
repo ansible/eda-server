@@ -930,7 +930,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2.6.20260225"
+version = "26.2.17.0.dev1+gce28fb026"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.11"
@@ -971,7 +971,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "ssh://git@github.com/ansible-automation-platform/django-ansible-base.git"
 reference = "stable-2.6"
-resolved_reference = "04d35a75edd328a0d63c0fe1adf49ae0fe209377"
+resolved_reference = "ce28fb026635c131faca72bacb818ed8510c6bac"
 
 [[package]]
 name = "django-crum"
@@ -1062,18 +1062,6 @@ rq = ">=2.6.1"
 prometheus = ["prometheus-client (>=0.4.0)"]
 sentry = ["sentry-sdk (>=1.0.0)"]
 testing = ["pytest (>=7.0)", "pytest-django (>=4.5)"]
-
-[[package]]
-name = "django-split-settings"
-version = "1.2.0"
-description = "Organize Django settings into multiple files and directories. Easily override and modify settings. Use wildcards and optional settings files."
-optional = false
-python-versions = ">=3.7,<4.0"
-groups = ["main"]
-files = [
-    {file = "django-split-settings-1.2.0.tar.gz", hash = "sha256:31415a618256b54c5cee8662cbaa72a890683b8b7465d64ba88fdd3affdd6c60"},
-    {file = "django_split_settings-1.2.0-py3-none-any.whl", hash = "sha256:4b3be146776d49c61bd9dcf89fad40edb1544f13ab27a87a0b1aecf5a0d636f4"},
-]
 
 [[package]]
 name = "djangorestframework"
@@ -3572,4 +3560,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "9b86bb821650f202a908866229da652408f1bcc2747b81fbcce445a0f4c0df1c"
+content-hash = "0859cee25ba387689bfff6e5b2042b6f260064793cfd5b1a927ac1f0e792df1b"
