@@ -148,7 +148,7 @@ PODMAN_MOUNTS: Optional[list] = []
 PODMAN_EXTRA_ARGS: Optional[dict] = {}
 CONTAINER_NAME_PREFIX: str = "eda"
 
-RQ_REDIS_PREFIX: str = "eda-rq"
+RQ_REDIS_PREFIX: str = "{eda-rq}"
 MQ_UNIX_SOCKET_PATH: Optional[str] = None
 MQ_HOST: str = "localhost"
 MQ_PORT: int = 6379
