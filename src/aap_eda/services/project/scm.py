@@ -231,7 +231,10 @@ class ScmRepository:
         scheme = result.scheme
         path = result.path
 
-        if ssh_key and scheme == "" and path.startswith("git@"):
+        if ssh_key and (
+            (scheme == "" and path.startswith("git@"))
+            or scheme in ("ssh", "git+ssh")
+        ):
             return url
 
         if user and password:
