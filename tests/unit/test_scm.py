@@ -35,6 +35,19 @@ def credential(
 
 
 @pytest.fixture
+def ssh_credential(
+    default_organization: models.Organization,
+) -> models.EdaCredential:
+    credential = models.EdaCredential.objects.create(
+        name="test-ssh-credential",
+        inputs={"ssh_key_data": "-----BEGIN OPENSSH PRIVATE KEY-----\n"},
+        organization=default_organization,
+    )
+    credential.refresh_from_db()
+    return credential
+
+
+@pytest.fixture
 def reload_scm():
     yield
     importlib.reload(scm)
@@ -214,6 +227,18 @@ def test_git_rev_parse_head():
             ("ssh://demo:abc@git.example.com/repo.git", "", "", ""),
             "ssh://git.example.com/repo.git",
         ],
+        [
+            ("ssh://git@git.example.com/repo.git", "", "", "sshkey"),
+            "ssh://git@git.example.com/repo.git",
+        ],
+        [
+            ("ssh://git@git.example.com:2222/repo.git", "", "", "sshkey"),
+            "ssh://git@git.example.com:2222/repo.git",
+        ],
+        [
+            ("git+ssh://git@git.example.com/repo.git", "", "", "sshkey"),
+            "git+ssh://git@git.example.com/repo.git",
+        ],
     ],
 )
 def test_build_url(url_params):
@@ -232,3 +257,46 @@ def test_build_url(url_params):
 )
 def test_is_refspec_valid(ref: str, is_branch: bool, expected: bool):
     assert scm.is_refspec_valid(ref, is_branch) is expected
+
+
+# AAP-65460: SSH clone tests simulating real user project creation
+# These verify that when a user creates a project with an SSH URL
+# and a Source Control credential containing an SSH key, the
+# executor receives the original URL (not corrupted) and a key_file.
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "url",
+    [
+        "git@git.example.com:user/repo.git",
+        "ssh://git@git.example.com/ansible/homelab.git",
+        "ssh://git@git.example.com:2222/ansible/homelab.git",
+        "git+ssh://git@git.example.com/ansible/homelab.git",
+    ],
+    ids=[
+        "git-at-shorthand",
+        "ssh-scheme",
+        "ssh-scheme-custom-port",
+        "git-plus-ssh-scheme",
+    ],
+)
+def test_git_clone_ssh_key(ssh_credential: models.EdaCredential, url: str):
+    """Clone with SSH key preserves URL and passes key_file."""
+    executor = mock.MagicMock()
+    with tempfile.TemporaryDirectory() as dest_path:
+        scm.ScmRepository.clone(
+            url,
+            dest_path,
+            credential=ssh_credential,
+            depth=1,
+            _executor=executor,
+        )
+        executor.assert_called_once()
+        call_kwargs = executor.call_args
+        extra_vars = call_kwargs.kwargs["extra_vars"]
+
+        # URL must reach the executor unchanged
+        assert extra_vars["scm_url"] == url
+
+        # SSH key file must be provided
+        assert "key_file" in extra_vars
+        assert extra_vars["key_file"]  # non-empty path
