@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import os
 import random
 import uuid
 from collections import Counter
@@ -127,6 +128,26 @@ def _manage_no_lock(
         ActivationStatus.RUNNING,
         ActivationStatus.WORKERS_OFFLINE,
     ]:
+        try:
+            queue_name = get_queue_name_by_parent_id(process_parent_type, id)
+        except ValueError as exc:
+            LOGGER.warning(
+                f"Could not determine queue for "
+                f"{process_parent_type} {id}: {exc}",
+            )
+            queue_name = None
+
+        local_queue = os.environ.get(
+            "EDA_RULEBOOK_QUEUE_NAME", settings.RULEBOOK_QUEUE_NAME
+        )
+        if queue_name and queue_name != local_queue:
+            LOGGER.info(
+                f"Skipping monitor for {process_parent_type} {id}: "
+                f"container on queue {queue_name}, "
+                f"not local queue {local_queue}",
+            )
+            return
+
         assign_request_id(request_id)
         assign_log_tracking_id(process_parent.log_tracking_id)
         LOGGER.info(
