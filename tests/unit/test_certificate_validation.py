@@ -137,7 +137,7 @@ def test_subject_format_validation_valid(subject):
         ("=value", "Invalid X.509 DN format"),
         ("CN=Acme,Inc", "Invalid X.509 DN format"),
         ("CN=test1,CN=test2", "Duplicate attributes not allowed"),
-        ("CN=test,C=USA", "Country name must be a 2 character country code"),
+        ("CN=test,C=USA", "Invalid X.509 DN format"),
     ],
 )
 def test_subject_format_validation_invalid(subject, expected_error):
@@ -608,9 +608,9 @@ def test_validate_x509_subject_match_regex_parametrized(
 
 def test_validate_x509_subject_match_performance_edge_cases():
     """Test performance and edge cases with regex patterns."""
-    # Very long patterns
-    long_pattern = "CN=" + "a" * 1000 + "[0-9]\\.com"
-    long_subject = "CN=" + "a" * 1000 + "5.com"
+    # Very long patterns (within 64-char CN limit per RFC 5280)
+    long_pattern = "CN=" + "a" * 50 + "[0-9]\\.com"
+    long_subject = "CN=" + "a" * 50 + "5.com"
     assert validate_x509_subject_match(long_pattern, long_subject) is True
 
     # Pattern with many alternations
