@@ -2210,12 +2210,27 @@ class Command(BaseCommand):
         )
         _db_options = settings.DATABASES["default"].get("OPTIONS", {})
 
-        # Use dedicated event stream credentials only if both username
-        # and password are defined, otherwise use default DB credentials.
-        if settings.EVENT_STREAM_DB_USER and settings.EVENT_STREAM_DB_PASSWORD:
+        # use TLS certs if provided
+        use_event_stream_cert_auth = (
+            settings.EVENT_STREAM_DB_SSLCERT
+            and settings.EVENT_STREAM_DB_SSLKEY
+        )
+
+        if use_event_stream_cert_auth:
+            # certificate auth
+            db_user = (
+                settings.EVENT_STREAM_DB_USER
+                or settings.DATABASES["default"]["USER"]
+            )
+            db_password = ""
+        elif (
+            settings.EVENT_STREAM_DB_USER and settings.EVENT_STREAM_DB_PASSWORD
+        ):
+            # Password auth with dedicated user
             db_user = settings.EVENT_STREAM_DB_USER
             db_password = settings.EVENT_STREAM_DB_PASSWORD
         else:
+            # Fallback to default DB credentials
             db_user = settings.DATABASES["default"]["USER"]
             db_password = settings.DATABASES["default"]["PASSWORD"]
 
@@ -2225,23 +2240,26 @@ class Command(BaseCommand):
             "postgres_db_name": settings.DATABASES["default"]["NAME"],
             "postgres_db_user": db_user,
             "postgres_db_password": db_password,
-            "postgres_sslmode": _db_options.get("sslmode", "allow"),
+            "postgres_sslmode": settings.EVENT_STREAM_DB_SSLMODE
+            or _db_options.get("sslmode", "allow"),
             "postgres_sslcert": "",
             "postgres_sslkey": "",
             "postgres_sslrootcert": "",
         }
 
-        if _db_options.get("sslcert", ""):
+        # SSL certificate for event streams user
+        if use_event_stream_cert_auth:
+            # Use event stream-specific certificate
             inputs["postgres_sslcert"] = self._read_file(
-                _db_options["sslcert"],
-                "PGSSLCERT",
+                settings.EVENT_STREAM_DB_SSLCERT,
+                "EVENT_STREAM_DB_SSLCERT",
             )
-
-        if _db_options.get("sslkey", ""):
             inputs["postgres_sslkey"] = self._read_file(
-                _db_options["sslkey"], "PGSSLKEY"
+                settings.EVENT_STREAM_DB_SSLKEY,
+                "EVENT_STREAM_DB_SSLKEY",
             )
 
+        # Always include CA cert for server verification
         if _db_options.get("sslrootcert", ""):
             inputs["postgres_sslrootcert"] = self._read_file(
                 _db_options["sslrootcert"],

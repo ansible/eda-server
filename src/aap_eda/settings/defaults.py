@@ -216,6 +216,9 @@ MAX_PG_NOTIFY_MESSAGE_SIZE: int = 6144
 # Database credentials for the event streams user
 EVENT_STREAM_DB_USER: Optional[str] = None
 EVENT_STREAM_DB_PASSWORD: Optional[str] = None
+EVENT_STREAM_DB_SSLCERT: Optional[str] = None  # Path to client certificate
+EVENT_STREAM_DB_SSLKEY: Optional[str] = None  # Path to client private key
+EVENT_STREAM_DB_SSLMODE: Optional[str] = None  # SSL mode for event streams
 
 # --------------------------------------------------------
 # METRICS COLLECTIONS:

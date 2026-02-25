@@ -132,3 +132,123 @@ def test_create_initial_data_fixes_outdated_postgres_credential_type():
     # Verify inputs were replaced with current schema
     cred_type.refresh_from_db()
     assert cred_type.inputs == POSTGRES_CREDENTIAL_INPUTS
+
+
+@pytest.mark.django_db
+def test_create_initial_data_postgres_cred_with_event_stream_sslmode():
+    """Test that EVENT_STREAM_DB_SSLMODE overrides platform sslmode."""
+    db_settings = copy.deepcopy(settings.DATABASES)
+    db_settings["default"]["OPTIONS"]["sslmode"] = "prefer"
+
+    with override_settings(
+        DATABASES=db_settings,
+        EVENT_STREAM_DB_USER="eda_event_stream",
+        EVENT_STREAM_DB_PASSWORD="test_password",
+        EVENT_STREAM_DB_SSLMODE="verify-full",
+    ):
+        call_command("create_initial_data")
+        cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+        )
+
+        raw_inputs = (
+            cred.inputs.get_secret_value()
+            if isinstance(cred.inputs, SecretValue)
+            else cred.inputs
+        )
+        decoded_inputs = inputs_from_store(raw_inputs)
+
+        # Should use explicit event stream sslmode, not platform's
+        assert decoded_inputs["postgres_sslmode"] == "verify-full"
+
+
+@pytest.mark.django_db
+def test_create_initial_data_postgres_cred_with_event_stream_cert_auth():
+    """Test that event stream cert auth uses dedicated certificate."""
+    key_file = tempfile.NamedTemporaryFile()
+    with open(key_file.name, "w") as f:
+        f.write("Testing")
+
+    cert_file = tempfile.NamedTemporaryFile()
+    with open(cert_file.name, "w") as f:
+        f.write("Testing")
+
+    with override_settings(
+        EVENT_STREAM_DB_USER="eda_event_stream",
+        EVENT_STREAM_DB_SSLCERT=cert_file.name,
+        EVENT_STREAM_DB_SSLKEY=key_file.name,
+    ):
+        call_command("create_initial_data")
+        cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+        )
+        assert cred
+
+        raw_inputs = (
+            cred.inputs.get_secret_value()
+            if isinstance(cred.inputs, SecretValue)
+            else cred.inputs
+        )
+        decoded_inputs = inputs_from_store(raw_inputs)
+
+        # Should use event stream username
+        assert decoded_inputs["postgres_db_user"] == "eda_event_stream"
+        # Should have empty password for cert auth
+        assert decoded_inputs["postgres_db_password"] == ""
+        # Should include certificate content
+        assert "Testing" in decoded_inputs["postgres_sslcert"]
+        assert "Testing" in decoded_inputs["postgres_sslkey"]
+
+
+@pytest.mark.django_db
+def test_create_initial_data_postgres_cred_no_leak_platform_certs():
+    """Test platform cert/key are not included when using password auth."""
+    # Create temporary files for main DB cert/key
+    key_file = tempfile.NamedTemporaryFile()
+    with open(key_file.name, "w") as f:
+        f.write("Testing")
+
+    cert_file = tempfile.NamedTemporaryFile()
+    with open(cert_file.name, "w") as f:
+        f.write("Testing")
+
+    rootcert_file = tempfile.NamedTemporaryFile()
+    with open(rootcert_file.name, "w") as f:
+        f.write("Testing")
+
+    # Simulate main DB using cert auth, but event streams using password auth
+    db_settings = copy.deepcopy(settings.DATABASES)
+    db_settings["default"]["OPTIONS"] = {
+        "sslmode": "verify-full",
+        "sslcert": cert_file.name,
+        "sslkey": key_file.name,
+        "sslrootcert": rootcert_file.name,
+    }
+
+    with override_settings(
+        # No EVENT_STREAM_DB_SSLCERT/SSLKEY - using password auth
+        DATABASES=db_settings,
+        EVENT_STREAM_DB_USER="eda_event_stream",
+        EVENT_STREAM_DB_PASSWORD="test_password",
+    ):
+        call_command("create_initial_data")
+        cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME
+        )
+        assert cred
+
+        raw_inputs = (
+            cred.inputs.get_secret_value()
+            if isinstance(cred.inputs, SecretValue)
+            else cred.inputs
+        )
+        decoded_inputs = inputs_from_store(raw_inputs)
+
+        # Should NOT contain platform cert/key
+        assert decoded_inputs["postgres_sslcert"] == ""
+        assert decoded_inputs["postgres_sslkey"] == ""
+        # Should still have CA cert for server verification
+        assert "Testing" in decoded_inputs["postgres_sslrootcert"]
+        # Should use password auth credentials
+        assert decoded_inputs["postgres_db_user"] == "eda_event_stream"
+        assert decoded_inputs["postgres_db_password"] == "test_password"
