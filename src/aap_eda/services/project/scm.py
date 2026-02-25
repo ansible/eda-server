@@ -76,6 +76,41 @@ if GIT_COMMAND is None:
     raise ExecutableNotFoundError("Cannot find git executable")
 
 
+_PROXY_KEYS = (
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+)
+
+
+@contextlib.contextmanager
+def set_proxy_environ(proxy: Optional[str] = None):
+    """Temporarily set proxy environment variables for credential plugins.
+
+    Credential plugins (awx_plugins) read proxy settings from the
+    process environment.  This context manager injects proxy variables
+    before plugin execution and restores the originals afterward.
+
+    When *proxy* is falsy the context manager is a no-op.
+    """
+    if not proxy:
+        yield
+        return
+
+    saved = {k: os.environ.get(k) for k in _PROXY_KEYS}
+    try:
+        for key in _PROXY_KEYS:
+            os.environ[key] = proxy
+        yield
+    finally:
+        for key in _PROXY_KEYS:
+            if saved[key] is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = saved[key]
+
+
 class ScmRepository:
     """Represents a SCM repository."""
 
@@ -150,36 +185,37 @@ class ScmRepository:
         key_password = None
         gpg_key_file = None
         gpg_home_dir = None
-        if credential:
-            inputs = credentials.get_resolved_secrets(credential)
-            secret = inputs.get("password", "")
-            key_data = inputs.get("ssh_key_data", "")
+        with set_proxy_environ(proxy):
+            if credential:
+                inputs = credentials.get_resolved_secrets(credential)
+                secret = inputs.get("password", "")
+                key_data = inputs.get("ssh_key_data", "")
 
-            final_url = cls.build_url(
-                url,
-                inputs.get("username", ""),
-                secret,
-                key_data,
-            )
+                final_url = cls.build_url(
+                    url,
+                    inputs.get("username", ""),
+                    secret,
+                    key_data,
+                )
 
-            if key_data:  # ssh
-                key_file = tempfile.NamedTemporaryFile("w+t")
-                key_file.write(key_data)
-                key_file.write("\n")
-                key_file.flush()
-                extra_vars["key_file"] = key_file.name
-                key_password = inputs.get("ssh_key_unlock")
+                if key_data:  # ssh
+                    key_file = tempfile.NamedTemporaryFile("w+t")
+                    key_file.write(key_data)
+                    key_file.write("\n")
+                    key_file.flush()
+                    extra_vars["key_file"] = key_file.name
+                    key_password = inputs.get("ssh_key_unlock")
 
-        if gpg_credential:
-            gpg_inputs = credentials.get_resolved_secrets(gpg_credential)
-            gpg_key = gpg_inputs.get("gpg_public_key")
-            gpg_key_file = tempfile.NamedTemporaryFile("w+t")
-            gpg_key_file.write(gpg_key)
-            gpg_key_file.write("\n")
-            gpg_key_file.flush()
-            extra_vars["verify_commit"] = "true"
-            gpg_home_dir = tempfile.TemporaryDirectory()
-            env_vars["GNUPGHOME"] = gpg_home_dir.name
+            if gpg_credential:
+                gpg_inputs = credentials.get_resolved_secrets(gpg_credential)
+                gpg_key = gpg_inputs.get("gpg_public_key")
+                gpg_key_file = tempfile.NamedTemporaryFile("w+t")
+                gpg_key_file.write(gpg_key)
+                gpg_key_file.write("\n")
+                gpg_key_file.flush()
+                extra_vars["verify_commit"] = "true"
+                gpg_home_dir = tempfile.TemporaryDirectory()
+                env_vars["GNUPGHOME"] = gpg_home_dir.name
 
         if not verify_ssl:
             extra_vars["ssl_no_verify"] = "true"
