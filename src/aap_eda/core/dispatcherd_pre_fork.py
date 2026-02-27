@@ -27,6 +27,8 @@ hazmat.
 
 django.setup()
 
+import aap_eda.tasks.shared_resources  # noqa: E402, F401
+
 # connections may or may not be open, but
 # before forking, all connections should be closed
 
