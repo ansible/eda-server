@@ -21,6 +21,10 @@ jobs:
       github.event.issue.pull_request &&
       github.event.comment.body == '/run-ui-e2e'
     runs-on: ubuntu-latest
+    permissions:
+      deployments: write
+      pull-requests: read
+      issues: read
     outputs:
       pr_sha: ${{ steps.pr-info.outputs.sha }}
       pr_repo: ${{ steps.pr-info.outputs.repo }}
@@ -103,6 +107,9 @@ jobs:
       (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
       (needs.check-trigger.result == 'success')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     environment: ${{ github.event_name == 'issue_comment' && 'protected' || '' }}
     steps:
       - name: Update deployment to in_progress
