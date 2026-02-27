@@ -20,12 +20,13 @@ from django.db import connection
 
 This sets up Django pre-fork, which must be implemented as a module to run
 on-import for compatibility with multiprocessing forkserver.
-This should never be imported by other modules, which is why it is called
-hazmat.
+This should never be imported by other modules.
 """
 
 
 django.setup()
+
+import aap_eda.tasks.shared_resources  # noqa: E402, F401
 
 # connections may or may not be open, but
 # before forking, all connections should be closed
