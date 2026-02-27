@@ -20,8 +20,7 @@ from django.db import connection
 
 This sets up Django pre-fork, which must be implemented as a module to run
 on-import for compatibility with multiprocessing forkserver.
-This should never be imported by other modules, which is why it is called
-hazmat.
+This should never be imported by other modules.
 """
 
 
