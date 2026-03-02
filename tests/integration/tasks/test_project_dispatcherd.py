@@ -382,22 +382,29 @@ def test_monitor_project_tasks_internal_no_unfinished_projects(mock_logger):
     # No projects exist, so no unfinished ones
     project._monitor_project_tasks()
 
-    # Should log start and complete
-    assert mock_logger.info.call_count == 2
+    # Should log start, no stuck projects, and complete
+    assert mock_logger.info.call_count == 3
     start_call = mock_logger.info.call_args_list[0][0][0]
-    complete_call = mock_logger.info.call_args_list[1][0][0]
+    no_stuck_call = mock_logger.info.call_args_list[1][0][0]
+    complete_call = mock_logger.info.call_args_list[2][0][0]
 
     assert "Task started: Monitor project tasks" in start_call
+    assert "No stuck projects found" in no_stuck_call
     assert "Task complete: Monitor project tasks" in complete_call
 
 
 @pytest.mark.django_db
 @patch("aap_eda.tasks.project.logger")
-def test_monitor_project_tasks_internal_with_unfinished_projects(
+def test_monitor_project_tasks_internal_with_recent_unfinished_projects(
     mock_logger, default_organization
 ):
-    """Test _monitor_project_tasks with unfinished projects."""
-    # Create projects in transition states
+    """Test _monitor_project_tasks ignores recently created projects.
+
+    Projects in transition states (PENDING/RUNNING) that were recently
+    modified should not be recovered -- they may still be processing.
+    Only projects older than the timeout threshold are recovered.
+    """
+    # Create projects in transition states (recently modified)
     models.Project.objects.create(
         name="pending-project",
         url="https://github.com/test/pending.git",
@@ -419,14 +426,14 @@ def test_monitor_project_tasks_internal_with_unfinished_projects(
 
     project._monitor_project_tasks()
 
-    # Should log start, unfinished count, and complete
+    # Recently created projects are not recovered;
+    # should log start, no stuck projects, and complete
     assert mock_logger.info.call_count == 3
 
     start_call = mock_logger.info.call_args_list[0][0][0]
-    unfinished_call = mock_logger.info.call_args_list[1][0][0]
+    no_stuck_call = mock_logger.info.call_args_list[1][0][0]
     complete_call = mock_logger.info.call_args_list[2][0][0]
 
     assert "Task started: Monitor project tasks" in start_call
-    assert "Found 2 projects in transition states" in unfinished_call
-    assert "Dispatcherd handles task recovery" in unfinished_call
+    assert "No stuck projects found" in no_stuck_call
     assert "Task complete: Monitor project tasks" in complete_call

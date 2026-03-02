@@ -516,7 +516,9 @@ def projects_table(
 def rulebooks_table(
     since: datetime, full_path: str, until: datetime, **kwargs
 ) -> list[str]:
-    queryset = _get_query(models.Rulebook.objects, since, until)
+    queryset = _get_query(models.Rulebook.objects, since, until).defer(
+        "rulesets_sha256"
+    )
 
     return _copy_table("rulebooks", queryset, full_path)
 

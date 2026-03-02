@@ -72,22 +72,14 @@ def build_source_list(rulesets_data: str) -> list[dict]:
 
 def get_rulebook_hash(rulebook: str) -> str:
     """
-    Get the hash code of rulebook.
+    Get the SHA256 hash of rulebook content.
 
     Args:
-        rulebook: string format of rulebook
+        rulebook: string format of rulebook content
 
     Returns: the hexadecimal representation of the hash
-
-
     """
-    if isinstance(rulebook, str):
-        rulebook = rulebook.encode("utf-8")
-
-    sha256 = hashlib.sha256()
-    sha256.update(rulebook)
-
-    return sha256.hexdigest()
+    return hashlib.sha256((rulebook or "").encode("utf-8")).hexdigest()
 
 
 def swap_event_stream_sources(
