@@ -17,11 +17,7 @@ def generate_simple_audit_log(
 def get_organization_name_from_data(data):
     org_name = ""
     if data.data["organization_id"]:
-        org_name = (
-            models.Organization.objects.get(
-                pk=data.data["organization_id"]
-            ).name
-            if data.data["organization_id"]
-            else None
-        )
+        org_name = models.Organization.objects.get(
+            pk=data.data["organization_id"]
+        ).name
     return org_name
