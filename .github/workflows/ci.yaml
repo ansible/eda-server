@@ -35,7 +35,7 @@ jobs:
         uses: ./.github/actions/validate-openapi-spec
 
       - name: Upload spec artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openapi-spec
           path: openapi.json
