@@ -28,6 +28,7 @@ from aap_eda.api.serializers.activation import (
 )
 from aap_eda.api.serializers.project import ENCRYPTED_STRING
 from aap_eda.core import enums, models
+from aap_eda.core.utils.rulebook import get_rulebook_hash
 from tests.integration.constants import api_url_v1
 
 PROJECT_GIT_HASH = "684f62df18ce5f8d5c428e53203b9b975426eed0"
@@ -1294,3 +1295,402 @@ def test_copy_activation_invalid_body(
         f"{api_url_v1}/activations/{a_id}/copy/", data={"name": name}
     )
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# ------------------------------------------------------------------
+# Project sync dependency tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_enable_triggers_sync_when_project_needs_update(
+    mock_sync,
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable triggers sync when project needs update on launch."""
+    mock_sync.return_value = "task-uuid"
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is True
+    assert default_activation.status == enums.ActivationStatus.PENDING
+    mock_sync.assert_called_once_with(default_project.id)
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_enable_skips_sync_when_project_already_syncing(
+    mock_sync,
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable sets flag but skips sync_project when already running."""
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.import_state = models.Project.ImportState.RUNNING
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+            "import_state",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is True
+    mock_sync.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+def test_enable_proceeds_normally_without_sync(
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable returns 204 when project doesn't need sync."""
+    default_project.update_revision_on_launch = False
+    default_project.save(update_fields=["update_revision_on_launch"])
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is False
+    assert default_activation.is_enabled is True
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_restart_triggers_sync_when_project_needs_update(
+    mock_sync,
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Restart triggers sync when project needs update."""
+    mock_sync.return_value = "task-uuid"
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = True
+    default_activation.status = enums.ActivationStatus.RUNNING
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/restart/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is True
+    mock_sync.assert_called_once_with(default_project.id)
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_enable_sync_failure_resets_flag(
+    mock_sync,
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Enable resets flag and returns error when sync_project throws."""
+    mock_sync.side_effect = RuntimeError("dispatcherd down")
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is False
+    assert default_activation.status == (enums.ActivationStatus.ERROR)
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+@mock.patch("aap_eda.api.views.activation.sync_project")
+def test_disable_clears_awaiting_project_sync(
+    mock_sync,
+    mock_health,
+    default_activation: models.Activation,
+    default_project: models.Project,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Disable clears awaiting_project_sync flag."""
+    mock_sync.return_value = "task-uuid"
+    default_project.update_revision_on_launch = True
+    default_project.scm_update_cache_timeout = 0
+    default_project.save(
+        update_fields=[
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
+        ]
+    )
+    default_activation.is_enabled = False
+    default_activation.status = enums.ActivationStatus.STOPPED
+    default_activation.save(update_fields=["is_enabled", "status"])
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/enable/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    # Set is_enabled so disable logic runs
+    default_activation.refresh_from_db()
+    default_activation.is_enabled = True
+    default_activation.save(update_fields=["is_enabled"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/disable/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    default_activation.refresh_from_db()
+    assert default_activation.awaiting_project_sync is False
+    assert default_activation.is_enabled is False
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@mock.patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+)
+def test_destroy_clears_awaiting_project_sync(
+    mock_health,
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Destroy clears awaiting_project_sync flag."""
+    default_activation.awaiting_project_sync = True
+    default_activation.save(update_fields=["awaiting_project_sync"])
+
+    response = admin_client.delete(
+        f"{api_url_v1}/activations/" f"{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.django_db
+def test_activation_detail_shows_warning_on_rulebook_drift(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Warnings show when rulebook SHA256 drifts from activation."""
+    old_hash = get_rulebook_hash("old-content")
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = old_hash
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    # Simulate rulebook drift by updating the rulebook's SHA
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = get_rulebook_hash("new-content")
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["warnings"]) == 1
+    assert "source mappings" in response.data["warnings"][0]
+
+
+@pytest.mark.django_db
+def test_activation_detail_no_warning_when_hashes_match(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """No warnings when activation and rulebook SHA256 match."""
+    matching_hash = get_rulebook_hash("same-content")
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = matching_hash
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = matching_hash
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["warnings"] == []
+
+
+@pytest.mark.django_db
+def test_activation_detail_no_warning_without_source_mappings(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """No warnings when activation has no source_mappings."""
+    default_activation.source_mappings = ""
+    default_activation.rulebook_rulesets_sha256 = get_rulebook_hash(
+        "old-content"
+    )
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = get_rulebook_hash("new-content")
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["warnings"] == []
+
+
+@pytest.mark.django_db
+def test_list_activations_does_not_include_warnings(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """List endpoint does not include warnings field."""
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = get_rulebook_hash(
+        "old-content"
+    )
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+        ]
+    )
+
+    rulebook = default_activation.rulebook
+    rulebook.rulesets_sha256 = get_rulebook_hash("new-content")
+    rulebook.save(update_fields=["rulesets_sha256"])
+
+    response = admin_client.get(f"{api_url_v1}/activations/")
+    assert response.status_code == status.HTTP_200_OK
+    for result in response.data["results"]:
+        assert "warnings" not in result
+
+
+@pytest.mark.django_db
+def test_activation_detail_warning_on_deleted_rulebook(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Warning when rulebook is deleted but source_mappings exist."""
+    default_activation.source_mappings = "[{source: src1, event_stream: es1}]"
+    default_activation.rulebook_rulesets_sha256 = get_rulebook_hash(
+        "old-content"
+    )
+    default_activation.rulebook = None
+    default_activation.save(
+        update_fields=[
+            "source_mappings",
+            "rulebook_rulesets_sha256",
+            "rulebook",
+        ]
+    )
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["warnings"]) == 1
+    assert "no longer exists" in response.data["warnings"][0]

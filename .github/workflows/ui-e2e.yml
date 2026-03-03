@@ -21,6 +21,10 @@ jobs:
       github.event.issue.pull_request &&
       github.event.comment.body == '/run-ui-e2e'
     runs-on: ubuntu-latest
+    permissions:
+      deployments: write
+      pull-requests: read
+      issues: read
     outputs:
       pr_sha: ${{ steps.pr-info.outputs.sha }}
       pr_repo: ${{ steps.pr-info.outputs.repo }}
@@ -29,7 +33,7 @@ jobs:
     steps:
       - name: Check if commenter has write access
         id: check-permission
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -45,7 +49,7 @@ jobs:
 
       - name: Get PR info
         id: pr-info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -61,7 +65,7 @@ jobs:
 
       - name: Create deployment
         id: create-deployment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             try {
@@ -103,11 +107,14 @@ jobs:
       (github.repository == 'ansible/eda-server' && github.event_name == 'workflow_dispatch') ||
       (needs.check-trigger.result == 'success')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     environment: ${{ github.event_name == 'issue_comment' && 'protected' || '' }}
     steps:
       - name: Update deployment to in_progress
         if: github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
@@ -160,7 +167,7 @@ jobs:
 
       - name: Update deployment status
         if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';

@@ -279,6 +279,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "is_enabled",
             "status",
             "git_hash",
+            "restart_on_project_update",
             "extra_var",
             "decision_environment_id",
             "project_id",
@@ -341,6 +342,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "description",
             "is_enabled",
             "status",
+            "restart_on_project_update",
             "extra_var",
             "decision_environment_id",
             "project_id",
@@ -406,6 +408,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "rulebook_id": activation.rulebook_id,
             "extra_var": extra_var,
             "organization_id": activation.organization_id,
+            "restart_on_project_update": (
+                activation.restart_on_project_update
+            ),
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -441,6 +446,7 @@ class ActivationCreateSerializer(
             "name",
             "description",
             "is_enabled",
+            "restart_on_project_update",
             "decision_environment_id",
             "rulebook_id",
             "extra_var",
@@ -509,6 +515,9 @@ class ActivationCreateSerializer(
         validated_data["user_id"] = validated_data["user"].id
         validated_data["rulebook_name"] = rulebook.name
         validated_data["rulebook_rulesets"] = rulebook.rulesets
+        validated_data["rulebook_rulesets_sha256"] = get_rulebook_hash(
+            rulebook.rulesets
+        )
         validated_data["git_hash"] = rulebook.project.git_hash
         validated_data["project_id"] = rulebook.project.id
         validated_data["log_tracking_id"] = str(uuid.uuid4())
@@ -572,6 +581,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "skip_audit_events": activation.skip_audit_events,
             "rulebook_name": activation.rulebook.name,
             "rulebook_rulesets": activation.rulebook_rulesets,
+            "rulebook_rulesets_sha256": activation.rulebook_rulesets_sha256,
             "git_hash": activation.rulebook.project.git_hash,
             "project": activation.rulebook.project,
             "log_tracking_id": str(uuid.uuid4()),
@@ -602,6 +612,7 @@ class ActivationUpdateSerializer(
             "name",
             "description",
             "is_enabled",
+            "restart_on_project_update",
             "decision_environment_id",
             "rulebook_id",
             "extra_var",
@@ -687,6 +698,9 @@ class ActivationUpdateSerializer(
             rulebook = models.Rulebook.objects.get(id=rulebook_id)
             self.validated_data["rulebook_name"] = rulebook.name
             self.validated_data["rulebook_rulesets"] = rulebook.rulesets
+            self.validated_data[
+                "rulebook_rulesets_sha256"
+            ] = get_rulebook_hash(rulebook.rulesets)
             self.validated_data["git_hash"] = rulebook.project.git_hash
             self.validated_data["project_id"] = rulebook.project.id
 
@@ -701,9 +715,11 @@ class ActivationUpdateSerializer(
         if yaml.safe_load(self.validated_data.get("source_mappings", "")):
             if not rulebook_id:
                 # load the original ruleset
+                rulesets = activation.rulebook.rulesets
+                self.validated_data["rulebook_rulesets"] = rulesets
                 self.validated_data[
-                    "rulebook_rulesets"
-                ] = activation.rulebook.rulesets
+                    "rulebook_rulesets_sha256"
+                ] = get_rulebook_hash(rulesets)
 
             _update_event_streams_and_credential(self.validated_data)
         else:
@@ -875,6 +891,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "decision_environment",
             "status",
             "git_hash",
+            "restart_on_project_update",
             "project",
             "rulebook",
             "extra_var",
@@ -973,6 +990,28 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             else ""
         )
 
+        warnings = []
+        if activation.source_mappings:
+            if not activation.rulebook:
+                warnings.append(
+                    "The rulebook associated with this activation "
+                    "no longer exists. Source mappings may be "
+                    "invalid."
+                )
+            elif (
+                activation.rulebook_rulesets_sha256
+                and activation.rulebook.rulesets_sha256
+                and (
+                    activation.rulebook_rulesets_sha256
+                    != activation.rulebook.rulesets_sha256
+                )
+            ):
+                warnings.append(
+                    "Rulebook content has changed since event "
+                    "stream sources were mapped. Please update "
+                    "source mappings."
+                )
+
         return {
             "id": activation.id,
             "name": activation.name,
@@ -988,6 +1027,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "instances": ActivationInstanceSerializer(
                 activation_instances, many=True
             ).data,
+            "restart_on_project_update": (
+                activation.restart_on_project_update
+            ),
             "restart_policy": activation.restart_policy,
             "restart_count": activation.restart_count,
             "rulebook_name": activation.rulebook_name,
@@ -1006,6 +1048,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "k8s_service_name": activation.k8s_service_name,
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
+            "warnings": warnings,
             "skip_audit_events": activation.skip_audit_events,
             "log_tracking_id": activation.log_tracking_id,
             "created_by": BasicUserSerializer(activation.created_by).data,

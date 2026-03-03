@@ -408,6 +408,14 @@ def test_manage_monitor_called_with_no_requests(
         mock.patch(
             "aap_eda.tasks.orchestrator.assign_log_tracking_id"
         ) as mock_assign_log,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="activation",
+        ),
+        mock.patch.dict(
+            "os.environ",
+            {"EDA_RULEBOOK_QUEUE_NAME": "activation"},
+        ),
     ):
         mock_manager.return_value = manager_mock
         _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
@@ -607,3 +615,125 @@ def test_check_rulebook_queue_health_various_truthy_responses(
         mock_control.control_with_reply.return_value = response
         result = check_rulebook_queue_health("test_queue")
         assert result is True, f"Expected True for response: {response}"
+
+
+@pytest.mark.django_db
+def test_manage_monitor_skipped_on_wrong_queue(
+    process_parent, mock_get_parent, mock_requests_queue
+):
+    """Monitor should not run when activation is on a different node."""
+    mock_get_parent.return_value = process_parent
+    mock_requests_queue.peek_all.return_value = []
+    manager_mock = mock.Mock()
+
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="eda-other-node-queue",
+        ),
+        mock.patch.dict(
+            "os.environ",
+            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        ),
+    ):
+        mock_manager.return_value = manager_mock
+        _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
+
+    manager_mock.monitor.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_manage_monitor_runs_on_matching_queue(
+    process_parent, mock_get_parent, mock_requests_queue
+):
+    """Monitor should run when activation is on the local node."""
+    mock_get_parent.return_value = process_parent
+    mock_requests_queue.peek_all.return_value = []
+    manager_mock = mock.Mock()
+
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch("aap_eda.tasks.orchestrator.assign_request_id"),
+        mock.patch("aap_eda.tasks.orchestrator.assign_log_tracking_id"),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            return_value="eda-local-node-queue",
+        ),
+        mock.patch.dict(
+            "os.environ",
+            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        ),
+    ):
+        mock_manager.return_value = manager_mock
+        _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
+
+    manager_mock.monitor.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_manage_monitor_runs_when_no_queue_assigned(
+    process_parent, mock_get_parent, mock_requests_queue
+):
+    """Monitor runs when activation has no queue yet."""
+    mock_get_parent.return_value = process_parent
+    mock_requests_queue.peek_all.return_value = []
+    manager_mock = mock.Mock()
+
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch("aap_eda.tasks.orchestrator.assign_request_id"),
+        mock.patch("aap_eda.tasks.orchestrator.assign_log_tracking_id"),
+        mock.patch(
+            "aap_eda.tasks.orchestrator.get_queue_name_by_parent_id",
+            side_effect=ValueError("No queue"),
+        ),
+        mock.patch.dict(
+            "os.environ",
+            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        ),
+    ):
+        mock_manager.return_value = manager_mock
+        _manage(ProcessParentType.ACTIVATION, 1, "x_request_id")
+
+    manager_mock.monitor.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_manage_monitor_runs_when_queue_returns_none(
+    process_parent, mock_get_parent, mock_requests_queue
+):
+    """Monitor runs when queue lookup returns None."""
+    mock_get_parent.return_value = process_parent
+    mock_requests_queue.peek_all.return_value = []
+    manager_mock = mock.Mock()
+
+    with (
+        mock.patch(
+            "aap_eda.tasks.orchestrator.ActivationManager"
+        ) as mock_manager,
+        mock.patch("aap_eda.tasks.orchestrator.assign_request_id"),
+        mock.patch("aap_eda.tasks.orchestrator.assign_log_tracking_id"),
+        mock.patch(
+            "aap_eda.tasks.orchestrator" ".get_queue_name_by_parent_id",
+            return_value=None,
+        ),
+        mock.patch.dict(
+            "os.environ",
+            {"EDA_RULEBOOK_QUEUE_NAME": "eda-local-node-queue"},
+        ),
+    ):
+        mock_manager.return_value = manager_mock
+        _manage(
+            ProcessParentType.ACTIVATION,
+            1,
+            "x_request_id",
+        )
+
+    manager_mock.monitor.assert_called_once()

@@ -427,7 +427,11 @@ class ActivationManager(StatusManager):
             f"activation id: {self.db_instance.id}",
         )
         container_logger = self.container_logger_class(self.latest_instance.id)
-        msg = "Missing container for running activation."
+        msg = (
+            "Missing container for running activation."
+            " Pod id:"
+            f" {self.latest_instance.activation_pod_id or 'N/A'}"
+        )
         try:
             self._fail_instance(msg)
         except engine_exceptions.ContainerCleanupError as exc:
