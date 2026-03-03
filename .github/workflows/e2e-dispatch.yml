@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: Check if commenter has write access
         id: check-permission
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -56,7 +56,7 @@ jobs:
 
       - name: Get PR info
         id: pr-info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -72,7 +72,7 @@ jobs:
 
       - name: Create deployment
         id: create-deployment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             try {
@@ -121,7 +121,7 @@ jobs:
     steps:
       - name: Update deployment to in_progress
         if: github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.repos.createDeploymentStatus({
@@ -219,7 +219,7 @@ jobs:
 
       - name: Update deployment status
         if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
@@ -312,7 +312,7 @@ jobs:
 
       - name: Update deployment status
         if: always() && github.event_name == 'issue_comment' && needs.check-trigger.outputs.deployment_id != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const state = '${{ job.status }}' === 'success' ? 'success' : 'failure';
