@@ -31,7 +31,7 @@ jobs:
           echo "📌 EDA branch: $SOURCE_BRANCH → Spec repo branch: $SPEC_BRANCH"
 
       - name: Download spec artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: openapi-spec
 
