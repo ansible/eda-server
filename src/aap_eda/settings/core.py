@@ -42,6 +42,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
+    'ansible_base.lib.middleware.observability.ObservabilityMiddleware',
     "aap_eda.middleware.request_log_middleware.RequestLogMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -178,5 +179,18 @@ ANSIBLE_BASE_ROLE_PRECREATE = {}
 
 ANSIBLE_BASE_ALLOW_SINGLETON_USER_ROLES = True
 ANSIBLE_BASE_CHECK_RELATED_PERMISSIONS = ["view"]
+
+# Observability and Profiling Settings
+# Each feature can be independently enabled/disabled for safe production use
+# ANSIBLE_BASE_PROFILE_TIMING: Add X-API-Time header (minimal overhead, safe for prod)
+# ANSIBLE_BASE_PROFILE_NODE: Add X-API-Node header (may expose internal topology)
+# ANSIBLE_BASE_CPROFILE_REQUESTS: Generate cProfile files (high overhead, debug only)
+# ANSIBLE_BASE_SQL_PROFILING: Add SQL metrics + trace_id comments (moderate overhead)
+ANSIBLE_BASE_PROFILE_TIMING = False
+ANSIBLE_BASE_PROFILE_NODE = False
+ANSIBLE_BASE_CPROFILE_REQUESTS = False
+ANSIBLE_BASE_SQL_PROFILING = False
+# Directory where cProfile files are written (defaults to system temp directory if not set)
+ANSIBLE_BASE_CPROFILE_DIR = '/tmp'
 
 DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME = "_DEFAULT_EDA_PG_NOTIFY_CREDS"
