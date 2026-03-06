@@ -181,6 +181,8 @@ def queue_dispatch(
     process_parent_id: int,
     request_type: Optional[ActivationRequest],
     request_id: str = "",
+    result_ttl: Optional[int] = settings.DEFAULT_RESULT_TTL,
+    failure_ttl: Optional[int] = settings.DEFAULT_FAILURE_TTL,
 ):
     """Dispatch the request to the right queue.
 
@@ -362,6 +364,8 @@ def queue_dispatch(
         process_parent_type,
         process_parent_id,
         request_id,
+        result_ttl=result_ttl,
+        failure_ttl=failure_ttl,
     )
     LOGGER.info(
         f"_manage({job_id}) submitted to queue {queue_name} "

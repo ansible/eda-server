@@ -679,8 +679,15 @@ def enqueue_delay(
     Proxy for enqueue_delay_rq and enqueue_delay_dispatcherd.
     """
     if features.DISPATCHERD:
+        # Filter out RQ-specific TTL parameters that dispatcherd
+        # doesn't support
+        # These are job metadata parameters, not function arguments
+        rq_ttl_params = {"result_ttl", "failure_ttl"}
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items() if k not in rq_ttl_params
+        }
         return enqueue_delay_dispatcherd(
-            queue_name, job_id, delay, *args, **kwargs
+            queue_name, job_id, delay, *args, **filtered_kwargs
         )
     return enqueue_delay_rq(queue_name, job_id, delay, *args, **kwargs)
 
@@ -712,7 +719,16 @@ def unique_enqueue(
     dispatcherd we just enqueue the job.
     """
     if features.DISPATCHERD:
-        return enqueue_job_dispatcherd(queue_name, job_id, *args, **kwargs)
+        # Filter out RQ-specific TTL parameters that dispatcherd
+        # doesn't support
+        # These are job metadata parameters, not function arguments
+        rq_ttl_params = {"result_ttl", "failure_ttl"}
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items() if k not in rq_ttl_params
+        }
+        return enqueue_job_dispatcherd(
+            queue_name, job_id, *args, **filtered_kwargs
+        )
     return unique_enqueue_rq(queue_name, job_id, *args, **kwargs)
 
 

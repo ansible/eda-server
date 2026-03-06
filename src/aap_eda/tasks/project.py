@@ -53,9 +53,18 @@ def import_project_dispatcherd(project_id: int) -> str:
 
 
 @tasking.redis_connect_retry()
-def import_project_rq(project_id: int) -> str:
+def import_project_rq(
+    project_id: int,
+    result_ttl: tp.Optional[int] = settings.DEFAULT_RESULT_TTL,
+    failure_ttl: tp.Optional[int] = settings.DEFAULT_FAILURE_TTL,
+) -> str:
     queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
-    return queue.enqueue(_import_project, project_id=project_id).id
+    return queue.enqueue(
+        _import_project,
+        project_id=project_id,
+        result_ttl=result_ttl,
+        failure_ttl=failure_ttl,
+    ).id
 
 
 def _import_project(project_id: int):
@@ -108,9 +117,18 @@ def sync_project_dispatcherd(project_id: int) -> str:
 
 
 @tasking.redis_connect_retry()
-def sync_project_rq(project_id: int) -> str:
+def sync_project_rq(
+    project_id: int,
+    result_ttl: tp.Optional[int] = settings.DEFAULT_RESULT_TTL,
+    failure_ttl: tp.Optional[int] = settings.DEFAULT_FAILURE_TTL,
+) -> str:
     queue = django_rq.get_queue(name=PROJECT_TASKS_QUEUE)
-    return queue.enqueue(_sync_project, project_id=project_id).id
+    return queue.enqueue(
+        _sync_project,
+        project_id=project_id,
+        result_ttl=result_ttl,
+        failure_ttl=failure_ttl,
+    ).id
 
 
 def _sync_project(project_id: int):
