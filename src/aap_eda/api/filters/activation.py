@@ -34,9 +34,15 @@ class ActivationFilter(django_filters.FilterSet):
         label="Filter by Decision Environment ID.",
     )
 
+    project_id = django_filters.NumberFilter(
+        field_name="project_id",
+        lookup_expr="exact",
+        label="Filter by project id",
+    )
+
     class Meta:
         model = models.Activation
-        fields = ["name", "status", "decision_environment_id"]
+        fields = ["name", "status", "decision_environment_id", "project_id"]
 
 
 class ActivationInstanceFilter(django_filters.FilterSet):

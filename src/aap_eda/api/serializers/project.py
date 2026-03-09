@@ -388,6 +388,8 @@ class ProjectRefSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "organization_id",
+            "update_revision_on_launch",
+            "scm_update_cache_timeout",
         ]
         read_only_fields = ["id"]
 
