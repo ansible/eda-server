@@ -140,7 +140,7 @@ jobs:
           ref: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_sha || github.sha }}
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.QUAY_USER }}
@@ -250,7 +250,7 @@ jobs:
           ref: ${{ github.event_name == 'issue_comment' && needs.check-trigger.outputs.pr_sha || github.sha }}
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.QUAY_USER }}
