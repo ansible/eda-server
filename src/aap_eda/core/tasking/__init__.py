@@ -29,6 +29,10 @@ from rq import (
     group as rq_group,
     results as rq_results,
 )
+from rq.exceptions import AbandonedJobError
+from rq.job import JobStatus
+from rq.registry import FailedJobRegistry, StartedJobRegistry
+from rq.utils import current_timestamp
 
 from aap_eda import utils
 from aap_eda.settings import (
@@ -305,6 +309,180 @@ def enable_redis_prefix():
 
 
 enable_redis_prefix()
+
+
+# ============================================================================
+# Redis Cluster Compatibility Fixes
+# ============================================================================
+# Redis Cluster has limitations compared to standalone Redis:
+# 1. Multi-key operations in pipelines fail (e.g., delete(key1, key2, key3))
+# 2. WATCH command is not implemented
+#
+# We apply two fixes:
+# - ClusterSafePipeline: Wraps pipeline to split multi-key deletes
+# - StartedJobRegistry.cleanup: Pass pipeline to skip WATCH calls
+# ============================================================================
+
+
+# Fix #1: Wrapper for Redis Cluster pipeline to handle multi-key operations
+# Redis Cluster doesn't support operations on multiple keys in pipelines
+class ClusterSafePipeline:
+    """Wrapper that intercepts multi-key operations and splits them."""
+
+    def __init__(self, pipeline):
+        self._pipeline = pipeline
+
+    def delete(self, *keys):
+        """Override delete to handle multiple keys individually."""
+        if len(keys) > 1:
+            # Split multi-key delete into individual deletes
+            for key in keys:
+                self._pipeline.delete(key)
+            return self
+        else:
+            return self._pipeline.delete(*keys)
+
+    def __getattr__(self, name):
+        """Proxy all other methods to the underlying pipeline."""
+        return getattr(self._pipeline, name)
+
+    def __enter__(self):
+        self._pipeline.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._pipeline.__exit__(exc_type, exc_val, exc_tb)
+
+
+# Patch DABRedisCluster.pipeline() to return our wrapper
+try:
+    _original_get_pipeline = DABRedisCluster.pipeline
+
+    def _get_cluster_safe_pipeline(self, transaction=True, shard_hint=None):
+        """Return a cluster-safe pipeline wrapper.
+
+        Note: transaction parameter is ignored - Redis Cluster doesn't support
+        transactions, so we always use transaction=False.
+        """
+        original_pipeline = _original_get_pipeline(
+            self, transaction=False, shard_hint=shard_hint
+        )
+        return ClusterSafePipeline(original_pipeline)
+
+    DABRedisCluster.pipeline = _get_cluster_safe_pipeline
+except (NameError, AttributeError):
+    # DABRedisCluster not available or doesn't have pipeline method
+    pass
+
+
+# Fix #2: StartedJobRegistry.cleanup() for Redis Cluster
+# Redis Cluster doesn't support WATCH, but enqueue_dependents() tries to use it
+# when called without a pipeline parameter. By passing pipeline=pipeline to
+# enqueue_dependents(), we skip the WATCH call (see line ~403 for the key fix).
+def _redis_cluster_safe_cleanup(self, timestamp=None, exception_handlers=None):
+    """Redis Cluster compatible version of StartedJobRegistry.cleanup()."""
+    score = timestamp if timestamp is not None else current_timestamp()
+    job_ids = self.get_expired_job_ids(score)
+
+    if job_ids:
+        queue = self.get_queue()
+        jobs_to_enqueue_dependents = []
+
+        with self.connection.pipeline() as pipeline:
+            for job_id in job_ids:
+                try:
+                    job = self.job_class.fetch(
+                        job_id,
+                        connection=self.connection,
+                        serializer=self.serializer,
+                    )
+                except Exception:
+                    continue
+
+                job.execute_failure_callback(
+                    self.death_penalty_class,
+                    AbandonedJobError,
+                    AbandonedJobError(),
+                    None,
+                )
+
+                if exception_handlers:
+                    for handler in exception_handlers:
+                        fallthrough = handler(
+                            job, AbandonedJobError, AbandonedJobError(), None
+                        )
+                        if fallthrough is None:
+                            fallthrough = True
+                        if not fallthrough:
+                            break
+
+                retry = job.retries_left and job.retries_left > 0
+
+                if retry:
+                    job.retry(queue, pipeline)
+                else:
+                    exc_string = (
+                        f"Moved to {FailedJobRegistry.__name__}, "
+                        f"due to {AbandonedJobError.__name__}, "
+                        f"at {datetime.now()}"
+                    )
+                    logger.warning(
+                        "%s cleanup: %s %s",
+                        self.__class__.__name__,
+                        job.id,
+                        exc_string,
+                    )
+                    job.set_status(JobStatus.FAILED, pipeline=pipeline)
+                    job._handle_failure(exc_string, pipeline, worker_name="")
+
+                    # Defer enqueue_dependents until after pipeline executes
+                    # (can't read from pipeline context)
+                    jobs_to_enqueue_dependents.append(job)
+
+            pipeline.zremrangebyscore(self.key, 0, score)
+            pipeline.execute()
+
+        # Enqueue dependents after pipeline - Redis Cluster doesn't support
+        # WATCH, so we manually enqueue without WATCH
+        for job in jobs_to_enqueue_dependents:
+            try:
+                queue.enqueue_dependents(job, refresh_job_status=False)
+            except redis.exceptions.RedisClusterException as e:
+                # WATCH not supported - manually enqueue dependents
+                if "watch()" in str(e).lower():
+                    logger.debug(
+                        "Manually enqueuing dependents for %s "
+                        "(WATCH not supported in Redis Cluster)",
+                        job.id,
+                    )
+                    # Manually read and enqueue dependents without WATCH
+                    dependents_key = job.dependents_key
+                    dependent_ids = self.connection.smembers(dependents_key)
+                    for dependent_id in dependent_ids:
+                        try:
+                            dependent = self.job_class.fetch(
+                                dependent_id.decode("utf-8")
+                                if isinstance(dependent_id, bytes)
+                                else dependent_id,
+                                connection=self.connection,
+                                serializer=self.serializer,
+                            )
+                            queue.enqueue_job(
+                                dependent, pipeline=None, at_front=False
+                            )
+                            self.connection.delete(dependents_key)
+                        except Exception as dep_err:
+                            logger.warning(
+                                "Failed to enqueue dependent %s: %s",
+                                dependent_id,
+                                dep_err,
+                            )
+                else:
+                    raise
+
+
+# Apply the StartedJobRegistry.cleanup fix
+rq.registry.StartedJobRegistry.cleanup = _redis_cluster_safe_cleanup
 
 
 class SerializerProtocol(typing.Protocol):
