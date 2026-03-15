@@ -1,0 +1,35 @@
+---
+- name: Check {{ env_type }} connection
+  block:
+    - k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: default
+        name: ansible-check-pod
+        kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+      register: k8s_info_result
+  rescue:
+    - fail:
+        msg: "Failed to connect to Kubernetes cluster. Please check your configuration and try again."
+  always:
+    - debug:
+        var: k8s_info_result
+
+- name: Create {{ awx_namespace }} namespace
+  k8s:
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ awx_namespace }}"
+  when: k8s_info_result is succeeded
+
+- name: Generate AWX Operator kustomization file
+  template:
+    src: kustomization-awx-operator.yaml.j2
+    dest: "{{ awx_operator_files_path }}/kustomization.yaml"
+
+- name: Apply AWX Operator kustomization file
+  k8s:
+    definition: "{{ lookup('pipe', 'kustomize build {{ awx_operator_files_path }}') }}"
+    state: present
