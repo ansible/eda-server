@@ -193,7 +193,7 @@ ALLOW_SHARED_RESOURCE_CUSTOM_ROLES: bool = False
 # DJANGO ANSIBLE BASE RESOURCE API CLIENT
 # --------------------------------------------------------
 
-RESOURCE_SERVER__URL: Optional[str] = "https://localhost"
+RESOURCE_SERVER__URL: Optional[str] = None
 RESOURCE_SERVER__SECRET_KEY: Optional[str] = ""
 RESOURCE_SERVER__VALIDATE_HTTPS: bool = False
 RESOURCE_JWT_USER_ID: Optional[str] = None
