@@ -330,6 +330,167 @@ def test_create_decision_environment_with_empty_credential(
         assert status_message in str(errors)
 
 
+@pytest.mark.django_db
+def test_create_de_with_external_credential_password(
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Credentials whose password is provided by an external credential
+    input source (e.g. HashiCorp Vault) should be accepted when
+    attaching to a Decision Environment."""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    registry_credential = models.EdaCredential.objects.create(
+        name="registry-external-password",
+        description="Registry credential with external password",
+        credential_type=registry_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "registry.com",
+                "username": "testuser",
+                "verify_ssl": True,
+            }
+        ),
+        organization=default_organization,
+    )
+    hashi_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+    hashi_credential = models.EdaCredential.objects.create(
+        name="hashi-vault-source",
+        description="HashiCorp Vault credential",
+        credential_type=hashi_credential_type,
+        inputs=inputs_to_store(
+            {
+                "url": "https://vault.example.com",
+                "token": "dummy-token",
+                "api_version": "v2",
+            }
+        ),
+        organization=default_organization,
+    )
+    models.CredentialInputSource.objects.create(
+        source_credential=hashi_credential,
+        target_credential=registry_credential,
+        input_field_name="password",
+        organization=default_organization,
+        metadata={"secret_path": "secret/data/registry", "secret_key": "pass"},
+    )
+
+    data_in = {
+        "name": "de-external-cred",
+        "description": "DE with externally-sourced credential",
+        "image_url": "registry.com/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": registry_credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_patch_de_with_external_credential_password(
+    default_decision_environment: models.DecisionEnvironment,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Updating a DE to use a credential whose password is provided by
+    an external credential input source should succeed."""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    registry_credential = models.EdaCredential.objects.create(
+        name="registry-external-password",
+        description="Registry credential with external password",
+        credential_type=registry_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "quay.io",
+                "username": "testuser",
+                "verify_ssl": True,
+            }
+        ),
+        organization=default_organization,
+    )
+    hashi_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+    hashi_credential = models.EdaCredential.objects.create(
+        name="hashi-vault-source",
+        description="HashiCorp Vault credential",
+        credential_type=hashi_credential_type,
+        inputs=inputs_to_store(
+            {
+                "url": "https://vault.example.com",
+                "token": "dummy-token",
+                "api_version": "v2",
+            }
+        ),
+        organization=default_organization,
+    )
+    models.CredentialInputSource.objects.create(
+        source_credential=hashi_credential,
+        target_credential=registry_credential,
+        input_field_name="password",
+        organization=default_organization,
+        metadata={"secret_path": "secret/data/registry", "secret_key": "pass"},
+    )
+
+    data = {"eda_credential_id": registry_credential.id}
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_create_de_rejects_credential_without_password_or_source(
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """A credential with no password in inputs AND no external input
+    source for the password field should still be rejected."""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    registry_credential = models.EdaCredential.objects.create(
+        name="registry-no-password",
+        description="Registry credential without any password",
+        credential_type=registry_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "registry.com",
+                "username": "testuser",
+                "verify_ssl": True,
+            }
+        ),
+        organization=default_organization,
+    )
+
+    data_in = {
+        "name": "de-no-password",
+        "description": "DE with credential missing password",
+        "image_url": "registry.com/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": registry_credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Need username and password or just token in credential" in str(
+        response.data
+    )
+
+
 de_requests = [
     (
         True,
@@ -458,7 +619,7 @@ def test_patch_decision_environment_with_no_credential(
         "organization_id": default_organization.id,
     }
     response = admin_client.patch(
-        f"{api_url_v1}/decision-environments/" f"{response.data['id']}/",
+        f"{api_url_v1}/decision-environments/{response.data['id']}/",
         data=data_in,
     )
     return_code = status.HTTP_400_BAD_REQUEST
