@@ -53,7 +53,7 @@ class ActivationViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Activation.objects.all()
+    queryset = models.Activation.objects.select_related("project").all()
     filter_backends = (defaultfilters.DjangoFilterBackend,)
     filterset_class = filters.ActivationFilter
 

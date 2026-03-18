@@ -333,6 +333,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
     created_by = BasicUserFieldSerializer()
     modified_by = BasicUserFieldSerializer()
     edited_by = BasicUserFieldSerializer()
+    project = ProjectRefSerializer(required=False, allow_null=True)
 
     class Meta:
         model = models.Activation
@@ -345,6 +346,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "restart_on_project_update",
             "extra_var",
             "decision_environment_id",
+            "project",
             "project_id",
             "rulebook_id",
             "organization_id",
@@ -404,6 +406,11 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "is_enabled": activation.is_enabled,
             "status": activation.status,
             "decision_environment_id": activation.decision_environment_id,
+            "project": (
+                ProjectRefSerializer(activation.project).data
+                if activation.project
+                else None
+            ),
             "project_id": activation.project_id,
             "rulebook_id": activation.rulebook_id,
             "extra_var": extra_var,
