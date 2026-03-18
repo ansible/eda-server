@@ -12,12 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import importlib
+import os
 import tempfile
 from unittest import mock
 
 import pytest
 
 from aap_eda.core import models
+from aap_eda.core.utils import credentials
 from aap_eda.services.project import scm
 
 
@@ -107,6 +109,51 @@ def test_git_clone(credential: models.EdaCredential):
         )
         assert isinstance(repository, scm.ScmRepository)
         assert repository.root == dest_path
+
+
+@pytest.mark.django_db
+def test_git_clone_sets_proxy_env_during_credential_resolution(
+    credential: models.EdaCredential,
+):
+    """Proxy env vars are set while resolving external credentials."""
+    executor = mock.MagicMock()
+    captured_env = {}
+
+    original_get = credentials.get_resolved_secrets
+
+    def spy_get(obj):
+        captured_env.update(
+            {
+                k: os.environ.get(k)
+                for k in (
+                    "http_proxy",
+                    "https_proxy",
+                    "HTTP_PROXY",
+                    "HTTPS_PROXY",
+                )
+            }
+        )
+        return original_get(obj)
+
+    with mock.patch(
+        "aap_eda.services.project.scm.credentials.get_resolved_secrets",
+        side_effect=spy_get,
+    ):
+        with tempfile.TemporaryDirectory() as dest_path:
+            scm.ScmRepository.clone(
+                "https://git.example.com/repo.git",
+                dest_path,
+                credential=credential,
+                proxy="http://myproxy:3128",
+                _executor=executor,
+            )
+
+    assert captured_env["http_proxy"] == "http://myproxy:3128"
+    assert captured_env["HTTPS_PROXY"] == "http://myproxy:3128"
+
+    # Env vars should be cleaned up after the with block
+    for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        assert os.environ.get(key) is None
 
 
 @pytest.mark.django_db
