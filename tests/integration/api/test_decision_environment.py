@@ -330,6 +330,88 @@ def test_create_decision_environment_with_empty_credential(
         assert status_message in str(errors)
 
 
+@pytest.mark.django_db
+def test_create_de_with_external_credential_password(
+    registry_credential_with_external_password: models.EdaCredential,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+):
+    """Credentials whose password is provided by an external credential
+    input source (e.g. HashiCorp Vault) should be accepted when
+    attaching to a Decision Environment."""
+    data_in = {
+        "name": "de-external-cred",
+        "description": "DE with externally-sourced credential",
+        "image_url": "quay.io/ansible/ansible-rulebook:latest",
+        "organization_id": default_organization.id,
+        "eda_credential_id": registry_credential_with_external_password.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_patch_de_with_external_credential_password(
+    registry_credential_with_external_password: models.EdaCredential,
+    default_decision_environment: models.DecisionEnvironment,
+    admin_client: APIClient,
+):
+    """Updating a DE to use a credential whose password is provided by
+    an external credential input source should succeed."""
+    data = {
+        "eda_credential_id": registry_credential_with_external_password.id,
+    }
+    response = admin_client.patch(
+        f"{api_url_v1}/decision-environments/"
+        f"{default_decision_environment.id}/",
+        data=data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_create_de_rejects_credential_without_password_or_source(
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """A credential with no password in inputs AND no external input
+    source for the password field should still be rejected."""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    registry_credential = models.EdaCredential.objects.create(
+        name="registry-no-password",
+        description="Registry credential without any password",
+        credential_type=registry_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "registry.com",
+                "username": "testuser",
+                "verify_ssl": True,
+            }
+        ),
+        organization=default_organization,
+    )
+
+    data_in = {
+        "name": "de-no-password",
+        "description": "DE with credential missing password",
+        "image_url": "registry.com/img1:tag1",
+        "organization_id": default_organization.id,
+        "eda_credential_id": registry_credential.id,
+    }
+    response = admin_client.post(
+        f"{api_url_v1}/decision-environments/", data=data_in
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Need username and password or just token in credential" in str(
+        response.data
+    )
+
+
 de_requests = [
     (
         True,
@@ -458,7 +540,7 @@ def test_patch_decision_environment_with_no_credential(
         "organization_id": default_organization.id,
     }
     response = admin_client.patch(
-        f"{api_url_v1}/decision-environments/" f"{response.data['id']}/",
+        f"{api_url_v1}/decision-environments/{response.data['id']}/",
         data=data_in,
     )
     return_code = status.HTTP_400_BAD_REQUEST

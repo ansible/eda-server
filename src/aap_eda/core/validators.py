@@ -56,8 +56,7 @@ def check_if_de_exists(decision_environment_id: int) -> int:
     ).exists():
         return decision_environment_id
     raise serializers.ValidationError(
-        f"DecisionEnvironment with id {decision_environment_id} "
-        "does not exist"
+        f"DecisionEnvironment with id {decision_environment_id} does not exist"
     )
 
 
@@ -360,9 +359,13 @@ def check_credential_registry_username_password(
     inputs = yaml.safe_load(credential.inputs.get_secret_value())
     password = inputs.get("password", "")
     if not password:
-        raise serializers.ValidationError(
-            "Need username and password or just token in credential"
-        )
+        has_external_password = credential.input_sources.filter(
+            input_field_name="password"
+        ).exists()
+        if not has_external_password:
+            raise serializers.ValidationError(
+                "Need username and password or just token in credential"
+            )
     return eda_credential_id
 
 
