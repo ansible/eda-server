@@ -342,7 +342,7 @@ def test_create_de_with_external_credential_password(
     data_in = {
         "name": "de-external-cred",
         "description": "DE with externally-sourced credential",
-        "image_url": "registry.com/img1:tag1",
+        "image_url": "quay.io/ansible/ansible-rulebook:latest",
         "organization_id": default_organization.id,
         "eda_credential_id": registry_credential_with_external_password.id,
     }

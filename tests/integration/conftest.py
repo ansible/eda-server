@@ -1217,7 +1217,7 @@ def registry_credential_with_external_password(
         credential_type=registry_credential_type,
         inputs=inputs_to_store(
             {
-                "host": "registry.com",
+                "host": "quay.io",
                 "username": "testuser",
                 "verify_ssl": True,
             }
