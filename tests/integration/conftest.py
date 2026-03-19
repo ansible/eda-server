@@ -1202,6 +1202,55 @@ def activation_payload_skip_audit_events(activation_payload: dict) -> dict:
 
 
 @pytest.fixture
+def registry_credential_with_external_password(
+    default_organization: models.Organization,
+    preseed_credential_types,
+) -> models.EdaCredential:
+    """Registry credential whose password is supplied by an external
+    HashiCorp Vault input source (no password in inputs)."""
+    registry_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+    registry_credential = models.EdaCredential.objects.create(
+        name="registry-external-password",
+        description="Registry credential with external password",
+        credential_type=registry_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "registry.com",
+                "username": "testuser",
+                "verify_ssl": True,
+            }
+        ),
+        organization=default_organization,
+    )
+    hashi_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
+    )
+    hashi_credential = models.EdaCredential.objects.create(
+        name="hashi-vault-source",
+        description="HashiCorp Vault credential",
+        credential_type=hashi_credential_type,
+        inputs=inputs_to_store(
+            {
+                "url": "https://vault.example.com",
+                "token": "dummy-token",
+                "api_version": "v2",
+            }
+        ),
+        organization=default_organization,
+    )
+    models.CredentialInputSource.objects.create(
+        source_credential=hashi_credential,
+        target_credential=registry_credential,
+        input_field_name="password",
+        organization=default_organization,
+        metadata={"secret_path": "secret/data/registry", "secret_key": "pass"},
+    )
+    return registry_credential
+
+
+@pytest.fixture
 def default_credential_input_source(
     default_organization: models.Organization,
     preseed_credential_types,

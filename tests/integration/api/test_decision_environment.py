@@ -332,59 +332,19 @@ def test_create_decision_environment_with_empty_credential(
 
 @pytest.mark.django_db
 def test_create_de_with_external_credential_password(
+    registry_credential_with_external_password: models.EdaCredential,
     default_organization: models.Organization,
     admin_client: APIClient,
-    preseed_credential_types,
 ):
     """Credentials whose password is provided by an external credential
     input source (e.g. HashiCorp Vault) should be accepted when
     attaching to a Decision Environment."""
-    registry_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.REGISTRY
-    )
-    registry_credential = models.EdaCredential.objects.create(
-        name="registry-external-password",
-        description="Registry credential with external password",
-        credential_type=registry_credential_type,
-        inputs=inputs_to_store(
-            {
-                "host": "registry.com",
-                "username": "testuser",
-                "verify_ssl": True,
-            }
-        ),
-        organization=default_organization,
-    )
-    hashi_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
-    )
-    hashi_credential = models.EdaCredential.objects.create(
-        name="hashi-vault-source",
-        description="HashiCorp Vault credential",
-        credential_type=hashi_credential_type,
-        inputs=inputs_to_store(
-            {
-                "url": "https://vault.example.com",
-                "token": "dummy-token",
-                "api_version": "v2",
-            }
-        ),
-        organization=default_organization,
-    )
-    models.CredentialInputSource.objects.create(
-        source_credential=hashi_credential,
-        target_credential=registry_credential,
-        input_field_name="password",
-        organization=default_organization,
-        metadata={"secret_path": "secret/data/registry", "secret_key": "pass"},
-    )
-
     data_in = {
         "name": "de-external-cred",
         "description": "DE with externally-sourced credential",
         "image_url": "registry.com/img1:tag1",
         "organization_id": default_organization.id,
-        "eda_credential_id": registry_credential.id,
+        "eda_credential_id": registry_credential_with_external_password.id,
     }
     response = admin_client.post(
         f"{api_url_v1}/decision-environments/", data=data_in
@@ -394,54 +354,15 @@ def test_create_de_with_external_credential_password(
 
 @pytest.mark.django_db
 def test_patch_de_with_external_credential_password(
+    registry_credential_with_external_password: models.EdaCredential,
     default_decision_environment: models.DecisionEnvironment,
-    default_organization: models.Organization,
     admin_client: APIClient,
-    preseed_credential_types,
 ):
     """Updating a DE to use a credential whose password is provided by
     an external credential input source should succeed."""
-    registry_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.REGISTRY
-    )
-    registry_credential = models.EdaCredential.objects.create(
-        name="registry-external-password",
-        description="Registry credential with external password",
-        credential_type=registry_credential_type,
-        inputs=inputs_to_store(
-            {
-                "host": "quay.io",
-                "username": "testuser",
-                "verify_ssl": True,
-            }
-        ),
-        organization=default_organization,
-    )
-    hashi_credential_type = models.CredentialType.objects.get(
-        name=enums.DefaultCredentialType.HASHICORP_LOOKUP
-    )
-    hashi_credential = models.EdaCredential.objects.create(
-        name="hashi-vault-source",
-        description="HashiCorp Vault credential",
-        credential_type=hashi_credential_type,
-        inputs=inputs_to_store(
-            {
-                "url": "https://vault.example.com",
-                "token": "dummy-token",
-                "api_version": "v2",
-            }
-        ),
-        organization=default_organization,
-    )
-    models.CredentialInputSource.objects.create(
-        source_credential=hashi_credential,
-        target_credential=registry_credential,
-        input_field_name="password",
-        organization=default_organization,
-        metadata={"secret_path": "secret/data/registry", "secret_key": "pass"},
-    )
-
-    data = {"eda_credential_id": registry_credential.id}
+    data = {
+        "eda_credential_id": registry_credential_with_external_password.id,
+    }
     response = admin_client.patch(
         f"{api_url_v1}/decision-environments/"
         f"{default_decision_environment.id}/",
