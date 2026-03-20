@@ -52,6 +52,13 @@ LABEL_PATH_TO_AUTH = "Path to Auth"
 LABEL_CLIENT_CERTIFICATE = "Client Certificate"
 LABEL_CLIENT_SECRET = "Client Secret"
 LABEL_CLIENT_ID = "Client ID"
+LABEL_POSTGRES_DB_HOST = "Postgres DB Host"
+LABEL_POSTGRES_DB_PORT = "Postgres DB Port"
+LABEL_POSTGRES_SSL_MODE = "Postgres SSL Mode"
+LABEL_POSTGRES_SSL_CERTIFICATE = "Postgres SSL Certificate"
+LABEL_POSTGRES_SSL_ROOT_CERTIFICATE = "Postgres SSL Root Certificate"
+LABEL_POSTGRES_SSL_KEY = "Postgres SSL Key"
+LABEL_POSTGRES_SSL_PASSWORD = "Postgres SSL Password"
 # FIXME(cutwater): Role descriptions were taken from the RBAC design document
 #  and must be updated.
 ORG_ROLES = [
@@ -878,15 +885,15 @@ POSTGRES_CREDENTIAL_INPUTS = {
     "fields": [
         {
             "id": "postgres_db_host",
-            "label": "Postgres DB Host",
+            "label": LABEL_POSTGRES_DB_HOST,
             "type": "string",
             "help_text": "Postgres DB Server",
         },
         {
             "id": "postgres_db_port",
-            "label": "Postgres DB Port",
+            "label": LABEL_POSTGRES_DB_PORT,
             "type": "string",
-            "help_text": "Postgres DB Port",
+            "help_text": LABEL_POSTGRES_DB_PORT,
             "default": "5432",
         },
         {
@@ -910,9 +917,9 @@ POSTGRES_CREDENTIAL_INPUTS = {
         },
         {
             "id": "postgres_sslmode",
-            "label": "Postgres SSL Mode",
+            "label": LABEL_POSTGRES_SSL_MODE,
             "type": "string",
-            "help_text": "Postgres SSL Mode",
+            "help_text": LABEL_POSTGRES_SSL_MODE,
             "choices": [
                 "disable",
                 "allow",
@@ -925,24 +932,24 @@ POSTGRES_CREDENTIAL_INPUTS = {
         },
         {
             "id": "postgres_sslcert",
-            "label": "Postgres SSL Certificate",
+            "label": LABEL_POSTGRES_SSL_CERTIFICATE,
             "type": "string",
-            "help_text": "Postgres SSL Certificate",
+            "help_text": LABEL_POSTGRES_SSL_CERTIFICATE,
             "multiline": True,
             "default": "",
         },
         {
             "id": "postgres_sslkey",
-            "label": "Postgres SSL Key",
+            "label": LABEL_POSTGRES_SSL_KEY,
             "type": "string",
-            "help_text": "Postgres SSL Key",
+            "help_text": LABEL_POSTGRES_SSL_KEY,
             "multiline": True,
             "secret": True,
             "default": "",
         },
         {
             "id": "postgres_sslpassword",
-            "label": "Postgres SSL Password",
+            "label": LABEL_POSTGRES_SSL_PASSWORD,
             "type": "string",
             "help_text": "Postgres SSL Password for key",
             "secret": True,
@@ -950,9 +957,9 @@ POSTGRES_CREDENTIAL_INPUTS = {
         },
         {
             "id": "postgres_sslrootcert",
-            "label": "Postgres SSL Root Certificate",
+            "label": LABEL_POSTGRES_SSL_ROOT_CERTIFICATE,
             "type": "string",
-            "help_text": "Postgres SSL Root Certificate",
+            "help_text": LABEL_POSTGRES_SSL_ROOT_CERTIFICATE,
             "multiline": True,
             "default": "",
         },
@@ -1820,6 +1827,210 @@ EVENT_STREAM_MTLS_INPUTS = {
     "required": ["auth_type", "http_header_key"],
 }
 
+EDA_RULE_ENGINE_CREDENTIAL_INPUTS = {
+    "fields": [
+        {
+            "id": "postgres_db_host",
+            "type": "string",
+            "label": LABEL_POSTGRES_DB_HOST,
+            "help_text": "Postgres DB Server",
+        },
+        {
+            "id": "postgres_db_port",
+            "type": "string",
+            "label": LABEL_POSTGRES_DB_PORT,
+            "default": "5432",
+            "help_text": LABEL_POSTGRES_DB_PORT,
+        },
+        {
+            "id": "postgres_db_name",
+            "type": "string",
+            "label": "Postgres DB Name",
+            "help_text": "Postgres Database name",
+        },
+        {
+            "id": "postgres_db_user",
+            "type": "string",
+            "label": "Postgres DB User",
+            "help_text": "Postgres Database user",
+        },
+        {
+            "id": "postgres_db_password",
+            "type": "string",
+            "label": "Postgres DB Password",
+            "secret": True,
+            "help_text": "Postgres Database password",
+        },
+        {
+            "id": "postgres_sslmode",
+            "type": "string",
+            "label": LABEL_POSTGRES_SSL_MODE,
+            "choices": [
+                "disable",
+                "allow",
+                "prefer",
+                "require",
+                "verify-ca",
+                "verify-full",
+            ],
+            "default": "prefer",
+            "help_text": LABEL_POSTGRES_SSL_MODE,
+        },
+        {
+            "id": "postgres_sslcert",
+            "type": "string",
+            "label": LABEL_POSTGRES_SSL_CERTIFICATE,
+            "default": "",
+            "help_text": LABEL_POSTGRES_SSL_CERTIFICATE,
+            "multiline": True,
+        },
+        {
+            "id": "postgres_sslkey",
+            "type": "string",
+            "label": LABEL_POSTGRES_SSL_KEY,
+            "secret": True,
+            "default": "",
+            "help_text": LABEL_POSTGRES_SSL_KEY,
+            "multiline": True,
+        },
+        {
+            "id": "postgres_sslpassword",
+            "type": "string",
+            "label": LABEL_POSTGRES_SSL_PASSWORD,
+            "secret": True,
+            "default": "",
+            "help_text": "Postgres SSL Password for key",
+        },
+        {
+            "id": "postgres_sslrootcert",
+            "type": "string",
+            "label": LABEL_POSTGRES_SSL_ROOT_CERTIFICATE,
+            "default": "",
+            "help_text": LABEL_POSTGRES_SSL_ROOT_CERTIFICATE,
+            "multiline": True,
+        },
+        {
+            "id": "primary_encryption_secret",
+            "type": "string",
+            "label": "Primary Encryption Secret",
+            "format": "aes_key",
+            "secret": True,
+            "help_text": (
+                "Used to derive AES keys for database encryption "
+                "(note: may impact performance). Warning: Only the "
+                "derived key is stored in our system; You must remember "
+                "your original secret. If lost, an Activation reset is "
+                "required. For key rotations, enter your new secret here "
+                "and re-enter your previous secret into the Secondary "
+                "Encryption Secret field to maintain access to historical "
+                "events. "
+                "Must be atleast 12 characters."
+            ),
+        },
+        {
+            "id": "secondary_encryption_secret",
+            "type": "string",
+            "label": "Secondary Encryption Secret",
+            "format": "aes_key",
+            "secret": True,
+            "help_text": (
+                "This field is used during key rotation to maintain access "
+                "to legacy data. When updating your Primary Encryption "
+                "Secret, you must manually re-enter your previous secret "
+                "here. This allows the system to decrypt historical records "
+                "while using the new string for future events. If left blank, "
+                "the system assumes no rotation has occurred. "
+                "Must be atleast 12 characters."
+            ),
+        },
+        {
+            "id": "aes_salt",
+            "type": "string",
+            "label": "Salt",
+            "format": "aes_salt",
+            "hidden": True,
+            "secret": True,
+            "help_text": (
+                "To ensure cryptographic uniqueness, a random 32-byte salt is "
+                "generated at the time of credential creation. This prevents "
+                "identical input strings from producing the same AES key "
+                "across different credentials. This field is managed "
+                "automatically by the backend and remains hidden from the "
+                "user interface."
+            ),
+        },
+        {
+            "id": "expired_window_grace_period",
+            "type": "string",
+            "label": "Recovery Grace Period",
+            "help_text": (
+                "Specifies an additional time window in seconds to process "
+                "events that expired while the system was offline. If the "
+                "process restarts after a crash, this grace period is "
+                "appended to the original window to allow for the ingestion"
+                "of delayed data. If set to zero, events outside the "
+                "original window will be dropped  immediately upon restart."
+            ),
+        },
+        {
+            "id": "deduplication_window_size",
+            "type": "string",
+            "label": "Duplicate Check History",
+            "help_text": (
+                "Defines how many unique event IDs the system remembers to "
+                "prevent re-processing. Once the limit is reached, the oldest "
+                "IDs are removed to make room for new ones. Default is 5"
+            ),
+            "default": "5",
+        },
+        {
+            "id": "overwrite_if_rulebook_changes",
+            "type": "boolean",
+            "label": "Reset State on Rulebook Change",
+            "help_text": (
+                "When enabled (default), the system clears existing state "
+                "data to ensure compatibility with the new rulebook. If "
+                "disabled, old state data is preserved but may become "
+                "stagnant or cause errors if the new rules do not support it."
+            ),
+            "default": True,
+        },
+    ],
+    "required": ["postgres_db_host", "postgres_db_name"],
+}
+
+EDA_RULE_ENGINE_CREDENTIAL_INJECTORS = {
+    "file": {
+        "template.drools_sslkey": "{{ postgres_sslkey }}",
+        "template.drools_sslcert": "{{ postgres_sslcert }}",
+        "template.drools_sslrootcert": "{{ postgres_sslrootcert }}",
+    },
+    "extra_vars": {
+        "drools_db_host": "{{ postgres_db_host }}",
+        "drools_db_name": "{{ postgres_db_name }}",
+        "drools_db_port": "{{ postgres_db_port }}",
+        "drools_db_user": "{{ postgres_db_user }}",
+        "drools_sslmode": "{{ postgres_sslmode }}",
+        "drools_db_password": "{{ postgres_db_password }}",
+        "drools_sslpassword": "{{ postgres_sslpassword | default(None) }}",
+        "drools_primary_encryption_secret": (
+            "{{ primary_encryption_secret | default(None)}}"
+        ),
+        "drools_secondary_encryption_secret": (
+            "{{ secondary_encryption_secret | default(None)}}"
+        ),
+        "drools_expired_window_grace_period": (
+            "{{ expired_window_grace_period | default(0) }}"
+        ),
+        "drools_overwrite_if_rulebook_changes": (
+            "{{ overwrite_if_rulebook_changes | default(true) }}"
+        ),
+        "drools_deduplication_window_size": (
+            "{{ deduplication_window_size | default(5) }}"
+        ),
+    },
+}
+
 CREDENTIAL_TYPES = [
     {
         "name": enums.DefaultCredentialType.SOURCE_CONTROL,
@@ -2116,6 +2327,19 @@ CREDENTIAL_TYPES = [
             "be transferred to the Gateway proxy for validation "
             "of incoming requests. We can optionally validate the "
             "Subject defined in the inbound Certificate."
+        ),
+    },
+    {
+        "name": enums.DefaultCredentialType.EDA_RULE_ENGINE,
+        "kind": "cloud",
+        "namespace": "drools",
+        "inputs": EDA_RULE_ENGINE_CREDENTIAL_INPUTS,
+        "injectors": EDA_RULE_ENGINE_CREDENTIAL_INJECTORS,
+        "managed": True,
+        "description": (
+            "Credential for EDA Rule Engine persistence. "
+            "This uses the Postgres DB Credential along "
+            "with other settings for the Rule Engine."
         ),
     },
 ]

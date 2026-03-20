@@ -121,6 +121,79 @@ EXTERNAL_CREDENTIAL_INPUT = {
     "required": ["host", "secret_backend"],
 }
 
+AES_INPUT = {
+    "fields": [
+        {
+            "id": "primary_key",
+            "label": "Primary Key",
+            "type": "string",
+            "help_text": ("Primary AES Encryption String"),
+            "format": "aes_key",
+            "secret": True,
+            "default": "",
+        },
+        {
+            "id": "secondary_key",
+            "label": "Secondary Key",
+            "type": "string",
+            "help_text": ("Secondary AES Encryption String"),
+            "format": "aes_key",
+            "secret": True,
+            "default": "",
+        },
+        {
+            "id": "aes_salt",
+            "label": "AES Salt",
+            "type": "string",
+            "help_text": ("Auto AES Salt"),
+            "hidden": True,
+            "format": "aes_salt",
+            "secret": True,
+            "default": "",
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+    ],
+}
+
+INVALID_AES_INPUT = {
+    "fields": [
+        {
+            "id": "primary_key",
+            "label": "Primary Key",
+            "type": "string",
+            "help_text": ("Primary AES Encryption String"),
+            "format": "aes_key",
+            "secret": True,
+            "default": "",
+        },
+        {
+            "id": "secondary_key",
+            "label": "Secondary Key",
+            "type": "string",
+            "help_text": ("Secondary AES Encryption String"),
+            "format": "aes_key",
+            "secret": True,
+            "default": "",
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+    ],
+}
+
+INVALID_FORMAT_INPUT = {
+    "fields": [
+        {
+            "id": "primary_key",
+            "label": "Primary Key",
+            "type": "string",
+            "help_text": ("Primary AES Encryption String"),
+            "format": "unknown",
+            "secret": True,
+            "default": "",
+        },
+        {"id": "username", "label": "Username", "type": "string"},
+    ],
+}
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
@@ -146,6 +219,15 @@ EXTERNAL_CREDENTIAL_INPUT = {
                     "username": "adam",
                     "password": "password",
                     "verify_ssl": False,
+                }
+            },
+        ),
+        (
+            AES_INPUT,
+            {
+                "extra_vars": {
+                    "drools_primary_key": "localhost",
+                    "drools_secondary_key": "adam",
                 }
             },
         ),
@@ -301,6 +383,25 @@ def test_create_credential_type_sans_type(superuser_client: APIClient):
             (
                 "Extra vars key 'ansible' cannot be one of "
                 "these reserved keys 'ansible, eda'"
+            ),
+        ),
+        (
+            INVALID_AES_INPUT,
+            {},
+            "inputs",
+            (
+                "When using format aes_key you need another field "
+                "with format aes_salt to store the salt"
+            ),
+        ),
+        (
+            INVALID_FORMAT_INPUT,
+            {},
+            "inputs",
+            (
+                "invalid format: unknown for field primary_key "
+                "must be one of aes_key aes_salt binary_base64 "
+                "pem_certificate ssh_private_key url vault_id"
             ),
         ),
     ],
