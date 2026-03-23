@@ -181,7 +181,6 @@ class EdaCredentialViewSet(
     def partial_update(self, request, pk):
         eda_credential = self.get_object()
         data = request.data
-
         data["inputs"] = inputs_to_store_dict(
             data.get("inputs", {}), eda_credential.inputs
         )
@@ -371,7 +370,9 @@ class EdaCredentialViewSet(
 
     def _create_eda_credential(self, request, data):
         """Create a new credential object given payload data."""
-        serializer = serializers.EdaCredentialCreateSerializer(data=data)
+        serializer = serializers.EdaCredentialCreateSerializer(
+            data=data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.validated_data["inputs"] = inputs_to_store(
             serializer.validated_data["inputs"]

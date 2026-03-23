@@ -12,7 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import base64
+import hashlib
 import re
+import secrets
 import tempfile
 import typing
 from datetime import datetime, timezone
@@ -50,8 +53,23 @@ SUPPORTED_KEYS_IN_INJECTORS = {"env", "extra_vars", "file"}
 PROTECTED_PASSPHRASE_ERROR = (
     "The key is passphrase protected, please provide passphrase."
 )
+AES_SALT_ERROR = (
+    "When using format aes_key you need another field "
+    "with format aes_salt to store the salt"
+)
 
 RESERVED_EXTRA_VAR_KEYS = {"ansible", "eda"}
+VALID_FIELD_FORMATS = {
+    "aes_key",
+    "aes_salt",
+    "binary_base64",
+    "pem_certificate",
+    "ssh_private_key",
+    "url",
+    "vault_id",
+}
+OWASP_ITERATION_RECOMMENDATION = 600000
+MINIMUM_AES_SECRET_LEN = 12
 
 
 class InjectorMissingKeyException(Exception):
@@ -117,6 +135,7 @@ def validate_inputs(
     schema: dict,
     inputs: dict,
     section: str = "fields",
+    old_inputs: Optional[dict] = None,
 ) -> dict:
     """Validate user inputs against credential schema.
 
@@ -129,6 +148,9 @@ def validate_inputs(
 
     Return an empty dict if no error.
     """
+    if old_inputs is None:
+        old_inputs = {}
+
     errors = {}
     required_fields = set(schema.get("required", []))
 
@@ -157,6 +179,16 @@ def validate_inputs(
         )
 
         return errors
+
+    # AES salt is auto-generated on credential creation if not present
+    aes_salt = None
+    aes_salt_field = _get_aes_salt_field(schema)
+    if aes_salt_field:
+        # Reuse existing salt or generate new 64-char hex string (32 bytes)
+        if old_inputs and aes_salt_field in old_inputs:
+            aes_salt = old_inputs[aes_salt_field]
+        else:
+            aes_salt = secrets.token_hex(32)
 
     for data in section_fields:
         field = data["id"]
@@ -187,7 +219,6 @@ def validate_inputs(
                 if required and len(user_input.strip()) == 0:
                     errors[display_field] = ["Cannot be blank"]
                     continue
-
         if data.get("format") and user_input:
             result = _validate_format(
                 schema=schema,
@@ -236,6 +267,17 @@ def validate_inputs(
         if choices and user_input and user_input not in choices:
             errors[display_field] = [f"Must be one of the choices: {choices}"]
             continue
+
+        if data.get("format") == "aes_salt" and aes_salt is not None:
+            inputs[field] = aes_salt
+
+        if data.get("format") == "aes_key" and inputs.get(field):
+            if aes_salt is None:
+                errors[display_field] = [AES_SALT_ERROR]
+            else:
+                # If this is update preserve the old values
+                if old_inputs.get(field) != inputs.get(field):
+                    inputs[field] = _get_aes_key(inputs[field], aes_salt)
 
     return errors
 
@@ -286,6 +328,7 @@ def validate_schema(schema: dict) -> list[str]:
                     "underscore characters"
                 )
 
+        formats_found = []
         for field in fields:
             for option in ["id", "label"]:
                 value = field.get(option)
@@ -320,6 +363,23 @@ def validate_schema(schema: dict) -> list[str]:
                         f"default for field '{field.get('id')}' "
                         "must be a string or boolean"
                     )
+
+            field_format = field.get("format")
+            if field_format:
+                # Only validate format if it's a string (non-string types
+                # are caught by the validation above)
+                if isinstance(field_format, str):
+                    formats_found.append(field_format)
+                    if field_format not in VALID_FIELD_FORMATS:
+                        errors.append(
+                            f"invalid format: {field_format} for field "
+                            f"{field.get('id')} "
+                            "must be one of "
+                            f"{' '.join(sorted(VALID_FIELD_FORMATS))}"
+                        )
+
+        if "aes_key" in formats_found and "aes_salt" not in formats_found:
+            errors.append(AES_SALT_ERROR)
 
     required_fields = schema.get("required")
     if required_fields:
@@ -465,7 +525,6 @@ def _validate_format(
     schema: dict, data_type: str, data: str, inputs: dict
 ) -> list[str]:
     errors = []
-
     if data_type == "vault_id":
         return _validate_vault_id(data)
 
@@ -474,6 +533,9 @@ def _validate_format(
 
     elif data_type == "pem_certificate":
         return _validate_pem_certificate(data)
+
+    elif data_type == "aes_key":
+        return _validate_aes_key(schema, data)
 
     return errors
 
@@ -935,3 +997,47 @@ def _match_regex_pattern_against_attrs(
     except re.error as e:
         LOGGER.error(f"Invalid regex pattern '{pattern}': {e}")
         return False
+
+
+def _validate_aes_key(schema: dict, data: str) -> list[str]:
+    errors = []
+    aes_salt_field = _get_aes_salt_field(schema)
+    if aes_salt_field is None:
+        errors.append(AES_SALT_ERROR)
+
+    # Validate secret strength
+    if not data or len(data.strip()) == 0:
+        errors.append("AES encryption secret cannot be empty")
+    elif len(data) < MINIMUM_AES_SECRET_LEN:
+        errors.append(
+            "AES secret must be atleast "
+            f"{MINIMUM_AES_SECRET_LEN} characters"
+        )
+
+    return errors
+
+
+def _get_aes_key(
+    password: str, salt: str, iterations: int = OWASP_ITERATION_RECOMMENDATION
+) -> str:
+    try:
+        raw_key = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt.encode("utf-8"),
+            iterations,
+            dklen=32,
+        )
+        return base64.b64encode(raw_key).decode("utf-8")
+    except Exception as e:
+        LOGGER.error(f"Failed to derive AES key: {e}")
+        raise ValidationError(f"Failed to generate encryption key: {str(e)}")
+
+
+def _get_aes_salt_field(
+    schema: dict, section: str = "fields"
+) -> Optional[str]:
+    for field in schema.get(section, []):
+        if "format" in field and field["format"] == "aes_salt":
+            return field["id"]
+    return None

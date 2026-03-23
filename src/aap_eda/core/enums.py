@@ -103,6 +103,7 @@ class DefaultCredentialType(DjangoStrEnum):
     AAP = "Red Hat Ansible Automation Platform"
     GPG = "GPG Public Key"
     POSTGRES = "Postgres"
+    EDA_RULE_ENGINE = "Event-Driven Ansible Rule Engine"
     HASHICORP_LOOKUP = "HashiCorp Vault Secret Lookup"
     HASHICORP_SSH = "HashiCorp Vault Signed SSH"
     AWS_SECRETS_LOOKUP = "AWS Secrets Manager lookup"

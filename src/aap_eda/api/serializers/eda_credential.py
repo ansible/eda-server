@@ -11,6 +11,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+import logging
+
 from django.db.models import Q
 from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field
@@ -28,6 +30,8 @@ from aap_eda.core.utils.credentials import (
     validate_inputs,
 )
 from aap_eda.core.utils.crypto.base import SecretValue
+
+LOGGER = logging.getLogger(__name__)
 
 
 class EdaCredentialReferenceSerializer(serializers.Serializer):
@@ -162,10 +166,17 @@ class EdaCredentialCreateSerializer(
             )
 
         inputs = data.get("inputs", {})
+        old_inputs = {}
+        request = self.context.get("request")
+        if request and "/copy/" in request.path:
+            old_inputs = inputs
+
         errors = validate_inputs(
             credential_type,
             credential_type.inputs,
             inputs,
+            "fields",
+            old_inputs,
         )
         if bool(errors):
             raise serializers.ValidationError(errors)
@@ -190,6 +201,13 @@ class EdaCredentialUpdateSerializer(
 
     def validate(self, data):
         credential_type = self.instance.credential_type
+        try:
+            old_inputs = inputs_from_store(
+                self.instance.inputs.get_secret_value()
+            )
+        except (AttributeError, ValueError) as e:
+            LOGGER.warning(f"Failed to load existing inputs: {e}")
+            old_inputs = {}
 
         inputs = data.get("inputs", {})
         # allow empty inputs during updating
@@ -200,6 +218,8 @@ class EdaCredentialUpdateSerializer(
             credential_type,
             credential_type.inputs,
             inputs,
+            "fields",
+            old_inputs,
         )
         if bool(errors):
             raise serializers.ValidationError(errors)

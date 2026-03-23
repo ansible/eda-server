@@ -145,6 +145,36 @@ EXTERNAL_CREDENTIAL_INPUT = {
     "required": ["url", "secret_backend"],
 }
 
+AES_CREDENTIAL_INPUT = {
+    "fields": [
+        {
+            "id": "primary_key",
+            "label": "Primary Key",
+            "type": "string",
+            "format": "aes_key",
+            "secret": True,
+            "help_text": ("Primary Key for AES."),
+        },
+        {
+            "id": "secondary_key",
+            "label": "Secondary Key",
+            "type": "string",
+            "format": "aes_key",
+            "secret": True,
+            "help_text": ("Secondary Key for AES."),
+        },
+        {
+            "id": "aes_salt",
+            "label": "Salt",
+            "type": "string",
+            "format": "aes_salt",
+            "help_text": ("AES salt"),
+            "secret": True,
+            "default": "",
+        },
+    ],
+}
+
 
 @pytest.mark.parametrize(
     ("inputs", "status_code", "status_message"),
@@ -2056,3 +2086,527 @@ def test_update_mtls_credential_triggers_sync(
     )
 
     assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize(
+    ("inputs", "updates", "status_code"),
+    [
+        (
+            {
+                "primary_key": "abcdef12345678",
+            },
+            {
+                "primary_key": "xyz123451234567",
+                "secondary_key": "abcdef12345678",
+            },
+            status.HTTP_201_CREATED,
+        ),
+        (
+            {"primary_key": "abcdef123456", "secondary_key": "xyz123123456"},
+            {"primary_key": "edm123123456", "secondary_key": "abcdef123456"},
+            status.HTTP_201_CREATED,
+        ),
+    ],
+)
+@pytest.mark.django_db
+def test_create_aes_credential_type(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+    inputs,
+    updates,
+    status_code,
+):
+    credential_type_data_in = {
+        "name": "my_aes",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "my_aes"
+    credential_data_in = {
+        "name": "eda-credential",
+        "inputs": inputs,
+        "credential_type_id": response.data["id"],
+        "organization_id": default_organization.id,
+    }
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    obj = response.json()
+    assert response.status_code == status_code
+    credential_data_in = {
+        "name": "eda-credential",
+        "inputs": updates,
+        "credential_type_id": response.data["id"],
+        "organization_id": default_organization.id,
+    }
+    response = superuser_client.patch(
+        f"{api_url_v1}/eda-credentials/{obj['id']}/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_aes_salt_persistence_across_updates(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that AES salt remains unchanged when updating non-AES fields."""
+    # Create credential type with AES fields
+    credential_type_data_in = {
+        "name": "aes_test_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Create credential with primary key
+    credential_data_in = {
+        "name": "aes-credential-salt-test",
+        "inputs": {"primary_key": "my-secret-password-123"},
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_id = response.data["id"]
+
+    # Get the credential and extract salt from database
+    credential = models.EdaCredential.objects.get(id=cred_id)
+    original_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    original_salt = original_inputs.get("aes_salt")
+    original_primary_key = original_inputs.get("primary_key")
+
+    assert original_salt is not None, "Salt should be auto-generated"
+    assert len(original_salt) == 64, "Salt should be 32 bytes (64 hex chars)"
+    assert (
+        original_primary_key != "my-secret-password-123"
+    ), "Primary key should be derived, not original password"
+
+    # Update credential - change only the name (non-AES field)
+    response = superuser_client.patch(
+        f"{api_url_v1}/eda-credentials/{cred_id}/",
+        data={"name": "aes-credential-salt-test-updated"},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify salt hasn't changed
+    credential.refresh_from_db()
+    updated_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    updated_salt = updated_inputs.get("aes_salt")
+
+    assert (
+        updated_salt == original_salt
+    ), "Salt must remain unchanged on update"
+    assert (
+        updated_inputs.get("primary_key") == original_primary_key
+    ), "Derived key must remain unchanged"
+
+
+@pytest.mark.django_db
+def test_aes_key_rotation_scenario(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test key rotation: moving primary to secondary and setting new
+    primary."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_rotation_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Step 1: Create credential with only primary key
+    credential_data_in = {
+        "name": "rotation-test-credential",
+        "inputs": {"primary_key": "original-secret-key"},
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_id = response.data["id"]
+
+    # Get original derived key
+    credential = models.EdaCredential.objects.get(id=cred_id)
+    original_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    original_primary_derived = original_inputs.get("primary_key")
+    original_salt = original_inputs.get("aes_salt")
+
+    # Step 2: Rotate - set new primary, move old to secondary
+    rotation_data = {
+        "inputs": {
+            "primary_key": "new-secret-key",
+            "secondary_key": "original-secret-key",
+        }
+    }
+
+    response = superuser_client.patch(
+        f"{api_url_v1}/eda-credentials/{cred_id}/",
+        data=rotation_data,
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify rotation
+    credential.refresh_from_db()
+    rotated_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+    assert (
+        rotated_inputs.get("aes_salt") == original_salt
+    ), "Salt must remain the same during rotation"
+    assert (
+        rotated_inputs.get("secondary_key") == original_primary_derived
+    ), "Secondary key should now contain the original primary derived key"
+    assert (
+        rotated_inputs.get("primary_key") != original_primary_derived
+    ), "Primary key should be newly derived"
+    assert rotated_inputs.get("primary_key") != rotated_inputs.get(
+        "secondary_key"
+    ), "Primary and secondary should be different"
+
+
+@pytest.mark.django_db
+def test_aes_salt_uniqueness_across_credentials(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that each credential gets a unique salt even with same password."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_uniqueness_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Create two credentials with identical passwords
+    same_password = "identical-password-123"
+    salts = []
+    derived_keys = []
+
+    for i in range(2):
+        credential_data_in = {
+            "name": f"unique-salt-test-{i}",
+            "inputs": {"primary_key": same_password},
+            "credential_type_id": cred_type_id,
+            "organization_id": default_organization.id,
+        }
+
+        response = superuser_client.post(
+            f"{api_url_v1}/eda-credentials/", data=credential_data_in
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
+        credential = models.EdaCredential.objects.get(id=response.data["id"])
+        inputs = yaml.safe_load(credential.inputs.get_secret_value())
+        salts.append(inputs.get("aes_salt"))
+        derived_keys.append(inputs.get("primary_key"))
+
+    # Verify salts are unique
+    assert salts[0] != salts[1], "Each credential must have a unique salt"
+
+    # Verify derived keys are different despite same password
+    assert (
+        derived_keys[0] != derived_keys[1]
+    ), "Derived keys must be different due to unique salts"
+
+
+@pytest.mark.django_db
+def test_aes_update_with_encrypted_string_preserves_value(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that sending $encrypted$ preserves the existing value."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_preserve_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Create credential
+    credential_data_in = {
+        "name": "preserve-test-credential",
+        "inputs": {
+            "primary_key": "original-key",
+            "secondary_key": "secondary-key",
+        },
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_id = response.data["id"]
+
+    # Get original values
+    credential = models.EdaCredential.objects.get(id=cred_id)
+    original_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+    # Update with $encrypted$ to preserve values
+    response = superuser_client.patch(
+        f"{api_url_v1}/eda-credentials/{cred_id}/",
+        data={
+            "inputs": {
+                "primary_key": ENCRYPTED_STRING,
+                "secondary_key": ENCRYPTED_STRING,
+            }
+        },
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify values are preserved
+    credential.refresh_from_db()
+    updated_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+    assert updated_inputs.get("primary_key") == original_inputs.get(
+        "primary_key"
+    ), "Primary key should be preserved"
+    assert updated_inputs.get("secondary_key") == original_inputs.get(
+        "secondary_key"
+    ), "Secondary key should be preserved"
+    assert updated_inputs.get("aes_salt") == original_inputs.get(
+        "aes_salt"
+    ), "Salt should be preserved"
+
+
+@pytest.mark.django_db
+def test_aes_partial_update_preserves_unmodified_keys(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that updating only primary key preserves secondary key."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_partial_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Create credential with both keys
+    credential_data_in = {
+        "name": "partial-update-test",
+        "inputs": {
+            "primary_key": "primary-secret",
+            "secondary_key": "secondary-secret",
+        },
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_id = response.data["id"]
+
+    # Get original secondary key
+    credential = models.EdaCredential.objects.get(id=cred_id)
+    original_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+    original_secondary = original_inputs.get("secondary_key")
+
+    # Update only primary key
+    response = superuser_client.patch(
+        f"{api_url_v1}/eda-credentials/{cred_id}/",
+        data={"inputs": {"primary_key": "new-primary-secret"}},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify secondary key is preserved
+    credential.refresh_from_db()
+    updated_inputs = yaml.safe_load(credential.inputs.get_secret_value())
+
+    assert (
+        updated_inputs.get("secondary_key") == original_secondary
+    ), "Secondary key should remain unchanged"
+    assert updated_inputs.get("primary_key") != original_inputs.get(
+        "primary_key"
+    ), "Primary key should be updated"
+
+
+@pytest.mark.django_db
+def test_aes_credential_copy_preserves_salt(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that copying an AES credential preserves the salt and derived
+    keys."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_copy_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Create original credential
+    credential_data_in = {
+        "name": "original-aes-credential",
+        "inputs": {"primary_key": "my-secret-key"},
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    original_cred_id = response.data["id"]
+
+    # Get original salt and derived key
+    original_cred = models.EdaCredential.objects.get(id=original_cred_id)
+    original_inputs = yaml.safe_load(original_cred.inputs.get_secret_value())
+    original_salt = original_inputs.get("aes_salt")
+    original_derived_key = original_inputs.get("primary_key")
+
+    # Copy the credential
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/{original_cred_id}/copy/",
+        data={"name": "copied-aes-credential"},
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    copied_cred_id = response.data["id"]
+
+    # Get copied credential's salt and derived key
+    copied_cred = models.EdaCredential.objects.get(id=copied_cred_id)
+    copied_inputs = yaml.safe_load(copied_cred.inputs.get_secret_value())
+    copied_salt = copied_inputs.get("aes_salt")
+    copied_derived_key = copied_inputs.get("primary_key")
+
+    # Verify salt and derived key are preserved in the copy
+    assert (
+        copied_salt == original_salt
+    ), "Copied credential should have the same salt"
+    assert (
+        copied_derived_key == original_derived_key
+    ), "Copied credential should have the same derived key"
+
+
+@pytest.mark.django_db
+def test_aes_empty_string_key_handling(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that empty string AES keys are handled correctly."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_empty_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Try to create credential with empty primary key
+    credential_data_in = {
+        "name": "empty-key-test",
+        "inputs": {"primary_key": ""},
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+
+    # Empty key should be accepted (fields have default: "")
+    # But the derived key should still be generated if not empty after strip
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+@pytest.mark.django_db
+def test_aes_retrieve_shows_encrypted_placeholder(
+    superuser_client: APIClient,
+    default_organization: models.Organization,
+):
+    """Test that retrieving AES credential shows $encrypted$ for secret
+    fields."""
+    # Create credential type
+    credential_type_data_in = {
+        "name": "aes_retrieve_type",
+        "inputs": AES_CREDENTIAL_INPUT,
+        "injectors": {},
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/credential-types/", data=credential_type_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_type_id = response.data["id"]
+
+    # Create credential
+    credential_data_in = {
+        "name": "retrieve-test-credential",
+        "inputs": {
+            "primary_key": "secret-primary",
+            "secondary_key": "secret-secondary",
+        },
+        "credential_type_id": cred_type_id,
+        "organization_id": default_organization.id,
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/", data=credential_data_in
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    cred_id = response.data["id"]
+
+    # Retrieve credential
+    response = superuser_client.get(f"{api_url_v1}/eda-credentials/{cred_id}/")
+    assert response.status_code == status.HTTP_200_OK
+
+    # Verify encrypted fields show placeholder
+    assert response.data["inputs"]["primary_key"] == ENCRYPTED_STRING
+    assert response.data["inputs"]["secondary_key"] == ENCRYPTED_STRING
+    # Salt should also be encrypted/hidden
+    assert response.data["inputs"]["aes_salt"] == ENCRYPTED_STRING
