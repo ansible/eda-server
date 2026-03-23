@@ -1144,3 +1144,126 @@ def test_credential_type_test(
         ):
             response = superuser_client.post(url, data=data_in)
             assert response.status_code == status_code
+
+
+@pytest.mark.django_db
+def test_eda_rule_engine_credential_type_exists(
+    preseed_credential_types,
+):
+    """Test that the EDA_RULE_ENGINE credential type is
+    created during migration.
+    """
+    rule_engine_cred_type = models.CredentialType.objects.filter(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    ).first()
+
+    assert rule_engine_cred_type is not None
+    assert (
+        rule_engine_cred_type.name
+        == enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    assert rule_engine_cred_type.managed is True
+
+    # Verify inputs structure
+    inputs = rule_engine_cred_type.inputs
+    assert "fields" in inputs
+    field_ids = {field["id"] for field in inputs["fields"]}
+
+    # Check key fields are present
+    assert "postgres_db_host" in field_ids
+    assert "postgres_db_name" in field_ids
+    assert "postgres_db_user" in field_ids
+    assert "postgres_db_password" in field_ids
+    assert "primary_encryption_secret" in field_ids
+    assert "secondary_encryption_secret" in field_ids
+    assert "aes_salt" in field_ids
+
+    # Verify required fields
+    assert "required" in inputs
+    assert "postgres_db_host" in inputs["required"]
+    assert "postgres_db_name" in inputs["required"]
+
+    # Verify injectors structure
+    injectors = rule_engine_cred_type.injectors
+    assert "extra_vars" in injectors
+    assert "drools_db_host" in injectors["extra_vars"]
+    assert "drools_db_name" in injectors["extra_vars"]
+    assert "drools_primary_encryption_secret" in injectors["extra_vars"]
+    assert "drools_secondary_encryption_secret" in injectors["extra_vars"]
+
+
+@pytest.mark.django_db
+def test_create_eda_rule_engine_credential(
+    superuser_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test creating an EDA Rule Engine credential."""
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+
+    credential_data = {
+        "name": "test-rule-engine-credential",
+        "credential_type_id": rule_engine_cred_type.id,
+        "organization_id": default_organization.id,
+        "inputs": {
+            "postgres_db_host": "localhost",
+            "postgres_db_port": "5432",
+            "postgres_db_name": "eda_db",
+            "postgres_db_user": "eda_user",
+            "postgres_db_password": "eda_password",
+            "primary_encryption_secret": "test_primary_secret_12345",
+            "secondary_encryption_secret": "test_secondary_secret_12345",
+            "postgres_sslmode": "prefer",
+            "expired_window_grace_period": "60",
+            "deduplication_window_size": "10",
+            "overwrite_if_rulebook_changes": True,
+        },
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/",
+        data=credential_data,
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["name"] == "test-rule-engine-credential"
+    assert response.data["credential_type"]["id"] == rule_engine_cred_type.id
+
+    # Verify the credential was created in the database
+    credential = models.EdaCredential.objects.get(id=response.data["id"])
+    assert credential.name == "test-rule-engine-credential"
+    assert credential.credential_type.id == rule_engine_cred_type.id
+
+
+@pytest.mark.django_db
+def test_eda_rule_engine_credential_validates_required_fields(
+    superuser_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test that EDA Rule Engine credential validates required fields."""
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+
+    # Missing required field postgres_db_name
+    credential_data = {
+        "name": "test-rule-engine-credential",
+        "credential_type_id": rule_engine_cred_type.id,
+        "organization_id": default_organization.id,
+        "inputs": {
+            "postgres_db_host": "localhost",
+            "postgres_db_user": "eda_user",
+            "postgres_db_password": "eda_password",
+        },
+    }
+
+    response = superuser_client.post(
+        f"{api_url_v1}/eda-credentials/",
+        data=credential_data,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "postgres_db_name" in str(response.data)

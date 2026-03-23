@@ -230,3 +230,73 @@ def test_container_request_default_pull_policy_from_model(
     request = default_activation.get_container_request()
     # Should use the model's default value
     assert request.pull_policy == "always"  # ImagePullPolicy.ALWAYS.value
+
+
+@pytest.mark.django_db
+def test_get_container_request_enable_persistence_false(activation):
+    """Test that enable_persistence=False is handled correctly in
+    command line.
+    """
+    activation.enable_persistence = False
+    activation.save(update_fields=["enable_persistence"])
+
+    request = activation.get_container_request()
+    cmdline = request.cmdline
+
+    assert isinstance(cmdline, AnsibleRulebookCmdLine)
+    assert cmdline.enable_persistence is False
+    args = cmdline.get_args()
+    assert "--persistence-id" not in args
+
+
+@pytest.mark.django_db
+def test_get_container_request_enable_persistence_true(activation):
+    """Test that enable_persistence=True includes persistence-id
+    in command line.
+    """
+    activation.enable_persistence = True
+    activation.save(update_fields=["enable_persistence"])
+
+    request = activation.get_container_request()
+    cmdline = request.cmdline
+
+    assert isinstance(cmdline, AnsibleRulebookCmdLine)
+    assert cmdline.enable_persistence is True
+    args = cmdline.get_args()
+    assert "--persistence-id" in args
+    # Find the index of --persistence-id and check the next value
+    persistence_id_index = args.index("--persistence-id")
+    assert args[persistence_id_index + 1] == str(activation.id)
+
+
+@pytest.mark.django_db
+def test_cmdline_args_with_persistence(activation):
+    """Test AnsibleRulebookCmdLine args generation with enable_persistence."""
+    activation.enable_persistence = True
+    activation.save(update_fields=["enable_persistence"])
+
+    cmdline = activation._build_cmdline()
+    args = cmdline.get_args()
+
+    # Verify the full command line structure
+    assert cmdline.enable_persistence is True
+    assert cmdline.parent_id == str(activation.id)
+    assert "--persistence-id" in args
+    persistence_id_index = args.index("--persistence-id")
+    assert args[persistence_id_index + 1] == str(activation.id)
+
+
+@pytest.mark.django_db
+def test_cmdline_command_and_args_with_persistence(activation):
+    """Test AnsibleRulebookCmdLine full command with enable_persistence."""
+    activation.enable_persistence = True
+    activation.save(update_fields=["enable_persistence"])
+
+    cmdline = activation._build_cmdline()
+    full_command = cmdline.command_and_args()
+
+    # Verify the command starts with ansible-rulebook
+    assert full_command[0] == "ansible-rulebook"
+    assert "--persistence-id" in full_command
+    persistence_id_index = full_command.index("--persistence-id")
+    assert full_command[persistence_id_index + 1] == str(activation.id)

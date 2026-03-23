@@ -2610,3 +2610,142 @@ def test_aes_retrieve_shows_encrypted_placeholder(
     assert response.data["inputs"]["secondary_key"] == ENCRYPTED_STRING
     # Salt should also be encrypted/hidden
     assert response.data["inputs"]["aes_salt"] == ENCRYPTED_STRING
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_namespace(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test filtering EDA credentials by credential_type namespace."""
+    # Get credential types with different namespaces
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    registry_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.REGISTRY
+    )
+
+    # Create credentials with different types
+    rule_engine_cred = models.EdaCredential.objects.create(
+        name="rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs={
+            "postgres_db_host": "localhost",
+            "postgres_db_name": "testdb",
+            "primary_encryption_secret": "secret123",
+        },
+        organization=default_organization,
+    )
+
+    models.EdaCredential.objects.create(
+        name="registry-credential",
+        credential_type=registry_cred_type,
+        inputs={
+            "username": "user",
+            "password": "pass",
+            "host": "quay.io",
+        },
+        organization=default_organization,
+    )
+
+    # Test filter by drools namespace
+    # (should return only rule engine credential)
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/"
+        f"?credential_type__namespace__in=drools"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["id"] == rule_engine_cred.id
+    assert (
+        response.data["results"][0]["credential_type"]["namespace"] == "drools"
+    )
+
+    # Test filter by multiple namespaces (comma-separated)
+    # Registry credential type has no namespace (None),
+    # so we test with drools only
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/"
+        f"?credential_type__namespace__in=drools,other_namespace"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["id"] == rule_engine_cred.id
+
+    # Test filter by non-existent namespace (should return empty)
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/"
+        f"?credential_type__namespace__in=nonexistent"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 0
+
+
+@pytest.mark.django_db
+def test_list_eda_credentials_filter_kind_and_namespace_not_in(
+    admin_client: APIClient,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test filtering credentials by kind='cloud' and excluding
+    namespace='drools'."""
+    # Get credential types
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    # Use AAP credential type which has kind='cloud' and namespace='controller'
+    aap_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+
+    # Create a Rule Engine credential (kind=cloud, namespace=drools)
+    models.EdaCredential.objects.create(
+        name="rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_name": "testdb",
+                "primary_encryption_secret": "secret123",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create an AAP credential (kind=cloud, namespace=controller)
+    cloud_cred = models.EdaCredential.objects.create(
+        name="cloud-credential",
+        credential_type=aap_cred_type,
+        inputs=inputs_to_store(
+            {
+                "host": "https://aap.example.com",
+                "username": "user",
+                "password": "pass",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Verify both credential types have kind='cloud'
+    assert rule_engine_cred_type.kind == "cloud"
+    assert aap_cred_type.kind == "cloud"
+    # Verify namespaces are different
+    assert rule_engine_cred_type.namespace == "drools"
+    assert aap_cred_type.namespace == "controller"
+
+    # Test filter by kind=cloud and namespace_not_in=drools
+    # Should return only the AAP credential (cloud but not drools)
+    response = admin_client.get(
+        f"{api_url_v1}/eda-credentials/"
+        "?credential_type__kind=cloud"
+        "&credential_type__namespace__not_in=drools"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+    assert response.data["results"][0]["id"] == cloud_cred.id
+    assert response.data["results"][0]["credential_type"]["kind"] == "cloud"
+    assert (
+        response.data["results"][0]["credential_type"]["namespace"] != "drools"
+    )

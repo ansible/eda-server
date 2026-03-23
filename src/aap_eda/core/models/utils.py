@@ -14,6 +14,7 @@
 
 from django.conf import settings
 
+from .eda_credential import EdaCredential
 from .organization import Organization
 
 
@@ -23,3 +24,10 @@ def get_default_organization():
 
 def get_default_organization_id():
     return get_default_organization().id
+
+
+def get_default_rule_engine_credential():
+    obj = EdaCredential.objects.filter(
+        name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+    ).first()
+    return obj

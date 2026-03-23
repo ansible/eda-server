@@ -86,7 +86,13 @@ def test_migration_populates_activation_hash(
 
     call_command("migrate", "core", "0069")
 
-    act_fresh = models.Activation.objects.get(pk=act.pk)
+    # Use historical model to avoid accessing fields from later migrations
+    HistoricalActivation0069 = get_historical_model(  # noqa: N806
+        "core",
+        "Activation",
+        "0069_activation_restart_and_sync_fields",
+    )
+    act_fresh = HistoricalActivation0069.objects.get(pk=act.pk)
     assert act_fresh.rulebook_rulesets_sha256 == (_sha256(content))
 
 

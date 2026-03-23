@@ -4,6 +4,7 @@ import logging
 import typing as tp
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 import yaml
@@ -22,6 +23,7 @@ from aap_eda.core.exceptions import (
     DuplicateFileTemplateKeyError,
     InvalidEnvKeyError,
 )
+from aap_eda.core.models.utils import get_default_rule_engine_credential
 from aap_eda.core.utils.credentials import (
     add_default_values_to_user_inputs,
     get_resolved_secrets,
@@ -129,6 +131,7 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             logger.error(f"Failed to parse {data} due to Env error: {err}")
 
     async def handle_workers(self, message: WorkerMessage):
+        additional_credentials = []
         logger.info(
             "Start to handle workers: activation_instance_id: "
             f"{message.activation_id}"
@@ -152,18 +155,26 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
         if controller_info:
             await self.send(text_data=controller_info.json())
 
+        rule_engine_credential = await self.get_rule_engine_credential(
+            activation
+        )
+        if rule_engine_credential is not None:
+            additional_credentials.append(rule_engine_credential)
+
         eda_vault_data = await self.get_eda_system_vault_passwords(activation)
         if eda_vault_data:
             vault_collection = VaultCollection(data=eda_vault_data)
             await self.send(text_data=vault_collection.json())
 
         file_contents = await self.get_file_contents_from_credentials(
-            activation
+            activation, additional_credentials
         )
         for file_content in file_contents:
             await self.send(text_data=file_content.json())
 
-        env_var = await self.get_env_vars_from_credentials(activation)
+        env_var = await self.get_env_vars_from_credentials(
+            activation, additional_credentials
+        )
         if env_var:
             env_var_message = EnvVars(
                 data=base64.b64encode(env_var.encode()).decode()
@@ -479,6 +490,18 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
         return vault_passwords
 
+    @database_sync_to_async
+    def get_rule_engine_credential(
+        self, activation: models.Activation
+    ) -> Optional[models.EdaCredential]:
+        """Get the Rule Engine Credential."""
+        if not activation.enable_persistence:
+            return None
+        return (
+            activation.rule_engine_credential
+            or get_default_rule_engine_credential()
+        )
+
     def _get_url(self, message: ActionMessage, inputs: dict) -> str:
         if message.action not in ("run_job_template", "run_workflow_template"):
             return ""
@@ -519,11 +542,15 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_file_contents_from_credentials(
-        self, activation: models.Activation
+        self,
+        activation: models.Activation,
+        additional_credentials: list[models.EdaCredential],
     ) -> tp.Optional[list[FileContentMessage]]:
         file_template_names = []
         file_messages = []
-        for eda_credential in activation.eda_credentials.all():
+        for eda_credential in (
+            list(activation.eda_credentials.all()) + additional_credentials
+        ):
             inputs = get_resolved_secrets(eda_credential)
             injectors = eda_credential.credential_type.injectors
             binary_fields = []
@@ -552,7 +579,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_env_vars_from_credentials(
-        self, activation: models.Activation
+        self,
+        activation: models.Activation,
+        additional_credentials: list[models.EdaCredential],
     ) -> tp.Optional[str]:
         try:
             vault_password, vault_id = self.get_vault_password_and_id(
@@ -560,7 +589,9 @@ class AnsibleRulebookConsumer(AsyncWebsocketConsumer):
             )
             env_vars = {}
 
-            for eda_credential in activation.eda_credentials.all():
+            for eda_credential in (
+                list(activation.eda_credentials.all()) + additional_credentials
+            ):
                 injectors = eda_credential.credential_type.injectors
                 if "env" not in injectors:
                     continue

@@ -38,6 +38,46 @@ def converted_extra_var(var: str) -> str:
     return yaml.safe_dump(yaml.safe_load(var))
 
 
+def ensure_default_rule_engine_credential(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    """Create the default rule engine credential if it doesn't exist.
+
+    This helper ensures the default system credential exists for tests.
+    In production, this will be created by the installer team.
+    """
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Check if the default system credential already exists
+    default_credential = models.EdaCredential.objects.filter(
+        name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+    ).first()
+
+    # Only create if it doesn't exist
+    if default_credential is None:
+        rule_engine_cred_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+        )
+        default_credential = models.EdaCredential.objects.create(
+            name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME,
+            credential_type=rule_engine_cred_type,
+            inputs=inputs_to_store(
+                {
+                    "postgres_db_host": "localhost",
+                    "postgres_db_port": "5432",
+                    "postgres_db_name": "testdb",
+                    "postgres_db_user": "testuser",
+                    "postgres_db_password": "testpass",
+                    "postgres_sslmode": "prefer",
+                    "primary_encryption_secret": "secret123secret",
+                }
+            ),
+            organization=organization,
+        )
+
+    return default_credential
+
+
 @pytest.mark.django_db
 @mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
 @patch(
@@ -1694,3 +1734,1104 @@ def test_activation_detail_warning_on_deleted_rulebook(
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data["warnings"]) == 1
     assert "no longer exists" in response.data["warnings"][0]
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_with_enable_persistence(
+    mock_health_check,
+    admin_awx_token: models.AwxToken,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    # Ensure default rule engine credential exists for persistence tests
+    ensure_default_rule_engine_credential(default_organization)
+
+    activation_payload["enable_persistence"] = True
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.enable_persistence is True
+    assert data["enable_persistence"] is True
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_with_enable_persistence_false(
+    mock_health_check,
+    admin_awx_token: models.AwxToken,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+):
+    activation_payload["enable_persistence"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.enable_persistence is False
+    assert data["enable_persistence"] is False
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_with_rule_engine_credential(
+    mock_health_check,
+    admin_awx_token: models.AwxToken,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    # Create an EDA Rule Engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs={
+            "primary_key": "test_primary_key_value",
+            "secondary_key": "test_secondary_key_value",
+            "aes_salt": "test_salt_value",
+        },
+        organization=default_organization,
+    )
+
+    activation_payload["rule_engine_credential_id"] = rule_engine_credential.id
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = response.data
+    activation = models.Activation.objects.filter(id=data["id"]).first()
+    assert activation.rule_engine_credential.id == rule_engine_credential.id
+    assert data["rule_engine_credential_id"] == rule_engine_credential.id
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_update_activation_enable_persistence(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    # Ensure default rule engine credential exists for persistence tests
+    ensure_default_rule_engine_credential(default_organization)
+
+    # Create activation with is_enabled=False so we can update it
+    activation_payload["is_enabled"] = False
+    activation_payload["enable_persistence"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Update enable_persistence to True
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/",
+        data={"enable_persistence": True},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["enable_persistence"] is True
+
+    # Verify in database
+    activation = models.Activation.objects.get(id=activation_id)
+    assert activation.enable_persistence is True
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_update_activation_rule_engine_credential(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    # Create an EDA Rule Engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs={
+            "postgres_db_host": "localhost",
+            "postgres_db_name": "testdb",
+            "primary_encryption_secret": "test_primary_key_value",
+            "secondary_encryption_secret": "test_secondary_key_value",
+        },
+        organization=default_organization,
+    )
+
+    # Create activation with is_enabled=False so we can update it
+    activation_payload["is_enabled"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Update to set the rule_engine_credential
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/",
+        data={"rule_engine_credential_id": rule_engine_credential.id},
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert (
+        response.data["rule_engine_credential_id"] == rule_engine_credential.id
+    )
+
+    # Verify in database
+    activation = models.Activation.objects.get(id=activation_id)
+    assert activation.rule_engine_credential.id == rule_engine_credential.id
+
+
+@pytest.mark.django_db
+def test_list_activation_includes_persistence_fields(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    # Create an EDA Rule Engine credential with required fields
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs={
+            "postgres_db_host": "localhost",
+            "postgres_db_name": "testdb",
+            "primary_encryption_secret": "test_primary_key_value",
+        },
+        organization=default_organization,
+    )
+
+    default_activation.enable_persistence = True
+    default_activation.rule_engine_credential = rule_engine_credential
+    default_activation.save(
+        update_fields=["enable_persistence", "rule_engine_credential"]
+    )
+
+    response = admin_client.get(f"{api_url_v1}/activations/")
+    assert response.status_code == status.HTTP_200_OK
+
+    # Find our activation in the results
+    activation_data = next(
+        (
+            item
+            for item in response.data["results"]
+            if item["id"] == default_activation.id
+        ),
+        None,
+    )
+    assert activation_data is not None
+    assert activation_data["enable_persistence"] is True
+    assert (
+        activation_data["rule_engine_credential_id"]
+        == rule_engine_credential.id
+    )
+
+
+@pytest.mark.django_db
+def test_read_activation_includes_persistence_fields(
+    default_activation: models.Activation,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    # Create an EDA Rule Engine credential with required fields
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs={
+            "postgres_db_host": "localhost",
+            "postgres_db_name": "testdb",
+            "primary_encryption_secret": "test_primary_key_value",
+        },
+        organization=default_organization,
+    )
+
+    default_activation.enable_persistence = True
+    default_activation.rule_engine_credential = rule_engine_credential
+    default_activation.save(
+        update_fields=["enable_persistence", "rule_engine_credential"]
+    )
+
+    response = admin_client.get(
+        f"{api_url_v1}/activations/{default_activation.id}/"
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["enable_persistence"] is True
+    assert (
+        response.data["rule_engine_credential_id"] == rule_engine_credential.id
+    )
+    # Verify the full credential object is returned
+    assert response.data["rule_engine_credential"] is not None
+    assert response.data["rule_engine_credential"]["id"] == (
+        rule_engine_credential.id
+    )
+    assert response.data["rule_engine_credential"]["name"] == (
+        rule_engine_credential.name
+    )
+
+
+@pytest.mark.django_db
+def test_create_activation_persistence_without_credential_or_default(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Test that creating an activation with enable_persistence=True fails
+    when no rule_engine_credential_id is provided and no default
+    credential exists.
+    """
+    activation_payload["enable_persistence"] = True
+    # Don't provide rule_engine_credential_id and ensure no default exists
+    # The default credential should not exist in a fresh test database
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "non_field_errors" in response.data
+    error_message = str(response.data["non_field_errors"][0])
+    assert "Persistence is enabled" in error_message
+    assert "Please provide a rule_engine_credential_id." in error_message
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_persistence_with_credential_provided(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test that creating an activation with enable_persistence=True succeeds
+    when rule_engine_credential_id is provided."""
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="custom-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret123secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    activation_payload["enable_persistence"] = True
+    activation_payload["rule_engine_credential_id"] = rule_engine_credential.id
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["enable_persistence"] is True
+    assert (
+        response.data["rule_engine_credential_id"] == rule_engine_credential.id
+    )
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_persistence_with_default_credential(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test that creating an activation with enable_persistence=True succeeds
+    when a default system credential exists.
+    """
+    # Ensure default rule engine credential exists for persistence tests
+    ensure_default_rule_engine_credential(default_organization)
+
+    activation_payload["enable_persistence"] = True
+    # Don't provide rule_engine_credential_id - should use default
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.data["enable_persistence"] is True
+
+
+@pytest.mark.django_db
+def test_update_activation_persistence_without_credential_or_default(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Test that updating an activation to enable_persistence=True fails
+    when no rule_engine_credential_id is provided and no default
+    credential exists.
+    """
+    # Create activation with is_enabled=False and persistence disabled
+    activation_payload["is_enabled"] = False
+    activation_payload["enable_persistence"] = False
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Try to update to enable persistence without providing credential
+    response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/",
+        data={"enable_persistence": True},
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "non_field_errors" in response.data
+    error_message = str(response.data["non_field_errors"][0])
+    assert "Persistence is enabled" in error_message
+    assert "Please provide a rule_engine_credential_id." in error_message
+
+
+@pytest.mark.django_db
+def test_create_activation_persistence_with_invalid_credential_id(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Test that creating an activation with enable_persistence=True and
+    an invalid rule_engine_credential_id fails."""
+    activation_payload["enable_persistence"] = True
+    activation_payload["rule_engine_credential_id"] = 99999  # Non-existent ID
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "non_field_errors" in response.data
+    error_message = str(response.data["non_field_errors"][0])
+    assert "EdaCredential with id 99999 does not exist" in error_message
+
+
+@pytest.mark.django_db
+def test_create_activation_persistence_with_wrong_namespace(
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test that creating an activation with enable_persistence=True and
+    a credential with wrong namespace fails."""
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Create a credential type with a different namespace
+    wrong_cred_type = models.CredentialType.objects.create(
+        name="Wrong Namespace Credential Type",
+        namespace="wrong_namespace",
+        kind="cloud",
+        inputs={
+            "fields": [
+                {"id": "test_field", "label": "Test Field", "type": "string"}
+            ]
+        },
+        injectors={},
+    )
+
+    # Create a credential with the wrong namespace
+    wrong_credential = models.EdaCredential.objects.create(
+        name="wrong-namespace-credential",
+        credential_type=wrong_cred_type,
+        inputs=inputs_to_store({"test_field": "test_value"}),
+        organization=default_organization,
+    )
+
+    activation_payload["enable_persistence"] = True
+    activation_payload["rule_engine_credential_id"] = wrong_credential.id
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "non_field_errors" in response.data
+    error_message = str(response.data["non_field_errors"][0])
+    assert "namespace 'drools'" in error_message
+    assert "wrong_namespace" in error_message
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_with_credential_and_persistence_credential_count(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test credential handling with both regular and rule engine credentials.
+
+    When creating an activation with:
+    - A regular credential (e.g., AAP) in eda_credentials list
+    - Persistence enabled with a rule_engine_credential
+
+    Expected behavior (after fix):
+    - The AAP credential is stored in the eda_credentials M2M
+      relationship
+    - The rule engine credential is ONLY stored in
+      rule_engine_credential FK field
+    - The rule engine credential is NOT added to eda_credentials M2M
+
+    The rule engine credential appears in ONE place:
+    - In the rule_engine_credential foreign key field ONLY
+
+    This ensures clean separation between regular credentials and persistence
+    credentials, avoiding orphaned credentials during updates.
+
+    Related tests:
+    - test_update_activation_disable_persistence_removes_rule_engine_credential
+      (no cleanup needed since never added)
+    - test_update_activation_change_rule_engine_credential
+      (no cleanup needed)
+    """
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Create a regular AAP credential
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    aap_credential = models.EdaCredential.objects.create(
+        name="test-aap-credential",
+        credential_type=aap_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "https://controller.example.com",
+                "username": "testuser",
+                "password": "testpass",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create a rule engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret123secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create activation with both regular credential and persistence enabled
+    activation_payload["eda_credentials"] = [aap_credential.id]
+    activation_payload["enable_persistence"] = True
+    activation_payload["rule_engine_credential_id"] = rule_engine_credential.id
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    # Verify the activation in the database
+    activation = models.Activation.objects.get(id=response.data["id"])
+
+    # Check eda_credentials - should ONLY contain the AAP credential
+    all_eda_credentials = list(activation.eda_credentials.all())
+    eda_credential_ids = [cred.id for cred in all_eda_credentials]
+
+    # After fix: Only regular credentials are in eda_credentials
+    assert len(all_eda_credentials) == 1, (
+        f"Expected 1 credential in eda_credentials "
+        f"(only AAP), got {len(all_eda_credentials)}: {eda_credential_ids}"
+    )
+    assert (
+        aap_credential.id in eda_credential_ids
+    ), "AAP credential should be in eda_credentials"
+    assert rule_engine_credential.id not in eda_credential_ids, (
+        "Rule engine credential should NOT be in eda_credentials - "
+        "it should only be in the rule_engine_credential FK field"
+    )
+
+    # Verify persistence is enabled and rule_engine_credential field is set
+    # The rule engine credential is ONLY in the FK field, not in M2M
+    assert activation.enable_persistence is True
+    assert activation.rule_engine_credential is not None
+    assert activation.rule_engine_credential.id == rule_engine_credential.id
+
+    # Verify the API response
+    assert response.data["enable_persistence"] is True
+    assert (
+        response.data["rule_engine_credential_id"] == rule_engine_credential.id
+    )
+
+    # Response eda_credentials should show only the AAP credential
+    response_credential_ids = [
+        cred["id"] for cred in response.data["eda_credentials"]
+    ]
+    assert len(response.data["eda_credentials"]) == 1, (
+        f"Only AAP credential should appear in response, "
+        f"got {len(response.data['eda_credentials'])}"
+    )
+    assert aap_credential.id in response_credential_ids
+    assert (
+        rule_engine_credential.id not in response_credential_ids
+    ), "Rule engine credential should NOT be in response eda_credentials"
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_update_activation_disable_persistence_removes_rule_engine_credential(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test that disabling persistence clears rule engine credential.
+
+    This test verifies that when an activation with persistence is
+    updated to disable persistence:
+    1. The rule_engine_credential FK field is cleared (set to None)
+    2. Regular credentials (AAP) remain in eda_credentials unchanged
+    3. No orphaned credentials are left behind
+
+    Since rule engine credentials are only stored in the FK field
+    (not in eda_credentials M2M), disabling persistence is clean.
+    """
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Create an AAP credential
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    aap_credential = models.EdaCredential.objects.create(
+        name="test-aap-credential",
+        credential_type=aap_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "https://controller.example.com",
+                "username": "testuser",
+                "password": "testpass",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create a rule engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret123secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create activation with AAP credential AND persistence enabled
+    activation_payload["is_enabled"] = False  # Must be disabled to update
+    activation_payload["eda_credentials"] = [aap_credential.id]
+    activation_payload["enable_persistence"] = True
+    activation_payload["rule_engine_credential_id"] = rule_engine_credential.id
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Verify initial state
+    activation = models.Activation.objects.get(id=activation_id)
+    initial_creds = list(activation.eda_credentials.all())
+
+    # Now disable persistence
+    update_response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/",
+        data={
+            "enable_persistence": False,
+            "rule_engine_credential_id": None,
+        },
+    )
+    assert update_response.status_code == status.HTTP_200_OK
+
+    # Check what happened to the credentials
+    activation.refresh_from_db()
+    updated_creds = list(activation.eda_credentials.all())
+
+    # Verify persistence was disabled and FK field cleared
+    assert activation.enable_persistence is False
+    assert activation.rule_engine_credential is None
+
+    # Verify credentials are properly maintained
+    initial_cred_ids = [c.id for c in initial_creds]
+    updated_cred_ids = [c.id for c in updated_creds]
+
+    # The AAP credential should remain unchanged
+    assert (
+        aap_credential.id in updated_cred_ids
+    ), "AAP credential should remain in eda_credentials after update"
+
+    # Verify rule engine credential was never in eda_credentials
+    assert rule_engine_credential.id not in initial_cred_ids, (
+        "Rule engine credential should only be in FK field, "
+        "not in eda_credentials"
+    )
+    assert rule_engine_credential.id not in updated_cred_ids, (
+        "Rule engine credential should not be in eda_credentials "
+        "after update"
+    )
+
+    # Verify no credentials were lost or orphaned
+    assert (
+        len(initial_creds) == len(updated_creds) == 1
+    ), "Should have exactly 1 credential (AAP) before and after"
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_update_activation_enable_persistence_with_rule_engine_credential(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test enabling persistence and adding rule engine credential.
+
+    This test verifies that when an activation without persistence is
+    updated to enable persistence and add a rule engine credential:
+    1. The enable_persistence field is set to True
+    2. The rule_engine_credential FK field is set to the new credential
+    3. Regular credentials (AAP) remain in eda_credentials unchanged
+    4. Rule engine credential is only in the FK field, not in eda_credentials
+    """
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Create an AAP credential
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    aap_credential = models.EdaCredential.objects.create(
+        name="test-aap-credential",
+        credential_type=aap_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "https://controller.example.com",
+                "username": "testuser",
+                "password": "testpass",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create a rule engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret123secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create activation WITHOUT persistence enabled
+    activation_payload["is_enabled"] = False  # Must be disabled to update
+    activation_payload["eda_credentials"] = [aap_credential.id]
+    activation_payload["enable_persistence"] = False
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Verify initial state - no persistence, no rule engine credential
+    activation = models.Activation.objects.get(id=activation_id)
+    assert activation.enable_persistence is False
+    assert activation.rule_engine_credential is None
+    initial_creds = list(activation.eda_credentials.all())
+    assert len(initial_creds) == 1
+    assert initial_creds[0].id == aap_credential.id
+
+    # Now enable persistence and add rule engine credential
+    update_response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/",
+        data={
+            "enable_persistence": True,
+            "rule_engine_credential_id": rule_engine_credential.id,
+        },
+    )
+    assert update_response.status_code == status.HTTP_200_OK
+
+    # Verify the update
+    activation.refresh_from_db()
+
+    # Check persistence is enabled and rule_engine_credential FK field is set
+    assert activation.enable_persistence is True
+    assert activation.rule_engine_credential is not None
+    assert activation.rule_engine_credential.id == rule_engine_credential.id
+
+    # Check eda_credentials - should ONLY contain the AAP credential
+    updated_creds = list(activation.eda_credentials.all())
+    updated_cred_ids = [c.id for c in updated_creds]
+
+    assert len(updated_creds) == 1, (
+        f"Expected 1 credential in eda_credentials (only AAP), "
+        f"got {len(updated_creds)}: {updated_cred_ids}"
+    )
+    assert (
+        aap_credential.id in updated_cred_ids
+    ), "AAP credential should remain in eda_credentials"
+    assert rule_engine_credential.id not in updated_cred_ids, (
+        "Rule engine credential should NOT be in eda_credentials - "
+        "it should only be in the rule_engine_credential FK field"
+    )
+
+    # Verify the API response
+    assert update_response.data["enable_persistence"] is True
+    assert (
+        update_response.data["rule_engine_credential_id"]
+        == rule_engine_credential.id
+    )
+
+    # Response eda_credentials should show only the AAP credential
+    response_credential_ids = [
+        cred["id"] for cred in update_response.data["eda_credentials"]
+    ]
+    assert len(update_response.data["eda_credentials"]) == 1, (
+        f"Only AAP credential should appear in response, "
+        f"got {len(update_response.data['eda_credentials'])}"
+    )
+    assert aap_credential.id in response_credential_ids
+    assert (
+        rule_engine_credential.id not in response_credential_ids
+    ), "Rule engine credential should NOT be in response eda_credentials"
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_update_activation_change_rule_engine_credential(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test changing from one rule engine credential to another.
+
+    This test verifies that when switching rule engine credentials:
+    1. The rule_engine_credential FK field is updated to the new credential
+    2. Regular credentials (AAP) in eda_credentials remain unchanged
+    3. Neither old nor new rule engine credentials appear in eda_credentials
+    4. The change is clean with no orphaned or duplicate credentials
+
+    Since rule engine credentials are only stored in the FK field, changing
+    them is a simple field update without affecting the M2M relationship.
+    """
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Create an AAP credential
+    aap_credential_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.AAP
+    )
+    aap_credential = models.EdaCredential.objects.create(
+        name="test-aap-credential",
+        credential_type=aap_credential_type,
+        inputs=inputs_to_store(
+            {
+                "host": "https://controller.example.com",
+                "username": "testuser",
+                "password": "testpass",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create first rule engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential_1 = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential-1",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb1",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret123secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create second rule engine credential
+    rule_engine_credential_2 = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential-2",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb2",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret456secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create activation with AAP credential AND first rule engine credential
+    activation_payload["is_enabled"] = False  # Must be disabled to update
+    activation_payload["eda_credentials"] = [aap_credential.id]
+    activation_payload["enable_persistence"] = True
+    activation_payload[
+        "rule_engine_credential_id"
+    ] = rule_engine_credential_1.id
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    activation_id = response.data["id"]
+
+    # Verify initial state
+    activation = models.Activation.objects.get(id=activation_id)
+    initial_creds = list(activation.eda_credentials.all())
+    initial_cred_ids = [c.id for c in initial_creds]
+
+    # Now change to the second rule engine credential
+    update_response = admin_client.patch(
+        f"{api_url_v1}/activations/{activation_id}/",
+        data={
+            "rule_engine_credential_id": rule_engine_credential_2.id,
+        },
+    )
+    assert update_response.status_code == status.HTTP_200_OK
+
+    # Check what happened to the credentials
+    activation.refresh_from_db()
+    updated_creds = list(activation.eda_credentials.all())
+    updated_cred_ids = [c.id for c in updated_creds]
+
+    # Verify the FK field was updated to the new credential
+    assert activation.enable_persistence is True
+    assert (
+        activation.rule_engine_credential.id == rule_engine_credential_2.id
+    ), "FK field should be updated to new rule engine credential"
+
+    # Verify regular credentials remain unchanged
+    assert (
+        aap_credential.id in updated_cred_ids
+    ), "AAP credential should remain in eda_credentials"
+
+    # Verify neither old nor new rule engine credentials in eda_credentials
+    assert (
+        rule_engine_credential_1.id not in initial_cred_ids
+    ), "Old rule engine credential should never be in eda_credentials"
+    assert rule_engine_credential_1.id not in updated_cred_ids, (
+        "Old rule engine credential should not be in eda_credentials "
+        "after update"
+    )
+    assert (
+        rule_engine_credential_2.id not in updated_cred_ids
+    ), "New rule engine credential should not be in eda_credentials"
+
+    # Verify no credentials were lost, duplicated, or orphaned
+    assert (
+        len(initial_cred_ids) == len(updated_cred_ids) == 1
+    ), "Should have exactly 1 credential (AAP) before and after"
+    assert initial_cred_ids == updated_cred_ids, (
+        "eda_credentials should be unchanged when switching "
+        "rule engine credentials"
+    )
+
+
+@pytest.mark.django_db
+@mock.patch.object(settings, "RULEBOOK_WORKER_QUEUES", [])
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_create_activation_with_only_rule_engine_credential(
+    mock_health_check,
+    activation_payload: Dict[str, Any],
+    default_rulebook: models.Rulebook,
+    admin_client: APIClient,
+    preseed_credential_types,
+    default_organization: models.Organization,
+):
+    """Test creating activation with ONLY rule engine credential.
+
+    This test verifies that rule engine credentials stay in the FK field
+    and are not added to eda_credentials, even when there are no regular
+    credentials.
+    """
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    # Create a rule engine credential
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+    rule_engine_credential = models.EdaCredential.objects.create(
+        name="test-rule-engine-credential",
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "primary_encryption_secret": "secret123secret",
+            }
+        ),
+        organization=default_organization,
+    )
+
+    # Create activation with ONLY persistence (no eda_credentials)
+    activation_payload["enable_persistence"] = True
+    activation_payload["rule_engine_credential_id"] = rule_engine_credential.id
+    # Explicitly NOT setting eda_credentials
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/", data=activation_payload
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+
+    # Check what's in eda_credentials
+    activation = models.Activation.objects.get(id=response.data["id"])
+    all_creds = list(activation.eda_credentials.all())
+    cred_ids = [c.id for c in all_creds]
+
+    # Verify rule engine credential is only in FK field
+    assert len(all_creds) == 0, (
+        "eda_credentials should be empty when only rule engine "
+        "credential is provided"
+    )
+    assert (
+        rule_engine_credential.id not in cred_ids
+    ), "Rule engine credential should not be in eda_credentials"
+    assert activation.rule_engine_credential.id == (
+        rule_engine_credential.id
+    ), "Rule engine credential should be in FK field"

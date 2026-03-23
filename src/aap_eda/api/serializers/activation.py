@@ -48,6 +48,7 @@ from aap_eda.api.vault import encrypt_string
 from aap_eda.core import models, validators
 from aap_eda.core.enums import DefaultCredentialType, ProcessParentType
 from aap_eda.core.exceptions import CredentialPluginError, ParseError
+from aap_eda.core.models.utils import get_default_rule_engine_credential
 from aap_eda.core.utils.credentials import (
     get_resolved_secrets,
     get_secret_fields,
@@ -134,7 +135,12 @@ def _update_extra_vars_from_eda_credentials(
     creating: bool,
     activation: models.Activation = None,
 ) -> None:
-    for eda_credential_id in validated_data["eda_credentials"]:
+    all_credential_ids = list(validated_data.get("eda_credentials", []))
+    rule_engine_id = _get_rule_engine_credential_id(validated_data)
+    if rule_engine_id:
+        all_credential_ids.append(rule_engine_id)
+
+    for eda_credential_id in all_credential_ids:
         eda_credential = models.EdaCredential.objects.get(id=eda_credential_id)
         if (
             creating
@@ -193,9 +199,19 @@ def _get_user_extra_vars(
     if not extra_var_str:
         return ""
     extra_vars = yaml.safe_load(extra_var_str)
+    additional_credentials = []
+    if activation.enable_persistence:
+        if activation.rule_engine_credential:
+            additional_credentials.append(activation.rule_engine_credential)
+        else:
+            obj = get_default_rule_engine_credential()
+            if obj:
+                additional_credentials.append(obj)
 
     # remove extra_vars injected from credentials
-    for eda_credential in activation.eda_credentials.all():
+    for eda_credential in (
+        list(activation.eda_credentials.all()) + additional_credentials
+    ):
         injectors = eda_credential.credential_type.injectors
         if not injectors or "extra_vars" not in injectors:
             continue
@@ -216,6 +232,24 @@ def _update_event_streams_and_credential(validated_data: dict):
     if postgres_cred.id not in eda_credentials:
         eda_credentials.append(postgres_cred.id)
     validated_data["eda_credentials"] = eda_credentials
+
+
+def _get_rule_engine_credential_id(validated_data: dict) -> Optional[int]:
+    if not validated_data.get("enable_persistence", False):
+        return None
+
+    credential_id = validated_data.get("rule_engine_credential_id")
+    if credential_id is not None:
+        return credential_id
+
+    default_credential = get_default_rule_engine_credential()
+    if default_credential is None:
+        raise serializers.ValidationError(
+            "Persistence is enabled but no default "
+            "EDA Rule Engine credential found. "
+            "Please provide a rule_engine_credential_id."
+        )
+    return default_credential.id
 
 
 def _create_system_eda_credential(
@@ -299,6 +333,8 @@ class ActivationSerializer(serializers.ModelSerializer):
             "log_level",
             "event_streams",
             "skip_audit_events",
+            "enable_persistence",
+            "rule_engine_credential_id",
         ]
         read_only_fields = [
             "id",
@@ -371,6 +407,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "source_mappings",
             "skip_audit_events",
             "log_tracking_id",
+            "enable_persistence",
+            "rule_engine_credential_id",
         ]
         read_only_fields = [
             "id",
@@ -439,6 +477,8 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
             "edited_by": BasicUserSerializer(activation.edited_by).data,
+            "enable_persistence": activation.enable_persistence,
+            "rule_engine_credential_id": activation.rule_engine_credential_id,
         }
 
 
@@ -466,6 +506,8 @@ class ActivationCreateSerializer(
             "k8s_service_name",
             "source_mappings",
             "skip_audit_events",
+            "enable_persistence",
+            "rule_engine_credential_id",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -510,10 +552,15 @@ class ActivationCreateSerializer(
         allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
+        _validate_persistence_credential(data=data)
         return data
 
     def create(self, validated_data):
@@ -539,12 +586,11 @@ class ActivationCreateSerializer(
         if validated_data.get("source_mappings", []):
             _update_event_streams_and_credential(validated_data)
 
-        if validated_data.get("eda_credentials"):
-            _update_extra_vars_from_eda_credentials(
-                validated_data=validated_data,
-                vault_data=vault_data,
-                creating=True,
-            )
+        _update_extra_vars_from_eda_credentials(
+            validated_data=validated_data,
+            vault_data=vault_data,
+            creating=True,
+        )
 
         if vault_data.password_used:
             validated_data[
@@ -592,6 +638,8 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "git_hash": activation.rulebook.project.git_hash,
             "project": activation.rulebook.project,
             "log_tracking_id": str(uuid.uuid4()),
+            "enable_persistence": activation.enable_persistence,
+            "rule_engine_credential_id": activation.rule_engine_credential_id,
         }
         if activation.eda_system_vault_credential:
             inputs = yaml.safe_load(
@@ -632,6 +680,8 @@ class ActivationUpdateSerializer(
             "k8s_service_name",
             "source_mappings",
             "skip_audit_events",
+            "enable_persistence",
+            "rule_engine_credential_id",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -668,6 +718,10 @@ class ActivationUpdateSerializer(
         allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
 
     def refill_needed_data(
         self, data: dict, activation: models.Activation
@@ -690,6 +744,7 @@ class ActivationUpdateSerializer(
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
+        _validate_persistence_credential(data=data)
         return data
 
     def prepare_update(self, activation: models.Activation):
@@ -729,16 +784,17 @@ class ActivationUpdateSerializer(
                 ] = get_rulebook_hash(rulesets)
 
             _update_event_streams_and_credential(self.validated_data)
-        else:
+
+        # Always update extra_vars from credentials when updating
+        _update_extra_vars_from_eda_credentials(
+            validated_data=self.validated_data,
+            vault_data=vault_data,
+            creating=True,
+        )
+
+        if not yaml.safe_load(self.validated_data.get("source_mappings", "")):
             # no mappings, clear event_streams
             self.validated_data["event_streams"] = []
-
-        if self.validated_data.get("eda_credentials"):
-            _update_extra_vars_from_eda_credentials(
-                validated_data=self.validated_data,
-                vault_data=vault_data,
-                creating=True,
-            )
 
         if vault_data.password_used and not system_vault_credential:
             self.validated_data[
@@ -805,6 +861,8 @@ class ActivationUpdateSerializer(
             "k8s_service_name": activation.k8s_service_name,
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
+            "enable_persistence": activation.enable_persistence,
+            "rule_engine_credential_id": activation.rule_engine_credential_id,
         }
 
 
@@ -854,6 +912,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
     rulebook = RulebookRefSerializer(required=False, allow_null=True)
     instances = ActivationInstanceSerializer(many=True)
     organization = OrganizationRefSerializer()
+    rule_engine_credential = EdaCredentialSerializer(
+        required=False, allow_null=True
+    )
     rules_count = serializers.IntegerField()
     rules_fired_count = serializers.IntegerField()
     ruleset_stats = YAMLSerializerField(
@@ -927,6 +988,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "source_mappings",
             "skip_audit_events",
             "log_tracking_id",
+            "enable_persistence",
+            "rule_engine_credential_id",
+            "rule_engine_credential",
         ]
         read_only_fields = [
             "id",
@@ -972,6 +1036,11 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         organization = (
             OrganizationRefSerializer(activation.organization).data
             if activation.organization
+            else None
+        )
+        rule_engine_credential = (
+            EdaCredentialSerializer(activation.rule_engine_credential).data
+            if activation.rule_engine_credential
             else None
         )
         eda_credentials = [
@@ -1061,6 +1130,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "created_by": BasicUserSerializer(activation.created_by).data,
             "modified_by": BasicUserSerializer(activation.modified_by).data,
             "edited_by": BasicUserSerializer(activation.modified_by).data,
+            "enable_persistence": activation.enable_persistence,
+            "rule_engine_credential_id": activation.rule_engine_credential_id,
+            "rule_engine_credential": rule_engine_credential,
         }
 
 
@@ -1094,10 +1166,19 @@ class PostActivationSerializer(serializers.ModelSerializer):
         allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
     )
+    enable_persistence = serializers.BooleanField(
+        required=False,
+        default=False,
+    )
+    rule_engine_credential_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+    )
 
     def validate(self, data):
         _validate_credentials_and_token_and_rulebook(data=data, creating=False)
         _validate_sources_with_event_streams(data=data)
+        _validate_persistence_credential(data=data)
         return data
 
     class Meta:
@@ -1119,6 +1200,8 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "k8s_service_name",
             "source_mappings",
             "skip_audit_events",
+            "enable_persistence",
+            "rule_engine_credential_id",
         ]
         read_only_fields = [
             "id",
@@ -1140,11 +1223,15 @@ def get_rules_count(ruleset_stats: dict) -> tuple[int, int]:
 
 
 def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
-    data = activation.__dict__
+    data = activation.__dict__.copy()
     data["eda_credentials"] = [
         obj.id for obj in activation.eda_credentials.all()
     ]
+
     data["event_streams"] = [obj.id for obj in activation.event_streams.all()]
+    # Ensure persistence fields are explicitly set from the activation instance
+    data["enable_persistence"] = activation.enable_persistence
+    data["rule_engine_credential_id"] = activation.rule_engine_credential_id
     serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
@@ -1261,10 +1348,6 @@ def _validate_aap_credential(credential: models.EdaCredential) -> None:
 
 
 def _validate_eda_credentials(data: dict) -> None:
-    eda_credential_ids = data.get("eda_credentials")
-    if eda_credential_ids is None:
-        return
-
     existing_extra_var_keys = []
     existing_env_var_keys = []
     existing_file_keys = []
@@ -1281,7 +1364,12 @@ def _validate_eda_credentials(data: dict) -> None:
             " does not exist"
         )
 
-    for eda_credential_id in eda_credential_ids:
+    all_credential_ids = list(data.get("eda_credentials", []))
+    rule_engine_id = _get_rule_engine_credential_id(data)
+    if rule_engine_id:
+        all_credential_ids.append(rule_engine_id)
+
+    for eda_credential_id in all_credential_ids:
         try:
             eda_credential = models.EdaCredential.objects.get(
                 id=eda_credential_id
@@ -1488,3 +1576,47 @@ def _check_injectors(
             raise serializers.ValidationError(message)
 
         existing_keys.append(key)
+
+
+def _validate_persistence_credential(data: dict) -> None:
+    """Validate rule engine credential availability.
+
+    Validate that a rule engine credential is available when
+    persistence is enabled.
+    """
+    # Check if user provided a rule_engine_credential_id
+    credential = None
+    rule_engine_credential_id = data.get("rule_engine_credential_id")
+    if rule_engine_credential_id is not None:
+        # Verify the credential exists
+        try:
+            credential = models.EdaCredential.objects.get(
+                id=rule_engine_credential_id
+            )
+        except models.EdaCredential.DoesNotExist as exc:
+            raise serializers.ValidationError(
+                f"Rule Engine Credential with id "
+                f"{rule_engine_credential_id} does not exist"
+            ) from exc
+
+    if credential is not None:
+        # Verify the credential type has namespace "drools"
+        namespace = getattr(credential.credential_type, "namespace", None)
+        if namespace != "drools":
+            raise serializers.ValidationError(
+                f"Rule Engine Credential must have credential type "
+                f"with namespace 'drools', but got '{namespace}'"
+            )
+        return
+
+    if not data.get("enable_persistence", False):
+        return
+
+    # Check if default system credential exists
+    if credential is None and get_default_rule_engine_credential() is None:
+        raise serializers.ValidationError(
+            "Persistence is enabled but no rule_engine_credential_id "
+            "was provided and no default system credential with name "
+            f"'{settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME}' "
+            "could not be found. Contact your system administrator."
+        )
