@@ -67,7 +67,7 @@ validators = "^0.34.0"
 django-flags = "^5.0.13"
 insights-analytics-collector = "^0.3.2"
 distro = "^1.9.0"
-dispatcherd = { version = "v2026.2.26", extras = ["pg_notify"] }
+dispatcherd = { version = "v2026.3.25", extras = ["pg_notify"] }
 urllib3 = ">=2.6.3"
 awx-plugins-core = { version = "^0.0.1a10", extras = [
                               "credentials-aim",
