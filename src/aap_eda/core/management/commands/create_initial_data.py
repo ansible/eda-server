@@ -2387,6 +2387,7 @@ class Command(BaseCommand):
             settings_registry.persist_registry_data()
             self._preload_credential_types()
             self._update_postgres_credentials()
+            self._update_rule_engine_credentials()
             self._create_org_roles()
             self._create_obj_roles()
             self._remove_deprecated_credential_kinds()
@@ -2494,6 +2495,80 @@ class Command(BaseCommand):
             name=settings.DEFAULT_SYSTEM_PG_NOTIFY_CREDENTIAL_NAME,
             defaults={
                 "description": "Default PG Notify Credentials",
+                "managed": True,
+                "credential_type": cred_type,
+                "inputs": inputs_to_store(inputs),
+                "organization": get_default_organization(),
+            },
+        )
+
+    def _update_rule_engine_credentials(self):
+        if not settings.EVENT_PERSISTENCE_DB_HOST:
+            return
+
+        use_cert_auth = (
+            settings.EVENT_PERSISTENCE_PGSSLCERT
+            and settings.EVENT_PERSISTENCE_PGSSLKEY
+        )
+
+        required = {
+            "EVENT_PERSISTENCE_DB_PORT": settings.EVENT_PERSISTENCE_DB_PORT,
+            "EVENT_PERSISTENCE_DB_USER": settings.EVENT_PERSISTENCE_DB_USER,
+        }
+        if not use_cert_auth:
+            required[
+                "EVENT_PERSISTENCE_DB_PASSWORD"
+            ] = settings.EVENT_PERSISTENCE_DB_PASSWORD
+
+        missing = [k for k, v in required.items() if not v]
+        if missing:
+            raise ImproperlyConfigured(
+                "EVENT_PERSISTENCE_DB_HOST is set but the following "
+                "required settings are missing: "
+                f"{', '.join(missing)}"
+            )
+
+        cred_type = models.CredentialType.objects.get(
+            name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+        )
+
+        if use_cert_auth:
+            db_password = ""
+        else:
+            db_password = settings.EVENT_PERSISTENCE_DB_PASSWORD
+
+        inputs = {
+            "postgres_db_host": settings.EVENT_PERSISTENCE_DB_HOST,
+            "postgres_db_port": str(settings.EVENT_PERSISTENCE_DB_PORT),
+            "postgres_db_name": settings.EVENT_PERSISTENCE_DB_NAME,
+            "postgres_db_user": settings.EVENT_PERSISTENCE_DB_USER,
+            "postgres_db_password": db_password,
+            "postgres_sslmode": settings.EVENT_PERSISTENCE_PGSSLMODE,
+            "postgres_sslcert": "",
+            "postgres_sslkey": "",
+            "postgres_sslrootcert": "",
+        }
+
+        if use_cert_auth:
+            inputs["postgres_sslcert"] = self._read_file(
+                settings.EVENT_PERSISTENCE_PGSSLCERT,
+                "EVENT_PERSISTENCE_PGSSLCERT",
+            )
+            inputs["postgres_sslkey"] = self._read_file(
+                settings.EVENT_PERSISTENCE_PGSSLKEY,
+                "EVENT_PERSISTENCE_PGSSLKEY",
+            )
+
+        if settings.EVENT_PERSISTENCE_PGSSLROOTCERT:
+            inputs["postgres_sslrootcert"] = self._read_file(
+                settings.EVENT_PERSISTENCE_PGSSLROOTCERT,
+                "EVENT_PERSISTENCE_PGSSLROOTCERT",
+            )
+
+        models.EdaCredential.objects.update_or_create(
+            name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME,
+            defaults={
+                "description": "Default Rule Engine Credential",
                 "managed": True,
                 "credential_type": cred_type,
                 "inputs": inputs_to_store(inputs),

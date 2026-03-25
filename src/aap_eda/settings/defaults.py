@@ -220,6 +220,17 @@ EVENT_STREAM_DB_SSLCERT: Optional[str] = None  # Path to client certificate
 EVENT_STREAM_DB_SSLKEY: Optional[str] = None  # Path to client private key
 EVENT_STREAM_DB_SSLMODE: Optional[str] = None  # SSL mode for event streams
 
+# Database settings for the event persistence DB (rule engine)
+EVENT_PERSISTENCE_DB_HOST: Optional[str] = None
+EVENT_PERSISTENCE_DB_PORT: Optional[int] = None
+EVENT_PERSISTENCE_DB_NAME: str = "eda_event_persistence"
+EVENT_PERSISTENCE_DB_USER: Optional[str] = None
+EVENT_PERSISTENCE_DB_PASSWORD: Optional[str] = None
+EVENT_PERSISTENCE_PGSSLMODE: Optional[str] = "prefer"
+EVENT_PERSISTENCE_PGSSLCERT: Optional[str] = None
+EVENT_PERSISTENCE_PGSSLKEY: Optional[str] = None
+EVENT_PERSISTENCE_PGSSLROOTCERT: Optional[str] = None
+
 # --------------------------------------------------------
 # METRICS COLLECTIONS:
 # --------------------------------------------------------

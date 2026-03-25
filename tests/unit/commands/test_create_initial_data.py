@@ -252,3 +252,130 @@ def test_create_initial_data_postgres_cred_no_leak_platform_certs():
         # Should use password auth credentials
         assert decoded_inputs["postgres_db_user"] == "eda_event_stream"
         assert decoded_inputs["postgres_db_password"] == "test_password"
+
+
+@pytest.mark.django_db
+def test_create_initial_data_rule_engine_cred_not_created_without_host():
+    """Test that no rule engine credential is created when
+    EVENT_PERSISTENCE_DB_HOST is not set.
+    """
+    call_command("create_initial_data")
+    assert not models.EdaCredential.objects.filter(
+        name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_create_initial_data_rule_engine_cred_with_password_auth():
+    """Test that the rule engine credential is created with password auth."""
+    with override_settings(
+        EVENT_PERSISTENCE_DB_HOST="ep-host",
+        EVENT_PERSISTENCE_DB_PORT=5433,
+        EVENT_PERSISTENCE_DB_NAME="custom_db",
+        EVENT_PERSISTENCE_DB_USER="ep_user",
+        EVENT_PERSISTENCE_DB_PASSWORD="ep_password",
+        EVENT_PERSISTENCE_PGSSLMODE="verify-full",
+    ):
+        call_command("create_initial_data")
+        cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+        )
+        assert cred.managed is True
+        assert (
+            cred.credential_type.name
+            == enums.DefaultCredentialType.EDA_RULE_ENGINE
+        )
+
+        raw_inputs = (
+            cred.inputs.get_secret_value()
+            if isinstance(cred.inputs, SecretValue)
+            else cred.inputs
+        )
+        decoded_inputs = inputs_from_store(raw_inputs)
+
+        assert decoded_inputs["postgres_db_host"] == "ep-host"
+        assert decoded_inputs["postgres_db_port"] == "5433"
+        assert decoded_inputs["postgres_db_name"] == "custom_db"
+        assert decoded_inputs["postgres_db_user"] == "ep_user"
+        assert decoded_inputs["postgres_db_password"] == "ep_password"
+        assert decoded_inputs["postgres_sslmode"] == "verify-full"
+
+
+@pytest.mark.django_db
+def test_create_initial_data_rule_engine_cred_missing_required():
+    """Test that ImproperlyConfigured is raised when host is set
+    but other required settings are missing.
+    """
+    with override_settings(
+        EVENT_PERSISTENCE_DB_HOST="ep-host",
+        EVENT_PERSISTENCE_DB_PORT=None,
+        EVENT_PERSISTENCE_DB_USER=None,
+        EVENT_PERSISTENCE_DB_PASSWORD=None,
+    ):
+        with pytest.raises(ImproperlyConfigured, match="required settings"):
+            call_command("create_initial_data")
+
+
+@pytest.mark.django_db
+def test_create_initial_data_rule_engine_cred_cert_auth():
+    """Test that cert auth does not require a password."""
+    cert_file = tempfile.NamedTemporaryFile()
+    with open(cert_file.name, "w") as f:
+        f.write("rule-engine-cert")
+
+    key_file = tempfile.NamedTemporaryFile()
+    with open(key_file.name, "w") as f:
+        f.write("rule-engine-key")
+
+    with override_settings(
+        EVENT_PERSISTENCE_DB_HOST="ep-host",
+        EVENT_PERSISTENCE_DB_PORT=5432,
+        EVENT_PERSISTENCE_DB_USER="ep_user",
+        EVENT_PERSISTENCE_DB_PASSWORD=None,
+        EVENT_PERSISTENCE_PGSSLCERT=cert_file.name,
+        EVENT_PERSISTENCE_PGSSLKEY=key_file.name,
+    ):
+        call_command("create_initial_data")
+        cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+        )
+
+        raw_inputs = (
+            cred.inputs.get_secret_value()
+            if isinstance(cred.inputs, SecretValue)
+            else cred.inputs
+        )
+        decoded_inputs = inputs_from_store(raw_inputs)
+
+        assert decoded_inputs["postgres_db_password"] == ""
+        assert "rule-engine-cert" in decoded_inputs["postgres_sslcert"]
+        assert "rule-engine-key" in decoded_inputs["postgres_sslkey"]
+
+
+@pytest.mark.django_db
+def test_create_initial_data_rule_engine_cred_with_rootcert():
+    """Test that rootcert is read when provided."""
+    rootcert_file = tempfile.NamedTemporaryFile()
+    with open(rootcert_file.name, "w") as f:
+        f.write("rule-engine-rootcert")
+
+    with override_settings(
+        EVENT_PERSISTENCE_DB_HOST="ep-host",
+        EVENT_PERSISTENCE_DB_PORT=5432,
+        EVENT_PERSISTENCE_DB_USER="ep_user",
+        EVENT_PERSISTENCE_DB_PASSWORD="ep_password",
+        EVENT_PERSISTENCE_PGSSLROOTCERT=rootcert_file.name,
+    ):
+        call_command("create_initial_data")
+        cred = models.EdaCredential.objects.get(
+            name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+        )
+
+        raw_inputs = (
+            cred.inputs.get_secret_value()
+            if isinstance(cred.inputs, SecretValue)
+            else cred.inputs
+        )
+        decoded_inputs = inputs_from_store(raw_inputs)
+
+        assert "rule-engine-rootcert" in decoded_inputs["postgres_sslrootcert"]
