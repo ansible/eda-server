@@ -40,6 +40,7 @@ def get_ansible_rulebook_cmdline(data: InitData):
         id=data.activation.id,
         log_level="-v",
         heartbeat=5,
+        parent_id=data.activation.id,
     )
 
 

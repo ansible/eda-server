@@ -173,6 +173,21 @@ class Activation(
         help_text=("Skip audit events for activation"),
     )
     log_tracking_id = models.TextField(blank=True)
+    enable_persistence = models.BooleanField(
+        default=False,
+        help_text=("Enable persistence for activation"),
+    )
+    rule_engine_credential = models.ForeignKey(
+        "EdaCredential",
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=(
+            "The Rule Engine Credential to use, if empty use "
+            "the default system rule engine credential."
+        ),
+    )
 
     def get_parent_type(self) -> str:
         return ProcessParentType.ACTIVATION

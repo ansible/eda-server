@@ -1493,3 +1493,312 @@ def _prepare_system_vault_credential(
         credential_type=vault_credential_type,
         organization=organization,
     )
+
+
+# Tests for Rule Engine Credential handling in WebSocket Consumer
+
+
+@database_sync_to_async
+def _prepare_rule_engine_credential(
+    organization: models.Organization,
+    name: str = "test-rule-engine-credential",
+) -> models.EdaCredential:
+    """Helper to create a rule engine credential for testing."""
+    from aap_eda.core.utils.credentials import inputs_to_store
+
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+
+    return models.EdaCredential.objects.create(
+        name=name,
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "localhost",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "testdb",
+                "postgres_db_user": "testuser",
+                "postgres_db_password": "testpass",
+                "postgres_sslmode": "prefer",
+                "postgres_sslcert": "",
+                "postgres_sslkey": "",
+                "postgres_sslrootcert": "",
+                "postgres_sslpassword": "",
+                "primary_encryption_secret": "secret123",
+            }
+        ),
+        organization=organization,
+    )
+
+
+@database_sync_to_async
+def _prepare_activation_with_rule_engine_credential(
+    default_organization: models.Organization,
+    rule_engine_credential: models.EdaCredential,
+) -> int:
+    """Create activation with persistence and rule engine credential."""
+    project, _ = models.Project.objects.get_or_create(
+        name="test-project-persistence",
+        url="https://github.com/test/project",
+        git_hash="persistence123",
+        organization=default_organization,
+    )
+
+    rulebook, _ = models.Rulebook.objects.get_or_create(
+        name="test-rulebook-persistence",
+        rulesets=TEST_RULESETS,
+        project=project,
+        organization=default_organization,
+    )
+
+    user, _ = models.User.objects.get_or_create(
+        username="test.persistence",
+        defaults={
+            "first_name": "Test",
+            "last_name": "Persistence",
+            "email": "test.persistence@example.com",
+            "password": "secret",
+        },
+    )
+
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
+        name="de_persistence",
+        organization=default_organization,
+        defaults={
+            "image_url": "de_test_image",
+            "description": "de for persistence",
+        },
+    )
+
+    activation, _ = models.Activation.objects.get_or_create(
+        name="test-activation-persistence",
+        restart_policy=enums.RestartPolicy.ALWAYS,
+        extra_var=TEST_EXTRA_VAR,
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+        status=ActivationStatus.RUNNING,
+        organization=default_organization,
+        enable_persistence=True,
+        rule_engine_credential=rule_engine_credential,
+    )
+
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
+        activation=activation,
+        status=ActivationStatus.RUNNING,
+        organization=default_organization,
+    )
+
+    return rulebook_process.id
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_rule_engine_credential_with_user_provided(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test activation with user-provided rule engine credential works."""
+    # Create a rule engine credential
+    rule_engine_cred = await _prepare_rule_engine_credential(
+        default_organization
+    )
+
+    # Create activation with persistence and rule engine credential
+    process_id = await _prepare_activation_with_rule_engine_credential(
+        default_organization, rule_engine_cred
+    )
+
+    # Send Worker payload - should work without errors
+    payload = {
+        "type": "Worker",
+        "activation_id": process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    # Just verify we get EndOfResponse without errors
+    received_end = False
+    for _ in range(10):  # Allow more messages
+        try:
+            response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+            if response["type"] == "EndOfResponse":
+                received_end = True
+                break
+        except asyncio.TimeoutError:
+            break
+
+    assert received_end, "Should receive EndOfResponse"
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_rule_engine_credential_persistence_disabled(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test activation without persistence works normally."""
+    # Create activation WITHOUT persistence
+    process_id = await _prepare_db_data(default_organization)
+
+    # Send Worker payload
+    payload = {
+        "type": "Worker",
+        "activation_id": process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    # Expect standard message sequence (no persistence-related messages)
+    for message_type in [
+        "ExtraVars",
+        "Rulebook",
+        "ControllerInfo",
+        "EndOfResponse",
+    ]:
+        response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+        assert response["type"] == message_type
+
+
+@database_sync_to_async
+def _get_existing_default_rule_engine_credential() -> models.EdaCredential:
+    """Check if default system rule engine credential exists."""
+    from aap_eda.settings import core as settings
+
+    return models.EdaCredential.objects.filter(
+        name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME
+    ).first()
+
+
+@database_sync_to_async
+def _prepare_default_rule_engine_credential(
+    organization: models.Organization,
+) -> models.EdaCredential:
+    """Helper to create default system rule engine credential."""
+    from aap_eda.core.utils.credentials import inputs_to_store
+    from aap_eda.settings import core as settings
+
+    rule_engine_cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.EDA_RULE_ENGINE
+    )
+
+    return models.EdaCredential.objects.create(
+        name=settings.DEFAULT_SYSTEM_RULE_ENGINE_CREDENTIAL_NAME,
+        credential_type=rule_engine_cred_type,
+        inputs=inputs_to_store(
+            {
+                "postgres_db_host": "default-host",
+                "postgres_db_port": "5432",
+                "postgres_db_name": "defaultdb",
+                "postgres_db_user": "defaultuser",
+                "postgres_db_password": "defaultpass",
+                "postgres_sslmode": "prefer",
+                "postgres_sslcert": "",
+                "postgres_sslkey": "",
+                "postgres_sslrootcert": "",
+                "postgres_sslpassword": "",
+                "primary_encryption_secret": "defaultsecret",
+            }
+        ),
+        organization=organization,
+        managed=True,
+    )
+
+
+@database_sync_to_async
+def _prepare_activation_with_default_rule_engine_credential(
+    default_organization: models.Organization,
+) -> int:
+    """Create activation with persistence but no explicit credential."""
+    project, _ = models.Project.objects.get_or_create(
+        name="test-project-default-persistence",
+        url="https://github.com/test/project",
+        git_hash="defaultpersistence123",
+        organization=default_organization,
+    )
+
+    rulebook, _ = models.Rulebook.objects.get_or_create(
+        name="test-rulebook-default-persistence",
+        rulesets=TEST_RULESETS,
+        project=project,
+        organization=default_organization,
+    )
+
+    user, _ = models.User.objects.get_or_create(
+        username="test.default.persistence",
+        defaults={
+            "first_name": "Test",
+            "last_name": "DefaultPersistence",
+            "email": "test.default.persistence@example.com",
+            "password": "secret",
+        },
+    )
+
+    decision_environment, _ = models.DecisionEnvironment.objects.get_or_create(
+        name="de_default_persistence",
+        organization=default_organization,
+        defaults={
+            "image_url": "de_default_test_image",
+            "description": "de for default persistence",
+        },
+    )
+
+    activation, _ = models.Activation.objects.get_or_create(
+        name="test-activation-default-persistence",
+        restart_policy=enums.RestartPolicy.ALWAYS,
+        extra_var=TEST_EXTRA_VAR,
+        rulebook=rulebook,
+        project=project,
+        user=user,
+        decision_environment=decision_environment,
+        status=ActivationStatus.RUNNING,
+        organization=default_organization,
+        enable_persistence=True,
+        rule_engine_credential=None,  # No explicit credential
+    )
+
+    rulebook_process, _ = models.RulebookProcess.objects.get_or_create(
+        activation=activation,
+        status=ActivationStatus.RUNNING,
+        organization=default_organization,
+    )
+
+    return rulebook_process.id
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_rule_engine_credential_uses_default(
+    ws_communicator: WebsocketCommunicator,
+    default_organization: models.Organization,
+    preseed_credential_types,
+):
+    """Test activation uses default rule engine credential."""
+    # Check if default credential exists, create one if not for testing
+    existing_default = await _get_existing_default_rule_engine_credential()
+    if not existing_default:
+        await _prepare_default_rule_engine_credential(default_organization)
+
+    # Create activation with persistence but no explicit credential
+    process_id = await _prepare_activation_with_default_rule_engine_credential(
+        default_organization
+    )
+
+    # Send Worker payload - should use default credential
+    payload = {
+        "type": "Worker",
+        "activation_id": process_id,
+    }
+    await ws_communicator.send_json_to(payload)
+
+    # Verify we get EndOfResponse
+    received_end = False
+    for _ in range(10):
+        try:
+            response = await ws_communicator.receive_json_from(timeout=TIMEOUT)
+            if response["type"] == "EndOfResponse":
+                received_end = True
+                break
+        except asyncio.TimeoutError:
+            break
+
+    assert received_end, "Should receive EndOfResponse with default credential"

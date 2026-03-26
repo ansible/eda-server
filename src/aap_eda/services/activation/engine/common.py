@@ -63,8 +63,10 @@ class AnsibleRulebookCmdLine(BaseModel):
     id: tp.Union[str, int]  # casted to str
     log_level: tp.Optional[str] = None  # -v or -vv or None
     skip_audit_events: bool = False
+    parent_id: str | int  # casted to str
+    enable_persistence: bool = False
 
-    @validator("id", pre=True)
+    @validator("id", "parent_id", pre=True)
     def cast_to_str(cls, v):
         return str(v)
 
@@ -93,6 +95,8 @@ class AnsibleRulebookCmdLine(BaseModel):
             args.append("--skip-audit-events")
         if self.log_level:
             args.append(self.log_level)
+        if self.enable_persistence:
+            args.extend(["--persistence-id", self.parent_id])
 
         return args
 
@@ -200,6 +204,8 @@ class ContainerableMixin:
             heartbeat=settings.RULEBOOK_LIVENESS_CHECK_SECONDS,
             id=str(self.latest_instance.id),
             skip_audit_events=self._get_skip_audit_events(),
+            parent_id=self.id,
+            enable_persistence=self.enable_persistence,
         )
 
     def _get_log_level(self) -> tp.Optional[str]:
