@@ -36,6 +36,7 @@ from aap_eda.services.activation.restart_helper import (
     system_restart_activation,
 )
 
+from .drools_cleanup import drools_cleanup
 from .engine.common import ContainerableInvalidError, ContainerEngine
 from .engine.factory import new_container_engine
 from .status_manager import StatusManager, run_with_lock
@@ -789,6 +790,8 @@ class ActivationManager(StatusManager):
                 f"Reason: {exc}"
             )
             LOGGER.error(msg)
+        finally:
+            drools_cleanup(self.db_instance)
 
         # Save the id; once the db instance is deleted the id is set to None.
         saved_id = self.db_instance.id
