@@ -55,6 +55,11 @@ x-environment:
   - EDA_AUTOMATION_ANALYTICS_GATHER_INTERVAL=${EDA_AUTOMATION_ANALYTICS_GATHER_INTERVAL:-14400}
   - EDA_REDHAT_USERNAME=${EDA_REDHAT_USERNAME:-''}
   - EDA_REDHAT_PASSWORD=${EDA_REDHAT_PASSWORD:-''}
+  - EDA_EVENT_PERSISTENCE_DB_HOST=${EDA_EVENT_PERSISTENCE_DB_HOST:-postgres}
+  - EDA_EVENT_PERSISTENCE_DB_PORT=${EDA_EVENT_PERSISTENCE_DB_PORT:-5432}
+  - EDA_EVENT_PERSISTENCE_DB_NAME=${EDA_EVENT_PERSISTENCE_DB_NAME:-eda_event_persistence}
+  - EDA_EVENT_PERSISTENCE_DB_USER=${EDA_EVENT_PERSISTENCE_DB_USER:-eda}
+  - EDA_EVENT_PERSISTENCE_DB_PASSWORD=${EDA_EVENT_PERSISTENCE_DB_PASSWORD:-secret}
 
 
 services:
@@ -65,10 +70,13 @@ services:
       POSTGRESQL_PASSWORD: secret
       POSTGRESQL_ADMIN_PASSWORD: secret
       POSTGRESQL_DATABASE: eda
+      EDA_EVENT_PERSISTENCE_DB_NAME: ${EDA_EVENT_PERSISTENCE_DB_NAME:-eda_event_persistence}
+      EDA_EVENT_PERSISTENCE_DB_USER: ${EDA_EVENT_PERSISTENCE_DB_USER:-eda}
     ports:
       - '${EDA_PG_PORT:-5432}:5432'
     volumes:
       - 'postgres_data:/var/lib/pgsql/data'
+      - './postgres/initdb.d/create_event_persistence_db.sh:/opt/app-root/src/postgresql-start/create_event_persistence_db.sh:z'
     healthcheck:
       test: [ 'CMD', 'pg_isready', '-U', 'postgres' ]
       interval: 5s
