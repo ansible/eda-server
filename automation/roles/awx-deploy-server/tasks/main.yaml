@@ -1,0 +1,80 @@
+---
+- name: Check {{ env_type }} connection
+  block:
+    - k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: default
+        name: ansible-check-pod
+        kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+      register: k8s_info_result
+  rescue:
+    - fail:
+        msg: "Failed to connect to Kubernetes cluster. Please check your configuration and try again."
+  always:
+    - debug:
+        var: k8s_info_result
+
+- name: Check if {{ awx_namespace }} namespace exists
+  k8s_info:
+    kind: Namespace
+    name: "{{ awx_namespace }}"
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+  register: namespace_info
+  failed_when: namespace_info.resources|length == 0
+
+- name: Define the AWX Host
+  set_fact:
+    awx_host: "{{ 'awx.local' if env_type == 'minikube' else 'awx-aap-awx.apps-crc.testing' }}"
+
+- name: Generate private key
+  command: "openssl genpkey -algorithm RSA -out tls.key"
+  args:
+    chdir: "{{ awx_server_files_path }}"
+
+- name: Generate certificate signing request (CSR)
+  command: "openssl req -new -key tls.key -out csr.pem -subj '/CN={{ awx_host }}/O={{ awx_host }}' -addext 'subjectAltName=DNS:{{ awx_host }}'"
+  args:
+    chdir: "{{ awx_server_files_path }}"
+
+- name: Generate signed certificate
+  command: "openssl x509 -req -in csr.pem -signkey tls.key -out tls.crt -days 365"
+  args:
+    chdir: "{{ awx_server_files_path }}"
+
+- name: Remove temporary certificate signing request (CSR)
+  file:
+    path: "{{ awx_server_files_path }}/csr.pem"
+    state: absent
+
+- name: Define Ingress type
+  set_fact:
+    ingress_type: "{{ 'ingress' if env_type == 'minikube' else 'Route' }}"
+
+- name: Define the TLS termination Mechanism
+  set_fact:
+    tls_termination_mechanism: "{{ '' if env_type == 'minikube' else 'Edge' }}"
+
+- name: Define the PostgreSQL storage class
+  set_fact:
+    postgres_storage_class: "{{ 'standard' if env_type == 'minikube' else 'crc-csi-hostpath-provisioner' }}"
+
+- name: Generate AWX Server pvc file
+  template:
+    src: awx-server-pvc.yaml.j2
+    dest: "{{ awx_server_files_path }}/awx-server-pvc.yaml"
+
+- name: Generate AWX Server file
+  template:
+    src: awx-server.yaml.j2
+    dest: "{{ awx_server_files_path }}/awx-server.yaml"
+
+- name: Generate AWX Server kustomization file
+  template:
+    src: awx-server-kustomization.yaml.j2
+    dest: "{{ awx_server_files_path }}/kustomization.yaml"
+
+- name: Apply AWX Server kustomization file
+  k8s:
+    definition: "{{ lookup('pipe', 'kustomize build {{ awx_server_files_path }}') }}"
+    state: present

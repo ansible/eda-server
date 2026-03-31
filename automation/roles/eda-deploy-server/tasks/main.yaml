@@ -1,0 +1,80 @@
+---
+- name: Check {{ env_type }} connection
+  block:
+    - k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: default
+        name: ansible-check-pod
+        kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+      register: k8s_info_result
+  rescue:
+    - fail:
+        msg: "Failed to connect to Kubernetes cluster. Please check your configuration and try again."
+  always:
+    - debug:
+        var: k8s_info_result
+
+- name: Check if {{ eda_namespace }} namespace exists
+  k8s_info:
+    kind: Namespace
+    name: "{{ eda_namespace }}"
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+  register: namespace_info
+  failed_when: namespace_info.resources|length == 0
+
+- name: Define the EDA Host
+  set_fact:
+    eda_host: "{{ 'eda.local' if env_type == 'minikube' else 'eda-aap-eda.apps-crc.testing' }}"
+
+- name: Generate private key
+  command: "openssl genpkey -algorithm RSA -out tls.key"
+  args:
+    chdir: "{{ eda_server_files_path }}"
+
+- name: Generate certificate signing request (CSR)
+  command: "openssl req -new -key tls.key -out csr.pem -subj '/CN={{ eda_host }}/O={{ eda_host }}' -addext 'subjectAltName=DNS:{{ eda_host }}'"
+  args:
+    chdir: "{{ eda_server_files_path }}"
+
+- name: Generate signed certificate
+  command: "openssl x509 -req -in csr.pem -signkey tls.key -out tls.crt -days 365"
+  args:
+    chdir: "{{ eda_server_files_path }}"
+
+- name: Remove temporary certificate signing request (CSR)
+  file:
+    path: "{{ eda_server_files_path }}/csr.pem"
+    state: absent
+
+- name: Define Ingress type
+  set_fact:
+    ingress_type: "{{ 'ingress' if env_type == 'minikube' else 'Route' }}"
+
+- name: Define the TLS termination Mechanism
+  set_fact:
+    tls_termination_mechanism: "{{ '' if env_type == 'minikube' else 'Edge' }}"
+
+- name: Define the PostgreSQL storage class
+  set_fact:
+    postgres_storage_class: "{{ 'standard' if env_type == 'minikube' else 'crc-csi-hostpath-provisioner' }}"
+
+- name: Generate EDA Server pvc file
+  template:
+    src: eda-server-pvc.yaml.j2
+    dest: "{{ eda_server_files_path }}/eda-server-pvc.yaml"
+
+- name: Generate EDA Server file
+  template:
+    src: eda-server.yaml.j2
+    dest: "{{ eda_server_files_path }}/eda-server.yaml"
+
+- name: Generate EDA Server kustomization file
+  template:
+    src: eda-server-kustomization.yaml.j2
+    dest: "{{ eda_server_files_path }}/kustomization.yaml"
+
+- name: Apply EDA Server kustomization file
+  k8s:
+    definition: "{{ lookup('pipe', 'kustomize build {{ eda_server_files_path }}') }}"
+    state: present
