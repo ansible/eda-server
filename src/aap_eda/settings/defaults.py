@@ -222,7 +222,7 @@ EVENT_STREAM_DB_SSLMODE: Optional[str] = None  # SSL mode for event streams
 
 # Database settings for the event persistence DB (rule engine)
 EVENT_PERSISTENCE_DB_HOST: Optional[str] = None
-EVENT_PERSISTENCE_DB_PORT: Optional[int] = None
+EVENT_PERSISTENCE_DB_PORT: Optional[str] = None
 EVENT_PERSISTENCE_DB_NAME: str = "eda_event_persistence"
 EVENT_PERSISTENCE_DB_USER: Optional[str] = None
 EVENT_PERSISTENCE_DB_PASSWORD: Optional[str] = None
