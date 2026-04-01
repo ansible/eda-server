@@ -270,7 +270,7 @@ def test_create_initial_data_rule_engine_cred_with_password_auth():
     """Test that the rule engine credential is created with password auth."""
     with override_settings(
         EVENT_PERSISTENCE_DB_HOST="ep-host",
-        EVENT_PERSISTENCE_DB_PORT=5433,
+        EVENT_PERSISTENCE_DB_PORT="5433",
         EVENT_PERSISTENCE_DB_NAME="custom_db",
         EVENT_PERSISTENCE_DB_USER="ep_user",
         EVENT_PERSISTENCE_DB_PASSWORD="ep_password",
@@ -329,7 +329,7 @@ def test_create_initial_data_rule_engine_cred_cert_auth():
 
     with override_settings(
         EVENT_PERSISTENCE_DB_HOST="ep-host",
-        EVENT_PERSISTENCE_DB_PORT=5432,
+        EVENT_PERSISTENCE_DB_PORT="5432",
         EVENT_PERSISTENCE_DB_USER="ep_user",
         EVENT_PERSISTENCE_DB_PASSWORD=None,
         EVENT_PERSISTENCE_PGSSLCERT=cert_file.name,
@@ -361,7 +361,7 @@ def test_create_initial_data_rule_engine_cred_with_rootcert():
 
     with override_settings(
         EVENT_PERSISTENCE_DB_HOST="ep-host",
-        EVENT_PERSISTENCE_DB_PORT=5432,
+        EVENT_PERSISTENCE_DB_PORT="5432",
         EVENT_PERSISTENCE_DB_USER="ep_user",
         EVENT_PERSISTENCE_DB_PASSWORD="ep_password",
         EVENT_PERSISTENCE_PGSSLROOTCERT=rootcert_file.name,

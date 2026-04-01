@@ -2539,7 +2539,7 @@ class Command(BaseCommand):
 
         inputs = {
             "postgres_db_host": settings.EVENT_PERSISTENCE_DB_HOST,
-            "postgres_db_port": str(settings.EVENT_PERSISTENCE_DB_PORT),
+            "postgres_db_port": settings.EVENT_PERSISTENCE_DB_PORT,
             "postgres_db_name": settings.EVENT_PERSISTENCE_DB_NAME,
             "postgres_db_user": settings.EVENT_PERSISTENCE_DB_USER,
             "postgres_db_password": db_password,
