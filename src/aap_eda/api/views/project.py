@@ -46,6 +46,11 @@ class DestroyProjectMixin(mixins.DestroyModelMixin):
     def destroy(self, request, *args, **kwargs):
         project = self.get_object()
 
+        if project.import_state == models.Project.ImportState.PENDING:
+            raise api_exc.Conflict(
+                detail="Project Sync is running. Please try again in a moment."
+            )
+
         response = super().destroy(request, *args, **kwargs)
 
         logger.info(
