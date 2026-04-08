@@ -931,7 +931,7 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-ansible-base"
-version = "2026.4.7.0.dev4+g1d99b5cb7"
+version = "2026.4.8.0.dev5+gd2fcd397c"
 description = "A Django app used by ansible services"
 optional = false
 python-versions = ">=3.11"
@@ -970,7 +970,7 @@ testing = ["cryptography", "pytest", "pytest-django"]
 type = "git"
 url = "https://github.com/ansible/django-ansible-base.git"
 reference = "devel"
-resolved_reference = "1d99b5cb7eda50b0460a65b5f6f70045669694d2"
+resolved_reference = "d2fcd397cadcbc30c70a3e0eb0b13c70db495ce6"
 
 [[package]]
 name = "django-crum"
@@ -2436,18 +2436,18 @@ tests = ["hypothesis (>=3.27.0)", "pytest (>=3.2.1,!=3.3.0)"]
 
 [[package]]
 name = "pyopenssl"
-version = "25.3.0"
+version = "26.0.0"
 description = "Python wrapper module around the OpenSSL library"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "pyopenssl-25.3.0-py3-none-any.whl", hash = "sha256:1fda6fc034d5e3d179d39e59c1895c9faeaf40a79de5fc4cbbfbe0d36f4a77b6"},
-    {file = "pyopenssl-25.3.0.tar.gz", hash = "sha256:c981cb0a3fd84e8602d7afc209522773b94c1c2446a3c710a75b06fe1beae329"},
+    {file = "pyopenssl-26.0.0-py3-none-any.whl", hash = "sha256:df94d28498848b98cc1c0ffb8ef1e71e40210d3b0a8064c9d29571ed2904bf81"},
+    {file = "pyopenssl-26.0.0.tar.gz", hash = "sha256:f293934e52936f2e3413b89c6ce36df66a0b34ae1ea3a053b8c5020ff2f513fc"},
 ]
 
 [package.dependencies]
-cryptography = ">=45.0.7,<47"
+cryptography = ">=46.0.0,<47"
 typing-extensions = {version = ">=4.9", markers = "python_version < \"3.13\" and python_version >= \"3.8\""}
 
 [package.extras]
@@ -3451,4 +3451,4 @@ dev = ["psycopg-binary"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.13"
-content-hash = "2b57dc6032ca2f1618613a496af9b5b4718397293dac8f2386512402b181d3be"
+content-hash = "06f6bb010f5b12f3e3b6844ba5b1eab7e406da6870fcc5ca534aa8bf64b6c509"
