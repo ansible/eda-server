@@ -87,7 +87,7 @@ def get_jwt_token(user_id, expiration, **kwargs):
 
 def parse_jwt_token(token: str) -> dict:
     try:
-        return jwt.decode(token, settings.SECRET_KEY, JWT_ALGORITHM)
+        return jwt.decode(token, settings.SECRET_KEY, [JWT_ALGORITHM])
     except jwt.DecodeError as e:
         raise InvalidTokenError("Bad token") from e
     except jwt.ExpiredSignatureError as e:

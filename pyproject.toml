@@ -61,7 +61,7 @@ python-gnupg = "^0.5.2"
 autobahn = ">=24.4.2"
 psycopg = "^3.1.17"
 xxhash = "3.4.*"
-pyjwt = { version = "2.7.*", extras = ["crypto"] }
+pyjwt = { version = ">=2.12.1,<3", extras = ["crypto"] }
 ecdsa = "0.18.*"
 validators = "^0.34.0"
 django-flags = "^5.0.13"
