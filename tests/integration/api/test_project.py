@@ -909,6 +909,21 @@ def test_delete_project_not_found(admin_client: APIClient):
 
 
 @pytest.mark.django_db
+def test_delete_new_project_still_syncing(
+    new_project: models.Project,
+    admin_client: APIClient,
+):
+    # Set import_state to pending to simulate syncing
+
+    new_project.import_state = models.Project.ImportState.PENDING
+    new_project.save(update_fields=["import_state"])
+
+    response = admin_client.delete(f"{api_url_v1}/projects/{new_project.id}/")
+
+    assert response.status_code == 409
+
+
+@pytest.mark.django_db
 @mock.patch("aap_eda.tasks.import_project")
 @mock.patch(
     "aap_eda.api.views.project.RedisDependencyMixin.redis_is_available"
