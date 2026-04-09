@@ -1,0 +1,124 @@
+name: CI-stable-2.7
+
+env:
+  POETRY_NO_INTERACTION: 1
+
+on:
+  push:
+    branches: [ 'stable-2.7' ]
+  pull_request:
+    branches: [ 'stable-2.7' ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: lint
+        uses: ./.github/actions/lint
+
+  test:
+    runs-on: ubuntu-latest
+    permissions: read-all
+    strategy:
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+    env:
+      EDA_SECRET_KEY: 'test'
+      EDA_DB_PASSWORD: 'secret'
+      PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_USER }}
+      PDE_ORG_RESULTS_UPLOAD_PASSWORD: ${{ secrets.PDE_ORG_RESULTS_UPLOAD_PASSWORD }}
+      PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL: ${{ vars.PDE_ORG_RESULTS_AGGREGATOR_UPLOAD_URL }}
+    services:
+      postgres:
+        image: 'quay.io/sclorg/postgresql-15-c9s:latest'
+        env:
+          POSTGRESQL_USER: eda
+          POSTGRESQL_PASSWORD: ${{ env.EDA_DB_PASSWORD }}
+          POSTGRESQL_ADMIN_PASSWORD: ${{ env.EDA_DB_PASSWORD }}
+          POSTGRESQL_DATABASE: eda
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - '5432:5432'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure Git access to private org repos
+        env:
+          # WARNING: This token is temporary, valid until 2026-05-01
+          GITHUB_TOKEN: ${{ secrets.AAP_ORG_FG_ANSIBLE_CICD_BOT_ACTIONS_REPO_READ }}
+        run: |
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: test
+        uses: ./.github/actions/test
+        with:
+          python-version: ${{ matrix.python-version }}
+
+  generate-openapi-spec:
+    name: Generate OpenAPI spec
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Configure Git access to private org repos
+        env:
+          GITHUB_TOKEN: ${{ secrets.AAP_ORG_FG_ANSIBLE_CICD_BOT_ACTIONS_REPO_READ }}
+        run: |
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: Install dependencies
+        run: poetry install -E all --only main
+
+      - name: Generate OpenAPI specification
+        env:
+          EDA_SECRET_KEY: "insecure-dev-key-for-ci"
+        run: |
+          poetry run aap-eda-manage spectacular \
+            --file openapi.json \
+            --format openapi-json
+
+      - name: Verify spec file
+        run: |
+          if [ ! -f "openapi.json" ]; then
+            echo "❌ Spec file not found"
+            exit 1
+          fi
+          echo "✅ Generated openapi.json ($(wc -c < openapi.json) bytes)"
+
+      - name: Upload spec artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi-spec
+          path: openapi.json
+
+  sync-openapi-spec:
+    needs: generate-openapi-spec
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/sync-openapi-spec.yml
+    secrets:
+      OPENAPI_SPEC_SYNC_TOKEN: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
