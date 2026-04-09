@@ -45,7 +45,7 @@ cryptography = ">=46.0.5,<47"
 pyopenssl = ">=26.0.0"
 kubernetes = "26.1.*"
 podman = "5.4.*"
-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
+django-ansible-base = { git = "git@github.com:ansible-automation-platform/django-ansible-base.git", branch = "stable-2.7", extras = [
     "channel-auth",
     "rbac",
     "resource-registry",
