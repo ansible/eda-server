@@ -676,12 +676,12 @@ class ActivationCreateSerializer(
         )
 
         if vault_data.password_used:
-            validated_data["eda_system_vault_credential"] = (
-                _create_system_eda_credential(
-                    vault_data.password,
-                    _get_vault_credential_type(),
-                    validated_data.get("organization_id"),
-                )
+            validated_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(
+                vault_data.password,
+                _get_vault_credential_type(),
+                validated_data.get("organization_id"),
             )
 
         return super().create(validated_data)
@@ -733,12 +733,12 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             inputs = yaml.safe_load(
                 activation.eda_system_vault_credential.inputs.get_secret_value()  # noqa E501
             )
-            copied_data["eda_system_vault_credential"] = (
-                _create_system_eda_credential(
-                    inputs["vault_password"],
-                    _get_vault_credential_type(),
-                    activation.organization.id,
-                )
+            copied_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(
+                inputs["vault_password"],
+                _get_vault_credential_type(),
+                activation.organization.id,
             )
 
         return super().create(copied_data)
@@ -838,9 +838,9 @@ class ActivationUpdateSerializer(
         if "k8s_service_name" not in data:
             data["k8s_service_name"] = activation.k8s_service_name
         if "k8s_pod_service_account_name" not in data:
-            data["k8s_pod_service_account_name"] = (
-                activation.k8s_pod_service_account_name
-            )
+            data[
+                "k8s_pod_service_account_name"
+            ] = activation.k8s_pod_service_account_name
         if "k8s_pod_labels" not in data:
             data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
         if "k8s_pod_annotations" not in data:
@@ -876,9 +876,9 @@ class ActivationUpdateSerializer(
             rulebook = models.Rulebook.objects.get(id=rulebook_id)
             self.validated_data["rulebook_name"] = rulebook.name
             self.validated_data["rulebook_rulesets"] = rulebook.rulesets
-            self.validated_data["rulebook_rulesets_sha256"] = (
-                get_rulebook_hash(rulebook.rulesets)
-            )
+            self.validated_data[
+                "rulebook_rulesets_sha256"
+            ] = get_rulebook_hash(rulebook.rulesets)
             self.validated_data["git_hash"] = rulebook.project.git_hash
             self.validated_data["project_id"] = rulebook.project.id
 
@@ -895,9 +895,9 @@ class ActivationUpdateSerializer(
                 # load the original ruleset
                 rulesets = activation.rulebook.rulesets
                 self.validated_data["rulebook_rulesets"] = rulesets
-                self.validated_data["rulebook_rulesets_sha256"] = (
-                    get_rulebook_hash(rulesets)
-                )
+                self.validated_data[
+                    "rulebook_rulesets_sha256"
+                ] = get_rulebook_hash(rulesets)
 
             _update_event_streams_and_credential(self.validated_data)
 
@@ -913,14 +913,14 @@ class ActivationUpdateSerializer(
             self.validated_data["event_streams"] = []
 
         if vault_data.password_used and not system_vault_credential:
-            self.validated_data["eda_system_vault_credential"] = (
-                _create_system_eda_credential(
-                    vault_data.password,
-                    _get_vault_credential_type(),
-                    self.validated_data.get(
-                        "organization_id", activation.organization.id
-                    ),
-                )
+            self.validated_data[
+                "eda_system_vault_credential"
+            ] = _create_system_eda_credential(
+                vault_data.password,
+                _get_vault_credential_type(),
+                self.validated_data.get(
+                    "organization_id", activation.organization.id
+                ),
             )
 
     def update(
@@ -1395,9 +1395,9 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
     # Ensure persistence fields are explicitly set from the activation instance
     data["enable_persistence"] = activation.enable_persistence
     data["rule_engine_credential_id"] = activation.rule_engine_credential_id
-    data["k8s_pod_service_account_name"] = (
-        activation.k8s_pod_service_account_name
-    )
+    data[
+        "k8s_pod_service_account_name"
+    ] = activation.k8s_pod_service_account_name
     data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
     data["k8s_pod_annotations"] = activation.k8s_pod_annotations or {}
     serializer = PostActivationSerializer(data=data)
