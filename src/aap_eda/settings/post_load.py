@@ -302,10 +302,10 @@ def _get_default_pg_notify_dsn_server(settings: Dynaconf) -> str:
         f"dbname={settings.DATABASES['default']['NAME']} "
         f"user={settings.DATABASES['default']['USER']} "
         f"password={settings.DATABASES['default']['PASSWORD']} "
-        f"sslmode={db_options.get('sslmode','allow')} "
-        f"sslcert={db_options.get('sslcert','')} "
-        f"sslkey={db_options.get('sslkey','')} "
-        f"sslrootcert={db_options.get('sslrootcert','')} "
+        f"sslmode={db_options.get('sslmode', 'allow')} "
+        f"sslcert={db_options.get('sslcert', '')} "
+        f"sslkey={db_options.get('sslkey', '')} "
+        f"sslrootcert={db_options.get('sslrootcert', '')} "
     )
 
 
@@ -320,6 +320,27 @@ def _set_resource_server(settings: Dynaconf) -> None:
         ] = {"schedule": 900}
 
 
+def _enforce_optional_str_type(settings: Dynaconf, key: str, value) -> None:
+    """Enforce Optional[str] type, converting int to str if needed."""
+    if value is None:
+        # None is valid for Optional[str]
+        pass
+    elif isinstance(value, int):
+        settings[key] = str(value)
+    elif isinstance(value, str):
+        settings[key] = _get_stripped_str(settings, key)
+    else:
+        _validate_type(key, value, Optional[str])
+
+
+def _enforce_str_type(settings: Dynaconf, key: str, value) -> None:
+    """Enforce str type."""
+    if isinstance(value, str):
+        settings[key] = _get_stripped_str(settings, key)
+    else:
+        _validate_type(key, value, str)
+
+
 def _enforce_types(settings: Dynaconf) -> None:
     for key, key_type in get_type_hints(defaults).items():
         if key_type is defaults.StrToList:
@@ -330,10 +351,12 @@ def _enforce_types(settings: Dynaconf) -> None:
             settings[key] = _get_int(settings, key)
         elif key_type is defaults.UrlSlash:
             settings[key] = _get_url_end_slash(settings, key)
+        elif key_type is Optional[str]:
+            _enforce_optional_str_type(settings, key, settings[key])
+        elif key_type is str:
+            _enforce_str_type(settings, key, settings[key])
         elif not isinstance(settings[key], key_type):
             _validate_type(key, settings[key], key_type)
-        elif key_type is str or key_type is Optional[str]:
-            settings[key] = _get_stripped_str(settings, key)
 
 
 def _validate_type(key: str, value, key_type) -> None:
