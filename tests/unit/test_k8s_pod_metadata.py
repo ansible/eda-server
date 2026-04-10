@@ -35,6 +35,21 @@ def test_validate_k8s_pod_labels_non_string_value():
         validate_k8s_pod_labels({"x": 1})
 
 
+def test_validate_k8s_pod_labels_rejects_non_object():
+    with pytest.raises(serializers.ValidationError):
+        validate_k8s_pod_labels("not-a-dict")
+
+
+def test_validate_k8s_pod_labels_rejects_long_unqualified_key():
+    with pytest.raises(serializers.ValidationError):
+        validate_k8s_pod_labels({"x" * 64: "y"})
+
+
+def test_validate_k8s_pod_labels_rejects_long_value():
+    with pytest.raises(serializers.ValidationError):
+        validate_k8s_pod_labels({"k": "v" * 64})
+
+
 def test_validate_k8s_pod_annotations_ok():
     validate_k8s_pod_annotations(
         {"eks.amazonaws.com/role-arn": "arn:aws:iam::123456789012:role/r"}
@@ -44,3 +59,19 @@ def test_validate_k8s_pod_annotations_ok():
 def test_validate_k8s_pod_annotations_invalid_key():
     with pytest.raises(serializers.ValidationError):
         validate_k8s_pod_annotations({"": "x"})
+
+
+def test_validate_k8s_pod_annotations_rejects_non_object():
+    with pytest.raises(serializers.ValidationError):
+        validate_k8s_pod_annotations([])
+
+
+def test_validate_k8s_pod_annotations_rejects_oversized_value():
+    huge = "x" * (256 * 1024 + 1)
+    with pytest.raises(serializers.ValidationError):
+        validate_k8s_pod_annotations({"example.com/k": huge})
+
+
+def test_validate_k8s_pod_annotations_allows_large_value_within_limit():
+    limit = 256 * 1024
+    validate_k8s_pod_annotations({"example.com/k": "z" * limit})

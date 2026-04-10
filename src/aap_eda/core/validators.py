@@ -345,6 +345,7 @@ def check_if_k8s_pod_service_account_name_valid(name: str) -> None:
 
 
 def check_if_k8s_pod_labels_valid(value) -> None:
+    """Run Kubernetes label validation when deployment type is k8s."""
     if value in (None, {}):
         return
     if settings.DEPLOYMENT_TYPE != "k8s":
@@ -353,6 +354,7 @@ def check_if_k8s_pod_labels_valid(value) -> None:
 
 
 def check_if_k8s_pod_annotations_valid(value) -> None:
+    """Run Kubernetes annotation validation when deployment type is k8s."""
     if value in (None, {}):
         return
     if settings.DEPLOYMENT_TYPE != "k8s":
