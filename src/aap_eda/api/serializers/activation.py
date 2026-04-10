@@ -117,6 +117,19 @@ def _update_k8s_service_name(validated_data: dict) -> str:
     return service_name or create_k8s_service_name(validated_data["name"])
 
 
+def _activation_k8s_pod_metadata_payload(
+    activation: "models.Activation",
+) -> dict:
+    """Build the k8s pod-metadata dict for serializer representation."""
+    return {
+        "k8s_pod_service_account_name": (
+            activation.k8s_pod_service_account_name
+        ),
+        "k8s_pod_labels": activation.k8s_pod_labels or {},
+        "k8s_pod_annotations": (activation.k8s_pod_annotations or {}),
+    }
+
+
 def _normalize_activation_k8s_pod_fields(data: dict) -> None:
     """Trim ServiceAccount name and string keys/values in pod label maps."""
     sa = data.get("k8s_pod_service_account_name")
@@ -537,11 +550,7 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "edited_by": BasicUserSerializer(activation.edited_by).data,
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
-            "k8s_pod_service_account_name": (
-                activation.k8s_pod_service_account_name
-            ),
-            "k8s_pod_labels": activation.k8s_pod_labels or {},
-            "k8s_pod_annotations": activation.k8s_pod_annotations or {},
+            **_activation_k8s_pod_metadata_payload(activation),
         }
 
 
@@ -723,11 +732,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "log_tracking_id": str(uuid.uuid4()),
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
-            "k8s_pod_service_account_name": (
-                activation.k8s_pod_service_account_name
-            ),
-            "k8s_pod_labels": activation.k8s_pod_labels or {},
-            "k8s_pod_annotations": activation.k8s_pod_annotations or {},
+            **_activation_k8s_pod_metadata_payload(activation),
         }
         if activation.eda_system_vault_credential:
             inputs = yaml.safe_load(
@@ -975,11 +980,7 @@ class ActivationUpdateSerializer(
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
-            "k8s_pod_service_account_name": (
-                activation.k8s_pod_service_account_name
-            ),
-            "k8s_pod_labels": activation.k8s_pod_labels or {},
-            "k8s_pod_annotations": activation.k8s_pod_annotations or {},
+            **_activation_k8s_pod_metadata_payload(activation),
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
             "enable_persistence": activation.enable_persistence,
@@ -1260,11 +1261,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
-            "k8s_pod_service_account_name": (
-                activation.k8s_pod_service_account_name
-            ),
-            "k8s_pod_labels": activation.k8s_pod_labels or {},
-            "k8s_pod_annotations": activation.k8s_pod_annotations or {},
+            **_activation_k8s_pod_metadata_payload(activation),
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "warnings": warnings,
@@ -1395,11 +1392,7 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
     # Ensure persistence fields are explicitly set from the activation instance
     data["enable_persistence"] = activation.enable_persistence
     data["rule_engine_credential_id"] = activation.rule_engine_credential_id
-    data[
-        "k8s_pod_service_account_name"
-    ] = activation.k8s_pod_service_account_name
-    data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
-    data["k8s_pod_annotations"] = activation.k8s_pod_annotations or {}
+    data.update(_activation_k8s_pod_metadata_payload(activation))
     serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
