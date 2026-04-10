@@ -316,6 +316,7 @@ def test_engine_start_applies_k8s_pod_metadata(
     assert spec.service_account_name == "eda-workload"
     labels = created_body.spec.template.metadata.labels
     assert labels["app"] == "eda"
+    assert labels["job-name"] == engine.job_name
     assert labels["cost-centre"] == "cba"
     assert (
         created_body.spec.template.metadata.annotations["example.com/audit"]

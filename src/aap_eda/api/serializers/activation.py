@@ -117,6 +117,42 @@ def _update_k8s_service_name(validated_data: dict) -> str:
     return service_name or create_k8s_service_name(validated_data["name"])
 
 
+def _normalize_activation_k8s_pod_fields(data: dict) -> None:
+    """Trim ServiceAccount name and string keys/values in pod label maps."""
+    sa = data.get("k8s_pod_service_account_name")
+    if sa is not None:
+        sa = str(sa).strip()
+        data["k8s_pod_service_account_name"] = sa or None
+    if data.get("k8s_pod_labels") is None:
+        data["k8s_pod_labels"] = {}
+    elif isinstance(data["k8s_pod_labels"], dict):
+        trimmed: dict = {}
+        for raw_k, raw_v in data["k8s_pod_labels"].items():
+            k = str(raw_k).strip()
+            if not k:
+                raise serializers.ValidationError(
+                    "k8s_pod_labels cannot contain empty keys"
+                )
+            trimmed[k] = (
+                str(raw_v).strip() if isinstance(raw_v, str) else raw_v
+            )
+        data["k8s_pod_labels"] = trimmed
+    if data.get("k8s_pod_annotations") is None:
+        data["k8s_pod_annotations"] = {}
+    elif isinstance(data["k8s_pod_annotations"], dict):
+        trimmed_a: dict = {}
+        for raw_k, raw_v in data["k8s_pod_annotations"].items():
+            k = str(raw_k).strip()
+            if not k:
+                raise serializers.ValidationError(
+                    "k8s_pod_annotations cannot contain empty keys"
+                )
+            trimmed_a[k] = (
+                str(raw_v).strip() if isinstance(raw_v, str) else raw_v
+            )
+        data["k8s_pod_annotations"] = trimmed_a
+
+
 def _extend_extra_vars_from_credentials(
     validated_data: dict, extra_vars: dict
 ) -> str:
@@ -607,13 +643,7 @@ class ActivationCreateSerializer(
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
-        sa = data.get("k8s_pod_service_account_name")
-        if sa is not None and str(sa).strip() == "":
-            data["k8s_pod_service_account_name"] = None
-        if data.get("k8s_pod_labels") is None:
-            data["k8s_pod_labels"] = {}
-        if data.get("k8s_pod_annotations") is None:
-            data["k8s_pod_annotations"] = {}
+        _normalize_activation_k8s_pod_fields(data)
         return data
 
     def create(self, validated_data):
@@ -830,13 +860,7 @@ class ActivationUpdateSerializer(
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
-        sa = data.get("k8s_pod_service_account_name")
-        if sa is not None and str(sa).strip() == "":
-            data["k8s_pod_service_account_name"] = None
-        if data.get("k8s_pod_labels") is None:
-            data["k8s_pod_labels"] = {}
-        if data.get("k8s_pod_annotations") is None:
-            data["k8s_pod_annotations"] = {}
+        _normalize_activation_k8s_pod_fields(data)
         return data
 
     def prepare_update(self, activation: models.Activation):
@@ -1314,13 +1338,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
         _validate_credentials_and_token_and_rulebook(data=data, creating=False)
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
-        sa = data.get("k8s_pod_service_account_name")
-        if sa is not None and str(sa).strip() == "":
-            data["k8s_pod_service_account_name"] = None
-        if data.get("k8s_pod_labels") is None:
-            data["k8s_pod_labels"] = {}
-        if data.get("k8s_pod_annotations") is None:
-            data["k8s_pod_annotations"] = {}
+        _normalize_activation_k8s_pod_fields(data)
         return data
 
     class Meta:
