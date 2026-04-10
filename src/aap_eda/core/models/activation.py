@@ -172,7 +172,10 @@ class Activation(
     k8s_pod_labels = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Additional labels merged into activation job pod template metadata.",
+        help_text=(
+            "Additional labels merged into activation job pod template "
+            "metadata."
+        ),
     )
     k8s_pod_annotations = models.JSONField(
         default=dict,
