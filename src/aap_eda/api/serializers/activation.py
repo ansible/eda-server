@@ -117,6 +117,50 @@ def _update_k8s_service_name(validated_data: dict) -> str:
     return service_name or create_k8s_service_name(validated_data["name"])
 
 
+class _K8sPodMetadataReadFields:
+    """Read-only k8s pod-metadata field declarations (no validators)."""
+
+    k8s_pod_service_account_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text=("Kubernetes ServiceAccount for activation job pods"),
+    )
+    k8s_pod_labels = serializers.JSONField(
+        required=False,
+        default=dict,
+    )
+    k8s_pod_annotations = serializers.JSONField(
+        required=False,
+        default=dict,
+    )
+
+
+class _K8sPodMetadataWriteFields:
+    """Writable k8s pod-metadata field declarations with validators."""
+
+    k8s_pod_service_account_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[
+            validators.check_if_k8s_pod_service_account_name_valid,
+        ],
+    )
+    k8s_pod_labels = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[validators.check_if_k8s_pod_labels_valid],
+    )
+    k8s_pod_annotations = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[
+            validators.check_if_k8s_pod_annotations_valid,
+        ],
+    )
+
+
 def _activation_k8s_pod_metadata_payload(
     activation: "models.Activation",
 ) -> dict:
@@ -396,7 +440,9 @@ class ActivationSerializer(serializers.ModelSerializer):
         ]
 
 
-class ActivationListSerializer(serializers.ModelSerializer):
+class ActivationListSerializer(
+    _K8sPodMetadataReadFields, serializers.ModelSerializer
+):
     """Serializer for listing the Activation model objects."""
 
     rules_count = serializers.IntegerField()
@@ -412,22 +458,6 @@ class ActivationListSerializer(serializers.ModelSerializer):
         allow_null=True,
         allow_blank=True,
         help_text="Service name of the activation",
-    )
-    k8s_pod_service_account_name = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        help_text="Kubernetes ServiceAccount for activation job pods",
-    )
-    k8s_pod_labels = serializers.JSONField(
-        required=False,
-        default=dict,
-        help_text=("Extra pod labels; keys app and job-name are not allowed"),
-    )
-    k8s_pod_annotations = serializers.JSONField(
-        required=False,
-        default=dict,
-        help_text="Pod template annotations (e.g. cloud workload identity)",
     )
     event_streams = serializers.ListField(
         required=False,
@@ -555,7 +585,9 @@ class ActivationListSerializer(serializers.ModelSerializer):
 
 
 class ActivationCreateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    _K8sPodMetadataWriteFields,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
     """Serializer for creating the Activation."""
 
@@ -626,22 +658,6 @@ class ActivationCreateSerializer(
         allow_null=True,
         allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
-    )
-    k8s_pod_service_account_name = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        validators=[validators.check_if_k8s_pod_service_account_name_valid],
-    )
-    k8s_pod_labels = serializers.JSONField(
-        required=False,
-        default=dict,
-        validators=[validators.check_if_k8s_pod_labels_valid],
-    )
-    k8s_pod_annotations = serializers.JSONField(
-        required=False,
-        default=dict,
-        validators=[validators.check_if_k8s_pod_annotations_valid],
     )
     rule_engine_credential_id = serializers.IntegerField(
         required=False,
@@ -750,7 +766,9 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
 
 class ActivationUpdateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    _K8sPodMetadataWriteFields,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
     """Serializer for updating the Activation."""
 
@@ -813,22 +831,6 @@ class ActivationUpdateSerializer(
         allow_null=True,
         allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
-    )
-    k8s_pod_service_account_name = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        validators=[validators.check_if_k8s_pod_service_account_name_valid],
-    )
-    k8s_pod_labels = serializers.JSONField(
-        required=False,
-        default=dict,
-        validators=[validators.check_if_k8s_pod_labels_valid],
-    )
-    k8s_pod_annotations = serializers.JSONField(
-        required=False,
-        default=dict,
-        validators=[validators.check_if_k8s_pod_annotations_valid],
     )
     rule_engine_credential_id = serializers.IntegerField(
         required=False,
@@ -1024,7 +1026,9 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class ActivationReadSerializer(serializers.ModelSerializer):
+class ActivationReadSerializer(
+    _K8sPodMetadataReadFields, serializers.ModelSerializer
+):
     """Serializer for reading the Activation with related objects info."""
 
     decision_environment = DecisionEnvironmentRefSerializer(
@@ -1055,20 +1059,6 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         allow_null=True,
         allow_blank=True,
         help_text="Service name of the activation",
-    )
-    k8s_pod_service_account_name = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        help_text="Kubernetes ServiceAccount for activation job pods",
-    )
-    k8s_pod_labels = serializers.JSONField(
-        required=False,
-        default=dict,
-    )
-    k8s_pod_annotations = serializers.JSONField(
-        required=False,
-        default=dict,
     )
     event_streams = serializers.ListField(
         required=False,
@@ -1276,7 +1266,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         }
 
 
-class PostActivationSerializer(serializers.ModelSerializer):
+class PostActivationSerializer(
+    _K8sPodMetadataWriteFields, serializers.ModelSerializer
+):
     """Serializer for validating activations before reactivate them."""
 
     id = serializers.IntegerField(
@@ -1305,22 +1297,6 @@ class PostActivationSerializer(serializers.ModelSerializer):
         allow_null=True,
         allow_blank=True,
         validators=[validators.check_if_rfc_1035_compliant],
-    )
-    k8s_pod_service_account_name = serializers.CharField(
-        required=False,
-        allow_null=True,
-        allow_blank=True,
-        validators=[validators.check_if_k8s_pod_service_account_name_valid],
-    )
-    k8s_pod_labels = serializers.JSONField(
-        required=False,
-        default=dict,
-        validators=[validators.check_if_k8s_pod_labels_valid],
-    )
-    k8s_pod_annotations = serializers.JSONField(
-        required=False,
-        default=dict,
-        validators=[validators.check_if_k8s_pod_annotations_valid],
     )
     enable_persistence = serializers.BooleanField(
         required=False,
