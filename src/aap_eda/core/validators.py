@@ -31,6 +31,10 @@ from aap_eda.core.utils.credentials import (
     validate_registry_host_name,
     validate_schema,
 )
+from aap_eda.core.utils.k8s_pod_metadata import (
+    validate_k8s_pod_annotations,
+    validate_k8s_pod_labels,
+)
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
 from aap_eda.services.project.scm import is_refspec_valid
 
@@ -325,6 +329,35 @@ def check_if_rfc_1035_compliant(service_name: str):
         raise serializers.ValidationError(
             f"{service_name} must be a valid RFC 1035 label name"
         )
+
+
+def check_if_k8s_pod_service_account_name_valid(name: str) -> None:
+    """Validate optional ServiceAccount name for activation job pods."""
+    if not name or not str(name).strip():
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    trimmed = str(name).strip()
+    if not is_rfc_1035_compliant(trimmed):
+        raise serializers.ValidationError(
+            f"{trimmed} must be a valid RFC 1035 label name"
+        )
+
+
+def check_if_k8s_pod_labels_valid(value) -> None:
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    validate_k8s_pod_labels(value)
+
+
+def check_if_k8s_pod_annotations_valid(value) -> None:
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    validate_k8s_pod_annotations(value)
 
 
 def check_credential_types(
