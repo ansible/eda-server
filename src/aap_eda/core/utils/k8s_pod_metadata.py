@@ -26,14 +26,47 @@ from rest_framework import serializers
 # Keys EDA sets on activation job pods for selectors and routing.
 RESERVED_POD_LABEL_KEYS = frozenset({"app", "job-name"})
 
-# Name segment: up to 63 chars; alnum, '-', '_', '.'; must start/end alnum.
 _NAME_SEGMENT = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9_.-]{0,61}[a-zA-Z0-9])?$")
-# DNS subdomain for optional key prefix (lowercase RFC 1123 style).
-_DNS_SUBDOMAIN = re.compile(
-    r"^[a-z0-9]([-a-z0-9.]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9.]*[a-z0-9])?)*$"
-)
+# Atomic groups via possessive-style workaround: each label is
+# anchored so the engine cannot backtrack across dot boundaries.
+_DNS_LABEL = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _LABEL_VALUE_MAX_LEN = 63
 _ANNOTATION_VALUE_MAX_LEN = 256 * 1024
+
+
+def _is_valid_dns_subdomain(value: str) -> bool:
+    """Check whether *value* is a valid DNS subdomain (RFC 1123)."""
+    if not value or len(value) > 253:
+        return False
+    return all(_DNS_LABEL.match(part) for part in value.split("."))
+
+
+def _validate_prefixed_key(
+    key: str, prefix: str, name: str, *, field_label: str
+) -> None:
+    """Validate the prefix/name form of a qualified metadata key."""
+    if not prefix or not name or "/" in name:
+        raise serializers.ValidationError(
+            f"{field_label} key {key!r} must be a single optional "
+            "DNS prefix followed by '/' and a name segment"
+        )
+    if len(prefix) > 253:
+        raise serializers.ValidationError(
+            f"{field_label} key prefix for {key!r} " "exceeds maximum length"
+        )
+    if len(name) > 63:
+        raise serializers.ValidationError(
+            f"{field_label} name segment for key {key!r} "
+            "exceeds 63 characters"
+        )
+    if not _is_valid_dns_subdomain(prefix):
+        raise serializers.ValidationError(
+            f"{field_label} key {key!r} has an invalid " "DNS subdomain prefix"
+        )
+    if not _NAME_SEGMENT.match(name):
+        raise serializers.ValidationError(
+            f"{field_label} key {key!r} has an invalid " "name segment"
+        )
 
 
 def _validate_qualified_metadata_key(key: str, *, field_label: str) -> None:
@@ -44,38 +77,16 @@ def _validate_qualified_metadata_key(key: str, *, field_label: str) -> None:
         )
     if "/" in key:
         prefix, name = key.split("/", 1)
-        if not prefix or not name or "/" in name:
-            raise serializers.ValidationError(
-                f"{field_label} key {key!r} must be a single optional "
-                "DNS prefix followed by '/' and a name segment"
-            )
-        if len(prefix) > 253:
-            raise serializers.ValidationError(
-                f"{field_label} key prefix for {key!r} exceeds maximum length"
-            )
-        if len(name) > 63:
-            raise serializers.ValidationError(
-                f"{field_label} name segment for key {key!r} exceeds 63 "
-                "characters"
-            )
-        if not _DNS_SUBDOMAIN.match(prefix):
-            raise serializers.ValidationError(
-                f"{field_label} key {key!r} has an invalid DNS subdomain "
-                "prefix"
-            )
-        if not _NAME_SEGMENT.match(name):
-            raise serializers.ValidationError(
-                f"{field_label} key {key!r} has an invalid name segment"
-            )
+        _validate_prefixed_key(key, prefix, name, field_label=field_label)
     else:
         if len(key) > 63:
             raise serializers.ValidationError(
-                f"{field_label} key {key!r} exceeds 63 characters (use "
-                "prefix/name for longer logical keys)"
+                f"{field_label} key {key!r} exceeds 63 characters "
+                "(use prefix/name for longer logical keys)"
             )
         if not _NAME_SEGMENT.match(key):
             raise serializers.ValidationError(
-                f"{field_label} key {key!r} is not a valid Kubernetes name"
+                f"{field_label} key {key!r} is not a valid " "Kubernetes name"
             )
 
 
@@ -85,13 +96,13 @@ def _validate_label_value(key: str, value: str) -> None:
         return
     if len(value) > _LABEL_VALUE_MAX_LEN:
         raise serializers.ValidationError(
-            f"Label value for key {key!r} exceeds maximum length "
-            f"{_LABEL_VALUE_MAX_LEN}"
+            f"Label value for key {key!r} exceeds maximum "
+            f"length {_LABEL_VALUE_MAX_LEN}"
         )
     if not _NAME_SEGMENT.match(value):
         raise serializers.ValidationError(
-            f"Label value for key {key!r} is not a valid Kubernetes "
-            "label value"
+            f"Label value for key {key!r} is not a valid "
+            "Kubernetes label value"
         )
 
 
@@ -109,7 +120,7 @@ def validate_k8s_pod_labels(data: dict) -> None:
             )
         if key in RESERVED_POD_LABEL_KEYS:
             raise serializers.ValidationError(
-                f"Label key {key!r} is reserved by Event-Driven Ansible"
+                f"Label key {key!r} is reserved by " "Event-Driven Ansible"
             )
         _validate_qualified_metadata_key(key, field_label="Label")
         _validate_label_value(key, value)
@@ -125,15 +136,15 @@ def validate_k8s_pod_annotations(data: dict) -> None:
     for key, value in data.items():
         if not isinstance(key, str) or not isinstance(value, str):
             raise serializers.ValidationError(
-                "k8s_pod_annotations keys and values must be strings"
+                "k8s_pod_annotations keys and values must be " "strings"
             )
         if len(key) > 253:
             raise serializers.ValidationError(
-                f"Annotation key {key!r} exceeds maximum length 253"
+                f"Annotation key {key!r} exceeds maximum " "length 253"
             )
         _validate_qualified_metadata_key(key, field_label="Annotation")
         if len(value) > _ANNOTATION_VALUE_MAX_LEN:
             raise serializers.ValidationError(
-                f"Annotation value for key {key!r} exceeds maximum length "
-                f"{_ANNOTATION_VALUE_MAX_LEN}"
+                f"Annotation value for key {key!r} exceeds "
+                f"maximum length {_ANNOTATION_VALUE_MAX_LEN}"
             )
