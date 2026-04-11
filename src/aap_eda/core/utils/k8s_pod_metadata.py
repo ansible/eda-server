@@ -136,7 +136,7 @@ def validate_k8s_pod_annotations(data: dict) -> None:
     for key, value in data.items():
         if not isinstance(key, str) or not isinstance(value, str):
             raise serializers.ValidationError(
-                "k8s_pod_annotations keys and values must be " "strings"
+                "k8s_pod_annotations keys and values must be strings"
             )
         if len(key) > 253:
             raise serializers.ValidationError(
