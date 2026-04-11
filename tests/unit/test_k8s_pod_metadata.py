@@ -22,6 +22,7 @@ from aap_eda.api.serializers.activation import (
     _normalize_activation_k8s_pod_fields,
 )
 from aap_eda.core.utils.k8s_pod_metadata import (
+    _is_valid_dns_subdomain,
     _validate_qualified_metadata_key,
     validate_k8s_pod_annotations,
     validate_k8s_pod_labels,
@@ -358,3 +359,21 @@ def test_payload_helper_populated_fields():
     assert result["k8s_pod_service_account_name"] == "my-sa"
     assert result["k8s_pod_labels"] == {"team": "x"}
     assert result["k8s_pod_annotations"] == {"example.com/k": "v"}
+
+
+# ---------------------------------------------------------------
+# _is_valid_dns_subdomain
+# ---------------------------------------------------------------
+
+
+def test_dns_subdomain_valid():
+    assert _is_valid_dns_subdomain("example.com") is True
+    assert _is_valid_dns_subdomain("a") is True
+    assert _is_valid_dns_subdomain("my-host.example.io") is True
+
+
+def test_dns_subdomain_invalid():
+    assert _is_valid_dns_subdomain("") is False
+    assert _is_valid_dns_subdomain("x" * 254) is False
+    assert _is_valid_dns_subdomain("UPPER.COM") is False
+    assert _is_valid_dns_subdomain("-bad.com") is False

@@ -174,40 +174,32 @@ def _activation_k8s_pod_metadata_payload(
     }
 
 
+def _trim_string_dict(value: dict, field_name: str) -> dict:
+    """Trim whitespace from string keys/values; reject empty keys."""
+    result: dict = {}
+    for raw_k, raw_v in value.items():
+        k = str(raw_k).strip()
+        if not k:
+            raise serializers.ValidationError(
+                f"{field_name} cannot contain empty keys"
+            )
+        result[k] = str(raw_v).strip() if isinstance(raw_v, str) else raw_v
+    return result
+
+
 def _normalize_activation_k8s_pod_fields(data: dict) -> None:
     """Trim ServiceAccount name and string keys/values in pod label maps."""
     sa = data.get("k8s_pod_service_account_name")
     if sa is not None:
         sa = str(sa).strip()
         data["k8s_pod_service_account_name"] = sa or None
-    if data.get("k8s_pod_labels") is None:
-        data["k8s_pod_labels"] = {}
-    elif isinstance(data["k8s_pod_labels"], dict):
-        trimmed: dict = {}
-        for raw_k, raw_v in data["k8s_pod_labels"].items():
-            k = str(raw_k).strip()
-            if not k:
-                raise serializers.ValidationError(
-                    "k8s_pod_labels cannot contain empty keys"
-                )
-            trimmed[k] = (
-                str(raw_v).strip() if isinstance(raw_v, str) else raw_v
-            )
-        data["k8s_pod_labels"] = trimmed
-    if data.get("k8s_pod_annotations") is None:
-        data["k8s_pod_annotations"] = {}
-    elif isinstance(data["k8s_pod_annotations"], dict):
-        trimmed_a: dict = {}
-        for raw_k, raw_v in data["k8s_pod_annotations"].items():
-            k = str(raw_k).strip()
-            if not k:
-                raise serializers.ValidationError(
-                    "k8s_pod_annotations cannot contain empty keys"
-                )
-            trimmed_a[k] = (
-                str(raw_v).strip() if isinstance(raw_v, str) else raw_v
-            )
-        data["k8s_pod_annotations"] = trimmed_a
+
+    for field in ("k8s_pod_labels", "k8s_pod_annotations"):
+        val = data.get(field)
+        if val is None:
+            data[field] = {}
+        elif isinstance(val, dict):
+            data[field] = _trim_string_dict(val, field)
 
 
 def _extend_extra_vars_from_credentials(
