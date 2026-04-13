@@ -43,6 +43,7 @@ django-filter = ">=25.1,<26"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=46.0.5,<47"
 pyopenssl = ">=26.0.0"
+dynaconf = ">=3.2.13"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
