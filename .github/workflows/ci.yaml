@@ -48,6 +48,8 @@ jobs:
     uses: ./.github/workflows/sync-openapi-spec.yml
     secrets:
       OPENAPI_SPEC_SYNC_TOKEN: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
+      OPENAPI_SPEC_REPO: ${{ secrets.OPENAPI_SPEC_REPO }}
+      OPENAPI_SPEC_SYNC_GPG_PRIVATE_KEY: ${{ secrets.OPENAPI_SPEC_SYNC_GPG_PRIVATE_KEY }}
 
   test:
     runs-on: ubuntu-latest
