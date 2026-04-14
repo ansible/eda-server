@@ -2682,6 +2682,8 @@ class Command(BaseCommand):
             admin_role_name = f"{cls._meta.verbose_name.title()} Admin"
             if cls._meta.model_name == "project":
                 admin_role_name = f"EDA {admin_role_name}"
+            elif cls._meta.model_name == "edacredential":
+                admin_role_name = admin_role_name.replace("Eda ", "EDA ")
 
             role, created = RoleDefinition.objects.update_or_create(
                 name=admin_role_name,
@@ -2705,6 +2707,8 @@ class Command(BaseCommand):
                 use_role_name = f"{cls._meta.verbose_name.title()} Use"
                 if cls._meta.model_name == "project":
                     use_role_name = f"EDA {use_role_name}"
+                elif cls._meta.model_name == "edacredential":
+                    use_role_name = use_role_name.replace("Eda ", "EDA ")
 
                 (
                     use_role,
@@ -2735,6 +2739,8 @@ class Command(BaseCommand):
                 )
                 if cls._meta.model_name == "project":
                     org_role_name = f"EDA {org_role_name}"
+                elif cls._meta.model_name == "edacredential":
+                    org_role_name = org_role_name.replace("Eda ", "EDA ")
 
                 (
                     org_role,

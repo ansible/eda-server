@@ -47,12 +47,14 @@ def test_create_all_roles():
         if parent_model and parent_model._meta.model_name == "organization":
             rbac_obj_names.append(cls._meta.verbose_name)
     role_names = []
+    role_names_case_preserved = []
     for rd in RoleDefinition.objects.all():
         parent_model = permission_registry.get_parent_model(
             rd.content_type.model_class()
         )
         if parent_model and parent_model._meta.model_name == "organization":
             role_names.append(rd.name.lower())
+            role_names_case_preserved.append(rd.name)
     for obj_name in rbac_obj_names:
         # team model has unique roles
         if obj_name == "team":
@@ -62,6 +64,10 @@ def test_create_all_roles():
             # Project roles should have EDA prefix
             assert "eda project admin" in role_names
             assert "eda project use" in role_names
+        elif obj_name == "eda credential":
+            # EDA Credential roles use proper EDA casing
+            assert "EDA Credential Admin" in role_names_case_preserved
+            assert "EDA Credential Use" in role_names_case_preserved
         else:
             assert f"{obj_name} admin" in role_names
             assert f"{obj_name} use" in role_names
