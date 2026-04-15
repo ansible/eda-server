@@ -43,6 +43,7 @@ django-filter = ">=25.1,<26"
 pydantic = ">=1.8.1,<1.11"
 cryptography = ">=46.0.5,<47"
 pyopenssl = ">=26.0.0"
+dynaconf = ">=3.2.13"
 kubernetes = "26.1.*"
 podman = "5.4.*"
 django-ansible-base = { git = "git@github.com:ansible-automation-platform/django-ansible-base.git", branch = "stable-2.7", extras = [
@@ -82,6 +83,7 @@ awx-plugins-core = { version = "^0.0.1a10", extras = [
                               "credentials-thycotic-dsv",
                               "credentials-thycotic-tss"
                     ]}
+pyasn1 = ">=0.6.3"
 # limit setuptools to avoid the pkg_resources removal
 setuptools = "<82"
 

@@ -133,6 +133,11 @@ def test_duplicated_worker_queue(mock_settings):
         ("PODMAN_EXTRA_ARGS", "opt=val", ImproperlyConfigured),
         ("RESOURCE_JWT_USER_ID", " eda ", "eda"),
         ("RESOURCE_JWT_USER_ID", ["eda"], ImproperlyConfigured),
+        # EVENT_PERSISTENCE_DB_PORT should accept int and convert to str
+        ("EVENT_PERSISTENCE_DB_PORT", 5432, "5432"),
+        ("EVENT_PERSISTENCE_DB_PORT", "5432", "5432"),
+        ("EVENT_PERSISTENCE_DB_PORT", " 5433 ", "5433"),
+        ("EVENT_PERSISTENCE_DB_PORT", None, None),
     ],
 )
 def test_types(mock_settings, name, value, expected):
