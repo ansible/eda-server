@@ -1,5 +1,5 @@
 ---
-# Sync generated OpenAPI spec to ansible-automation-platform/aap-openapi-specs.
+# Sync generated OpenAPI spec to the central spec repository.
 # Called by CI workflows after spec generation via workflow_call.
 name: Sync OpenAPI Spec
 
@@ -11,6 +11,8 @@ on:
       OPENAPI_SPEC_REPO:
         required: true
       OPENAPI_SPEC_SYNC_GPG_PRIVATE_KEY:
+        required: true
+      OPENAPI_SPEC_PR_REVIEW_TEAM:
         required: true
 
 jobs:
@@ -96,6 +98,7 @@ jobs:
           GH_TOKEN: ${{ secrets.OPENAPI_SPEC_SYNC_TOKEN }}
           GPG_PRIVATE_KEY: ${{ secrets.OPENAPI_SPEC_SYNC_GPG_PRIVATE_KEY }}
           SPEC_REPO: ${{ secrets.OPENAPI_SPEC_REPO }}
+          SPEC_PR_REVIEW_TEAM: ${{ secrets.OPENAPI_SPEC_PR_REVIEW_TEAM }}
           SPEC_BRANCH: ${{ steps.branch_map.outputs.spec_branch }}
           SOURCE_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
@@ -116,7 +119,7 @@ jobs:
 
           # Use a stable branch name so we can reuse it across runs
           BRANCH_NAME="auto/update-eda-${SPEC_BRANCH}"
-          
+
           # Check if there's already an open PR from this branch
           EXISTING_PR=$(gh pr list \
             --repo "$SPEC_REPO" \
@@ -133,7 +136,7 @@ jobs:
             # Clean up stale remote branch from a previously merged PR
             git push origin --delete "$BRANCH_NAME" 2>/dev/null || true
           fi
-          
+
           git checkout -b "$BRANCH_NAME"
 
           # Add and commit changes
@@ -192,7 +195,8 @@ jobs:
               --title "$PR_TITLE" \
               --body "$PR_BODY" \
               --base "$SPEC_BRANCH" \
-              --head "$BRANCH_NAME"
+              --head "$BRANCH_NAME" \
+              --reviewer "$SPEC_PR_REVIEW_TEAM"
             echo "✅ Created PR in spec repo"
           fi
 
