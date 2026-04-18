@@ -43,4 +43,16 @@ class Migration(migrations.Migration):
                 null=True,
             ),
         ),
+        migrations.AddField(
+            model_name="activation",
+            name="k8s_pod_node_selector",
+            field=models.JSONField(
+                blank=True,
+                default=dict,
+                help_text=(
+                    "Kubernetes nodeSelector applied to activation job "
+                    "pods for scheduling onto specific nodes."
+                ),
+            ),
+        ),
     ]

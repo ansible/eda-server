@@ -134,6 +134,10 @@ class _K8sPodMetadataReadFields:
         required=False,
         default=dict,
     )
+    k8s_pod_node_selector = serializers.JSONField(
+        required=False,
+        default=dict,
+    )
 
 
 class _K8sPodMetadataWriteFields:
@@ -159,6 +163,13 @@ class _K8sPodMetadataWriteFields:
             validators.check_if_k8s_pod_annotations_valid,
         ],
     )
+    k8s_pod_node_selector = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[
+            validators.check_if_k8s_pod_node_selector_valid,
+        ],
+    )
 
 
 def _activation_k8s_pod_metadata_payload(
@@ -171,6 +182,7 @@ def _activation_k8s_pod_metadata_payload(
         ),
         "k8s_pod_labels": activation.k8s_pod_labels or {},
         "k8s_pod_annotations": (activation.k8s_pod_annotations or {}),
+        "k8s_pod_node_selector": (activation.k8s_pod_node_selector or {}),
     }
 
 
@@ -194,7 +206,11 @@ def _normalize_activation_k8s_pod_fields(data: dict) -> None:
         sa = str(sa).strip()
         data["k8s_pod_service_account_name"] = sa or None
 
-    for field in ("k8s_pod_labels", "k8s_pod_annotations"):
+    for field in (
+        "k8s_pod_labels",
+        "k8s_pod_annotations",
+        "k8s_pod_node_selector",
+    ):
         val = data.get(field)
         if val is None:
             data[field] = {}
@@ -423,6 +439,7 @@ class ActivationSerializer(serializers.ModelSerializer):
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
             "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
         read_only_fields = [
             "id",
@@ -502,6 +519,7 @@ class ActivationListSerializer(
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
             "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
         read_only_fields = [
             "id",
@@ -607,6 +625,7 @@ class ActivationCreateSerializer(
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
             "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -788,6 +807,7 @@ class ActivationUpdateSerializer(
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
             "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -844,6 +864,10 @@ class ActivationUpdateSerializer(
             data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
         if "k8s_pod_annotations" not in data:
             data["k8s_pod_annotations"] = activation.k8s_pod_annotations or {}
+        if "k8s_pod_node_selector" not in data:
+            data["k8s_pod_node_selector"] = (
+                activation.k8s_pod_node_selector or {}
+            )
         if "extra_var" not in data:
             data["extra_var"] = activation.extra_var
         data["extra_var"] = _get_user_extra_vars(activation, data["extra_var"])
@@ -1105,6 +1129,7 @@ class ActivationReadSerializer(
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
             "k8s_pod_annotations",
+            "k8s_pod_node_selector",
             "event_streams",
             "source_mappings",
             "skip_audit_events",
@@ -1326,6 +1351,7 @@ class PostActivationSerializer(
             "k8s_pod_service_account_name",
             "k8s_pod_labels",
             "k8s_pod_annotations",
+            "k8s_pod_node_selector",
             "source_mappings",
             "skip_audit_events",
             "enable_persistence",

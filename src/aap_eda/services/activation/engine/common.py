@@ -129,6 +129,7 @@ class ContainerRequest(BaseModel):
     k8s_pod_service_account_name: tp.Optional[str] = None
     k8s_pod_labels: tp.Optional[dict] = None
     k8s_pod_annotations: tp.Optional[dict] = None
+    k8s_pod_node_selector: tp.Optional[dict] = None
     log_tracking_id: tp.Optional[str] = None
 
 
@@ -178,6 +179,7 @@ class ContainerableMixin:
             k8s_pod_service_account_name=self.k8s_pod_service_account_name,
             k8s_pod_labels=self.k8s_pod_labels or {},
             k8s_pod_annotations=self.k8s_pod_annotations or {},
+            k8s_pod_node_selector=self.k8s_pod_node_selector or {},
             log_tracking_id=self.log_tracking_id,
             pull_policy=self.decision_environment.pull_policy,
         )

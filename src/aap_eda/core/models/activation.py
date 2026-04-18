@@ -182,6 +182,14 @@ class Activation(
         blank=True,
         help_text="Annotations on activation job pod template metadata.",
     )
+    k8s_pod_node_selector = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Kubernetes nodeSelector applied to activation job pods "
+            "for scheduling onto specific nodes."
+        ),
+    )
     event_streams = models.ManyToManyField(
         EventStream, related_name="activations", default=None
     )

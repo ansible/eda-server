@@ -131,6 +131,12 @@ PODMAN_MOUNTS: Optional[list] = []
 PODMAN_EXTRA_ARGS: Optional[dict] = {}
 CONTAINER_NAME_PREFIX: str = "eda"
 
+# Comma-separated list of Kubernetes ServiceAccount names that activation
+# pods are allowed to use.  An empty list (default) means any valid SA
+# name is accepted.  Set via EDA_ALLOWED_SERVICE_ACCOUNTS env var.
+#   export EDA_ALLOWED_SERVICE_ACCOUNTS="eda-workload,eda-reader"
+ALLOWED_SERVICE_ACCOUNTS: StrToList = []
+
 
 # A list of queues to be used in multinode mode
 # If the list is empty, use the default singlenode queue name

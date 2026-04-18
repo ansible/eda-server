@@ -342,6 +342,9 @@ class Engine(ContainerEngine):
         sa_name = (request.k8s_pod_service_account_name or "").strip()
         if sa_name:
             spec_kwargs["service_account_name"] = sa_name
+        node_selector = request.k8s_pod_node_selector or {}
+        if node_selector:
+            spec_kwargs["node_selector"] = node_selector
 
         spec = k8sclient.V1PodSpec(**spec_kwargs)
 
