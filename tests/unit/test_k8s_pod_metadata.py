@@ -30,6 +30,7 @@ from aap_eda.core.utils.k8s_pod_metadata import (
 from aap_eda.core.validators import (
     check_if_k8s_pod_annotations_valid,
     check_if_k8s_pod_labels_valid,
+    check_if_k8s_pod_node_selector_valid,
     check_if_k8s_pod_service_account_name_valid,
 )
 
@@ -223,6 +224,28 @@ def test_check_sa_valid_rejects_bad_name(mock_settings):
 
 
 @patch("aap_eda.core.validators.settings")
+def test_check_sa_allowlist_accepts_listed(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = ["eda-workload", "eda-reader"]
+    check_if_k8s_pod_service_account_name_valid("eda-workload")
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_sa_allowlist_rejects_unlisted(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = ["eda-workload"]
+    with pytest.raises(serializers.ValidationError, match="ALLOWED"):
+        check_if_k8s_pod_service_account_name_valid("cluster-admin")
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_sa_allowlist_empty_allows_any(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = []
+    check_if_k8s_pod_service_account_name_valid("any-sa")
+
+
+@patch("aap_eda.core.validators.settings")
 def test_check_labels_valid_skips_non_k8s(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "podman"
     check_if_k8s_pod_labels_valid({"app": "forbidden"})
@@ -262,6 +285,44 @@ def test_check_annotations_valid_delegates(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     with pytest.raises(serializers.ValidationError):
         check_if_k8s_pod_annotations_valid({"": "bad"})
+
+
+# ---------------------------------------------------------------
+# check_if_k8s_pod_node_selector_valid
+# ---------------------------------------------------------------
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_skips_non_k8s(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "podman"
+    check_if_k8s_pod_node_selector_valid({"bad": 123})
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_none_noop(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    check_if_k8s_pod_node_selector_valid(None)
+    check_if_k8s_pod_node_selector_valid({})
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_valid(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    check_if_k8s_pod_node_selector_valid({"kubernetes.io/os": "linux"})
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_rejects_non_dict(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    with pytest.raises(serializers.ValidationError):
+        check_if_k8s_pod_node_selector_valid("not-a-dict")
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_rejects_non_string_value(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    with pytest.raises(serializers.ValidationError):
+        check_if_k8s_pod_node_selector_valid({"key": 42})
 
 
 # ---------------------------------------------------------------
@@ -329,16 +390,37 @@ def test_normalize_rejects_empty_annotation_key():
         _normalize_activation_k8s_pod_fields(data)
 
 
+def test_normalize_none_node_selector_becomes_empty_dict():
+    data = {"k8s_pod_node_selector": None}
+    _normalize_activation_k8s_pod_fields(data)
+    assert data["k8s_pod_node_selector"] == {}
+
+
+def test_normalize_trims_node_selector_keys_and_values():
+    data = {"k8s_pod_node_selector": {" os ": " linux "}}
+    _normalize_activation_k8s_pod_fields(data)
+    assert data["k8s_pod_node_selector"] == {"os": "linux"}
+
+
+def test_normalize_rejects_empty_node_selector_key():
+    data = {"k8s_pod_node_selector": {"  ": "v"}}
+    with pytest.raises(serializers.ValidationError):
+        _normalize_activation_k8s_pod_fields(data)
+
+
 # ---------------------------------------------------------------
 # _activation_k8s_pod_metadata_payload
 # ---------------------------------------------------------------
 
 
 class _FakeActivation:
-    def __init__(self, sa=None, labels=None, annotations=None):
+    def __init__(
+        self, sa=None, labels=None, annotations=None, node_selector=None
+    ):
         self.k8s_pod_service_account_name = sa
         self.k8s_pod_labels = labels
         self.k8s_pod_annotations = annotations
+        self.k8s_pod_node_selector = node_selector
 
 
 def test_payload_helper_none_fields():
@@ -346,6 +428,7 @@ def test_payload_helper_none_fields():
     assert result["k8s_pod_service_account_name"] is None
     assert result["k8s_pod_labels"] == {}
     assert result["k8s_pod_annotations"] == {}
+    assert result["k8s_pod_node_selector"] == {}
 
 
 def test_payload_helper_populated_fields():
@@ -354,11 +437,13 @@ def test_payload_helper_populated_fields():
             sa="my-sa",
             labels={"team": "x"},
             annotations={"example.com/k": "v"},
+            node_selector={"kubernetes.io/os": "linux"},
         )
     )
     assert result["k8s_pod_service_account_name"] == "my-sa"
     assert result["k8s_pod_labels"] == {"team": "x"}
     assert result["k8s_pod_annotations"] == {"example.com/k": "v"}
+    assert result["k8s_pod_node_selector"] == {"kubernetes.io/os": "linux"}
 
 
 # ---------------------------------------------------------------

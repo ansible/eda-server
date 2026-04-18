@@ -293,6 +293,7 @@ def test_engine_start_applies_k8s_pod_metadata(
         k8s_pod_service_account_name="eda-workload",
         k8s_pod_labels={"cost-centre": "cba"},
         k8s_pod_annotations={"example.com/audit": "true"},
+        k8s_pod_node_selector={"kubernetes.io/os": "linux"},
     )
     log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
     created_body = None
@@ -322,6 +323,7 @@ def test_engine_start_applies_k8s_pod_metadata(
         created_body.spec.template.metadata.annotations["example.com/audit"]
         == "true"
     )
+    assert spec.node_selector == {"kubernetes.io/os": "linux"}
 
 
 @pytest.mark.django_db

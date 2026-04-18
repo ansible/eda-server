@@ -342,6 +342,12 @@ def check_if_k8s_pod_service_account_name_valid(name: str) -> None:
         raise serializers.ValidationError(
             f"{trimmed} must be a valid RFC 1035 label name"
         )
+    allowed = getattr(settings, "ALLOWED_SERVICE_ACCOUNTS", [])
+    if allowed and trimmed not in allowed:
+        raise serializers.ValidationError(
+            f"ServiceAccount {trimmed!r} is not in"
+            f" ALLOWED_SERVICE_ACCOUNTS"
+        )
 
 
 def check_if_k8s_pod_labels_valid(value) -> None:
@@ -360,6 +366,23 @@ def check_if_k8s_pod_annotations_valid(value) -> None:
     if settings.DEPLOYMENT_TYPE != "k8s":
         return
     validate_k8s_pod_annotations(value)
+
+
+def check_if_k8s_pod_node_selector_valid(value) -> None:
+    """Validate nodeSelector dict: string keys and string values."""
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    if not isinstance(value, dict):
+        raise serializers.ValidationError(
+            "k8s_pod_node_selector must be a JSON object"
+        )
+    for k, v in value.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise serializers.ValidationError(
+                "k8s_pod_node_selector keys and values must be strings"
+            )
 
 
 def check_credential_types(

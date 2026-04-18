@@ -217,6 +217,7 @@ def activations_table(
         "k8s_pod_service_account_name",
         "k8s_pod_labels",
         "k8s_pod_annotations",
+        "k8s_pod_node_selector",
         "source_mappings",
         "skip_audit_events",
     )
