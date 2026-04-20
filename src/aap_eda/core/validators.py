@@ -32,6 +32,8 @@ from aap_eda.core.utils.credentials import (
     validate_schema,
 )
 from aap_eda.core.utils.k8s_pod_metadata import (
+    _validate_label_value,
+    _validate_qualified_metadata_key,
     validate_k8s_pod_annotations,
     validate_k8s_pod_labels,
 )
@@ -369,7 +371,7 @@ def check_if_k8s_pod_annotations_valid(value) -> None:
 
 
 def check_if_k8s_pod_node_selector_valid(value) -> None:
-    """Validate nodeSelector dict: string keys and string values."""
+    """Validate nodeSelector dict: qualified-name keys, label values."""
     if value in (None, {}):
         return
     if settings.DEPLOYMENT_TYPE != "k8s":
@@ -383,6 +385,8 @@ def check_if_k8s_pod_node_selector_valid(value) -> None:
             raise serializers.ValidationError(
                 "k8s_pod_node_selector keys and values must be strings"
             )
+        _validate_qualified_metadata_key(k, field_label="nodeSelector")
+        _validate_label_value(k, v)
 
 
 def check_credential_types(

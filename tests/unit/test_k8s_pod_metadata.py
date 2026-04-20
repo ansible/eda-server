@@ -117,15 +117,16 @@ def test_validate_k8s_pod_annotations_rejects_none():
         validate_k8s_pod_annotations(None)
 
 
-def test_validate_k8s_pod_annotations_rejects_oversized_value():
-    huge = "x" * (256 * 1024 + 1)
-    with pytest.raises(serializers.ValidationError):
-        validate_k8s_pod_annotations({"example.com/k": huge})
+def test_validate_k8s_pod_annotations_rejects_oversized_total():
+    half = 128 * 1024
+    with pytest.raises(serializers.ValidationError, match="total size"):
+        validate_k8s_pod_annotations(
+            {"example.com/a": "x" * half, "example.com/b": "y" * half}
+        )
 
 
-def test_validate_k8s_pod_annotations_allows_large_value():
-    limit = 256 * 1024
-    validate_k8s_pod_annotations({"example.com/k": "z" * limit})
+def test_validate_k8s_pod_annotations_allows_within_total_limit():
+    validate_k8s_pod_annotations({"example.com/k": "z" * 1000})
 
 
 def test_validate_k8s_pod_annotations_non_string_value():
@@ -187,9 +188,16 @@ def test_qualified_key_invalid_name_segment():
         _validate_qualified_metadata_key("-bad-start", field_label="Label")
 
 
-def test_qualified_key_exceeds_253():
+def test_qualified_key_long_unqualified_rejected():
+    """Unqualified keys >63 chars are rejected."""
     with pytest.raises(serializers.ValidationError):
-        _validate_qualified_metadata_key("x" * 254, field_label="Label")
+        _validate_qualified_metadata_key("x" * 64, field_label="Label")
+
+
+def test_qualified_key_long_prefixed_allowed():
+    """A valid prefix/name key >253 total chars is accepted."""
+    prefix = "a" * 253
+    _validate_qualified_metadata_key(f"{prefix}/key", field_label="Label")
 
 
 # ---------------------------------------------------------------
@@ -326,6 +334,20 @@ def test_check_node_selector_rejects_non_string_value(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "k8s"
     with pytest.raises(serializers.ValidationError):
         check_if_k8s_pod_node_selector_valid({"key": 42})
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_rejects_invalid_key(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    with pytest.raises(serializers.ValidationError):
+        check_if_k8s_pod_node_selector_valid({"-bad-key": "v"})
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_node_selector_rejects_invalid_value(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    with pytest.raises(serializers.ValidationError):
+        check_if_k8s_pod_node_selector_valid({"kubernetes.io/os": "x" * 64})
 
 
 # ---------------------------------------------------------------

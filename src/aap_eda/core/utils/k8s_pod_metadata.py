@@ -31,7 +31,7 @@ _NAME_SEGMENT = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9_.-]{0,61}[a-zA-Z0-9])?$")
 # anchored so the engine cannot backtrack across dot boundaries.
 _DNS_LABEL = re.compile(r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _LABEL_VALUE_MAX_LEN = 63
-_ANNOTATION_VALUE_MAX_LEN = 256 * 1024
+_ANNOTATIONS_TOTAL_MAX_BYTES = 256 * 1024
 
 
 def _is_valid_dns_subdomain(value: str) -> bool:
@@ -71,10 +71,6 @@ def _validate_prefixed_key(
 
 def _validate_qualified_metadata_key(key: str, *, field_label: str) -> None:
     """Reject invalid qualified names for label or annotation keys."""
-    if len(key) > 253:
-        raise serializers.ValidationError(
-            f"{field_label} key {key!r} exceeds maximum length 253"
-        )
     if "/" in key:
         prefix, name = key.split("/", 1)
         _validate_prefixed_key(key, prefix, name, field_label=field_label)
@@ -133,18 +129,17 @@ def validate_k8s_pod_annotations(data: dict) -> None:
             "k8s_pod_annotations must be a JSON object"
         )
 
+    total_size = 0
     for key, value in data.items():
         if not isinstance(key, str) or not isinstance(value, str):
             raise serializers.ValidationError(
                 "k8s_pod_annotations keys and values must be strings"
             )
-        if len(key) > 253:
-            raise serializers.ValidationError(
-                f"Annotation key {key!r} exceeds maximum " "length 253"
-            )
         _validate_qualified_metadata_key(key, field_label="Annotation")
-        if len(value) > _ANNOTATION_VALUE_MAX_LEN:
-            raise serializers.ValidationError(
-                f"Annotation value for key {key!r} exceeds "
-                f"maximum length {_ANNOTATION_VALUE_MAX_LEN}"
-            )
+        total_size += len(key.encode("utf-8")) + len(value.encode("utf-8"))
+
+    if total_size > _ANNOTATIONS_TOTAL_MAX_BYTES:
+        raise serializers.ValidationError(
+            "k8s_pod_annotations total size exceeds "
+            f"{_ANNOTATIONS_TOTAL_MAX_BYTES} bytes"
+        )
