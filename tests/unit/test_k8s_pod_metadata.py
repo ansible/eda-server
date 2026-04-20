@@ -206,6 +206,7 @@ def test_check_sa_valid_skips_non_k8s(mock_settings):
 @patch("aap_eda.core.validators.settings")
 def test_check_sa_valid_blank_noop(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = []
     check_if_k8s_pod_service_account_name_valid("")
     check_if_k8s_pod_service_account_name_valid("  ")
 
@@ -213,12 +214,14 @@ def test_check_sa_valid_blank_noop(mock_settings):
 @patch("aap_eda.core.validators.settings")
 def test_check_sa_valid_accepts_good_name(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = []
     check_if_k8s_pod_service_account_name_valid("my-sa")
 
 
 @patch("aap_eda.core.validators.settings")
 def test_check_sa_valid_rejects_bad_name(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = []
     with pytest.raises(serializers.ValidationError):
         check_if_k8s_pod_service_account_name_valid("INVALID_UPPERCASE")
 
