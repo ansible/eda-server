@@ -131,6 +131,15 @@ PODMAN_MOUNTS: Optional[list] = []
 PODMAN_EXTRA_ARGS: Optional[dict] = {}
 CONTAINER_NAME_PREFIX: str = "eda"
 
+# Kubernetes pod resource limits for activation job containers.
+# Uses Kubernetes quantity syntax (e.g. "200Mi", "1Gi", "500m", "2").
+# None (default) means no limit is set; the namespace's LimitRange or
+# ResourceQuota defaults apply.
+#   export EDA_K8S_MEM_LIMIT="200Mi"
+#   export EDA_K8S_CPU_LIMIT="500m"
+K8S_MEM_LIMIT: Optional[str] = None
+K8S_CPU_LIMIT: Optional[str] = None
+
 # Comma-separated list of Kubernetes ServiceAccount names that activation
 # pods are allowed to use.  An empty list (default) means any valid SA
 # name is accepted.  Set via EDA_ALLOWED_SERVICE_ACCOUNTS env var.

@@ -289,15 +289,29 @@ class Engine(ContainerEngine):
                 k8sclient.V1ContainerPort(container_port=port)
                 for port in self._get_ports(request.ports)
             ]
-        container = k8sclient.V1Container(
-            image=request.image_url,
-            name=request.name,
-            image_pull_policy=ImagePullPolicy(request.pull_policy).to_k8s(),
-            env=[k8sclient.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")],
-            args=request.cmdline.get_args(),
-            ports=ports,
-            command=[request.cmdline.command()],
-        )
+        container_kwargs: dict = {
+            "image": request.image_url,
+            "name": request.name,
+            "image_pull_policy": ImagePullPolicy(request.pull_policy).to_k8s(),
+            "env": [
+                k8sclient.V1EnvVar(name="ANSIBLE_LOCAL_TEMP", value="/tmp")
+            ],
+            "args": request.cmdline.get_args(),
+            "ports": ports,
+            "command": [request.cmdline.command()],
+        }
+
+        limits: dict = {}
+        if request.k8s_mem_limit:
+            limits["memory"] = request.k8s_mem_limit
+        if request.k8s_cpu_limit:
+            limits["cpu"] = request.k8s_cpu_limit
+        if limits:
+            container_kwargs["resources"] = k8sclient.V1ResourceRequirements(
+                limits=limits
+            )
+
+        container = k8sclient.V1Container(**container_kwargs)
 
         LOGGER.info(
             f"Created container: name: {container.name}, "
