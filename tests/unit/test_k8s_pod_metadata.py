@@ -196,7 +196,9 @@ def test_qualified_key_long_unqualified_rejected():
 
 def test_qualified_key_long_prefixed_allowed():
     """A valid prefix/name key >253 total chars is accepted."""
-    prefix = "a" * 253
+    # Build a 253-char valid DNS subdomain: labels <=63 chars joined by dots
+    prefix = ".".join(["a" * 63] * 3 + ["a" * (253 - 63 * 3 - 3)])
+    assert len(prefix) == 253
     _validate_qualified_metadata_key(f"{prefix}/key", field_label="Label")
 
 
