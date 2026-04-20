@@ -34,3 +34,22 @@ def test_encrypt_decrypt_string():
 def test_decrypt_invalid_string():
     with pytest.raises(ValueError):
         decrypt_string("Invalid string")
+
+
+def test_encrypt_decrypt_with_explicit_key_material(settings):
+    """Decrypt with old material, encrypt with new (no settings swap)."""
+    settings.SECRET_KEY = "runtime-default"
+    old_k = "old-secret-key-material"
+    new_k = "new-secret-key-material"
+    value = "credential-payload"
+
+    ciphertext = encrypt_string(value, key_material=old_k)
+    assert ciphertext.startswith("$encrypted$fernet-256$")
+
+    assert decrypt_string(ciphertext, key_material=old_k) == value
+
+    rewrapped = encrypt_string(
+        decrypt_string(ciphertext, key_material=old_k),
+        key_material=new_k,
+    )
+    assert decrypt_string(rewrapped, key_material=new_k) == value

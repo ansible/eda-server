@@ -11,6 +11,11 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+from __future__ import annotations
+
+from typing import Optional
+
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.utils.encoding import force_bytes
@@ -21,14 +26,17 @@ from .fernet import Fernet256, get_encryption_key
 KEY_LENGTH = 64
 
 
-def encrypt_string(value: str) -> str:
-    fernet = Fernet256(get_encryption_key(KEY_LENGTH))
+def encrypt_string(value: str, *, key_material: Optional[str] = None) -> str:
+    """Encrypt *value*; uses *key_material* or ``settings.SECRET_KEY``."""
+    km = settings.SECRET_KEY if key_material is None else key_material
+    fernet = Fernet256(get_encryption_key(KEY_LENGTH, key_material=km))
     encrypted_value = fernet.encrypt(force_bytes(value))
     tokens = ("$encrypted", "fernet-256", encrypted_value.decode("utf-8"))
     return "$".join(tokens)
 
 
-def decrypt_string(value: str) -> str:
+def decrypt_string(value: str, *, key_material: Optional[str] = None) -> str:
+    """Decrypt ``encrypt_string`` output using matching key material."""
     tokens = value.split("$", 3)
     if tokens[0] != "" or tokens[1] != "encrypted":
         raise ValueError(
@@ -36,9 +44,10 @@ def decrypt_string(value: str) -> str:
         )
     if tokens[2] != "fernet-256":
         raise ValueError("Only fernet-256 is supported at the moment.")
-    value = tokens[3]
-    fernet = Fernet256(get_encryption_key(KEY_LENGTH))
-    return fernet.decrypt(value).decode("utf-8")
+    ciphertext = tokens[3]
+    km = settings.SECRET_KEY if key_material is None else key_material
+    fernet = Fernet256(get_encryption_key(KEY_LENGTH, key_material=km))
+    return fernet.decrypt(ciphertext).decode("utf-8")
 
 
 class BaseEncryptedField(models.Field):
