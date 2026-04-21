@@ -27,6 +27,11 @@ from .job import (
     JobInstanceEvent,
     JobInstanceHost,
 )
+from .management_job import (
+    ManagementJob,
+    ManagementJobExecution,
+    ManagementJobSchedule,
+)
 from .organization import Organization
 from .project import Project
 from .queue import ActivationRequestQueue
@@ -65,6 +70,9 @@ __all__ = [
     "Organization",
     "Team",
     "EventStream",
+    "ManagementJob",
+    "ManagementJobExecution",
+    "ManagementJobSchedule",
     "Setting",
 ]
 
@@ -73,6 +81,7 @@ permission_registry.register(
     EdaCredential,
     CredentialInputSource,
     DecisionEnvironment,
+    ManagementJob,
     Project,
     Organization,
     Team,
