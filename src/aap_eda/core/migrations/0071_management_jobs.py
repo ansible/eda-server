@@ -7,7 +7,6 @@ import aap_eda.core.enums
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("core", "0070_activation_enable_persistence_and_more"),
     ]
