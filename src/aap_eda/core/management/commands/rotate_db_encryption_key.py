@@ -118,8 +118,7 @@ class Command(BaseCommand):
             self.stdout.write(f"{total} value(s) re-encrypted.")
 
         if not use_custom_key:
-            return self.new_key
-        return None
+            self.stdout.write(self.new_key)
 
     def _reencrypt_fields(self, fields, dry_run: bool) -> int:
         """Decrypt with old key, re-encrypt with new key.
@@ -138,28 +137,51 @@ class Command(BaseCommand):
             total += self._reencrypt_column(model, field, dry_run)
         return total
 
+    @staticmethod
+    def _build_select_sql(model, field) -> str:
+        """Build a SELECT query for encrypted column scanning.
+
+        Safe from SQL injection: all identifiers originate from Django
+        model metadata and are quoted via the database backend.
+        """
+        qn = connection.ops.quote_name
+        return (
+            "SELECT {pk}, {col} FROM {table} WHERE {col} IS NOT NULL".format(
+                pk=qn(model._meta.pk.column),
+                col=qn(field.column),
+                table=qn(model._meta.db_table),
+            )
+        )
+
+    @staticmethod
+    def _build_update_sql(model, field) -> str:
+        """Build an UPDATE query for re-encrypting a single row.
+
+        Safe from SQL injection: all identifiers originate from Django
+        model metadata and are quoted via the database backend.
+        """
+        qn = connection.ops.quote_name
+        return "UPDATE {table} SET {col} = %s WHERE {pk} = %s".format(
+            table=qn(model._meta.db_table),
+            col=qn(field.column),
+            pk=qn(model._meta.pk.column),
+        )
+
     def _reencrypt_column(self, model, field, dry_run: bool) -> int:
         """Re-encrypt a single column across all rows."""
-        qn = connection.ops.quote_name
-        table = qn(model._meta.db_table)
-        col = qn(field.column)
-        pk_col = qn(model._meta.pk.column)
+        select_sql = self._build_select_sql(model, field)
+        update_sql = self._build_update_sql(model, field)
         count = 0
         with connection.cursor() as cur:
-            cur.execute(
-                f"SELECT {pk_col}, {col} FROM {table} "  # noqa: S608
-                f"WHERE {col} IS NOT NULL",
-            )
+            cur.execute(select_sql)
             while True:
                 rows = cur.fetchmany(_FETCH_BATCH_SIZE)
                 if not rows:
                     break
-                count += self._reencrypt_rows(
-                    rows, table, col, pk_col, dry_run
-                )
+                count += self._reencrypt_rows(rows, update_sql, dry_run)
         return count
 
-    def _reencrypt_rows(self, rows, table, col, pk_col, dry_run):
+    def _reencrypt_rows(self, rows, update_sql, dry_run):
         """Decrypt and re-encrypt a batch of rows."""
         count = 0
         for pk, raw in rows:
@@ -169,10 +191,6 @@ class Command(BaseCommand):
             new_val = encrypt_string(clear, key_material=self.new_key)
             if not dry_run:
                 with connection.cursor() as ucur:
-                    ucur.execute(
-                        f"UPDATE {table} SET {col} = %s "  # noqa: S608
-                        f"WHERE {pk_col} = %s",
-                        [new_val, pk],
-                    )
+                    ucur.execute(update_sql, [new_val, pk])
             count += 1
         return count
