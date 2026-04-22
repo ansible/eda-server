@@ -47,10 +47,18 @@ _FETCH_BATCH_SIZE = 2000
 
 
 def _iter_encrypted_text_fields() -> Iterator[tuple[type, EncryptedTextField]]:
-    """Yield ``(model_class, field)`` for every EncryptedTextField."""
+    """Yield ``(model_class, field)`` for every EncryptedTextField.
+
+    Only yields fields defined directly on the model (not inherited)
+    to avoid processing the same column twice in multi-table
+    inheritance hierarchies.
+    """
     for model in apps.get_models():
         for field in model._meta.get_fields():
-            if isinstance(field, EncryptedTextField):
+            if (
+                isinstance(field, EncryptedTextField)
+                and getattr(field, "model", None) is model
+            ):
                 yield model, field
 
 
