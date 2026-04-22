@@ -131,7 +131,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(f"{total} value(s) re-encrypted.")
 
-        if not use_custom_key:
+        if not dry_run and not use_custom_key:
             self.stdout.write(self.new_key)
 
     def _reencrypt_fields(self, fields, dry_run: bool) -> int:

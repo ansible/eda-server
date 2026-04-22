@@ -79,10 +79,26 @@ def test_dry_run_reports_without_writing(settings):
     assert after_cipher == old_cipher
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_auto_generated_key_printed_once(settings):
-    """Generated key appears exactly once in stdout."""
+    """Generated key appears exactly once in stdout (non-dry-run)."""
     settings.SECRET_KEY = "test-secret-for-auto-gen"
+    out = io.StringIO()
+    call_command(
+        "rotate_db_encryption_key",
+        stdout=out,
+    )
+    lines = [ln for ln in out.getvalue().splitlines() if ln.strip()]
+    assert lines[0].endswith("re-encrypted.")
+    key_line = lines[1]
+    assert len(key_line) > 0
+    assert out.getvalue().count(key_line) == 1
+
+
+@pytest.mark.django_db
+def test_dry_run_does_not_print_generated_key(settings):
+    """--dry-run must not emit a generated key to avoid operator confusion."""
+    settings.SECRET_KEY = "test-secret-for-dry-run-no-key"
     out = io.StringIO()
     call_command(
         "rotate_db_encryption_key",
@@ -90,10 +106,8 @@ def test_auto_generated_key_printed_once(settings):
         stdout=out,
     )
     lines = [ln for ln in out.getvalue().splitlines() if ln.strip()]
+    assert len(lines) == 1
     assert lines[0].endswith("would be re-encrypted.")
-    key_line = lines[1]
-    assert len(key_line) > 0
-    assert out.getvalue().count(key_line) == 1
 
 
 @pytest.mark.django_db(transaction=True)
