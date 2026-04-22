@@ -152,25 +152,32 @@ class Command(BaseCommand):
         return total
 
     @staticmethod
-    def _build_select_page_sql(model, field) -> str:
+    def _build_select_page_sql(model, field, *, with_pk_bound: bool) -> str:
         """Build a paginated SELECT for encrypted column scanning.
 
-        Uses PK-window pagination (``WHERE pk > %s ORDER BY pk LIMIT n``)
-        so only one page of rows is buffered by the database driver at a
-        time, regardless of table size.
+        When *with_pk_bound* is ``True`` the query includes a
+        ``WHERE pk > %s`` predicate for keyset pagination.  The first
+        page is fetched without this predicate so no assumption about
+        the PK type (integer vs UUID) is needed.
 
         Safe from SQL injection: all identifiers originate from Django
         model metadata and are quoted via the database backend.
         """
         qn = connection.ops.quote_name
+        pk = qn(model._meta.pk.column)
+        col = qn(field.column)
+        table = qn(model._meta.db_table)
+
+        pk_clause = "AND {pk} > %s ".format(pk=pk) if with_pk_bound else ""
         return (
             "SELECT {pk}, {col} FROM {table} "
-            "WHERE {col} IS NOT NULL AND {pk} > %s "
+            "WHERE {col} IS NOT NULL {pk_clause}"
             "ORDER BY {pk} LIMIT {limit}"
         ).format(
-            pk=qn(model._meta.pk.column),
-            col=qn(field.column),
-            table=qn(model._meta.db_table),
+            pk=pk,
+            col=col,
+            table=table,
+            pk_clause=pk_clause,
             limit=_FETCH_BATCH_SIZE,
         )
 
@@ -190,13 +197,21 @@ class Command(BaseCommand):
 
     def _reencrypt_column(self, model, field, dry_run: bool) -> int:
         """Re-encrypt a single column across all rows."""
-        select_sql = self._build_select_page_sql(model, field)
+        first_page_sql = self._build_select_page_sql(
+            model, field, with_pk_bound=False
+        )
+        next_page_sql = self._build_select_page_sql(
+            model, field, with_pk_bound=True
+        )
         update_sql = self._build_update_sql(model, field)
         count = 0
-        last_pk = 0
+        last_pk = None
         while True:
             with connection.cursor() as cur:
-                cur.execute(select_sql, [last_pk])
+                if last_pk is None:
+                    cur.execute(first_page_sql)
+                else:
+                    cur.execute(next_page_sql, [last_pk])
                 rows = cur.fetchall()
             if not rows:
                 break
