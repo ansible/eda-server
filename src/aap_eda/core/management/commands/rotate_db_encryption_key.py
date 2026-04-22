@@ -109,6 +109,12 @@ class Command(BaseCommand):
         else:
             self.new_key = base64.encodebytes(os.urandom(33)).decode().rstrip()
 
+        if self.new_key == self.old_key:
+            raise CommandError(
+                "New encryption key is identical to the current "
+                "SECRET_KEY; rotation aborted."
+            )
+
         fields = list(_iter_encrypted_text_fields())
         total = self._reencrypt_fields(fields, dry_run)
 
@@ -138,19 +144,26 @@ class Command(BaseCommand):
         return total
 
     @staticmethod
-    def _build_select_sql(model, field) -> str:
-        """Build a SELECT query for encrypted column scanning.
+    def _build_select_page_sql(model, field) -> str:
+        """Build a paginated SELECT for encrypted column scanning.
+
+        Uses PK-window pagination (``WHERE pk > %s ORDER BY pk LIMIT n``)
+        so only one page of rows is buffered by the database driver at a
+        time, regardless of table size.
 
         Safe from SQL injection: all identifiers originate from Django
         model metadata and are quoted via the database backend.
         """
         qn = connection.ops.quote_name
         return (
-            "SELECT {pk}, {col} FROM {table} WHERE {col} IS NOT NULL".format(
-                pk=qn(model._meta.pk.column),
-                col=qn(field.column),
-                table=qn(model._meta.db_table),
-            )
+            "SELECT {pk}, {col} FROM {table} "
+            "WHERE {col} IS NOT NULL AND {pk} > %s "
+            "ORDER BY {pk} LIMIT {limit}"
+        ).format(
+            pk=qn(model._meta.pk.column),
+            col=qn(field.column),
+            table=qn(model._meta.db_table),
+            limit=_FETCH_BATCH_SIZE,
         )
 
     @staticmethod
@@ -169,16 +182,18 @@ class Command(BaseCommand):
 
     def _reencrypt_column(self, model, field, dry_run: bool) -> int:
         """Re-encrypt a single column across all rows."""
-        select_sql = self._build_select_sql(model, field)
+        select_sql = self._build_select_page_sql(model, field)
         update_sql = self._build_update_sql(model, field)
         count = 0
-        with connection.cursor() as cur:
-            cur.execute(select_sql)
-            while True:
-                rows = cur.fetchmany(_FETCH_BATCH_SIZE)
-                if not rows:
-                    break
-                count += self._reencrypt_rows(rows, update_sql, dry_run)
+        last_pk = 0
+        while True:
+            with connection.cursor() as cur:
+                cur.execute(select_sql, [last_pk])
+                rows = cur.fetchall()
+            if not rows:
+                break
+            last_pk = rows[-1][0]
+            count += self._reencrypt_rows(rows, update_sql, dry_run)
         return count
 
     def _reencrypt_rows(self, rows, update_sql, dry_run):

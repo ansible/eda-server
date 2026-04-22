@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import pytest
+from cryptography.fernet import InvalidToken
 
 from aap_eda.core.utils.crypto.fields import decrypt_string, encrypt_string
 
@@ -48,8 +49,14 @@ def test_encrypt_decrypt_with_explicit_key_material(settings):
 
     assert decrypt_string(ciphertext, key_material=old_k) == value
 
+    with pytest.raises(InvalidToken):
+        decrypt_string(ciphertext, key_material=new_k)
+
     rewrapped = encrypt_string(
         decrypt_string(ciphertext, key_material=old_k),
         key_material=new_k,
     )
     assert decrypt_string(rewrapped, key_material=new_k) == value
+
+    with pytest.raises(InvalidToken):
+        decrypt_string(rewrapped, key_material=old_k)

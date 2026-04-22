@@ -35,9 +35,27 @@ def test_use_custom_key_requires_eda_secret_key():
 
 
 @pytest.mark.django_db
+def test_same_key_aborts(settings):
+    """CommandError when the new key equals the current SECRET_KEY."""
+    settings.SECRET_KEY = "identical-key"
+    with patch.dict(os.environ, {"EDA_SECRET_KEY": "identical-key"}):
+        with pytest.raises(CommandError, match="identical"):
+            call_command("rotate_db_encryption_key", use_custom_key=True)
+
+
+@pytest.mark.django_db(transaction=True)
 def test_dry_run_reports_without_writing(settings):
-    """--dry-run completes and reports without committing."""
+    """--dry-run reports affected rows but leaves ciphertext unchanged."""
     settings.SECRET_KEY = "test-secret-for-rotation-command"
+
+    Setting.objects.create(key="dry_run_rotation", value="dry-run-secret")
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT value FROM core_setting WHERE key = %s",
+            ["dry_run_rotation"],
+        )
+        old_cipher = cur.fetchone()[0]
+
     out = io.StringIO()
     with patch.dict(
         os.environ,
@@ -49,7 +67,16 @@ def test_dry_run_reports_without_writing(settings):
             dry_run=True,
             stdout=out,
         )
-    assert "would be re-encrypted" in out.getvalue()
+
+    assert "1 value(s) would be re-encrypted" in out.getvalue()
+
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT value FROM core_setting WHERE key = %s",
+            ["dry_run_rotation"],
+        )
+        after_cipher = cur.fetchone()[0]
+    assert after_cipher == old_cipher
 
 
 @pytest.mark.django_db
