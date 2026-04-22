@@ -117,6 +117,107 @@ def _update_k8s_service_name(validated_data: dict) -> str:
     return service_name or create_k8s_service_name(validated_data["name"])
 
 
+class _K8sPodMetadataReadFields:
+    """Read-only k8s pod-metadata field declarations (no validators)."""
+
+    k8s_pod_service_account_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text=("Kubernetes ServiceAccount for activation job pods"),
+    )
+    k8s_pod_labels = serializers.JSONField(
+        required=False,
+        default=dict,
+    )
+    k8s_pod_annotations = serializers.JSONField(
+        required=False,
+        default=dict,
+    )
+    k8s_pod_node_selector = serializers.JSONField(
+        required=False,
+        default=dict,
+    )
+
+
+class _K8sPodMetadataWriteFields:
+    """Writable k8s pod-metadata field declarations with validators."""
+
+    k8s_pod_service_account_name = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[
+            validators.check_if_k8s_pod_service_account_name_valid,
+        ],
+    )
+    k8s_pod_labels = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[validators.check_if_k8s_pod_labels_valid],
+    )
+    k8s_pod_annotations = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[
+            validators.check_if_k8s_pod_annotations_valid,
+        ],
+    )
+    k8s_pod_node_selector = serializers.JSONField(
+        required=False,
+        default=dict,
+        validators=[
+            validators.check_if_k8s_pod_node_selector_valid,
+        ],
+    )
+
+
+def _activation_k8s_pod_metadata_payload(
+    activation: "models.Activation",
+) -> dict:
+    """Build the k8s pod-metadata dict for serializer representation."""
+    return {
+        "k8s_pod_service_account_name": (
+            activation.k8s_pod_service_account_name
+        ),
+        "k8s_pod_labels": activation.k8s_pod_labels or {},
+        "k8s_pod_annotations": (activation.k8s_pod_annotations or {}),
+        "k8s_pod_node_selector": (activation.k8s_pod_node_selector or {}),
+    }
+
+
+def _trim_string_dict(value: dict, field_name: str) -> dict:
+    """Trim whitespace from string keys/values; reject empty keys."""
+    result: dict = {}
+    for raw_k, raw_v in value.items():
+        k = str(raw_k).strip()
+        if not k:
+            raise serializers.ValidationError(
+                f"{field_name} cannot contain empty keys"
+            )
+        result[k] = str(raw_v).strip() if isinstance(raw_v, str) else raw_v
+    return result
+
+
+def _normalize_activation_k8s_pod_fields(data: dict) -> None:
+    """Trim ServiceAccount name and string keys/values in pod label maps."""
+    sa = data.get("k8s_pod_service_account_name")
+    if sa is not None:
+        sa = str(sa).strip()
+        data["k8s_pod_service_account_name"] = sa or None
+
+    for field in (
+        "k8s_pod_labels",
+        "k8s_pod_annotations",
+        "k8s_pod_node_selector",
+    ):
+        val = data.get(field)
+        if val is None:
+            data[field] = {}
+        elif isinstance(val, dict):
+            data[field] = _trim_string_dict(val, field)
+
+
 def _extend_extra_vars_from_credentials(
     validated_data: dict, extra_vars: dict
 ) -> str:
@@ -335,6 +436,10 @@ class ActivationSerializer(serializers.ModelSerializer):
             "skip_audit_events",
             "enable_persistence",
             "rule_engine_credential_id",
+            "k8s_pod_service_account_name",
+            "k8s_pod_labels",
+            "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
         read_only_fields = [
             "id",
@@ -344,7 +449,9 @@ class ActivationSerializer(serializers.ModelSerializer):
         ]
 
 
-class ActivationListSerializer(serializers.ModelSerializer):
+class ActivationListSerializer(
+    _K8sPodMetadataReadFields, serializers.ModelSerializer
+):
     """Serializer for listing the Activation model objects."""
 
     rules_count = serializers.IntegerField()
@@ -409,6 +516,10 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "log_tracking_id",
             "enable_persistence",
             "rule_engine_credential_id",
+            "k8s_pod_service_account_name",
+            "k8s_pod_labels",
+            "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
         read_only_fields = [
             "id",
@@ -479,11 +590,14 @@ class ActivationListSerializer(serializers.ModelSerializer):
             "edited_by": BasicUserSerializer(activation.edited_by).data,
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
+            **_activation_k8s_pod_metadata_payload(activation),
         }
 
 
 class ActivationCreateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    _K8sPodMetadataWriteFields,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
     """Serializer for creating the Activation."""
 
@@ -508,6 +622,10 @@ class ActivationCreateSerializer(
             "skip_audit_events",
             "enable_persistence",
             "rule_engine_credential_id",
+            "k8s_pod_service_account_name",
+            "k8s_pod_labels",
+            "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -561,6 +679,7 @@ class ActivationCreateSerializer(
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
+        _normalize_activation_k8s_pod_fields(data)
         return data
 
     def create(self, validated_data):
@@ -640,6 +759,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "log_tracking_id": str(uuid.uuid4()),
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
+            **_activation_k8s_pod_metadata_payload(activation),
         }
         if activation.eda_system_vault_credential:
             inputs = yaml.safe_load(
@@ -657,7 +777,9 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
 
 class ActivationUpdateSerializer(
-    OrganizationIdFieldMixin, serializers.ModelSerializer
+    _K8sPodMetadataWriteFields,
+    OrganizationIdFieldMixin,
+    serializers.ModelSerializer,
 ):
     """Serializer for updating the Activation."""
 
@@ -682,6 +804,10 @@ class ActivationUpdateSerializer(
             "skip_audit_events",
             "enable_persistence",
             "rule_engine_credential_id",
+            "k8s_pod_service_account_name",
+            "k8s_pod_labels",
+            "k8s_pod_annotations",
+            "k8s_pod_node_selector",
         ]
 
     rulebook_id = serializers.IntegerField(
@@ -730,6 +856,18 @@ class ActivationUpdateSerializer(
             data["name"] = activation.name
         if "k8s_service_name" not in data:
             data["k8s_service_name"] = activation.k8s_service_name
+        if "k8s_pod_service_account_name" not in data:
+            data[
+                "k8s_pod_service_account_name"
+            ] = activation.k8s_pod_service_account_name
+        if "k8s_pod_labels" not in data:
+            data["k8s_pod_labels"] = activation.k8s_pod_labels or {}
+        if "k8s_pod_annotations" not in data:
+            data["k8s_pod_annotations"] = activation.k8s_pod_annotations or {}
+        if "k8s_pod_node_selector" not in data:
+            data["k8s_pod_node_selector"] = (
+                activation.k8s_pod_node_selector or {}
+            )
         if "extra_var" not in data:
             data["extra_var"] = activation.extra_var
         data["extra_var"] = _get_user_extra_vars(activation, data["extra_var"])
@@ -745,6 +883,7 @@ class ActivationUpdateSerializer(
         _validate_credentials_and_token_and_rulebook(data=data, creating=True)
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
+        _normalize_activation_k8s_pod_fields(data)
         return data
 
     def prepare_update(self, activation: models.Activation):
@@ -859,6 +998,7 @@ class ActivationUpdateSerializer(
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
+            **_activation_k8s_pod_metadata_payload(activation),
             "source_mappings": activation.source_mappings,
             "skip_audit_events": activation.skip_audit_events,
             "enable_persistence": activation.enable_persistence,
@@ -902,7 +1042,9 @@ class ActivationInstanceLogSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class ActivationReadSerializer(serializers.ModelSerializer):
+class ActivationReadSerializer(
+    _K8sPodMetadataReadFields, serializers.ModelSerializer
+):
     """Serializer for reading the Activation with related objects info."""
 
     decision_environment = DecisionEnvironmentRefSerializer(
@@ -984,6 +1126,10 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "eda_credentials",
             "log_level",
             "k8s_service_name",
+            "k8s_pod_service_account_name",
+            "k8s_pod_labels",
+            "k8s_pod_annotations",
+            "k8s_pod_node_selector",
             "event_streams",
             "source_mappings",
             "skip_audit_events",
@@ -1122,6 +1268,7 @@ class ActivationReadSerializer(serializers.ModelSerializer):
             "log_level": activation.log_level,
             "eda_credentials": eda_credentials,
             "k8s_service_name": activation.k8s_service_name,
+            **_activation_k8s_pod_metadata_payload(activation),
             "event_streams": event_streams,
             "source_mappings": activation.source_mappings,
             "warnings": warnings,
@@ -1136,7 +1283,9 @@ class ActivationReadSerializer(serializers.ModelSerializer):
         }
 
 
-class PostActivationSerializer(serializers.ModelSerializer):
+class PostActivationSerializer(
+    _K8sPodMetadataWriteFields, serializers.ModelSerializer
+):
     """Serializer for validating activations before reactivate them."""
 
     id = serializers.IntegerField(
@@ -1179,6 +1328,7 @@ class PostActivationSerializer(serializers.ModelSerializer):
         _validate_credentials_and_token_and_rulebook(data=data, creating=False)
         _validate_sources_with_event_streams(data=data)
         _validate_persistence_credential(data=data)
+        _normalize_activation_k8s_pod_fields(data)
         return data
 
     class Meta:
@@ -1198,6 +1348,10 @@ class PostActivationSerializer(serializers.ModelSerializer):
             "rulebook_id",
             "eda_credentials",
             "k8s_service_name",
+            "k8s_pod_service_account_name",
+            "k8s_pod_labels",
+            "k8s_pod_annotations",
+            "k8s_pod_node_selector",
             "source_mappings",
             "skip_audit_events",
             "enable_persistence",
@@ -1232,6 +1386,7 @@ def is_activation_valid(activation: models.Activation) -> tuple[bool, str]:
     # Ensure persistence fields are explicitly set from the activation instance
     data["enable_persistence"] = activation.enable_persistence
     data["rule_engine_credential_id"] = activation.rule_engine_credential_id
+    data.update(_activation_k8s_pod_metadata_payload(activation))
     serializer = PostActivationSerializer(data=data)
 
     valid = serializer.is_valid()
