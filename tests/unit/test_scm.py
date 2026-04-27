@@ -165,7 +165,7 @@ def test_git_clone_leak_password(
     def raise_error(**kwargs):
         raise scm.ScmError(
             "fatal: Unable to access "
-            "'https://me:supersecret@git.example.com/repo.git'"
+            "'https://adam:secret@git.example.com/repo.git'"
         )
 
     executor.side_effect = raise_error
@@ -178,8 +178,72 @@ def test_git_clone_leak_password(
                 credential=credential,
                 _executor=executor,
             )
-    assert "supersecret" not in str(exc_info)
-    assert "****" in str(exc_info)
+    error_msg = str(exc_info.value)
+    assert "secret" not in error_msg
+    assert "adam:secret@" not in error_msg
+    assert "git.example.com/repo.git" in error_msg
+
+
+@pytest.mark.django_db
+def test_git_clone_no_oracle_attack(
+    credential: models.EdaCredential,
+):
+    """Secret substrings in non-URL parts of the error are not redacted,
+    preventing an oracle attack (AAP-72813)."""
+    executor = mock.MagicMock()
+
+    def raise_error(**kwargs):
+        raise scm.ScmError(
+            "Project Import Error: " '"Failed to checkout first-secret-second"'
+        )
+
+    executor.side_effect = raise_error
+
+    with pytest.raises(scm.ScmError) as exc_info:
+        with tempfile.TemporaryDirectory() as dest_path:
+            scm.ScmRepository.clone(
+                "https://git.example.com/repo.git",
+                dest_path,
+                credential=credential,
+                _executor=executor,
+            )
+    error_msg = str(exc_info.value)
+    assert "first-secret-second" in error_msg
+
+
+@pytest.mark.django_db
+def test_git_clone_sanitizes_decoded_url(
+    default_organization: models.Organization,
+):
+    """URL-decoded credentials are also sanitized (AAP-72813)."""
+    credential = models.EdaCredential.objects.create(
+        name="special-char-cred",
+        inputs={"username": "user", "password": "p@ss"},
+        organization=default_organization,
+    )
+    credential.refresh_from_db()
+    executor = mock.MagicMock()
+
+    def raise_error(**kwargs):
+        raise scm.ScmError(
+            "fatal: Unable to access "
+            "'https://user:p@ss@git.example.com/repo.git'"
+        )
+
+    executor.side_effect = raise_error
+
+    with pytest.raises(scm.ScmError) as exc_info:
+        with tempfile.TemporaryDirectory() as dest_path:
+            scm.ScmRepository.clone(
+                "https://git.example.com/repo.git",
+                dest_path,
+                credential=credential,
+                _executor=executor,
+            )
+    error_msg = str(exc_info.value)
+    assert "p@ss" not in error_msg
+    assert "p%40ss" not in error_msg
+    assert "git.example.com/repo.git" in error_msg
 
 
 def test_git_clone_without_ssl_verification():
