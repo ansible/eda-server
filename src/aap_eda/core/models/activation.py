@@ -160,6 +160,36 @@ class Activation(
         blank=True,
         help_text="Name of the kubernetes service",
     )
+    k8s_pod_service_account_name = models.TextField(
+        null=True,
+        default=None,
+        blank=True,
+        help_text=(
+            "Kubernetes ServiceAccount name for activation job pods "
+            "(Kubernetes-style deployments only)."
+        ),
+    )
+    k8s_pod_labels = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Additional labels merged into activation job pod template "
+            "metadata."
+        ),
+    )
+    k8s_pod_annotations = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Annotations on activation job pod template metadata.",
+    )
+    k8s_pod_node_selector = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Kubernetes nodeSelector applied to activation job pods "
+            "for scheduling onto specific nodes."
+        ),
+    )
     event_streams = models.ManyToManyField(
         EventStream, related_name="activations", default=None
     )

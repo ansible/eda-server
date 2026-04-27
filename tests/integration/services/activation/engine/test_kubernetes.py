@@ -278,6 +278,153 @@ def test_get_k8s_client_exception():
 
 
 @pytest.mark.django_db
+def test_engine_start_applies_k8s_pod_metadata(
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization: models.Organization,
+):
+    """Assert Job pod template sets ServiceAccount, labels, annotations."""
+    engine = kubernetes_engine
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+        k8s_pod_service_account_name="eda-workload",
+        k8s_pod_labels={"cost-centre": "cba"},
+        k8s_pod_annotations={"example.com/audit": "true"},
+        k8s_pod_node_selector={"kubernetes.io/os": "linux"},
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    created_body = None
+
+    def capture_job(namespace, body):
+        nonlocal created_body
+        created_body = body
+        return mock.Mock()
+
+    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            with mock.patch.object(
+                engine.client.batch_api,
+                "create_namespaced_job",
+                side_effect=capture_job,
+            ):
+                engine.start(request, log_handler)
+
+    spec = created_body.spec.template.spec
+    assert spec.service_account_name == "eda-workload"
+    labels = created_body.spec.template.metadata.labels
+    assert labels["app"] == "eda"
+    assert labels["job-name"] == engine.job_name
+    assert labels["cost-centre"] == "cba"
+    assert (
+        created_body.spec.template.metadata.annotations["example.com/audit"]
+        == "true"
+    )
+    assert spec.node_selector == {"kubernetes.io/os": "linux"}
+
+
+@pytest.mark.parametrize(
+    "mem,cpu,expect_mem,expect_cpu",
+    [
+        ("200Mi", "500m", "200Mi", "500m"),
+        ("200Mi", None, "200Mi", None),
+        (None, "500m", None, "500m"),
+    ],
+    ids=["both", "memory-only", "cpu-only"],
+)
+@pytest.mark.django_db
+def test_engine_start_applies_k8s_resource_limits(
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization: models.Organization,
+    mem,
+    cpu,
+    expect_mem,
+    expect_cpu,
+):
+    """Assert Job container sets the configured resource limits."""
+    engine = kubernetes_engine
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+        k8s_mem_limit=mem,
+        k8s_cpu_limit=cpu,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    created_body = None
+
+    def capture_job(namespace, body):
+        nonlocal created_body
+        created_body = body
+        return mock.Mock()
+
+    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            with mock.patch.object(
+                engine.client.batch_api,
+                "create_namespaced_job",
+                side_effect=capture_job,
+            ):
+                engine.start(request, log_handler)
+
+    container = created_body.spec.template.spec.containers[0]
+    assert container.resources is not None
+    limits = container.resources.limits
+    if expect_mem:
+        assert limits["memory"] == expect_mem
+    else:
+        assert "memory" not in limits
+    if expect_cpu:
+        assert limits["cpu"] == expect_cpu
+    else:
+        assert "cpu" not in limits
+
+
+@pytest.mark.django_db
+def test_engine_start_no_resource_limits_by_default(
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization: models.Organization,
+):
+    """Assert no resource limits when settings are None."""
+    engine = kubernetes_engine
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+        k8s_mem_limit=None,
+        k8s_cpu_limit=None,
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    created_body = None
+
+    def capture_job(namespace, body):
+        nonlocal created_body
+        created_body = body
+        return mock.Mock()
+
+    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            with mock.patch.object(
+                engine.client.batch_api,
+                "create_namespaced_job",
+                side_effect=capture_job,
+            ):
+                engine.start(request, log_handler)
+
+    container = created_body.spec.template.spec.containers[0]
+    assert container.resources is None
+
+
+@pytest.mark.django_db
 def test_engine_start(
     init_kubernetes_data,
     kubernetes_engine,
