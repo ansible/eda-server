@@ -316,3 +316,64 @@ def test_project_import_with_invalid_rulebooks(
     assert project.import_state == models.Project.ImportState.COMPLETED
     assert caplog.text.count("WARNING") == 20
     assert project.rulebook_set.count() == 1
+
+
+# ------------------------------------------------------------------
+# AAP-72814: git_hash cleared on sync failure
+# ------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_sync_failure_clears_git_hash(
+    default_organization: models.Organization,
+    service_tempdir_patch,
+):
+    """When sync fails, git_hash is cleared to empty string so the
+    next successful sync does not early-exit."""
+    project = models.Project.objects.create(
+        name="test-clear-hash",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+        git_hash="original-hash-abc123",
+        import_state=models.Project.ImportState.COMPLETED,
+    )
+
+    git_mock = mock.Mock(name="ScmRepository", spec=ScmRepository)
+    git_mock.clone.side_effect = Exception("Failed to checkout foobar")
+
+    service = ProjectImportService(scm_cls=git_mock)
+    with pytest.raises(Exception, match="Failed to import the project"):
+        service.sync_project(project)
+
+    project.refresh_from_db()
+    assert project.git_hash == ""
+    assert project.import_state == models.Project.ImportState.FAILED
+    assert "Failed to checkout foobar" in project.import_error
+
+
+@pytest.mark.django_db
+def test_sync_recovery_after_failure_reprocesses(
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """After a failed sync clears git_hash, a subsequent successful
+    sync with the same commit reprocesses rulebooks (no early-exit)."""
+    project = models.Project.objects.create(
+        name="test-recovery",
+        url="https://git.example.com/repo.git",
+        organization=default_organization,
+        git_hash="",
+        import_state=models.Project.ImportState.FAILED,
+    )
+
+    git_mock = _mock_git_clone(
+        "project-02", "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    )
+    service = ProjectImportService(scm_cls=git_mock)
+    service.sync_project(project)
+    project.refresh_from_db()
+
+    assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
+    assert project.import_state == models.Project.ImportState.COMPLETED
+    assert project.rulebook_set.count() > 0

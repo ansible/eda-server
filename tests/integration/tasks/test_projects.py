@@ -1887,3 +1887,228 @@ def test_recover_orphaned_exception_handling(
     activation.refresh_from_db()
     # Still stuck because save failed
     assert activation.awaiting_project_sync is True
+
+
+# ------------------------------------------------------------------
+# AAP-72814: Auto-restart FAILED/ERROR activations on successful sync
+# ------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_failed_activation_on_sync(
+    mock_restart,
+    default_organization,
+):
+    """FAILED activation with restart_on_project_update=True restarts
+    after successful sync even when content is unchanged."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="failed-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="same-content",
+        git_hash="abc123",
+        status=ActivationStatus.FAILED,
+        failure_count=3,
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_called_once()
+    activation.refresh_from_db()
+    assert activation.failure_count == 0
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_error_activation_on_sync(
+    mock_restart,
+    default_organization,
+):
+    """ERROR activation with restart_on_project_update=True restarts
+    after successful sync even when content is unchanged."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="error-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="same-content",
+        git_hash="abc123",
+        status=ActivationStatus.ERROR,
+        failure_count=5,
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_called_once()
+    activation.refresh_from_db()
+    assert activation.failure_count == 0
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_running_activation_not_restarted(
+    mock_restart,
+    default_organization,
+):
+    """RUNNING activation with unchanged content is NOT restarted."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="running-activation",
+        restart_on_project_update=True,
+        rulebook_rulesets="same-content",
+        git_hash="abc123",
+        status=ActivationStatus.RUNNING,
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_failed_activation_without_restart_flag(
+    mock_restart,
+    default_organization,
+):
+    """FAILED activation with restart_on_project_update=False is NOT
+    restarted (excluded by queryset filter)."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="same-content",
+    )
+    _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="no-restart-flag",
+        restart_on_project_update=False,
+        rulebook_rulesets="same-content",
+        git_hash="abc123",
+        status=ActivationStatus.FAILED,
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_not_called()
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_content_changed_still_works(
+    mock_restart,
+    default_organization,
+):
+    """Content-changed restart still works as before (regression guard)."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="content-changed",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="abc123",
+        status=ActivationStatus.RUNNING,
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_called_once()
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == "new-content"
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.restart_rulebook_process")
+def test_auto_restart_failed_with_content_change(
+    mock_restart,
+    default_organization,
+):
+    """FAILED activation with content change: both failure_count reset
+    and content update occur, log shows 'Content changed'."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="abc123",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="failed-content-changed",
+        restart_on_project_update=True,
+        rulebook_rulesets="old-content",
+        git_hash="abc123",
+        status=ActivationStatus.FAILED,
+        failure_count=3,
+    )
+
+    _auto_restart_activations(project)
+
+    mock_restart.assert_called_once()
+    activation.refresh_from_db()
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.failure_count == 0

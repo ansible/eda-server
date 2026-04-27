@@ -240,48 +240,7 @@ def _auto_restart_activations(project: models.Project):
     for activation in activations:
         checked_count += 1
         try:
-            current_rulebook = models.Rulebook.objects.get(
-                id=activation.rulebook_id
-            )
-            current_sha256 = current_rulebook.rulesets_sha256
-            current_git_hash = project.git_hash
-
-            content_changed = (
-                activation.rulebook_rulesets_sha256 != current_sha256
-            )
-            hash_changed = activation.git_hash != current_git_hash
-
-            if content_changed and activation.source_mappings:
-                logger.warning(
-                    f"Skipping auto-restart for activation "
-                    f"'{activation.name}' - has event stream "
-                    f"source mappings that need manual update"
-                )
-                continue
-
-            # Only auto-restart activations have their cached
-            # rulesets updated (filtered by query above).
-            if content_changed or hash_changed:
-                activation.rulebook_rulesets = current_rulebook.rulesets or ""
-                activation.rulebook_rulesets_sha256 = current_sha256
-                activation.git_hash = current_git_hash
-                activation.save(
-                    update_fields=[
-                        "rulebook_rulesets",
-                        "rulebook_rulesets_sha256",
-                        "git_hash",
-                    ]
-                )
-
-            if content_changed:
-                logger.info(
-                    f"Content changed for activation "
-                    f"'{activation.name}', "
-                    f"triggering auto-restart"
-                )
-                _restart_activation(activation)
-                restart_count += 1
-
+            restart_count += _check_and_restart_activation(activation, project)
         except ObjectDoesNotExist:
             logger.warning(
                 f"Rulebook for activation "
@@ -302,8 +261,71 @@ def _auto_restart_activations(project: models.Project):
     )
 
 
-def _restart_activation(activation: models.Activation):
-    """Execute auto-restart for an activation."""
+def _check_and_restart_activation(
+    activation: models.Activation,
+    project: models.Project,
+) -> int:
+    """Check a single activation and restart if needed.
+
+    Returns 1 if a restart was triggered, 0 otherwise.
+    """
+    current_rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
+    current_sha256 = current_rulebook.rulesets_sha256
+    current_git_hash = project.git_hash
+
+    content_changed = activation.rulebook_rulesets_sha256 != current_sha256
+    hash_changed = activation.git_hash != current_git_hash
+
+    if content_changed and activation.source_mappings:
+        logger.warning(
+            f"Skipping auto-restart for activation "
+            f"'{activation.name}' - has event stream "
+            f"source mappings that need manual update"
+        )
+        return 0
+
+    if content_changed or hash_changed:
+        activation.rulebook_rulesets = current_rulebook.rulesets or ""
+        activation.rulebook_rulesets_sha256 = current_sha256
+        activation.git_hash = current_git_hash
+        activation.save(
+            update_fields=[
+                "rulebook_rulesets",
+                "rulebook_rulesets_sha256",
+                "git_hash",
+            ]
+        )
+
+    activation_failed = activation.status in (
+        ActivationStatus.FAILED,
+        ActivationStatus.ERROR,
+    )
+
+    if not content_changed and not activation_failed:
+        return 0
+
+    reason = (
+        "Content changed"
+        if content_changed
+        else "Recovering failed activation"
+    )
+    logger.info(
+        f"{reason} for activation "
+        f"'{activation.name}', "
+        f"triggering auto-restart"
+    )
+    restarted = _restart_activation(activation)
+    if activation_failed and restarted:
+        activation.failure_count = 0
+        activation.save(update_fields=["failure_count"])
+    return 1
+
+
+def _restart_activation(activation: models.Activation) -> bool:
+    """Execute auto-restart for an activation.
+
+    Returns True if the restart was submitted successfully.
+    """
     try:
         restart_rulebook_process(
             process_parent_type=ProcessParentType.ACTIVATION,
@@ -328,7 +350,7 @@ def _restart_activation(activation: models.Activation):
                 f"'{activation.name}': {save_err}",
                 exc_info=True,
             )
-        return
+        return False
 
     try:
         activation.restart_count += 1
@@ -341,6 +363,7 @@ def _restart_activation(activation: models.Activation):
         )
 
     logger.info(f"Auto-restarted activation '{activation.name}'")
+    return True
 
 
 def _update_activation_content(
