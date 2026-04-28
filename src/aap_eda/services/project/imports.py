@@ -74,6 +74,7 @@ def _project_import_wrapper(
         except Exception as e:
             project.import_state = models.Project.ImportState.FAILED
             project.import_error = str(e)
+            project.git_hash = ""
             error = e
         finally:
             try:
