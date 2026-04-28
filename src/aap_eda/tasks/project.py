@@ -352,16 +352,6 @@ def _restart_activation(activation: models.Activation) -> bool:
             )
         return False
 
-    try:
-        activation.restart_count += 1
-        activation.save(update_fields=["restart_count"])
-    except Exception as e:
-        logger.warning(
-            f"Restart succeeded for '{activation.name}' "
-            f"but failed to update restart_count: {e}",
-            exc_info=True,
-        )
-
     logger.info(f"Auto-restarted activation '{activation.name}'")
     return True
 
