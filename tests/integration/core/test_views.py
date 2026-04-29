@@ -1,7 +1,11 @@
 from unittest.mock import patch
 
 import pytest
-from ansible_base.lib.constants import STATUS_FAILED, STATUS_GOOD
+from ansible_base.lib.constants import (
+    STATUS_DEGRADED,
+    STATUS_FAILED,
+    STATUS_GOOD,
+)
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -59,9 +63,9 @@ def test_status_view_dispatcherd_failure():
         return_value=False,
     ):
         response = client.get(f"{api_url_v1}/status/")
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.status_code == status.HTTP_200_OK
         assert response.data == {
-            "status": STATUS_FAILED,
+            "status": STATUS_DEGRADED,
             "message": "Dispatcherd workers unavailable",
         }
 
