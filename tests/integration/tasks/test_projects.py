@@ -2104,3 +2104,124 @@ def test_auto_restart_failed_with_content_change(
     activation.refresh_from_db()
     assert activation.rulebook_rulesets == "new-content"
     assert activation.failure_count == 0
+
+
+@pytest.mark.django_db
+def test_update_activation_content_preserves_source_mapped_rulesets(
+    default_organization,
+):
+    """Content update skips rulesets overwrite for source-mapped
+    activations (AAP-72873).
+
+    Without the fix, _update_activation_content overwrites
+    rulebook_rulesets with the original (unswapped) rulebook,
+    losing the event stream source swap.
+    """
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="original-unswapped-content",
+    )
+    swapped_content = "swapped-pg-listener-content"
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="swap-activation",
+        rulebook_rulesets=swapped_content,
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    _update_activation_content(activation, project)
+
+    assert activation.rulebook_rulesets == swapped_content
+    assert activation.rulebook_rulesets_sha256 == get_rulebook_hash(
+        swapped_content
+    )
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+def test_update_activation_content_updates_rulesets_without_source_mappings(
+    default_organization,
+):
+    """Content update refreshes rulesets when no source_mappings."""
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="new-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="new-content",
+    )
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="no-source-mapping",
+        rulebook_rulesets="old-content",
+    )
+
+    _update_activation_content(activation, project)
+
+    assert activation.rulebook_rulesets == "new-content"
+    assert activation.rulebook_rulesets_sha256 == get_rulebook_hash(
+        "new-content"
+    )
+    assert activation.git_hash == "new-hash"
+
+
+@pytest.mark.django_db
+@patch("aap_eda.tasks.project.start_rulebook_process")
+def test_resume_waiting_preserves_event_stream_swap(
+    mock_start,
+    default_organization,
+):
+    """Resume after project sync preserves the event stream source swap
+    (AAP-72873).
+
+    End-to-end regression test: activations with source_mappings should
+    keep their swapped rulesets through the sync->resume path.
+    """
+    project = models.Project.objects.create(
+        name="Test Project",
+        url="https://github.com/example/repo",
+        organization=default_organization,
+        git_hash="post-sync-hash",
+    )
+    rulebook = _create_test_rulebook(
+        project,
+        default_organization,
+        rulesets="original-webhook-content",
+    )
+    swapped_content = "swapped-pg-listener-content"
+    activation = _create_test_activation(
+        project,
+        default_organization,
+        rulebook,
+        name="resume-swap",
+        is_enabled=False,
+        awaiting_project_sync=True,
+        status=ActivationStatus.STOPPED,
+        rulebook_rulesets=swapped_content,
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+
+    _resume_waiting_activations(project)
+
+    activation.refresh_from_db()
+    assert (
+        activation.rulebook_rulesets == swapped_content
+    ), "Event stream swap lost after project sync resume"
+    assert activation.is_enabled is True
+    assert activation.awaiting_project_sync is False
+    mock_start.assert_called_once()

@@ -16,6 +16,7 @@ import logging
 from datetime import timedelta
 from typing import Optional
 
+import yaml
 from ansible_base.lib.utils.db import advisory_lock
 from dispatcherd.publish import submit_task
 from django.conf import settings
@@ -276,7 +277,7 @@ def _check_and_restart_activation(
     content_changed = activation.rulebook_rulesets_sha256 != current_sha256
     hash_changed = activation.git_hash != current_git_hash
 
-    if content_changed and activation.source_mappings:
+    if content_changed and _has_source_mappings(activation):
         logger.warning(
             f"Skipping auto-restart for activation "
             f"'{activation.name}' - has event stream "
@@ -356,21 +357,42 @@ def _restart_activation(activation: models.Activation) -> bool:
     return True
 
 
+def _has_source_mappings(activation: models.Activation) -> bool:
+    """Check if activation has non-empty source mappings.
+
+    The source_mappings field is a YAML text field that may contain
+    empty-ish values like "", "[]", or whitespace.
+    """
+    value = (activation.source_mappings or "").strip()
+    if not value:
+        return False
+    try:
+        parsed = yaml.safe_load(value)
+    except yaml.YAMLError:
+        return False
+    return bool(parsed)
+
+
 def _update_activation_content(
     activation: models.Activation,
     project: models.Project,
 ):
-    """Update activation's cached rulebook content, hash, and git hash."""
-    try:
-        rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
-        activation.rulebook_rulesets = rulebook.rulesets or ""
-        activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
-    except ObjectDoesNotExist:
-        logger.warning(
-            f"Rulebook for activation "
-            f"'{activation.name}' not found, "
-            f"keeping existing rulesets"
-        )
+    """Update activation's cached rulebook content, hash, and git hash.
+
+    Skips rulesets update for activations with source_mappings to
+    preserve the event stream source swap (AAP-72873).
+    """
+    if not _has_source_mappings(activation):
+        try:
+            rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
+            activation.rulebook_rulesets = rulebook.rulesets or ""
+            activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
+        except ObjectDoesNotExist:
+            logger.warning(
+                f"Rulebook for activation "
+                f"'{activation.name}' not found, "
+                f"keeping existing rulesets"
+            )
     activation.git_hash = project.git_hash
 
 

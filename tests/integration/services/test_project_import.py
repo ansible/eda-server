@@ -21,6 +21,8 @@ from unittest import mock
 import pytest
 
 from aap_eda.core import models
+from aap_eda.core.enums import ActivationStatus
+from aap_eda.core.utils.rulebook import get_rulebook_hash
 from aap_eda.services.project import ProjectImportService
 from aap_eda.services.project.scm import ScmRepository
 
@@ -377,3 +379,67 @@ def test_sync_recovery_after_failure_reprocesses(
     assert project.git_hash == "e5fa44f2b31c1fb553b6021e7360d07d5d91ff5e"
     assert project.import_state == models.Project.ImportState.COMPLETED
     assert project.rulebook_set.count() > 0
+
+
+@pytest.mark.django_db
+def test_sync_rulebook_preserves_source_mapped_rulesets(
+    project: models.Project,
+    default_organization: models.Organization,
+    storage_save_patch,
+    service_tempdir_patch,
+):
+    """_sync_rulebook bulk update preserves swapped rulesets for
+    source-mapped activations (AAP-72873).
+
+    The kafka rulebook changes between project-02 and project-03,
+    triggering the content-changed path in _sync_rulebook.
+    Source-mapped activations should keep their swapped rulesets;
+    non-mapped activations should get the new content.
+    """
+    _setup_project_sync(project)
+    storage_save_patch.reset_mock()
+
+    rulebook = project.rulebook_set.get(
+        name="kafka/kafka-test-rules.yml",
+    )
+    swapped_content = "swapped-pg-listener-content"
+
+    source_mapped = models.Activation.objects.create(
+        name="source-mapped-activation",
+        rulebook=rulebook,
+        rulebook_rulesets=swapped_content,
+        rulebook_rulesets_sha256=get_rulebook_hash(swapped_content),
+        organization=default_organization,
+        project=project,
+        is_enabled=True,
+        status=ActivationStatus.RUNNING,
+        restart_on_project_update=False,
+        source_mappings="[{source: src1, event_stream: es1}]",
+    )
+    no_mapping = models.Activation.objects.create(
+        name="no-mapping-activation",
+        rulebook=rulebook,
+        rulebook_rulesets=rulebook.rulesets,
+        rulebook_rulesets_sha256=rulebook.rulesets_sha256,
+        organization=default_organization,
+        project=project,
+        is_enabled=True,
+        status=ActivationStatus.RUNNING,
+        restart_on_project_update=False,
+    )
+
+    new_hash = "7448d8798a4380162d4b56f9b452e2f6f9e24e7a"
+    git_mock = _mock_git_clone("project-03", new_hash)
+    service = ProjectImportService(scm_cls=git_mock)
+    service.sync_project(project)
+
+    source_mapped.refresh_from_db()
+    no_mapping.refresh_from_db()
+
+    assert (
+        source_mapped.rulebook_rulesets == swapped_content
+    ), "Source-mapped activation lost swapped rulesets during sync"
+    assert source_mapped.git_hash == new_hash
+
+    assert no_mapping.rulebook_rulesets != swapped_content
+    assert no_mapping.git_hash == new_hash
