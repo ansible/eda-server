@@ -12,7 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ansible_base.lib.constants import STATUS_FAILED, STATUS_GOOD
+from ansible_base.lib.constants import (
+    STATUS_DEGRADED,
+    STATUS_FAILED,
+    STATUS_GOOD,
+)
 from django.db import connection
 from django.db.utils import OperationalError
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -56,16 +60,20 @@ class StatusView(APIView):
         responses={
             status.HTTP_200_OK: OpenApiResponse(
                 StatusResponseSerializer,
+                description="EDA is healthy or degraded (workers down "
+                "but database is available).",
             ),
             status.HTTP_500_INTERNAL_SERVER_ERROR: OpenApiResponse(
                 StatusResponseSerializer,
+                description="EDA is unavailable (database failure).",
             ),
         },
     )
     def get(self, request):
         errors = []
+        db_healthy = self._check_database()
 
-        if not self._check_database():
+        if not db_healthy:
             errors.append("Database connection failed")
 
         if not check_dispatcherd_workers_health():
@@ -74,10 +82,18 @@ class StatusView(APIView):
         if not errors:
             return Response({"status": STATUS_GOOD}, status=status.HTTP_200_OK)
 
+        if db_healthy:
+            # Workers are down but DB is fine. System degraded but not failed
+            resp_status = STATUS_DEGRADED
+            http_status = status.HTTP_200_OK
+        else:
+            resp_status = STATUS_FAILED
+            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+
         return Response(
             {
-                "status": STATUS_FAILED,
+                "status": resp_status,
                 "message": "; ".join(errors),
             },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status=http_status,
         )
