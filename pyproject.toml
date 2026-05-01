@@ -78,6 +78,7 @@ awx-plugins-core = { version = "^0.0.1a10", extras = [
                               "credentials-centrify-vault-kv",
                               "credentials-conjur",
                               "credentials-github-app",
+                              "credentials-oauth2-client-credentials",
                               "credentials-hashivault-kv",
                               "credentials-hashivault-ssh",
                               "credentials-thycotic-dsv",

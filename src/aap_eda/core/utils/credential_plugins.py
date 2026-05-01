@@ -26,6 +26,9 @@ from awx_plugins.credentials.hashivault import (
     hashivault_kv_plugin,
     hashivault_ssh_plugin,
 )
+from awx_plugins.credentials.oauth2 import (
+    oauth2_client_credentials_plugin,
+)
 from awx_plugins.credentials.tss import tss_plugin
 
 from aap_eda.core.exceptions import (
@@ -44,6 +47,7 @@ PLUGIN_TYPES = {
     "github_app": github_app_lookup,
     "hashivault_kv": hashivault_kv_plugin,
     "hashivault_ssh": hashivault_ssh_plugin,
+    "oauth2_client_credentials": oauth2_client_credentials_plugin,
     "thycotic_dsv": dsv_plugin,
     "thycotic_tss": tss_plugin,
 }
