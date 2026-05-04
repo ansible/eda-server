@@ -15,6 +15,7 @@
 import base64
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -566,6 +567,15 @@ class Engine(ContainerEngine):
             watcher.stop()
 
     def _set_namespace(self) -> None:
+        ns_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "")
+        if ns_override.strip():
+            self.namespace = ns_override.strip()
+            LOGGER.info(
+                "Using activation job namespace override: %s",
+                self.namespace,
+            )
+            return
+
         namespace_file = (
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
         )
