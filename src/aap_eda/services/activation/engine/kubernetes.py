@@ -245,7 +245,8 @@ class Engine(ContainerEngine):
                 if timestamp:
                     log_timestamp = self._set_log_timestamp(timestamp)
                     dt = datetime.fromtimestamp(
-                        int(log_timestamp), timezone.utc  # remove millisecond
+                        int(log_timestamp),
+                        timezone.utc,  # remove millisecond
                     )
                     log_handler.flush()
                     log_handler.set_log_read_at(dt)
@@ -346,6 +347,19 @@ class Engine(ContainerEngine):
         node_selector = request.k8s_pod_node_selector or {}
         if node_selector:
             spec_kwargs["node_selector"] = node_selector
+
+        tolerations = request.k8s_pod_tolerations or []
+        if tolerations:
+            spec_kwargs["tolerations"] = [
+                k8sclient.V1Toleration(
+                    key=t.get("key"),
+                    operator=t.get("operator", "Equal"),
+                    value=t.get("value"),
+                    effect=t.get("effect"),
+                    toleration_seconds=t.get("tolerationSeconds"),
+                )
+                for t in tolerations
+            ]
 
         spec = k8sclient.V1PodSpec(**spec_kwargs)
 

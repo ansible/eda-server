@@ -65,8 +65,7 @@ class Activation(
     awaiting_project_sync = models.BooleanField(
         default=False,
         help_text=(
-            "Activation is waiting for project "
-            "sync to complete before launch"
+            "Activation is waiting for project sync to complete before launch"
         ),
     )
     # TODO(alex) Since local activations are no longer supported
@@ -188,6 +187,14 @@ class Activation(
         help_text=(
             "Kubernetes nodeSelector applied to activation job pods "
             "for scheduling onto specific nodes."
+        ),
+    )
+    k8s_pod_tolerations = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Kubernetes tolerations applied to activation job pods "
+            "so they can be scheduled onto tainted nodes."
         ),
     )
     event_streams = models.ManyToManyField(
