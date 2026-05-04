@@ -210,12 +210,19 @@ class ProjectImportService:
         # restart_on_project_update=True are handled by
         # _auto_restart_activations which needs to detect
         # the change via SHA256 comparison.
-        models.Activation.objects.filter(
+        base_qs = models.Activation.objects.filter(
             rulebook=rulebook,
             restart_on_project_update=False,
-        ).update(
+        )
+        base_qs.filter(source_mappings="").update(
             rulebook_rulesets=rulebook.rulesets,
             rulebook_rulesets_sha256=new_sha256,
+            git_hash=git_hash,
+        )
+        # Source-mapped activations: preserve SHA256 for stale
+        # warning detection (AAP-72873).
+        base_qs.exclude(source_mappings="").update(
+            rulebook_rulesets=rulebook.rulesets,
             git_hash=git_hash,
         )
 

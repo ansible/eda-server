@@ -364,7 +364,8 @@ def _update_activation_content(
     try:
         rulebook = models.Rulebook.objects.get(id=activation.rulebook_id)
         activation.rulebook_rulesets = rulebook.rulesets or ""
-        activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
+        if not activation.source_mappings:
+            activation.rulebook_rulesets_sha256 = rulebook.rulesets_sha256
     except ObjectDoesNotExist:
         logger.warning(
             f"Rulebook for activation "
