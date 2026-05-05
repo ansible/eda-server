@@ -323,3 +323,118 @@ jobs:
               state: state,
               log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
+
+  notify-result-e2e:
+    needs: [check-trigger, api-e2e-tests, api-e2e-multinode-tests]
+    if: >
+      always() &&
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/run-e2e')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      deployments: write
+      statuses: write
+    steps:
+      - name: Set commit status
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const e2e = '${{ needs.api-e2e-tests.result }}';
+            const multinode = '${{ needs.api-e2e-multinode-tests.result }}';
+            const allPassed = e2e === 'success' && multinode === 'success';
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ needs.check-trigger.outputs.pr_sha }}',
+              state: allPassed ? 'success' : 'failure',
+              context: 'e2e-tests',
+              description: allPassed
+                ? 'All e2e tests passed'
+                : 'E2e tests failed',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Update deployment status
+        if: needs.check-trigger.outputs.deployment_id != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const e2e = '${{ needs.api-e2e-tests.result }}';
+            const multinode = '${{ needs.api-e2e-multinode-tests.result }}';
+            const allPassed = e2e === 'success' && multinode === 'success';
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: '${{ needs.check-trigger.outputs.deployment_id }}',
+              state: allPassed ? 'success' : 'failure',
+              description: allPassed
+                ? 'All e2e tests have passed'
+                : 'E2E tests failed',
+              log_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Post result comment
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const triggerResult = '${{ needs.check-trigger.result }}';
+            const e2eResult = '${{ needs.api-e2e-tests.result }}';
+            const multinodeResult = '${{ needs.api-e2e-multinode-tests.result }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const statusIcon = (result) => ({
+              success: ':white_check_mark: Passed',
+              failure: ':x: Failed',
+              skipped: ':warning: Skipped',
+              cancelled: ':no_entry: Cancelled',
+            }[result] || `:question: ${result}`);
+
+            const reasons = [];
+
+            if (triggerResult === 'skipped') {
+              const body = context.payload.comment.body;
+              if (body !== '/run-e2e') {
+                reasons.push(`Comment must be exactly \`/run-e2e\` with no extra characters. Received: \`${JSON.stringify(body)}\``);
+              }
+            }
+
+            if (e2eResult === 'failure') {
+              reasons.push('**API E2E Tests** failed — see [workflow run logs](' + runUrl + ') for details.');
+            }
+            if (e2eResult === 'skipped' && triggerResult === 'success') {
+              reasons.push('**API E2E Tests** were skipped unexpectedly.');
+            }
+
+            if (multinodeResult === 'failure') {
+              reasons.push('**Multinode E2E Tests** failed — see [workflow run logs](' + runUrl + ') for details.');
+            }
+            if (multinodeResult === 'skipped' && triggerResult === 'success') {
+              reasons.push('**Multinode E2E Tests** were skipped unexpectedly.');
+            }
+
+            const allPassed = triggerResult === 'success' && e2eResult === 'success' && multinodeResult === 'success';
+
+            let body = `**E2E Test Results**\n\n`;
+
+            if (!allPassed) {
+              body += `| Trigger Check | ${statusIcon(triggerResult)} |\n`;
+              body += `| API E2E Tests | ${statusIcon(e2eResult)} |\n`;
+              body += `| Multinode E2E Tests | ${statusIcon(multinodeResult)} |\n`;
+
+              if (reasons.length > 0) {
+                body += `\n**Why:**\n\n${reasons.map(r => '- ' + r).join('\n')}\n`;
+              }
+            }
+
+            body += `\n[View workflow run](${runUrl})`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
