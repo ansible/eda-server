@@ -36,6 +36,7 @@ from aap_eda.core.utils.credential_plugins import run_plugin
         "github_app",
         "hashivault_kv",
         "hashivault_ssh",
+        "oauth2_client_credentials",
         "thycotic_dsv",
         "thycotic_tss",
     ],

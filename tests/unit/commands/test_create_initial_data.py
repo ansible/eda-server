@@ -23,6 +23,7 @@ from django.test import override_settings
 
 from aap_eda.core import enums, models
 from aap_eda.core.management.commands.create_initial_data import (
+    OAUTH2_CLIENT_CREDENTIALS_INPUTS,
     POSTGRES_CREDENTIAL_INPUTS,
 )
 from aap_eda.core.utils.credentials import inputs_from_store
@@ -379,3 +380,28 @@ def test_create_initial_data_rule_engine_cred_with_rootcert():
         decoded_inputs = inputs_from_store(raw_inputs)
 
         assert "rule-engine-rootcert" in decoded_inputs["postgres_sslrootcert"]
+
+
+@pytest.mark.django_db
+def test_create_initial_data_oauth2_client_credentials_type():
+    """Test that the OAuth2 Client Credentials credential type is seeded."""
+    call_command("create_initial_data")
+    cred_type = models.CredentialType.objects.get(
+        name=enums.DefaultCredentialType.OAUTH2_CLIENT_CREDENTIALS
+    )
+    assert cred_type.managed is True
+    assert cred_type.kind == "external"
+    assert cred_type.namespace == "oauth2_client_credentials"
+    assert cred_type.inputs == OAUTH2_CLIENT_CREDENTIALS_INPUTS
+    assert cred_type.injectors == {}
+
+    field_ids = [f["id"] for f in cred_type.inputs["fields"]]
+    assert "token_url" in field_ids
+    assert "client_id" in field_ids
+    assert "client_secret" in field_ids
+
+    secret_field = next(
+        f for f in cred_type.inputs["fields"]
+        if f["id"] == "client_secret"
+    )
+    assert secret_field["secret"] is True

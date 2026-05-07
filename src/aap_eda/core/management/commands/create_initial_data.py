@@ -1778,6 +1778,51 @@ GITHUB_APP_INPUTS = {
     "required": ["app_or_client_id", "install_id", "private_rsa_key"],
 }
 
+OAUTH2_CLIENT_CREDENTIALS_INPUTS = {
+    "fields": [
+        {
+            "id": "token_url",
+            "label": "Token Endpoint URL",
+            "type": "string",
+            "help_text": (
+                "The full OAuth2 token endpoint URL. "
+                "For Microsoft Entra ID: "
+                "https://login.microsoftonline.com/"
+                "<TENANT_ID>/oauth2/v2.0/token"
+            ),
+        },
+        {
+            "id": "client_id",
+            "label": "Client ID",
+            "type": "string",
+            "help_text": (
+                "The OAuth2 client identifier "
+                "(Application ID for Microsoft Entra)."
+            ),
+        },
+        {
+            "id": "client_secret",
+            "label": "Client Secret",
+            "type": "string",
+            "secret": True,
+            "help_text": "The OAuth2 client secret.",
+        },
+    ],
+    "metadata": [
+        {
+            "id": "scope",
+            "label": "Scope (optional)",
+            "type": "string",
+            "help_text": (
+                "The OAuth2 scope to request. "
+                "For Azure DevOps: "
+                "499b84ac-1321-427f-aa17-267ca6975798/.default"
+            ),
+        },
+    ],
+    "required": ["token_url", "client_id", "client_secret"],
+}
+
 EVENT_STREAM_MTLS_INPUTS = {
     "fields": [
         {
@@ -2310,6 +2355,14 @@ CREDENTIAL_TYPES = [
         "name": enums.DefaultCredentialType.GITHUB_APP,
         "namespace": "github_app",
         "inputs": GITHUB_APP_INPUTS,
+        "kind": "external",
+        "injectors": {},
+        "managed": True,
+    },
+    {
+        "name": enums.DefaultCredentialType.OAUTH2_CLIENT_CREDENTIALS,
+        "namespace": "oauth2_client_credentials",
+        "inputs": OAUTH2_CLIENT_CREDENTIALS_INPUTS,
         "kind": "external",
         "injectors": {},
         "managed": True,
