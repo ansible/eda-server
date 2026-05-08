@@ -1737,11 +1737,15 @@ def test_restart_activation_save_error_after_failure(
 
 @pytest.mark.django_db
 @patch("aap_eda.tasks.project.restart_rulebook_process")
-def test_restart_activation_count_save_failure(
+def test_restart_activation_does_not_increment_count(
     mock_restart,
     default_organization,
 ):
-    """Restart count save failure doesn't set ERROR."""
+    """_restart_activation does not increment restart_count (AAP-72812).
+
+    The activation manager handles the count via
+    _increase_restart_count when processing the restart request.
+    """
     project = models.Project.objects.create(
         name="Test Project",
         url="https://github.com/example/repo",
@@ -1754,27 +1758,15 @@ def test_restart_activation_count_save_failure(
         project,
         default_organization,
         rulebook,
-        name="count-fail",
+        name="no-double-count",
+        restart_count=5,
     )
 
-    original_save = activation.save
+    _restart_activation(activation)
 
-    call_count = 0
-
-    def fail_on_second_save(**kwargs):
-        nonlocal call_count
-        call_count += 1
-        if call_count > 1:
-            raise RuntimeError("count save failed")
-        original_save(**kwargs)
-
-    with patch.object(
-        type(activation), "save", side_effect=fail_on_second_save
-    ):
-        _restart_activation(activation)
-
-    # Restart succeeded, count save failed but no ERROR
     mock_restart.assert_called_once()
+    activation.refresh_from_db()
+    assert activation.restart_count == 5
 
 
 @pytest.mark.django_db
