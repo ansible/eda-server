@@ -1,5 +1,11 @@
 {
-  "tekton": {
-    "automerge": true
-  }
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "description": "Update aap-ci tekton-catalog pipeline bundles",
+      "matchPackageNames": ["/^quay\\.io\\/aap-ci\\/tekton-catalog\\/pipeline\\//"],
+      "matchManagers": ["tekton"],
+      "automerge": true
+    }
+  ]
 }
