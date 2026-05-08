@@ -243,9 +243,17 @@ class ScmRepository:
                 git_hash = _executor(extra_vars=extra_vars, env_vars=env_vars)
         except ScmError as e:
             msg = str(e)
-            if secret:
-                msg = msg.replace(secret, "****", 1)
-                msg = msg.replace(quote(secret, safe=""), "****", 1)
+            # Replace credential-embedded URL with clean URL instead
+            # of redacting the password substring (which would create
+            # an oracle attack vector — see AAP-72813).
+            if final_url != url:
+                msg = msg.replace(final_url, url)
+            # Handle URL-decoded form for passwords with special chars
+            # (e.g., "p@ss" is encoded as "p%40ss" in final_url, but
+            # git may print the decoded form in error messages).
+            if secret and secret != quote(secret, safe=""):
+                raw_url = final_url.replace(quote(secret, safe=""), secret)
+                msg = msg.replace(raw_url, url)
             logger.warning("SCM clone failed: %s", msg)
             raise e.__class__(msg) from None
         finally:
