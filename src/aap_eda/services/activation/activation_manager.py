@@ -702,6 +702,13 @@ class ActivationManager(StatusManager):
 
     def stop(self):
         """User requested stop."""
+        # Cancel any pending auto-restart regardless of current state.
+        # This prevents a queued restart from firing after a user-initiated
+        # stop, which can create orphaned containers on other nodes.
+        system_cancel_restart_activation(
+            self.db_instance_type,
+            self.db_instance.id,
+        )
         LOGGER.info(
             "Stop operation requested for activation "
             f"id: {self.db_instance.id} Stopping activation.",

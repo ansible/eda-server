@@ -14,7 +14,7 @@
 """Activation Manager tests."""
 # TODO(alex) dedup code and fixtures across all the tests
 
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 from _pytest.logging import LogCaptureFixture
@@ -893,3 +893,80 @@ def test_status_manager_set_status(process_parent):
     )
     assert process_parent.status == enums.ActivationStatus.PENDING
     assert process_parent.status_message == "Activation is pending"
+
+
+CANCEL_RESTART_PATH = (
+    "aap_eda.services.activation.activation_manager"
+    ".system_cancel_restart_activation"
+)
+
+
+@pytest.mark.django_db
+def test_stop_cancels_pending_auto_restart(
+    running_activation: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test that stop() cancels any pending auto-restart timer."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=running_activation,
+    )
+
+    with patch(CANCEL_RESTART_PATH) as mock_cancel:
+        activation_manager.stop()
+
+    mock_cancel.assert_called_once_with(
+        enums.ProcessParentType.ACTIVATION,
+        running_activation.id,
+    )
+
+
+@pytest.mark.django_db
+def test_stop_cancels_auto_restart_when_already_stopped(
+    activation_with_instance: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test that stop() cancels auto-restart even when already stopped.
+
+    This is critical: a pending auto-restart timer from a previous failure
+    must be cancelled even if the activation is already in a stopped state.
+    """
+    activation_with_instance.status = enums.ActivationStatus.STOPPED
+    activation_with_instance.latest_instance.status = (
+        enums.ActivationStatus.STOPPED
+    )
+    activation_with_instance.latest_instance.save(update_fields=["status"])
+    activation_with_instance.save(update_fields=["status"])
+
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=activation_with_instance,
+    )
+
+    with patch(CANCEL_RESTART_PATH) as mock_cancel:
+        activation_manager.stop()
+
+    mock_cancel.assert_called_once_with(
+        enums.ProcessParentType.ACTIVATION,
+        activation_with_instance.id,
+    )
+
+
+@pytest.mark.django_db
+def test_stop_cancels_auto_restart_when_no_instance(
+    basic_activation: models.Activation,
+    container_engine_mock: MagicMock,
+):
+    """Test that stop() cancels auto-restart even with no instance."""
+    activation_manager = ActivationManager(
+        container_engine=container_engine_mock,
+        db_instance=basic_activation,
+    )
+
+    with patch(CANCEL_RESTART_PATH) as mock_cancel:
+        activation_manager.stop()
+
+    mock_cancel.assert_called_once_with(
+        enums.ProcessParentType.ACTIVATION,
+        basic_activation.id,
+    )
