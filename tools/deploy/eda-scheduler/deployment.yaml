@@ -40,4 +40,8 @@ spec:
           name: eda-scheduler
           resources: {}
       restartPolicy: Always
+      initContainers:
+        - name: wait-for-postgres
+          image: postgresql
+          command: [ 'sh', '-c', "until pg_isready -h eda-postgres -p 5432; do echo waiting for eda-postgres; sleep 2; done" ]
 status: {}
