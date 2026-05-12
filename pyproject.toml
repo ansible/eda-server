@@ -41,7 +41,7 @@ channels = { version = "4.3.*", extras = ["daphne"] }
 psycopg-binary = { version = "*", optional = true }
 django-filter = ">=25.1,<26"
 pydantic = ">=1.8.1,<1.11"
-cryptography = ">=46.0.5,<47"
+cryptography = ">=46.0.7,<47"
 pyopenssl = ">=26.0.0"
 dynaconf = ">=3.2.13"
 kubernetes = "26.1.*"
