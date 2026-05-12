@@ -26,17 +26,39 @@ spec:
               value: secret
             - name: POSTGRESQL_ADMIN_PASSWORD
               value: secret
-          image: quay.io/sclorg/postgresql-15-c9s:latest
+            - name: EDA_EVENT_PERSISTENCE_DB_NAME
+              value: eda_event_persistence
+            - name: EDA_EVENT_PERSISTENCE_DB_USER
+              value: eda
+          image: postgresql
           name: postgres
           ports:
             - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ['pg_isready', '-U', 'postgres']
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ['pg_isready', '-U', 'postgres']
+            initialDelaySeconds: 15
+            periodSeconds: 10
           resources: {}
           volumeMounts:
             - mountPath: /var/lib/pgsql/data
               name: postgres-data
+            - mountPath: /opt/app-root/src/postgresql-start/create_event_persistence_db.sh
+              name: postgres-initdb
+              subPath: create_event_persistence_db.sh
+              readOnly: true
       restartPolicy: Always
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: postgres-data
+        - name: postgres-initdb
+          configMap:
+            name: eda-postgres-initdb
+            defaultMode: 0755
 status: {}

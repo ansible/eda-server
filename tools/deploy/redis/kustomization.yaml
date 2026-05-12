@@ -1,6 +1,8 @@
-commonLabels:
-  app: eda
-  comp: redis
+labels:
+- pairs:
+    app: eda
+    comp: redis
+  includeSelectors: true
 resources:
 - deployment.yaml
 - service.yaml
