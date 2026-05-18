@@ -77,7 +77,7 @@ runs:
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
-        env_vars: OS,PYTHON
+        use_oidc: true
         fail_ci_if_error: false
         files: ./coverage.xml
         flags: "unit-int-tests-${{ inputs.python-version }}"
