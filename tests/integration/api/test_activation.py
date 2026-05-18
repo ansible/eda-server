@@ -604,6 +604,44 @@ def test_restart_activation(
 
 
 @pytest.mark.django_db
+@patch(
+    "aap_eda.api.views.activation.check_dispatcherd_workers_health",
+    return_value=True,
+)
+def test_restart_activation_passes_queue_name(
+    mock_health_check,
+    default_activation: models.Activation,
+    default_organization: models.Organization,
+    admin_client: APIClient,
+    preseed_credential_types,
+):
+    """Test that restart resolves the activation's queue and passes it
+    to check_dispatcherd_workers_health."""
+    instance = models.RulebookProcess.objects.create(
+        name="test-instance",
+        activation=default_activation,
+        git_hash="abc123",
+        status=enums.ActivationStatus.COMPLETED,
+        organization=default_organization,
+    )
+    models.RulebookProcessQueue.objects.create(
+        process=instance,
+        queue_name="node-2",
+    )
+    default_activation.latest_instance = instance
+    default_activation.save(update_fields=["latest_instance"])
+
+    response = admin_client.post(
+        f"{api_url_v1}/activations/{default_activation.id}/restart/"
+    )
+
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    mock_health_check.assert_called_with(
+        raise_exceptions=True, queue_name="node-2"
+    )
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("force_restart", "expected_response"),
     [
