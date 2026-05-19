@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+from typing import Optional
 
 from django.conf import settings
 
@@ -23,19 +24,26 @@ from aap_eda.tasks.project import check_default_worker_health
 logger = logging.getLogger(__name__)
 
 
-def check_activation_worker_health() -> bool:
+def check_activation_worker_health(
+    queue_name: Optional[str] = None,
+) -> bool:
     """Check activation worker health (rulebook queues only).
+
+    Args:
+        queue_name: If provided, check only this specific queue.
+                    If None, check all configured queues and return
+                    True if any is healthy.
 
     Returns:
         bool: True if activation workers are healthy, False otherwise.
     """
     try:
-        # Check activation workers (sample one rulebook queue)
+        if queue_name is not None:
+            return check_rulebook_queue_health(queue_name)
+
         rulebook_queues = getattr(settings, "RULEBOOK_WORKER_QUEUES", [])
         if rulebook_queues:
-            # Check first configured rulebook queue as
-            # representative sample
-            return check_rulebook_queue_health(rulebook_queues[0])
+            return any(check_rulebook_queue_health(q) for q in rulebook_queues)
 
         # If no rulebook queues configured, activation workers are considered
         # healthy
@@ -48,12 +56,18 @@ def check_activation_worker_health() -> bool:
         return False
 
 
-def check_dispatcherd_workers_health(raise_exceptions=False) -> bool:
+def check_dispatcherd_workers_health(
+    raise_exceptions=False,
+    queue_name: Optional[str] = None,
+) -> bool:
     """Check dispatcherd worker health for both default and activation workers.
 
     Args:
         raise_exceptions: If True, raises WorkerUnavailable with
                          specific worker_type. If False, returns boolean.
+        queue_name: If provided, check only this specific activation queue.
+                    If None, check all configured queues (healthy if any
+                    is up).
 
     Returns:
         bool: True if both worker types are healthy, False otherwise.
@@ -71,7 +85,7 @@ def check_dispatcherd_workers_health(raise_exceptions=False) -> bool:
             return False
 
         # Check activation workers
-        if not check_activation_worker_health():
+        if not check_activation_worker_health(queue_name=queue_name):
             if raise_exceptions:
                 raise api_exc.WorkerUnavailable(worker_type="activation")
             return False
