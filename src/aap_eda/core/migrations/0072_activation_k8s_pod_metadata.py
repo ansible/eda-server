@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0070_activation_enable_persistence_and_more"),
+        ("core", "0071_rename_eda_credential_roles"),
     ]
 
     operations = [

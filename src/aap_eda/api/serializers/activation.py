@@ -734,6 +734,20 @@ class ActivationCopySerializer(serializers.ModelSerializer):
 
     def copy(self) -> dict:
         activation: models.Activation = self.instance
+        pod_metadata = _activation_k8s_pod_metadata_payload(activation)
+        _normalize_activation_k8s_pod_fields(pod_metadata)
+        validators.check_if_k8s_pod_service_account_name_valid(
+            pod_metadata["k8s_pod_service_account_name"]
+        )
+        validators.check_if_k8s_pod_labels_valid(
+            pod_metadata["k8s_pod_labels"]
+        )
+        validators.check_if_k8s_pod_annotations_valid(
+            pod_metadata["k8s_pod_annotations"]
+        )
+        validators.check_if_k8s_pod_node_selector_valid(
+            pod_metadata["k8s_pod_node_selector"]
+        )
         copied_data = {
             "name": self.validated_data["name"],
             "description": activation.description,
@@ -759,7 +773,7 @@ class ActivationCopySerializer(serializers.ModelSerializer):
             "log_tracking_id": str(uuid.uuid4()),
             "enable_persistence": activation.enable_persistence,
             "rule_engine_credential_id": activation.rule_engine_credential_id,
-            **_activation_k8s_pod_metadata_payload(activation),
+            **pod_metadata,
         }
         if activation.eda_system_vault_credential:
             inputs = yaml.safe_load(
