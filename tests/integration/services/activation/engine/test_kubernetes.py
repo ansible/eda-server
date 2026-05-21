@@ -278,6 +278,55 @@ def test_get_k8s_client_exception():
 
 
 @pytest.mark.django_db
+def test_engine_start_applies_k8s_pod_metadata(
+    init_kubernetes_data,
+    kubernetes_engine,
+    default_organization: models.Organization,
+):
+    """Assert Job pod template sets ServiceAccount, labels, annotations."""
+    engine = kubernetes_engine
+    request = get_request(
+        init_kubernetes_data,
+        "admin",
+        default_organization,
+        k8s_service_name=init_kubernetes_data.activation.k8s_service_name,
+        k8s_pod_service_account_name="eda-workload",
+        k8s_pod_labels={"cost-centre": "cba"},
+        k8s_pod_annotations={"example.com/audit": "true"},
+        k8s_pod_node_selector={"kubernetes.io/os": "linux"},
+    )
+    log_handler = DBLogger(init_kubernetes_data.activation_instance.id)
+    created_body = None
+
+    def capture_job(namespace, body):
+        nonlocal created_body
+        created_body = body
+        return mock.Mock()
+
+    with mock.patch("aap_eda.services.activation.engine.kubernetes.watch"):
+        with mock.patch.object(engine.client, "core_api") as core_api_mock:
+            core_api_mock.list_namespaced_service.return_value.items = None
+            with mock.patch.object(
+                engine.client.batch_api,
+                "create_namespaced_job",
+                side_effect=capture_job,
+            ):
+                engine.start(request, log_handler)
+
+    spec = created_body.spec.template.spec
+    assert spec.service_account_name == "eda-workload"
+    labels = created_body.spec.template.metadata.labels
+    assert labels["app"] == "eda"
+    assert labels["job-name"] == engine.job_name
+    assert labels["cost-centre"] == "cba"
+    assert (
+        created_body.spec.template.metadata.annotations["example.com/audit"]
+        == "true"
+    )
+    assert spec.node_selector == {"kubernetes.io/os": "linux"}
+
+
+@pytest.mark.django_db
 def test_engine_start(
     init_kubernetes_data,
     kubernetes_engine,

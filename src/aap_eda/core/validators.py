@@ -31,6 +31,12 @@ from aap_eda.core.utils.credentials import (
     validate_registry_host_name,
     validate_schema,
 )
+from aap_eda.core.utils.k8s_pod_metadata import (
+    _validate_label_value,
+    _validate_qualified_metadata_key,
+    validate_k8s_pod_annotations,
+    validate_k8s_pod_labels,
+)
 from aap_eda.core.utils.k8s_service_name import is_rfc_1035_compliant
 from aap_eda.services.project.scm import is_refspec_valid
 
@@ -325,6 +331,62 @@ def check_if_rfc_1035_compliant(service_name: str):
         raise serializers.ValidationError(
             f"{service_name} must be a valid RFC 1035 label name"
         )
+
+
+def check_if_k8s_pod_service_account_name_valid(name: str) -> None:
+    """Validate optional ServiceAccount name for activation job pods."""
+    if not name or not str(name).strip():
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    trimmed = str(name).strip()
+    if not is_rfc_1035_compliant(trimmed):
+        raise serializers.ValidationError(
+            f"{trimmed} must be a valid RFC 1035 label name"
+        )
+    allowed = getattr(settings, "ALLOWED_SERVICE_ACCOUNTS", [])
+    if allowed and trimmed not in allowed:
+        raise serializers.ValidationError(
+            f"ServiceAccount {trimmed!r} is not in"
+            f" ALLOWED_SERVICE_ACCOUNTS"
+        )
+
+
+def check_if_k8s_pod_labels_valid(value) -> None:
+    """Run Kubernetes label validation when deployment type is k8s."""
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    validate_k8s_pod_labels(value)
+
+
+def check_if_k8s_pod_annotations_valid(value) -> None:
+    """Run Kubernetes annotation validation when deployment type is k8s."""
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    validate_k8s_pod_annotations(value)
+
+
+def check_if_k8s_pod_node_selector_valid(value) -> None:
+    """Validate nodeSelector dict: qualified-name keys, label values."""
+    if value in (None, {}):
+        return
+    if settings.DEPLOYMENT_TYPE != "k8s":
+        return
+    if not isinstance(value, dict):
+        raise serializers.ValidationError(
+            "k8s_pod_node_selector must be a JSON object"
+        )
+    for k, v in value.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise serializers.ValidationError(
+                "k8s_pod_node_selector keys and values must be strings"
+            )
+        _validate_qualified_metadata_key(k, field_label="nodeSelector")
+        _validate_label_value(k, v)
 
 
 def check_credential_types(

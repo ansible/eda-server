@@ -15,6 +15,7 @@
 import base64
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -317,26 +318,40 @@ class Engine(ContainerEngine):
         log_handler: LogHandler,
     ) -> k8sclient.V1PodTemplateSpec:
         container = self._create_container_spec(request, log_handler)
+        pod_labels = {
+            **(request.k8s_pod_labels or {}),
+            "app": "eda",
+            "job-name": self.job_name,
+        }
+        pod_meta = {
+            "name": self.pod_name,
+            "labels": pod_labels,
+        }
+        pod_annotations = request.k8s_pod_annotations or {}
+        if pod_annotations:
+            pod_meta["annotations"] = pod_annotations
+
+        spec_kwargs: dict = {
+            "restart_policy": "Never",
+            "containers": [container],
+        }
         if request.credential:
             self._create_secret(request, log_handler)
-            spec = k8sclient.V1PodSpec(
-                restart_policy="Never",
-                containers=[container],
-                image_pull_secrets=[
-                    k8sclient.V1LocalObjectReference(self.secret_name)
-                ],
-            )
-        else:
-            spec = k8sclient.V1PodSpec(
-                restart_policy="Never", containers=[container]
-            )
+            spec_kwargs["image_pull_secrets"] = [
+                k8sclient.V1LocalObjectReference(self.secret_name)
+            ]
+        sa_name = (request.k8s_pod_service_account_name or "").strip()
+        if sa_name:
+            spec_kwargs["service_account_name"] = sa_name
+        node_selector = request.k8s_pod_node_selector or {}
+        if node_selector:
+            spec_kwargs["node_selector"] = node_selector
+
+        spec = k8sclient.V1PodSpec(**spec_kwargs)
 
         pod_template = k8sclient.V1PodTemplateSpec(
             spec=spec,
-            metadata=k8sclient.V1ObjectMeta(
-                name=self.pod_name,
-                labels={"app": "eda", "job-name": self.job_name},
-            ),
+            metadata=k8sclient.V1ObjectMeta(**pod_meta),
         )
 
         LOGGER.info(f"Created Pod template: {self.pod_name}")
@@ -566,6 +581,15 @@ class Engine(ContainerEngine):
             watcher.stop()
 
     def _set_namespace(self) -> None:
+        ns_override = os.environ.get("EDA_ACTIVATION_JOB_NAMESPACE", "")
+        if ns_override.strip():
+            self.namespace = ns_override.strip()
+            LOGGER.info(
+                "Using activation job namespace override: %s",
+                self.namespace,
+            )
+            return
+
         namespace_file = (
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
         )
