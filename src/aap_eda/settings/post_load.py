@@ -104,6 +104,8 @@ def _get_databases_settings(settings: Dynaconf) -> dict:
             "USER": settings.get("DB_USER", "postgres"),
             "PASSWORD": settings.get("DB_PASSWORD"),
             "NAME": settings.get("DB_NAME", "eda"),
+            "CONN_MAX_AGE": settings.get("CONN_MAX_AGE", 600),
+            "CONN_HEALTH_CHECKS": settings.get("CONN_HEALTH_CHECKS", True),
             "OPTIONS": {
                 "sslmode": settings.get("PGSSLMODE", default="allow"),
                 "sslcert": settings.get("PGSSLCERT", default=""),
