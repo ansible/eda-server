@@ -662,6 +662,24 @@ _TOLERATION_EFFECTS = frozenset(
 _TOLERATION_OPERATORS = frozenset({"Exists", "Equal", "Lt", "Gt"})
 
 
+def _validate_toleration_seconds(idx: int, item: dict, effect: str) -> None:
+    """Validate tolerationSeconds within a single toleration entry."""
+    tol_seconds = item.get("tolerationSeconds")
+    if tol_seconds is None:
+        return
+    if not isinstance(tol_seconds, int) or isinstance(tol_seconds, bool):
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}]."
+            "tolerationSeconds must be an integer"
+        )
+    if effect != "NoExecute":
+        raise serializers.ValidationError(
+            f"k8s_pod_tolerations[{idx}]."
+            "tolerationSeconds is only valid "
+            "with effect 'NoExecute'"
+        )
+
+
 def _validate_single_toleration(idx: int, item: dict) -> None:
     """Validate a single toleration entry at *idx*."""
     if not isinstance(item, dict):
@@ -720,19 +738,7 @@ def _validate_single_toleration(idx: int, item: dict) -> None:
             "be set when operator is 'Exists'"
         )
 
-    tol_seconds = item.get("tolerationSeconds")
-    if tol_seconds is not None:
-        if not isinstance(tol_seconds, int) or isinstance(tol_seconds, bool):
-            raise serializers.ValidationError(
-                f"k8s_pod_tolerations[{idx}]."
-                "tolerationSeconds must be an integer"
-            )
-        if effect != "NoExecute":
-            raise serializers.ValidationError(
-                f"k8s_pod_tolerations[{idx}]."
-                "tolerationSeconds is only valid "
-                "with effect 'NoExecute'"
-            )
+    _validate_toleration_seconds(idx, item, effect)
 
 
 def validate_k8s_pod_tolerations(data: list) -> None:
