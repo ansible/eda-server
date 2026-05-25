@@ -259,6 +259,20 @@ def test_check_sa_allowlist_empty_allows_any(mock_settings):
 
 
 @patch("aap_eda.core.validators.settings")
+def test_check_sa_allowlist_strips_whitespace(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = ["eda-workload", " eda-reader "]
+    check_if_k8s_pod_service_account_name_valid("eda-reader")
+
+
+@patch("aap_eda.core.validators.settings")
+def test_check_sa_allowlist_handles_csv_string(mock_settings):
+    mock_settings.DEPLOYMENT_TYPE = "k8s"
+    mock_settings.ALLOWED_SERVICE_ACCOUNTS = "eda-workload, eda-reader"
+    check_if_k8s_pod_service_account_name_valid("eda-reader")
+
+
+@patch("aap_eda.core.validators.settings")
 def test_check_labels_valid_skips_non_k8s(mock_settings):
     mock_settings.DEPLOYMENT_TYPE = "podman"
     check_if_k8s_pod_labels_valid({"app": "forbidden"})

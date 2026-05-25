@@ -117,7 +117,7 @@ def _update_k8s_service_name(validated_data: dict) -> str:
     return service_name or create_k8s_service_name(validated_data["name"])
 
 
-class _K8sPodMetadataReadFields:
+class _K8sPodMetadataReadFields(serializers.Serializer):
     """Read-only k8s pod-metadata field declarations (no validators)."""
 
     k8s_pod_service_account_name = serializers.CharField(
@@ -140,7 +140,7 @@ class _K8sPodMetadataReadFields:
     )
 
 
-class _K8sPodMetadataWriteFields:
+class _K8sPodMetadataWriteFields(serializers.Serializer):
     """Writable k8s pod-metadata field declarations with validators."""
 
     k8s_pod_service_account_name = serializers.CharField(

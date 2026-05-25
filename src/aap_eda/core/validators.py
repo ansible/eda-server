@@ -344,7 +344,11 @@ def check_if_k8s_pod_service_account_name_valid(name: str) -> None:
         raise serializers.ValidationError(
             f"{trimmed} must be a valid RFC 1035 label name"
         )
-    allowed = getattr(settings, "ALLOWED_SERVICE_ACCOUNTS", [])
+    raw = getattr(settings, "ALLOWED_SERVICE_ACCOUNTS", [])
+    if isinstance(raw, str):
+        allowed = [s.strip() for s in raw.split(",") if s.strip()]
+    else:
+        allowed = [s.strip() for s in (raw or [])]
     if allowed and trimmed not in allowed:
         raise serializers.ValidationError(
             f"ServiceAccount {trimmed!r} is not in"

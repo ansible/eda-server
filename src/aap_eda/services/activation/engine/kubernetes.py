@@ -291,6 +291,12 @@ class Engine(ContainerEngine):
                 k8sclient.V1ContainerPort(container_port=port)
                 for port in self._get_ports(request.ports)
             ]
+        limits: dict = {}
+        if request.k8s_mem_limit:
+            limits["memory"] = request.k8s_mem_limit
+        if request.k8s_cpu_limit:
+            limits["cpu"] = request.k8s_cpu_limit
+
         container = k8sclient.V1Container(
             image=request.image_url,
             name=request.name,
@@ -299,6 +305,11 @@ class Engine(ContainerEngine):
             args=request.cmdline.get_args(),
             ports=ports,
             command=[request.cmdline.command()],
+            resources=(
+                k8sclient.V1ResourceRequirements(limits=limits)
+                if limits
+                else None
+            ),
         )
 
         LOGGER.info(
